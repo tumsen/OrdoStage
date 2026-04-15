@@ -33,6 +33,25 @@ export const auth = betterAuth({
       },
     }),
   ],
+  user: {
+    additionalFields: {
+      organizationId: {
+        type: "string",
+        required: false,
+        input: false,
+      },
+      orgRole: {
+        type: "string",
+        required: false,
+        input: false,
+      },
+      isAdmin: {
+        type: "boolean",
+        required: false,
+        input: false,
+      },
+    },
+  },
   advanced: {
     trustedProxyHeaders: true,
     disableCSRFCheck: true,
