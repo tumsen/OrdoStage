@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { CreateVenueSchema, UpdateVenueSchema } from "../types";
+import { canWrite } from "../permissions";
 
 const venuesRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -42,6 +43,10 @@ venuesRouter.post("/venues", zValidator("json", CreateVenueSchema), async (c) =>
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+
   const body = c.req.valid("json");
   const venue = await prisma.venue.create({
     data: {
@@ -77,6 +82,10 @@ venuesRouter.put("/venues/:id", zValidator("json", UpdateVenueSchema), async (c)
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+
   const { id } = c.req.param();
   const body = c.req.valid("json");
   const existing = await prisma.venue.findUnique({
@@ -102,6 +111,10 @@ venuesRouter.delete("/venues/:id", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
 
   const { id } = c.req.param();
   const existing = await prisma.venue.findUnique({

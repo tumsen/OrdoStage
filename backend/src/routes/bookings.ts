@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { CreateInternalBookingSchema, UpdateInternalBookingSchema } from "../types";
+import { canWrite } from "../permissions";
 
 const bookingsRouter = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -142,6 +143,10 @@ bookingsRouter.post("/bookings", zValidator("json", CreateInternalBookingSchema)
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+
   const body = c.req.valid("json");
 
   const booking = await prisma.internalBooking.create({
@@ -192,6 +197,10 @@ bookingsRouter.put("/bookings/:id", zValidator("json", UpdateInternalBookingSche
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+
   const { id } = c.req.param();
   const body = c.req.valid("json");
 
@@ -238,6 +247,10 @@ bookingsRouter.delete("/bookings/:id", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
 
   const { id } = c.req.param();
   const existing = await prisma.internalBooking.findUnique({

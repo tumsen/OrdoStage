@@ -13,6 +13,7 @@ import NewEvent from "./pages/NewEvent";
 import EventDetail from "./pages/EventDetail";
 import Venues from "./pages/Venues";
 import People from "./pages/People";
+import Team from "./pages/Team";
 import Calendars from "./pages/Calendars";
 import Schedule from "./pages/Schedule";
 import Login from "./pages/Login";
@@ -120,6 +121,16 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <People />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/team"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Team />
                 </Layout>
               </ProtectedRoute>
             }

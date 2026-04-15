@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { CreateCalendarSchema } from "../types";
+import { canWrite } from "../permissions";
 
 const calendarsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -63,9 +64,10 @@ function buildICS(
           .join(", ");
         parts.push(`People: ${peopleList}`);
       }
-      const fullDescription = parts.length > 0
-        ? `DESCRIPTION:${escapeICSText(parts.join("\\n"))}`
-        : null;
+      const fullDescription =
+        parts.length > 0
+          ? `DESCRIPTION:${escapeICSText(parts.join("\\n"))}`
+          : null;
 
       // Location: venue name + address
       let location: string | null = null;
@@ -126,6 +128,10 @@ calendarsRouter.post("/calendars", zValidator("json", CreateCalendarSchema), asy
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+
   const body = c.req.valid("json");
   const calendar = await prisma.calendar.create({
     data: {
@@ -142,6 +148,10 @@ calendarsRouter.delete("/calendars/:id", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
 
   const { id } = c.req.param();
   const existing = await prisma.calendar.findUnique({
@@ -174,6 +184,7 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
     status?: string;
     venueId?: string;
     tags?: string;
+    departmentId?: string;
   } = {};
 
   if (calendar.filter) {
@@ -191,12 +202,29 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
     where.tags = { contains: filter.tags };
   }
 
+  // Department filter: include events where any assigned person belongs to that department
+  if (filter.departmentId) {
+    where.people = {
+      some: {
+        person: {
+          departmentId: filter.departmentId,
+        },
+      },
+    };
+  }
+
   const events = await prisma.event.findMany({
     where,
     orderBy: { startDate: "asc" },
     include: {
       venue: { select: { name: true, address: true, capacity: true } },
-      people: { include: { person: { select: { name: true, role: true } } } },
+      people: {
+        include: {
+          person: {
+            select: { name: true, role: true, departmentId: true },
+          },
+        },
+      },
     },
   });
 

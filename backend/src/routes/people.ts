@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { CreatePersonSchema, UpdatePersonSchema } from "../types";
+import { canWrite } from "../permissions";
 
 const peopleRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -12,12 +13,18 @@ function serializePerson(person: {
   role: string | null;
   email: string | null;
   phone: string | null;
+  departmentId: string | null;
   organizationId: string;
   createdAt: Date;
   updatedAt: Date;
 }) {
   return {
-    ...person,
+    id: person.id,
+    name: person.name,
+    role: person.role,
+    email: person.email,
+    phone: person.phone,
+    departmentId: person.departmentId,
     createdAt: person.createdAt.toISOString(),
     updatedAt: person.updatedAt.toISOString(),
   };
@@ -42,6 +49,10 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+
   const body = c.req.valid("json");
   const person = await prisma.person.create({
     data: {
@@ -49,6 +60,7 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       role: body.role ?? null,
       email: body.email ?? null,
       phone: body.phone ?? null,
+      departmentId: body.departmentId ?? null,
       organizationId: user.organizationId,
     },
   });
@@ -77,6 +89,10 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+
   const { id } = c.req.param();
   const body = c.req.valid("json");
   const existing = await prisma.person.findUnique({
@@ -92,6 +108,7 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       ...(body.role !== undefined && { role: body.role }),
       ...(body.email !== undefined && { email: body.email }),
       ...(body.phone !== undefined && { phone: body.phone }),
+      ...(body.departmentId !== undefined && { departmentId: body.departmentId }),
     },
   });
   return c.json({ data: serializePerson(person) });
@@ -102,6 +119,10 @@ peopleRouter.delete("/people/:id", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
 
   const { id } = c.req.param();
   const existing = await prisma.person.findUnique({

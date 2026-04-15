@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { CreateEventSchema, UpdateEventSchema, AssignPersonSchema } from "../types";
+import { canWrite } from "../permissions";
 
 const eventsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -16,13 +17,32 @@ function serializeEvent(event: {
   venueId: string | null;
   organizationId: string;
   tags: string | null;
+  contactPerson: string | null;
+  getInTime: string | null;
+  setupTime: string | null;
+  stageSize: string | null;
+  actorCount: number | null;
+  allergies: string | null;
+  customFields: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
   return {
-    ...event,
+    id: event.id,
+    title: event.title,
+    description: event.description,
     startDate: event.startDate.toISOString(),
     endDate: event.endDate ? event.endDate.toISOString() : null,
+    status: event.status,
+    venueId: event.venueId,
+    tags: event.tags,
+    contactPerson: event.contactPerson,
+    getInTime: event.getInTime,
+    setupTime: event.setupTime,
+    stageSize: event.stageSize,
+    actorCount: event.actorCount,
+    allergies: event.allergies,
+    customFields: event.customFields,
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
   };
@@ -52,12 +72,18 @@ function serializePerson(person: {
   role: string | null;
   email: string | null;
   phone: string | null;
+  departmentId: string | null;
   organizationId: string;
   createdAt: Date;
   updatedAt: Date;
 }) {
   return {
-    ...person,
+    id: person.id,
+    name: person.name,
+    role: person.role,
+    email: person.email,
+    phone: person.phone,
+    departmentId: person.departmentId,
     createdAt: person.createdAt.toISOString(),
     updatedAt: person.updatedAt.toISOString(),
   };
@@ -75,6 +101,94 @@ function serializeDocument(doc: {
   return {
     ...doc,
     createdAt: doc.createdAt.toISOString(),
+  };
+}
+
+const eventInclude = {
+  venue: true,
+  people: {
+    include: { person: true },
+  },
+  documents: {
+    select: {
+      id: true,
+      eventId: true,
+      name: true,
+      type: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+  },
+} as const;
+
+function serializeFullEvent(event: {
+  id: string;
+  title: string;
+  description: string | null;
+  startDate: Date;
+  endDate: Date | null;
+  status: string;
+  venueId: string | null;
+  organizationId: string;
+  tags: string | null;
+  contactPerson: string | null;
+  getInTime: string | null;
+  setupTime: string | null;
+  stageSize: string | null;
+  actorCount: number | null;
+  allergies: string | null;
+  customFields: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  venue: {
+    id: string;
+    name: string;
+    address: string | null;
+    capacity: number | null;
+    notes: string | null;
+    organizationId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  } | null;
+  people: Array<{
+    id: string;
+    eventId: string;
+    personId: string;
+    role: string | null;
+    person: {
+      id: string;
+      name: string;
+      role: string | null;
+      email: string | null;
+      phone: string | null;
+      departmentId: string | null;
+      organizationId: string;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+  }>;
+  documents: Array<{
+    id: string;
+    eventId: string;
+    name: string;
+    type: string;
+    filename: string;
+    mimeType: string;
+    createdAt: Date;
+  }>;
+}) {
+  return {
+    ...serializeEvent(event),
+    venue: serializeVenue(event.venue),
+    people: event.people.map((ep) => ({
+      id: ep.id,
+      eventId: ep.eventId,
+      personId: ep.personId,
+      role: ep.role,
+      person: serializePerson(ep.person),
+    })),
+    documents: event.documents.map(serializeDocument),
   };
 }
 
@@ -98,39 +212,10 @@ eventsRouter.get("/events", async (c) => {
   const events = await prisma.event.findMany({
     where,
     orderBy: { startDate: "asc" },
-    include: {
-      venue: true,
-      people: {
-        include: { person: true },
-      },
-      documents: {
-        select: {
-          id: true,
-          eventId: true,
-          name: true,
-          type: true,
-          filename: true,
-          mimeType: true,
-          createdAt: true,
-        },
-      },
-    },
+    include: eventInclude,
   });
 
-  const serialized = events.map((event) => ({
-    ...serializeEvent(event),
-    venue: serializeVenue(event.venue),
-    people: event.people.map((ep) => ({
-      id: ep.id,
-      eventId: ep.eventId,
-      personId: ep.personId,
-      role: ep.role,
-      person: serializePerson(ep.person),
-    })),
-    documents: event.documents.map(serializeDocument),
-  }));
-
-  return c.json({ data: serialized });
+  return c.json({ data: events.map(serializeFullEvent) });
 });
 
 // POST /api/events
@@ -138,6 +223,10 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
 
   const body = c.req.valid("json");
   const event = await prisma.event.create({
@@ -149,44 +238,19 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
       status: body.status ?? "draft",
       venueId: body.venueId ?? null,
       tags: body.tags ?? null,
+      contactPerson: body.contactPerson ?? null,
+      getInTime: body.getInTime ?? null,
+      setupTime: body.setupTime ?? null,
+      stageSize: body.stageSize ?? null,
+      actorCount: body.actorCount ?? null,
+      allergies: body.allergies ?? null,
+      customFields: body.customFields ?? null,
       organizationId: user.organizationId,
     },
-    include: {
-      venue: true,
-      people: {
-        include: { person: true },
-      },
-      documents: {
-        select: {
-          id: true,
-          eventId: true,
-          name: true,
-          type: true,
-          filename: true,
-          mimeType: true,
-          createdAt: true,
-        },
-      },
-    },
+    include: eventInclude,
   });
 
-  return c.json(
-    {
-      data: {
-        ...serializeEvent(event),
-        venue: serializeVenue(event.venue),
-        people: event.people.map((ep) => ({
-          id: ep.id,
-          eventId: ep.eventId,
-          personId: ep.personId,
-          role: ep.role,
-          person: serializePerson(ep.person),
-        })),
-        documents: event.documents.map(serializeDocument),
-      },
-    },
-    201
-  );
+  return c.json({ data: serializeFullEvent(event) }, 201);
 });
 
 // GET /api/events/:id
@@ -198,43 +262,14 @@ eventsRouter.get("/events/:id", async (c) => {
   const { id } = c.req.param();
   const event = await prisma.event.findUnique({
     where: { id, organizationId: user.organizationId },
-    include: {
-      venue: true,
-      people: {
-        include: { person: true },
-      },
-      documents: {
-        select: {
-          id: true,
-          eventId: true,
-          name: true,
-          type: true,
-          filename: true,
-          mimeType: true,
-          createdAt: true,
-        },
-      },
-    },
+    include: eventInclude,
   });
 
   if (!event) {
     return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
 
-  return c.json({
-    data: {
-      ...serializeEvent(event),
-      venue: serializeVenue(event.venue),
-      people: event.people.map((ep) => ({
-        id: ep.id,
-        eventId: ep.eventId,
-        personId: ep.personId,
-        role: ep.role,
-        person: serializePerson(ep.person),
-      })),
-      documents: event.documents.map(serializeDocument),
-    },
-  });
+  return c.json({ data: serializeFullEvent(event) });
 });
 
 // PUT /api/events/:id
@@ -242,6 +277,10 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
 
   const { id } = c.req.param();
   const body = c.req.valid("json");
@@ -263,40 +302,18 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
       ...(body.status !== undefined && { status: body.status }),
       ...(body.venueId !== undefined && { venueId: body.venueId }),
       ...(body.tags !== undefined && { tags: body.tags }),
+      ...(body.contactPerson !== undefined && { contactPerson: body.contactPerson }),
+      ...(body.getInTime !== undefined && { getInTime: body.getInTime }),
+      ...(body.setupTime !== undefined && { setupTime: body.setupTime }),
+      ...(body.stageSize !== undefined && { stageSize: body.stageSize }),
+      ...(body.actorCount !== undefined && { actorCount: body.actorCount }),
+      ...(body.allergies !== undefined && { allergies: body.allergies }),
+      ...(body.customFields !== undefined && { customFields: body.customFields }),
     },
-    include: {
-      venue: true,
-      people: {
-        include: { person: true },
-      },
-      documents: {
-        select: {
-          id: true,
-          eventId: true,
-          name: true,
-          type: true,
-          filename: true,
-          mimeType: true,
-          createdAt: true,
-        },
-      },
-    },
+    include: eventInclude,
   });
 
-  return c.json({
-    data: {
-      ...serializeEvent(event),
-      venue: serializeVenue(event.venue),
-      people: event.people.map((ep) => ({
-        id: ep.id,
-        eventId: ep.eventId,
-        personId: ep.personId,
-        role: ep.role,
-        person: serializePerson(ep.person),
-      })),
-      documents: event.documents.map(serializeDocument),
-    },
-  });
+  return c.json({ data: serializeFullEvent(event) });
 });
 
 // DELETE /api/events/:id
@@ -304,6 +321,10 @@ eventsRouter.delete("/events/:id", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
 
   const { id } = c.req.param();
   const existing = await prisma.event.findUnique({
@@ -321,6 +342,10 @@ eventsRouter.post("/events/:id/people", zValidator("json", AssignPersonSchema), 
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
 
   const { id } = c.req.param();
   const body = c.req.valid("json");
@@ -373,6 +398,10 @@ eventsRouter.delete("/events/:id/people/:personId", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  if (!canWrite(user.orgRole)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
 
   const { id, personId } = c.req.param();
 

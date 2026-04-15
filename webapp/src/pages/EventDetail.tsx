@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Edit2, Trash2, Plus, X, Download, Upload } from "lucide-react";
 import { api } from "@/lib/api";
 import type { EventDetail, Person, EventPerson, Document } from "@/lib/types";
+import type { Department } from "../../../backend/src/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
 import { Button } from "@/components/ui/button";
@@ -56,9 +57,74 @@ const EventEditSchema = z.object({
   status: z.enum(["draft", "confirmed", "cancelled"]),
   venueId: z.string().optional(),
   tags: z.string().optional(),
+  contactPerson: z.string().optional(),
+  actorCount: z.string().optional(),
+  allergies: z.string().optional(),
+  stageSize: z.string().optional(),
+  getInTime: z.string().optional(),
+  setupTime: z.string().optional(),
 });
 
 type EventEditValues = z.infer<typeof EventEditSchema>;
+type CustomField = { key: string; value: string; departments: string[] };
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-xs text-white/40 uppercase tracking-widest mb-3 mt-6 pb-2 border-b border-white/[0.06]">
+      {children}
+    </div>
+  );
+}
+
+function DeptBadge({
+  dept,
+  selected,
+  onToggle,
+}: {
+  dept: Department;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="px-2 py-0.5 rounded text-xs font-medium border transition-all"
+      style={
+        selected
+          ? {
+              backgroundColor: dept.color + "33",
+              borderColor: dept.color + "66",
+              color: dept.color,
+            }
+          : {
+              backgroundColor: "transparent",
+              borderColor: "rgba(255,255,255,0.1)",
+              color: "rgba(255,255,255,0.35)",
+            }
+      }
+    >
+      {dept.name}
+    </button>
+  );
+}
+
+function DeptTag({ dept }: { dept: Department }) {
+  return (
+    <span
+      className="px-2 py-0.5 rounded text-xs font-medium border"
+      style={{
+        backgroundColor: dept.color + "22",
+        borderColor: dept.color + "44",
+        color: dept.color,
+      }}
+    >
+      {dept.name}
+    </span>
+  );
+}
 
 // ── Details Tab ──────────────────────────────────────────────────────────────
 
@@ -67,10 +133,27 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const parsedCustomFields: CustomField[] = (() => {
+    try {
+      return event.customFields ? (JSON.parse(event.customFields) as CustomField[]) : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const [customFields, setCustomFields] = useState<CustomField[]>(parsedCustomFields);
+
   const { data: venues } = useQuery({
     queryKey: ["venues"],
     queryFn: () => api.get<{ id: string; name: string }[]>("/api/venues"),
   });
+
+  const { data: departments } = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => api.get<Department[]>("/api/departments"),
+  });
+
+  const depts = departments ?? [];
 
   const form = useForm<EventEditValues>({
     resolver: zodResolver(EventEditSchema),
@@ -82,11 +165,18 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
       status: event.status,
       venueId: event.venueId ?? "",
       tags: event.tags ?? "",
+      contactPerson: event.contactPerson ?? "",
+      actorCount: event.actorCount != null ? String(event.actorCount) : "",
+      allergies: event.allergies ?? "",
+      stageSize: event.stageSize ?? "",
+      getInTime: event.getInTime ?? "",
+      setupTime: event.setupTime ?? "",
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: EventEditValues) => api.put(`/api/events/${event.id}`, data),
+    mutationFn: (data: Record<string, unknown>) =>
+      api.put(`/api/events/${event.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["event", event.id] });
       setEditing(false);
@@ -99,14 +189,54 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
   });
 
   function onSubmit(values: EventEditValues) {
-    const payload = {
-      ...values,
-      venueId: values.venueId === "__none__" || values.venueId === "" ? undefined : values.venueId,
-      endDate: values.endDate === "" ? undefined : values.endDate,
-      description: values.description === "" ? undefined : values.description,
-      tags: values.tags === "" ? undefined : values.tags,
+    const payload: Record<string, unknown> = {
+      title: values.title,
+      startDate: values.startDate,
+      status: values.status,
     };
+    if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
+    else payload.venueId = undefined;
+    if (values.endDate) payload.endDate = values.endDate;
+    if (values.description) payload.description = values.description;
+    if (values.tags) payload.tags = values.tags;
+    if (values.contactPerson) payload.contactPerson = values.contactPerson;
+    if (values.allergies) payload.allergies = values.allergies;
+    if (values.stageSize) payload.stageSize = values.stageSize;
+    if (values.getInTime) payload.getInTime = values.getInTime;
+    if (values.setupTime) payload.setupTime = values.setupTime;
+    if (values.actorCount) payload.actorCount = Number(values.actorCount);
+    payload.customFields = customFields.length > 0 ? JSON.stringify(customFields) : undefined;
+
     updateMutation.mutate(payload);
+  }
+
+  function addCustomField() {
+    setCustomFields((prev) => [...prev, { key: "", value: "", departments: [] }]);
+  }
+
+  function removeCustomField(idx: number) {
+    setCustomFields((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateCustomField(idx: number, patch: Partial<CustomField>) {
+    setCustomFields((prev) =>
+      prev.map((f, i) => (i === idx ? { ...f, ...patch } : f))
+    );
+  }
+
+  function toggleDept(fieldIdx: number, deptId: string) {
+    setCustomFields((prev) =>
+      prev.map((f, i) => {
+        if (i !== fieldIdx) return f;
+        const already = f.departments.includes(deptId);
+        return {
+          ...f,
+          departments: already
+            ? f.departments.filter((d) => d !== deptId)
+            : [...f.departments, deptId],
+        };
+      })
+    );
   }
 
   if (editing) {
@@ -114,6 +244,7 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
       <div className="space-y-5">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            {/* ── Core fields ── */}
             <FormField
               control={form.control}
               name="title"
@@ -223,6 +354,155 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
                 </FormItem>
               )}
             />
+
+            {/* ── Production Info ── */}
+            <SectionHeader>Production Info</SectionHeader>
+
+            <FormField
+              control={form.control}
+              name="contactPerson"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contact Person</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ""} placeholder="Name and phone number" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="actorCount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Actor Count</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ""} type="number" min={0} placeholder="e.g. 12" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="allergies"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Allergies / Dietary Requirements</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} value={field.value ?? ""} placeholder="Any allergies or dietary requirements" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-none" rows={2} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {/* ── Technical ── */}
+            <SectionHeader>Technical</SectionHeader>
+
+            <FormField
+              control={form.control}
+              name="stageSize"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Stage Size</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ""} placeholder="e.g. 12m × 8m" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="getInTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in Time</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ""} placeholder="e.g. 14:00" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="setupTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Setup Time</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ""} placeholder="e.g. 09:00" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* ── Additional Info ── */}
+            <SectionHeader>Additional Info</SectionHeader>
+
+            <div className="space-y-3">
+              {customFields.map((cf, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white/[0.02] border border-white/[0.07] rounded-lg p-3 space-y-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={cf.key}
+                      onChange={(e) => updateCustomField(idx, { key: e.target.value })}
+                      placeholder="Label"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 text-sm h-8"
+                    />
+                    <Input
+                      value={cf.value}
+                      onChange={(e) => updateCustomField(idx, { value: e.target.value })}
+                      placeholder="Value"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 text-sm h-8"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeCustomField(idx)}
+                      className="text-white/25 hover:text-red-400 transition-colors flex-shrink-0 p-1"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {depts.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-xs text-white/30 self-center mr-1">Departments:</span>
+                      {depts.map((dept) => (
+                        <DeptBadge
+                          key={dept.id}
+                          dept={dept}
+                          selected={cf.departments.includes(dept.id)}
+                          onToggle={() => toggleDept(idx, dept.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={addCustomField}
+                className="flex items-center gap-2 text-sm text-white/40 hover:text-white/70 transition-colors py-1"
+              >
+                <Plus size={13} /> Add Field
+              </button>
+            </div>
+
+            {updateMutation.isError && (
+              <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+                {updateMutation.error instanceof Error
+                  ? updateMutation.error.message
+                  : "Failed to save changes."}
+              </div>
+            )}
+
             <div className="flex gap-3">
               <Button type="submit" disabled={updateMutation.isPending} className="bg-red-900 hover:bg-red-800 text-white border-red-700/50">
                 {updateMutation.isPending ? "Saving..." : "Save Changes"}
@@ -236,6 +516,12 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
       </div>
     );
   }
+
+  // ── View mode ────────────────────────────────────────────────────────────
+
+  const hasProductionInfo =
+    event.contactPerson || event.actorCount != null || event.allergies;
+  const hasTechnical = event.stageSize || event.getInTime || event.setupTime;
 
   return (
     <div className="space-y-6">
@@ -260,6 +546,77 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
         <InfoRow label="Venue" value={event.venue?.name ?? "—"} />
         <InfoRow label="Tags" value={event.tags ?? "—"} />
       </div>
+
+      {hasProductionInfo ? (
+        <div>
+          <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
+            Production Info
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {event.contactPerson ? (
+              <InfoRow label="Contact Person" value={event.contactPerson} />
+            ) : null}
+            {event.actorCount != null ? (
+              <InfoRow label="Actor Count" value={String(event.actorCount)} />
+            ) : null}
+            {event.allergies ? (
+              <div className="sm:col-span-2">
+                <InfoRow label="Allergies / Dietary" value={event.allergies} />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {hasTechnical ? (
+        <div>
+          <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
+            Technical
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {event.stageSize ? (
+              <InfoRow label="Stage Size" value={event.stageSize} />
+            ) : null}
+            {event.getInTime ? (
+              <InfoRow label="Get-in Time" value={event.getInTime} />
+            ) : null}
+            {event.setupTime ? (
+              <InfoRow label="Setup Time" value={event.setupTime} />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {parsedCustomFields.length > 0 ? (
+        <div>
+          <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
+            Additional Info
+          </div>
+          <div className="space-y-2">
+            {parsedCustomFields.map((cf, idx) => {
+              const fieldDepts = depts.filter((d) => cf.departments.includes(d.id));
+              return (
+                <div
+                  key={idx}
+                  className="bg-white/[0.02] border border-white/[0.07] rounded-lg px-4 py-3 flex items-start justify-between gap-4"
+                >
+                  <div className="min-w-0">
+                    <div className="text-xs text-white/35 uppercase tracking-wide mb-0.5">{cf.key}</div>
+                    <div className="text-sm text-white/80">{cf.value}</div>
+                  </div>
+                  {fieldDepts.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 flex-shrink-0">
+                      {fieldDepts.map((d) => (
+                        <DeptTag key={d.id} dept={d} />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="pt-2 border-t border-white/10">
         <Button

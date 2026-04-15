@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+// Department
+export const DepartmentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string(),
+  createdAt: z.string(),
+});
+
+export const CreateDepartmentSchema = z.object({
+  name: z.string().min(1),
+  color: z.string().optional(),
+});
+
+export const UpdateDepartmentSchema = CreateDepartmentSchema.partial();
+
 // Venue
 export const VenueSchema = z.object({
   id: z.string(),
@@ -27,6 +42,7 @@ export const PersonSchema = z.object({
   role: z.string().nullable(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
+  departmentId: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -36,6 +52,7 @@ export const CreatePersonSchema = z.object({
   role: z.string().optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),
+  departmentId: z.string().nullable().optional(),
 });
 
 export const UpdatePersonSchema = CreatePersonSchema.partial();
@@ -50,6 +67,13 @@ export const EventSchema = z.object({
   status: z.enum(["draft", "confirmed", "cancelled"]),
   venueId: z.string().nullable(),
   tags: z.string().nullable(),
+  contactPerson: z.string().nullable(),
+  getInTime: z.string().nullable(),
+  setupTime: z.string().nullable(),
+  stageSize: z.string().nullable(),
+  actorCount: z.number().nullable(),
+  allergies: z.string().nullable(),
+  customFields: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -62,6 +86,13 @@ export const CreateEventSchema = z.object({
   status: z.enum(["draft", "confirmed", "cancelled"]).default("draft"),
   venueId: z.string().optional(),
   tags: z.string().optional(),
+  contactPerson: z.string().optional(),
+  getInTime: z.string().optional(),
+  setupTime: z.string().optional(),
+  stageSize: z.string().optional(),
+  actorCount: z.number().optional(),
+  allergies: z.string().optional(),
+  customFields: z.string().optional(),
 });
 
 export const UpdateEventSchema = CreateEventSchema.partial();
@@ -150,6 +181,24 @@ export const CreateInternalBookingSchema = z.object({
 
 export const UpdateInternalBookingSchema = CreateInternalBookingSchema.partial();
 
+// Team management
+export const UpdateRoleSchema = z.object({
+  role: z.enum(["owner", "manager", "viewer"]),
+});
+
+export const TeamMemberSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  orgRole: z.string(),
+  departmentId: z.string().nullable(),
+  department: DepartmentSchema.nullable(),
+  createdAt: z.string(),
+});
+
+// Type exports
+export type Department = z.infer<typeof DepartmentSchema>;
+export type CreateDepartment = z.infer<typeof CreateDepartmentSchema>;
 export type Venue = z.infer<typeof VenueSchema>;
 export type CreateVenue = z.infer<typeof CreateVenueSchema>;
 export type Person = z.infer<typeof PersonSchema>;
@@ -164,3 +213,5 @@ export type InternalBooking = z.infer<typeof InternalBookingSchema>;
 export type InternalBookingDetail = z.infer<typeof InternalBookingDetailSchema>;
 export type CreateInternalBooking = z.infer<typeof CreateInternalBookingSchema>;
 export type UpdateInternalBooking = z.infer<typeof UpdateInternalBookingSchema>;
+export type TeamMember = z.infer<typeof TeamMemberSchema>;
+export type UpdateRole = z.infer<typeof UpdateRoleSchema>;

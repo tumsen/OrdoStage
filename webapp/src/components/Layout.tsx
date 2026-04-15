@@ -5,6 +5,7 @@ import {
   CalendarRange,
   MapPin,
   Users,
+  UsersRound,
   Share2,
   Menu,
   CreditCard,
@@ -36,6 +37,7 @@ const navItems = [
   { to: "/schedule", label: "Schedule", icon: CalendarRange },
   { to: "/venues", label: "Venues", icon: MapPin },
   { to: "/people", label: "People", icon: Users },
+  { to: "/team", label: "Team", icon: UsersRound },
   { to: "/calendars", label: "Calendars", icon: Share2 },
   { to: "/billing", label: "Billing", icon: CreditCard },
 ];
@@ -47,6 +49,7 @@ const pageTitles: Record<string, string> = {
   "/schedule": "Schedule",
   "/venues": "Venues",
   "/people": "People",
+  "/team": "Team",
   "/calendars": "Calendars",
   "/billing": "Billing",
 };
@@ -70,6 +73,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
 
   const userEmail = session?.user?.email ?? "";
   const userName = session?.user?.name ?? userEmail;
+  const orgRole = (session?.user as Record<string, unknown>)?.orgRole as string ?? "viewer";
   const initials = userName
     .split(" ")
     .map((part: string) => part[0])
@@ -130,6 +134,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-white/70 text-xs truncate">{userName}</div>
+              <span className="text-xs text-white/30 capitalize">{orgRole}</span>
             </div>
           </div>
         ) : null}
