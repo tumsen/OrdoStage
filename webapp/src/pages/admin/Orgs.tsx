@@ -1,0 +1,151 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { api } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Search } from "lucide-react";
+
+interface OrgSummary {
+  id: string;
+  name: string;
+  creditBalance: number;
+  freeTrialUsed: boolean;
+  createdAt: string;
+  _count: { users: number; events: number };
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function CreditBadge({ balance }: { balance: number }) {
+  if (balance <= 0) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-950/60 text-red-400 border border-red-800/40">
+        {balance}d
+      </span>
+    );
+  }
+  if (balance <= 30) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-950/60 text-amber-400 border border-amber-800/40">
+        {balance}d
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-950/60 text-green-400 border border-green-800/40">
+      {balance}d
+    </span>
+  );
+}
+
+export default function Orgs() {
+  const [search, setSearch] = useState("");
+
+  const { data: orgs, isPending } = useQuery<OrgSummary[]>({
+    queryKey: ["admin", "orgs"],
+    queryFn: () => api.get<OrgSummary[]>("/api/admin/orgs"),
+  });
+
+  const filtered = (orgs ?? []).filter((o) =>
+    o.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="p-6 space-y-4">
+      {/* Search */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+          <Input
+            placeholder="Search organizations..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-gray-900 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-rose-500/30"
+          />
+        </div>
+        <div className="text-white/30 text-sm">{filtered.length} organizations</div>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-lg border border-white/10 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-white/10 hover:bg-transparent">
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Theater Name</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Users</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Events</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Credits</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Free Trial</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Created</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isPending ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i} className="border-white/5">
+                  {Array.from({ length: 7 }).map((_, j) => (
+                    <TableCell key={j}>
+                      <div className="h-4 bg-white/5 rounded animate-pulse" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : filtered.length === 0 ? (
+              <TableRow className="border-white/5">
+                <TableCell colSpan={7} className="text-center text-white/30 py-12">
+                  {search ? "No organizations match your search" : "No organizations yet"}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((org) => (
+                <TableRow key={org.id} className="border-white/5 hover:bg-white/[0.02]">
+                  <TableCell className="font-medium text-white/80">{org.name}</TableCell>
+                  <TableCell className="text-white/50">{org._count.users}</TableCell>
+                  <TableCell className="text-white/50">{org._count.events}</TableCell>
+                  <TableCell>
+                    <CreditBadge balance={org.creditBalance} />
+                  </TableCell>
+                  <TableCell>
+                    {org.freeTrialUsed ? (
+                      <Badge className="bg-white/5 text-white/40 border-white/10 text-xs">Used</Badge>
+                    ) : (
+                      <Badge className="bg-blue-950/60 text-blue-400 border-blue-800/40 text-xs">Available</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-white/40 text-sm">{formatDate(org.createdAt)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="border-white/10 text-white/60 hover:bg-white/5 hover:text-white text-xs"
+                    >
+                      <Link to={`/admin/orgs/${org.id}`}>Manage</Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}

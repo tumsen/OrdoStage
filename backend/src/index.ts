@@ -12,6 +12,10 @@ import documentsRouter from "./routes/documents";
 import calendarsRouter from "./routes/calendars";
 import orgRouter from "./routes/org";
 import billingRouter from "./routes/billing";
+import adminRouter from "./routes/admin";
+import { seedPacks } from "./seed-packs";
+
+seedPacks().catch(console.error);
 
 const app = new Hono<{
   Variables: {
@@ -97,6 +101,7 @@ app.route("/api", peopleRouter);
 app.route("/api", eventsRouter);
 app.route("/api", documentsRouter);
 app.route("/api", calendarsRouter);
+app.route("/api", adminRouter);
 
 const port = Number(process.env.PORT) || 3000;
 

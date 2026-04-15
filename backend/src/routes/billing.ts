@@ -8,18 +8,16 @@ const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null
 
 const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
-const DAY_PACKS = [
-  { id: "pack_100", days: 100, amountCents: 900, label: "100 days", price: "€9" },
-  { id: "pack_500", days: 500, amountCents: 3900, label: "500 days", price: "€39" },
-  { id: "pack_1000", days: 1000, amountCents: 6900, label: "1000 days", price: "€69" },
-  { id: "pack_5000", days: 5000, amountCents: 29900, label: "5000 days", price: "€299" },
-];
-
-// GET /api/billing/packs — get available day packs
+// GET /api/billing/packs — get available day packs from database
 app.get("/billing/packs", async (c) => {
   const user = c.get("user");
   if (!user) return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  return c.json({ data: DAY_PACKS });
+
+  const packs = await prisma.pricePack.findMany({
+    where: { active: true },
+    orderBy: { days: "asc" },
+  });
+  return c.json({ data: packs });
 });
 
 // POST /api/billing/checkout — create Stripe checkout session
@@ -29,7 +27,10 @@ app.post("/billing/checkout", async (c) => {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
   const { packId } = await c.req.json();
-  const pack = DAY_PACKS.find((p) => p.id === packId);
+
+  const pack = await prisma.pricePack.findUnique({
+    where: { packId, active: true },
+  });
   if (!pack) return c.json({ error: { message: "Invalid pack", code: "INVALID_PACK" } }, 400);
 
   const origin = c.req.header("origin") || "http://localhost:8000";
@@ -48,7 +49,7 @@ app.post("/billing/checkout", async (c) => {
     ],
     metadata: {
       organizationId: user.organizationId,
-      packId: pack.id,
+      packId: pack.packId,
       days: String(pack.days),
       amountCents: String(pack.amountCents),
     },
@@ -73,7 +74,9 @@ app.post("/billing/webhook", async (c) => {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const { organizationId, days, amountCents } = session.metadata!;
+    const organizationId = session.metadata?.organizationId as string;
+    const days = session.metadata?.days as string;
+    const amountCents = session.metadata?.amountCents as string;
 
     // Idempotency check
     const existing = await prisma.creditPurchase.findUnique({
@@ -92,6 +95,14 @@ app.post("/billing/webhook", async (c) => {
         prisma.organization.update({
           where: { id: organizationId },
           data: { creditBalance: { increment: parseInt(days) } },
+        }),
+        prisma.creditLog.create({
+          data: {
+            organizationId,
+            delta: parseInt(days),
+            reason: "purchase",
+            note: `Stripe session ${session.id}`,
+          },
         }),
       ]);
     }

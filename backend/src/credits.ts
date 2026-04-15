@@ -24,6 +24,17 @@ export async function deductCredits(
       data: { creditBalance: newBalance, lastDeductedAt: now },
     });
 
+    if (toDeduct > 0) {
+      await prisma.creditLog.create({
+        data: {
+          organizationId,
+          delta: -toDeduct,
+          reason: "daily_deduction",
+          note: `${daysSince} day(s) × ${userCount} user(s)`,
+        },
+      });
+    }
+
     return {
       balance: newBalance,
       warning: newBalance <= CREDIT_WARNING_THRESHOLD,

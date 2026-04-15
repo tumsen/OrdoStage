@@ -15,6 +15,8 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().default("sk_test_placeholder"),
   STRIPE_WEBHOOK_SECRET: z.string().default("whsec_placeholder"),
   STRIPE_PUBLISHABLE_KEY: z.string().default("pk_test_placeholder"),
+  // Admin
+  ADMIN_EMAILS: z.string().default(""),
 });
 
 /**

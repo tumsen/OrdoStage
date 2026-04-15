@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/Layout";
+import { AdminLayout, AdminRoute } from "@/components/AdminLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { GuestRoute } from "@/components/GuestRoute";
 import Index from "./pages/Index";
@@ -18,6 +19,11 @@ import VerifyOtp from "./pages/VerifyOtp";
 import SetupOrg from "./pages/SetupOrg";
 import Billing from "./pages/Billing";
 import NotFound from "./pages/NotFound";
+import AdminDashboard from "./pages/admin/Dashboard";
+import AdminOrgs from "./pages/admin/Orgs";
+import AdminOrgDetail from "./pages/admin/OrgDetail";
+import AdminPricing from "./pages/admin/Pricing";
+import AdminUsers from "./pages/admin/Users";
 
 const queryClient = new QueryClient();
 
@@ -134,6 +140,68 @@ const App = () => (
                 <Layout>
                   <Billing />
                 </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin routes */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <AdminLayout>
+                    <AdminDashboard />
+                  </AdminLayout>
+                </AdminRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/orgs"
+            element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <AdminLayout>
+                    <AdminOrgs />
+                  </AdminLayout>
+                </AdminRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/orgs/:id"
+            element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <AdminLayout>
+                    <AdminOrgDetail />
+                  </AdminLayout>
+                </AdminRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/pricing"
+            element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <AdminLayout>
+                    <AdminPricing />
+                  </AdminLayout>
+                </AdminRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <AdminLayout>
+                    <AdminUsers />
+                  </AdminLayout>
+                </AdminRoute>
               </ProtectedRoute>
             }
           />
