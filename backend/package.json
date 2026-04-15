@@ -16,12 +16,14 @@
   "dependencies": {
     "@hono/node-server": "1.12.0",
     "@hono/zod-validator": "^0.7.6",
-    "@prisma/client": "5.22.0",
+    "@prisma/client": "6",
     "@vibecodeapp/backend-sdk": "^1.0.1",
     "@vibecodeapp/cloud-studio": "^0.2.4",
     "@vibecodeapp/proxy": "^2.0.3",
+    "better-auth": "^1.6.4",
     "hono": "4.6.0",
-    "prisma": "5.22.0",
+    "prisma": "6",
+    "stripe": "^22.0.1",
     "zod": "4.1.11"
   }
 }

@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
-import prisma from "../db";
+import { prisma } from "../prisma";
+import { auth } from "../auth";
 import { CreateEventSchema, UpdateEventSchema, AssignPersonSchema } from "../types";
 
-const eventsRouter = new Hono();
+const eventsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
 function serializeEvent(event: {
   id: string;
@@ -14,6 +14,7 @@ function serializeEvent(event: {
   endDate: Date | null;
   status: string;
   venueId: string | null;
+  organizationId: string;
   tags: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +34,7 @@ function serializeVenue(venue: {
   address: string | null;
   capacity: number | null;
   notes: string | null;
+  organizationId: string;
   createdAt: Date;
   updatedAt: Date;
 } | null) {
@@ -50,6 +52,7 @@ function serializePerson(person: {
   role: string | null;
   email: string | null;
   phone: string | null;
+  organizationId: string;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -77,9 +80,13 @@ function serializeDocument(doc: {
 
 // GET /api/events
 eventsRouter.get("/events", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
   const { status, venueId, from, to } = c.req.query();
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { organizationId: user.organizationId };
   if (status) where.status = status;
   if (venueId) where.venueId = venueId;
   if (from || to) {
@@ -128,6 +135,10 @@ eventsRouter.get("/events", async (c) => {
 
 // POST /api/events
 eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
   const body = c.req.valid("json");
   const event = await prisma.event.create({
     data: {
@@ -138,6 +149,7 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
       status: body.status ?? "draft",
       venueId: body.venueId ?? null,
       tags: body.tags ?? null,
+      organizationId: user.organizationId,
     },
     include: {
       venue: true,
@@ -179,9 +191,13 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
 
 // GET /api/events/:id
 eventsRouter.get("/events/:id", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
   const { id } = c.req.param();
   const event = await prisma.event.findUnique({
-    where: { id },
+    where: { id, organizationId: user.organizationId },
     include: {
       venue: true,
       people: {
@@ -223,10 +239,16 @@ eventsRouter.get("/events/:id", async (c) => {
 
 // PUT /api/events/:id
 eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
   const { id } = c.req.param();
   const body = c.req.valid("json");
 
-  const existing = await prisma.event.findUnique({ where: { id } });
+  const existing = await prisma.event.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
   if (!existing) {
     return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
@@ -279,8 +301,14 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
 
 // DELETE /api/events/:id
 eventsRouter.delete("/events/:id", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
   const { id } = c.req.param();
-  const existing = await prisma.event.findUnique({ where: { id } });
+  const existing = await prisma.event.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
   if (!existing) {
     return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
@@ -289,66 +317,79 @@ eventsRouter.delete("/events/:id", async (c) => {
 });
 
 // POST /api/events/:id/people — assign person to event
-eventsRouter.post(
-  "/events/:id/people",
-  zValidator("json", AssignPersonSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const body = c.req.valid("json");
+eventsRouter.post("/events/:id/people", zValidator("json", AssignPersonSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-    const event = await prisma.event.findUnique({ where: { id } });
-    if (!event) {
-      return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
-    }
+  const { id } = c.req.param();
+  const body = c.req.valid("json");
 
-    const person = await prisma.person.findUnique({ where: { id: body.personId } });
-    if (!person) {
-      return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
-    }
-
-    const eventPerson = await prisma.eventPerson.upsert({
-      where: {
-        eventId_personId: { eventId: id, personId: body.personId },
-      },
-      update: {
-        role: body.role ?? null,
-      },
-      create: {
-        eventId: id,
-        personId: body.personId,
-        role: body.role ?? null,
-      },
-      include: { person: true },
-    });
-
-    return c.json(
-      {
-        data: {
-          id: eventPerson.id,
-          eventId: eventPerson.eventId,
-          personId: eventPerson.personId,
-          role: eventPerson.role,
-          person: serializePerson(eventPerson.person),
-        },
-      },
-      201
-    );
+  const event = await prisma.event.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!event) {
+    return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
-);
+
+  const person = await prisma.person.findUnique({
+    where: { id: body.personId, organizationId: user.organizationId },
+  });
+  if (!person) {
+    return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const eventPerson = await prisma.eventPerson.upsert({
+    where: {
+      eventId_personId: { eventId: id, personId: body.personId },
+    },
+    update: {
+      role: body.role ?? null,
+    },
+    create: {
+      eventId: id,
+      personId: body.personId,
+      role: body.role ?? null,
+    },
+    include: { person: true },
+  });
+
+  return c.json(
+    {
+      data: {
+        id: eventPerson.id,
+        eventId: eventPerson.eventId,
+        personId: eventPerson.personId,
+        role: eventPerson.role,
+        person: serializePerson(eventPerson.person),
+      },
+    },
+    201
+  );
+});
 
 // DELETE /api/events/:id/people/:personId — unassign person
 eventsRouter.delete("/events/:id/people/:personId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
   const { id, personId } = c.req.param();
+
+  // Verify event belongs to org
+  const event = await prisma.event.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!event) {
+    return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
+  }
 
   const eventPerson = await prisma.eventPerson.findUnique({
     where: { eventId_personId: { eventId: id, personId } },
   });
 
   if (!eventPerson) {
-    return c.json(
-      { error: { message: "Assignment not found", code: "NOT_FOUND" } },
-      404
-    );
+    return c.json({ error: { message: "Assignment not found", code: "NOT_FOUND" } }, 404);
   }
 
   await prisma.eventPerson.delete({

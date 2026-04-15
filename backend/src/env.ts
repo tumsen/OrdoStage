@@ -8,6 +8,13 @@ const envSchema = z.object({
   // Server Configuration
   PORT: z.string().optional().default("3000"),
   NODE_ENV: z.string().optional(),
+  BACKEND_URL: z.string().default("http://localhost:3000"),
+  // Auth
+  BETTER_AUTH_SECRET: z.string().min(1),
+  // Stripe
+  STRIPE_SECRET_KEY: z.string().default("sk_test_placeholder"),
+  STRIPE_WEBHOOK_SECRET: z.string().default("whsec_placeholder"),
+  STRIPE_PUBLISHABLE_KEY: z.string().default("pk_test_placeholder"),
 });
 
 /**

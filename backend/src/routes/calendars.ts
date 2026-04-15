@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import prisma from "../db";
+import { prisma } from "../prisma";
+import { auth } from "../auth";
 import { CreateCalendarSchema } from "../types";
 
-const calendarsRouter = new Hono();
+const calendarsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
 function formatICSDate(date: Date): string {
   return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
@@ -85,7 +86,12 @@ function buildICS(
 
 // GET /api/calendars
 calendarsRouter.get("/calendars", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
   const calendars = await prisma.calendar.findMany({
+    where: { organizationId: user.organizationId },
     orderBy: { name: "asc" },
   });
   return c.json({ data: calendars });
@@ -93,11 +99,16 @@ calendarsRouter.get("/calendars", async (c) => {
 
 // POST /api/calendars
 calendarsRouter.post("/calendars", zValidator("json", CreateCalendarSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
   const body = c.req.valid("json");
   const calendar = await prisma.calendar.create({
     data: {
       name: body.name,
       filter: body.filter ?? null,
+      organizationId: user.organizationId,
     },
   });
   return c.json({ data: calendar }, 201);
@@ -105,8 +116,14 @@ calendarsRouter.post("/calendars", zValidator("json", CreateCalendarSchema), asy
 
 // DELETE /api/calendars/:id
 calendarsRouter.delete("/calendars/:id", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
   const { id } = c.req.param();
-  const existing = await prisma.calendar.findUnique({ where: { id } });
+  const existing = await prisma.calendar.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
   if (!existing) {
     return c.json({ error: { message: "Calendar not found", code: "NOT_FOUND" } }, 404);
   }
@@ -114,14 +131,17 @@ calendarsRouter.delete("/calendars/:id", async (c) => {
   return new Response(null, { status: 204 });
 });
 
-// GET /api/calendars/:token.ics — ICS subscription endpoint
+// GET /api/calendars/:token.ics — PUBLIC ICS subscription endpoint (no auth required)
 calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
   const tokenIcs = c.req.param("tokenIcs");
 
   // Strip .ics extension
   const token = tokenIcs.endsWith(".ics") ? tokenIcs.slice(0, -4) : tokenIcs;
 
-  const calendar = await prisma.calendar.findUnique({ where: { token } });
+  const calendar = await prisma.calendar.findUnique({
+    where: { token },
+    include: { organization: true },
+  });
   if (!calendar) {
     return c.json({ error: { message: "Calendar not found", code: "NOT_FOUND" } }, 404);
   }
@@ -141,7 +161,7 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
     }
   }
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { organizationId: calendar.organizationId };
   if (filter.status) where.status = filter.status;
   if (filter.venueId) where.venueId = filter.venueId;
   if (filter.tags) {

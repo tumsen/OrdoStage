@@ -7,42 +7,129 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Venue {
-  id        String   @id @default(cuid())
-  name      String
-  address   String?
-  capacity  Int?
-  notes     String?
-  events    Event[]
+// Better Auth tables
+model User {
+  id             String        @id
+  name           String
+  email          String        @unique
+  emailVerified  Boolean       @default(false)
+  image          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  sessions       Session[]
+  accounts       Account[]
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  orgRole        String        @default("member")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// Theater organization
+model Organization {
+  id              String           @id @default(cuid())
+  name            String
+  creditBalance   Int              @default(0)
+  lastDeductedAt  DateTime         @default(now())
+  users           User[]
+  venues          Venue[]
+  events          Event[]
+  people          Person[]
+  calendars       Calendar[]
+  creditPurchases CreditPurchase[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model CreditPurchase {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  days            Int
+  amountCents     Int
+  stripeSessionId String?      @unique
+  createdAt       DateTime     @default(now())
+}
+
+// App models - all scoped to an organization
+model Venue {
+  id             String       @id @default(cuid())
+  name           String
+  address        String?
+  capacity       Int?
+  notes          String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  events         Event[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 model Person {
-  id          String        @id @default(cuid())
-  name        String
-  role        String?
-  email       String?
-  phone       String?
-  assignments EventPerson[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  name           String
+  role           String?
+  email          String?
+  phone          String?
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignments    EventPerson[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Event {
-  id          String        @id @default(cuid())
-  title       String
-  description String?
-  startDate   DateTime
-  endDate     DateTime?
-  status      String        @default("draft")
-  venueId     String?
-  venue       Venue?        @relation(fields: [venueId], references: [id])
-  people      EventPerson[]
-  documents   Document[]
-  tags        String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  title          String
+  description    String?
+  startDate      DateTime
+  endDate        DateTime?
+  status         String        @default("draft")
+  venueId        String?
+  venue          Venue?        @relation(fields: [venueId], references: [id])
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  people         EventPerson[]
+  documents      Document[]
+  tags           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model EventPerson {
@@ -69,8 +156,10 @@ model Document {
 }
 
 model Calendar {
-  id     String  @id @default(cuid())
-  name   String
-  token  String  @unique @default(cuid())
-  filter String?
+  id             String       @id @default(cuid())
+  name           String
+  token          String       @unique @default(cuid())
+  filter         String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
