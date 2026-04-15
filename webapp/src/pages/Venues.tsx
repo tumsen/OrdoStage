@@ -1,0 +1,320 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Plus, Edit2, Trash2, Check, X } from "lucide-react";
+import { api } from "@/lib/api";
+import type { Venue } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+const VenueFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  address: z.string().optional(),
+  capacity: z.coerce.number().positive().optional().or(z.literal("")),
+  notes: z.string().optional(),
+});
+
+type VenueFormValues = z.infer<typeof VenueFormSchema>;
+
+function VenueRow({
+  venue,
+  onDelete,
+}: {
+  venue: Venue;
+  onDelete: (id: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+
+  const form = useForm<VenueFormValues>({
+    resolver: zodResolver(VenueFormSchema),
+    values: {
+      name: venue.name,
+      address: venue.address ?? "",
+      capacity: venue.capacity ?? "",
+      notes: venue.notes ?? "",
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: VenueFormValues) => {
+      const payload = {
+        name: data.name,
+        address: data.address || undefined,
+        capacity: data.capacity === "" ? undefined : Number(data.capacity),
+        notes: data.notes || undefined,
+      };
+      return api.put(`/api/venues/${venue.id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["venues"] });
+      setEditing(false);
+    },
+  });
+
+  if (editing) {
+    return (
+      <tr className="border-b border-white/5">
+        <td className="px-5 py-3">
+          <Input
+            {...form.register("name")}
+            className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+          />
+        </td>
+        <td className="px-5 py-3 hidden sm:table-cell">
+          <Input
+            {...form.register("address")}
+            className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+          />
+        </td>
+        <td className="px-5 py-3 hidden md:table-cell">
+          <Input
+            {...form.register("capacity")}
+            type="number"
+            className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30 w-24"
+          />
+        </td>
+        <td className="px-5 py-3">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-emerald-400 hover:text-emerald-300"
+              onClick={form.handleSubmit((v) => updateMutation.mutate(v))}
+              disabled={updateMutation.isPending}
+            >
+              <Check size={13} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-white/30 hover:text-white"
+              onClick={() => setEditing(false)}
+            >
+              <X size={13} />
+            </Button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="border-b border-white/5 group hover:bg-white/[0.02] transition-colors">
+      <td className="px-5 py-3.5 text-sm font-medium text-white/90">{venue.name}</td>
+      <td className="px-5 py-3.5 text-sm text-white/50 hidden sm:table-cell">{venue.address ?? "—"}</td>
+      <td className="px-5 py-3.5 text-sm text-white/50 hidden md:table-cell">
+        {venue.capacity != null ? venue.capacity.toLocaleString() : "—"}
+      </td>
+      <td className="px-5 py-3.5">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-white/30 hover:text-white"
+            onClick={() => setEditing(true)}
+          >
+            <Edit2 size={13} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-white/30 hover:text-red-400"
+            onClick={() => onDelete(venue.id)}
+          >
+            <Trash2 size={13} />
+          </Button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function AddVenueForm({ onSuccess }: { onSuccess: () => void }) {
+  const form = useForm<VenueFormValues>({
+    resolver: zodResolver(VenueFormSchema),
+    defaultValues: { name: "", address: "", capacity: "", notes: "" },
+  });
+
+  const queryClient = useQueryClient();
+  const createMutation = useMutation({
+    mutationFn: (data: VenueFormValues) => {
+      const payload = {
+        name: data.name,
+        address: data.address || undefined,
+        capacity: data.capacity === "" ? undefined : Number(data.capacity),
+        notes: data.notes || undefined,
+      };
+      return api.post<Venue>("/api/venues", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["venues"] });
+      form.reset();
+      onSuccess();
+    },
+  });
+
+  return (
+    <tr className="border-t border-white/10 bg-white/[0.02]">
+      <td className="px-5 py-3">
+        <Input
+          {...form.register("name")}
+          placeholder="Venue name *"
+          className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+        />
+        {form.formState.errors.name && (
+          <p className="text-red-400 text-xs mt-1">{form.formState.errors.name.message}</p>
+        )}
+      </td>
+      <td className="px-5 py-3 hidden sm:table-cell">
+        <Input
+          {...form.register("address")}
+          placeholder="Address"
+          className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+        />
+      </td>
+      <td className="px-5 py-3 hidden md:table-cell">
+        <Input
+          {...form.register("capacity")}
+          type="number"
+          placeholder="Capacity"
+          className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30 w-24"
+        />
+      </td>
+      <td className="px-5 py-3">
+        <Button
+          size="sm"
+          onClick={form.handleSubmit((v) => createMutation.mutate(v))}
+          disabled={createMutation.isPending}
+          className="bg-red-900 hover:bg-red-800 text-white border-red-700/50 h-8 gap-1.5"
+        >
+          <Plus size={13} />
+          {createMutation.isPending ? "Adding..." : "Add"}
+        </Button>
+      </td>
+    </tr>
+  );
+}
+
+export default function Venues() {
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: venues, isLoading, error } = useQuery({
+    queryKey: ["venues"],
+    queryFn: () => api.get<Venue[]>("/api/venues"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/venues/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["venues"] });
+      setDeleteId(null);
+    },
+  });
+
+  return (
+    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-white/40">Manage your theater venues.</p>
+        <Button
+          size="sm"
+          onClick={() => setShowAddForm(true)}
+          className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2"
+        >
+          <Plus size={14} /> Add Venue
+        </Button>
+      </div>
+
+      <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-white/10">
+              <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide">Name</th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden sm:table-cell">Address</th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden md:table-cell">Capacity</th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide w-20"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={4} className="px-5 py-8">
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-8 w-full bg-white/5" />
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={4} className="px-5 py-10 text-center text-red-400 text-sm">
+                  Failed to load venues.
+                </td>
+              </tr>
+            ) : (venues ?? []).length === 0 && !showAddForm ? (
+              <tr>
+                <td colSpan={4} className="px-5 py-10 text-center text-white/30 text-sm">
+                  No venues yet.
+                </td>
+              </tr>
+            ) : (
+              (venues ?? []).map((venue) => (
+                <VenueRow key={venue.id} venue={venue} onDelete={setDeleteId} />
+              ))
+            )}
+            {showAddForm && (
+              <AddVenueForm onSuccess={() => setShowAddForm(false)} />
+            )}
+          </tbody>
+        </table>
+
+        {!showAddForm && (venues ?? []).length > 0 && (
+          <div className="px-5 py-3 border-t border-white/5">
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="text-xs text-white/30 hover:text-white/60 flex items-center gap-1.5 transition-colors"
+            >
+              <Plus size={12} /> Add another venue
+            </button>
+          </div>
+        )}
+      </div>
+
+      <AlertDialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
+        <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete venue?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/50">
+              This will permanently delete the venue.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+              onClick={() => { if (deleteId) deleteMutation.mutate(deleteId); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

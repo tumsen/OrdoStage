@@ -4,6 +4,11 @@ import { cors } from "hono/cors";
 import "./env";
 import { sampleRouter } from "./routes/sample";
 import { logger } from "hono/logger";
+import venuesRouter from "./routes/venues";
+import peopleRouter from "./routes/people";
+import eventsRouter from "./routes/events";
+import documentsRouter from "./routes/documents";
+import calendarsRouter from "./routes/calendars";
 
 const app = new Hono();
 
@@ -30,10 +35,15 @@ app.use(
 app.use("*", logger());
 
 // Health check endpoint
-app.get("/health", (c) => c.json({ status: "ok" }));
+app.get("/health", (c) => c.json({ status: "ok", version: "1.0.0" }));
 
 // Routes
 app.route("/api/sample", sampleRouter);
+app.route("/api", venuesRouter);
+app.route("/api", peopleRouter);
+app.route("/api", eventsRouter);
+app.route("/api", documentsRouter);
+app.route("/api", calendarsRouter);
 
 const port = Number(process.env.PORT) || 3000;
 

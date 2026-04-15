@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Venue {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  capacity  Int?
+  notes     String?
+  events    Event[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Person {
+  id          String        @id @default(cuid())
+  name        String
+  role        String?
+  email       String?
+  phone       String?
+  assignments EventPerson[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Event {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  status      String        @default("draft")
+  venueId     String?
+  venue       Venue?        @relation(fields: [venueId], references: [id])
+  people      EventPerson[]
+  documents   Document[]
+  tags        String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model EventPerson {
+  id       String  @id @default(cuid())
+  eventId  String
+  personId String
+  role     String?
+  event    Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  person   Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, personId])
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  eventId   String
+  name      String
+  type      String   @default("other")
+  filename  String
+  data      Bytes
+  mimeType  String   @default("application/pdf")
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Calendar {
+  id     String  @id @default(cuid())
+  name   String
+  token  String  @unique @default(cuid())
+  filter String?
+}
