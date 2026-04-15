@@ -56,7 +56,7 @@ const App = () => (
           <Route
             path="/setup-org"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireOrg={false}>
                 <SetupOrg />
               </ProtectedRoute>
             }
