@@ -27,7 +27,9 @@ function buildICS(
     startDate: Date;
     endDate: Date | null;
     status: string;
-    venue: { name: string } | null;
+    tags: string | null;
+    venue: { name: string; address: string | null; capacity: number | null } | null;
+    people: Array<{ person: { name: string; role: string | null }; role: string | null }>;
   }>
 ): string {
   const now = formatICSDate(new Date());
@@ -46,12 +48,33 @@ function buildICS(
         : formatICSDate(new Date(event.startDate.getTime() + 60 * 60 * 1000));
 
       const icsStatus = statusMap[event.status] ?? "TENTATIVE";
-      const description = event.description
-        ? `DESCRIPTION:${escapeICSText(event.description)}\r\n`
-        : "";
-      const location = event.venue
-        ? `LOCATION:${escapeICSText(event.venue.name)}\r\n`
-        : "";
+
+      // Build rich description
+      const parts: string[] = [];
+      if (event.description) parts.push(event.description);
+      if (event.venue?.capacity) parts.push(`Capacity: ${event.venue.capacity}`);
+      if (event.tags) parts.push(`Tags: ${event.tags}`);
+      if (event.people.length > 0) {
+        const peopleList = event.people
+          .map((ep) => {
+            const role = ep.role || ep.person.role;
+            return role ? `${ep.person.name} (${role})` : ep.person.name;
+          })
+          .join(", ");
+        parts.push(`People: ${peopleList}`);
+      }
+      const fullDescription = parts.length > 0
+        ? `DESCRIPTION:${escapeICSText(parts.join("\\n"))}`
+        : null;
+
+      // Location: venue name + address
+      let location: string | null = null;
+      if (event.venue) {
+        const loc = event.venue.address
+          ? `${event.venue.name}, ${event.venue.address}`
+          : event.venue.name;
+        location = `LOCATION:${escapeICSText(loc)}`;
+      }
 
       return [
         "BEGIN:VEVENT",
@@ -60,8 +83,8 @@ function buildICS(
         `DTSTART:${dtstart}`,
         `DTEND:${dtend}`,
         `SUMMARY:${escapeICSText(event.title)}`,
-        description.trim() ? description.trim() : null,
-        location.trim() ? location.trim() : null,
+        fullDescription,
+        location,
         `STATUS:${icsStatus}`,
         "END:VEVENT",
       ]
@@ -171,7 +194,10 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
   const events = await prisma.event.findMany({
     where,
     orderBy: { startDate: "asc" },
-    include: { venue: true },
+    include: {
+      venue: { select: { name: true, address: true, capacity: true } },
+      people: { include: { person: { select: { name: true, role: true } } } },
+    },
   });
 
   const icsContent = buildICS(calendar.name, events);
