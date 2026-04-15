@@ -111,6 +111,45 @@ export const EventDetailSchema = EventSchema.extend({
   documents: z.array(DocumentSchema),
 });
 
+// InternalBooking
+export const InternalBookingSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  startDate: z.string(),
+  endDate: z.string().nullable(),
+  type: z.string(),
+  venueId: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const InternalBookingDetailSchema = InternalBookingSchema.extend({
+  venue: VenueSchema.nullable(),
+  people: z.array(
+    z.object({
+      id: z.string(),
+      personId: z.string(),
+      role: z.string().nullable(),
+      person: PersonSchema,
+    })
+  ),
+});
+
+export const CreateInternalBookingSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  startDate: z.string(),
+  endDate: z.string().optional(),
+  type: z.enum(["rehearsal", "maintenance", "private", "other"]).default("other"),
+  venueId: z.string().optional(),
+  personIds: z
+    .array(z.object({ personId: z.string(), role: z.string().optional() }))
+    .optional(),
+});
+
+export const UpdateInternalBookingSchema = CreateInternalBookingSchema.partial();
+
 export type Venue = z.infer<typeof VenueSchema>;
 export type CreateVenue = z.infer<typeof CreateVenueSchema>;
 export type Person = z.infer<typeof PersonSchema>;
@@ -121,3 +160,7 @@ export type EventDetail = z.infer<typeof EventDetailSchema>;
 export type EventPerson = z.infer<typeof EventPersonSchema>;
 export type Document = z.infer<typeof DocumentSchema>;
 export type Calendar = z.infer<typeof CalendarSchema>;
+export type InternalBooking = z.infer<typeof InternalBookingSchema>;
+export type InternalBookingDetail = z.infer<typeof InternalBookingDetailSchema>;
+export type CreateInternalBooking = z.infer<typeof CreateInternalBookingSchema>;
+export type UpdateInternalBooking = z.infer<typeof UpdateInternalBookingSchema>;

@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   CalendarDays,
+  CalendarRange,
   MapPin,
   Users,
   Share2,
@@ -32,6 +33,7 @@ interface OrgData {
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/events", label: "Events", icon: CalendarDays },
+  { to: "/schedule", label: "Schedule", icon: CalendarRange },
   { to: "/venues", label: "Venues", icon: MapPin },
   { to: "/people", label: "People", icon: Users },
   { to: "/calendars", label: "Calendars", icon: Share2 },
@@ -42,6 +44,7 @@ const pageTitles: Record<string, string> = {
   "/": "Dashboard",
   "/events": "Events",
   "/events/new": "New Event",
+  "/schedule": "Schedule",
   "/venues": "Venues",
   "/people": "People",
   "/calendars": "Calendars",

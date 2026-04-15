@@ -14,6 +14,7 @@ import EventDetail from "./pages/EventDetail";
 import Venues from "./pages/Venues";
 import People from "./pages/People";
 import Calendars from "./pages/Calendars";
+import Schedule from "./pages/Schedule";
 import Login from "./pages/Login";
 import VerifyOtp from "./pages/VerifyOtp";
 import SetupOrg from "./pages/SetupOrg";
@@ -129,6 +130,16 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <Calendars />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/schedule"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Schedule />
                 </Layout>
               </ProtectedRoute>
             }

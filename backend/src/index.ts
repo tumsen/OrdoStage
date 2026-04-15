@@ -13,6 +13,8 @@ import calendarsRouter from "./routes/calendars";
 import orgRouter from "./routes/org";
 import billingRouter from "./routes/billing";
 import adminRouter from "./routes/admin";
+import bookingsRouter from "./routes/bookings";
+import scheduleRouter from "./routes/schedule";
 import { seedPacks } from "./seed-packs";
 
 seedPacks().catch(console.error);
@@ -102,6 +104,8 @@ app.route("/api", eventsRouter);
 app.route("/api", documentsRouter);
 app.route("/api", calendarsRouter);
 app.route("/api", adminRouter);
+app.route("/api", bookingsRouter);
+app.route("/api", scheduleRouter);
 
 const port = Number(process.env.PORT) || 3000;
 

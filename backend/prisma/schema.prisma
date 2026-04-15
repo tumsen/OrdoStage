@@ -64,20 +64,21 @@ model Verification {
 
 // Theater organization
 model Organization {
-  id              String           @id @default(cuid())
-  name            String
-  creditBalance   Int              @default(0)
-  lastDeductedAt  DateTime         @default(now())
-  users           User[]
-  venues          Venue[]
-  events          Event[]
-  people          Person[]
-  calendars       Calendar[]
-  creditPurchases CreditPurchase[]
-  creditLogs      CreditLog[]
-  freeTrialUsed   Boolean          @default(false)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id               String             @id @default(cuid())
+  name             String
+  creditBalance    Int                @default(0)
+  lastDeductedAt   DateTime           @default(now())
+  users            User[]
+  venues           Venue[]
+  events           Event[]
+  people           Person[]
+  calendars        Calendar[]
+  creditPurchases  CreditPurchase[]
+  creditLogs       CreditLog[]
+  internalBookings InternalBooking[]
+  freeTrialUsed    Boolean            @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }
 
 model CreditPurchase {
@@ -92,29 +93,31 @@ model CreditPurchase {
 
 // App models - all scoped to an organization
 model Venue {
-  id             String       @id @default(cuid())
-  name           String
-  address        String?
-  capacity       Int?
-  notes          String?
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  events         Event[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id               String             @id @default(cuid())
+  name             String
+  address          String?
+  capacity         Int?
+  notes            String?
+  organizationId   String
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  events           Event[]
+  internalBookings InternalBooking[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }
 
 model Person {
-  id             String        @id @default(cuid())
-  name           String
-  role           String?
-  email          String?
-  phone          String?
-  organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assignments    EventPerson[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id               String                  @id @default(cuid())
+  name             String
+  role             String?
+  email            String?
+  phone            String?
+  organizationId   String
+  organization     Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignments      EventPerson[]
+  internalBookings InternalBookingPerson[]
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
 }
 
 model Event {
@@ -187,4 +190,31 @@ model PricePack {
   amountCents Int
   label       String
   active      Boolean @default(true)
+}
+
+model InternalBooking {
+  id             String                  @id @default(cuid())
+  title          String
+  description    String?
+  startDate      DateTime
+  endDate        DateTime?
+  type           String                  @default("other") // rehearsal | maintenance | private | other
+  venueId        String?
+  venue          Venue?                  @relation(fields: [venueId], references: [id])
+  organizationId String
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  people         InternalBookingPerson[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+}
+
+model InternalBookingPerson {
+  id        String          @id @default(cuid())
+  bookingId String
+  personId  String
+  role      String?
+  booking   InternalBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  person    Person          @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, personId])
 }
