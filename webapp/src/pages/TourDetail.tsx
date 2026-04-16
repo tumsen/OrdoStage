@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowLeft,
   Edit2,
@@ -879,7 +879,7 @@ interface SendTechRiderDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function buildTechRiderText(tour: TourDetail, show: TourShow): string {
+function buildTechRiderText(tour: TourDetail, show: TourShow, pdfUrl?: string | null): string {
   const date = new Date(show.date).toLocaleDateString("en-GB", {
     weekday: "long", day: "numeric", month: "long", year: "numeric"
   });
@@ -950,6 +950,15 @@ function buildTechRiderText(tour: TourDetail, show: TourShow): string {
     lines.push(``);
   }
 
+  // PDF link
+  if (pdfUrl) {
+    lines.push(`TECH RIDER PDF`);
+    lines.push(`--------------`);
+    lines.push(`Download the complete tech rider (PDF):`);
+    lines.push(pdfUrl);
+    lines.push(``);
+  }
+
   // Footer
   lines.push(`---`);
   if (tour.tourManagerName || tour.tourManagerPhone || tour.tourManagerEmail) {
@@ -964,8 +973,22 @@ function buildTechRiderText(tour: TourDetail, show: TourShow): string {
 
 function SendTechRiderDialog({ tour, show, open, onOpenChange }: SendTechRiderDialogProps) {
   const [copied, setCopied] = useState(false);
-  const emailText = buildTechRiderText(tour, show);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+
   const subject = `Tech Rider — ${tour.name} — ${new Date(show.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}${show.venueName ? ` — ${show.venueName}` : ""}`;
+  const emailText = buildTechRiderText(tour, show, pdfUrl);
+
+  // Auto-generate shareable PDF link when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    setPdfUrl(null);
+    setPdfUploading(true);
+    uploadVenueTechRiderForSharing(tour, show)
+      .then(url => setPdfUrl(url))
+      .catch(() => { /* silently ignore — email sends without link */ })
+      .finally(() => setPdfUploading(false));
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCopy() {
     await navigator.clipboard.writeText(emailText);
@@ -1000,6 +1023,23 @@ function SendTechRiderDialog({ tour, show, open, onOpenChange }: SendTechRiderDi
         <div className="flex items-center gap-2 bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3 flex-shrink-0">
           <span className="text-xs text-white/40 uppercase tracking-wide w-12 flex-shrink-0">Subject</span>
           <span className="text-sm text-white/70 truncate">{subject}</span>
+        </div>
+
+        {/* PDF status */}
+        <div className="flex items-center gap-2 flex-shrink-0 px-1">
+          {pdfUploading ? (
+            <>
+              <Loader2 size={12} className="animate-spin text-white/30" />
+              <span className="text-xs text-white/40">Generating PDF download link…</span>
+            </>
+          ) : pdfUrl ? (
+            <>
+              <FileDown size={12} className="text-green-400/70" />
+              <span className="text-xs text-green-400/70">PDF download link included in email</span>
+            </>
+          ) : (
+            <span className="text-xs text-white/25">PDF link unavailable — text only</span>
+          )}
         </div>
 
         {/* Email preview */}
