@@ -13,6 +13,9 @@ RUN cd backend && bun install --frozen-lockfile
 # Copy backend source (includes prisma/ directory)
 COPY backend/ ./backend/
 
+# Switch Prisma provider to PostgreSQL for production
+RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' backend/prisma/schema.prisma
+
 # Generate Prisma client
 RUN cd backend && bunx prisma generate
 

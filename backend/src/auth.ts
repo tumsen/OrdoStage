@@ -33,7 +33,9 @@ async function sendOTPEmail(email: string, otp: string) {
 }
 
 export const auth = betterAuth({
-  database: prismaAdapter(prisma, { provider: "postgresql" }),
+  database: prismaAdapter(prisma, {
+    provider: (process.env.DATABASE_URL || "").startsWith("postgresql") ? "postgresql" : "sqlite",
+  }),
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BACKEND_URL,
   trustedOrigins: [
