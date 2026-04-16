@@ -1,5 +1,5 @@
-// Vibecode proxy — only active in Vibecode environment, safe to skip on Railway
-if (!process.env.RAILWAY_ENVIRONMENT) {
+// Vibecode proxy — only load when using SQLite (Vibecode dev). Skip on Railway (PostgreSQL).
+if (!(process.env.DATABASE_URL || "").startsWith("postgresql")) {
   try { await import("@vibecodeapp/proxy"); } catch { /* not in Vibecode */ }
 }
 import { Hono } from "hono";
