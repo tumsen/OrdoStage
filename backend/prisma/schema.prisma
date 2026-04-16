@@ -77,6 +77,7 @@ model Organization {
   creditLogs       CreditLog[]
   internalBookings InternalBooking[]
   departments      Department[]
+  tours            Tour[]
   freeTrialUsed    Boolean            @default(false)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -119,6 +120,7 @@ model Person {
   department       Department?             @relation(fields: [departmentId], references: [id])
   assignments      EventPerson[]
   internalBookings InternalBookingPerson[]
+  tourAssignments  TourPerson[]
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 }
@@ -237,4 +239,61 @@ model Department {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   people         Person[]
   createdAt      DateTime     @default(now())
+}
+
+model Tour {
+  id               String       @id @default(cuid())
+  name             String
+  description      String?
+  status           String       @default("draft") // draft | active | completed
+  tourManagerName  String?
+  tourManagerPhone String?
+  tourManagerEmail String?
+  notes            String?
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shows            TourShow[]
+  people           TourPerson[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model TourShow {
+  id             String   @id @default(cuid())
+  tourId         String
+  tour           Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  date           DateTime
+  showTime       String?
+  getInTime      String?
+  rehearsalTime  String?
+  soundcheckTime String?
+  doorsTime      String?
+  venueName      String?
+  venueAddress   String?
+  venueCity      String?
+  contactName    String?
+  contactPhone   String?
+  contactEmail   String?
+  hotelName      String?
+  hotelAddress   String?
+  hotelPhone     String?
+  hotelCheckIn   String?
+  hotelCheckOut  String?
+  travelInfo     String?
+  cateringInfo   String?
+  notes          String?
+  order          Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model TourPerson {
+  id       String  @id @default(cuid())
+  tourId   String
+  tour     Tour    @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  personId String
+  person   Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  role     String?
+
+  @@unique([tourId, personId])
 }

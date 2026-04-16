@@ -20,6 +20,8 @@ import Login from "./pages/Login";
 import VerifyOtp from "./pages/VerifyOtp";
 import SetupOrg from "./pages/SetupOrg";
 import Billing from "./pages/Billing";
+import Tours from "./pages/Tours";
+import TourDetail from "./pages/TourDetail";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminOrgs from "./pages/admin/Orgs";
@@ -151,6 +153,26 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <Schedule />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tours"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Tours />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tours/:id"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TourDetail />
                 </Layout>
               </ProtectedRoute>
             }

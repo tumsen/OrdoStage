@@ -12,6 +12,7 @@ import {
   LogOut,
   AlertTriangle,
   XCircle,
+  Route,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/events", label: "Events", icon: CalendarDays },
   { to: "/schedule", label: "Schedule", icon: CalendarRange },
+  { to: "/tours", label: "Tours", icon: Route },
   { to: "/venues", label: "Venues", icon: MapPin },
   { to: "/people", label: "People", icon: Users },
   { to: "/team", label: "Team", icon: UsersRound },
@@ -47,6 +49,7 @@ const pageTitles: Record<string, string> = {
   "/events": "Events",
   "/events/new": "New Event",
   "/schedule": "Schedule",
+  "/tours": "Tours",
   "/venues": "Venues",
   "/people": "People",
   "/team": "Team",
@@ -57,6 +60,9 @@ const pageTitles: Record<string, string> = {
 function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/events/") && pathname !== "/events/new") {
     return "Event Detail";
+  }
+  if (pathname.startsWith("/tours/")) {
+    return "Tour Detail";
   }
   return pageTitles[pathname] ?? "Theater Planner";
 }

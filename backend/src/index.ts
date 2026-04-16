@@ -17,6 +17,7 @@ import bookingsRouter from "./routes/bookings";
 import scheduleRouter from "./routes/schedule";
 import departmentsRouter from "./routes/departments";
 import teamRouter from "./routes/team";
+import toursRouter from "./routes/tours";
 import { seedPacks } from "./seed-packs";
 
 seedPacks().catch(console.error);
@@ -110,6 +111,7 @@ app.route("/api", bookingsRouter);
 app.route("/api", scheduleRouter);
 app.route("/api", departmentsRouter);
 app.route("/api", teamRouter);
+app.route("/api", toursRouter);
 
 const port = Number(process.env.PORT) || 3000;
 

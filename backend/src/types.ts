@@ -215,3 +215,108 @@ export type CreateInternalBooking = z.infer<typeof CreateInternalBookingSchema>;
 export type UpdateInternalBooking = z.infer<typeof UpdateInternalBookingSchema>;
 export type TeamMember = z.infer<typeof TeamMemberSchema>;
 export type UpdateRole = z.infer<typeof UpdateRoleSchema>;
+
+// TourShow
+export const TourShowSchema = z.object({
+  id: z.string(),
+  tourId: z.string(),
+  date: z.string(),
+  showTime: z.string().nullable(),
+  getInTime: z.string().nullable(),
+  rehearsalTime: z.string().nullable(),
+  soundcheckTime: z.string().nullable(),
+  doorsTime: z.string().nullable(),
+  venueName: z.string().nullable(),
+  venueAddress: z.string().nullable(),
+  venueCity: z.string().nullable(),
+  contactName: z.string().nullable(),
+  contactPhone: z.string().nullable(),
+  contactEmail: z.string().nullable(),
+  hotelName: z.string().nullable(),
+  hotelAddress: z.string().nullable(),
+  hotelPhone: z.string().nullable(),
+  hotelCheckIn: z.string().nullable(),
+  hotelCheckOut: z.string().nullable(),
+  travelInfo: z.string().nullable(),
+  cateringInfo: z.string().nullable(),
+  notes: z.string().nullable(),
+  order: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const CreateTourShowSchema = z.object({
+  date: z.string(),
+  showTime: z.string().optional(),
+  getInTime: z.string().optional(),
+  rehearsalTime: z.string().optional(),
+  soundcheckTime: z.string().optional(),
+  doorsTime: z.string().optional(),
+  venueName: z.string().optional(),
+  venueAddress: z.string().optional(),
+  venueCity: z.string().optional(),
+  contactName: z.string().optional(),
+  contactPhone: z.string().optional(),
+  contactEmail: z.string().optional(),
+  hotelName: z.string().optional(),
+  hotelAddress: z.string().optional(),
+  hotelPhone: z.string().optional(),
+  hotelCheckIn: z.string().optional(),
+  hotelCheckOut: z.string().optional(),
+  travelInfo: z.string().optional(),
+  cateringInfo: z.string().optional(),
+  notes: z.string().optional(),
+  order: z.number().optional(),
+});
+
+export const UpdateTourShowSchema = CreateTourShowSchema.partial();
+
+// TourPerson
+export const TourPersonSchema = z.object({
+  id: z.string(),
+  tourId: z.string(),
+  personId: z.string(),
+  role: z.string().nullable(),
+  person: PersonSchema,
+});
+
+// Tour
+export const TourSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: z.enum(["draft", "active", "completed"]),
+  tourManagerName: z.string().nullable(),
+  tourManagerPhone: z.string().nullable(),
+  tourManagerEmail: z.string().nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const TourDetailSchema = TourSchema.extend({
+  shows: z.array(TourShowSchema),
+  people: z.array(TourPersonSchema),
+});
+
+export const CreateTourSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  status: z.enum(["draft", "active", "completed"]).optional(),
+  tourManagerName: z.string().optional(),
+  tourManagerPhone: z.string().optional(),
+  tourManagerEmail: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const UpdateTourSchema = CreateTourSchema.partial();
+
+// Tour type exports
+export type TourShow = z.infer<typeof TourShowSchema>;
+export type CreateTourShow = z.infer<typeof CreateTourShowSchema>;
+export type UpdateTourShow = z.infer<typeof UpdateTourShowSchema>;
+export type TourPerson = z.infer<typeof TourPersonSchema>;
+export type Tour = z.infer<typeof TourSchema>;
+export type TourDetail = z.infer<typeof TourDetailSchema>;
+export type CreateTour = z.infer<typeof CreateTourSchema>;
+export type UpdateTour = z.infer<typeof UpdateTourSchema>;
