@@ -50,6 +50,25 @@ export const auth = betterAuth({
     "https://*.up.railway.app",
     "https://theaterplanner-production.up.railway.app",
   ],
+  emailAndPassword: {
+    enabled: true,
+    async sendResetPassword({ user, token }: { user: { email: string }; token: string }) {
+      const frontendUrl = env.FRONTEND_URL || env.BACKEND_URL;
+      const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+      if (env.RESEND_API_KEY) {
+        const { Resend } = await import("resend");
+        const resend = new Resend(env.RESEND_API_KEY);
+        await resend.emails.send({
+          from: env.FROM_EMAIL || "Theater Planner <noreply@theaterplanner.app>",
+          to: user.email,
+          subject: "Reset your password",
+          html: `<p>Click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 1 hour.</p>`,
+        });
+      } else {
+        console.log(`[DEV] Password reset link for ${user.email}: ${resetUrl}`);
+      }
+    },
+  },
   plugins: [
     emailOTP({
       async sendVerificationOTP({ email, otp, type }) {

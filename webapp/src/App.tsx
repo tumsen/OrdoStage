@@ -18,6 +18,8 @@ import Calendars from "./pages/Calendars";
 import Schedule from "./pages/Schedule";
 import Login from "./pages/Login";
 import VerifyOtp from "./pages/VerifyOtp";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import SetupOrg from "./pages/SetupOrg";
 import Billing from "./pages/Billing";
 import Tours from "./pages/Tours";
@@ -255,6 +257,23 @@ const App = () => (
           {/* Public routes (no auth required) */}
           <Route path="/t/:token" element={<PublicTourSchedule />} />
           <Route path="/p/:personalToken" element={<PersonalTourView />} />
+
+          <Route
+            path="/forgot-password"
+            element={
+              <GuestRoute>
+                <ForgotPassword />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <GuestRoute>
+                <ResetPassword />
+              </GuestRoute>
+            }
+          />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
