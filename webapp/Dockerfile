@@ -13,8 +13,9 @@ ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
 RUN bun run build
 
 # ── Serve stage ───────────────────────────────────────────────────────────────
-FROM nginx:alpine
-RUN apk add --no-cache gettext
+FROM nginx:stable-bullseye
+
+RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY --from=builder /app/nginx.conf /etc/nginx/conf.d/default.conf.template
