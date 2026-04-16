@@ -62,6 +62,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
 import { downloadVenueTechRider, printVenueTechRider, uploadVenueTechRiderForSharing } from "@/lib/downloadVenueTechRider";
+import { TourCalendarView } from "@/components/TourCalendarView";
 
 // ── Google Maps helpers ───────────────────────────────────────────────────────
 
@@ -1275,26 +1276,18 @@ function ShowCard({
             {hasContact ? (
               <div>
                 <div className="text-xs text-white/35 uppercase tracking-wide mb-2">Venue Contact</div>
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-col gap-1">
                   {show.contactName ? (
-                    <span className="text-sm text-white/70">{show.contactName}</span>
+                    <span className="text-sm font-medium text-white/75">{show.contactName}</span>
                   ) : null}
-                  {show.contactPhone ? (
-                    <a
-                      href={`tel:${show.contactPhone}`}
-                      className="text-sm text-blue-400 hover:text-blue-300"
-                    >
-                      {show.contactPhone}
-                    </a>
-                  ) : null}
-                  {show.contactEmail ? (
-                    <a
-                      href={`mailto:${show.contactEmail}`}
-                      className="text-sm text-blue-400 hover:text-blue-300"
-                    >
-                      {show.contactEmail}
-                    </a>
-                  ) : null}
+                  <div className="flex flex-wrap gap-3">
+                    {show.contactPhone ? (
+                      <a href={`tel:${show.contactPhone}`} className="text-sm text-blue-400 hover:text-blue-300">{show.contactPhone}</a>
+                    ) : null}
+                    {show.contactEmail ? (
+                      <a href={`mailto:${show.contactEmail}`} className="text-sm text-blue-400 hover:text-blue-300">{show.contactEmail}</a>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -1302,30 +1295,19 @@ function ShowCard({
             {hasHotel ? (
               <div>
                 <div className="text-xs text-white/35 uppercase tracking-wide mb-2">Hotel</div>
-                <div className="flex flex-wrap gap-4">
-                  {show.hotelName ? (
-                    <span className="text-sm font-medium text-white/70">{show.hotelName}</span>
-                  ) : null}
+                <div className="flex flex-col gap-1">
+                  {show.hotelName ? <span className="text-sm font-medium text-white/75">{show.hotelName}</span> : null}
                   {show.hotelAddress ? (
-                    <a
-                      href={mapsUrl(show.hotelAddress)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1"
-                    >
-                      <MapPin size={11} />
-                      {show.hotelAddress}
+                    <a href={mapsUrl(show.hotelAddress)} target="_blank" rel="noopener noreferrer"
+                       className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1">
+                      <MapPin size={10} />{show.hotelAddress}
                     </a>
                   ) : null}
-                  {show.hotelPhone ? (
-                    <span className="text-sm text-white/50">{show.hotelPhone}</span>
-                  ) : null}
-                  {show.hotelCheckIn ? (
-                    <span className="text-sm text-white/40">Check-in: {show.hotelCheckIn}</span>
-                  ) : null}
-                  {show.hotelCheckOut ? (
-                    <span className="text-sm text-white/40">Check-out: {show.hotelCheckOut}</span>
-                  ) : null}
+                  <div className="flex flex-wrap gap-3">
+                    {show.hotelPhone ? <span className="text-xs text-white/50">{show.hotelPhone}</span> : null}
+                    {show.hotelCheckIn ? <span className="text-xs text-white/40">Check-in: {show.hotelCheckIn}</span> : null}
+                    {show.hotelCheckOut ? <span className="text-xs text-white/40">Check-out: {show.hotelCheckOut}</span> : null}
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -2308,6 +2290,12 @@ export default function TourDetailPage() {
               >
                 People ({tour.people.length})
               </TabsTrigger>
+              <TabsTrigger
+                value="calendar"
+                className="flex-1 text-xs py-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/40 hover:text-white/70"
+              >
+                Calendar
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -2317,6 +2305,9 @@ export default function TourDetailPage() {
             </TabsContent>
             <TabsContent value="people" className="mt-0">
               <PeopleTab tour={tour} />
+            </TabsContent>
+            <TabsContent value="calendar" className="mt-0">
+              <TourCalendarView tour={tour} />
             </TabsContent>
           </div>
         </Tabs>
