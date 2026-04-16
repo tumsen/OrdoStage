@@ -49,6 +49,7 @@ function serializeTourShow(show: any) {
     techRiderSentTo: show.techRiderSentTo ?? null,
     techRiderOpenedAt: show.techRiderOpenedAt instanceof Date ? show.techRiderOpenedAt.toISOString() : (show.techRiderOpenedAt ?? null),
     techRiderOpenCount: show.techRiderOpenCount ?? 0,
+    techRiderLastOpenedAt: show.techRiderLastOpenedAt instanceof Date ? show.techRiderLastOpenedAt.toISOString() : (show.techRiderLastOpenedAt ?? null),
     techRiderPdfUrl: show.techRiderPdfUrl ?? null,
     showPeople: (show.showPeople ?? []).map((sp: any) => ({
       id: sp.id,
@@ -735,6 +736,7 @@ toursRouter.get("/tours/:id/shows/:showId/venue-rider/track", async (c) => {
     data: {
       techRiderOpenCount: { increment: 1 },
       techRiderOpenedAt: show.techRiderOpenedAt ?? new Date(),
+      techRiderLastOpenedAt: new Date(),
     },
   });
 

@@ -266,6 +266,7 @@ export const TourShowSchema = z.object({
   techRiderSentTo: z.string().nullable(),
   techRiderOpenedAt: z.string().nullable(),
   techRiderOpenCount: z.number(),
+  techRiderLastOpenedAt: z.string().nullable(),
   techRiderPdfUrl: z.string().nullable(),
   showPeople: z.array(TourShowPersonSchema),
   createdAt: z.string(),

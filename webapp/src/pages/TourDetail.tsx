@@ -1538,23 +1538,68 @@ function ShowCard({
                   </Button>
                 ) : null}
               </div>
-              {/* Tracking status */}
+              {/* Delivery tracking panel */}
               {(show.techRiderSentAt || show.techRiderOpenCount > 0) ? (
-                <div className="flex flex-wrap gap-3 mt-2">
+                <div className="mt-3 rounded-lg border border-white/[0.07] overflow-hidden">
+                  {/* Sent row */}
                   {show.techRiderSentAt ? (
-                    <div className="flex items-center gap-1.5 text-xs text-white/40">
-                      <Send size={10} className="text-white/30" />
-                      Sent {new Date(show.techRiderSentAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                      {show.techRiderSentTo ? <span className="text-white/25">to {show.techRiderSentTo}</span> : null}
+                    <div className="flex items-center gap-3 px-3 py-2.5 border-b border-white/[0.05] last:border-b-0">
+                      <div className="w-5 h-5 rounded-full bg-blue-900/40 border border-blue-700/30 flex items-center justify-center flex-shrink-0">
+                        <Send size={9} className="text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-white/60">Sent</div>
+                        <div className="text-xs text-white/35 truncate">
+                          {new Date(show.techRiderSentAt).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                          {" at "}
+                          {new Date(show.techRiderSentAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                          {show.techRiderSentTo ? ` → ${show.techRiderSentTo}` : ""}
+                        </div>
+                      </div>
                     </div>
                   ) : null}
-                  {show.techRiderOpenCount > 0 ? (
-                    <div className="flex items-center gap-1.5 text-xs text-green-400/70">
-                      <CheckCheck size={10} />
-                      Opened {show.techRiderOpenCount}&times;
-                      {show.techRiderOpenedAt ? <span className="text-green-400/50">(last: {new Date(show.techRiderOpenedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })})</span> : null}
+
+                  {/* Download count row */}
+                  <div className={cn(
+                    "flex items-center gap-3 px-3 py-2.5",
+                    show.techRiderOpenCount > 0 ? "bg-green-950/20" : "bg-white/[0.01]"
+                  )}>
+                    <div className={cn(
+                      "w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0",
+                      show.techRiderOpenCount > 0
+                        ? "bg-green-900/40 border-green-700/30"
+                        : "bg-white/5 border-white/10"
+                    )}>
+                      <CheckCheck size={9} className={show.techRiderOpenCount > 0 ? "text-green-400" : "text-white/20"} />
                     </div>
-                  ) : null}
+                    <div className="flex-1 min-w-0">
+                      {show.techRiderOpenCount > 0 ? (
+                        <>
+                          <div className="text-xs font-medium text-green-400/80">
+                            Downloaded {show.techRiderOpenCount} {show.techRiderOpenCount === 1 ? "time" : "times"}
+                          </div>
+                          <div className="text-xs text-green-400/40 space-y-0.5">
+                            {show.techRiderOpenedAt ? (
+                              <div>
+                                First: {new Date(show.techRiderOpenedAt).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                                {" at "}
+                                {new Date(show.techRiderOpenedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                              </div>
+                            ) : null}
+                            {show.techRiderLastOpenedAt && show.techRiderLastOpenedAt !== show.techRiderOpenedAt ? (
+                              <div>
+                                Last: {new Date(show.techRiderLastOpenedAt).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                                {" at "}
+                                {new Date(show.techRiderLastOpenedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                              </div>
+                            ) : null}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-xs text-white/25">Not yet downloaded</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </div>

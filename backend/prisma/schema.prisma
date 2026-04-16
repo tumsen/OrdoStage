@@ -308,6 +308,7 @@ model TourShow {
   techRiderSentTo   String?
   techRiderOpenedAt DateTime?
   techRiderOpenCount Int @default(0)
+  techRiderLastOpenedAt DateTime?
   techRiderPdfUrl   String?
   showPeople     TourShowPerson[]
   personNotes    TourPersonNote[]
