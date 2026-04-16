@@ -14,8 +14,8 @@ RUN cd webapp && bun install --frozen-lockfile
 # Copy webapp source
 COPY webapp/ ./webapp/
 
-# The webapp imports types from the backend — copy just that file
-COPY backend/src/types.ts ./backend/src/types.ts
+# The webapp imports types from the backend
+COPY backend/src/ ./backend/src/
 
 # Build the Vite app (VITE_BACKEND_URL set at Railway build time)
 ARG VITE_BACKEND_URL
