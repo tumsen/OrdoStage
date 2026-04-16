@@ -244,6 +244,7 @@ export const TourShowSchema = z.object({
   cateringInfo: z.string().nullable(),
   notes: z.string().nullable(),
   order: z.number(),
+  handsNeeded: z.number().nullable(),
   travelTimeMinutes: z.number().nullable(),
   distanceKm: z.number().nullable(),
   createdAt: z.string(),
@@ -275,6 +276,7 @@ export const CreateTourShowSchema = z.object({
   cateringInfo: z.string().optional(),
   notes: z.string().optional(),
   order: z.number().optional(),
+  handsNeeded: z.number().optional(),
   travelTimeMinutes: z.number().optional(),
   distanceKm: z.number().optional(),
 });
@@ -307,6 +309,7 @@ export const TourSchema = z.object({
   soundRequirements: z.string().nullable(),
   lightingRequirements: z.string().nullable(),
   riderNotes: z.string().nullable(),
+  techRiderPdfName: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

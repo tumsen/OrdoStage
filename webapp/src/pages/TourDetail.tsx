@@ -22,6 +22,7 @@ import {
   Coffee,
   Globe,
   ExternalLink,
+  FileText,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { TourDetail, TourShow, TourPerson, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
@@ -58,6 +59,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
+import { downloadVenueTechRider } from "@/lib/downloadVenueTechRider";
 
 // ── Google Maps helpers ───────────────────────────────────────────────────────
 
@@ -1067,6 +1069,7 @@ function ShowCard({
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [riderOpen, setRiderOpen] = useState(false);
+  const [venuePdfLoading, setVenuePdfLoading] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/api/tours/${tourId}/shows/${show.id}`),
@@ -1347,6 +1350,34 @@ function ShowCard({
             {!show.venueAddress && !hasTimes && !hasContact && !hasHotel && !hasLogistics ? (
               <div className="text-sm text-white/25 text-center py-2">No additional details.</div>
             ) : null}
+
+            {/* Download venue tech rider */}
+            <div className="pt-3 border-t border-white/[0.06]">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  setVenuePdfLoading(true);
+                  try {
+                    await downloadVenueTechRider(tour, show);
+                  } finally {
+                    setVenuePdfLoading(false);
+                  }
+                }}
+                disabled={venuePdfLoading}
+                className="border-white/10 text-white/60 hover:text-white bg-transparent gap-2 h-8"
+              >
+                {venuePdfLoading ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <FileText size={12} />
+                )}
+                {venuePdfLoading ? "Generating..." : "Download Venue Tech Rider"}
+                {tour.techRiderPdfName ? null : (
+                  <span className="text-white/25 text-xs ml-1">(cover only)</span>
+                )}
+              </Button>
+            </div>
           </div>
         ) : null}
       </div>
@@ -1727,6 +1758,116 @@ function ShareTourSection({ tour }: { tour: TourDetail }) {
   );
 }
 
+// ── Tech Rider PDF Section ────────────────────────────────────────────────────
+
+function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
+  const queryClient = useQueryClient();
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+      const resp = await fetch(`${baseUrl}/api/tours/${tour.id}/tech-rider`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!resp.ok) throw new Error("Upload failed");
+      return resp.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async () => {
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+      await fetch(`${baseUrl}/api/tours/${tour.id}/tech-rider`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+    },
+  });
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadMutation.mutate(file);
+    e.target.value = "";
+  }
+
+  return (
+    <div className="mt-4 pt-3 border-t border-white/[0.06]">
+      <div className="text-xs text-white/40 uppercase tracking-wide mb-2">
+        Static Tech Rider PDF
+      </div>
+      {tour.techRiderPdfName ? (
+        <div className="flex items-center gap-3 bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3">
+          <FileText size={14} className="text-white/40 flex-shrink-0" />
+          <span className="text-sm text-white/70 flex-1 truncate">
+            {tour.techRiderPdfName}
+          </span>
+          <label className="cursor-pointer">
+            <span className="text-xs text-white/40 hover:text-white transition-colors">
+              {uploadMutation.isPending ? "Uploading..." : "Replace"}
+            </span>
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={handleFileChange}
+              className="hidden"
+              disabled={uploadMutation.isPending}
+            />
+          </label>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => removeMutation.mutate()}
+            disabled={removeMutation.isPending}
+            className="h-6 px-2 text-white/30 hover:text-red-400"
+          >
+            <X size={11} />
+          </Button>
+        </div>
+      ) : (
+        <label className="cursor-pointer block">
+          <div
+            className={`border border-dashed border-white/15 rounded-lg px-4 py-3 flex items-center gap-3 hover:border-white/30 transition-colors ${
+              uploadMutation.isPending ? "opacity-50 pointer-events-none" : ""
+            }`}
+          >
+            {uploadMutation.isPending ? (
+              <Loader2 size={14} className="text-white/40 animate-spin" />
+            ) : (
+              <Plus size={14} className="text-white/40" />
+            )}
+            <span className="text-sm text-white/40">
+              {uploadMutation.isPending
+                ? "Uploading..."
+                : "Upload static tech rider PDF (light plans, stage plot, etc.)"}
+            </span>
+          </div>
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={handleFileChange}
+            className="hidden"
+            disabled={uploadMutation.isPending}
+          />
+        </label>
+      )}
+      <p className="text-xs text-white/25 mt-2">
+        Automatically prepended to each venue's tech rider download.
+      </p>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function TourDetailPage() {
@@ -1843,6 +1984,8 @@ export default function TourDetailPage() {
             </div>
           </div>
         ) : null}
+
+        <TechRiderPDFSection tour={tour} />
 
         {tour.notes ? (
           <div>

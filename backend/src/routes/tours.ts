@@ -41,6 +41,7 @@ function serializeTourShow(show: any) {
     cateringInfo: show.cateringInfo,
     notes: show.notes,
     order: show.order,
+    handsNeeded: show.handsNeeded ?? null,
     travelTimeMinutes: show.travelTimeMinutes,
     distanceKm: show.distanceKm,
     createdAt: show.createdAt instanceof Date ? show.createdAt.toISOString() : show.createdAt,
@@ -78,6 +79,7 @@ function serializeTour(tour: any) {
     soundRequirements: tour.soundRequirements,
     lightingRequirements: tour.lightingRequirements,
     riderNotes: tour.riderNotes,
+    techRiderPdfName: tour.techRiderPdfName ?? null,
     createdAt: tour.createdAt instanceof Date ? tour.createdAt.toISOString() : tour.createdAt,
     updatedAt: tour.updatedAt instanceof Date ? tour.updatedAt.toISOString() : tour.updatedAt,
   };
@@ -289,6 +291,7 @@ toursRouter.post("/tours/:id/shows", zValidator("json", CreateTourShowSchema), a
       cateringInfo: body.cateringInfo ?? null,
       notes: body.notes ?? null,
       order: body.order ?? 0,
+      handsNeeded: body.handsNeeded ?? null,
       travelTimeMinutes: body.travelTimeMinutes ?? null,
       distanceKm: body.distanceKm ?? null,
     },
@@ -355,6 +358,7 @@ toursRouter.put(
         ...(body.cateringInfo !== undefined && { cateringInfo: body.cateringInfo }),
         ...(body.notes !== undefined && { notes: body.notes }),
         ...(body.order !== undefined && { order: body.order }),
+        ...(body.handsNeeded !== undefined && { handsNeeded: body.handsNeeded }),
         ...(body.travelTimeMinutes !== undefined && { travelTimeMinutes: body.travelTimeMinutes }),
         ...(body.distanceKm !== undefined && { distanceKm: body.distanceKm }),
       },
@@ -484,6 +488,85 @@ toursRouter.delete("/tours/:id/people/:personId", async (c) => {
 
   await prisma.tourPerson.delete({
     where: { tourId_personId: { tourId: id, personId } },
+  });
+
+  return new Response(null, { status: 204 });
+});
+
+// POST /api/tours/:id/tech-rider — upload static tech rider PDF
+toursRouter.post("/tours/:id/tech-rider", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  if (!canWrite(user.orgRole))
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+
+  const { id } = c.req.param();
+  const tour = await prisma.tour.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!tour) return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+
+  const formData = await c.req.parseBody();
+  const file = formData["file"];
+  if (!file || typeof file === "string")
+    return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
+
+  const arrayBuffer = await (file as File).arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  await prisma.tour.update({
+    where: { id },
+    data: {
+      techRiderPdfData: buffer,
+      techRiderPdfName: (file as File).name,
+    },
+  });
+
+  return c.json({ data: { name: (file as File).name } }, 201);
+});
+
+// GET /api/tours/:id/tech-rider/download — download the static tech rider PDF bytes
+toursRouter.get("/tours/:id/tech-rider/download", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  const { id } = c.req.param();
+  const tour = await prisma.tour.findUnique({
+    where: { id, organizationId: user.organizationId },
+    select: { techRiderPdfData: true, techRiderPdfName: true },
+  });
+
+  if (!tour?.techRiderPdfData)
+    return c.json({ error: { message: "No tech rider PDF uploaded", code: "NOT_FOUND" } }, 404);
+
+  return new Response(tour.techRiderPdfData, {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${tour.techRiderPdfName || "tech-rider.pdf"}"`,
+      "Content-Length": String(tour.techRiderPdfData.length),
+    },
+  });
+});
+
+// DELETE /api/tours/:id/tech-rider — remove the static tech rider PDF
+toursRouter.delete("/tours/:id/tech-rider", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  if (!canWrite(user.orgRole))
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+
+  const { id } = c.req.param();
+  const tour = await prisma.tour.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!tour) return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+
+  await prisma.tour.update({
+    where: { id },
+    data: { techRiderPdfData: null, techRiderPdfName: null },
   });
 
   return new Response(null, { status: 204 });

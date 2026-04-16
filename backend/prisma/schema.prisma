@@ -257,6 +257,8 @@ model Tour {
   soundRequirements    String?   // PA/sound system requirements
   lightingRequirements String?   // lighting requirements
   riderNotes           String?   // additional tech rider notes
+  techRiderPdfData     Bytes?    // uploaded static tech rider PDF bytes
+  techRiderPdfName     String?   // original filename
   organizationId   String
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   shows            TourShow[]
@@ -293,6 +295,7 @@ model TourShow {
   cateringInfo   String?
   notes          String?
   order          Int      @default(0)
+  handsNeeded    Int?     // per-venue override for number of hands needed
   travelTimeMinutes Int?  // estimated drive/travel time to NEXT venue in minutes
   distanceKm        Float? // estimated distance to NEXT venue in km
   createdAt      DateTime @default(now())
