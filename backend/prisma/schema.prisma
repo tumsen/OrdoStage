@@ -249,7 +249,13 @@ model Tour {
   tourManagerName  String?
   tourManagerPhone String?
   tourManagerEmail String?
-  notes            String?
+  notes                String?
+  showDuration         String?   // e.g. "1h 45min" — duration of the show
+  handsNeeded          Int?      // number of stagehands/crew needed at venue
+  stageRequirements    String?   // stage setup requirements
+  soundRequirements    String?   // PA/sound system requirements
+  lightingRequirements String?   // lighting requirements
+  riderNotes           String?   // additional tech rider notes
   organizationId   String
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   shows            TourShow[]

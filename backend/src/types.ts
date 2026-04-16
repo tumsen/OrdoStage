@@ -294,6 +294,12 @@ export const TourSchema = z.object({
   tourManagerPhone: z.string().nullable(),
   tourManagerEmail: z.string().nullable(),
   notes: z.string().nullable(),
+  showDuration: z.string().nullable(),
+  handsNeeded: z.number().nullable(),
+  stageRequirements: z.string().nullable(),
+  soundRequirements: z.string().nullable(),
+  lightingRequirements: z.string().nullable(),
+  riderNotes: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -311,6 +317,12 @@ export const CreateTourSchema = z.object({
   tourManagerPhone: z.string().optional(),
   tourManagerEmail: z.string().optional(),
   notes: z.string().optional(),
+  showDuration: z.string().optional(),
+  handsNeeded: z.number().optional(),
+  stageRequirements: z.string().optional(),
+  soundRequirements: z.string().optional(),
+  lightingRequirements: z.string().optional(),
+  riderNotes: z.string().optional(),
 });
 
 export const UpdateTourSchema = CreateTourSchema.partial();

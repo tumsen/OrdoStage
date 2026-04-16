@@ -15,6 +15,9 @@ import {
   CalendarDays,
   MapPin,
   Navigation,
+  Mail,
+  Copy,
+  Check,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { TourDetail, TourShow, TourPerson, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
@@ -142,6 +145,12 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
   const [tourManagerPhone, setTourManagerPhone] = useState(tour.tourManagerPhone ?? "");
   const [tourManagerEmail, setTourManagerEmail] = useState(tour.tourManagerEmail ?? "");
   const [notes, setNotes] = useState(tour.notes ?? "");
+  const [showDuration, setShowDuration] = useState(tour.showDuration ?? "");
+  const [handsNeeded, setHandsNeeded] = useState(tour.handsNeeded != null ? String(tour.handsNeeded) : "");
+  const [stageRequirements, setStageRequirements] = useState(tour.stageRequirements ?? "");
+  const [soundRequirements, setSoundRequirements] = useState(tour.soundRequirements ?? "");
+  const [lightingRequirements, setLightingRequirements] = useState(tour.lightingRequirements ?? "");
+  const [riderNotes, setRiderNotes] = useState(tour.riderNotes ?? "");
 
   const updateMutation = useMutation({
     mutationFn: (data: UpdateTour) => api.put<TourDetail>(`/api/tours/${tour.id}`, data),
@@ -163,6 +172,12 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
       tourManagerPhone: tourManagerPhone.trim() || undefined,
       tourManagerEmail: tourManagerEmail.trim() || undefined,
       notes: notes.trim() || undefined,
+      showDuration: showDuration.trim() || undefined,
+      handsNeeded: handsNeeded ? parseInt(handsNeeded, 10) : undefined,
+      stageRequirements: stageRequirements.trim() || undefined,
+      soundRequirements: soundRequirements.trim() || undefined,
+      lightingRequirements: lightingRequirements.trim() || undefined,
+      riderNotes: riderNotes.trim() || undefined,
     };
     updateMutation.mutate(payload);
   }
@@ -248,6 +263,74 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
               className="bg-white/5 border-white/10 text-white focus:border-white/30 resize-none"
               rows={3}
             />
+          </div>
+
+          <div className="pt-2 border-t border-white/10">
+            <p className="text-xs text-white/40 uppercase tracking-wide mb-3">Technical Rider</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">Show Duration</Label>
+                  <Input
+                    value={showDuration}
+                    onChange={(e) => setShowDuration(e.target.value)}
+                    placeholder="e.g. 1h 45min"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">Hands Needed</Label>
+                  <Input
+                    type="number"
+                    value={handsNeeded}
+                    onChange={(e) => setHandsNeeded(e.target.value)}
+                    placeholder="e.g. 4"
+                    min="0"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-white/60 text-xs uppercase tracking-wide">Stage Requirements</Label>
+                <Textarea
+                  value={stageRequirements}
+                  onChange={(e) => setStageRequirements(e.target.value)}
+                  placeholder="Stage dimensions, setup requirements..."
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-none"
+                  rows={2}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-white/60 text-xs uppercase tracking-wide">Sound Requirements</Label>
+                <Textarea
+                  value={soundRequirements}
+                  onChange={(e) => setSoundRequirements(e.target.value)}
+                  placeholder="PA system, microphones, monitors..."
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-none"
+                  rows={2}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-white/60 text-xs uppercase tracking-wide">Lighting Requirements</Label>
+                <Textarea
+                  value={lightingRequirements}
+                  onChange={(e) => setLightingRequirements(e.target.value)}
+                  placeholder="Lighting rig, follow spots..."
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-none"
+                  rows={2}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-white/60 text-xs uppercase tracking-wide">Additional Rider Notes</Label>
+                <Textarea
+                  value={riderNotes}
+                  onChange={(e) => setRiderNotes(e.target.value)}
+                  placeholder="Any other technical requirements..."
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-none"
+                  rows={2}
+                />
+              </div>
+            </div>
           </div>
 
           {updateMutation.isError ? (
@@ -690,6 +773,180 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
   );
 }
 
+// ── Send Tech Rider Dialog ────────────────────────────────────────────────────
+
+interface SendTechRiderDialogProps {
+  tour: TourDetail;
+  show: TourShow;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function buildTechRiderText(tour: TourDetail, show: TourShow): string {
+  const date = new Date(show.date).toLocaleDateString("en-GB", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric"
+  });
+  const venue = [show.venueName, show.venueCity].filter(Boolean).join(", ");
+
+  const lines: string[] = [];
+
+  lines.push(`TECH RIDER`);
+  lines.push(`==========`);
+  lines.push(``);
+  lines.push(`Tour: ${tour.name}`);
+  if (venue) lines.push(`Venue: ${venue}`);
+  if (show.venueAddress) lines.push(`Address: ${show.venueAddress}`);
+  lines.push(`Date: ${date}`);
+  lines.push(``);
+
+  // Schedule
+  const scheduleParts: string[] = [];
+  if (show.getInTime) scheduleParts.push(`Get-in: ${show.getInTime}`);
+  if (show.rehearsalTime) scheduleParts.push(`Rehearsal: ${show.rehearsalTime}`);
+  if (show.soundcheckTime) scheduleParts.push(`Soundcheck: ${show.soundcheckTime}`);
+  if (show.doorsTime) scheduleParts.push(`Doors: ${show.doorsTime}`);
+  if (show.showTime) scheduleParts.push(`Show: ${show.showTime}`);
+  if (tour.showDuration) scheduleParts.push(`Duration: ${tour.showDuration}`);
+  if (scheduleParts.length > 0) {
+    lines.push(`SCHEDULE`);
+    lines.push(`--------`);
+    scheduleParts.forEach(s => lines.push(s));
+    lines.push(``);
+  }
+
+  // Crew
+  if (tour.handsNeeded) {
+    lines.push(`CREW REQUIRED`);
+    lines.push(`-------------`);
+    lines.push(`Hands needed at venue: ${tour.handsNeeded}`);
+    lines.push(``);
+  }
+
+  // Technical requirements
+  const hasReqs = tour.stageRequirements || tour.soundRequirements || tour.lightingRequirements;
+  if (hasReqs) {
+    lines.push(`TECHNICAL REQUIREMENTS`);
+    lines.push(`----------------------`);
+    if (tour.stageRequirements) {
+      lines.push(`Stage Setup:`);
+      lines.push(tour.stageRequirements);
+      lines.push(``);
+    }
+    if (tour.soundRequirements) {
+      lines.push(`Sound System:`);
+      lines.push(tour.soundRequirements);
+      lines.push(``);
+    }
+    if (tour.lightingRequirements) {
+      lines.push(`Lighting:`);
+      lines.push(tour.lightingRequirements);
+      lines.push(``);
+    }
+  }
+
+  // Additional notes
+  const additionalNotes = [tour.riderNotes, show.notes].filter(Boolean).join("\n\n");
+  if (additionalNotes) {
+    lines.push(`ADDITIONAL NOTES`);
+    lines.push(`----------------`);
+    lines.push(additionalNotes);
+    lines.push(``);
+  }
+
+  // Footer
+  lines.push(`---`);
+  if (tour.tourManagerName || tour.tourManagerPhone || tour.tourManagerEmail) {
+    lines.push(`Questions? Contact our Tour Manager:`);
+    if (tour.tourManagerName) lines.push(tour.tourManagerName);
+    const contact = [tour.tourManagerPhone, tour.tourManagerEmail].filter(Boolean).join(" | ");
+    if (contact) lines.push(contact);
+  }
+
+  return lines.join("\n");
+}
+
+function SendTechRiderDialog({ tour, show, open, onOpenChange }: SendTechRiderDialogProps) {
+  const [copied, setCopied] = useState(false);
+  const emailText = buildTechRiderText(tour, show);
+  const subject = `Tech Rider — ${tour.name} — ${new Date(show.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}${show.venueName ? ` — ${show.venueName}` : ""}`;
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(emailText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleOpenEmailApp() {
+    const mailtoUrl = `mailto:${show.contactEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailText)}`;
+    window.open(mailtoUrl, "_blank");
+  }
+
+  const recipientDisplay = [show.contactName, show.contactEmail].filter(Boolean).join(" — ");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Mail size={16} className="text-white/50" />
+            Send Tech Rider
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Recipient */}
+        <div className="flex items-center gap-2 bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3 flex-shrink-0">
+          <span className="text-xs text-white/40 uppercase tracking-wide w-12 flex-shrink-0">To</span>
+          <span className="text-sm text-white/80">{recipientDisplay || "No contact email set"}</span>
+        </div>
+
+        {/* Subject */}
+        <div className="flex items-center gap-2 bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3 flex-shrink-0">
+          <span className="text-xs text-white/40 uppercase tracking-wide w-12 flex-shrink-0">Subject</span>
+          <span className="text-sm text-white/70 truncate">{subject}</span>
+        </div>
+
+        {/* Email preview */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="bg-white/[0.02] border border-white/8 rounded-lg p-4">
+            <pre className="text-xs text-white/60 leading-relaxed whitespace-pre-wrap font-mono">
+              {emailText}
+            </pre>
+          </div>
+        </div>
+
+        <DialogFooter className="flex-shrink-0 gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="border-white/10 text-white/60 hover:text-white bg-transparent"
+          >
+            Close
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCopy}
+            className="border-white/10 text-white/70 hover:text-white bg-transparent gap-2"
+          >
+            {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+            {copied ? "Copied!" : "Copy Text"}
+          </Button>
+          <Button
+            type="button"
+            onClick={handleOpenEmailApp}
+            disabled={!show.contactEmail}
+            className="bg-red-900 hover:bg-red-800 text-white border-red-700/50 gap-2"
+          >
+            <Mail size={14} />
+            Open in Email App
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Shows Tab ─────────────────────────────────────────────────────────────────
 
 function formatShowDate(dateStr: string): string {
@@ -707,15 +964,18 @@ function ShowCard({
   show,
   dayNumber,
   tourId,
+  tour,
 }: {
   show: TourShow;
   dayNumber: number;
   tourId: string;
+  tour: TourDetail;
 }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [riderOpen, setRiderOpen] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/api/tours/${tourId}/shows/${show.id}`),
@@ -766,6 +1026,17 @@ function ShowCard({
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
+            {show.contactEmail ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-white/30 hover:text-blue-400"
+                onClick={() => setRiderOpen(true)}
+                title="Send tech rider"
+              >
+                <Mail size={13} />
+              </Button>
+            ) : null}
             <Button
               variant="ghost"
               size="icon"
@@ -964,6 +1235,15 @@ function ShowCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {riderOpen ? (
+        <SendTechRiderDialog
+          tour={tour}
+          show={show}
+          open={riderOpen}
+          onOpenChange={setRiderOpen}
+        />
+      ) : null}
     </>
   );
 }
@@ -1067,7 +1347,7 @@ function ShowsTab({ tour }: { tour: TourDetail }) {
             const isDifferentDate = nextShow && show.date.slice(0, 10) !== nextShow.date.slice(0, 10);
             return (
               <div key={show.id}>
-                <ShowCard show={show} dayNumber={i + 1} tourId={tour.id} />
+                <ShowCard show={show} dayNumber={i + 1} tourId={tour.id} tour={tour} />
                 {isDifferentDate ? (
                   <TravelConnector currentShow={show} nextShow={nextShow} />
                 ) : null}
@@ -1334,6 +1614,28 @@ export default function TourDetailPage() {
               <InfoRow label="Name" value={tour.tourManagerName} />
               <InfoRow label="Phone" value={tour.tourManagerPhone} />
               <InfoRow label="Email" value={tour.tourManagerEmail} />
+            </div>
+          </div>
+        ) : null}
+
+        {(tour.showDuration || tour.handsNeeded || tour.stageRequirements || tour.soundRequirements || tour.lightingRequirements || tour.riderNotes) ? (
+          <div>
+            <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
+              Technical Rider
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <InfoRow label="Show Duration" value={tour.showDuration} />
+              {tour.handsNeeded != null ? (
+                <InfoRow label="Hands Needed" value={`${tour.handsNeeded} crew`} />
+              ) : null}
+              <InfoRow label="Stage Requirements" value={tour.stageRequirements} />
+              <InfoRow label="Sound Requirements" value={tour.soundRequirements} />
+              <InfoRow label="Lighting Requirements" value={tour.lightingRequirements} />
+              {tour.riderNotes ? (
+                <div className="sm:col-span-2">
+                  <InfoRow label="Additional Notes" value={tour.riderNotes} />
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}
