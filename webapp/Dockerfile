@@ -26,7 +26,7 @@ RUN cd webapp && bun run build
 # ── Serve stage ───────────────────────────────────────────────────────────────
 FROM nginx:alpine
 COPY --from=builder /app/webapp/dist /usr/share/nginx/html
-COPY webapp/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/webapp/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
