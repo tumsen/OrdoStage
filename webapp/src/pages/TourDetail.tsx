@@ -2215,7 +2215,10 @@ export default function TourDetailPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex gap-6 items-start">
+        {/* Main content column */}
+        <div className="flex-1 min-w-0 space-y-6">
       {/* Back */}
       <Button
         variant="ghost"
@@ -2334,12 +2337,6 @@ export default function TourDetailPage() {
               >
                 People ({tour.people.length})
               </TabsTrigger>
-              <TabsTrigger
-                value="calendar"
-                className="flex-1 text-xs py-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/40 hover:text-white/70"
-              >
-                Calendar
-              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -2350,14 +2347,23 @@ export default function TourDetailPage() {
             <TabsContent value="people" className="mt-0">
               <PeopleTab tour={tour} />
             </TabsContent>
-            <TabsContent value="calendar" className="mt-0">
-              <TourCalendarView tour={tour} />
-            </TabsContent>
           </div>
         </Tabs>
       </div>
 
-      <EditTourDialog tour={tour} open={editOpen} onOpenChange={setEditOpen} />
+          <EditTourDialog tour={tour} open={editOpen} onOpenChange={setEditOpen} />
+        </div>{/* end main content */}
+
+        {/* Vertical calendar sidebar — hidden on mobile, sticky on desktop */}
+        <div className="hidden lg:block w-52 flex-shrink-0">
+          <div className="sticky top-6">
+            <div className="bg-white/[0.03] border border-white/10 rounded-xl p-4">
+              <div className="text-[10px] text-white/25 uppercase tracking-widest mb-3 font-semibold">Schedule</div>
+              <TourCalendarView tour={tour} />
+            </div>
+          </div>
+        </div>
+      </div>{/* end flex row */}
     </div>
   );
 }
