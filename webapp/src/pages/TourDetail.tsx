@@ -2337,6 +2337,12 @@ export default function TourDetailPage() {
               >
                 People ({tour.people.length})
               </TabsTrigger>
+              <TabsTrigger
+                value="calendar"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                Calendar
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -2346,6 +2352,9 @@ export default function TourDetailPage() {
             </TabsContent>
             <TabsContent value="people" className="mt-0">
               <PeopleTab tour={tour} />
+            </TabsContent>
+            <TabsContent value="calendar" className="mt-0">
+              <TourCalendarView tour={tour} />
             </TabsContent>
           </div>
         </Tabs>
