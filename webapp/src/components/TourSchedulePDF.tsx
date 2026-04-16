@@ -17,7 +17,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingTop: 48,
     paddingBottom: 56,
-    paddingHorizontal: 48,
+    paddingLeft: 48,
+    paddingRight: 112,
   },
   // Header
   header: {
@@ -198,12 +199,115 @@ const styles = StyleSheet.create({
     color: "#444",
     lineHeight: 1.5,
   },
+  // Calendar sidebar
+  calSidebar: {
+    position: "absolute",
+    right: 8,
+    top: 48,
+    bottom: 56,
+    width: 94,
+    borderLeftWidth: 0.5,
+    borderLeftColor: "#e0e0e0",
+    paddingLeft: 8,
+    overflow: "hidden",
+  },
+  calTitle: {
+    fontSize: 6.5,
+    fontFamily: "Helvetica-Bold",
+    color: "#999",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 5,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#eee",
+    paddingBottom: 3,
+  },
+  calWeekRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 1,
+  },
+  calWeekNum: {
+    fontSize: 5.5,
+    color: "#bbb",
+    width: 14,
+    textAlign: "right",
+  },
+  calWeekLine: {
+    flex: 1,
+    height: 0.5,
+    backgroundColor: "#f0f0f0",
+    marginLeft: 2,
+  },
+  calDayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 0.5,
+    paddingHorizontal: 1,
+    marginBottom: 0.5,
+  },
+  calWeekendRow: {
+    backgroundColor: "#fdf8f3",
+    borderRadius: 1,
+  },
+  calDayNum: {
+    fontSize: 7,
+    width: 12,
+    textAlign: "right",
+    color: "#777",
+  },
+  calWeekendDayNum: {
+    color: "#b45309",
+    fontFamily: "Helvetica-Bold",
+  },
+  calDayName: {
+    fontSize: 6,
+    width: 12,
+    marginLeft: 2,
+    color: "#bbb",
+  },
+  calWeekendDayName: {
+    color: "#d97706",
+  },
+  calMonthLabel: {
+    fontSize: 5.5,
+    color: "#bbb",
+    marginLeft: 1,
+  },
+  calBadge: {
+    marginLeft: 2,
+    borderRadius: 1,
+    paddingHorizontal: 2,
+    paddingVertical: 0.5,
+  },
+  calBadgeShow: {
+    backgroundColor: "#fef2f2",
+  },
+  calBadgeTravel: {
+    backgroundColor: "#eff6ff",
+  },
+  calBadgeDayOff: {
+    backgroundColor: "#f0fdf4",
+  },
+  calBadgeText: {
+    fontSize: 5.5,
+  },
+  calBadgeTextShow: {
+    color: "#dc2626",
+  },
+  calBadgeTextTravel: {
+    color: "#2563eb",
+  },
+  calBadgeTextDayOff: {
+    color: "#16a34a",
+  },
   // Footer
   footer: {
     position: "absolute",
     bottom: 24,
     left: 48,
-    right: 48,
+    right: 112,
     borderTopWidth: 0.5,
     borderTopColor: "#ccc",
     paddingTop: 6,
@@ -256,6 +360,29 @@ const styles = StyleSheet.create({
     textDecoration: "underline",
   },
 });
+
+function getISOWeekPDF(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+function addDaysPDF(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+function getISOWeekStartPDF(d: Date): Date {
+  const r = new Date(d);
+  r.setHours(0, 0, 0, 0);
+  const dow = r.getDay();
+  r.setDate(r.getDate() - ((dow + 6) % 7));
+  return r;
+}
+
+const DOW_PDF = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
 function formatPDFDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
@@ -482,6 +609,100 @@ function TravelToNext({ currentShow, nextShow }: { currentShow: TourShow; nextSh
   );
 }
 
+function PDFCalendarSidebar({ shows }: { shows: TourShow[] }) {
+  if (shows.length === 0) return null;
+
+  const showsByDate = new Map<string, TourShow[]>();
+  for (const show of shows) {
+    const k = new Date(show.date).toISOString().slice(0, 10);
+    if (!showsByDate.has(k)) showsByDate.set(k, []);
+    showsByDate.get(k)!.push(show);
+  }
+
+  const sortedKeys = [...showsByDate.keys()].sort();
+  const firstDate = getISOWeekStartPDF(new Date(sortedKeys[0] + "T00:00:00"));
+  const rawLast = new Date(sortedKeys[sortedKeys.length - 1] + "T00:00:00");
+  const lastWeekStart = getISOWeekStartPDF(rawLast);
+  const lastDate = addDaysPDF(lastWeekStart, 6);
+
+  const days: Date[] = [];
+  let cur = new Date(firstDate);
+  while (cur <= lastDate) {
+    days.push(new Date(cur));
+    cur = addDaysPDF(cur, 1);
+  }
+
+  let lastWeekNum = -1;
+
+  return (
+    <View style={styles.calSidebar} fixed>
+      <Text style={styles.calTitle}>Calendar</Text>
+      {days.map((day) => {
+        const k = day.toISOString().slice(0, 10);
+        const dayShows = showsByDate.get(k) ?? [];
+        const dowIndex = (day.getDay() + 6) % 7;
+        const isWeekend = dowIndex >= 5;
+        const isMonday = dowIndex === 0;
+        const weekNum = getISOWeekPDF(day);
+        const showWeekNum = isMonday && weekNum !== lastWeekNum;
+        if (showWeekNum) lastWeekNum = weekNum;
+
+        return (
+          <View key={k}>
+            {showWeekNum ? (
+              <View style={styles.calWeekRow}>
+                <Text style={styles.calWeekNum}>W{weekNum}</Text>
+                <View style={styles.calWeekLine} />
+              </View>
+            ) : null}
+            <View style={[styles.calDayRow, isWeekend ? styles.calWeekendRow : {}]}>
+              <Text style={[styles.calDayNum, isWeekend ? styles.calWeekendDayNum : {}]}>
+                {day.getDate()}
+              </Text>
+              <Text style={[styles.calDayName, isWeekend ? styles.calWeekendDayName : {}]}>
+                {DOW_PDF[dowIndex]}
+              </Text>
+              {day.getDate() === 1 ? (
+                <Text style={styles.calMonthLabel}>
+                  {day.toLocaleDateString("en-GB", { month: "short" })}
+                </Text>
+              ) : null}
+              {dayShows.map((show) => {
+                const isTravel = show.type === "travel";
+                const isDayOff = show.type === "day_off";
+                const time = show.showTime ?? show.getInTime;
+                const label = isTravel
+                  ? "Travel"
+                  : isDayOff
+                  ? "Off"
+                  : show.venueCity?.slice(0, 6) ?? "Show";
+                return (
+                  <View
+                    key={show.id}
+                    style={[
+                      styles.calBadge,
+                      isTravel ? styles.calBadgeTravel : isDayOff ? styles.calBadgeDayOff : styles.calBadgeShow,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.calBadgeText,
+                        isTravel ? styles.calBadgeTextTravel : isDayOff ? styles.calBadgeTextDayOff : styles.calBadgeTextShow,
+                      ]}
+                    >
+                      {time ? `${time} ` : ""}{label}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function TourSchedulePDF({ tour }: { tour: TourDetail }) {
   const sortedShows = [...tour.shows].sort((a, b) => a.date.localeCompare(b.date));
   const generatedDate = new Date().toLocaleDateString("en-GB", {
@@ -589,6 +810,7 @@ export function TourSchedulePDF({ tour }: { tour: TourDetail }) {
             render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
           />
         </View>
+        <PDFCalendarSidebar shows={sortedShows} />
       </Page>
 
       {/* One page per show */}
@@ -613,6 +835,7 @@ export function TourSchedulePDF({ tour }: { tour: TourDetail }) {
                 render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
               />
             </View>
+            <PDFCalendarSidebar shows={sortedShows} />
           </Page>
         );
       })}
