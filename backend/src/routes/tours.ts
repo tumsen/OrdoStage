@@ -169,6 +169,10 @@ toursRouter.get("/tours/:id", async (c) => {
       people: {
         include: { person: true },
       },
+      personNotes: {
+        include: { person: true },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
@@ -180,12 +184,24 @@ toursRouter.get("/tours/:id", async (c) => {
     data: {
       ...serializeTour(tour),
       shows: tour.shows.map(serializeTourShow),
-      people: tour.people.map((tp) => ({
+      people: tour.people.map((tp: any) => ({
         id: tp.id,
         tourId: tp.tourId,
         personId: tp.personId,
         role: tp.role,
+        personalToken: tp.personalToken,
         person: serializePerson(tp.person),
+      })),
+      personNotes: (tour.personNotes ?? []).map((n: any) => ({
+        id: n.id,
+        tourId: n.tourId,
+        showId: n.showId,
+        personId: n.personId,
+        note: n.note ?? null,
+        needsHotel: n.needsHotel,
+        person: { id: n.person.id, name: n.person.name, role: n.person.role ?? null },
+        createdAt: n.createdAt instanceof Date ? n.createdAt.toISOString() : n.createdAt,
+        updatedAt: n.updatedAt instanceof Date ? n.updatedAt.toISOString() : n.updatedAt,
       })),
     },
   });
@@ -462,6 +478,7 @@ toursRouter.post(
           tourId: tourPerson.tourId,
           personId: tourPerson.personId,
           role: tourPerson.role,
+          personalToken: (tourPerson as any).personalToken,
           person: serializePerson(tourPerson.person),
         },
       },
@@ -689,5 +706,48 @@ toursRouter.post("/tours/:id/shows/:showId/venue-rider", async (c) => {
 
   return c.json({ data: { url: stored.url, filename: pdfFile.name } }, 201);
 });
+
+// PUT /api/tours/:id/shows/:showId/person-notes/:personId — tour manager edits a note
+toursRouter.put(
+  "/tours/:id/shows/:showId/person-notes/:personId",
+  zValidator("json", z.object({ note: z.string().optional(), needsHotel: z.boolean().optional() })),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId)
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    if (!canWrite(user.orgRole))
+      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+
+    const { id, showId, personId } = c.req.param();
+    const body = c.req.valid("json");
+
+    const tour = await prisma.tour.findUnique({ where: { id, organizationId: user.organizationId } });
+    if (!tour) return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+
+    const note = await prisma.tourPersonNote.upsert({
+      where: { showId_personId: { showId, personId } },
+      update: {
+        ...(body.note !== undefined && { note: body.note }),
+        ...(body.needsHotel !== undefined && { needsHotel: body.needsHotel }),
+      },
+      create: { tourId: id, showId, personId, note: body.note ?? null, needsHotel: body.needsHotel ?? false },
+      include: { person: true },
+    });
+
+    return c.json({
+      data: {
+        id: note.id,
+        tourId: note.tourId,
+        showId: note.showId,
+        personId: note.personId,
+        note: note.note ?? null,
+        needsHotel: note.needsHotel,
+        person: { id: note.person.id, name: note.person.name, role: note.person.role ?? null },
+        createdAt: note.createdAt.toISOString(),
+        updatedAt: note.updatedAt.toISOString(),
+      },
+    });
+  }
+);
 
 export default toursRouter;

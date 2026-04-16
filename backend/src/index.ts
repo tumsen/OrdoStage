@@ -59,7 +59,7 @@ app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 app.get("/health", (c) => c.json({ status: "ok", version: "1.0.0" }));
 
 // Public routes (no auth required — mount before credit check middleware)
-app.route("/api/public/tours", publicRouter);
+app.route("/api/public", publicRouter);
 
 // Billing routes (webhook must be before credit check middleware)
 app.route("/api", billingRouter);

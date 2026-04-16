@@ -23,6 +23,7 @@ import Billing from "./pages/Billing";
 import Tours from "./pages/Tours";
 import TourDetail from "./pages/TourDetail";
 import PublicTourSchedule from "./pages/PublicTourSchedule";
+import PersonalTourView from "./pages/PersonalTourView";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminOrgs from "./pages/admin/Orgs";
@@ -253,6 +254,7 @@ const App = () => (
 
           {/* Public routes (no auth required) */}
           <Route path="/t/:token" element={<PublicTourSchedule />} />
+          <Route path="/p/:personalToken" element={<PersonalTourView />} />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

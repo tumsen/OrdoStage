@@ -122,6 +122,7 @@ model Person {
   internalBookings InternalBookingPerson[]
   tourAssignments  TourPerson[]
   showAssignments  TourShowPerson[]
+  tourNotes        TourPersonNote[]
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 }
@@ -264,6 +265,7 @@ model Tour {
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   shows            TourShow[]
   people           TourPerson[]
+  personNotes      TourPersonNote[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 }
@@ -300,19 +302,37 @@ model TourShow {
   travelTimeMinutes Int?  // estimated drive/travel time to NEXT venue in minutes
   distanceKm        Float? // estimated distance to NEXT venue in km
   showPeople     TourShowPerson[]
+  personNotes    TourPersonNote[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
 
 model TourPerson {
-  id       String  @id @default(cuid())
-  tourId   String
-  tour     Tour    @relation(fields: [tourId], references: [id], onDelete: Cascade)
-  personId String
-  person   Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
-  role     String?
+  id            String  @id @default(cuid())
+  tourId        String
+  tour          Tour    @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  personId      String
+  person        Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  role          String?
+  personalToken String  @unique @default(cuid())
 
   @@unique([tourId, personId])
+}
+
+model TourPersonNote {
+  id         String   @id @default(cuid())
+  tourId     String
+  showId     String
+  personId   String
+  note       String?
+  needsHotel Boolean  @default(false)
+  tour       Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  show       TourShow @relation(fields: [showId], references: [id], onDelete: Cascade)
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([showId, personId])
 }
 
 model TourShowPerson {

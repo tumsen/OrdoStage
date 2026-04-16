@@ -25,9 +25,10 @@ import {
   FileText,
   Printer,
   Send,
+  Link2,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { TourDetail, TourShow, TourPerson, TourShowPerson, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
+import type { TourDetail, TourShow, TourPerson, TourShowPerson, TourPersonNote, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1337,6 +1338,33 @@ function ShowCard({
               <div className="text-sm text-white/25 text-center py-2">No additional details.</div>
             ) : null}
 
+            {/* Person responses (hotel + notes) */}
+            {(() => {
+              const showNotes = tour.personNotes.filter((n: TourPersonNote) => n.showId === show.id);
+              if (showNotes.length === 0) return null;
+              return (
+                <div>
+                  <div className="text-xs text-white/35 uppercase tracking-wide mb-2">Responses</div>
+                  <div className="space-y-1.5">
+                    {showNotes.map((n: TourPersonNote) => (
+                      <div key={n.id} className="flex items-start gap-2.5 bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-medium text-white/70">{n.person.name}</span>
+                            {n.person.role ? <span className="text-[10px] text-white/30">{n.person.role}</span> : null}
+                            {n.needsHotel ? (
+                              <span className="text-[10px] bg-indigo-900/40 text-indigo-300 border border-indigo-700/30 rounded px-1.5 py-0.5">Hotel needed</span>
+                            ) : null}
+                          </div>
+                          {n.note ? <p className="text-xs text-white/45 mt-1 leading-relaxed">{n.note}</p> : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* People for this show */}
             <div className="pt-1">
               <ShowPeopleSection show={show} tour={tour} />
@@ -1802,6 +1830,7 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
   const [addOpen, setAddOpen] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState("");
   const [role, setRole] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const { data: allPeople } = useQuery({
     queryKey: ["people"],
@@ -1877,15 +1906,30 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
                   </div>
                 ) : null}
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => removeMutation.mutate(tp.id)}
-                className="h-7 w-7 text-white/25 hover:text-red-400"
-                disabled={removeMutation.isPending}
-              >
-                <X size={13} />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(`${window.location.origin}/p/${tp.personalToken}`);
+                    setCopiedId(tp.id);
+                    setTimeout(() => setCopiedId(null), 2000);
+                  }}
+                  className="h-7 w-7 text-white/25 hover:text-blue-400"
+                  title="Copy personal link"
+                >
+                  {copiedId === tp.id ? <Check size={13} className="text-green-400" /> : <Link2 size={13} />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeMutation.mutate(tp.id)}
+                  className="h-7 w-7 text-white/25 hover:text-red-400"
+                  disabled={removeMutation.isPending}
+                >
+                  <X size={13} />
+                </Button>
+              </div>
             </div>
           ))}
         </div>

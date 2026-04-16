@@ -293,12 +293,27 @@ export const CreateTourShowSchema = z.object({
 
 export const UpdateTourShowSchema = CreateTourShowSchema.partial();
 
+// TourPersonNote
+export const TourPersonNoteSchema = z.object({
+  id: z.string(),
+  tourId: z.string(),
+  showId: z.string(),
+  personId: z.string(),
+  note: z.string().nullable(),
+  needsHotel: z.boolean(),
+  person: z.object({ id: z.string(), name: z.string(), role: z.string().nullable() }),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type TourPersonNote = z.infer<typeof TourPersonNoteSchema>;
+
 // TourPerson
 export const TourPersonSchema = z.object({
   id: z.string(),
   tourId: z.string(),
   personId: z.string(),
   role: z.string().nullable(),
+  personalToken: z.string(),
   person: PersonSchema,
 });
 
@@ -327,6 +342,7 @@ export const TourSchema = z.object({
 export const TourDetailSchema = TourSchema.extend({
   shows: z.array(TourShowSchema),
   people: z.array(TourPersonSchema),
+  personNotes: z.array(TourPersonNoteSchema),
 });
 
 export const CreateTourSchema = z.object({
@@ -357,3 +373,4 @@ export type Tour = z.infer<typeof TourSchema>;
 export type TourDetail = z.infer<typeof TourDetailSchema>;
 export type CreateTour = z.infer<typeof CreateTourSchema>;
 export type UpdateTour = z.infer<typeof UpdateTourSchema>;
+// TourPersonNote is already exported above as a named export
