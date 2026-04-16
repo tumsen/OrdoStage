@@ -26,6 +26,7 @@ import {
   Printer,
   Send,
   Link2,
+  CheckCheck,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { TourDetail, TourShow, TourPerson, TourShowPerson, TourPersonNote, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
@@ -972,6 +973,7 @@ function buildTechRiderText(tour: TourDetail, show: TourShow, pdfUrl?: string | 
 }
 
 function SendTechRiderDialog({ tour, show, open, onOpenChange }: SendTechRiderDialogProps) {
+  const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfUploading, setPdfUploading] = useState(false);
@@ -996,9 +998,22 @@ function SendTechRiderDialog({ tour, show, open, onOpenChange }: SendTechRiderDi
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function handleOpenEmailApp() {
+  async function handleOpenEmailApp() {
     const mailtoUrl = `mailto:${show.contactEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailText)}`;
     window.open(mailtoUrl, "_blank");
+    // Mark as sent
+    try {
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+      await fetch(`${baseUrl}/api/tours/${tour.id}/shows/${show.id}/tech-rider-sent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sentTo: show.contactEmail }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+    } catch {
+      // non-critical, ignore
+    }
   }
 
   const recipientDisplay = [show.contactName, show.contactEmail].filter(Boolean).join(" — ");
@@ -1211,20 +1226,27 @@ function ShowCard({
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             {show.type !== "travel" && show.type !== "day_off" ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-white/30 hover:text-white"
-                onClick={async () => {
-                  setVenuePdfLoading(true);
-                  try { await downloadVenueTechRider(tour, show); }
-                  finally { setVenuePdfLoading(false); }
-                }}
-                disabled={venuePdfLoading}
-                title="Download tech rider PDF"
-              >
-                {venuePdfLoading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
-              </Button>
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-white/30 hover:text-white"
+                  onClick={async () => {
+                    setVenuePdfLoading(true);
+                    try { await downloadVenueTechRider(tour, show); }
+                    finally { setVenuePdfLoading(false); }
+                  }}
+                  disabled={venuePdfLoading}
+                  title={show.techRiderOpenCount > 0 ? `Tech rider opened ${show.techRiderOpenCount}×` : show.techRiderSentAt ? "Tech rider sent" : "Download tech rider PDF"}
+                >
+                  {venuePdfLoading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+                </Button>
+                {show.techRiderOpenCount > 0 ? (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400" />
+                ) : show.techRiderSentAt ? (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-blue-400/70" />
+                ) : null}
+              </div>
             ) : null}
             {show.contactEmail ? (
               <Button
@@ -1491,6 +1513,19 @@ function ShowCard({
                           `Hi${show.contactName ? ` ${show.contactName}` : ""},\n\nPlease find the tech rider for ${tour.name} at ${venue} on ${date}:\n\n${url}\n\nThis includes our get-in schedule, crew requirements, and technical specifications.\n\nPlease don't hesitate to get in touch if you have any questions.\n\nBest regards,\n${tour.tourManagerName || ""}`
                         );
                         window.open(`mailto:${show.contactEmail}?subject=${subject}&body=${body}`, "_blank");
+                        // Mark as sent
+                        try {
+                          const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+                          await fetch(`${baseUrl}/api/tours/${tour.id}/shows/${show.id}/tech-rider-sent`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ sentTo: show.contactEmail }),
+                          });
+                          queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+                        } catch {
+                          // non-critical, ignore
+                        }
                       } finally {
                         setVenueSendLoading(false);
                       }
@@ -1503,6 +1538,25 @@ function ShowCard({
                   </Button>
                 ) : null}
               </div>
+              {/* Tracking status */}
+              {(show.techRiderSentAt || show.techRiderOpenCount > 0) ? (
+                <div className="flex flex-wrap gap-3 mt-2">
+                  {show.techRiderSentAt ? (
+                    <div className="flex items-center gap-1.5 text-xs text-white/40">
+                      <Send size={10} className="text-white/30" />
+                      Sent {new Date(show.techRiderSentAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      {show.techRiderSentTo ? <span className="text-white/25">to {show.techRiderSentTo}</span> : null}
+                    </div>
+                  ) : null}
+                  {show.techRiderOpenCount > 0 ? (
+                    <div className="flex items-center gap-1.5 text-xs text-green-400/70">
+                      <CheckCheck size={10} />
+                      Opened {show.techRiderOpenCount}&times;
+                      {show.techRiderOpenedAt ? <span className="text-green-400/50">(last: {new Date(show.techRiderOpenedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })})</span> : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}

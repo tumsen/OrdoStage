@@ -118,6 +118,7 @@ export async function uploadVenueTechRiderForSharing(
     { method: "POST", body: formData, credentials: "include" }
   );
   if (!resp.ok) throw new Error("Upload failed");
-  const data = await resp.json();
-  return data.data.url as string;
+  const trackingBaseUrl = import.meta.env.VITE_BACKEND_URL || window.location.origin;
+  const trackingUrl = `${trackingBaseUrl}/api/tours/${tour.id}/shows/${show.id}/venue-rider/track`;
+  return trackingUrl;
 }

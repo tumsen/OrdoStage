@@ -45,6 +45,11 @@ function serializeTourShow(show: any) {
     handsNeeded: show.handsNeeded ?? null,
     travelTimeMinutes: show.travelTimeMinutes,
     distanceKm: show.distanceKm,
+    techRiderSentAt: show.techRiderSentAt instanceof Date ? show.techRiderSentAt.toISOString() : (show.techRiderSentAt ?? null),
+    techRiderSentTo: show.techRiderSentTo ?? null,
+    techRiderOpenedAt: show.techRiderOpenedAt instanceof Date ? show.techRiderOpenedAt.toISOString() : (show.techRiderOpenedAt ?? null),
+    techRiderOpenCount: show.techRiderOpenCount ?? 0,
+    techRiderPdfUrl: show.techRiderPdfUrl ?? null,
     showPeople: (show.showPeople ?? []).map((sp: any) => ({
       id: sp.id,
       showId: sp.showId,
@@ -704,7 +709,63 @@ toursRouter.post("/tours/:id/shows/:showId/venue-rider", async (c) => {
   const vibecode = createVibecodeSDK();
   const stored = await vibecode.storage.upload(pdfFile);
 
+  await prisma.tourShow.update({
+    where: { id: showId },
+    data: { techRiderPdfUrl: stored.url },
+  });
+
   return c.json({ data: { url: stored.url, filename: pdfFile.name } }, 201);
+});
+
+// GET /api/tours/:id/shows/:showId/venue-rider/track — public tracking redirect
+toursRouter.get("/tours/:id/shows/:showId/venue-rider/track", async (c) => {
+  const { id, showId } = c.req.param();
+
+  const show = await prisma.tourShow.findUnique({
+    where: { id: showId, tourId: id },
+  });
+
+  if (!show?.techRiderPdfUrl) {
+    return c.text("Tech rider not found", 404);
+  }
+
+  // Record the access
+  await prisma.tourShow.update({
+    where: { id: showId },
+    data: {
+      techRiderOpenCount: { increment: 1 },
+      techRiderOpenedAt: show.techRiderOpenedAt ?? new Date(),
+    },
+  });
+
+  return c.redirect(show.techRiderPdfUrl, 302);
+});
+
+// POST /api/tours/:id/shows/:showId/tech-rider-sent — mark as sent
+toursRouter.post("/tours/:id/shows/:showId/tech-rider-sent", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  const { id, showId } = c.req.param();
+  const body = await c.req.json().catch(() => ({}));
+  const sentTo = body.sentTo as string | undefined;
+
+  const tour = await prisma.tour.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!tour)
+    return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+
+  const updated = await prisma.tourShow.update({
+    where: { id: showId, tourId: id },
+    data: {
+      techRiderSentAt: new Date(),
+      techRiderSentTo: sentTo ?? null,
+    },
+  });
+
+  return c.json({ data: { techRiderSentAt: updated.techRiderSentAt!.toISOString(), techRiderSentTo: updated.techRiderSentTo } });
 });
 
 // PUT /api/tours/:id/shows/:showId/person-notes/:personId — tour manager edits a note

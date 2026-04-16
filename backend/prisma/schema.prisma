@@ -304,6 +304,11 @@ model TourShow {
   handsNeeded    Int?     // per-venue override for number of hands needed
   travelTimeMinutes Int?  // estimated drive/travel time to NEXT venue in minutes
   distanceKm        Float? // estimated distance to NEXT venue in km
+  techRiderSentAt   DateTime?
+  techRiderSentTo   String?
+  techRiderOpenedAt DateTime?
+  techRiderOpenCount Int @default(0)
+  techRiderPdfUrl   String?
   showPeople     TourShowPerson[]
   personNotes    TourPersonNote[]
   createdAt      DateTime @default(now())
