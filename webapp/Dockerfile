@@ -1,13 +1,13 @@
-# Build context = webapp/ (Railway uses Dockerfile's directory as context)
+# Build context = repo root
 FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
-# Copy package.json and install dependencies
-COPY package.json ./
+# Copy webapp package.json and install dependencies
+COPY webapp/package.json ./
 RUN bun install
 
 # Copy webapp source
-COPY . .
+COPY webapp/ .
 
 # Build the Vite app (VITE_BACKEND_URL must be set as a Railway build variable)
 ARG VITE_BACKEND_URL
