@@ -18,7 +18,7 @@ const styles = StyleSheet.create({
     paddingTop: 48,
     paddingBottom: 56,
     paddingLeft: 48,
-    paddingRight: 112,
+    paddingRight: 132,
   },
   // Header
   header: {
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     right: 8,
     top: 48,
     bottom: 56,
-    width: 94,
+    width: 112,
     borderLeftWidth: 0.5,
     borderLeftColor: "#e0e0e0",
     paddingLeft: 8,
@@ -329,12 +329,31 @@ const styles = StyleSheet.create({
     color: "#ddd",
     marginLeft: 3,
   },
+  calHighlightRow: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: 2,
+  },
+  calHighlightDayNum: {
+    color: "#fff",
+    fontFamily: "Helvetica-Bold",
+  },
+  calHighlightDayName: {
+    color: "#aaa",
+  },
+  calHighlightMarker: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "#fff",
+    marginLeft: 2,
+    marginRight: 1,
+  },
   // Footer
   footer: {
     position: "absolute",
     bottom: 24,
     left: 48,
-    right: 112,
+    right: 132,
     borderTopWidth: 0.5,
     borderTopColor: "#ccc",
     paddingTop: 6,
@@ -636,7 +655,7 @@ function TravelToNext({ currentShow, nextShow }: { currentShow: TourShow; nextSh
   );
 }
 
-function PDFCalendarSidebar({ shows, startDate }: { shows: TourShow[]; startDate: string }) {
+function PDFCalendarSidebar({ shows, startDate, highlightDate }: { shows: TourShow[]; startDate: string; highlightDate?: string }) {
   if (shows.length === 0) return null;
 
   const showsByDate = new Map<string, TourShow[]>();
@@ -646,10 +665,10 @@ function PDFCalendarSidebar({ shows, startDate }: { shows: TourShow[]; startDate
     showsByDate.get(k)!.push(show);
   }
 
-  // 14 days starting from startDate
-  const start = new Date(startDate + "T00:00:00");
+  // Start 7 days before startDate, show 60 days
+  const start = addDaysPDF(new Date(startDate + "T00:00:00"), -7);
   const days: Date[] = [];
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 60; i++) {
     days.push(addDaysPDF(start, i));
   }
 
@@ -674,6 +693,7 @@ function PDFCalendarSidebar({ shows, startDate }: { shows: TourShow[]; startDate
         if (showMonthSep) lastMonth = month;
         if (isMonday) lastWeekNum = weekNum;
 
+        const isHighlight = k === highlightDate;
         return (
           <View key={k}>
             {/* Month separator */}
@@ -692,14 +712,24 @@ function PDFCalendarSidebar({ shows, startDate }: { shows: TourShow[]; startDate
                 <View style={styles.calWeekLine} />
               </View>
             ) : null}
-            <View style={[styles.calDayRow, isWeekend ? styles.calWeekendRow : {}]}>
-              <Text style={[styles.calDayNum, isWeekend ? styles.calWeekendDayNum : {}]}>
+            <View style={[
+              styles.calDayRow,
+              isHighlight ? styles.calHighlightRow : isWeekend ? styles.calWeekendRow : {},
+            ]}>
+              <Text style={[
+                styles.calDayNum,
+                isHighlight ? styles.calHighlightDayNum : isWeekend ? styles.calWeekendDayNum : {},
+              ]}>
                 {day.getDate()}
               </Text>
-              <Text style={[styles.calDayName, isWeekend ? styles.calWeekendDayName : {}]}>
+              <Text style={[
+                styles.calDayName,
+                isHighlight ? styles.calHighlightDayName : isWeekend ? styles.calWeekendDayName : {},
+              ]}>
                 {DOW_PDF[dowIndex]}
               </Text>
-              {dayShows.length === 0 ? (
+              {isHighlight ? <View style={styles.calHighlightMarker} /> : null}
+              {dayShows.length === 0 && !isHighlight ? (
                 <Text style={styles.calEmptyDot}>·</Text>
               ) : null}
               {dayShows.map((show) => {
@@ -824,15 +854,29 @@ export function TourSchedulePDF({ tour }: { tour: TourDetail }) {
         {sortedShows.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Shows Overview ({sortedShows.length} shows)</Text>
-            {sortedShows.map((show, i) => (
-              <View key={show.id} style={styles.personRow}>
-                <Text style={[styles.personName, { width: "10%" }]}>Day {i + 1}</Text>
-                <Text style={[styles.personRole, { width: "35%" }]}>{formatPDFDate(show.date)}</Text>
-                <Text style={styles.personContact}>
-                  {[show.venueCity, show.venueName].filter(Boolean).join(" · ") || "—"}
-                </Text>
-              </View>
-            ))}
+            {sortedShows.map((show, i) => {
+              const isTravel = show.type === "travel";
+              const isDayOff = show.type === "day_off";
+              const venueLabel = isTravel
+                ? [show.fromLocation, show.toLocation].filter(Boolean).join(" → ") || "Travel day"
+                : isDayOff
+                ? "Day off"
+                : [show.venueCity, show.venueName].filter(Boolean).join(" · ") || "—";
+              const times = [
+                show.getInTime ? `Get-in ${show.getInTime}` : null,
+                show.showTime ? `Show ${show.showTime}` : null,
+              ].filter(Boolean).join("  ");
+              return (
+                <View key={show.id} style={styles.personRow}>
+                  <Text style={[styles.personName, { width: "8%" }]}>Day {i + 1}</Text>
+                  <Text style={[styles.personRole, { width: "30%", fontSize: 8.5 }]}>{formatPDFDate(show.date)}</Text>
+                  <Text style={[styles.personContact, { flex: 1 }]}>{venueLabel}</Text>
+                  {times ? (
+                    <Text style={{ fontSize: 8, color: "#555", width: "22%", textAlign: "right" }}>{times}</Text>
+                  ) : null}
+                </View>
+              );
+            })}
           </View>
         ) : null}
 
@@ -845,7 +889,7 @@ export function TourSchedulePDF({ tour }: { tour: TourDetail }) {
             render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
           />
         </View>
-        <PDFCalendarSidebar shows={sortedShows} startDate={sortedShows[0]?.date.slice(0, 10) ?? new Date().toISOString().slice(0, 10)} />
+        <PDFCalendarSidebar shows={sortedShows} startDate={sortedShows[0]?.date.slice(0, 10) ?? new Date().toISOString().slice(0, 10)} highlightDate={sortedShows[0]?.date.slice(0, 10)} />
       </Page>
 
       {/* One page per show */}
@@ -870,7 +914,7 @@ export function TourSchedulePDF({ tour }: { tour: TourDetail }) {
                 render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
               />
             </View>
-            <PDFCalendarSidebar shows={sortedShows} startDate={show.date.slice(0, 10)} />
+            <PDFCalendarSidebar shows={sortedShows} startDate={show.date.slice(0, 10)} highlightDate={show.date.slice(0, 10)} />
           </Page>
         );
       })}
