@@ -1,11 +1,11 @@
-# Build context = webapp/ (set Root Directory = "webapp" in Railway service settings)
+# Build context = repo root (leave Root Directory EMPTY in Railway service settings)
 FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
-COPY package.json ./
+COPY webapp/package.json ./
 RUN bun install
 
-COPY . .
+COPY webapp/ .
 
 ARG VITE_BACKEND_URL
 ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
