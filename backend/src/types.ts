@@ -221,6 +221,9 @@ export const TourShowSchema = z.object({
   id: z.string(),
   tourId: z.string(),
   date: z.string(),
+  type: z.enum(["show", "travel", "day_off"]),
+  fromLocation: z.string().nullable(),
+  toLocation: z.string().nullable(),
   showTime: z.string().nullable(),
   getInTime: z.string().nullable(),
   rehearsalTime: z.string().nullable(),
@@ -249,6 +252,9 @@ export const TourShowSchema = z.object({
 
 export const CreateTourShowSchema = z.object({
   date: z.string(),
+  type: z.enum(["show", "travel", "day_off"]).optional(),
+  fromLocation: z.string().optional(),
+  toLocation: z.string().optional(),
   showTime: z.string().optional(),
   getInTime: z.string().optional(),
   rehearsalTime: z.string().optional(),
@@ -287,6 +293,7 @@ export const TourPersonSchema = z.object({
 // Tour
 export const TourSchema = z.object({
   id: z.string(),
+  shareToken: z.string(),
   name: z.string(),
   description: z.string().nullable(),
   status: z.enum(["draft", "active", "completed"]),

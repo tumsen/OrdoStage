@@ -243,6 +243,7 @@ model Department {
 
 model Tour {
   id               String       @id @default(cuid())
+  shareToken        String       @unique @default(cuid())
   name             String
   description      String?
   status           String       @default("draft") // draft | active | completed
@@ -269,6 +270,9 @@ model TourShow {
   tourId         String
   tour           Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
   date           DateTime
+  type           String   @default("show")  // show | travel | day_off
+  fromLocation   String?
+  toLocation     String?
   showTime       String?
   getInTime      String?
   rehearsalTime  String?

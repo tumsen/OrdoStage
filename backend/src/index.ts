@@ -18,6 +18,7 @@ import scheduleRouter from "./routes/schedule";
 import departmentsRouter from "./routes/departments";
 import teamRouter from "./routes/team";
 import toursRouter from "./routes/tours";
+import publicRouter from "./routes/public";
 import { seedPacks } from "./seed-packs";
 
 seedPacks().catch(console.error);
@@ -56,6 +57,9 @@ app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 // Health check endpoint
 app.get("/health", (c) => c.json({ status: "ok", version: "1.0.0" }));
+
+// Public routes (no auth required — mount before credit check middleware)
+app.route("/api/public/tours", publicRouter);
 
 // Billing routes (webhook must be before credit check middleware)
 app.route("/api", billingRouter);

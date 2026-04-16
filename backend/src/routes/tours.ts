@@ -13,37 +13,14 @@ import { canWrite } from "../permissions";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
-function serializeTourShow(show: {
-  id: string;
-  tourId: string;
-  date: Date;
-  showTime: string | null;
-  getInTime: string | null;
-  rehearsalTime: string | null;
-  soundcheckTime: string | null;
-  doorsTime: string | null;
-  venueName: string | null;
-  venueAddress: string | null;
-  venueCity: string | null;
-  contactName: string | null;
-  contactPhone: string | null;
-  contactEmail: string | null;
-  hotelName: string | null;
-  hotelAddress: string | null;
-  hotelPhone: string | null;
-  hotelCheckIn: string | null;
-  hotelCheckOut: string | null;
-  travelInfo: string | null;
-  cateringInfo: string | null;
-  notes: string | null;
-  order: number;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function serializeTourShow(show: any) {
   return {
     id: show.id,
     tourId: show.tourId,
-    date: show.date.toISOString(),
+    date: show.date instanceof Date ? show.date.toISOString() : show.date,
+    type: show.type ?? "show",
+    fromLocation: show.fromLocation,
+    toLocation: show.toLocation,
     showTime: show.showTime,
     getInTime: show.getInTime,
     rehearsalTime: show.rehearsalTime,
@@ -64,22 +41,14 @@ function serializeTourShow(show: {
     cateringInfo: show.cateringInfo,
     notes: show.notes,
     order: show.order,
-    createdAt: show.createdAt.toISOString(),
-    updatedAt: show.updatedAt.toISOString(),
+    travelTimeMinutes: show.travelTimeMinutes,
+    distanceKm: show.distanceKm,
+    createdAt: show.createdAt instanceof Date ? show.createdAt.toISOString() : show.createdAt,
+    updatedAt: show.updatedAt instanceof Date ? show.updatedAt.toISOString() : show.updatedAt,
   };
 }
 
-function serializePerson(person: {
-  id: string;
-  name: string;
-  role: string | null;
-  email: string | null;
-  phone: string | null;
-  departmentId: string | null;
-  organizationId: string;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function serializePerson(person: any) {
   return {
     id: person.id,
     name: person.name,
@@ -87,26 +56,15 @@ function serializePerson(person: {
     email: person.email,
     phone: person.phone,
     departmentId: person.departmentId,
-    createdAt: person.createdAt.toISOString(),
-    updatedAt: person.updatedAt.toISOString(),
+    createdAt: person.createdAt instanceof Date ? person.createdAt.toISOString() : person.createdAt,
+    updatedAt: person.updatedAt instanceof Date ? person.updatedAt.toISOString() : person.updatedAt,
   };
 }
 
-function serializeTour(tour: {
-  id: string;
-  name: string;
-  description: string | null;
-  status: string;
-  tourManagerName: string | null;
-  tourManagerPhone: string | null;
-  tourManagerEmail: string | null;
-  notes: string | null;
-  organizationId: string;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function serializeTour(tour: any) {
   return {
     id: tour.id,
+    shareToken: tour.shareToken,
     name: tour.name,
     description: tour.description,
     status: tour.status as "draft" | "active" | "completed",
@@ -114,8 +72,14 @@ function serializeTour(tour: {
     tourManagerPhone: tour.tourManagerPhone,
     tourManagerEmail: tour.tourManagerEmail,
     notes: tour.notes,
-    createdAt: tour.createdAt.toISOString(),
-    updatedAt: tour.updatedAt.toISOString(),
+    showDuration: tour.showDuration,
+    handsNeeded: tour.handsNeeded,
+    stageRequirements: tour.stageRequirements,
+    soundRequirements: tour.soundRequirements,
+    lightingRequirements: tour.lightingRequirements,
+    riderNotes: tour.riderNotes,
+    createdAt: tour.createdAt instanceof Date ? tour.createdAt.toISOString() : tour.createdAt,
+    updatedAt: tour.updatedAt instanceof Date ? tour.updatedAt.toISOString() : tour.updatedAt,
   };
 }
 
@@ -163,6 +127,12 @@ toursRouter.post("/tours", zValidator("json", CreateTourSchema), async (c) => {
       tourManagerPhone: body.tourManagerPhone ?? null,
       tourManagerEmail: body.tourManagerEmail ?? null,
       notes: body.notes ?? null,
+      showDuration: body.showDuration ?? null,
+      handsNeeded: body.handsNeeded ?? null,
+      stageRequirements: body.stageRequirements ?? null,
+      soundRequirements: body.soundRequirements ?? null,
+      lightingRequirements: body.lightingRequirements ?? null,
+      riderNotes: body.riderNotes ?? null,
       organizationId: user.organizationId,
     },
   });
@@ -238,6 +208,12 @@ toursRouter.put("/tours/:id", zValidator("json", UpdateTourSchema), async (c) =>
       ...(body.tourManagerPhone !== undefined && { tourManagerPhone: body.tourManagerPhone }),
       ...(body.tourManagerEmail !== undefined && { tourManagerEmail: body.tourManagerEmail }),
       ...(body.notes !== undefined && { notes: body.notes }),
+      ...(body.showDuration !== undefined && { showDuration: body.showDuration }),
+      ...(body.handsNeeded !== undefined && { handsNeeded: body.handsNeeded }),
+      ...(body.stageRequirements !== undefined && { stageRequirements: body.stageRequirements }),
+      ...(body.soundRequirements !== undefined && { soundRequirements: body.soundRequirements }),
+      ...(body.lightingRequirements !== undefined && { lightingRequirements: body.lightingRequirements }),
+      ...(body.riderNotes !== undefined && { riderNotes: body.riderNotes }),
     },
   });
 
@@ -290,6 +266,9 @@ toursRouter.post("/tours/:id/shows", zValidator("json", CreateTourShowSchema), a
     data: {
       tourId: id,
       date: new Date(body.date),
+      type: body.type ?? "show",
+      fromLocation: body.fromLocation ?? null,
+      toLocation: body.toLocation ?? null,
       showTime: body.showTime ?? null,
       getInTime: body.getInTime ?? null,
       rehearsalTime: body.rehearsalTime ?? null,
@@ -310,6 +289,8 @@ toursRouter.post("/tours/:id/shows", zValidator("json", CreateTourShowSchema), a
       cateringInfo: body.cateringInfo ?? null,
       notes: body.notes ?? null,
       order: body.order ?? 0,
+      travelTimeMinutes: body.travelTimeMinutes ?? null,
+      distanceKm: body.distanceKm ?? null,
     },
   });
 
@@ -351,6 +332,9 @@ toursRouter.put(
       where: { id: showId },
       data: {
         ...(body.date !== undefined && { date: new Date(body.date) }),
+        ...(body.type !== undefined && { type: body.type }),
+        ...(body.fromLocation !== undefined && { fromLocation: body.fromLocation }),
+        ...(body.toLocation !== undefined && { toLocation: body.toLocation }),
         ...(body.showTime !== undefined && { showTime: body.showTime }),
         ...(body.getInTime !== undefined && { getInTime: body.getInTime }),
         ...(body.rehearsalTime !== undefined && { rehearsalTime: body.rehearsalTime }),
@@ -371,6 +355,8 @@ toursRouter.put(
         ...(body.cateringInfo !== undefined && { cateringInfo: body.cateringInfo }),
         ...(body.notes !== undefined && { notes: body.notes }),
         ...(body.order !== undefined && { order: body.order }),
+        ...(body.travelTimeMinutes !== undefined && { travelTimeMinutes: body.travelTimeMinutes }),
+        ...(body.distanceKm !== undefined && { distanceKm: body.distanceKm }),
       },
     });
 

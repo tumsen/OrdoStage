@@ -22,6 +22,7 @@ import SetupOrg from "./pages/SetupOrg";
 import Billing from "./pages/Billing";
 import Tours from "./pages/Tours";
 import TourDetail from "./pages/TourDetail";
+import PublicTourSchedule from "./pages/PublicTourSchedule";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminOrgs from "./pages/admin/Orgs";
@@ -249,6 +250,9 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
+          {/* Public routes (no auth required) */}
+          <Route path="/t/:token" element={<PublicTourSchedule />} />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

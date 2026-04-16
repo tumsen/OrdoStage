@@ -18,9 +18,14 @@ import {
   Mail,
   Copy,
   Check,
+  Truck,
+  Coffee,
+  Globe,
+  ExternalLink,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { TourDetail, TourShow, TourPerson, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -374,6 +379,9 @@ interface ShowFormDialogProps {
 }
 
 const emptyShowForm = {
+  type: "show" as "show" | "travel" | "day_off",
+  fromLocation: "",
+  toLocation: "",
   date: "",
   showTime: "",
   venueCity: "",
@@ -402,6 +410,9 @@ type ShowFormState = typeof emptyShowForm;
 
 function showToForm(show: TourShow): ShowFormState {
   return {
+    type: (show.type ?? "show") as "show" | "travel" | "day_off",
+    fromLocation: show.fromLocation ?? "",
+    toLocation: show.toLocation ?? "",
     date: show.date,
     showTime: show.showTime ?? "",
     venueCity: show.venueCity ?? "",
@@ -429,6 +440,9 @@ function showToForm(show: TourShow): ShowFormState {
 
 function formToPayload(form: ShowFormState): CreateTourShow {
   const payload: CreateTourShow = { date: form.date };
+  payload.type = form.type;
+  if (form.fromLocation) payload.fromLocation = form.fromLocation;
+  if (form.toLocation) payload.toLocation = form.toLocation;
   if (form.showTime) payload.showTime = form.showTime;
   if (form.venueCity) payload.venueCity = form.venueCity;
   if (form.venueName) payload.venueName = form.venueName;
@@ -502,9 +516,35 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Show" : "Add Show"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Day" : "Add Day"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 py-2">
+          {/* Type selector */}
+          <div className="space-y-2">
+            <Label className="text-white/60 text-xs uppercase tracking-wide">Day Type</Label>
+            <div className="flex gap-2">
+              {(["show", "travel", "day_off"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setField("type", t)}
+                  className={cn(
+                    "flex-1 py-2 px-3 rounded-lg text-xs font-medium border transition-colors",
+                    form.type === t
+                      ? t === "show"
+                        ? "bg-red-900/40 border-red-700/50 text-red-300"
+                        : t === "travel"
+                        ? "bg-blue-900/40 border-blue-700/50 text-blue-300"
+                        : "bg-green-900/40 border-green-700/50 text-green-300"
+                      : "bg-white/[0.03] border-white/10 text-white/40 hover:text-white/60"
+                  )}
+                >
+                  {t === "show" ? "Show" : t === "travel" ? "Travel Day" : "Day Off"}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Core */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -519,112 +559,163 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label className="text-white/60 text-xs uppercase tracking-wide">Show Time</Label>
-              <Input
-                value={form.showTime}
-                onChange={(e) => setField("showTime", e.target.value)}
-                placeholder="e.g. 20:00"
-                className={fieldCls}
-              />
-            </div>
+            {form.type === "show" ? (
+              <div className="space-y-2">
+                <Label className="text-white/60 text-xs uppercase tracking-wide">Show Time</Label>
+                <Input
+                  value={form.showTime}
+                  onChange={(e) => setField("showTime", e.target.value)}
+                  placeholder="e.g. 20:00"
+                  className={fieldCls}
+                />
+              </div>
+            ) : null}
           </div>
 
-          {/* Venue */}
-          <div>
-            <SectionHeader>Venue</SectionHeader>
-            <div className="space-y-3">
+          {/* Travel route */}
+          {form.type === "travel" ? (
+            <div>
+              <SectionHeader>Route</SectionHeader>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label className="text-white/60 text-xs uppercase tracking-wide">City</Label>
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">From</Label>
                   <Input
-                    value={form.venueCity}
-                    onChange={(e) => setField("venueCity", e.target.value)}
-                    placeholder="e.g. Manchester"
+                    value={form.fromLocation}
+                    onChange={(e) => setField("fromLocation", e.target.value)}
+                    placeholder="Departing city / location"
                     className={fieldCls}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/60 text-xs uppercase tracking-wide">Venue Name</Label>
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">To</Label>
                   <Input
-                    value={form.venueName}
-                    onChange={(e) => setField("venueName", e.target.value)}
-                    placeholder="e.g. The Lowry"
+                    value={form.toLocation}
+                    onChange={(e) => setField("toLocation", e.target.value)}
+                    placeholder="Arriving city / location"
                     className={fieldCls}
                   />
                 </div>
               </div>
+            </div>
+          ) : null}
+
+          {/* Day off location */}
+          {form.type === "day_off" ? (
+            <div>
+              <SectionHeader>Location</SectionHeader>
               <div className="space-y-2">
-                <Label className="text-white/60 text-xs uppercase tracking-wide">Venue Address</Label>
+                <Label className="text-white/60 text-xs uppercase tracking-wide">City / Location</Label>
                 <Input
-                  value={form.venueAddress}
-                  onChange={(e) => setField("venueAddress", e.target.value)}
-                  placeholder="Full address"
+                  value={form.venueCity}
+                  onChange={(e) => setField("venueCity", e.target.value)}
+                  placeholder="Where are you that day?"
                   className={fieldCls}
                 />
               </div>
             </div>
-          </div>
+          ) : null}
 
-          {/* Schedule times */}
-          <div>
-            <SectionHeader>Schedule</SectionHeader>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {(
-                [
-                  ["Get-in Time", "getInTime"],
-                  ["Rehearsal Time", "rehearsalTime"],
-                  ["Soundcheck Time", "soundcheckTime"],
-                  ["Doors Time", "doorsTime"],
-                ] as [string, keyof ShowFormState][]
-              ).map(([label, key]) => (
-                <div key={key} className="space-y-2">
-                  <Label className="text-white/60 text-xs uppercase tracking-wide">{label}</Label>
+          {/* Venue (show only) */}
+          {form.type === "show" ? (
+            <div>
+              <SectionHeader>Venue</SectionHeader>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-white/60 text-xs uppercase tracking-wide">City</Label>
+                    <Input
+                      value={form.venueCity}
+                      onChange={(e) => setField("venueCity", e.target.value)}
+                      placeholder="e.g. Manchester"
+                      className={fieldCls}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-white/60 text-xs uppercase tracking-wide">Venue Name</Label>
+                    <Input
+                      value={form.venueName}
+                      onChange={(e) => setField("venueName", e.target.value)}
+                      placeholder="e.g. The Lowry"
+                      className={fieldCls}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">Venue Address</Label>
                   <Input
-                    value={form[key] as string}
-                    onChange={(e) => setField(key, e.target.value)}
-                    placeholder="e.g. 14:00"
+                    value={form.venueAddress}
+                    onChange={(e) => setField("venueAddress", e.target.value)}
+                    placeholder="Full address"
                     className={fieldCls}
                   />
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
+          ) : null}
 
-          {/* Venue contact */}
-          <div>
-            <SectionHeader>Venue Contact</SectionHeader>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2 col-span-2 sm:col-span-1">
-                <Label className="text-white/60 text-xs uppercase tracking-wide">Contact Name</Label>
-                <Input
-                  value={form.contactName}
-                  onChange={(e) => setField("contactName", e.target.value)}
-                  placeholder="Name"
-                  className={fieldCls}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-white/60 text-xs uppercase tracking-wide">Phone</Label>
-                <Input
-                  value={form.contactPhone}
-                  onChange={(e) => setField("contactPhone", e.target.value)}
-                  placeholder="+44..."
-                  className={fieldCls}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-white/60 text-xs uppercase tracking-wide">Email</Label>
-                <Input
-                  value={form.contactEmail}
-                  onChange={(e) => setField("contactEmail", e.target.value)}
-                  placeholder="email@..."
-                  type="email"
-                  className={fieldCls}
-                />
+          {/* Schedule times (show only) */}
+          {form.type === "show" ? (
+            <div>
+              <SectionHeader>Schedule</SectionHeader>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {(
+                  [
+                    ["Get-in Time", "getInTime"],
+                    ["Rehearsal Time", "rehearsalTime"],
+                    ["Soundcheck Time", "soundcheckTime"],
+                    ["Doors Time", "doorsTime"],
+                  ] as [string, keyof ShowFormState][]
+                ).map(([label, key]) => (
+                  <div key={key} className="space-y-2">
+                    <Label className="text-white/60 text-xs uppercase tracking-wide">{label}</Label>
+                    <Input
+                      value={form[key] as string}
+                      onChange={(e) => setField(key, e.target.value)}
+                      placeholder="e.g. 14:00"
+                      className={fieldCls}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          ) : null}
+
+          {/* Venue contact (show only) */}
+          {form.type === "show" ? (
+            <div>
+              <SectionHeader>Venue Contact</SectionHeader>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2 col-span-2 sm:col-span-1">
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">Contact Name</Label>
+                  <Input
+                    value={form.contactName}
+                    onChange={(e) => setField("contactName", e.target.value)}
+                    placeholder="Name"
+                    className={fieldCls}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">Phone</Label>
+                  <Input
+                    value={form.contactPhone}
+                    onChange={(e) => setField("contactPhone", e.target.value)}
+                    placeholder="+44..."
+                    className={fieldCls}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">Email</Label>
+                  <Input
+                    value={form.contactEmail}
+                    onChange={(e) => setField("contactEmail", e.target.value)}
+                    placeholder="email@..."
+                    type="email"
+                    className={fieldCls}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* Hotel */}
           <div>
@@ -764,7 +855,7 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
               disabled={!form.date || isPending}
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
             >
-              {isPending ? "Saving..." : isEdit ? "Save Changes" : "Add Show"}
+              {isPending ? "Saving..." : isEdit ? "Save Changes" : "Add Day"}
             </Button>
           </DialogFooter>
         </form>
@@ -992,37 +1083,81 @@ function ShowCard({
 
   return (
     <>
-      <div className="bg-white/[0.03] border border-white/8 rounded-xl overflow-hidden">
+      <div className={cn(
+        "border rounded-xl overflow-hidden",
+        show.type === "travel"
+          ? "bg-blue-950/20 border-blue-900/30"
+          : show.type === "day_off"
+          ? "bg-green-950/20 border-green-900/30"
+          : "bg-white/[0.03] border-white/8"
+      )}>
         {/* Card header - always visible */}
         <div className="flex items-start gap-3 px-4 py-4">
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/5 border border-white/8 flex items-center justify-center">
-            <span className="text-xs font-bold text-white/50">{dayNumber}</span>
+          <div className={cn(
+            "flex-shrink-0 w-10 h-10 rounded-lg border flex items-center justify-center",
+            show.type === "travel"
+              ? "bg-blue-900/30 border-blue-700/30"
+              : show.type === "day_off"
+              ? "bg-green-900/30 border-green-700/30"
+              : "bg-white/5 border-white/8"
+          )}>
+            {show.type === "travel" ? (
+              <Truck size={14} className="text-blue-400/70" />
+            ) : show.type === "day_off" ? (
+              <Coffee size={14} className="text-green-400/70" />
+            ) : (
+              <span className="text-xs font-bold text-white/50">{dayNumber}</span>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium text-white/90">{formatShowDate(show.date)}</span>
-              {show.venueCity ? (
-                <span className="text-xs text-white/40">{show.venueCity}</span>
+              {show.type === "travel" ? (
+                <span className="text-xs font-semibold text-blue-400/80 uppercase tracking-wide">Travel Day</span>
+              ) : show.type === "day_off" ? (
+                <span className="text-xs font-semibold text-green-400/80 uppercase tracking-wide">Day Off</span>
               ) : null}
-              {show.venueName ? (
-                <span className="text-xs text-white/55 font-medium">{show.venueName}</span>
+              <span className="text-sm font-medium text-white/90">{formatShowDate(show.date)}</span>
+              {show.type === "travel" && (show.fromLocation || show.toLocation) ? (
+                <span className="text-xs text-white/50">
+                  {[show.fromLocation, show.toLocation].filter(Boolean).join(" → ")}
+                </span>
+              ) : show.type !== "travel" && (show.venueCity || show.venueName) ? (
+                <>
+                  {show.venueCity ? <span className="text-xs text-white/40">{show.venueCity}</span> : null}
+                  {show.venueName ? <span className="text-xs text-white/55 font-medium">{show.venueName}</span> : null}
+                </>
               ) : null}
             </div>
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-              {show.showTime ? (
-                <span className="text-xs text-white/40">
-                  Show: <span className="text-white/60 font-medium">{show.showTime}</span>
-                </span>
-              ) : null}
-              {show.getInTime ? (
-                <span className="text-xs text-white/35">Get-in: {show.getInTime}</span>
-              ) : null}
-              {show.soundcheckTime ? (
-                <span className="text-xs text-white/35">Soundcheck: {show.soundcheckTime}</span>
-              ) : null}
-              {show.hotelName ? (
-                <span className="text-xs text-white/30">Hotel: {show.hotelName}</span>
-              ) : null}
+              {show.type === "travel" ? (
+                <>
+                  {show.getInTime ? <span className="text-xs text-white/35">Departure: {show.getInTime}</span> : null}
+                  {show.showTime ? <span className="text-xs text-white/35">Arrival: {show.showTime}</span> : null}
+                  {show.travelTimeMinutes ? <span className="text-xs text-white/30">{formatTravelTime(show.travelTimeMinutes)}</span> : null}
+                </>
+              ) : show.type === "day_off" ? (
+                <>
+                  {show.hotelName ? <span className="text-xs text-white/30">Hotel: {show.hotelName}</span> : null}
+                  {show.notes ? <span className="text-xs text-white/25 truncate max-w-[200px]">{show.notes}</span> : null}
+                </>
+              ) : (
+                <>
+                  {show.showTime ? (
+                    <span className="text-xs text-white/40">
+                      Show: <span className="text-white/60 font-medium">{show.showTime}</span>
+                    </span>
+                  ) : null}
+                  {show.getInTime ? (
+                    <span className="text-xs text-white/35">Get-in: {show.getInTime}</span>
+                  ) : null}
+                  {show.soundcheckTime ? (
+                    <span className="text-xs text-white/35">Soundcheck: {show.soundcheckTime}</span>
+                  ) : null}
+                  {show.hotelName ? (
+                    <span className="text-xs text-white/30">Hotel: {show.hotelName}</span>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -1067,7 +1202,17 @@ function ShowCard({
         {/* Expanded details */}
         {expanded ? (
           <div className="border-t border-white/[0.06] px-4 py-4 space-y-4">
-            {show.venueAddress ? (
+            {show.type === "travel" && (show.fromLocation || show.toLocation) ? (
+              <div>
+                <div className="text-xs text-white/35 uppercase tracking-wide mb-2">Route</div>
+                <div className="flex items-center gap-2 text-sm text-white/70">
+                  {show.fromLocation ? <span>{show.fromLocation}</span> : null}
+                  {show.fromLocation && show.toLocation ? <span className="text-white/30">→</span> : null}
+                  {show.toLocation ? <span>{show.toLocation}</span> : null}
+                </div>
+              </div>
+            ) : null}
+            {show.type !== "travel" && show.venueAddress ? (
               <div>
                 <div className="text-xs text-white/35 uppercase tracking-wide mb-1">Venue Address</div>
                 <a
@@ -1323,7 +1468,7 @@ function ShowsTab({ tour }: { tour: TourDetail }) {
           onClick={() => setAddOpen(true)}
           className="bg-white/5 hover:bg-white/10 text-white border border-white/10 gap-2 h-8"
         >
-          <Plus size={13} /> Add Show
+          <Plus size={13} /> Add Day
         </Button>
       </div>
 
@@ -1337,7 +1482,7 @@ function ShowsTab({ tour }: { tour: TourDetail }) {
             variant="outline"
             className="mt-3 border-white/10 text-white/50 hover:text-white bg-transparent gap-2"
           >
-            <Plus size={12} /> Add First Show
+            <Plus size={12} /> Add First Day
           </Button>
         </div>
       ) : (
@@ -1523,6 +1668,65 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
   );
 }
 
+// ── Share Tour Section ────────────────────────────────────────────────────────
+
+function ShareTourSection({ tour }: { tour: TourDetail }) {
+  const [copied, setCopied] = useState(false);
+  const shareUrl = `${window.location.origin}/t/${tour.shareToken}`;
+
+  async function handleCopyLink() {
+    await navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleEmailSchedule() {
+    const subject = encodeURIComponent(`Tour Schedule: ${tour.name}`);
+    const body = encodeURIComponent(
+      `Hi,\n\nHere is the tour schedule for ${tour.name}:\n\n${shareUrl}\n\nBest regards`
+    );
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+  }
+
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      <div className="flex items-center gap-2 bg-white/[0.03] border border-white/8 rounded-lg px-3 py-2">
+        <Globe size={12} className="text-white/30 flex-shrink-0" />
+        <span className="text-xs text-white/50 flex-1 truncate font-mono">{shareUrl}</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleCopyLink}
+          className="h-6 px-2 text-xs text-white/40 hover:text-white gap-1"
+        >
+          {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleEmailSchedule}
+          className="border-white/10 text-white/60 hover:text-white bg-transparent gap-2 h-8"
+        >
+          <Mail size={12} />
+          Email Schedule Link
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-white/10 text-white/60 hover:text-white bg-transparent gap-2 h-8"
+          onClick={() => window.open(shareUrl, "_blank")}
+        >
+          <ExternalLink size={12} />
+          Preview
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function TourDetailPage() {
@@ -1663,6 +1867,12 @@ export default function TourDetailPage() {
             )}
             {pdfLoading ? "Generating PDF..." : "Download Tour Schedule PDF"}
           </Button>
+        </div>
+
+        {/* Share */}
+        <div className="pt-3 border-t border-white/[0.06]">
+          <div className="text-xs text-white/40 uppercase tracking-widest mb-3">Share Tour Schedule</div>
+          <ShareTourSection tour={tour} />
         </div>
       </div>
 
