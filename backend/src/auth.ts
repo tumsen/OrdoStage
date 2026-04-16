@@ -48,6 +48,7 @@ export const auth = betterAuth({
     "https://vibecode.dev",
     "https://*.railway.app",
     "https://*.up.railway.app",
+    "https://theaterplanner-production.up.railway.app",
   ],
   plugins: [
     emailOTP({
