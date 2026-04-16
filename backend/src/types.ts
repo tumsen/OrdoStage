@@ -42,6 +42,9 @@ export const PersonSchema = z.object({
   role: z.string().nullable(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
+  address: z.string().nullable(),
+  emergencyContactName: z.string().nullable(),
+  emergencyContactPhone: z.string().nullable(),
   departmentId: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -52,6 +55,9 @@ export const CreatePersonSchema = z.object({
   role: z.string().optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),
+  address: z.string().optional(),
+  emergencyContactName: z.string().optional(),
+  emergencyContactPhone: z.string().optional(),
   departmentId: z.string().nullable().optional(),
 });
 

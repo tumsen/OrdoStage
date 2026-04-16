@@ -13,6 +13,9 @@ function serializePerson(person: {
   role: string | null;
   email: string | null;
   phone: string | null;
+  address: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
   departmentId: string | null;
   organizationId: string;
   createdAt: Date;
@@ -24,6 +27,9 @@ function serializePerson(person: {
     role: person.role,
     email: person.email,
     phone: person.phone,
+    address: person.address ?? null,
+    emergencyContactName: person.emergencyContactName ?? null,
+    emergencyContactPhone: person.emergencyContactPhone ?? null,
     departmentId: person.departmentId,
     createdAt: person.createdAt.toISOString(),
     updatedAt: person.updatedAt.toISOString(),
@@ -60,6 +66,9 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       role: body.role ?? null,
       email: body.email ?? null,
       phone: body.phone ?? null,
+      address: body.address ?? null,
+      emergencyContactName: body.emergencyContactName ?? null,
+      emergencyContactPhone: body.emergencyContactPhone ?? null,
       departmentId: body.departmentId ?? null,
       organizationId: user.organizationId,
     },
@@ -108,6 +117,9 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       ...(body.role !== undefined && { role: body.role }),
       ...(body.email !== undefined && { email: body.email }),
       ...(body.phone !== undefined && { phone: body.phone }),
+      ...(body.address !== undefined && { address: body.address }),
+      ...(body.emergencyContactName !== undefined && { emergencyContactName: body.emergencyContactName }),
+      ...(body.emergencyContactPhone !== undefined && { emergencyContactPhone: body.emergencyContactPhone }),
       ...(body.departmentId !== undefined && { departmentId: body.departmentId }),
     },
   });
