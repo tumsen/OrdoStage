@@ -283,6 +283,8 @@ model TourShow {
   cateringInfo   String?
   notes          String?
   order          Int      @default(0)
+  travelTimeMinutes Int?  // estimated drive/travel time to NEXT venue in minutes
+  distanceKm        Float? // estimated distance to NEXT venue in km
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

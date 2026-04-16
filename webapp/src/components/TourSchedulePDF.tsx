@@ -5,6 +5,7 @@ import {
   View,
   StyleSheet,
   pdf,
+  Link,
 } from "@react-pdf/renderer";
 import type { TourDetail, TourShow } from "../../../backend/src/types";
 
@@ -222,6 +223,38 @@ const styles = StyleSheet.create({
     color: "#bbb",
     fontFamily: "Helvetica-Oblique",
   },
+  travelSection: {
+    marginVertical: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: "#f8f8f8",
+    borderRadius: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  travelLabel: {
+    fontSize: 7.5,
+    color: "#666",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  travelValue: {
+    fontSize: 8.5,
+    color: "#333",
+    fontFamily: "Helvetica-Bold",
+  },
+  etdHighlight: {
+    fontSize: 8.5,
+    color: "#b45309",
+    fontFamily: "Helvetica-Bold",
+  },
+  addressLink: {
+    fontSize: 9,
+    color: "#1d4ed8",
+    textDecoration: "underline",
+  },
 });
 
 function formatPDFDate(dateStr: string | null | undefined): string {
@@ -296,7 +329,9 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
         {show.venueAddress ? (
           <View style={[styles.showBlock, { marginBottom: 8 }]}>
             <Text style={[styles.cellLabel, { marginBottom: 2 }]}>Venue Address</Text>
-            <Text style={styles.cellValue}>{show.venueAddress}</Text>
+            <Link src={`https://maps.google.com/?q=${encodeURIComponent(show.venueAddress ?? "")}`} style={styles.addressLink}>
+              {show.venueAddress}
+            </Link>
           </View>
         ) : null}
 
@@ -338,7 +373,14 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
               </Text>
             ) : null}
             <View style={styles.twoColGrid}>
-              <InfoCell label="Address" value={show.hotelAddress} />
+              {show.hotelAddress ? (
+                <View style={styles.twoColCell}>
+                  <Text style={styles.cellLabel}>Address</Text>
+                  <Link src={`https://maps.google.com/?q=${encodeURIComponent(show.hotelAddress ?? "")}`} style={styles.addressLink}>
+                    {show.hotelAddress}
+                  </Link>
+                </View>
+              ) : null}
               <InfoCell label="Phone" value={show.hotelPhone} />
             </View>
             <View style={[styles.twoColGrid, { marginTop: 4 }]}>
@@ -376,6 +418,66 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
           </View>
         ) : null}
       </View>
+    </View>
+  );
+}
+
+function TravelToNext({ currentShow, nextShow }: { currentShow: TourShow; nextShow: TourShow }) {
+  const hasTravelInfo = currentShow.travelTimeMinutes || currentShow.distanceKm;
+  const nextVenue = [nextShow.venueCity, nextShow.venueName].filter(Boolean).join(", ");
+  const currentAddr = currentShow.venueAddress || currentShow.venueName || "";
+  const nextAddr = nextShow.venueAddress || nextShow.venueName || "";
+  const directionsUrl = currentAddr && nextAddr
+    ? `https://www.google.com/maps/dir/${encodeURIComponent(currentAddr)}/${encodeURIComponent(nextAddr)}`
+    : null;
+
+  const etd = (currentShow.travelTimeMinutes && nextShow.getInTime)
+    ? (() => {
+        const match = nextShow.getInTime!.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return null;
+        let total = parseInt(match[1]) * 60 + parseInt(match[2]) - currentShow.travelTimeMinutes!;
+        if (total < 0) total += 1440;
+        const h = Math.floor(total / 60) % 24;
+        const m = total % 60;
+        return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+      })()
+    : null;
+
+  if (!hasTravelInfo && !directionsUrl) return null;
+
+  return (
+    <View style={styles.travelSection}>
+      <View>
+        <Text style={styles.travelLabel}>Travel to Next</Text>
+        {nextVenue ? <Text style={styles.travelValue}>{nextVenue}</Text> : null}
+      </View>
+      {currentShow.distanceKm ? (
+        <View>
+          <Text style={styles.travelLabel}>Distance</Text>
+          <Text style={styles.travelValue}>{currentShow.distanceKm} km</Text>
+        </View>
+      ) : null}
+      {currentShow.travelTimeMinutes ? (
+        <View>
+          <Text style={styles.travelLabel}>Travel Time</Text>
+          <Text style={styles.travelValue}>
+            {currentShow.travelTimeMinutes < 60
+              ? `${currentShow.travelTimeMinutes} min`
+              : `${Math.floor(currentShow.travelTimeMinutes / 60)}h${currentShow.travelTimeMinutes % 60 > 0 ? ` ${currentShow.travelTimeMinutes % 60}min` : ""}`}
+          </Text>
+        </View>
+      ) : null}
+      {etd ? (
+        <View>
+          <Text style={styles.travelLabel}>Latest ETD</Text>
+          <Text style={styles.etdHighlight}>{etd}</Text>
+        </View>
+      ) : null}
+      {directionsUrl ? (
+        <View>
+          <Link src={directionsUrl} style={styles.addressLink}>Open in Maps</Link>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -490,25 +592,30 @@ export function TourSchedulePDF({ tour }: { tour: TourDetail }) {
       </Page>
 
       {/* One page per show */}
-      {sortedShows.map((show, i) => (
-        <Page key={show.id} size="A4" style={styles.page}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>{tour.name}</Text>
-            <Text style={styles.headerSubtitle}>Show Details</Text>
-          </View>
+      {sortedShows.map((show, i) => {
+        const nextShow = sortedShows[i + 1];
+        const isDifferentDate = nextShow && show.date.slice(0, 10) !== nextShow.date.slice(0, 10);
+        return (
+          <Page key={show.id} size="A4" style={styles.page}>
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>{tour.name}</Text>
+              <Text style={styles.headerSubtitle}>Show Details</Text>
+            </View>
 
-          <ShowSection show={show} dayNumber={i + 1} />
+            <ShowSection show={show} dayNumber={i + 1} />
+            {isDifferentDate ? <TravelToNext currentShow={show} nextShow={nextShow} /> : null}
 
-          <View style={styles.footer} fixed>
-            <Text style={styles.footerText}>Generated {generatedDate}</Text>
-            <Text style={styles.confidential}>Confidential — For cast and crew only</Text>
-            <Text
-              style={styles.pageNumber}
-              render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-            />
-          </View>
-        </Page>
-      ))}
+            <View style={styles.footer} fixed>
+              <Text style={styles.footerText}>Generated {generatedDate}</Text>
+              <Text style={styles.confidential}>Confidential — For cast and crew only</Text>
+              <Text
+                style={styles.pageNumber}
+                render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+              />
+            </View>
+          </Page>
+        );
+      })}
     </Document>
   );
 }

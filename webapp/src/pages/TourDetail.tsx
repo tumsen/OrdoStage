@@ -13,6 +13,8 @@ import {
   Loader2,
   Users,
   CalendarDays,
+  MapPin,
+  Navigation,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { TourDetail, TourShow, TourPerson, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
@@ -48,6 +50,34 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
+
+// ── Google Maps helpers ───────────────────────────────────────────────────────
+
+function mapsUrl(address: string): string {
+  return `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+}
+
+function mapsDirectionsUrl(from: string, to: string): string {
+  return `https://www.google.com/maps/dir/${encodeURIComponent(from)}/${encodeURIComponent(to)}`;
+}
+
+// Computes latest ETD: nextGetInTime minus travelTimeMinutes
+function computeLatestETD(travelTimeMinutes: number, nextGetInTime: string): string | null {
+  const match = nextGetInTime.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  let total = parseInt(match[1]) * 60 + parseInt(match[2]) - travelTimeMinutes;
+  if (total < 0) total += 24 * 60; // wrap around
+  const h = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+}
+
+function formatTravelTime(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
 
 // ── Status badge ─────────────────────────────────────────────────────────────
 
@@ -281,6 +311,8 @@ const emptyShowForm = {
   travelInfo: "",
   cateringInfo: "",
   notes: "",
+  travelTimeMinutes: "",
+  distanceKm: "",
 };
 
 type ShowFormState = typeof emptyShowForm;
@@ -307,6 +339,8 @@ function showToForm(show: TourShow): ShowFormState {
     travelInfo: show.travelInfo ?? "",
     cateringInfo: show.cateringInfo ?? "",
     notes: show.notes ?? "",
+    travelTimeMinutes: show.travelTimeMinutes != null ? String(show.travelTimeMinutes) : "",
+    distanceKm: show.distanceKm != null ? String(show.distanceKm) : "",
   };
 }
 
@@ -331,6 +365,8 @@ function formToPayload(form: ShowFormState): CreateTourShow {
   if (form.travelInfo) payload.travelInfo = form.travelInfo;
   if (form.cateringInfo) payload.cateringInfo = form.cateringInfo;
   if (form.notes) payload.notes = form.notes;
+  if (form.travelTimeMinutes) payload.travelTimeMinutes = parseInt(form.travelTimeMinutes, 10);
+  if (form.distanceKm) payload.distanceKm = parseFloat(form.distanceKm);
   return payload;
 }
 
@@ -567,6 +603,31 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
           <div>
             <SectionHeader>Logistics</SectionHeader>
             <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">Travel Time to Next (min)</Label>
+                  <Input
+                    type="number"
+                    value={form.travelTimeMinutes}
+                    onChange={(e) => setField("travelTimeMinutes", e.target.value)}
+                    placeholder="e.g. 120"
+                    min="0"
+                    className={fieldCls}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">Distance to Next (km)</Label>
+                  <Input
+                    type="number"
+                    value={form.distanceKm}
+                    onChange={(e) => setField("distanceKm", e.target.value)}
+                    placeholder="e.g. 85"
+                    min="0"
+                    step="0.1"
+                    className={fieldCls}
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label className="text-white/60 text-xs uppercase tracking-wide">Travel Info</Label>
                 <Textarea
@@ -738,7 +799,15 @@ function ShowCard({
             {show.venueAddress ? (
               <div>
                 <div className="text-xs text-white/35 uppercase tracking-wide mb-1">Venue Address</div>
-                <div className="text-sm text-white/70">{show.venueAddress}</div>
+                <a
+                  href={mapsUrl(show.venueAddress)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1"
+                >
+                  <MapPin size={11} />
+                  {show.venueAddress}
+                </a>
               </div>
             ) : null}
 
@@ -788,10 +857,20 @@ function ShowCard({
                     <span className="text-sm text-white/70">{show.contactName}</span>
                   ) : null}
                   {show.contactPhone ? (
-                    <span className="text-sm text-white/50">{show.contactPhone}</span>
+                    <a
+                      href={`tel:${show.contactPhone}`}
+                      className="text-sm text-blue-400 hover:text-blue-300"
+                    >
+                      {show.contactPhone}
+                    </a>
                   ) : null}
                   {show.contactEmail ? (
-                    <span className="text-sm text-white/50">{show.contactEmail}</span>
+                    <a
+                      href={`mailto:${show.contactEmail}`}
+                      className="text-sm text-blue-400 hover:text-blue-300"
+                    >
+                      {show.contactEmail}
+                    </a>
                   ) : null}
                 </div>
               </div>
@@ -805,7 +884,15 @@ function ShowCard({
                     <span className="text-sm font-medium text-white/70">{show.hotelName}</span>
                   ) : null}
                   {show.hotelAddress ? (
-                    <span className="text-sm text-white/50">{show.hotelAddress}</span>
+                    <a
+                      href={mapsUrl(show.hotelAddress)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1"
+                    >
+                      <MapPin size={11} />
+                      {show.hotelAddress}
+                    </a>
                   ) : null}
                   {show.hotelPhone ? (
                     <span className="text-sm text-white/50">{show.hotelPhone}</span>
@@ -881,6 +968,66 @@ function ShowCard({
   );
 }
 
+// ── Travel Connector ──────────────────────────────────────────────────────────
+
+interface TravelConnectorProps {
+  currentShow: TourShow;
+  nextShow: TourShow;
+}
+
+function TravelConnector({ currentShow, nextShow }: TravelConnectorProps) {
+  const nextVenueLabel = [nextShow.venueCity, nextShow.venueName].filter(Boolean).join(" · ");
+  const nextAddress = nextShow.venueAddress || nextShow.venueName || nextShow.venueCity;
+  const currentAddress = currentShow.venueAddress || currentShow.venueName || currentShow.venueCity;
+
+  const etd = (currentShow.travelTimeMinutes && nextShow.getInTime)
+    ? computeLatestETD(currentShow.travelTimeMinutes, nextShow.getInTime)
+    : null;
+
+  return (
+    <div className="flex items-stretch gap-3 my-1 pl-4">
+      {/* Vertical line */}
+      <div className="flex flex-col items-center w-10 flex-shrink-0">
+        <div className="w-px flex-1 bg-white/10" />
+        <div className="w-1.5 h-1.5 rounded-full bg-white/20 my-1" />
+        <div className="w-px flex-1 bg-white/10" />
+      </div>
+
+      {/* Travel info */}
+      <div className="flex-1 py-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+        {nextVenueLabel ? (
+          <span className="text-xs text-white/35 flex items-center gap-1">
+            <Navigation size={10} className="text-white/25" />
+            {nextVenueLabel}
+          </span>
+        ) : null}
+        {currentShow.distanceKm ? (
+          <span className="text-xs text-white/30">{currentShow.distanceKm} km</span>
+        ) : null}
+        {currentShow.travelTimeMinutes ? (
+          <span className="text-xs text-white/30">{formatTravelTime(currentShow.travelTimeMinutes)}</span>
+        ) : null}
+        {etd ? (
+          <span className="text-xs text-white/40">
+            Latest ETD: <span className="font-medium text-amber-400/70">{etd}</span>
+          </span>
+        ) : null}
+        {currentAddress && nextAddress ? (
+          <a
+            href={mapsDirectionsUrl(currentAddress, nextAddress)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-400/60 hover:text-blue-400 flex items-center gap-1 ml-auto"
+          >
+            <MapPin size={10} />
+            Directions
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function ShowsTab({ tour }: { tour: TourDetail }) {
   const [addOpen, setAddOpen] = useState(false);
   const sortedShows = [...tour.shows].sort((a, b) => a.date.localeCompare(b.date));
@@ -915,9 +1062,18 @@ function ShowsTab({ tour }: { tour: TourDetail }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {sortedShows.map((show, i) => (
-            <ShowCard key={show.id} show={show} dayNumber={i + 1} tourId={tour.id} />
-          ))}
+          {sortedShows.map((show, i) => {
+            const nextShow = sortedShows[i + 1];
+            const isDifferentDate = nextShow && show.date.slice(0, 10) !== nextShow.date.slice(0, 10);
+            return (
+              <div key={show.id}>
+                <ShowCard show={show} dayNumber={i + 1} tourId={tour.id} />
+                {isDifferentDate ? (
+                  <TravelConnector currentShow={show} nextShow={nextShow} />
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       )}
 
