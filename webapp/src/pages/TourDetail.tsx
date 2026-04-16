@@ -23,6 +23,8 @@ import {
   Globe,
   ExternalLink,
   FileText,
+  Printer,
+  Send,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { TourDetail, TourShow, TourPerson, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
@@ -59,7 +61,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
-import { downloadVenueTechRider } from "@/lib/downloadVenueTechRider";
+import { downloadVenueTechRider, printVenueTechRider, uploadVenueTechRiderForSharing } from "@/lib/downloadVenueTechRider";
 
 // ── Google Maps helpers ───────────────────────────────────────────────────────
 
@@ -1070,6 +1072,8 @@ function ShowCard({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [riderOpen, setRiderOpen] = useState(false);
   const [venuePdfLoading, setVenuePdfLoading] = useState(false);
+  const [venuePrintLoading, setVenuePrintLoading] = useState(false);
+  const [venueSendLoading, setVenueSendLoading] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/api/tours/${tourId}/shows/${show.id}`),
@@ -1351,32 +1355,83 @@ function ShowCard({
               <div className="text-sm text-white/25 text-center py-2">No additional details.</div>
             ) : null}
 
-            {/* Download venue tech rider */}
+            {/* Venue tech rider actions */}
             <div className="pt-3 border-t border-white/[0.06]">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  setVenuePdfLoading(true);
-                  try {
-                    await downloadVenueTechRider(tour, show);
-                  } finally {
-                    setVenuePdfLoading(false);
-                  }
-                }}
-                disabled={venuePdfLoading}
-                className="border-white/10 text-white/60 hover:text-white bg-transparent gap-2 h-8"
-              >
-                {venuePdfLoading ? (
-                  <Loader2 size={12} className="animate-spin" />
+              <div className="text-xs text-white/35 uppercase tracking-wide mb-2">
+                Venue Tech Rider
+                {tour.techRiderPdfName ? (
+                  <span className="text-white/25 normal-case tracking-normal ml-2">
+                    (cover + {tour.techRiderPdfName})
+                  </span>
                 ) : (
-                  <FileText size={12} />
+                  <span className="text-white/20 normal-case tracking-normal ml-2">(cover page only — upload static PDF to include light plans)</span>
                 )}
-                {venuePdfLoading ? "Generating..." : "Download Venue Tech Rider"}
-                {tour.techRiderPdfName ? null : (
-                  <span className="text-white/25 text-xs ml-1">(cover only)</span>
-                )}
-              </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {/* Download */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    setVenuePdfLoading(true);
+                    try { await downloadVenueTechRider(tour, show); }
+                    finally { setVenuePdfLoading(false); }
+                  }}
+                  disabled={venuePdfLoading || venuePrintLoading || venueSendLoading}
+                  className="border-white/10 text-white/60 hover:text-white bg-transparent gap-1.5 h-8 text-xs"
+                >
+                  {venuePdfLoading ? <Loader2 size={12} className="animate-spin" /> : <FileDown size={12} />}
+                  {venuePdfLoading ? "Generating..." : "Download"}
+                </Button>
+
+                {/* Print */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    setVenuePrintLoading(true);
+                    try { await printVenueTechRider(tour, show); }
+                    finally { setVenuePrintLoading(false); }
+                  }}
+                  disabled={venuePdfLoading || venuePrintLoading || venueSendLoading}
+                  className="border-white/10 text-white/60 hover:text-white bg-transparent gap-1.5 h-8 text-xs"
+                >
+                  {venuePrintLoading ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />}
+                  {venuePrintLoading ? "Opening..." : "Print"}
+                </Button>
+
+                {/* Send to venue contact */}
+                {show.contactEmail ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      setVenueSendLoading(true);
+                      try {
+                        const url = await uploadVenueTechRiderForSharing(tour, show);
+                        const date = new Date(show.date).toLocaleDateString("en-GB", {
+                          day: "numeric", month: "long", year: "numeric"
+                        });
+                        const venue = show.venueName || show.venueCity || "your venue";
+                        const subject = encodeURIComponent(
+                          `Tech Rider — ${tour.name} — ${date}`
+                        );
+                        const body = encodeURIComponent(
+                          `Hi${show.contactName ? ` ${show.contactName}` : ""},\n\nPlease find the tech rider for ${tour.name} at ${venue} on ${date}:\n\n${url}\n\nThis includes our get-in schedule, crew requirements, and technical specifications.\n\nPlease don't hesitate to get in touch if you have any questions.\n\nBest regards,\n${tour.tourManagerName || ""}`
+                        );
+                        window.open(`mailto:${show.contactEmail}?subject=${subject}&body=${body}`, "_blank");
+                      } finally {
+                        setVenueSendLoading(false);
+                      }
+                    }}
+                    disabled={venuePdfLoading || venuePrintLoading || venueSendLoading}
+                    className="border-white/10 text-white/60 hover:text-white bg-transparent gap-1.5 h-8 text-xs"
+                  >
+                    {venueSendLoading ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                    {venueSendLoading ? "Uploading PDF..." : `Send to ${show.contactName || show.contactEmail}`}
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : null}

@@ -10,6 +10,7 @@ import {
   UpdateTourShowSchema,
 } from "../types";
 import { canWrite } from "../permissions";
+import { createVibecodeSDK } from "@vibecodeapp/backend-sdk";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -570,6 +571,39 @@ toursRouter.delete("/tours/:id/tech-rider", async (c) => {
   });
 
   return new Response(null, { status: 204 });
+});
+
+// POST /api/tours/:id/shows/:showId/venue-rider
+// Accepts a generated venue tech rider PDF, uploads to Vibecode storage, returns public URL
+toursRouter.post("/tours/:id/shows/:showId/venue-rider", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  const { id, showId } = c.req.param();
+
+  const tour = await prisma.tour.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!tour)
+    return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+
+  const show = await prisma.tourShow.findUnique({
+    where: { id: showId, tourId: id },
+  });
+  if (!show)
+    return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
+
+  const formData = await c.req.parseBody();
+  const file = formData["file"];
+  if (!file || typeof file === "string")
+    return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
+
+  const pdfFile = file as File;
+  const vibecode = createVibecodeSDK();
+  const stored = await vibecode.storage.upload(pdfFile);
+
+  return c.json({ data: { url: stored.url, filename: pdfFile.name } }, 201);
 });
 
 export default toursRouter;
