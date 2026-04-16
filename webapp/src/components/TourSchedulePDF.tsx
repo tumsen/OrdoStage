@@ -302,6 +302,33 @@ const styles = StyleSheet.create({
   calBadgeTextDayOff: {
     color: "#16a34a",
   },
+  calMonthRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f0f0f0",
+    borderRadius: 2,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  calMonthHeader: {
+    fontSize: 6,
+    fontFamily: "Helvetica-Bold",
+    color: "#555",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  calMonthWeekNum: {
+    fontSize: 5.5,
+    color: "#999",
+  },
+  calEmptyDot: {
+    fontSize: 7,
+    color: "#ddd",
+    marginLeft: 3,
+  },
   // Footer
   footer: {
     position: "absolute",
@@ -609,7 +636,7 @@ function TravelToNext({ currentShow, nextShow }: { currentShow: TourShow; nextSh
   );
 }
 
-function PDFCalendarSidebar({ shows }: { shows: TourShow[] }) {
+function PDFCalendarSidebar({ shows, startDate }: { shows: TourShow[]; startDate: string }) {
   if (shows.length === 0) return null;
 
   const showsByDate = new Map<string, TourShow[]>();
@@ -619,24 +646,19 @@ function PDFCalendarSidebar({ shows }: { shows: TourShow[] }) {
     showsByDate.get(k)!.push(show);
   }
 
-  const sortedKeys = [...showsByDate.keys()].sort();
-  const firstDate = getISOWeekStartPDF(new Date(sortedKeys[0] + "T00:00:00"));
-  const rawLast = new Date(sortedKeys[sortedKeys.length - 1] + "T00:00:00");
-  const lastWeekStart = getISOWeekStartPDF(rawLast);
-  const lastDate = addDaysPDF(lastWeekStart, 6);
-
+  // 14 days starting from startDate
+  const start = new Date(startDate + "T00:00:00");
   const days: Date[] = [];
-  let cur = new Date(firstDate);
-  while (cur <= lastDate) {
-    days.push(new Date(cur));
-    cur = addDaysPDF(cur, 1);
+  for (let i = 0; i < 14; i++) {
+    days.push(addDaysPDF(start, i));
   }
 
   let lastWeekNum = -1;
+  let lastMonth = -1;
 
   return (
     <View style={styles.calSidebar} fixed>
-      <Text style={styles.calTitle}>Calendar</Text>
+      <Text style={styles.calTitle}>Next 14 Days</Text>
       {days.map((day) => {
         const k = day.toISOString().slice(0, 10);
         const dayShows = showsByDate.get(k) ?? [];
@@ -644,12 +666,27 @@ function PDFCalendarSidebar({ shows }: { shows: TourShow[] }) {
         const isWeekend = dowIndex >= 5;
         const isMonday = dowIndex === 0;
         const weekNum = getISOWeekPDF(day);
-        const showWeekNum = isMonday && weekNum !== lastWeekNum;
-        if (showWeekNum) lastWeekNum = weekNum;
+        const month = day.getMonth();
+
+        const showMonthSep = month !== lastMonth;
+        const showWeekSep = isMonday && weekNum !== lastWeekNum && !showMonthSep;
+
+        if (showMonthSep) lastMonth = month;
+        if (isMonday) lastWeekNum = weekNum;
 
         return (
           <View key={k}>
-            {showWeekNum ? (
+            {/* Month separator */}
+            {showMonthSep ? (
+              <View style={styles.calMonthRow}>
+                <Text style={styles.calMonthHeader}>
+                  {day.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
+                </Text>
+                <Text style={styles.calMonthWeekNum}>W{weekNum}</Text>
+              </View>
+            ) : null}
+            {/* Week separator (only on Mondays where month didn't also change) */}
+            {showWeekSep ? (
               <View style={styles.calWeekRow}>
                 <Text style={styles.calWeekNum}>W{weekNum}</Text>
                 <View style={styles.calWeekLine} />
@@ -662,10 +699,8 @@ function PDFCalendarSidebar({ shows }: { shows: TourShow[] }) {
               <Text style={[styles.calDayName, isWeekend ? styles.calWeekendDayName : {}]}>
                 {DOW_PDF[dowIndex]}
               </Text>
-              {day.getDate() === 1 ? (
-                <Text style={styles.calMonthLabel}>
-                  {day.toLocaleDateString("en-GB", { month: "short" })}
-                </Text>
+              {dayShows.length === 0 ? (
+                <Text style={styles.calEmptyDot}>·</Text>
               ) : null}
               {dayShows.map((show) => {
                 const isTravel = show.type === "travel";
@@ -674,8 +709,8 @@ function PDFCalendarSidebar({ shows }: { shows: TourShow[] }) {
                 const label = isTravel
                   ? "Travel"
                   : isDayOff
-                  ? "Off"
-                  : show.venueCity?.slice(0, 6) ?? "Show";
+                  ? "Day off"
+                  : show.venueName?.slice(0, 8) ?? show.venueCity?.slice(0, 8) ?? "Show";
                 return (
                   <View
                     key={show.id}
@@ -810,7 +845,7 @@ export function TourSchedulePDF({ tour }: { tour: TourDetail }) {
             render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
           />
         </View>
-        <PDFCalendarSidebar shows={sortedShows} />
+        <PDFCalendarSidebar shows={sortedShows} startDate={sortedShows[0]?.date.slice(0, 10) ?? new Date().toISOString().slice(0, 10)} />
       </Page>
 
       {/* One page per show */}
@@ -835,7 +870,7 @@ export function TourSchedulePDF({ tour }: { tour: TourDetail }) {
                 render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
               />
             </View>
-            <PDFCalendarSidebar shows={sortedShows} />
+            <PDFCalendarSidebar shows={sortedShows} startDate={show.date.slice(0, 10)} />
           </Page>
         );
       })}
