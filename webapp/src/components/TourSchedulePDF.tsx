@@ -480,9 +480,9 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
   const hasTravelOrCatering = show.travelInfo || show.cateringInfo;
 
   return (
-    <View style={styles.showCard} wrap={false}>
-      {/* Header */}
-      <View style={styles.showCardHeader}>
+    <View style={styles.showCard}>
+      {/* Header — keep together */}
+      <View style={styles.showCardHeader} wrap={false}>
         <View>
           <Text style={styles.showDayNumber}>Day {dayNumber}</Text>
           <Text style={styles.showDate}>{formatPDFDate(show.date)}</Text>
@@ -500,7 +500,7 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
       <View style={styles.showCardBody}>
         {/* Venue address */}
         {show.venueAddress ? (
-          <View style={[styles.showBlock, { marginBottom: 8 }]}>
+          <View style={[styles.showBlock, { marginBottom: 8 }]} wrap={false}>
             <Text style={[styles.cellLabel, { marginBottom: 2 }]}>Venue Address</Text>
             <Link src={`https://maps.google.com/?q=${encodeURIComponent(show.venueAddress ?? "")}`} style={styles.addressLink}>
               {show.venueAddress}
@@ -510,7 +510,7 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
 
         {/* Timeline */}
         {hasTimeline ? (
-          <View style={styles.showBlock}>
+          <View style={styles.showBlock} wrap={false}>
             <Text style={styles.showBlockTitle}>Schedule</Text>
             <TimeRow label="Get-in" value={show.getInTime} />
             <TimeRow label="Rehearsal" value={show.rehearsalTime} />
@@ -520,25 +520,26 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
           </View>
         ) : null}
 
-        {/* Contact */}
+        {/* Contact — name on its own line, phone+email side by side */}
         {hasContact ? (
-          <View style={styles.showBlock}>
+          <View style={styles.showBlock} wrap={false}>
             <Text style={styles.showBlockTitle}>Venue Contact</Text>
-            <View style={styles.twoColGrid}>
-              <InfoCell label="Name" value={show.contactName} />
-              <InfoCell label="Phone" value={show.contactPhone} />
-            </View>
-            {show.contactEmail ? (
-              <View style={{ marginTop: 4 }}>
-                <InfoCell label="Email" value={show.contactEmail} />
+            {show.contactName ? (
+              <View style={{ marginBottom: 3 }}>
+                <Text style={styles.cellLabel}>Name</Text>
+                <Text style={styles.cellValue}>{show.contactName}</Text>
               </View>
             ) : null}
+            <View style={styles.twoColGrid}>
+              <InfoCell label="Phone" value={show.contactPhone} />
+              <InfoCell label="Email" value={show.contactEmail} />
+            </View>
           </View>
         ) : null}
 
         {/* Hotel */}
         {hasHotel ? (
-          <View style={styles.showBlock}>
+          <View style={styles.showBlock} wrap={false}>
             <Text style={styles.showBlockTitle}>Hotel</Text>
             {show.hotelName ? (
               <Text style={[styles.cellValue, { fontFamily: "Helvetica-Bold", marginBottom: 3 }]}>
@@ -565,7 +566,7 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
 
         {/* Travel & Catering */}
         {hasTravelOrCatering ? (
-          <View style={styles.showBlock}>
+          <View style={styles.showBlock} wrap={false}>
             <View style={styles.twoColGrid}>
               {show.travelInfo ? (
                 <View style={styles.twoColCell}>
@@ -585,7 +586,7 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
 
         {/* Notes */}
         {show.notes ? (
-          <View style={styles.showBlock}>
+          <View style={styles.showBlock} wrap={false}>
             <Text style={styles.showBlockTitle}>Notes</Text>
             <Text style={styles.noteText}>{show.notes}</Text>
           </View>

@@ -1170,6 +1170,22 @@ function ShowCard({
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
+            {show.type !== "travel" && show.type !== "day_off" ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-white/30 hover:text-white"
+                onClick={async () => {
+                  setVenuePdfLoading(true);
+                  try { await downloadVenueTechRider(tour, show); }
+                  finally { setVenuePdfLoading(false); }
+                }}
+                disabled={venuePdfLoading}
+                title="Download tech rider PDF"
+              >
+                {venuePdfLoading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+              </Button>
+            ) : null}
             {show.contactEmail ? (
               <Button
                 variant="ghost"
