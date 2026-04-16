@@ -27,7 +27,7 @@ import {
   Send,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { TourDetail, TourShow, TourPerson, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
+import type { TourDetail, TourShow, TourPerson, TourShowPerson, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1355,6 +1355,11 @@ function ShowCard({
               <div className="text-sm text-white/25 text-center py-2">No additional details.</div>
             ) : null}
 
+            {/* People for this show */}
+            <div className="pt-1">
+              <ShowPeopleSection show={show} tour={tour} />
+            </div>
+
             {/* Venue tech rider actions */}
             <div className="pt-3 border-t border-white/[0.06]">
               <div className="text-xs text-white/35 uppercase tracking-wide mb-2">
@@ -1597,6 +1602,217 @@ function ShowsTab({ tour }: { tour: TourDetail }) {
   );
 }
 
+// ── Show People Section ────────────────────────────────────────────────────────
+
+function ShowPeopleSection({ show, tour }: { show: TourShow; tour: TourDetail }) {
+  const queryClient = useQueryClient();
+  const [addOpen, setAddOpen] = useState(false);
+  const [selectedPersonId, setSelectedPersonId] = useState("");
+  const [role, setRole] = useState("");
+
+  const { data: allPeople } = useQuery({
+    queryKey: ["people"],
+    queryFn: () => api.get<Person[]>("/api/people"),
+  });
+
+  const isOverridden = show.showPeople.length > 0;
+  // Effective people: show-level if overridden, otherwise tour defaults
+  const effectivePeople = isOverridden
+    ? show.showPeople
+    : tour.people;
+
+  const addMutation = useMutation({
+    mutationFn: ({ personId, role }: { personId: string; role?: string }) =>
+      api.post<TourShowPerson>(`/api/tours/${tour.id}/shows/${show.id}/people`, {
+        personId,
+        role: role || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+      setAddOpen(false);
+      setSelectedPersonId("");
+      setRole("");
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (assignmentId: string) =>
+      api.delete(`/api/tours/${tour.id}/shows/${show.id}/people/${assignmentId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+    },
+  });
+
+  // "Customize" = copy tour people into show-level people (one by one)
+  const customizeMutation = useMutation({
+    mutationFn: async () => {
+      for (const tp of tour.people) {
+        await api.post<TourShowPerson>(`/api/tours/${tour.id}/shows/${show.id}/people`, {
+          personId: tp.personId,
+          role: tp.role || undefined,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+    },
+  });
+
+  // "Reset" = delete all show-level people
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      for (const sp of show.showPeople) {
+        await api.delete(`/api/tours/${tour.id}/shows/${show.id}/people/${sp.id}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+    },
+  });
+
+  // Available to add: all org people not already in the effective list
+  const effectivePersonIds = new Set(
+    isOverridden
+      ? show.showPeople.map((sp) => sp.personId)
+      : tour.people.map((tp) => tp.personId)
+  );
+  const available = (allPeople ?? []).filter((p) => !effectivePersonIds.has(p.id));
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs text-white/35 uppercase tracking-wide flex items-center gap-2">
+          People
+          {!isOverridden ? (
+            <span className="normal-case tracking-normal text-white/20 text-[10px]">tour defaults</span>
+          ) : (
+            <span className="normal-case tracking-normal text-amber-400/50 text-[10px]">custom roster</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          {isOverridden ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => resetMutation.mutate()}
+              disabled={resetMutation.isPending}
+              className="h-6 px-2 text-[10px] text-white/25 hover:text-white/60"
+            >
+              Reset to defaults
+            </Button>
+          ) : tour.people.length > 0 ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => customizeMutation.mutate()}
+              disabled={customizeMutation.isPending}
+              className="h-6 px-2 text-[10px] text-white/25 hover:text-white/60"
+            >
+              {customizeMutation.isPending ? "Copying..." : "Customize"}
+            </Button>
+          ) : null}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setAddOpen(true)}
+            className="h-6 px-2 text-[10px] text-white/25 hover:text-white/60 gap-1"
+          >
+            <Plus size={10} /> Add
+          </Button>
+        </div>
+      </div>
+
+      {effectivePeople.length === 0 ? (
+        <div className="text-xs text-white/20 italic py-1">No people assigned to this tour yet.</div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {effectivePeople.map((p) => {
+            const person = "person" in p ? p.person : null;
+            const name = person?.name ?? "";
+            const roleLabel = (p.role ?? person?.role) || null;
+            return (
+              <div
+                key={p.id}
+                className="flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.07] rounded-md px-2.5 py-1"
+              >
+                <div>
+                  <span className="text-xs text-white/70">{name}</span>
+                  {roleLabel ? (
+                    <span className="text-[10px] text-white/35 ml-1.5">{roleLabel}</span>
+                  ) : null}
+                </div>
+                {isOverridden ? (
+                  <button
+                    onClick={() => removeMutation.mutate(p.id)}
+                    disabled={removeMutation.isPending}
+                    className="text-white/20 hover:text-red-400 ml-1"
+                  >
+                    <X size={10} />
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="bg-[#16161f] border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle>Add Person to This Show</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-white/60 text-xs uppercase tracking-wide">Person</Label>
+              <Select value={selectedPersonId} onValueChange={setSelectedPersonId}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder="Select a person..." />
+                </SelectTrigger>
+                <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                  {available.length === 0 ? (
+                    <SelectItem value="__empty__" disabled>All people already added</SelectItem>
+                  ) : (
+                    available.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}{p.role ? ` — ${p.role}` : ""}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white/60 text-xs uppercase tracking-wide">Role (optional)</Label>
+              <Input
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="e.g. Lead Actor, Stage Manager..."
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAddOpen(false)}
+              className="border-white/10 text-white/60 hover:text-white bg-transparent"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!selectedPersonId || addMutation.isPending}
+              onClick={() => addMutation.mutate({ personId: selectedPersonId, role })}
+              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+            >
+              {addMutation.isPending ? "Adding..." : "Add"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // ── People Tab ────────────────────────────────────────────────────────────────
 
 function PeopleTab({ tour }: { tour: TourDetail }) {
@@ -1634,6 +1850,7 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-white/30 mb-4">Default roster for all shows. Override individual shows below.</p>
       <div className="flex items-center justify-between">
         <span className="text-xs text-white/40">
           {tour.people.length} {tour.people.length === 1 ? "person" : "people"}
@@ -1695,7 +1912,7 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="bg-[#16161f] border-white/10 text-white">
           <DialogHeader>
-            <DialogTitle>Add Person to Tour</DialogTitle>
+            <DialogTitle>Add to Tour Roster</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">

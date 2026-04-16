@@ -121,6 +121,7 @@ model Person {
   assignments      EventPerson[]
   internalBookings InternalBookingPerson[]
   tourAssignments  TourPerson[]
+  showAssignments  TourShowPerson[]
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 }
@@ -298,6 +299,7 @@ model TourShow {
   handsNeeded    Int?     // per-venue override for number of hands needed
   travelTimeMinutes Int?  // estimated drive/travel time to NEXT venue in minutes
   distanceKm        Float? // estimated distance to NEXT venue in km
+  showPeople     TourShowPerson[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -311,4 +313,15 @@ model TourPerson {
   role     String?
 
   @@unique([tourId, personId])
+}
+
+model TourShowPerson {
+  id       String   @id @default(cuid())
+  showId   String
+  show     TourShow @relation(fields: [showId], references: [id], onDelete: Cascade)
+  personId String
+  person   Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  role     String?
+
+  @@unique([showId, personId])
 }

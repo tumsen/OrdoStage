@@ -45,6 +45,13 @@ function serializeTourShow(show: any) {
     handsNeeded: show.handsNeeded ?? null,
     travelTimeMinutes: show.travelTimeMinutes,
     distanceKm: show.distanceKm,
+    showPeople: (show.showPeople ?? []).map((sp: any) => ({
+      id: sp.id,
+      showId: sp.showId,
+      personId: sp.personId,
+      role: sp.role,
+      person: serializePerson(sp.person),
+    })),
     createdAt: show.createdAt instanceof Date ? show.createdAt.toISOString() : show.createdAt,
     updatedAt: show.updatedAt instanceof Date ? show.updatedAt.toISOString() : show.updatedAt,
   };
@@ -155,6 +162,9 @@ toursRouter.get("/tours/:id", async (c) => {
     include: {
       shows: {
         orderBy: [{ order: "asc" }, { date: "asc" }],
+        include: {
+          showPeople: { include: { person: true } },
+        },
       },
       people: {
         include: { person: true },
@@ -491,6 +501,80 @@ toursRouter.delete("/tours/:id/people/:personId", async (c) => {
     where: { tourId_personId: { tourId: id, personId } },
   });
 
+  return new Response(null, { status: 204 });
+});
+
+// POST /api/tours/:id/shows/:showId/people — add person to a specific show
+toursRouter.post(
+  "/tours/:id/shows/:showId/people",
+  zValidator("json", z.object({ personId: z.string(), role: z.string().optional() })),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId)
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    if (!canWrite(user.orgRole))
+      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+
+    const { id, showId } = c.req.param();
+    const body = c.req.valid("json");
+
+    const show = await prisma.tourShow.findFirst({
+      where: { id: showId, tourId: id, tour: { organizationId: user.organizationId } },
+    });
+    if (!show)
+      return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
+
+    const person = await prisma.person.findUnique({
+      where: { id: body.personId, organizationId: user.organizationId },
+    });
+    if (!person)
+      return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+
+    const sp = await prisma.tourShowPerson.upsert({
+      where: { showId_personId: { showId, personId: body.personId } },
+      update: { role: body.role ?? null },
+      create: { showId, personId: body.personId, role: body.role ?? null },
+      include: { person: true },
+    });
+
+    return c.json(
+      {
+        data: {
+          id: sp.id,
+          showId: sp.showId,
+          personId: sp.personId,
+          role: sp.role,
+          person: serializePerson(sp.person),
+        },
+      },
+      201
+    );
+  }
+);
+
+// DELETE /api/tours/:id/shows/:showId/people/:assignmentId — remove person from show
+toursRouter.delete("/tours/:id/shows/:showId/people/:assignmentId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  if (!canWrite(user.orgRole))
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+
+  const { id, showId, assignmentId } = c.req.param();
+
+  const show = await prisma.tourShow.findFirst({
+    where: { id: showId, tourId: id, tour: { organizationId: user.organizationId } },
+  });
+  if (!show)
+    return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
+
+  const sp = await prisma.tourShowPerson.findFirst({
+    where: { id: assignmentId, showId },
+  });
+  if (!sp)
+    return c.json({ error: { message: "Assignment not found", code: "NOT_FOUND" } }, 404);
+
+  await prisma.tourShowPerson.delete({ where: { id: assignmentId } });
   return new Response(null, { status: 204 });
 });
 

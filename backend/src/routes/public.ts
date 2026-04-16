@@ -1,6 +1,19 @@
 import { Hono } from "hono";
 import { prisma } from "../prisma";
 
+function serializePublicPerson(person: any) {
+  return {
+    id: person.id,
+    name: person.name,
+    role: person.role,
+    email: person.email,
+    phone: person.phone,
+    departmentId: person.departmentId,
+    createdAt: person.createdAt instanceof Date ? person.createdAt.toISOString() : person.createdAt,
+    updatedAt: person.updatedAt instanceof Date ? person.updatedAt.toISOString() : person.updatedAt,
+  };
+}
+
 const publicRouter = new Hono();
 
 // GET /api/public/tours/:token — public tour schedule (no auth)
@@ -10,7 +23,10 @@ publicRouter.get("/:token", async (c) => {
   const tour = await prisma.tour.findUnique({
     where: { shareToken: token },
     include: {
-      shows: { orderBy: [{ order: "asc" }, { date: "asc" }] },
+      shows: {
+        orderBy: [{ order: "asc" }, { date: "asc" }],
+        include: { showPeople: { include: { person: true } } },
+      },
       people: { include: { person: true } },
     },
   });
@@ -65,8 +81,16 @@ publicRouter.get("/:token", async (c) => {
         cateringInfo: show.cateringInfo,
         notes: show.notes,
         order: show.order,
+        handsNeeded: show.handsNeeded ?? null,
         travelTimeMinutes: show.travelTimeMinutes,
         distanceKm: show.distanceKm,
+        showPeople: (show.showPeople ?? []).map((sp: any) => ({
+          id: sp.id,
+          showId: sp.showId,
+          personId: sp.personId,
+          role: sp.role,
+          person: serializePublicPerson(sp.person),
+        })),
         createdAt: show.createdAt.toISOString(),
         updatedAt: show.updatedAt.toISOString(),
       })),
@@ -75,16 +99,7 @@ publicRouter.get("/:token", async (c) => {
         tourId: tp.tourId,
         personId: tp.personId,
         role: tp.role,
-        person: {
-          id: tp.person.id,
-          name: tp.person.name,
-          role: tp.person.role,
-          email: tp.person.email,
-          phone: tp.person.phone,
-          departmentId: tp.person.departmentId,
-          createdAt: tp.person.createdAt.toISOString(),
-          updatedAt: tp.person.updatedAt.toISOString(),
-        },
+        person: serializePublicPerson(tp.person),
       })),
     },
   });

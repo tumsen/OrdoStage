@@ -216,6 +216,15 @@ export type UpdateInternalBooking = z.infer<typeof UpdateInternalBookingSchema>;
 export type TeamMember = z.infer<typeof TeamMemberSchema>;
 export type UpdateRole = z.infer<typeof UpdateRoleSchema>;
 
+// TourShowPerson (defined before TourShowSchema because TourShowSchema references it)
+export const TourShowPersonSchema = z.object({
+  id: z.string(),
+  showId: z.string(),
+  personId: z.string(),
+  role: z.string().nullable(),
+  person: PersonSchema,
+});
+
 // TourShow
 export const TourShowSchema = z.object({
   id: z.string(),
@@ -247,6 +256,7 @@ export const TourShowSchema = z.object({
   handsNeeded: z.number().nullable(),
   travelTimeMinutes: z.number().nullable(),
   distanceKm: z.number().nullable(),
+  showPeople: z.array(TourShowPersonSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -342,6 +352,7 @@ export type TourShow = z.infer<typeof TourShowSchema>;
 export type CreateTourShow = z.infer<typeof CreateTourShowSchema>;
 export type UpdateTourShow = z.infer<typeof UpdateTourShowSchema>;
 export type TourPerson = z.infer<typeof TourPersonSchema>;
+export type TourShowPerson = z.infer<typeof TourShowPersonSchema>;
 export type Tour = z.infer<typeof TourSchema>;
 export type TourDetail = z.infer<typeof TourDetailSchema>;
 export type CreateTour = z.infer<typeof CreateTourSchema>;
