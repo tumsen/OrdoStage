@@ -1,4 +1,7 @@
-import "@vibecodeapp/proxy"; // DO NOT REMOVE OTHERWISE VIBECODE PROXY WILL NOT WORK
+// Vibecode proxy — only active in Vibecode environment, safe to skip on Railway
+if (!process.env.RAILWAY_ENVIRONMENT) {
+  try { await import("@vibecodeapp/proxy"); } catch { /* not in Vibecode */ }
+}
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";

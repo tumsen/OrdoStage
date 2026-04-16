@@ -1,14 +1,39 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { emailOTP } from "better-auth/plugins";
-import { createVibecodeSDK } from "@vibecodeapp/backend-sdk";
 import { prisma } from "./prisma";
 import { env } from "./env";
 
-const vibecode = createVibecodeSDK();
+async function sendOTPEmail(email: string, otp: string) {
+  if (env.RESEND_API_KEY) {
+    // Production: use Resend
+    const { Resend } = await import("resend");
+    const resend = new Resend(env.RESEND_API_KEY);
+    await resend.emails.send({
+      from: env.FROM_EMAIL || "Theater Planner <noreply@theaterplanner.app>",
+      to: email,
+      subject: "Your login code",
+      html: `<p>Your login code is: <strong>${otp}</strong></p><p>This code expires in 10 minutes.</p>`,
+    });
+  } else {
+    // Development (Vibecode): use Vibecode SDK
+    try {
+      const { createVibecodeSDK } = await import("@vibecodeapp/backend-sdk");
+      const vibecode = createVibecodeSDK();
+      await vibecode.email.sendOTP({
+        to: email,
+        code: otp,
+        fromName: "Theater Planner",
+        lang: "en",
+      });
+    } catch {
+      console.log(`[DEV] OTP for ${email}: ${otp}`);
+    }
+  }
+}
 
 export const auth = betterAuth({
-  database: prismaAdapter(prisma, { provider: "sqlite" }),
+  database: prismaAdapter(prisma, { provider: "postgresql" }),
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BACKEND_URL,
   trustedOrigins: [
@@ -19,17 +44,14 @@ export const auth = betterAuth({
     "https://*.vibecodeapp.com",
     "https://*.vibecode.dev",
     "https://vibecode.dev",
+    "https://*.railway.app",
+    "https://*.up.railway.app",
   ],
   plugins: [
     emailOTP({
       async sendVerificationOTP({ email, otp, type }) {
         if (type !== "sign-in") return;
-        await vibecode.email.sendOTP({
-          to: email,
-          code: String(otp),
-          fromName: "Theater Planner",
-          lang: "en",
-        });
+        await sendOTPEmail(email, String(otp));
       },
     }),
   ],
