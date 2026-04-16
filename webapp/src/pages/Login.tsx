@@ -1,8 +1,5 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { authClient } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -10,41 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
-const signInSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
-});
-
-const signUpSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string().min(1, "Please confirm your password"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
-
-type SignInValues = z.infer<typeof signInSchema>;
-type SignUpValues = z.infer<typeof signUpSchema>;
-
 function SignInForm() {
   const navigate = useNavigate();
-  const [error, setError] = useState<string>("");
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<SignInValues>({ resolver: zodResolver(signInSchema) });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (values: SignInValues) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
-    const result = await authClient.signIn.email({
-      email: values.email,
-      password: values.password,
-    });
+    setLoading(true);
+    const result = await authClient.signIn.email({ email: email.trim(), password });
+    setLoading(false);
     if (result.error) {
-      setError(result.error.message || "Sign in failed");
+      setError(result.error.message || "Invalid email or password");
       return;
     }
     try {
@@ -56,17 +33,18 @@ function SignInForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1">
         <Label htmlFor="signin-email" className="text-gray-300 text-sm">Email</Label>
         <Input
           id="signin-email"
           type="email"
           placeholder="your@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
           className="bg-gray-800 border-white/20 text-white placeholder:text-gray-500"
-          {...register("email")}
         />
-        {errors.email ? <p className="text-red-400 text-xs">{errors.email.message}</p> : null}
       </div>
       <div className="space-y-1">
         <Label htmlFor="signin-password" className="text-gray-300 text-sm">Password</Label>
@@ -74,23 +52,20 @@ function SignInForm() {
           id="signin-password"
           type="password"
           placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
           className="bg-gray-800 border-white/20 text-white placeholder:text-gray-500"
-          {...register("password")}
         />
-        {errors.password ? <p className="text-red-400 text-xs">{errors.password.message}</p> : null}
       </div>
       <div className="flex justify-end">
-        <Link to="/forgot-password" className="text-purple-400 hover:text-purple-300 text-sm transition-colors">
+        <Link to="/forgot-password" className="text-purple-400 hover:text-purple-300 text-sm">
           Forgot password?
         </Link>
       </div>
       {error ? <p className="text-red-400 text-sm">{error}</p> : null}
-      <Button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium"
-      >
-        {isSubmitting ? "Signing in..." : "Sign In"}
+      <Button type="submit" disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700">
+        {loading ? "Signing in..." : "Sign In"}
       </Button>
     </form>
   );
@@ -98,20 +73,27 @@ function SignInForm() {
 
 function SignUpForm() {
   const navigate = useNavigate();
-  const [error, setError] = useState<string>("");
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<SignUpValues>({ resolver: zodResolver(signUpSchema) });
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (values: SignUpValues) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
-    const result = await authClient.signUp.email({
-      email: values.email,
-      password: values.password,
-      name: values.name,
-    });
+    if (password !== confirm) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    setLoading(true);
+    const result = await authClient.signUp.email({ email: email.trim(), password, name: name.trim() });
+    setLoading(false);
     if (result.error) {
       setError(result.error.message || "Sign up failed");
       return;
@@ -120,17 +102,18 @@ function SignUpForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1">
         <Label htmlFor="signup-name" className="text-gray-300 text-sm">Name</Label>
         <Input
           id="signup-name"
           type="text"
           placeholder="Your full name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
           className="bg-gray-800 border-white/20 text-white placeholder:text-gray-500"
-          {...register("name")}
         />
-        {errors.name ? <p className="text-red-400 text-xs">{errors.name.message}</p> : null}
       </div>
       <div className="space-y-1">
         <Label htmlFor="signup-email" className="text-gray-300 text-sm">Email</Label>
@@ -138,10 +121,11 @@ function SignUpForm() {
           id="signup-email"
           type="email"
           placeholder="your@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
           className="bg-gray-800 border-white/20 text-white placeholder:text-gray-500"
-          {...register("email")}
         />
-        {errors.email ? <p className="text-red-400 text-xs">{errors.email.message}</p> : null}
       </div>
       <div className="space-y-1">
         <Label htmlFor="signup-password" className="text-gray-300 text-sm">Password</Label>
@@ -149,10 +133,11 @@ function SignUpForm() {
           id="signup-password"
           type="password"
           placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
           className="bg-gray-800 border-white/20 text-white placeholder:text-gray-500"
-          {...register("password")}
         />
-        {errors.password ? <p className="text-red-400 text-xs">{errors.password.message}</p> : null}
       </div>
       <div className="space-y-1">
         <Label htmlFor="signup-confirm" className="text-gray-300 text-sm">Confirm Password</Label>
@@ -160,18 +145,15 @@ function SignUpForm() {
           id="signup-confirm"
           type="password"
           placeholder="••••••••"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          required
           className="bg-gray-800 border-white/20 text-white placeholder:text-gray-500"
-          {...register("confirmPassword")}
         />
-        {errors.confirmPassword ? <p className="text-red-400 text-xs">{errors.confirmPassword.message}</p> : null}
       </div>
       {error ? <p className="text-red-400 text-sm">{error}</p> : null}
-      <Button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium"
-      >
-        {isSubmitting ? "Creating account..." : "Sign Up"}
+      <Button type="submit" disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700">
+        {loading ? "Creating account..." : "Sign Up"}
       </Button>
     </form>
   );
