@@ -8,7 +8,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Venue, Person } from "../../../../backend/src/types";
 
-export type ScheduleViewMode = "year" | "month" | "week" | "day" | "next7";
+export type ScheduleViewMode = "year" | "yeardisc" | "month" | "week" | "day" | "next7";
 
 export interface VisibilityFilters {
   event: boolean;
@@ -54,6 +54,7 @@ export function ScheduleFilters({
           </SelectTrigger>
           <SelectContent className="bg-[#16161f] border-white/10 text-white">
             <SelectItem value="year">Year calendar</SelectItem>
+            <SelectItem value="yeardisc">Year disc</SelectItem>
             <SelectItem value="month">Month</SelectItem>
             <SelectItem value="week">Week</SelectItem>
             <SelectItem value="day">Day</SelectItem>

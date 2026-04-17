@@ -14,7 +14,12 @@ import { CalendarGrid } from "@/components/schedule/CalendarGrid";
 import { ItemDetailSheet } from "@/components/schedule/ItemDetailSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { ScheduleLegend } from "@/components/schedule/ScheduleLegend";
-import { toCalendarItems, formatMonthLabel, itemsForDay } from "@/components/schedule/scheduleUtils";
+import {
+  toCalendarItems,
+  formatMonthLabel,
+  itemsForDay,
+  itemColor,
+} from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 
 interface ScheduleData {
@@ -55,7 +60,7 @@ function addYears(date: Date, years: number): Date {
 }
 
 function getRange(mode: ScheduleViewMode, anchorDate: Date): { from: string; to: string } {
-  if (mode === "year") {
+  if (mode === "year" || mode === "yeardisc") {
     const y = anchorDate.getFullYear();
     return { from: `${y}-01-01`, to: `${y}-12-31` };
   }
@@ -81,6 +86,7 @@ function getRange(mode: ScheduleViewMode, anchorDate: Date): { from: string; to:
 
 function rangeLabel(mode: ScheduleViewMode, date: Date): string {
   if (mode === "year") return String(date.getFullYear());
+  if (mode === "yeardisc") return `Year Disc ${date.getFullYear()}`;
   if (mode === "month") return formatMonthLabel(date.getFullYear(), date.getMonth());
   if (mode === "week") {
     const fromDate = startOfWeek(date);
@@ -106,6 +112,179 @@ function getRangeDays(mode: ScheduleViewMode, anchorDate: Date): Date[] {
     return Array.from({ length: 7 }).map((_, i) => addDays(anchorDate, i));
   }
   return [anchorDate];
+}
+
+function getItemTimeRange(item: CalendarItem): { start: Date; end: Date; hasExplicitTime: boolean } {
+  const start = new Date(item.startDate);
+  const end = item.endDate ? new Date(item.endDate) : new Date(start.getTime() + 60 * 60 * 1000);
+  const hasExplicitTime = item.startDate.includes("T");
+  return { start, end, hasExplicitTime };
+}
+
+function OutlookTimeGrid({
+  days,
+  items,
+  onItemClick,
+}: {
+  days: Date[];
+  items: CalendarItem[];
+  onItemClick: (item: CalendarItem) => void;
+}) {
+  const hourHeight = 48;
+  const totalHeight = 24 * hourHeight;
+  const hours = Array.from({ length: 24 }).map((_, h) => h);
+
+  return (
+    <div className="rounded-lg border border-white/10 overflow-auto">
+      <div className="min-w-[860px]">
+        <div className="grid" style={{ gridTemplateColumns: `72px repeat(${days.length}, minmax(0, 1fr))` }}>
+          <div className="border-b border-white/10 bg-white/[0.02]" />
+          {days.map((d) => (
+            <div key={d.toISOString()} className="border-b border-l border-white/10 bg-white/[0.02] px-2 py-2">
+              <div className="text-xs text-white/80 font-medium">
+                {d.toLocaleDateString("en-US", { weekday: "short" })}
+              </div>
+              <div className="text-[11px] text-white/40">
+                {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid" style={{ gridTemplateColumns: `72px repeat(${days.length}, minmax(0, 1fr))` }}>
+          <div className="relative border-r border-white/10" style={{ height: totalHeight }}>
+            {hours.map((h) => (
+              <div
+                key={h}
+                className="absolute w-full text-[10px] text-white/35 pr-2 text-right"
+                style={{ top: h * hourHeight - 6 }}
+              >
+                {`${String(h).padStart(2, "0")}:00`}
+              </div>
+            ))}
+          </div>
+
+          {days.map((day) => {
+            const dayStart = new Date(day);
+            dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(dayStart);
+            dayEnd.setDate(dayEnd.getDate() + 1);
+
+            const dayItems = itemsForDay(items, day);
+            const timed = dayItems
+              .map((item) => ({ item, ...getItemTimeRange(item) }))
+              .filter(({ hasExplicitTime }) => hasExplicitTime);
+            const allDay = dayItems
+              .map((item) => ({ item, ...getItemTimeRange(item) }))
+              .filter(({ hasExplicitTime }) => !hasExplicitTime);
+
+            return (
+              <div key={day.toISOString()} className="relative border-l border-white/10" style={{ height: totalHeight }}>
+                {hours.map((h) => (
+                  <div
+                    key={h}
+                    className="absolute left-0 right-0 border-t border-white/5"
+                    style={{ top: h * hourHeight }}
+                  />
+                ))}
+
+                {allDay.map(({ item }, idx) => (
+                  <button
+                    key={`${item.id}-all-${idx}`}
+                    onClick={() => onItemClick(item)}
+                    className="absolute left-1 right-1 rounded px-2 py-1 text-[10px] truncate text-left bg-white/10 text-white/80 hover:bg-white/20"
+                    style={{ top: 2 + idx * 20 }}
+                    title={item.title}
+                  >
+                    All day - {item.title}
+                  </button>
+                ))}
+
+                {timed.map(({ item, start, end }, idx) => {
+                  const clippedStart = start < dayStart ? dayStart : start;
+                  const clippedEnd = end > dayEnd ? dayEnd : end;
+                  const startMinutes = clippedStart.getHours() * 60 + clippedStart.getMinutes();
+                  const endMinutes = clippedEnd.getHours() * 60 + clippedEnd.getMinutes();
+                  const top = (startMinutes / 60) * hourHeight;
+                  const height = Math.max(18, ((endMinutes - startMinutes) / 60) * hourHeight);
+                  const venueName =
+                    item.kind === "event"
+                      ? (item.raw as EventDetail).venue?.name
+                      : (item.raw as InternalBookingDetail).venue?.name;
+
+                  return (
+                    <button
+                      key={`${item.id}-${idx}`}
+                      onClick={() => onItemClick(item)}
+                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[10px] text-left hover:opacity-90 ${itemColor(item)}`}
+                      style={{ top, height }}
+                      title={item.title}
+                    >
+                      <div className="truncate font-semibold">{item.title}</div>
+                      <div className="truncate opacity-80">
+                        {clippedStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} -{" "}
+                        {clippedEnd.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {venueName ? ` - ${venueName}` : ""}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function YearDiscView({ year, items }: { year: number; items: CalendarItem[] }) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {Array.from({ length: 12 }).map((_, month) => {
+        const start = new Date(year, month, 1);
+        const end = new Date(year, month + 1, 0);
+        const daysInMonth = end.getDate();
+        let occupiedDays = 0;
+        for (let d = 1; d <= daysInMonth; d++) {
+          const date = new Date(year, month, d);
+          if (itemsForDay(items, date).length > 0) occupiedDays += 1;
+        }
+        const pct = Math.round((occupiedDays / daysInMonth) * 100);
+        const radius = 32;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (pct / 100) * circumference;
+
+        return (
+          <div key={month} className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+            <div className="text-xs text-white/50 mb-2">{formatMonthLabel(year, month)}</div>
+            <div className="flex items-center gap-4">
+              <svg width="84" height="84" viewBox="0 0 84 84" className="-rotate-90">
+                <circle cx="42" cy="42" r={radius} stroke="rgba(255,255,255,0.12)" strokeWidth="8" fill="none" />
+                <circle
+                  cx="42"
+                  cy="42"
+                  r={radius}
+                  stroke="rgba(244,63,94,0.95)"
+                  strokeWidth="8"
+                  fill="none"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={offset}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div>
+                <div className="text-2xl font-semibold text-white">{pct}%</div>
+                <div className="text-xs text-white/40">
+                  {occupiedDays}/{daysInMonth} days occupied
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function Schedule() {
@@ -159,14 +338,14 @@ export default function Schedule() {
   });
 
   function moveBackward() {
-    if (viewMode === "year") setAnchorDate((d) => addYears(d, -1));
+    if (viewMode === "year" || viewMode === "yeardisc") setAnchorDate((d) => addYears(d, -1));
     else if (viewMode === "month") setAnchorDate((d) => addMonths(d, -1));
     else if (viewMode === "week" || viewMode === "next7") setAnchorDate((d) => addDays(d, -7));
     else setAnchorDate((d) => addDays(d, -1));
   }
 
   function moveForward() {
-    if (viewMode === "year") setAnchorDate((d) => addYears(d, 1));
+    if (viewMode === "year" || viewMode === "yeardisc") setAnchorDate((d) => addYears(d, 1));
     else if (viewMode === "month") setAnchorDate((d) => addMonths(d, 1));
     else if (viewMode === "week" || viewMode === "next7") setAnchorDate((d) => addDays(d, 7));
     else setAnchorDate((d) => addDays(d, 1));
@@ -260,10 +439,18 @@ export default function Schedule() {
                   </div>
                 ))}
               </div>
+            ) : viewMode === "yeardisc" ? (
+              <YearDiscView year={anchorDate.getFullYear()} items={visibleItems} />
             ) : viewMode === "month" ? (
               <CalendarGrid
                 year={anchorDate.getFullYear()}
                 month={anchorDate.getMonth()}
+                items={visibleItems}
+                onItemClick={setSelectedItem}
+              />
+            ) : viewMode === "week" || viewMode === "day" ? (
+              <OutlookTimeGrid
+                days={getRangeDays(viewMode, anchorDate)}
                 items={visibleItems}
                 onItemClick={setSelectedItem}
               />

@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import type { Venue } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
@@ -19,15 +20,153 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const VenueFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   address: z.string().optional(),
   capacity: z.coerce.number().positive().optional().or(z.literal("")),
+  stageSize: z.string().optional(),
+  ceilingHeight: z.string().optional(),
+  customFieldsText: z.string().optional(),
   notes: z.string().optional(),
 });
 
 type VenueFormValues = z.infer<typeof VenueFormSchema>;
+
+function customFieldsToText(fields: Array<{ key: string; value?: string }>): string {
+  return fields.map((field) => `${field.key}: ${field.value ?? ""}`.trim()).join("\n");
+}
+
+function textToCustomFields(value: string | undefined): Array<{ key: string; value: string }> {
+  if (!value) return [];
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [keyPart, ...valueParts] = line.split(":");
+      return {
+        key: keyPart.trim(),
+        value: valueParts.join(":").trim(),
+      };
+    })
+    .filter((field) => field.key.length > 0);
+}
+
+function CustomFieldsEditor({
+  fields,
+  onChange,
+}: {
+  fields: Array<{ key: string; value: string }>;
+  onChange: (fields: Array<{ key: string; value: string }>) => void;
+}) {
+  return (
+    <div className="mt-2 space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
+      {fields.map((field, index) => (
+        <div key={`${index}-${field.key}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+          <Input
+            value={field.key}
+            onChange={(e) => {
+              const next = [...fields];
+              next[index] = { ...next[index], key: e.target.value };
+              onChange(next);
+            }}
+            placeholder="Field name"
+            className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+          />
+          <Input
+            value={field.value}
+            onChange={(e) => {
+              const next = [...fields];
+              next[index] = { ...next[index], value: e.target.value };
+              onChange(next);
+            }}
+            placeholder="Value"
+            className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-white/40 hover:text-red-400"
+            onClick={() => onChange(fields.filter((_, i) => i !== index))}
+          >
+            <Trash2 size={12} />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onChange([...fields, { key: "", value: "" }])}
+        className="h-8 border-white/10 bg-white/5 text-white/70 hover:text-white"
+      >
+        <Plus size={12} className="mr-1" /> Add custom field
+      </Button>
+    </div>
+  );
+}
+
+function AddressInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [predictions, setPredictions] = useState<Array<{ placeId: string; description: string }>>([]);
+  const [open, setOpen] = useState(false);
+
+  async function searchAddresses(query: string) {
+    if (query.trim().length < 3) {
+      setPredictions([]);
+      return;
+    }
+    try {
+      const results = await api.get<Array<{ placeId: string; description: string }>>(
+        `/api/venues/address-search?q=${encodeURIComponent(query)}`
+      );
+      setPredictions(results);
+      setOpen(true);
+    } catch {
+      setPredictions([]);
+    }
+  }
+
+  return (
+    <div className="relative">
+      <Input
+        value={value}
+        onChange={(e) => {
+          const next = e.target.value;
+          onChange(next);
+          searchAddresses(next);
+        }}
+        placeholder="Address (Google search enabled)"
+        className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+      />
+      {open && predictions.length > 0 ? (
+        <div className="absolute z-20 mt-1 w-full rounded-md border border-white/10 bg-[#16161f] shadow-lg overflow-hidden">
+          {predictions.slice(0, 6).map((prediction) => (
+            <button
+              key={prediction.placeId}
+              type="button"
+              onClick={() => {
+                onChange(prediction.description);
+                setOpen(false);
+              }}
+              className="w-full px-2 py-1.5 text-left text-xs text-white/80 hover:bg-white/10"
+            >
+              {prediction.description}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function VenueRow({
   venue,
@@ -37,6 +176,7 @@ function VenueRow({
   onDelete: (id: string) => void;
 }) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [editing, setEditing] = useState(false);
 
   const form = useForm<VenueFormValues>({
@@ -45,6 +185,9 @@ function VenueRow({
       name: venue.name,
       address: venue.address ?? "",
       capacity: venue.capacity ?? "",
+      stageSize: venue.stageSize ?? "",
+      ceilingHeight: venue.ceilingHeight ?? "",
+      customFieldsText: customFieldsToText(venue.customFields ?? []),
       notes: venue.notes ?? "",
     },
   });
@@ -55,6 +198,9 @@ function VenueRow({
         name: data.name,
         address: data.address || undefined,
         capacity: data.capacity === "" ? undefined : Number(data.capacity),
+        stageSize: data.stageSize || undefined,
+        ceilingHeight: data.ceilingHeight || undefined,
+        customFields: textToCustomFields(data.customFieldsText),
         notes: data.notes || undefined,
       };
       return api.put(`/api/venues/${venue.id}`, payload);
@@ -62,6 +208,9 @@ function VenueRow({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["venues"] });
       setEditing(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not save venue", description: error.message, variant: "destructive" });
     },
   });
 
@@ -75,9 +224,9 @@ function VenueRow({
           />
         </td>
         <td className="px-5 py-3 hidden sm:table-cell">
-          <Input
-            {...form.register("address")}
-            className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+          <AddressInput
+            value={form.watch("address") ?? ""}
+            onChange={(value) => form.setValue("address", value)}
           />
         </td>
         <td className="px-5 py-3 hidden md:table-cell">
@@ -85,6 +234,29 @@ function VenueRow({
             {...form.register("capacity")}
             type="number"
             className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30 w-24"
+          />
+          <Input
+            {...form.register("stageSize")}
+            placeholder="Size (W x D)"
+            className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30 w-32"
+          />
+          <Input
+            {...form.register("ceilingHeight")}
+            placeholder="Height"
+            className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30 w-24"
+          />
+          <Input
+            {...form.register("notes")}
+            placeholder="Notes"
+            className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+          />
+          <Textarea
+            {...form.register("customFieldsText")}
+            className="hidden"
+          />
+          <CustomFieldsEditor
+            fields={textToCustomFields(form.watch("customFieldsText"))}
+            onChange={(fields) => form.setValue("customFieldsText", customFieldsToText(fields))}
           />
         </td>
         <td className="px-5 py-3">
@@ -117,7 +289,16 @@ function VenueRow({
       <td className="px-5 py-3.5 text-sm font-medium text-white/90">{venue.name}</td>
       <td className="px-5 py-3.5 text-sm text-white/50 hidden sm:table-cell">{venue.address ?? "—"}</td>
       <td className="px-5 py-3.5 text-sm text-white/50 hidden md:table-cell">
-        {venue.capacity != null ? venue.capacity.toLocaleString() : "—"}
+        <div>{venue.capacity != null ? `${venue.capacity.toLocaleString()} cap` : "—"}</div>
+        <div className="text-[11px] text-white/30">
+          {venue.stageSize ? `Size: ${venue.stageSize}` : "Size: —"} · {venue.ceilingHeight ? `H: ${venue.ceilingHeight}` : "H: —"}
+        </div>
+        {venue.notes ? <div className="text-[11px] text-white/30 truncate max-w-56">{venue.notes}</div> : null}
+        {(venue.customFields ?? []).length > 0 ? (
+          <div className="text-[11px] text-white/30 truncate max-w-56">
+            {(venue.customFields ?? []).map((f) => `${f.key}: ${f.value}`).join(" · ")}
+          </div>
+        ) : null}
       </td>
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -146,16 +327,28 @@ function VenueRow({
 function AddVenueForm({ onSuccess }: { onSuccess: () => void }) {
   const form = useForm<VenueFormValues>({
     resolver: zodResolver(VenueFormSchema),
-    defaultValues: { name: "", address: "", capacity: "", notes: "" },
+    defaultValues: {
+      name: "",
+      address: "",
+      capacity: "",
+      stageSize: "",
+      ceilingHeight: "",
+      customFieldsText: "",
+      notes: "",
+    },
   });
 
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const createMutation = useMutation({
     mutationFn: (data: VenueFormValues) => {
       const payload = {
         name: data.name,
         address: data.address || undefined,
         capacity: data.capacity === "" ? undefined : Number(data.capacity),
+        stageSize: data.stageSize || undefined,
+        ceilingHeight: data.ceilingHeight || undefined,
+        customFields: textToCustomFields(data.customFieldsText),
         notes: data.notes || undefined,
       };
       return api.post<Venue>("/api/venues", payload);
@@ -164,6 +357,9 @@ function AddVenueForm({ onSuccess }: { onSuccess: () => void }) {
       queryClient.invalidateQueries({ queryKey: ["venues"] });
       form.reset();
       onSuccess();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not save venue", description: error.message, variant: "destructive" });
     },
   });
 
@@ -180,10 +376,9 @@ function AddVenueForm({ onSuccess }: { onSuccess: () => void }) {
         )}
       </td>
       <td className="px-5 py-3 hidden sm:table-cell">
-        <Input
-          {...form.register("address")}
-          placeholder="Address"
-          className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+        <AddressInput
+          value={form.watch("address") ?? ""}
+          onChange={(value) => form.setValue("address", value)}
         />
       </td>
       <td className="px-5 py-3 hidden md:table-cell">
@@ -192,6 +387,29 @@ function AddVenueForm({ onSuccess }: { onSuccess: () => void }) {
           type="number"
           placeholder="Capacity"
           className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30 w-24"
+        />
+        <Input
+          {...form.register("stageSize")}
+          placeholder="Size (W x D)"
+          className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30 w-32"
+        />
+        <Input
+          {...form.register("ceilingHeight")}
+          placeholder="Height"
+          className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30 w-24"
+        />
+        <Input
+          {...form.register("notes")}
+          placeholder="Notes"
+          className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+        />
+        <Textarea
+          {...form.register("customFieldsText")}
+          className="hidden"
+        />
+        <CustomFieldsEditor
+          fields={textToCustomFields(form.watch("customFieldsText"))}
+          onChange={(fields) => form.setValue("customFieldsText", customFieldsToText(fields))}
         />
       </td>
       <td className="px-5 py-3">

@@ -18,6 +18,8 @@ const envSchema = z.object({
   // Email (production)
   RESEND_API_KEY: z.string().optional(),
   FROM_EMAIL: z.string().optional(),
+  // Google Maps
+  GOOGLE_MAPS_API_KEY: z.string().optional(),
   // Frontend
   FRONTEND_URL: z.string().optional(),
   // Admin

@@ -108,6 +108,18 @@ export function VenueTechRiderCoverDoc({
   })();
 
   const venueLabel = [show.venueName, show.venueCity].filter(Boolean).join(", ");
+  const visibility = {
+    venue: true,
+    schedule: true,
+    crew: true,
+    technicalRequirements: true,
+    venueContact: true,
+    hotel: true,
+    notes: true,
+    managerContact: true,
+    customFields: true,
+    ...(tour.riderVisibility ?? {}),
+  };
   const handsNeeded = show.handsNeeded ?? tour.handsNeeded;
   const showDuration = tour.showDuration;
   const hasSchedule =
@@ -131,7 +143,7 @@ export function VenueTechRiderCoverDoc({
         </View>
 
         {/* Venue address */}
-        {show.venueAddress ? (
+        {visibility.venue && show.venueAddress ? (
           <View style={{ marginBottom: 14 }}>
             <Text style={S.sectionTitle}>Venue</Text>
             <Text style={S.addressLine}>{show.venueAddress}</Text>
@@ -139,10 +151,10 @@ export function VenueTechRiderCoverDoc({
         ) : null}
 
         {/* Schedule + Crew side by side */}
-        {(hasSchedule || showDuration || handsNeeded) ? (
+        {(visibility.schedule || visibility.crew) && (hasSchedule || showDuration || handsNeeded) ? (
           <View style={S.twoCol}>
             {/* Schedule */}
-            {(hasSchedule || showDuration) ? (
+            {visibility.schedule && (hasSchedule || showDuration) ? (
               <View style={S.col}>
                 <Text style={S.sectionTitle}>Schedule</Text>
                 <Row label="Arrival / Get-in" value={show.getInTime} />
@@ -155,17 +167,26 @@ export function VenueTechRiderCoverDoc({
             ) : null}
 
             {/* Crew */}
-            {handsNeeded ? (
+            {visibility.crew && handsNeeded ? (
               <View style={S.col}>
                 <Text style={S.sectionTitle}>Crew Required</Text>
                 <Row label="Hands needed" value={String(handsNeeded)} />
+              </View>
+            ) : null}
+            {visibility.technicalRequirements &&
+            (tour.stageRequirements || tour.soundRequirements || tour.lightingRequirements) ? (
+              <View style={S.col}>
+                <Text style={S.sectionTitle}>Technical Requirements</Text>
+                <Row label="Stage" value={tour.stageRequirements} />
+                <Row label="Sound" value={tour.soundRequirements} />
+                <Row label="Lighting" value={tour.lightingRequirements} />
               </View>
             ) : null}
           </View>
         ) : null}
 
         {/* Venue contact */}
-        {hasContact ? (
+        {visibility.venueContact && hasContact ? (
           <View style={{ marginBottom: 14 }}>
             <Text style={S.sectionTitle}>Venue Contact</Text>
             <View style={S.contactRow}>
@@ -183,7 +204,7 @@ export function VenueTechRiderCoverDoc({
         ) : null}
 
         {/* Hotel */}
-        {hasHotel ? (
+        {visibility.hotel && hasHotel ? (
           <View style={{ marginBottom: 14 }}>
             <Text style={S.sectionTitle}>Hotel</Text>
             {show.hotelName ? (
@@ -206,7 +227,7 @@ export function VenueTechRiderCoverDoc({
         ) : null}
 
         {/* Notes */}
-        {(show.notes || tour.riderNotes) ? (
+        {visibility.notes && (show.notes || tour.riderNotes) ? (
           <View style={{ marginBottom: 14 }}>
             <Text style={S.sectionTitle}>Notes</Text>
             {show.notes ? <Text style={S.noteText}>{show.notes}</Text> : null}
@@ -216,11 +237,26 @@ export function VenueTechRiderCoverDoc({
           </View>
         ) : null}
 
+        {visibility.customFields && (tour.customFields ?? []).length > 0 ? (
+          <View style={{ marginBottom: 14 }}>
+            <Text style={S.sectionTitle}>Custom Fields</Text>
+            {(tour.customFields ?? []).map((field, index) => (
+              <Row key={`${field.key}-${index}`} label={field.key} value={field.value} />
+            ))}
+          </View>
+        ) : null}
+
         {/* Footer */}
         <View style={S.footerLine}>
           <Text style={S.footerText}>
-            {tour.tourManagerName ? `Tour Manager: ${tour.tourManagerName}` : ""}
-            {tour.tourManagerPhone ? `  ·  ${tour.tourManagerPhone}` : ""}
+            {visibility.managerContact ? (
+              <>
+                {tour.tourManagerName ? `Tour Manager: ${tour.tourManagerName}` : ""}
+                {tour.tourManagerPhone ? `  ·  ${tour.tourManagerPhone}` : ""}
+              </>
+            ) : (
+              ""
+            )}
           </Text>
           {tour.techRiderPdfName ? (
             <Text style={S.footerBold}>Technical specifications follow →</Text>

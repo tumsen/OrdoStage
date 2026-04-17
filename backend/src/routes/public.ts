@@ -3,6 +3,40 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { prisma } from "../prisma";
 
+const DEFAULT_RIDER_VISIBILITY = {
+  venue: true,
+  schedule: true,
+  crew: true,
+  technicalRequirements: true,
+  venueContact: true,
+  hotel: true,
+  notes: true,
+  managerContact: true,
+  customFields: true,
+};
+
+function parseCustomFields(value: string | null | undefined) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && typeof item.key === "string")
+      .map((item) => ({ key: String(item.key), value: item.value == null ? "" : String(item.value) }));
+  } catch {
+    return [];
+  }
+}
+
+function parseRiderVisibility(value: string | null | undefined) {
+  if (!value) return DEFAULT_RIDER_VISIBILITY;
+  try {
+    return { ...DEFAULT_RIDER_VISIBILITY, ...(JSON.parse(value) ?? {}) };
+  } catch {
+    return DEFAULT_RIDER_VISIBILITY;
+  }
+}
+
 function serializePublicPerson(person: any) {
   return {
     id: person.id,
@@ -54,6 +88,8 @@ publicRouter.get("/tours/:token", async (c) => {
       soundRequirements: (tour as any).soundRequirements ?? null,
       lightingRequirements: (tour as any).lightingRequirements ?? null,
       riderNotes: (tour as any).riderNotes ?? null,
+      customFields: parseCustomFields((tour as any).customFields),
+      riderVisibility: parseRiderVisibility((tour as any).riderVisibility),
       createdAt: tour.createdAt.toISOString(),
       updatedAt: tour.updatedAt.toISOString(),
       shows: tour.shows.map((show: any) => ({

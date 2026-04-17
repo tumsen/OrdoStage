@@ -15,6 +15,44 @@ import { createVibecodeSDK } from "@vibecodeapp/backend-sdk";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
+const DEFAULT_RIDER_VISIBILITY = {
+  venue: true,
+  schedule: true,
+  crew: true,
+  technicalRequirements: true,
+  venueContact: true,
+  hotel: true,
+  notes: true,
+  managerContact: true,
+  customFields: true,
+};
+
+function parseCustomFields(value: string | null | undefined) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && typeof item.key === "string")
+      .map((item) => ({ key: String(item.key), value: item.value == null ? "" : String(item.value) }));
+  } catch {
+    return [];
+  }
+}
+
+function parseRiderVisibility(value: string | null | undefined) {
+  if (!value) return DEFAULT_RIDER_VISIBILITY;
+  try {
+    const parsed = JSON.parse(value);
+    return {
+      ...DEFAULT_RIDER_VISIBILITY,
+      ...(parsed ?? {}),
+    };
+  } catch {
+    return DEFAULT_RIDER_VISIBILITY;
+  }
+}
+
 function serializeTourShow(show: any) {
   return {
     id: show.id,
@@ -108,6 +146,8 @@ function serializeTour(tour: any) {
     soundRequirements: tour.soundRequirements,
     lightingRequirements: tour.lightingRequirements,
     riderNotes: tour.riderNotes,
+    customFields: parseCustomFields(tour.customFields),
+    riderVisibility: parseRiderVisibility(tour.riderVisibility),
     techRiderPdfName: tour.techRiderPdfName ?? null,
     createdAt: tour.createdAt instanceof Date ? tour.createdAt.toISOString() : tour.createdAt,
     updatedAt: tour.updatedAt instanceof Date ? tour.updatedAt.toISOString() : tour.updatedAt,
@@ -164,6 +204,10 @@ toursRouter.post("/tours", zValidator("json", CreateTourSchema), async (c) => {
       soundRequirements: body.soundRequirements ?? null,
       lightingRequirements: body.lightingRequirements ?? null,
       riderNotes: body.riderNotes ?? null,
+      customFields: body.customFields ? JSON.stringify(body.customFields) : null,
+      riderVisibility: body.riderVisibility
+        ? JSON.stringify({ ...DEFAULT_RIDER_VISIBILITY, ...body.riderVisibility })
+        : JSON.stringify(DEFAULT_RIDER_VISIBILITY),
       organizationId: user.organizationId,
     },
   });
@@ -293,6 +337,15 @@ toursRouter.put("/tours/:id", zValidator("json", UpdateTourSchema), async (c) =>
       ...(body.soundRequirements !== undefined && { soundRequirements: body.soundRequirements }),
       ...(body.lightingRequirements !== undefined && { lightingRequirements: body.lightingRequirements }),
       ...(body.riderNotes !== undefined && { riderNotes: body.riderNotes }),
+      ...(body.customFields !== undefined && {
+        customFields: body.customFields ? JSON.stringify(body.customFields) : null,
+      }),
+      ...(body.riderVisibility !== undefined && {
+        riderVisibility: JSON.stringify({
+          ...parseRiderVisibility(existing.riderVisibility),
+          ...body.riderVisibility,
+        }),
+      }),
     },
   });
 

@@ -1,5 +1,22 @@
 import { z } from "zod";
 
+export const CustomFieldSchema = z.object({
+  key: z.string().min(1),
+  value: z.string().optional().default(""),
+});
+
+export const RiderVisibilitySchema = z.object({
+  venue: z.boolean().default(true),
+  schedule: z.boolean().default(true),
+  crew: z.boolean().default(true),
+  technicalRequirements: z.boolean().default(true),
+  venueContact: z.boolean().default(true),
+  hotel: z.boolean().default(true),
+  notes: z.boolean().default(true),
+  managerContact: z.boolean().default(true),
+  customFields: z.boolean().default(true),
+});
+
 // Department
 export const DepartmentSchema = z.object({
   id: z.string(),
@@ -21,6 +38,9 @@ export const VenueSchema = z.object({
   name: z.string(),
   address: z.string().nullable(),
   capacity: z.number().nullable(),
+  stageSize: z.string().nullable(),
+  ceilingHeight: z.string().nullable(),
+  customFields: z.array(CustomFieldSchema),
   notes: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -30,6 +50,9 @@ export const CreateVenueSchema = z.object({
   name: z.string().min(1),
   address: z.string().optional(),
   capacity: z.number().optional(),
+  stageSize: z.string().optional(),
+  ceilingHeight: z.string().optional(),
+  customFields: z.array(CustomFieldSchema).optional(),
   notes: z.string().optional(),
 });
 
@@ -220,6 +243,8 @@ export const TeamMemberSchema = z.object({
 // Type exports
 export type Department = z.infer<typeof DepartmentSchema>;
 export type CreateDepartment = z.infer<typeof CreateDepartmentSchema>;
+export type CustomField = z.infer<typeof CustomFieldSchema>;
+export type RiderVisibility = z.infer<typeof RiderVisibilitySchema>;
 export type Venue = z.infer<typeof VenueSchema>;
 export type CreateVenue = z.infer<typeof CreateVenueSchema>;
 export type Person = z.infer<typeof PersonSchema>;
@@ -369,6 +394,8 @@ export const TourSchema = z.object({
   soundRequirements: z.string().nullable(),
   lightingRequirements: z.string().nullable(),
   riderNotes: z.string().nullable(),
+  customFields: z.array(CustomFieldSchema),
+  riderVisibility: RiderVisibilitySchema,
   techRiderPdfName: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -399,6 +426,8 @@ export const CreateTourSchema = z.object({
   soundRequirements: z.string().optional(),
   lightingRequirements: z.string().optional(),
   riderNotes: z.string().optional(),
+  customFields: z.array(CustomFieldSchema).optional(),
+  riderVisibility: RiderVisibilitySchema.partial().optional(),
 });
 
 export const UpdateTourSchema = CreateTourSchema.partial();

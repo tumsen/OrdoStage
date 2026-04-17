@@ -102,6 +102,9 @@ model Venue {
   name             String
   address          String?
   capacity         Int?
+  stageSize        String?
+  ceilingHeight    String?
+  customFields     String?
   notes            String?
   organizationId   String
   organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -286,6 +289,8 @@ model Tour {
   soundRequirements    String?   // PA/sound system requirements
   lightingRequirements String?   // lighting requirements
   riderNotes           String?   // additional tech rider notes
+  customFields         String?   // JSON array of key/value pairs
+  riderVisibility      String?   // JSON toggle map for what to include in rider
   techRiderPdfData     Bytes?    // uploaded static tech rider PDF bytes
   techRiderPdfName     String?   // original filename
   organizationId   String

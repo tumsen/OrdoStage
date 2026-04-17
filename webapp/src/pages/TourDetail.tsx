@@ -73,6 +73,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
 import { downloadVenueTechRider, printVenueTechRider, uploadVenueTechRiderForSharing } from "@/lib/downloadVenueTechRider";
 import { TourCalendarView } from "@/components/TourCalendarView";
@@ -104,6 +105,92 @@ function formatTravelTime(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
+
+const DEFAULT_RIDER_VISIBILITY: TourDetail["riderVisibility"] = {
+  venue: true,
+  schedule: true,
+  crew: true,
+  technicalRequirements: true,
+  venueContact: true,
+  hotel: true,
+  notes: true,
+  managerContact: true,
+  customFields: true,
+};
+
+function customFieldsToText(fields: Array<{ key: string; value?: string }>): string {
+  return fields.map((field) => `${field.key}: ${field.value ?? ""}`.trim()).join("\n");
+}
+
+function textToCustomFields(value: string): Array<{ key: string; value: string }> {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [keyPart, ...valueParts] = line.split(":");
+      return {
+        key: keyPart.trim(),
+        value: valueParts.join(":").trim(),
+      };
+    })
+    .filter((field) => field.key.length > 0);
+}
+
+function CustomFieldsEditor({
+  fields,
+  onChange,
+}: {
+  fields: Array<{ key: string; value: string }>;
+  onChange: (fields: Array<{ key: string; value: string }>) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+      {fields.map((field, index) => (
+        <div key={`${index}-${field.key}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+          <Input
+            value={field.key}
+            onChange={(e) => {
+              const next = [...fields];
+              next[index] = { ...next[index], key: e.target.value };
+              onChange(next);
+            }}
+            placeholder="Field name"
+            className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 h-9"
+          />
+          <Input
+            value={field.value}
+            onChange={(e) => {
+              const next = [...fields];
+              next[index] = { ...next[index], value: e.target.value };
+              onChange(next);
+            }}
+            placeholder="Value"
+            className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 h-9"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-white/40 hover:text-red-400"
+            onClick={() => onChange(fields.filter((_, i) => i !== index))}
+          >
+            <Trash2 size={13} />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onChange([...fields, { key: "", value: "" }])}
+        className="border-white/10 bg-white/5 text-white/70 hover:text-white"
+      >
+        <Plus size={12} className="mr-1" /> Add custom field
+      </Button>
+    </div>
+  );
 }
 
 // ── Status badge ─────────────────────────────────────────────────────────────
@@ -175,6 +262,13 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
   const [soundRequirements, setSoundRequirements] = useState(tour.soundRequirements ?? "");
   const [lightingRequirements, setLightingRequirements] = useState(tour.lightingRequirements ?? "");
   const [riderNotes, setRiderNotes] = useState(tour.riderNotes ?? "");
+  const [customFields, setCustomFields] = useState<Array<{ key: string; value: string }>>(
+    textToCustomFields(customFieldsToText(tour.customFields ?? []))
+  );
+  const [riderVisibility, setRiderVisibility] = useState<TourDetail["riderVisibility"]>({
+    ...DEFAULT_RIDER_VISIBILITY,
+    ...(tour.riderVisibility ?? {}),
+  });
 
   const updateMutation = useMutation({
     mutationFn: (data: UpdateTour) => api.put<TourDetail>(`/api/tours/${tour.id}`, data),
@@ -202,6 +296,8 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
       soundRequirements: soundRequirements.trim() || undefined,
       lightingRequirements: lightingRequirements.trim() || undefined,
       riderNotes: riderNotes.trim() || undefined,
+      customFields: customFields.filter((field) => field.key.trim().length > 0),
+      riderVisibility,
     };
     updateMutation.mutate(payload);
   }
@@ -353,6 +449,38 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
                   className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-none"
                   rows={2}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-white/60 text-xs uppercase tracking-wide">Custom Tour Fields</Label>
+                <CustomFieldsEditor fields={customFields} onChange={setCustomFields} />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-white/60 text-xs uppercase tracking-wide">Include In Venue Tech Rider</Label>
+                <div className="grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                  {(
+                    [
+                      ["venue", "Venue info"],
+                      ["schedule", "Schedule"],
+                      ["crew", "Crew"],
+                      ["technicalRequirements", "Tech requirements"],
+                      ["venueContact", "Venue contact"],
+                      ["hotel", "Hotel"],
+                      ["notes", "Notes"],
+                      ["managerContact", "Manager contact"],
+                      ["customFields", "Custom fields"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2 text-xs text-white/70">
+                      <Checkbox
+                        checked={riderVisibility[key]}
+                        onCheckedChange={(checked) =>
+                          setRiderVisibility((prev) => ({ ...prev, [key]: Boolean(checked) }))
+                        }
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -899,13 +1027,14 @@ function buildTechRiderText(tour: TourDetail, show: TourShow, pdfUrl?: string | 
   const venue = [show.venueName, show.venueCity].filter(Boolean).join(", ");
 
   const lines: string[] = [];
+  const visibility = { ...DEFAULT_RIDER_VISIBILITY, ...(tour.riderVisibility ?? {}) };
 
   lines.push(`TECH RIDER`);
   lines.push(`==========`);
   lines.push(``);
   lines.push(`Tour: ${tour.name}`);
-  if (venue) lines.push(`Venue: ${venue}`);
-  if (show.venueAddress) lines.push(`Address: ${show.venueAddress}`);
+  if (visibility.venue && venue) lines.push(`Venue: ${venue}`);
+  if (visibility.venue && show.venueAddress) lines.push(`Address: ${show.venueAddress}`);
   lines.push(`Date: ${date}`);
   lines.push(``);
 
@@ -917,7 +1046,7 @@ function buildTechRiderText(tour: TourDetail, show: TourShow, pdfUrl?: string | 
   if (show.doorsTime) scheduleParts.push(`Doors: ${show.doorsTime}`);
   if (show.showTime) scheduleParts.push(`Show: ${show.showTime}`);
   if (tour.showDuration) scheduleParts.push(`Duration: ${tour.showDuration}`);
-  if (scheduleParts.length > 0) {
+  if (visibility.schedule && scheduleParts.length > 0) {
     lines.push(`SCHEDULE`);
     lines.push(`--------`);
     scheduleParts.forEach(s => lines.push(s));
@@ -925,7 +1054,7 @@ function buildTechRiderText(tour: TourDetail, show: TourShow, pdfUrl?: string | 
   }
 
   // Crew
-  if (tour.handsNeeded) {
+  if (visibility.crew && tour.handsNeeded) {
     lines.push(`CREW REQUIRED`);
     lines.push(`-------------`);
     lines.push(`Hands needed at venue: ${tour.handsNeeded}`);
@@ -934,7 +1063,7 @@ function buildTechRiderText(tour: TourDetail, show: TourShow, pdfUrl?: string | 
 
   // Technical requirements
   const hasReqs = tour.stageRequirements || tour.soundRequirements || tour.lightingRequirements;
-  if (hasReqs) {
+  if (visibility.technicalRequirements && hasReqs) {
     lines.push(`TECHNICAL REQUIREMENTS`);
     lines.push(`----------------------`);
     if (tour.stageRequirements) {
@@ -956,7 +1085,16 @@ function buildTechRiderText(tour: TourDetail, show: TourShow, pdfUrl?: string | 
 
   // Additional notes
   const additionalNotes = [tour.riderNotes, show.notes].filter(Boolean).join("\n\n");
-  if (additionalNotes) {
+  if (visibility.notes && additionalNotes) {
+  if (visibility.customFields && (tour.customFields ?? []).length > 0) {
+    lines.push(`CUSTOM FIELDS`);
+    lines.push(`-------------`);
+    (tour.customFields ?? []).forEach((field) => {
+      lines.push(`${field.key}: ${field.value}`);
+    });
+    lines.push(``);
+  }
+
     lines.push(`ADDITIONAL NOTES`);
     lines.push(`----------------`);
     lines.push(additionalNotes);
@@ -974,7 +1112,7 @@ function buildTechRiderText(tour: TourDetail, show: TourShow, pdfUrl?: string | 
 
   // Footer
   lines.push(`---`);
-  if (tour.tourManagerName || tour.tourManagerPhone || tour.tourManagerEmail) {
+  if (visibility.managerContact && (tour.tourManagerName || tour.tourManagerPhone || tour.tourManagerEmail)) {
     lines.push(`Questions? Contact our Tour Manager:`);
     if (tour.tourManagerName) lines.push(tour.tourManagerName);
     const contact = [tour.tourManagerPhone, tour.tourManagerEmail].filter(Boolean).join(" | ");
@@ -2479,7 +2617,13 @@ export default function TourDetailPage() {
           </div>
         ) : null}
 
-        {(tour.showDuration || tour.handsNeeded || tour.stageRequirements || tour.soundRequirements || tour.lightingRequirements || tour.riderNotes) ? (
+        {(tour.showDuration ||
+          tour.handsNeeded ||
+          tour.stageRequirements ||
+          tour.soundRequirements ||
+          tour.lightingRequirements ||
+          tour.riderNotes ||
+          (tour.customFields ?? []).length > 0) ? (
           <div>
             <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
               Technical Rider
@@ -2495,6 +2639,16 @@ export default function TourDetailPage() {
               {tour.riderNotes ? (
                 <div className="sm:col-span-2">
                   <InfoRow label="Additional Notes" value={tour.riderNotes} />
+                </div>
+              ) : null}
+              {(tour.customFields ?? []).length > 0 ? (
+                <div className="sm:col-span-2 bg-white/[0.02] border border-white/8 rounded-lg px-4 py-3">
+                  <div className="text-xs text-white/35 uppercase tracking-wide mb-1">Custom Fields</div>
+                  <div className="space-y-1 text-sm text-white/80">
+                    {(tour.customFields ?? []).map((field, index) => (
+                      <div key={`${field.key}-${index}`}>{field.key}: {field.value}</div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>
