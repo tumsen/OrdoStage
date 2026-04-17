@@ -18,6 +18,7 @@ interface RecentPurchase {
 interface AdminStats {
   totalOrgs: number;
   totalUsers: number;
+  totalPeople: number;
   totalRevenueCents: number;
   recentPurchases: RecentPurchase[];
 }
@@ -88,8 +89,8 @@ export default function Dashboard() {
   if (statsPending) {
     return (
       <div className="p-6 space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[0, 1, 2, 3].map((i) => (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} className="h-24 bg-gray-900 border border-white/10 rounded-lg animate-pulse" />
           ))}
         </div>
@@ -100,7 +101,7 @@ export default function Dashboard() {
   return (
     <div className="p-6 space-y-6">
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           title="Total Organizations"
           value={stats?.totalOrgs ?? 0}
@@ -109,6 +110,11 @@ export default function Dashboard() {
         <StatCard
           title="Total Users"
           value={stats?.totalUsers ?? 0}
+          icon={Users}
+        />
+        <StatCard
+          title="Total People"
+          value={stats?.totalPeople ?? 0}
           icon={Users}
         />
         <StatCard

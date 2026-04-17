@@ -46,6 +46,8 @@ interface OrgDetail {
   id: string;
   name: string;
   creditBalance: number;
+  discountPercent: number;
+  discountNote: string | null;
   freeTrialUsed: boolean;
   createdAt: string;
   users: OrgUser[];
@@ -123,6 +125,8 @@ function CreditsTab({ org }: { org: OrgDetail }) {
   const [creditNote, setCreditNote] = useState("");
   const [trialDays, setTrialDays] = useState<string>("30");
   const [trialNote, setTrialNote] = useState("");
+  const [discountPercent, setDiscountPercent] = useState<string>(String(org.discountPercent ?? 0));
+  const [discountNote, setDiscountNote] = useState<string>(org.discountNote ?? "");
 
   const creditMutation = useMutation({
     mutationFn: (data: { delta: number; note?: string }) =>
@@ -155,6 +159,19 @@ function CreditsTab({ org }: { org: OrgDetail }) {
     },
   });
 
+  const discountMutation = useMutation({
+    mutationFn: (data: { discountPercent: number; discountNote?: string }) =>
+      api.put(`/api/admin/orgs/${org.id}/pricing`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
+      toast({ title: "Pricing updated", description: "Customer discount has been updated." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update discount.", variant: "destructive" });
+    },
+  });
+
   const handleCreditSubmit = () => {
     const delta = parseInt(creditDelta, 10);
     if (isNaN(delta)) return;
@@ -169,6 +186,7 @@ function CreditsTab({ org }: { org: OrgDetail }) {
 
   const deltaValue = parseInt(creditDelta, 10);
   const trialDaysValue = parseInt(trialDays, 10);
+  const discountPercentValue = parseInt(discountPercent, 10);
 
   return (
     <div className="space-y-6">
@@ -271,6 +289,53 @@ function CreditsTab({ org }: { org: OrgDetail }) {
                 : trialMutation.isPending
                 ? "Granting..."
                 : "Grant Free Trial"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Customer discount */}
+        <Card className="bg-gray-900 border border-white/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-white/70">Customer Discount</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1 block">Discount % (0-100)</label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                placeholder="0"
+                value={discountPercent}
+                onChange={(e) => setDiscountPercent(e.target.value)}
+                className="bg-gray-800 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-rose-500/30"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1 block">Note (optional)</label>
+              <Input
+                placeholder="e.g. Partner theater agreement"
+                value={discountNote}
+                onChange={(e) => setDiscountNote(e.target.value)}
+                className="bg-gray-800 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-rose-500/30"
+              />
+            </div>
+            <Button
+              onClick={() =>
+                discountMutation.mutate({
+                  discountPercent: discountPercentValue,
+                  discountNote: discountNote || undefined,
+                })
+              }
+              disabled={
+                discountMutation.isPending ||
+                isNaN(discountPercentValue) ||
+                discountPercentValue < 0 ||
+                discountPercentValue > 100
+              }
+              className="w-full bg-rose-700 hover:bg-rose-600 text-white"
+            >
+              {discountMutation.isPending ? "Saving..." : "Save Discount"}
             </Button>
           </CardContent>
         </Card>

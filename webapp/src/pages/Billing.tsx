@@ -19,12 +19,14 @@ interface CheckoutResponse {
   url: string;
 }
 
-const PACKS = [
-  { days: 100, price: 9, label: "Starter", description: "Great for a small production" },
-  { days: 500, price: 39, label: "Standard", description: "Perfect for a season" },
-  { days: 1000, price: 69, label: "Pro", description: "For active companies", popular: true },
-  { days: 5000, price: 299, label: "Enterprise", description: "Unlimited runway" },
-];
+interface BillingPack {
+  id: string;
+  packId: string;
+  days: number;
+  label: string;
+  amountCents: number;
+  active: boolean;
+}
 
 function CreditStatus({ credits, userCount }: { credits: number; userCount: number }) {
   const daysLeft = userCount > 0 ? Math.floor(credits / userCount) : credits;
@@ -68,9 +70,14 @@ export default function Billing() {
     queryFn: () => api.get<OrgData>("/api/org"),
   });
 
+  const { data: packs } = useQuery<BillingPack[]>({
+    queryKey: ["billing", "packs"],
+    queryFn: () => api.get<BillingPack[]>("/api/billing/packs"),
+  });
+
   const checkoutMutation = useMutation({
-    mutationFn: (days: number) =>
-      api.post<CheckoutResponse>("/api/billing/checkout", { days }),
+    mutationFn: (packId: string) =>
+      api.post<CheckoutResponse>("/api/billing/checkout", { packId }),
     onSuccess: (data) => {
       if (data?.url) {
         window.location.href = data.url;
@@ -169,14 +176,14 @@ export default function Billing() {
           Top Up Credits
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {PACKS.map((pack) => (
+          {(packs ?? []).map((pack, index) => (
             <Card
-              key={pack.days}
+              key={pack.packId}
               className={`relative bg-gray-900 border transition-all duration-150 hover:border-purple-500/60 cursor-pointer ${
-                pack.popular ? "border-purple-500/50" : "border-white/10"
+                index === 2 ? "border-purple-500/50" : "border-white/10"
               }`}
             >
-              {pack.popular ? (
+              {index === 2 ? (
                 <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs px-3 py-0.5 rounded-full font-medium">
                   Most Popular
                 </div>
@@ -184,21 +191,21 @@ export default function Billing() {
               <CardContent className="p-5 space-y-4">
                 <div>
                   <div className="text-white font-semibold">{pack.label}</div>
-                  <div className="text-gray-400 text-xs mt-0.5">{pack.description}</div>
+                  <div className="text-gray-400 text-xs mt-0.5">Credit top-up pack</div>
                 </div>
                 <div>
                   <span className="text-3xl font-bold text-white">{pack.days.toLocaleString()}</span>
                   <span className="text-gray-400 text-sm ml-1">days</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-purple-400 font-semibold text-lg">€{pack.price}</span>
+                  <span className="text-purple-400 font-semibold text-lg">€{(pack.amountCents / 100).toFixed(2)}</span>
                   <span className="text-gray-500 text-xs">
-                    €{(pack.price / pack.days * 100).toFixed(1)}¢/day
+                    €{((pack.amountCents / 100) / pack.days * 100).toFixed(1)}¢/day
                   </span>
                 </div>
                 <Button
                   className="w-full bg-purple-600 hover:bg-purple-700 text-sm"
-                  onClick={() => checkoutMutation.mutate(pack.days)}
+                  onClick={() => checkoutMutation.mutate(pack.packId)}
                   disabled={checkoutMutation.isPending}
                 >
                   {checkoutMutation.isPending ? "Loading..." : "Buy Now"}

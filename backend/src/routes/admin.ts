@@ -14,11 +14,12 @@ app.use("/admin/*", adminMiddleware);
 // ── Stats ──────────────────────────────────────────────────────────────────
 
 app.get("/admin/stats", async (c) => {
-  const [totalOrgs, totalUsers, totalRevenue, recentPurchases] =
+  const [totalOrgs, totalUsers, totalRevenue, totalPeople, recentPurchases] =
     await Promise.all([
       prisma.organization.count(),
       prisma.user.count({ where: { organizationId: { not: null } } }),
       prisma.creditPurchase.aggregate({ _sum: { amountCents: true } }),
+      prisma.person.count(),
       prisma.creditPurchase.findMany({
         orderBy: { createdAt: "desc" },
         take: 10,
@@ -30,6 +31,7 @@ app.get("/admin/stats", async (c) => {
     data: {
       totalOrgs,
       totalUsers,
+      totalPeople,
       totalRevenueCents: totalRevenue._sum.amountCents || 0,
       recentPurchases,
     },
@@ -42,7 +44,10 @@ app.get("/admin/orgs", async (c) => {
   const orgs = await prisma.organization.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      _count: { select: { users: true, events: true } },
+      _count: { select: { users: true, events: true, people: true } },
+      creditPurchases: {
+        select: { days: true, amountCents: true },
+      },
       users: {
         select: {
           id: true,
@@ -54,7 +59,13 @@ app.get("/admin/orgs", async (c) => {
       },
     },
   });
-  return c.json({ data: orgs });
+  return c.json({
+    data: orgs.map((org) => ({
+      ...org,
+      totalPurchasedDays: org.creditPurchases.reduce((sum, purchase) => sum + purchase.days, 0),
+      totalPurchasedCents: org.creditPurchases.reduce((sum, purchase) => sum + purchase.amountCents, 0),
+    })),
+  });
 });
 
 app.get("/admin/orgs/:id", async (c) => {
@@ -81,6 +92,32 @@ app.get("/admin/orgs/:id", async (c) => {
 });
 
 // ── Credit management ──────────────────────────────────────────────────────
+
+app.put("/admin/orgs/:id/pricing", async (c) => {
+  const body = await c.req.json();
+  const { discountPercent, discountNote } = z
+    .object({
+      discountPercent: z.number().int().min(0).max(100),
+      discountNote: z.string().optional(),
+    })
+    .parse(body);
+
+  const org = await prisma.organization.findUnique({
+    where: { id: c.req.param("id") },
+  });
+  if (!org)
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  const updated = await prisma.organization.update({
+    where: { id: org.id },
+    data: {
+      discountPercent,
+      discountNote: discountNote || null,
+    },
+  });
+
+  return c.json({ data: updated });
+});
 
 // Add or remove credits manually
 app.post("/admin/orgs/:id/credits", async (c) => {

@@ -19,9 +19,12 @@ interface OrgSummary {
   id: string;
   name: string;
   creditBalance: number;
+  discountPercent: number;
   freeTrialUsed: boolean;
   createdAt: string;
-  _count: { users: number; events: number };
+  totalPurchasedDays: number;
+  totalPurchasedCents: number;
+  _count: { users: number; events: number; people: number };
 }
 
 function formatDate(dateStr: string): string {
@@ -89,8 +92,11 @@ export default function Orgs() {
             <TableRow className="border-white/10 hover:bg-transparent">
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Theater Name</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Users</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">People</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Events</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Credits</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Discount</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Purchased</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Free Trial</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Created</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider text-right">Actions</TableHead>
@@ -100,7 +106,7 @@ export default function Orgs() {
             {isPending ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i} className="border-white/5">
-                  {Array.from({ length: 7 }).map((_, j) => (
+                  {Array.from({ length: 10 }).map((_, j) => (
                     <TableCell key={j}>
                       <div className="h-4 bg-white/5 rounded animate-pulse" />
                     </TableCell>
@@ -109,7 +115,7 @@ export default function Orgs() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow className="border-white/5">
-                <TableCell colSpan={7} className="text-center text-white/30 py-12">
+                <TableCell colSpan={10} className="text-center text-white/30 py-12">
                   {search ? "No organizations match your search" : "No organizations yet"}
                 </TableCell>
               </TableRow>
@@ -118,9 +124,16 @@ export default function Orgs() {
                 <TableRow key={org.id} className="border-white/5 hover:bg-white/[0.02]">
                   <TableCell className="font-medium text-white/80">{org.name}</TableCell>
                   <TableCell className="text-white/50">{org._count.users}</TableCell>
+                  <TableCell className="text-white/50">{org._count.people}</TableCell>
                   <TableCell className="text-white/50">{org._count.events}</TableCell>
                   <TableCell>
                     <CreditBadge balance={org.creditBalance} />
+                  </TableCell>
+                  <TableCell className="text-white/50">
+                    {org.discountPercent > 0 ? `${org.discountPercent}%` : "—"}
+                  </TableCell>
+                  <TableCell className="text-white/50 text-sm">
+                    {org.totalPurchasedDays}d / €{(org.totalPurchasedCents / 100).toFixed(0)}
                   </TableCell>
                   <TableCell>
                     {org.freeTrialUsed ? (

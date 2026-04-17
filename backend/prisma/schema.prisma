@@ -80,6 +80,8 @@ model Organization {
   tours            Tour[]
   freeTrialUsed    Boolean            @default(false)
   unlimitedCredits Boolean            @default(false)
+  discountPercent  Int                @default(0)
+  discountNote     String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 }

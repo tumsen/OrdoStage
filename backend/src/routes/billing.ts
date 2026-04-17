@@ -26,12 +26,27 @@ app.post("/billing/checkout", async (c) => {
   if (!user || !user.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  const { packId } = await c.req.json();
+  const { packId, days } = await c.req.json();
+  const resolvedPackId = packId || (days ? `pack_${days}` : undefined);
+  if (!resolvedPackId) {
+    return c.json({ error: { message: "Pack is required", code: "BAD_REQUEST" } }, 400);
+  }
 
   const pack = await prisma.pricePack.findUnique({
-    where: { packId, active: true },
+    where: { packId: resolvedPackId, active: true },
   });
   if (!pack) return c.json({ error: { message: "Invalid pack", code: "INVALID_PACK" } }, 400);
+
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { discountPercent: true },
+  });
+
+  const discountPercent = Math.max(0, Math.min(100, org?.discountPercent ?? 0));
+  const discountedAmountCents =
+    discountPercent > 0
+      ? Math.max(1, Math.round(pack.amountCents * (100 - discountPercent) / 100))
+      : pack.amountCents;
 
   const origin = c.req.header("origin") || "http://localhost:8000";
 
@@ -42,7 +57,7 @@ app.post("/billing/checkout", async (c) => {
         price_data: {
           currency: "eur",
           product_data: { name: `Theater Planner — ${pack.label}` },
-          unit_amount: pack.amountCents,
+          unit_amount: discountedAmountCents,
         },
         quantity: 1,
       },
@@ -51,7 +66,8 @@ app.post("/billing/checkout", async (c) => {
       organizationId: user.organizationId,
       packId: pack.packId,
       days: String(pack.days),
-      amountCents: String(pack.amountCents),
+      amountCents: String(discountedAmountCents),
+      discountPercent: String(discountPercent),
     },
     success_url: `${origin}/billing?success=1`,
     cancel_url: `${origin}/billing?cancelled=1`,
