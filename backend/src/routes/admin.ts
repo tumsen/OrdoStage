@@ -299,4 +299,52 @@ app.get("/admin/users", async (c) => {
   return c.json({ data: users });
 });
 
+// ── Support access / impersonation ──────────────────────────────────────────
+
+app.post("/admin/orgs/:id/support-access", async (c) => {
+  const user = c.get("user");
+  if (!user) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const body = await c.req.json();
+  const { mode, role } = z
+    .object({
+      mode: z.enum(["impersonate", "incognito"]).default("impersonate"),
+      role: z.enum(["owner", "manager", "viewer"]).optional(),
+    })
+    .parse(body);
+
+  const org = await prisma.organization.findUnique({
+    where: { id: c.req.param("id") },
+    select: { id: true },
+  });
+  if (!org) {
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const nextRole = mode === "incognito" ? "viewer" : (role ?? "owner");
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      organizationId: org.id,
+      orgRole: nextRole,
+    },
+    select: {
+      id: true,
+      organizationId: true,
+      orgRole: true,
+    },
+  });
+
+  return c.json({
+    data: {
+      userId: updatedUser.id,
+      organizationId: updatedUser.organizationId,
+      orgRole: updatedUser.orgRole,
+      mode,
+    },
+  });
+});
+
 export default app;

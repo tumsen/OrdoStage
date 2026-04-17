@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -344,6 +344,74 @@ function CreditsTab({ org }: { org: OrgDetail }) {
   );
 }
 
+function SupportAccessTab({ org }: { org: OrgDetail }) {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [role, setRole] = useState<"owner" | "manager" | "viewer">("owner");
+
+  const accessMutation = useMutation({
+    mutationFn: (data: { mode: "impersonate" | "incognito"; role?: "owner" | "manager" | "viewer" }) =>
+      api.post(`/api/admin/orgs/${org.id}/support-access`, data),
+    onSuccess: (_, variables) => {
+      toast({
+        title: variables.mode === "incognito" ? "Incognito support mode enabled" : "Support access enabled",
+        description: `You are now entering ${org.name} as ${variables.mode === "incognito" ? "viewer" : role}.`,
+      });
+      navigate("/");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to switch into support mode for this organization.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Card className="bg-gray-900 border border-white/10">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold text-white/70">Support Access</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-white/40">
+          Enter this organization as a selected role for troubleshooting, or use incognito mode
+          for safe read-only exploration.
+        </p>
+        <div>
+          <label className="text-xs text-white/40 mb-1 block">Role to assume</label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as "owner" | "manager" | "viewer")}
+            className="w-full h-9 rounded-md bg-gray-800 border border-white/10 text-white px-2 text-sm"
+          >
+            <option value="owner">Owner</option>
+            <option value="manager">Manager</option>
+            <option value="viewer">Viewer</option>
+          </select>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={() => accessMutation.mutate({ mode: "impersonate", role })}
+            disabled={accessMutation.isPending}
+            className="bg-rose-700 hover:bg-rose-600 text-white"
+          >
+            {accessMutation.isPending ? "Switching..." : `Enter as ${role}`}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => accessMutation.mutate({ mode: "incognito" })}
+            disabled={accessMutation.isPending}
+            className="border-white/10 text-white/70 hover:text-white hover:bg-white/5"
+          >
+            Open Incognito (viewer)
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function UsersTab({ users }: { users: OrgUser[] }) {
   return (
     <div className="rounded-lg border border-white/10 overflow-hidden">
@@ -507,7 +575,10 @@ export default function OrgDetail() {
         </TabsList>
 
         <TabsContent value="credits" className="mt-4">
-          <CreditsTab org={org} />
+          <div className="space-y-4">
+            <CreditsTab org={org} />
+            <SupportAccessTab org={org} />
+          </div>
         </TabsContent>
 
         <TabsContent value="users" className="mt-4">
