@@ -14,6 +14,9 @@ COPY backend/ ./backend/
 # Switch Prisma provider to PostgreSQL for production
 RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' backend/prisma/schema.prisma
 
+# Remove SQLite-only PRAGMA calls that crash on PostgreSQL
+RUN sed -i '/PRAGMA/d' backend/src/prisma.ts && sed -i '/initSqlitePragmas/d' backend/src/prisma.ts
+
 # Generate Prisma client
 RUN cd backend && bunx prisma generate
 
