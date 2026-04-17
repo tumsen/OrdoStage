@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   XCircle,
   Route,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -80,6 +81,9 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   const userEmail = session?.user?.email ?? "";
   const userName = session?.user?.name ?? userEmail;
   const orgRole = (session?.user as Record<string, unknown>)?.orgRole as string ?? "viewer";
+  const isAdmin = Boolean((session?.user as Record<string, unknown> | undefined)?.isAdmin);
+  const isSupportUser = userEmail.toLowerCase() === "tumsen@gmail.com";
+  const canAccessOwnerAdmin = isAdmin || isSupportUser;
   const initials = userName
     .split(" ")
     .map((part: string) => part[0])
@@ -129,6 +133,28 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
             </Link>
           );
         })}
+        {canAccessOwnerAdmin ? (
+          <Link
+            to="/admin"
+            onClick={onNav}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150",
+              location.pathname === "/admin" || location.pathname.startsWith("/admin/")
+                ? "bg-rose-900/40 text-rose-200 border border-rose-800/40"
+                : "text-rose-300/70 hover:text-rose-200 hover:bg-rose-900/20 border border-rose-900/30"
+            )}
+          >
+            <ShieldCheck
+              size={16}
+              className={
+                location.pathname === "/admin" || location.pathname.startsWith("/admin/")
+                  ? "text-rose-300"
+                  : "text-rose-300/70"
+              }
+            />
+            <span className="font-medium">Owner Admin</span>
+          </Link>
+        ) : null}
       </nav>
 
       {/* User + Sign out */}
