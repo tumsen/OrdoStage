@@ -65,7 +65,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/tours/")) {
     return "Tour Detail";
   }
-  return pageTitles[pathname] ?? "Theater Planner";
+  return pageTitles[pathname] ?? "OrdoStage";
 }
 
 function SidebarContent({ onNav }: { onNav?: () => void }) {
@@ -97,11 +97,11 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
       <div className="px-6 py-6 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded bg-red-900/80 flex items-center justify-center">
-            <span className="text-red-200 text-sm font-bold">T</span>
+            <span className="text-red-200 text-sm font-bold">O</span>
           </div>
           <div>
-            <div className="text-white font-semibold text-sm tracking-wide">THEATER</div>
-            <div className="text-white/40 text-xs tracking-widest uppercase">Planner</div>
+            <div className="text-white font-semibold text-sm tracking-wide">ORDO</div>
+            <div className="text-white/40 text-xs tracking-widest uppercase">Stage</div>
           </div>
         </div>
       </div>

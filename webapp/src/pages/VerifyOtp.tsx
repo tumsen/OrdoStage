@@ -49,7 +49,7 @@ export default function VerifyOtp() {
       <div className="w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="text-6xl mb-4">🎭</div>
-          <h1 className="text-3xl font-bold text-white">Theater Planner</h1>
+          <h1 className="text-3xl font-bold text-white">OrdoStage</h1>
         </div>
         <div className="bg-gray-900 border border-white/10 rounded-xl p-6">
           <h2 className="text-xl font-semibold text-white mb-1">Enter your code</h2>

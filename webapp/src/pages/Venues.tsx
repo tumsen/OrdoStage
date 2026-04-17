@@ -230,7 +230,7 @@ export default function Venues() {
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-white/40">Manage your theater venues.</p>
+        <p className="text-sm text-white/40">Manage your venues.</p>
         <Button
           size="sm"
           onClick={() => setShowAddForm(true)}

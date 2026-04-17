@@ -10,7 +10,7 @@ async function sendOTPEmail(email: string, otp: string) {
     const { Resend } = await import("resend");
     const resend = new Resend(env.RESEND_API_KEY);
     await resend.emails.send({
-      from: env.FROM_EMAIL || "Theater Planner <noreply@theaterplanner.app>",
+      from: env.FROM_EMAIL || "OrdoStage <noreply@ordostage.com>",
       to: email,
       subject: "Your login code",
       html: `<p>Your login code is: <strong>${otp}</strong></p><p>This code expires in 10 minutes.</p>`,
@@ -23,7 +23,7 @@ async function sendOTPEmail(email: string, otp: string) {
       await vibecode.email.sendOTP({
         to: email,
         code: otp,
-        fromName: "Theater Planner",
+        fromName: "OrdoStage",
         lang: "en",
       });
     } catch {
@@ -48,7 +48,7 @@ export const auth = betterAuth({
     "https://vibecode.dev",
     "https://*.railway.app",
     "https://*.up.railway.app",
-    "https://theaterplanner-production.up.railway.app",
+    "https://ordostage.com",
   ],
   socialProviders: {
     github: {
@@ -65,7 +65,7 @@ export const auth = betterAuth({
         const { Resend } = await import("resend");
         const resend = new Resend(env.RESEND_API_KEY);
         await resend.emails.send({
-          from: env.FROM_EMAIL || "Theater Planner <noreply@theaterplanner.app>",
+          from: env.FROM_EMAIL || "OrdoStage <noreply@ordostage.com>",
           to: user.email,
           subject: "Reset your password",
           html: `<p>Click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 1 hour.</p>`,

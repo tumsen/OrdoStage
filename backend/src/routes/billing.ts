@@ -56,7 +56,7 @@ app.post("/billing/checkout", async (c) => {
       {
         price_data: {
           currency: "eur",
-          product_data: { name: `Theater Planner — ${pack.label}` },
+          product_data: { name: `OrdoStage — ${pack.label}` },
           unit_amount: discountedAmountCents,
         },
         quantity: 1,

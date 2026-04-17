@@ -30,14 +30,14 @@ export default function SetupOrg() {
         <div className="text-center mb-8">
           <div className="text-6xl mb-4">🎭</div>
           <h1 className="text-3xl font-bold text-white">Welcome!</h1>
-          <p className="text-gray-400 mt-2">Let's set up your theater organization</p>
+          <p className="text-gray-400 mt-2">Let's set up your organization</p>
         </div>
         <div className="bg-gray-900 border border-white/10 rounded-xl p-6">
-          <h2 className="text-xl font-semibold text-white mb-1">Name your theater</h2>
+          <h2 className="text-xl font-semibold text-white mb-1">Name your organization</h2>
           <p className="text-gray-400 text-sm mb-6">This is the name your team will see</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              placeholder="e.g. Grand Theater Amsterdam"
+              placeholder="e.g. OrdoStage Theatre Group"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required

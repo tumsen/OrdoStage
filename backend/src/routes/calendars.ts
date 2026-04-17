@@ -80,7 +80,7 @@ function buildICS(
 
       return [
         "BEGIN:VEVENT",
-        `UID:${event.id}@theater`,
+        `UID:${event.id}@ordostage`,
         `DTSTAMP:${now}`,
         `DTSTART:${dtstart}`,
         `DTEND:${dtend}`,
@@ -98,7 +98,7 @@ function buildICS(
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Theater Planning//EN",
+    "PRODID:-//OrdoStage Calendar//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     `X-WR-CALNAME:${escapeICSText(calendarName)}`,

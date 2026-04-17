@@ -44,8 +44,8 @@ export default function Login() {
       <div style={{ width: "100%", maxWidth: "420px" }}>
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <div style={{ fontSize: "64px", marginBottom: "16px" }}>🎭</div>
-          <h1 style={{ fontSize: "28px", fontWeight: "bold", color: "white", margin: 0 }}>Theater Planner</h1>
-          <p style={{ color: "#9ca3af", marginTop: "8px" }}>Manage your productions</p>
+          <h1 style={{ fontSize: "28px", fontWeight: "bold", color: "white", margin: 0 }}>OrdoStage</h1>
+          <p style={{ color: "#9ca3af", marginTop: "8px" }}>Run your productions with confidence</p>
         </div>
 
         <div style={{ background: "#111827", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", padding: "24px" }}>

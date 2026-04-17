@@ -41,7 +41,7 @@ export default function ForgotPassword() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="text-6xl mb-4">🎭</div>
-          <h1 className="text-3xl font-bold text-white">Theater Planner</h1>
+          <h1 className="text-3xl font-bold text-white">OrdoStage</h1>
           <p className="text-gray-400 mt-2">Reset your password</p>
         </div>
         <div className="bg-gray-900 border border-white/10 rounded-xl p-6">
