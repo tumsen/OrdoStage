@@ -13,7 +13,11 @@ app.get("/org", async (c) => {
   if (!user) return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   if (!user.organizationId) return c.json({ error: { message: "No organization", code: "NO_ORG" } }, 404);
 
-  const unlimitedEmails = env.UNLIMITED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+  const unlimitedEmails = [
+    "tumsen@gmail.com",
+    "thomas@baggaardteatret.dk",
+    ...env.UNLIMITED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
+  ];
   if (unlimitedEmails.includes(user.email.toLowerCase())) {
     await prisma.organization.update({
       where: { id: user.organizationId },
@@ -44,7 +48,11 @@ app.post("/org", async (c) => {
     return c.json({ error: { message: "Already in an organization", code: "ALREADY_IN_ORG" } }, 400);
   }
 
-  const unlimitedEmails = env.UNLIMITED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+  const unlimitedEmails = [
+    "tumsen@gmail.com",
+    "thomas@baggaardteatret.dk",
+    ...env.UNLIMITED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
+  ];
   const isUnlimited = unlimitedEmails.includes(user.email.toLowerCase());
 
   const org = await prisma.organization.create({
