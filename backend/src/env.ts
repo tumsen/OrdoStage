@@ -22,6 +22,7 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().optional(),
   // Admin
   ADMIN_EMAILS: z.string().default(""),
+  UNLIMITED_EMAILS: z.string().default(""),
   // GitHub OAuth
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),

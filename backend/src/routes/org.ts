@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { deductCredits } from "../credits";
+import { env } from "../env";
 
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -35,10 +36,14 @@ app.post("/org", async (c) => {
     return c.json({ error: { message: "Already in an organization", code: "ALREADY_IN_ORG" } }, 400);
   }
 
+  const unlimitedEmails = env.UNLIMITED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+  const isUnlimited = unlimitedEmails.includes(user.email.toLowerCase());
+
   const org = await prisma.organization.create({
     data: {
       name,
       users: { connect: { id: user.id } },
+      ...(isUnlimited && { unlimitedCredits: true, creditBalance: 999999999 }),
     },
   });
 
