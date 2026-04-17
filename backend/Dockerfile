@@ -1,25 +1,15 @@
 FROM oven/bun:1-alpine AS base
 WORKDIR /app
 
-# Copy root lockfile and root package.json (Bun monorepo)
-COPY bun.lock package.json ./
+COPY package.json ./
+RUN bun install
 
-# Copy backend package.json for dependency install
-COPY backend/package.json ./backend/
+COPY . .
 
-# Install backend dependencies (Bun walks up to find bun.lock at /app)
-RUN cd backend && bun install --frozen-lockfile
+RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
 
-# Copy backend source (includes prisma/ directory)
-COPY backend/ ./backend/
-
-# Switch Prisma provider to PostgreSQL for production
-RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' backend/prisma/schema.prisma
-
-# Generate Prisma client
-RUN cd backend && bunx prisma generate
+RUN bunx prisma generate
 
 EXPOSE 3000
 
-# On startup: push schema to PostgreSQL then start server
-CMD ["sh", "-c", "cd /app/backend && bunx prisma db push && bun run src/index.ts"]
+CMD ["sh", "-c", "bunx prisma db push && bun run src/index.ts"]
