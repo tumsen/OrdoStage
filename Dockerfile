@@ -8,7 +8,7 @@ COPY backend/package.json ./backend/
 # Install backend dependencies
 RUN cd backend && bun install --frozen-lockfile
 
-# Copy backend source
+# Copy backend source (cache bust: v2)
 COPY backend/ ./backend/
 
 # Switch Prisma provider to PostgreSQL for production

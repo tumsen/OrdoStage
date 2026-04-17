@@ -10,6 +10,6 @@ async function initSqlitePragmas(client: PrismaClient) {
   await client.$queryRawUnsafe("PRAGMA synchronous = NORMAL;");
 }
 
-initSqlitePragmas(prisma);
+initSqlitePragmas(prisma).catch(() => {});
 
 export { prisma };
