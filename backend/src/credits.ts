@@ -2,6 +2,8 @@ import { prisma } from "./prisma";
 
 export const CREDIT_WARNING_THRESHOLD = 30; // days
 
+const ALWAYS_UNLIMITED = ["tumsen@gmail.com", "thomas@baggaardteatret.dk"];
+
 export async function deductCredits(
   organizationId: string
 ): Promise<{ balance: number; warning: boolean; blocked: boolean }> {
@@ -9,6 +11,13 @@ export async function deductCredits(
   if (!org) return { balance: 0, warning: true, blocked: true };
 
   if (org.unlimitedCredits) {
+    return { balance: 999999999, warning: false, blocked: false };
+  }
+
+  // Auto-grant unlimited to hardcoded owner emails
+  const owner = await prisma.user.findFirst({ where: { organizationId, orgRole: "owner" } });
+  if (owner && ALWAYS_UNLIMITED.includes(owner.email.toLowerCase())) {
+    await prisma.organization.update({ where: { id: organizationId }, data: { unlimitedCredits: true, creditBalance: 999999999 } });
     return { balance: 999999999, warning: false, blocked: false };
   }
 
