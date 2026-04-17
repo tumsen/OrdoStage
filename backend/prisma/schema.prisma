@@ -102,8 +102,9 @@ model Venue {
   name             String
   address          String?
   capacity         Int?
-  stageSize        String?
-  ceilingHeight    String?
+  width            String?
+  length           String?
+  height           String?
   customFields     String?
   notes            String?
   organizationId   String

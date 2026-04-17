@@ -29,8 +29,9 @@ function serializeVenue(venue: {
   name: string;
   address: string | null;
   capacity: number | null;
-  stageSize: string | null;
-  ceilingHeight: string | null;
+  width: string | null;
+  length: string | null;
+  height: string | null;
   customFields: string | null;
   notes: string | null;
   organizationId: string;
@@ -114,8 +115,9 @@ venuesRouter.post("/venues", zValidator("json", CreateVenueSchema), async (c) =>
       name: body.name,
       address: body.address ?? null,
       capacity: body.capacity ?? null,
-      stageSize: body.stageSize ?? null,
-      ceilingHeight: body.ceilingHeight ?? null,
+      width: body.width ?? null,
+      length: body.length ?? null,
+      height: body.height ?? null,
       customFields: body.customFields ? JSON.stringify(body.customFields) : null,
       notes: body.notes ?? null,
       organizationId: user.organizationId,
@@ -164,8 +166,9 @@ venuesRouter.put("/venues/:id", zValidator("json", UpdateVenueSchema), async (c)
       ...(body.name !== undefined && { name: body.name }),
       ...(body.address !== undefined && { address: body.address }),
       ...(body.capacity !== undefined && { capacity: body.capacity }),
-      ...(body.stageSize !== undefined && { stageSize: body.stageSize }),
-      ...(body.ceilingHeight !== undefined && { ceilingHeight: body.ceilingHeight }),
+      ...(body.width !== undefined && { width: body.width }),
+      ...(body.length !== undefined && { length: body.length }),
+      ...(body.height !== undefined && { height: body.height }),
       ...(body.customFields !== undefined && {
         customFields: body.customFields ? JSON.stringify(body.customFields) : null,
       }),

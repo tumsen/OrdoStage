@@ -4,7 +4,7 @@ export function usePermissions() {
   const { data: session } = useSession();
   const orgRole = (session?.user as Record<string, unknown>)?.orgRole as string ?? "viewer";
   return {
-    canWrite: ["owner", "manager"].includes(orgRole),
+    canWrite: ["owner", "manager", "member"].includes(orgRole),
     isOwner: orgRole === "owner",
     orgRole,
   };

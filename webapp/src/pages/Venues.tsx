@@ -21,13 +21,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const VenueFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   address: z.string().optional(),
-  capacity: z.coerce.number().positive().optional().or(z.literal("")),
-  stageSize: z.string().optional(),
-  ceilingHeight: z.string().optional(),
+  capacity: z.union([z.literal(""), z.coerce.number().int().min(0)]),
+  width: z.string().optional(),
+  length: z.string().optional(),
+  height: z.string().optional(),
   customFieldsText: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -171,9 +173,11 @@ function AddressInput({
 function VenueRow({
   venue,
   onDelete,
+  canWrite,
 }: {
   venue: Venue;
   onDelete: (id: string) => void;
+  canWrite: boolean;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -185,8 +189,9 @@ function VenueRow({
       name: venue.name,
       address: venue.address ?? "",
       capacity: venue.capacity ?? "",
-      stageSize: venue.stageSize ?? "",
-      ceilingHeight: venue.ceilingHeight ?? "",
+      width: venue.width ?? "",
+      length: venue.length ?? "",
+      height: venue.height ?? "",
       customFieldsText: customFieldsToText(venue.customFields ?? []),
       notes: venue.notes ?? "",
     },
@@ -198,8 +203,9 @@ function VenueRow({
         name: data.name,
         address: data.address || undefined,
         capacity: data.capacity === "" ? undefined : Number(data.capacity),
-        stageSize: data.stageSize || undefined,
-        ceilingHeight: data.ceilingHeight || undefined,
+        width: data.width?.trim() || undefined,
+        length: data.length?.trim() || undefined,
+        height: data.height?.trim() || undefined,
         customFields: textToCustomFields(data.customFieldsText),
         notes: data.notes || undefined,
       };
@@ -230,21 +236,30 @@ function VenueRow({
           />
         </td>
         <td className="px-5 py-3 hidden md:table-cell">
-          <Input
-            {...form.register("capacity")}
-            type="number"
-            className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30 w-24"
-          />
-          <Input
-            {...form.register("stageSize")}
-            placeholder="Size (W x D)"
-            className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30 w-32"
-          />
-          <Input
-            {...form.register("ceilingHeight")}
-            placeholder="Height"
-            className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30 w-24"
-          />
+          <div className="grid grid-cols-2 gap-2 max-w-[220px]">
+            <Input
+              {...form.register("width")}
+              placeholder="Width"
+              className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+            />
+            <Input
+              {...form.register("length")}
+              placeholder="Length"
+              className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+            />
+            <Input
+              {...form.register("height")}
+              placeholder="Height"
+              className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+            />
+            <Input
+              {...form.register("capacity")}
+              type="number"
+              min={0}
+              placeholder="Capacity"
+              className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+            />
+          </div>
           <Input
             {...form.register("notes")}
             placeholder="Notes"
@@ -266,7 +281,7 @@ function VenueRow({
               size="icon"
               className="h-7 w-7 text-emerald-400 hover:text-emerald-300"
               onClick={form.handleSubmit((v) => updateMutation.mutate(v))}
-              disabled={updateMutation.isPending}
+              disabled={updateMutation.isPending || !canWrite}
             >
               <Check size={13} />
             </Button>
@@ -289,9 +304,9 @@ function VenueRow({
       <td className="px-5 py-3.5 text-sm font-medium text-white/90">{venue.name}</td>
       <td className="px-5 py-3.5 text-sm text-white/50 hidden sm:table-cell">{venue.address ?? "—"}</td>
       <td className="px-5 py-3.5 text-sm text-white/50 hidden md:table-cell">
-        <div>{venue.capacity != null ? `${venue.capacity.toLocaleString()} cap` : "—"}</div>
+        <div>{venue.capacity != null ? venue.capacity.toLocaleString() : "—"}</div>
         <div className="text-[11px] text-white/30">
-          {venue.stageSize ? `Size: ${venue.stageSize}` : "Size: —"} · {venue.ceilingHeight ? `H: ${venue.ceilingHeight}` : "H: —"}
+          W {venue.width ?? "—"} · L {venue.length ?? "—"} · H {venue.height ?? "—"}
         </div>
         {venue.notes ? <div className="text-[11px] text-white/30 truncate max-w-56">{venue.notes}</div> : null}
         {(venue.customFields ?? []).length > 0 ? (
@@ -302,37 +317,42 @@ function VenueRow({
       </td>
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-white/30 hover:text-white"
-            onClick={() => setEditing(true)}
-          >
-            <Edit2 size={13} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-white/30 hover:text-red-400"
-            onClick={() => onDelete(venue.id)}
-          >
-            <Trash2 size={13} />
-          </Button>
+          {canWrite ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-white/30 hover:text-white"
+              onClick={() => setEditing(true)}
+            >
+              <Edit2 size={13} />
+            </Button>
+          ) : null}
+          {canWrite ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-white/30 hover:text-red-400"
+              onClick={() => onDelete(venue.id)}
+            >
+              <Trash2 size={13} />
+            </Button>
+          ) : null}
         </div>
       </td>
     </tr>
   );
 }
 
-function AddVenueForm({ onSuccess }: { onSuccess: () => void }) {
+function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite: boolean }) {
   const form = useForm<VenueFormValues>({
     resolver: zodResolver(VenueFormSchema),
     defaultValues: {
       name: "",
       address: "",
       capacity: "",
-      stageSize: "",
-      ceilingHeight: "",
+      width: "",
+      length: "",
+      height: "",
       customFieldsText: "",
       notes: "",
     },
@@ -346,8 +366,9 @@ function AddVenueForm({ onSuccess }: { onSuccess: () => void }) {
         name: data.name,
         address: data.address || undefined,
         capacity: data.capacity === "" ? undefined : Number(data.capacity),
-        stageSize: data.stageSize || undefined,
-        ceilingHeight: data.ceilingHeight || undefined,
+        width: data.width?.trim() || undefined,
+        length: data.length?.trim() || undefined,
+        height: data.height?.trim() || undefined,
         customFields: textToCustomFields(data.customFieldsText),
         notes: data.notes || undefined,
       };
@@ -382,22 +403,30 @@ function AddVenueForm({ onSuccess }: { onSuccess: () => void }) {
         />
       </td>
       <td className="px-5 py-3 hidden md:table-cell">
-        <Input
-          {...form.register("capacity")}
-          type="number"
-          placeholder="Capacity"
-          className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30 w-24"
-        />
-        <Input
-          {...form.register("stageSize")}
-          placeholder="Size (W x D)"
-          className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30 w-32"
-        />
-        <Input
-          {...form.register("ceilingHeight")}
-          placeholder="Height"
-          className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30 w-24"
-        />
+        <div className="grid grid-cols-2 gap-2 max-w-[220px]">
+          <Input
+            {...form.register("width")}
+            placeholder="Width"
+            className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+          />
+          <Input
+            {...form.register("length")}
+            placeholder="Length"
+            className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+          />
+          <Input
+            {...form.register("height")}
+            placeholder="Height"
+            className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+          />
+          <Input
+            {...form.register("capacity")}
+            type="number"
+            min={0}
+            placeholder="Capacity"
+            className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+          />
+        </div>
         <Input
           {...form.register("notes")}
           placeholder="Notes"
@@ -416,11 +445,11 @@ function AddVenueForm({ onSuccess }: { onSuccess: () => void }) {
         <Button
           size="sm"
           onClick={form.handleSubmit((v) => createMutation.mutate(v))}
-          disabled={createMutation.isPending}
+          disabled={createMutation.isPending || !canWrite}
           className="bg-red-900 hover:bg-red-800 text-white border-red-700/50 h-8 gap-1.5"
         >
           <Plus size={13} />
-          {createMutation.isPending ? "Adding..." : "Add"}
+          {createMutation.isPending ? "Saving…" : "Save Venue"}
         </Button>
       </td>
     </tr>
@@ -428,6 +457,7 @@ function AddVenueForm({ onSuccess }: { onSuccess: () => void }) {
 }
 
 export default function Venues() {
+  const { canWrite } = usePermissions();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const queryClient = useQueryClient();
@@ -447,11 +477,18 @@ export default function Venues() {
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-white/40">Manage your venues.</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="space-y-1">
+          <p className="text-sm text-white/40">Manage your venues.</p>
+          {!canWrite ? (
+            <p className="text-xs text-amber-400/80">View only — ask an owner or manager to change venues.</p>
+          ) : null}
+        </div>
         <Button
           size="sm"
           onClick={() => setShowAddForm(true)}
+          disabled={!canWrite}
+          title={canWrite ? undefined : "Only owners and managers can edit venues"}
           className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2"
         >
           <Plus size={14} /> Add Venue
@@ -464,7 +501,7 @@ export default function Venues() {
             <tr className="border-b border-white/10">
               <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide">Name</th>
               <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden sm:table-cell">Address</th>
-              <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden md:table-cell">Capacity</th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden md:table-cell">Size &amp; capacity</th>
               <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide w-20"></th>
             </tr>
           </thead>
@@ -493,25 +530,26 @@ export default function Venues() {
               </tr>
             ) : (
               (venues ?? []).map((venue) => (
-                <VenueRow key={venue.id} venue={venue} onDelete={setDeleteId} />
+                <VenueRow key={venue.id} venue={venue} onDelete={setDeleteId} canWrite={canWrite} />
               ))
             )}
-            {showAddForm && (
-              <AddVenueForm onSuccess={() => setShowAddForm(false)} />
-            )}
+            {showAddForm ? (
+              <AddVenueForm onSuccess={() => setShowAddForm(false)} canWrite={canWrite} />
+            ) : null}
           </tbody>
         </table>
 
-        {!showAddForm && (venues ?? []).length > 0 && (
+        {!showAddForm && (venues ?? []).length > 0 && canWrite ? (
           <div className="px-5 py-3 border-t border-white/5">
             <button
+              type="button"
               onClick={() => setShowAddForm(true)}
               className="text-xs text-white/30 hover:text-white/60 flex items-center gap-1.5 transition-colors"
             >
               <Plus size={12} /> Add another venue
             </button>
           </div>
-        )}
+        ) : null}
       </div>
 
       <AlertDialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
