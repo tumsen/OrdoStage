@@ -12,7 +12,6 @@ RUN bunx prisma generate
 
 EXPOSE 3000
 
-# DB schema is applied via Railway preDeployCommand (see railway.json) so the
-# server can bind quickly and pass health checks. For local Docker, run:
-#   docker run ... sh -c "bunx prisma db push && bun run src/index.ts"
-CMD ["bun", "run", "src/index.ts"]
+# Sync schema before listening. Railway deploy.startCommand overrides Dockerfile CMD,
+# so railway.json must not set startCommand unless it includes this same sequence.
+CMD ["sh", "-c", "bunx prisma db push && exec bun run src/index.ts"]
