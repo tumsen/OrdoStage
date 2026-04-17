@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { CalendarItem } from "./scheduleUtils";
-import { itemColor, itemsForDay } from "./scheduleUtils";
+import type { InternalBookingDetail } from "../../../../backend/src/types";
+import { itemColor, itemsForDay, hasTimedStart } from "./scheduleUtils";
 
 const PILL_LIMIT = 3;
 
@@ -56,12 +57,25 @@ export function CalendarCell({ date, items, isToday, onItemClick }: CalendarCell
             key={item.id}
             onClick={() => onItemClick(item)}
             className={cn(
-              "w-full text-left text-[11px] px-1.5 py-0.5 rounded truncate font-medium transition-opacity hover:opacity-80",
+              "w-full text-left text-[11px] px-1.5 py-0.5 rounded font-medium transition-opacity hover:opacity-80",
               itemColor(item)
             )}
             title={item.title}
           >
-            {item.title}
+            <span className="block truncate">{item.title}</span>
+            {hasTimedStart(item) ? (
+              <span className="block text-[9px] opacity-80 truncate tabular-nums">
+                {new Date(item.startDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {item.endDate
+                  ? `–${new Date(item.endDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                  : ""}
+              </span>
+            ) : null}
+            {item.kind === "booking" && (item.raw as InternalBookingDetail).createdBy?.name ? (
+              <span className="block text-[9px] text-white/40 truncate">
+                by {(item.raw as InternalBookingDetail).createdBy!.name}
+              </span>
+            ) : null}
           </button>
         ))}
         {overflow > 0 ? (

@@ -5,7 +5,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Clock, Users, Tag } from "lucide-react";
+import { MapPin, Clock, Users, Tag, UserCircle } from "lucide-react";
 import type { CalendarItem } from "./scheduleUtils";
 import { formatTime, itemColor } from "./scheduleUtils";
 import { cn } from "@/lib/utils";
@@ -81,6 +81,18 @@ export function ItemDetailSheet({ item, onClose }: ItemDetailSheetProps) {
                   ) : null}
                 </div>
               </div>
+
+              {/* Booked by (internal bookings only) */}
+              {!isEventDetail(raw) && raw.createdBy ? (
+                <div className="flex items-start gap-2.5">
+                  <UserCircle size={14} className="text-white/30 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-[11px] text-white/35 uppercase tracking-wide">Booked by</div>
+                    <div className="text-sm text-white/80 font-medium">{raw.createdBy.name}</div>
+                    <div className="text-xs text-white/40">{raw.createdBy.email}</div>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Venue */}
               {raw.venue ? (

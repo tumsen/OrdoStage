@@ -108,6 +108,7 @@ scheduleRouter.get("/schedule", async (c) => {
       orderBy: { startDate: "asc" },
       include: {
         venue: true,
+        createdBy: { select: { id: true, name: true, email: true } },
         people: { include: { person: true } },
       },
     }),
@@ -140,6 +141,9 @@ scheduleRouter.get("/schedule", async (c) => {
     createdAt: serializeDate(booking.createdAt),
     updatedAt: serializeDate(booking.updatedAt),
     venue: serializeVenue(booking.venue),
+    createdBy: booking.createdBy
+      ? { id: booking.createdBy.id, name: booking.createdBy.name, email: booking.createdBy.email }
+      : null,
     people: booking.people.map((bp) => ({
       id: bp.id,
       personId: bp.personId,

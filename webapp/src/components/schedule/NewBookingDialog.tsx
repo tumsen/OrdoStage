@@ -1,5 +1,6 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import {
   Dialog,
@@ -34,22 +35,39 @@ interface NewBookingDialogProps {
   onClose: () => void;
   venues: Venue[];
   people: Person[];
+  /** Prefill start/end from week/day grid drag */
+  initialSlot?: { startDate: string; endDate: string } | null;
 }
 
-export function NewBookingDialog({ open, onClose, venues, people }: NewBookingDialogProps) {
+const emptyForm: CreateInternalBooking = {
+  title: "",
+  description: "",
+  startDate: "",
+  endDate: "",
+  type: "other",
+  venueId: "",
+  personIds: [],
+};
+
+export function NewBookingDialog({ open, onClose, venues, people, initialSlot }: NewBookingDialogProps) {
   const queryClient = useQueryClient();
 
   const form = useForm<CreateInternalBooking>({
-    defaultValues: {
-      title: "",
-      description: "",
-      startDate: "",
-      endDate: "",
-      type: "other",
-      venueId: "",
-      personIds: [],
-    },
+    defaultValues: emptyForm,
   });
+
+  useEffect(() => {
+    if (!open) return;
+    if (initialSlot?.startDate && initialSlot?.endDate) {
+      form.reset({
+        ...emptyForm,
+        startDate: initialSlot.startDate,
+        endDate: initialSlot.endDate,
+      });
+    } else {
+      form.reset(emptyForm);
+    }
+  }, [open, initialSlot]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,

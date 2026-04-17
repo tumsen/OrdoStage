@@ -18,13 +18,20 @@ function serializeBooking(booking: {
   type: string;
   venueId: string | null;
   organizationId: string;
+  createdById: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
   return {
-    ...booking,
+    id: booking.id,
+    title: booking.title,
+    description: booking.description,
     startDate: booking.startDate.toISOString(),
     endDate: booking.endDate ? booking.endDate.toISOString() : null,
+    type: booking.type,
+    venueId: booking.venueId,
+    organizationId: booking.organizationId,
+    createdById: booking.createdById,
     createdAt: booking.createdAt.toISOString(),
     updatedAt: booking.updatedAt.toISOString(),
   };
@@ -67,10 +74,16 @@ function serializePerson(person: {
 
 const bookingInclude = {
   venue: true,
+  createdBy: { select: { id: true, name: true, email: true } },
   people: {
     include: { person: true },
   },
 } as const;
+
+function serializeCreator(user: { id: string; name: string; email: string } | null) {
+  if (!user) return null;
+  return { id: user.id, name: user.name, email: user.email };
+}
 
 function serializeFullBooking(booking: {
   id: string;
@@ -81,6 +94,7 @@ function serializeFullBooking(booking: {
   type: string;
   venueId: string | null;
   organizationId: string;
+  createdById: string | null;
   createdAt: Date;
   updatedAt: Date;
   venue: {
@@ -93,6 +107,7 @@ function serializeFullBooking(booking: {
     createdAt: Date;
     updatedAt: Date;
   } | null;
+  createdBy: { id: string; name: string; email: string } | null;
   people: Array<{
     id: string;
     bookingId: string;
@@ -112,6 +127,7 @@ function serializeFullBooking(booking: {
 }) {
   return {
     ...serializeBooking(booking),
+    createdBy: serializeCreator(booking.createdBy),
     venue: serializeVenue(booking.venue),
     people: booking.people.map((bp) => ({
       id: bp.id,
@@ -158,6 +174,7 @@ bookingsRouter.post("/bookings", zValidator("json", CreateInternalBookingSchema)
       type: body.type ?? "other",
       venueId: body.venueId ?? null,
       organizationId: user.organizationId,
+      createdById: user.id,
       people: body.personIds
         ? {
             create: body.personIds.map((p) => ({

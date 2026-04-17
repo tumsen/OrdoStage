@@ -108,4 +108,8 @@ export const sampleApi = {
   getSample: () => api.get<SampleResponse>("/api/sample"),
 };
 
+export function isApiError(e: unknown): e is ApiError {
+  return e instanceof ApiError;
+}
+
 export { ApiError };

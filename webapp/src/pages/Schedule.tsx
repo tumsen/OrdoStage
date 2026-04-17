@@ -18,9 +18,10 @@ import {
   toCalendarItems,
   formatMonthLabel,
   itemsForDay,
-  itemColor,
+  toDatetimeLocalValue,
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
+import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
 
 interface ScheduleData {
   events: EventDetail[];
@@ -114,130 +115,6 @@ function getRangeDays(mode: ScheduleViewMode, anchorDate: Date): Date[] {
   return [anchorDate];
 }
 
-function getItemTimeRange(item: CalendarItem): { start: Date; end: Date; hasExplicitTime: boolean } {
-  const start = new Date(item.startDate);
-  const end = item.endDate ? new Date(item.endDate) : new Date(start.getTime() + 60 * 60 * 1000);
-  const hasExplicitTime = item.startDate.includes("T");
-  return { start, end, hasExplicitTime };
-}
-
-function OutlookTimeGrid({
-  days,
-  items,
-  onItemClick,
-}: {
-  days: Date[];
-  items: CalendarItem[];
-  onItemClick: (item: CalendarItem) => void;
-}) {
-  const hourHeight = 48;
-  const totalHeight = 24 * hourHeight;
-  const hours = Array.from({ length: 24 }).map((_, h) => h);
-
-  return (
-    <div className="rounded-lg border border-white/10 overflow-auto">
-      <div className="min-w-[860px]">
-        <div className="grid" style={{ gridTemplateColumns: `72px repeat(${days.length}, minmax(0, 1fr))` }}>
-          <div className="border-b border-white/10 bg-white/[0.02]" />
-          {days.map((d) => (
-            <div key={d.toISOString()} className="border-b border-l border-white/10 bg-white/[0.02] px-2 py-2">
-              <div className="text-xs text-white/80 font-medium">
-                {d.toLocaleDateString("en-US", { weekday: "short" })}
-              </div>
-              <div className="text-[11px] text-white/40">
-                {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid" style={{ gridTemplateColumns: `72px repeat(${days.length}, minmax(0, 1fr))` }}>
-          <div className="relative border-r border-white/10" style={{ height: totalHeight }}>
-            {hours.map((h) => (
-              <div
-                key={h}
-                className="absolute w-full text-[10px] text-white/35 pr-2 text-right"
-                style={{ top: h * hourHeight - 6 }}
-              >
-                {`${String(h).padStart(2, "0")}:00`}
-              </div>
-            ))}
-          </div>
-
-          {days.map((day) => {
-            const dayStart = new Date(day);
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(dayStart);
-            dayEnd.setDate(dayEnd.getDate() + 1);
-
-            const dayItems = itemsForDay(items, day);
-            const timed = dayItems
-              .map((item) => ({ item, ...getItemTimeRange(item) }))
-              .filter(({ hasExplicitTime }) => hasExplicitTime);
-            const allDay = dayItems
-              .map((item) => ({ item, ...getItemTimeRange(item) }))
-              .filter(({ hasExplicitTime }) => !hasExplicitTime);
-
-            return (
-              <div key={day.toISOString()} className="relative border-l border-white/10" style={{ height: totalHeight }}>
-                {hours.map((h) => (
-                  <div
-                    key={h}
-                    className="absolute left-0 right-0 border-t border-white/5"
-                    style={{ top: h * hourHeight }}
-                  />
-                ))}
-
-                {allDay.map(({ item }, idx) => (
-                  <button
-                    key={`${item.id}-all-${idx}`}
-                    onClick={() => onItemClick(item)}
-                    className="absolute left-1 right-1 rounded px-2 py-1 text-[10px] truncate text-left bg-white/10 text-white/80 hover:bg-white/20"
-                    style={{ top: 2 + idx * 20 }}
-                    title={item.title}
-                  >
-                    All day - {item.title}
-                  </button>
-                ))}
-
-                {timed.map(({ item, start, end }, idx) => {
-                  const clippedStart = start < dayStart ? dayStart : start;
-                  const clippedEnd = end > dayEnd ? dayEnd : end;
-                  const startMinutes = clippedStart.getHours() * 60 + clippedStart.getMinutes();
-                  const endMinutes = clippedEnd.getHours() * 60 + clippedEnd.getMinutes();
-                  const top = (startMinutes / 60) * hourHeight;
-                  const height = Math.max(18, ((endMinutes - startMinutes) / 60) * hourHeight);
-                  const venueName =
-                    item.kind === "event"
-                      ? (item.raw as EventDetail).venue?.name
-                      : (item.raw as InternalBookingDetail).venue?.name;
-
-                  return (
-                    <button
-                      key={`${item.id}-${idx}`}
-                      onClick={() => onItemClick(item)}
-                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[10px] text-left hover:opacity-90 ${itemColor(item)}`}
-                      style={{ top, height }}
-                      title={item.title}
-                    >
-                      <div className="truncate font-semibold">{item.title}</div>
-                      <div className="truncate opacity-80">
-                        {clippedStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} -{" "}
-                        {clippedEnd.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        {venueName ? ` - ${venueName}` : ""}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function YearDiscView({ year, items }: { year: number; items: CalendarItem[] }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -295,6 +172,7 @@ export default function Schedule() {
   const [personId, setPersonId] = useState("all");
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingSlot, setBookingSlot] = useState<{ startDate: string; endDate: string } | null>(null);
   const [visibility, setVisibility] = useState<VisibilityFilters>({
     event: true,
     rehearsal: true,
@@ -368,7 +246,10 @@ export default function Schedule() {
           onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
         />
         <Button
-          onClick={() => setBookingOpen(true)}
+          onClick={() => {
+            setBookingSlot(null);
+            setBookingOpen(true);
+          }}
           className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 flex-shrink-0"
         >
           <Plus size={14} />
@@ -449,11 +330,23 @@ export default function Schedule() {
                 onItemClick={setSelectedItem}
               />
             ) : viewMode === "week" || viewMode === "day" ? (
-              <OutlookTimeGrid
-                days={getRangeDays(viewMode, anchorDate)}
-                items={visibleItems}
-                onItemClick={setSelectedItem}
-              />
+              <div className="space-y-2">
+                <p className="text-[11px] text-white/35">
+                  Drag across a day column to select a time range; the new booking form opens with start and end filled in.
+                </p>
+                <OutlookTimeGrid
+                  days={getRangeDays(viewMode, anchorDate)}
+                  items={visibleItems}
+                  onItemClick={setSelectedItem}
+                  onSelectTimeRange={(start, end) => {
+                    setBookingSlot({
+                      startDate: toDatetimeLocalValue(start),
+                      endDate: toDatetimeLocalValue(end),
+                    });
+                    setBookingOpen(true);
+                  }}
+                />
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {getRangeDays(viewMode, anchorDate).map((date) => {
@@ -501,7 +394,11 @@ export default function Schedule() {
       {/* New booking dialog */}
       <NewBookingDialog
         open={bookingOpen}
-        onClose={() => setBookingOpen(false)}
+        onClose={() => {
+          setBookingOpen(false);
+          setBookingSlot(null);
+        }}
+        initialSlot={bookingSlot}
         venues={venues ?? []}
         people={people ?? []}
       />

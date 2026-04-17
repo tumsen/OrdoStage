@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -262,8 +262,18 @@ export function Layout({ children }: LayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const title = getPageTitle(location.pathname);
 
+  useEffect(() => {
+    document.title = `${title} · OrdoStage`;
+  }, [title]);
+
   return (
     <div className="flex h-screen bg-[#0a0a0f] text-white overflow-hidden">
+      <a
+        href="#main-content"
+        className="absolute left-4 top-0 z-[200] -translate-y-full bg-red-900 px-4 py-2 text-sm text-white shadow-lg transition-transform focus:translate-y-4 focus:outline-none focus:ring-2 focus:ring-white/40"
+      >
+        Skip to main content
+      </a>
       {/* Desktop Sidebar */}
       {!isMobile ? (
         <aside className="w-56 flex-shrink-0 bg-[#0d0d14] border-r border-white/10 flex flex-col">
@@ -297,7 +307,7 @@ export function Layout({ children }: LayoutProps) {
         <CreditBanner />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15">
           {children}
         </main>
       </div>

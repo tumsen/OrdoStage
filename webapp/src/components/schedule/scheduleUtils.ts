@@ -120,6 +120,52 @@ export function itemColor(item: CalendarItem): string {
   return ITEM_COLORS[item.type ?? "other"] ?? ITEM_COLORS.other;
 }
 
+/** ISO string includes a time component (not date-only). */
+export function hasTimedStart(item: CalendarItem): boolean {
+  return /\dT\d/.test(item.startDate);
+}
+
+export function getItemTimeRange(item: CalendarItem): { start: Date; end: Date; hasExplicitTime: boolean } {
+  const start = new Date(item.startDate);
+  const end = item.endDate ? new Date(item.endDate) : new Date(start.getTime() + 60 * 60 * 1000);
+  const hasExplicitTime = hasTimedStart(item);
+  return { start, end, hasExplicitTime };
+}
+
+/**
+ * Position a timed block inside a single calendar day column (local timezone).
+ * Uses millisecond deltas so spans past midnight render correctly up to end of day.
+ */
+export function layoutTimedBlockInDay(
+  day: Date,
+  start: Date,
+  end: Date,
+  hourHeightPx: number
+): { top: number; height: number; clippedStart: Date; clippedEnd: Date } | null {
+  const dayStart = new Date(day);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  const clippedStart = start < dayStart ? dayStart : start;
+  const clippedEnd = end > dayEnd ? dayEnd : end;
+  if (clippedEnd.getTime() <= clippedStart.getTime()) return null;
+
+  const msPerHour = 60 * 60 * 1000;
+  const top = ((clippedStart.getTime() - dayStart.getTime()) / msPerHour) * hourHeightPx;
+  const height = Math.max(
+    16,
+    ((clippedEnd.getTime() - clippedStart.getTime()) / msPerHour) * hourHeightPx
+  );
+  return { top, height, clippedStart, clippedEnd };
+}
+
+/** Format for HTML datetime-local inputs (local time). */
+export function toDatetimeLocalValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",

@@ -189,6 +189,12 @@ export const EventDetailSchema = EventSchema.extend({
 });
 
 // InternalBooking
+export const BookingCreatorSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+});
+
 export const InternalBookingSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -197,12 +203,14 @@ export const InternalBookingSchema = z.object({
   endDate: z.string().nullable(),
   type: z.string(),
   venueId: z.string().nullable(),
+  createdById: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 
 export const InternalBookingDetailSchema = InternalBookingSchema.extend({
   venue: VenueSchema.nullable(),
+  createdBy: BookingCreatorSchema.nullable().optional(),
   people: z.array(
     z.object({
       id: z.string(),
