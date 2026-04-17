@@ -26,6 +26,16 @@ function yToMinutesFromMidnight(clientY: number, columnTop: number): number {
   return Math.max(0, Math.min(24 * 60 - SNAP_MINUTES, snapped));
 }
 
+function getSnappedRangeMinutes(startY: number, currentY: number, columnTop: number): { lo: number; hi: number } {
+  const m0 = yToMinutesFromMidnight(startY, columnTop);
+  const m1 = yToMinutesFromMidnight(currentY, columnTop);
+  return { lo: Math.min(m0, m1), hi: Math.max(m0, m1) };
+}
+
+function formatDragTime(d: Date): string {
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
 function minutesToDate(day: Date, minutesFromMidnight: number): Date {
   const d = new Date(day);
   d.setHours(0, 0, 0, 0);
@@ -59,11 +69,7 @@ export function OutlookTimeGrid({ days, items, onItemClick, onSelectTimeRange }:
     if (!col) return;
 
     const rect = col.getBoundingClientRect();
-    const top = rect.top;
-    const m0 = yToMinutesFromMidnight(d.startY, top);
-    const m1 = yToMinutesFromMidnight(d.currentY, top);
-    const lo = Math.min(m0, m1);
-    const hi = Math.max(m0, m1);
+    const { lo, hi } = getSnappedRangeMinutes(d.startY, d.currentY, rect.top);
     if (Math.abs(d.currentY - d.startY) < MIN_DRAG_PX) return;
     if (hi - lo < SNAP_MINUTES) return;
 
@@ -145,13 +151,24 @@ export function OutlookTimeGrid({ days, items, onItemClick, onSelectTimeRange }:
               const col = columnRefs.current[dayIndex];
               if (col) {
                 const rect = col.getBoundingClientRect();
-                const topPx = Math.min(drag.startY, drag.currentY) - rect.top;
-                const hPx = Math.abs(drag.currentY - drag.startY);
+                const { lo, hi } = getSnappedRangeMinutes(drag.startY, drag.currentY, rect.top);
+                const durMin = Math.max(hi - lo, SNAP_MINUTES);
+                const topPx = (lo / 60) * HOUR_HEIGHT;
+                const hPx = Math.max((durMin / 60) * HOUR_HEIGHT, 36);
+                const startAt = minutesToDate(day, lo);
+                const endAt = minutesToDate(day, lo === hi ? lo + SNAP_MINUTES : hi);
                 selectionOverlay = (
                   <div
-                    className="absolute left-1 right-1 rounded-md border-2 border-rose-400/80 bg-rose-500/25 z-[5] pointer-events-none"
-                    style={{ top: topPx, height: Math.max(hPx, 4) }}
-                  />
+                    className="absolute left-1 right-1 rounded-md border-2 border-rose-400/80 bg-rose-500/25 z-[5] pointer-events-none flex flex-col justify-start px-1.5 py-1 overflow-hidden"
+                    style={{ top: topPx, height: hPx }}
+                  >
+                    <div className="text-[10px] font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
+                      {formatDragTime(startAt)} – {formatDragTime(endAt)}
+                    </div>
+                    <div className="text-[9px] text-white/85 leading-tight mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
+                      {durMin} min
+                    </div>
+                  </div>
                 );
               }
             }

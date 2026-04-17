@@ -332,7 +332,7 @@ export default function Schedule() {
             ) : viewMode === "week" || viewMode === "day" ? (
               <div className="space-y-2">
                 <p className="text-[11px] text-white/35">
-                  Drag across a day column to select a time range; the new booking form opens with start and end filled in.
+                  Drag across a day column to select a time range (15-minute steps); start and end times show while you drag.
                 </p>
                 <OutlookTimeGrid
                   days={getRangeDays(viewMode, anchorDate)}
