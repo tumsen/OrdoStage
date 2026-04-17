@@ -13,6 +13,14 @@ app.get("/org", async (c) => {
   if (!user) return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   if (!user.organizationId) return c.json({ error: { message: "No organization", code: "NO_ORG" } }, 404);
 
+  const unlimitedEmails = env.UNLIMITED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+  if (unlimitedEmails.includes(user.email.toLowerCase())) {
+    await prisma.organization.update({
+      where: { id: user.organizationId },
+      data: { unlimitedCredits: true, creditBalance: 999999999 },
+    });
+  }
+
   const credits = await deductCredits(user.organizationId);
   const org = await prisma.organization.findUnique({
     where: { id: user.organizationId },
