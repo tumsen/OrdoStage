@@ -65,6 +65,7 @@ import { Label } from "@/components/ui/label";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
 import { downloadVenueTechRider, printVenueTechRider, uploadVenueTechRiderForSharing } from "@/lib/downloadVenueTechRider";
 import { TourCalendarView } from "@/components/TourCalendarView";
+import { useToast } from "@/hooks/use-toast";
 
 // ── Google Maps helpers ───────────────────────────────────────────────────────
 
@@ -2215,6 +2216,9 @@ function ShareTourSection({ tour }: { tour: TourDetail }) {
 
 function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const MAX_TECH_RIDER_MB = 50;
+  const MAX_TECH_RIDER_BYTES = MAX_TECH_RIDER_MB * 1024 * 1024;
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -2226,11 +2230,36 @@ function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
         body: formData,
         credentials: "include",
       });
-      if (!resp.ok) throw new Error("Upload failed");
+      if (!resp.ok) {
+        if (resp.status === 413) {
+          throw new Error(`File too large. Please upload a PDF smaller than ${MAX_TECH_RIDER_MB} MB.`);
+        }
+
+        let backendMessage = "";
+        try {
+          const payload = await resp.json();
+          backendMessage = payload?.error?.message ?? payload?.message ?? "";
+        } catch {
+          backendMessage = "";
+        }
+
+        throw new Error(backendMessage || "Upload failed. Please try again.");
+      }
       return resp.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+      toast({
+        title: "Tech rider uploaded",
+        description: "The PDF is now included in generated venue riders.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Something went wrong during upload.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -2250,6 +2279,17 @@ function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.size > MAX_TECH_RIDER_BYTES) {
+      toast({
+        title: "File too large",
+        description: `Please choose a PDF smaller than ${MAX_TECH_RIDER_MB} MB.`,
+        variant: "destructive",
+      });
+      e.target.value = "";
+      return;
+    }
+
     uploadMutation.mutate(file);
     e.target.value = "";
   }
@@ -2315,7 +2355,7 @@ function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
         </label>
       )}
       <p className="text-xs text-white/25 mt-2">
-        Automatically prepended to each venue's tech rider download.
+        Automatically prepended to each venue's tech rider download. Maximum file size: {MAX_TECH_RIDER_MB} MB.
       </p>
     </div>
   );
