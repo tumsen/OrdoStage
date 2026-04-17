@@ -31,7 +31,7 @@ app.get("/org", async (c) => {
     include: { _count: { select: { users: true } } },
   });
 
-  return c.json({ data: { ...org, ...credits } });
+  return c.json({ data: { ...org, ...credits, credits: credits.balance } });
 });
 
 // POST /api/org — create org (called after first login)
