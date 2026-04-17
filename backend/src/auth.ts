@@ -49,6 +49,7 @@ export const auth = betterAuth({
     "https://*.railway.app",
     "https://*.up.railway.app",
     "https://ordostage.com",
+    "https://www.ordostage.com",
   ],
   socialProviders: {
     github: {

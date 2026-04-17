@@ -5,12 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import type { EventDetail, InternalBookingDetail, Venue, Person } from "../../../backend/src/types";
-import { ScheduleFilters } from "@/components/schedule/ScheduleFilters";
+import {
+  ScheduleFilters,
+  type ScheduleViewMode,
+  type VisibilityFilters,
+} from "@/components/schedule/ScheduleFilters";
 import { CalendarGrid } from "@/components/schedule/CalendarGrid";
 import { ItemDetailSheet } from "@/components/schedule/ItemDetailSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { ScheduleLegend } from "@/components/schedule/ScheduleLegend";
-import { toCalendarItems, formatMonthLabel } from "@/components/schedule/scheduleUtils";
+import { toCalendarItems, formatMonthLabel, itemsForDay } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 
 interface ScheduleData {
@@ -18,23 +22,109 @@ interface ScheduleData {
   bookings: InternalBookingDetail[];
 }
 
-function toISODate(year: number, month: number, day: number): string {
-  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+function toISODate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function startOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const dow = (d.getDay() + 6) % 7; // Monday-based
+  d.setDate(d.getDate() - dow);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
+
+function addYears(date: Date, years: number): Date {
+  const d = new Date(date);
+  d.setFullYear(d.getFullYear() + years);
+  return d;
+}
+
+function getRange(mode: ScheduleViewMode, anchorDate: Date): { from: string; to: string } {
+  if (mode === "year") {
+    const y = anchorDate.getFullYear();
+    return { from: `${y}-01-01`, to: `${y}-12-31` };
+  }
+  if (mode === "month") {
+    const y = anchorDate.getFullYear();
+    const m = anchorDate.getMonth();
+    const from = new Date(y, m, 1);
+    const to = new Date(y, m + 1, 0);
+    return { from: toISODate(from), to: toISODate(to) };
+  }
+  if (mode === "week") {
+    const fromDate = startOfWeek(anchorDate);
+    const toDate = addDays(fromDate, 6);
+    return { from: toISODate(fromDate), to: toISODate(toDate) };
+  }
+  if (mode === "day") {
+    return { from: toISODate(anchorDate), to: toISODate(anchorDate) };
+  }
+  const fromDate = new Date(anchorDate);
+  const toDate = addDays(fromDate, 6);
+  return { from: toISODate(fromDate), to: toISODate(toDate) };
+}
+
+function rangeLabel(mode: ScheduleViewMode, date: Date): string {
+  if (mode === "year") return String(date.getFullYear());
+  if (mode === "month") return formatMonthLabel(date.getFullYear(), date.getMonth());
+  if (mode === "week") {
+    const fromDate = startOfWeek(date);
+    const toDate = addDays(fromDate, 6);
+    return `${fromDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${toDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  }
+  if (mode === "day") {
+    return date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  }
+  const toDate = addDays(date, 6);
+  return `Next 7 days (${date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })} - ${toDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`;
+}
+
+function getRangeDays(mode: ScheduleViewMode, anchorDate: Date): Date[] {
+  if (mode === "week") {
+    const start = startOfWeek(anchorDate);
+    return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
+  }
+  if (mode === "next7") {
+    return Array.from({ length: 7 }).map((_, i) => addDays(anchorDate, i));
+  }
+  return [anchorDate];
 }
 
 export default function Schedule() {
   const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
+  const [anchorDate, setAnchorDate] = useState(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+  const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
   const [venueId, setVenueId] = useState("all");
   const [personId, setPersonId] = useState("all");
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [visibility, setVisibility] = useState<VisibilityFilters>({
+    event: true,
+    rehearsal: true,
+    maintenance: true,
+    private: true,
+    other: true,
+  });
 
-  // First/last day of displayed month
-  const from = toISODate(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  const to = toISODate(year, month, lastDay);
+  const { from, to } = getRange(viewMode, anchorDate);
 
   // Build query string
   const params = new URLSearchParams({ from, to });
@@ -42,7 +132,7 @@ export default function Schedule() {
   if (personId !== "all") params.set("personId", personId);
 
   const { data: scheduleData, isLoading } = useQuery({
-    queryKey: ["schedule", { venueId, personId, year, month }],
+    queryKey: ["schedule", { venueId, personId, viewMode, from, to }],
     queryFn: () => api.get<ScheduleData>(`/api/schedule?${params.toString()}`),
   });
 
@@ -60,22 +150,26 @@ export default function Schedule() {
     ? toCalendarItems(scheduleData.events, scheduleData.bookings)
     : [];
 
-  function prevMonth() {
-    if (month === 0) {
-      setMonth(11);
-      setYear((y) => y - 1);
-    } else {
-      setMonth((m) => m - 1);
-    }
+  const visibleItems = items.filter((item) => {
+    if (item.kind === "event") return visibility.event;
+    if (item.type === "rehearsal") return visibility.rehearsal;
+    if (item.type === "maintenance") return visibility.maintenance;
+    if (item.type === "private") return visibility.private;
+    return visibility.other;
+  });
+
+  function moveBackward() {
+    if (viewMode === "year") setAnchorDate((d) => addYears(d, -1));
+    else if (viewMode === "month") setAnchorDate((d) => addMonths(d, -1));
+    else if (viewMode === "week" || viewMode === "next7") setAnchorDate((d) => addDays(d, -7));
+    else setAnchorDate((d) => addDays(d, -1));
   }
 
-  function nextMonth() {
-    if (month === 11) {
-      setMonth(0);
-      setYear((y) => y + 1);
-    } else {
-      setMonth((m) => m + 1);
-    }
+  function moveForward() {
+    if (viewMode === "year") setAnchorDate((d) => addYears(d, 1));
+    else if (viewMode === "month") setAnchorDate((d) => addMonths(d, 1));
+    else if (viewMode === "week" || viewMode === "next7") setAnchorDate((d) => addDays(d, 7));
+    else setAnchorDate((d) => addDays(d, 1));
   }
 
   return (
@@ -85,10 +179,14 @@ export default function Schedule() {
         <ScheduleFilters
           venues={venues ?? []}
           people={people ?? []}
+          viewMode={viewMode}
+          visibility={visibility}
           venueId={venueId}
           personId={personId}
           onVenueChange={setVenueId}
           onPersonChange={setPersonId}
+          onViewModeChange={setViewMode}
+          onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
         />
         <Button
           onClick={() => setBookingOpen(true)}
@@ -99,25 +197,25 @@ export default function Schedule() {
         </Button>
       </div>
 
-      {/* Month navigation */}
+      {/* Calendar navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/5"
-            onClick={prevMonth}
+            onClick={moveBackward}
           >
             <ChevronLeft size={16} />
           </Button>
           <h2 className="text-base font-semibold text-white/90 min-w-[160px] text-center">
-            {formatMonthLabel(year, month)}
+            {rangeLabel(viewMode, anchorDate)}
           </h2>
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/5"
-            onClick={nextMonth}
+            onClick={moveForward}
           >
             <ChevronRight size={16} />
           </Button>
@@ -126,8 +224,7 @@ export default function Schedule() {
             size="sm"
             className="h-7 text-xs text-white/40 hover:text-white/70 hover:bg-white/5 ml-1"
             onClick={() => {
-              setYear(today.getFullYear());
-              setMonth(today.getMonth());
+              setAnchorDate(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
             }}
           >
             Today
@@ -146,12 +243,65 @@ export default function Schedule() {
             ))}
           </div>
         ) : (
-          <CalendarGrid
-            year={year}
-            month={month}
-            items={items}
-            onItemClick={setSelectedItem}
-          />
+          <>
+            {viewMode === "year" ? (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {Array.from({ length: 12 }).map((_, m) => (
+                  <div key={m} className="rounded-lg border border-white/10 p-2">
+                    <div className="text-xs text-white/40 mb-2 px-1">
+                      {formatMonthLabel(anchorDate.getFullYear(), m)}
+                    </div>
+                    <CalendarGrid
+                      year={anchorDate.getFullYear()}
+                      month={m}
+                      items={visibleItems}
+                      onItemClick={setSelectedItem}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : viewMode === "month" ? (
+              <CalendarGrid
+                year={anchorDate.getFullYear()}
+                month={anchorDate.getMonth()}
+                items={visibleItems}
+                onItemClick={setSelectedItem}
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                {getRangeDays(viewMode, anchorDate).map((date) => {
+                  const dayItems = itemsForDay(visibleItems, date);
+                  return (
+                    <div key={date.toISOString()} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                      <div className="text-xs text-white/40 mb-2">
+                        {date.toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </div>
+                      {dayItems.length === 0 ? (
+                        <div className="text-xs text-white/25 italic">No items</div>
+                      ) : (
+                        <div className="space-y-1">
+                          {dayItems.map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={() => setSelectedItem(item)}
+                              className="w-full text-left text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80"
+                            >
+                              {item.title}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
 
