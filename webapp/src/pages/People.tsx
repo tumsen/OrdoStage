@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,6 +8,7 @@ import {
   Plus, Edit2, Trash2, Phone, Mail, MapPin, ShieldAlert, User
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
 import type { Person } from "../../../backend/src/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -458,6 +460,11 @@ export default function People() {
     queryFn: () => api.get<Person[]>("/api/people"),
   });
 
+  const { data: orgCredits, isLoading: orgLoading } = useQuery({
+    queryKey: ["org"],
+    queryFn: () => api.get<OrgCreditsPayload & { unlimitedCredits?: boolean }>("/api/org"),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/people/${id}`),
     onSuccess: () => {
@@ -468,8 +475,19 @@ export default function People() {
 
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-white/40">Cast, crew and contacts.</p>
+      <CreditsSummary org={orgCredits} isLoading={orgLoading} variant="compact" className="max-w-3xl" />
+
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm text-white/40">Cast, crew and contacts.</p>
+          <p className="text-xs text-white/25 mt-1">
+            To invite someone to log in and use the app, use{" "}
+            <Link to="/team" className="text-white/45 hover:text-white/70 underline underline-offset-2">
+              Team
+            </Link>
+            .
+          </p>
+        </div>
         <Button
           size="sm"
           onClick={() => setAddOpen(true)}

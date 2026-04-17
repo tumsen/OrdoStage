@@ -14,6 +14,7 @@ import {
   XCircle,
   Route,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,9 @@ interface OrgData {
   userCount: number;
   warning: boolean;
   blocked: boolean;
+  unlimitedCredits?: boolean;
+  estimatedDaysRemaining?: number | null;
+  pendingAutoTopUpUrl?: string | null;
 }
 
 const navItems = [
@@ -191,9 +195,33 @@ function CreditBanner() {
 
   if (!org) return null;
 
+  if (org.unlimitedCredits) return null;
+
   const credits = org.credits ?? 0;
   const userCount = org.userCount ?? 1;
-  const daysLeft = userCount > 0 ? Math.floor(credits / userCount) : credits;
+  const daysLeft =
+    org.estimatedDaysRemaining != null
+      ? org.estimatedDaysRemaining
+      : userCount > 0
+        ? Math.floor(credits / userCount)
+        : credits;
+
+  if (org.pendingAutoTopUpUrl) {
+    return (
+      <div className="flex-shrink-0 bg-indigo-950/80 border-b border-indigo-500/30 px-4 py-2 flex items-center gap-2 text-sm">
+        <Sparkles size={14} className="text-indigo-300 flex-shrink-0" />
+        <span className="text-indigo-200">
+          Credits are low — a checkout is ready for your automatic top-up. Complete payment to add credits.
+        </span>
+        <a
+          href={org.pendingAutoTopUpUrl}
+          className="ml-auto text-indigo-100 underline underline-offset-2 hover:text-white whitespace-nowrap"
+        >
+          Pay now →
+        </a>
+      </div>
+    );
+  }
 
   if (org.blocked || credits <= 0) {
     return (

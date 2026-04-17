@@ -36,6 +36,7 @@ import SiteContentAdmin from "./pages/admin/SiteContent";
 import Frontpage from "./pages/Frontpage";
 import PublicPricing from "./pages/PublicPricing";
 import LegalPage from "./pages/LegalPage";
+import AcceptInvite from "./pages/AcceptInvite";
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,7 @@ const App = () => (
           <Route path="/terms-of-service" element={<LegalPage />} />
           <Route path="/privacy-policy" element={<LegalPage />} />
           <Route path="/refund-policy" element={<LegalPage />} />
+          <Route path="/accept-invite" element={<AcceptInvite />} />
 
           {/* Protected routes with sidebar layout */}
           <Route

@@ -4,8 +4,35 @@ import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { deductCredits } from "../credits";
 import { env } from "../env";
+import { canWrite as userCanWrite, isOwner } from "../permissions";
+import { maybeEnqueueAutoTopUp } from "../autoTopup";
 
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
+
+// GET /api/me — current user role from DB (session may omit orgRole in the client)
+app.get("/me", async (c) => {
+  const sessionUser = c.get("user");
+  if (!sessionUser?.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const dbUser = await prisma.user.findUnique({
+    where: { id: sessionUser.id },
+    select: { orgRole: true, organizationId: true, isActive: true },
+  });
+  if (!dbUser) {
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  }
+  const orgRole = dbUser.orgRole || "viewer";
+  const isActive = dbUser.isActive;
+  return c.json({
+    data: {
+      orgRole,
+      canWrite: isActive && userCanWrite(orgRole),
+      hasOrganization: Boolean(dbUser.organizationId),
+      isActive,
+    },
+  });
+});
 
 // GET /api/org — get current org info + credit status
 app.get("/org", async (c) => {
@@ -26,12 +53,92 @@ app.get("/org", async (c) => {
   }
 
   const credits = await deductCredits(user.organizationId);
+
+  const activeUserCount = await prisma.user.count({
+    where: { organizationId: user.organizationId, isActive: true },
+  });
+
+  const origin =
+    c.req.header("origin") || env.FRONTEND_URL || env.BACKEND_URL || "http://localhost:5173";
+  await maybeEnqueueAutoTopUp(user.organizationId, origin);
+
   const org = await prisma.organization.findUnique({
     where: { id: user.organizationId },
     include: { _count: { select: { users: true } } },
   });
 
-  return c.json({ data: { ...org, ...credits, credits: credits.balance } });
+  if (!org) {
+    return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const unlimited = Boolean(org.unlimitedCredits);
+  const estimatedDaysRemaining = unlimited
+    ? null
+    : activeUserCount > 0
+      ? Math.floor(credits.balance / activeUserCount)
+      : credits.balance;
+
+  return c.json({
+    data: {
+      ...org,
+      ...credits,
+      credits: credits.balance,
+      userCount: activeUserCount,
+      dailyCreditsUsed: activeUserCount,
+      estimatedDaysRemaining,
+      pendingAutoTopUpUrl: org.pendingAutoTopUpUrl ?? null,
+      autoTopUpEnabled: org.autoTopUpEnabled ?? false,
+      autoTopUpPackId: org.autoTopUpPackId ?? null,
+      autoTopUpThreshold: org.autoTopUpThreshold ?? 30,
+    },
+  });
+});
+
+const BillingSettingsSchema = z.object({
+  autoTopUpEnabled: z.boolean().optional(),
+  autoTopUpPackId: z.string().min(1).nullable().optional(),
+  autoTopUpThreshold: z.number().int().min(0).max(1_000_000).optional(),
+});
+
+// PATCH /api/org/billing-settings — owner only
+app.patch("/org/billing-settings", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { orgRole: true },
+  });
+  if (!isOwner(dbUser?.orgRole || "")) {
+    return c.json(
+      { error: { message: "Only the owner can change billing settings", code: "FORBIDDEN" } },
+      403
+    );
+  }
+
+  const body = BillingSettingsSchema.parse(await c.req.json().catch(() => ({})));
+
+  const data: {
+    autoTopUpEnabled?: boolean;
+    autoTopUpPackId?: string | null;
+    autoTopUpThreshold?: number;
+  } = {};
+  if (body.autoTopUpEnabled !== undefined) data.autoTopUpEnabled = body.autoTopUpEnabled;
+  if (body.autoTopUpPackId !== undefined) data.autoTopUpPackId = body.autoTopUpPackId;
+  if (body.autoTopUpThreshold !== undefined) data.autoTopUpThreshold = body.autoTopUpThreshold;
+
+  if (Object.keys(data).length === 0) {
+    return c.json({ error: { message: "No changes", code: "BAD_REQUEST" } }, 400);
+  }
+
+  await prisma.organization.update({
+    where: { id: user.organizationId },
+    data,
+  });
+
+  return c.json({ data: { ok: true } });
 });
 
 // POST /api/org — create org (called after first login)

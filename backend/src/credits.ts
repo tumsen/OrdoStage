@@ -28,7 +28,9 @@ export async function deductCredits(
   );
 
   if (daysSince > 0) {
-    const userCount = await prisma.user.count({ where: { organizationId } });
+    const userCount = await prisma.user.count({
+      where: { organizationId, isActive: true },
+    });
     const toDeduct = daysSince * Math.max(userCount, 1);
     const newBalance = org.creditBalance - toDeduct;
 

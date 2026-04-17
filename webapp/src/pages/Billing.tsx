@@ -1,18 +1,31 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreditCard, TrendingUp, AlertTriangle, XCircle, CheckCircle } from "lucide-react";
+import { CreditCard, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
+import { usePermissions } from "@/hooks/usePermissions";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
-interface OrgData {
+interface OrgBillingData extends OrgCreditsPayload {
   id: string;
   name: string;
-  credits: number;
-  userCount: number;
-  warning: boolean;
-  blocked: boolean;
+  unlimitedCredits?: boolean;
+  autoTopUpEnabled: boolean;
+  autoTopUpPackId: string | null;
+  autoTopUpThreshold: number;
+  pendingAutoTopUpUrl: string | null;
 }
 
 interface CheckoutResponse {
@@ -28,46 +41,16 @@ interface BillingPack {
   active: boolean;
 }
 
-function CreditStatus({ credits, userCount }: { credits: number; userCount: number }) {
-  const daysLeft = userCount > 0 ? Math.floor(credits / userCount) : credits;
-  const isBlocked = credits <= 0;
-  const isWarning = credits > 0 && daysLeft <= 30;
-
-  const colorClass = isBlocked
-    ? "text-red-400 bg-red-950/40 border-red-800/40"
-    : isWarning
-    ? "text-amber-400 bg-amber-950/40 border-amber-800/40"
-    : "text-green-400 bg-green-950/40 border-green-800/40";
-
-  const icon = isBlocked ? (
-    <XCircle size={20} className="text-red-400" />
-  ) : isWarning ? (
-    <AlertTriangle size={20} className="text-amber-400" />
-  ) : (
-    <CheckCircle size={20} className="text-green-400" />
-  );
-
-  const label = isBlocked
-    ? "No credits — read-only mode"
-    : isWarning
-    ? `Low credits: ~${daysLeft} days left`
-    : `Healthy: ~${daysLeft} days remaining`;
-
-  return (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${colorClass}`}>
-      {icon}
-      <span className="text-sm font-medium">{label}</span>
-    </div>
-  );
-}
-
 export default function Billing() {
+  const queryClient = useQueryClient();
+  const { isOwner } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [thresholdDraft, setThresholdDraft] = useState("");
 
-  const { data: org, isLoading } = useQuery<OrgData>({
+  const { data: org, isLoading } = useQuery<OrgBillingData>({
     queryKey: ["org"],
-    queryFn: () => api.get<OrgData>("/api/org"),
+    queryFn: () => api.get<OrgBillingData>("/api/org"),
   });
 
   const { data: packs } = useQuery<BillingPack[]>({
@@ -88,11 +71,33 @@ export default function Billing() {
     },
   });
 
+  const settingsMutation = useMutation({
+    mutationFn: (body: {
+      autoTopUpEnabled?: boolean;
+      autoTopUpPackId?: string | null;
+      autoTopUpThreshold?: number;
+    }) => api.patch<{ ok: boolean }>("/api/org/billing-settings", body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org"] });
+      setToast({ type: "success", message: "Billing settings saved." });
+    },
+    onError: (e: Error) => {
+      setToast({ type: "error", message: e.message || "Could not save settings." });
+    },
+  });
+
   useEffect(() => {
     const success = searchParams.get("success");
     const cancelled = searchParams.get("cancelled");
+    const autoTop = searchParams.get("auto_topup");
     if (success === "1") {
-      setToast({ type: "success", message: "Payment successful! Your credits have been added." });
+      setToast({
+        type: "success",
+        message:
+          autoTop === "1"
+            ? "Payment successful! Credits have been added (auto top-up checkout)."
+            : "Payment successful! Your credits have been added.",
+      });
       setSearchParams({});
     } else if (cancelled === "1") {
       setToast({ type: "error", message: "Payment cancelled. No charges were made." });
@@ -107,12 +112,14 @@ export default function Billing() {
     }
   }, [toast]);
 
-  const credits = org?.credits ?? 0;
-  const userCount = org?.userCount ?? 1;
+  const firstPackId = packs?.[0]?.packId ?? "";
+
+  useEffect(() => {
+    if (org?.autoTopUpThreshold !== undefined) setThresholdDraft(String(org.autoTopUpThreshold));
+  }, [org?.autoTopUpThreshold]);
 
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-4xl">
-      {/* Toast */}
       {toast ? (
         <div
           className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${
@@ -121,55 +128,116 @@ export default function Billing() {
               : "bg-red-950/90 border-red-700 text-red-300"
           }`}
         >
-          {toast.type === "success" ? (
-            <CheckCircle size={16} />
-          ) : (
-            <XCircle size={16} />
-          )}
+          {toast.type === "success" ? <CheckCircle size={16} /> : <XCircle size={16} />}
           <span className="text-sm">{toast.message}</span>
         </div>
       ) : null}
 
-      {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-white">Billing &amp; Credits</h2>
         <p className="text-gray-400 mt-1 text-sm">
-          Each user in your organization uses 1 credit per day.
+          Each active team member uses 1 credit per day. Credits are shared across your organisation.
         </p>
       </div>
 
-      {/* Current Balance */}
-      <Card className="bg-gray-900 border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white text-base flex items-center gap-2">
-            <TrendingUp size={18} className="text-purple-400" />
-            Credit Balance
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading ? (
-            <div className="h-8 bg-gray-800 rounded animate-pulse" />
-          ) : (
-            <>
-              <div className="flex items-end gap-2">
-                <span className="text-5xl font-bold text-white">{credits.toLocaleString()}</span>
-                <span className="text-gray-400 mb-1">days</span>
-              </div>
-              <CreditStatus credits={credits} userCount={userCount} />
-              {userCount > 0 && credits > 0 ? (
-                <p className="text-gray-400 text-sm">
-                  At current usage ({userCount} {userCount === 1 ? "user" : "users"}), your credits will last{" "}
-                  <span className="text-white font-medium">
-                    ~{Math.floor(credits / userCount)} days
-                  </span>
-                </p>
-              ) : null}
-            </>
-          )}
-        </CardContent>
-      </Card>
+      <CreditsSummary org={org} isLoading={isLoading} variant="card" />
 
-      {/* Day Packs */}
+      {org?.pendingAutoTopUpUrl && !org.unlimitedCredits ? (
+        <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 text-sm">
+          <div className="flex items-start gap-2 text-indigo-200">
+            <RefreshCw size={16} className="mt-0.5 flex-shrink-0" />
+            <span>
+              Automatic top-up prepared a checkout because your balance is at or below your threshold.
+              Complete payment to add credits.
+            </span>
+          </div>
+          <Button asChild className="bg-indigo-600 hover:bg-indigo-500 sm:ml-auto flex-shrink-0">
+            <a href={org.pendingAutoTopUpUrl}>Complete payment</a>
+          </Button>
+        </div>
+      ) : null}
+
+      {isOwner ? (
+        <Card className="bg-gray-900 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base">Automatic top-up when running low</CardTitle>
+            <p className="text-gray-400 text-sm font-normal">
+              When your balance is at or below the threshold, we create a Paddle checkout link for your chosen pack.
+              You still confirm payment — credits are added after a successful transaction.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="auto-topup" className="text-white/80">
+                Enable automatic checkout
+              </Label>
+              <Switch
+                id="auto-topup"
+                checked={org?.autoTopUpEnabled ?? false}
+                disabled={settingsMutation.isPending || isLoading}
+                onCheckedChange={(v) => {
+                  settingsMutation.mutate({
+                    autoTopUpEnabled: v,
+                    autoTopUpPackId: v ? org?.autoTopUpPackId || firstPackId || null : org?.autoTopUpPackId ?? null,
+                    autoTopUpThreshold: org?.autoTopUpThreshold ?? 30,
+                  });
+                }}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-white/70">Pack to buy when low</Label>
+                <Select
+                  value={org?.autoTopUpPackId || firstPackId || ""}
+                  onValueChange={(packId) => {
+                    settingsMutation.mutate({
+                      autoTopUpPackId: packId,
+                      autoTopUpEnabled: org?.autoTopUpEnabled ?? false,
+                      autoTopUpThreshold: org?.autoTopUpThreshold ?? 30,
+                    });
+                  }}
+                  disabled={settingsMutation.isPending || !(packs && packs.length)}
+                >
+                  <SelectTrigger className="bg-gray-800 border-white/10 text-white">
+                    <SelectValue placeholder="Select pack" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a24] border-white/10">
+                    {(packs ?? []).map((p) => (
+                      <SelectItem key={p.packId} value={p.packId}>
+                        {p.label} — {p.days} days (€{(p.amountCents / 100).toFixed(2)})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-white/70">Balance threshold (credit days)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  className="bg-gray-800 border-white/10 text-white"
+                  value={thresholdDraft}
+                  onChange={(e) => setThresholdDraft(e.target.value)}
+                  onBlur={() => {
+                    const n = Number.parseInt(thresholdDraft, 10);
+                    if (Number.isNaN(n) || n < 0) return;
+                    settingsMutation.mutate({
+                      autoTopUpThreshold: n,
+                      autoTopUpEnabled: org?.autoTopUpEnabled ?? false,
+                      autoTopUpPackId: org?.autoTopUpPackId ?? firstPackId,
+                    });
+                  }}
+                  disabled={settingsMutation.isPending}
+                />
+                <p className="text-[11px] text-white/35">
+                  When balance is at or below this, a new checkout link is prepared (at most once per 24 hours).
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div>
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <CreditCard size={18} className="text-purple-400" />
@@ -200,7 +268,7 @@ export default function Billing() {
                 <div className="flex items-center justify-between">
                   <span className="text-purple-400 font-semibold text-lg">€{(pack.amountCents / 100).toFixed(2)}</span>
                   <span className="text-gray-500 text-xs">
-                    €{((pack.amountCents / 100) / pack.days * 100).toFixed(1)}¢/day
+                    €{(((pack.amountCents / 100) / pack.days) * 100).toFixed(1)}¢/day
                   </span>
                 </div>
                 <Button
@@ -216,11 +284,10 @@ export default function Billing() {
         </div>
       </div>
 
-      {/* Info */}
       <div className="bg-gray-900/50 border border-white/5 rounded-lg p-4 text-gray-400 text-sm space-y-1">
-        <p>Credits are shared across your whole organization.</p>
-        <p>Adding more users means credits are consumed faster — plan accordingly.</p>
-        <p>Payments are processed securely by Paddle. No subscription, pay as you go.</p>
+        <p>Credits are shared across your whole organisation.</p>
+        <p>Adding more active team members means credits are consumed faster — plan accordingly.</p>
+        <p>Payments are processed securely by Paddle. No subscription required for manual top-ups.</p>
       </div>
     </div>
   );

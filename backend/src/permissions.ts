@@ -6,3 +6,8 @@ export function canWrite(orgRole: string): boolean {
 export function isOwner(orgRole: string): boolean {
   return orgRole === "owner";
 }
+
+/** Invite members and set inactive; owners and managers. */
+export function canManageTeam(orgRole: string): boolean {
+  return ["owner", "manager"].includes(orgRole);
+}

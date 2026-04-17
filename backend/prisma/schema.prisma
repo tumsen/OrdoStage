@@ -22,6 +22,7 @@ model User {
   organization   Organization? @relation(fields: [organizationId], references: [id])
   orgRole        String        @default("member")
   isAdmin        Boolean       @default(false)
+  isActive       Boolean       @default(true)
 }
 
 model Session {
@@ -82,8 +83,30 @@ model Organization {
   unlimitedCredits Boolean            @default(false)
   discountPercent  Int                @default(0)
   discountNote     String?
+  autoTopUpEnabled         Boolean   @default(false)
+  autoTopUpPackId          String?
+  autoTopUpThreshold       Int       @default(30)
+  autoTopUpLastAttemptAt   DateTime?
+  pendingAutoTopUpUrl      String?
+  pendingAutoTopUpCreatedAt DateTime?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
+  invitations      OrganizationInvitation[]
+}
+
+model OrganizationInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  orgRole        String
+  token          String       @unique @default(cuid())
+  invitedById    String?
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  acceptedAt     DateTime?
+
+  @@index([organizationId, email])
 }
 
 model CreditPurchase {

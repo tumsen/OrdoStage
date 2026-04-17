@@ -229,7 +229,12 @@ export const UpdateInternalBookingSchema = CreateInternalBookingSchema.partial()
 
 // Team management
 export const UpdateRoleSchema = z.object({
-  role: z.enum(["owner", "manager", "viewer"]),
+  role: z.enum(["owner", "manager", "viewer", "member"]),
+});
+
+export const CreateInvitationSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(["manager", "viewer", "member"]),
 });
 
 export const TeamMemberSchema = z.object({
@@ -237,8 +242,17 @@ export const TeamMemberSchema = z.object({
   name: z.string(),
   email: z.string(),
   orgRole: z.string(),
+  isActive: z.boolean(),
   departmentId: z.string().nullable(),
   department: DepartmentSchema.nullable(),
+  createdAt: z.string(),
+});
+
+export const OrganizationInvitationSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  orgRole: z.string(),
+  expiresAt: z.string(),
   createdAt: z.string(),
 });
 

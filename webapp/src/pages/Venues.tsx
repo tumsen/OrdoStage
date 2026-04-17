@@ -478,17 +478,12 @@ export default function Venues() {
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="space-y-1">
-          <p className="text-sm text-white/40">Manage your venues.</p>
-          {!canWrite ? (
-            <p className="text-xs text-amber-400/80">View only — ask an owner or manager to change venues.</p>
-          ) : null}
-        </div>
+        <p className="text-sm text-white/40">Manage your venues.</p>
         <Button
           size="sm"
           onClick={() => setShowAddForm(true)}
           disabled={!canWrite}
-          title={canWrite ? undefined : "Only owners and managers can edit venues"}
+          title={canWrite ? undefined : "Read-only for your role. Ask an org owner to give you Manager access if you need to edit."}
           className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2"
         >
           <Plus size={14} /> Add Venue

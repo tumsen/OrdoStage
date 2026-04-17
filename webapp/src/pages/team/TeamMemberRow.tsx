@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { RoleBadge } from "./RoleBadge";
 import { cn } from "@/lib/utils";
@@ -11,21 +12,29 @@ export interface TeamMember {
   name: string;
   email: string;
   orgRole: string;
+  isActive: boolean;
   departmentId: string | null;
   department: { id: string; name: string; color: string } | null;
   createdAt: string;
 }
 
-const ROLES = ["owner", "manager", "viewer"] as const;
+const ROLES = ["owner", "manager", "member", "viewer"] as const;
 
 interface TeamMemberRowProps {
   member: TeamMember;
   isOwner: boolean;
+  canManageTeam: boolean;
   currentUserId: string | undefined;
   onRemove: (id: string, name: string) => void;
 }
 
-export function TeamMemberRow({ member, isOwner, currentUserId, onRemove }: TeamMemberRowProps) {
+export function TeamMemberRow({
+  member,
+  isOwner,
+  canManageTeam,
+  currentUserId,
+  onRemove,
+}: TeamMemberRowProps) {
   const queryClient = useQueryClient();
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
@@ -44,7 +53,17 @@ export function TeamMemberRow({ member, isOwner, currentUserId, onRemove }: Team
     },
   });
 
+  const activeMutation = useMutation({
+    mutationFn: (isActive: boolean) => api.put(`/api/team/${member.id}/active`, { isActive }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["team"] });
+      queryClient.invalidateQueries({ queryKey: ["me", "permissions"] });
+    },
+  });
+
   const isSelf = member.id === currentUserId;
+  const canToggleActive =
+    canManageTeam && !isSelf && (isOwner || member.orgRole !== "owner");
 
   return (
     <tr className="border-b border-white/5 group hover:bg-white/[0.02] transition-colors">
@@ -58,6 +77,11 @@ export function TeamMemberRow({ member, isOwner, currentUserId, onRemove }: Team
             <div className="text-sm font-medium text-white/90">
               {member.name}
               {isSelf ? <span className="ml-2 text-xs text-white/30">(you)</span> : null}
+              {!member.isActive ? (
+                <span className="ml-2 text-[10px] uppercase tracking-wide text-amber-400/90 border border-amber-500/30 rounded px-1.5 py-0.5">
+                  Inactive
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -88,6 +112,7 @@ export function TeamMemberRow({ member, isOwner, currentUserId, onRemove }: Team
         {isOwner && !isSelf ? (
           <div className="relative">
             <button
+              type="button"
               onClick={() => setRoleDropdownOpen((v) => !v)}
               className="flex items-center gap-1 group/role"
             >
@@ -101,6 +126,7 @@ export function TeamMemberRow({ member, isOwner, currentUserId, onRemove }: Team
                   {ROLES.map((r) => (
                     <button
                       key={r}
+                      type="button"
                       onClick={() => roleMutation.mutate(r)}
                       disabled={roleMutation.isPending}
                       className={cn(
@@ -119,6 +145,19 @@ export function TeamMemberRow({ member, isOwner, currentUserId, onRemove }: Team
           </div>
         ) : (
           <RoleBadge role={member.orgRole} />
+        )}
+      </td>
+
+      {/* Active */}
+      <td className="px-5 py-3.5 hidden sm:table-cell">
+        {canToggleActive ? (
+          <Switch
+            checked={member.isActive}
+            disabled={activeMutation.isPending}
+            onCheckedChange={(v) => activeMutation.mutate(v)}
+          />
+        ) : (
+          <span className="text-xs text-white/35">{member.isActive ? "Active" : "Off"}</span>
         )}
       </td>
 

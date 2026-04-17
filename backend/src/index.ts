@@ -24,6 +24,7 @@ import toursRouter from "./routes/tours";
 import publicRouter from "./routes/public";
 import siteContentRouter from "./routes/site-content";
 import { seedPacks } from "./seed-packs";
+import { prisma } from "./prisma";
 
 seedPacks().catch(console.error);
 const SUPPORT_EMAILS = new Set(["tumsen@gmail.com"]);
@@ -54,6 +55,42 @@ app.use("*", async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   c.set("user", session?.user ?? null);
   c.set("session", session?.session ?? null);
+  await next();
+});
+
+// Block inactive org members from API (except auth, public, billing webhook, GET /api/me)
+app.use("/api/*", async (c, next) => {
+  const path = c.req.path;
+  if (path.startsWith("/api/auth/") || path === "/api/billing/webhook" || path.startsWith("/api/public")) {
+    await next();
+    return;
+  }
+  if (path === "/api/me" && c.req.method === "GET") {
+    await next();
+    return;
+  }
+  const sessionUser = c.get("user");
+  if (!sessionUser?.id) {
+    await next();
+    return;
+  }
+  const dbUser = await prisma.user.findUnique({
+    where: { id: sessionUser.id },
+    select: { isActive: true, isAdmin: true, email: true },
+  });
+  const isSupport =
+    Boolean(dbUser?.isAdmin) || SUPPORT_EMAILS.has((dbUser?.email || "").toLowerCase());
+  if (dbUser && !dbUser.isActive && !isSupport) {
+    return c.json(
+      {
+        error: {
+          message: "Your account has been deactivated. Contact your organization.",
+          code: "INACTIVE",
+        },
+      },
+      403
+    );
+  }
   await next();
 });
 

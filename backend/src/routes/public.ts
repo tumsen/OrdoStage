@@ -52,6 +52,25 @@ function serializePublicPerson(person: any) {
 
 const publicRouter = new Hono();
 
+// GET /api/public/invite/:token — invitation preview (no auth)
+publicRouter.get("/invite/:token", async (c) => {
+  const { token } = c.req.param();
+  const invite = await prisma.organizationInvitation.findUnique({
+    where: { token },
+    include: { organization: { select: { name: true } } },
+  });
+  if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
+    return c.json({ error: { message: "Invalid or expired invitation", code: "NOT_FOUND" } }, 404);
+  }
+  return c.json({
+    data: {
+      organizationName: invite.organization.name,
+      email: invite.email,
+      role: invite.orgRole,
+    },
+  });
+});
+
 // GET /api/public/tours/:token — public tour schedule (no auth)
 publicRouter.get("/tours/:token", async (c) => {
   const { token } = c.req.param();

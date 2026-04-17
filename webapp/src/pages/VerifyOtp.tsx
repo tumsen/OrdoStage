@@ -9,6 +9,7 @@ export default function VerifyOtp() {
   const navigate = useNavigate();
   const location = useLocation();
   const email = (location.state as { email?: string } | null)?.email ?? "";
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? "";
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -28,6 +29,19 @@ export default function VerifyOtp() {
       setError(result.error.message || "Invalid code");
     } else {
       try {
+        const pendingToken = sessionStorage.getItem("pendingInviteToken");
+        if (pendingToken) {
+          try {
+            await api.post("/api/team/invitations/accept", { token: pendingToken });
+            sessionStorage.removeItem("pendingInviteToken");
+          } catch {
+            /* user can open /accept-invite manually */
+          }
+        }
+        if (returnTo) {
+          navigate(returnTo);
+          return;
+        }
         const org = await api.get<unknown>("/api/org");
         if (org) {
           navigate("/dashboard");
@@ -35,6 +49,10 @@ export default function VerifyOtp() {
           navigate("/setup-org");
         }
       } catch {
+        if (returnTo) {
+          navigate(returnTo);
+          return;
+        }
         navigate("/setup-org");
       }
     }

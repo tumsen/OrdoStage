@@ -1,10 +1,14 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get("returnTo")?.trim() ?? "";
+  const emailFromQuery = searchParams.get("email")?.trim() ?? "";
+
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -12,6 +16,10 @@ export default function Login() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (emailFromQuery) setEmail(emailFromQuery);
+  }, [emailFromQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,12 +32,20 @@ export default function Login() {
       const result = await authClient.signUp.email({ email: email.trim(), password, name: name.trim() });
       setLoading(false);
       if (result.error) { setError(result.error.message || "Sign up failed"); return; }
+      if (returnTo) {
+        navigate(returnTo);
+        return;
+      }
       navigate("/setup-org");
     } else {
       setLoading(true);
       const result = await authClient.signIn.email({ email: email.trim(), password });
       setLoading(false);
       if (result.error) { setError(result.error.message || "Invalid email or password"); return; }
+      if (returnTo) {
+        navigate(returnTo);
+        return;
+      }
       try {
         await api.get<unknown>("/api/org");
         navigate("/dashboard");
