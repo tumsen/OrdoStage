@@ -50,6 +50,12 @@ export const auth = betterAuth({
     "https://*.up.railway.app",
     "https://theaterplanner-production.up.railway.app",
   ],
+  socialProviders: {
+    github: {
+      clientId: env.GITHUB_CLIENT_ID as string,
+      clientSecret: env.GITHUB_CLIENT_SECRET as string,
+    },
+  },
   emailAndPassword: {
     enabled: true,
     async sendResetPassword({ user, token }: { user: { email: string }; token: string }) {
