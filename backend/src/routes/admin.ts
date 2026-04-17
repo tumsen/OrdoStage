@@ -222,6 +222,48 @@ app.get("/admin/packs", async (c) => {
   return c.json({ data: packs });
 });
 
+app.post("/admin/packs", async (c) => {
+  const body = await c.req.json();
+  const { packId, days, amountCents, label, active } = z
+    .object({
+      packId: z
+        .string()
+        .regex(/^[a-zA-Z0-9_-]+$/)
+        .optional(),
+      days: z.number().int().min(1),
+      amountCents: z.number().int().min(1),
+      label: z.string().min(1),
+      active: z.boolean().optional(),
+    })
+    .parse(body);
+
+  const normalizedPackId = (packId && packId.trim().length > 0)
+    ? packId.trim()
+    : `pack_${days}_${Date.now()}`;
+
+  const existing = await prisma.pricePack.findUnique({
+    where: { packId: normalizedPackId },
+  });
+  if (existing) {
+    return c.json(
+      { error: { message: "Pack ID already exists", code: "CONFLICT" } },
+      409
+    );
+  }
+
+  const created = await prisma.pricePack.create({
+    data: {
+      packId: normalizedPackId,
+      days,
+      amountCents,
+      label,
+      active: active ?? true,
+    },
+  });
+
+  return c.json({ data: created }, 201);
+});
+
 app.put("/admin/packs/:packId", async (c) => {
   const body = await c.req.json();
   const { amountCents, label, active } = z

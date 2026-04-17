@@ -18,6 +18,7 @@ import { Info } from "lucide-react";
 
 interface PricePack {
   id: string;
+  packId: string;
   days: number;
   label: string;
   amountCents: number;
@@ -36,7 +37,7 @@ function PackRow({
   isSaving,
 }: {
   pack: PricePack;
-  onSave: (id: string, data: { label?: string; amountCents?: number; active?: boolean }) => void;
+  onSave: (packId: string, data: { label?: string; amountCents?: number; active?: boolean }) => void;
   isSaving: boolean;
 }) {
   const [edits, setEdits] = useState<PackEdits>({
@@ -53,7 +54,7 @@ function PackRow({
   const handleSave = () => {
     const amountCents = Math.round(parseFloat(edits.amountEuros) * 100);
     if (isNaN(amountCents)) return;
-    onSave(pack.id, {
+    onSave(pack.packId, {
       label: edits.label,
       amountCents,
       active: edits.active,
@@ -121,6 +122,10 @@ export default function Pricing() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [newPackId, setNewPackId] = useState("");
+  const [newDays, setNewDays] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+  const [newAmountEuros, setNewAmountEuros] = useState("");
 
   const { data: packs, isPending } = useQuery<PricePack[]>({
     queryKey: ["admin", "packs"],
@@ -144,12 +149,95 @@ export default function Pricing() {
     },
   });
 
+  const createMutation = useMutation({
+    mutationFn: (data: {
+      packId?: string;
+      days: number;
+      label: string;
+      amountCents: number;
+      active?: boolean;
+    }) => api.post("/api/admin/packs", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "packs"] });
+      setNewPackId("");
+      setNewDays("");
+      setNewLabel("");
+      setNewAmountEuros("");
+      toast({ title: "Pack created", description: "New credit pack has been added." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create pack.", variant: "destructive" });
+    },
+  });
+
   const handleSave = (packId: string, data: { label?: string; amountCents?: number; active?: boolean }) => {
     updateMutation.mutate({ packId, data });
   };
 
+  const parsedDays = parseInt(newDays, 10);
+  const parsedAmountCents = Math.round(parseFloat(newAmountEuros) * 100);
+  const canCreate =
+    !createMutation.isPending &&
+    !isNaN(parsedDays) &&
+    parsedDays > 0 &&
+    !isNaN(parsedAmountCents) &&
+    parsedAmountCents > 0 &&
+    newLabel.trim().length > 0;
+
   return (
     <div className="p-6 space-y-4">
+      <div className="rounded-lg border border-white/10 p-4 bg-white/[0.02]">
+        <h3 className="text-sm font-semibold text-white/80 mb-3 uppercase tracking-wider">Add Credit Pack</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Input
+            placeholder="Pack ID (optional)"
+            value={newPackId}
+            onChange={(e) => setNewPackId(e.target.value)}
+            className="bg-gray-800 border-white/10 text-white placeholder:text-white/20"
+          />
+          <Input
+            type="number"
+            min="1"
+            placeholder="Days (e.g. 750)"
+            value={newDays}
+            onChange={(e) => setNewDays(e.target.value)}
+            className="bg-gray-800 border-white/10 text-white placeholder:text-white/20"
+          />
+          <Input
+            placeholder="Label (e.g. 750 days)"
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            className="bg-gray-800 border-white/10 text-white placeholder:text-white/20"
+          />
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="Price € (e.g. 49.00)"
+            value={newAmountEuros}
+            onChange={(e) => setNewAmountEuros(e.target.value)}
+            className="bg-gray-800 border-white/10 text-white placeholder:text-white/20"
+          />
+        </div>
+        <div className="mt-3 flex justify-end">
+          <Button
+            onClick={() =>
+              createMutation.mutate({
+                packId: newPackId.trim() || undefined,
+                days: parsedDays,
+                label: newLabel.trim(),
+                amountCents: parsedAmountCents,
+                active: true,
+              })
+            }
+            disabled={!canCreate}
+            className="bg-rose-700 hover:bg-rose-600 text-white"
+          >
+            {createMutation.isPending ? "Creating..." : "Create Pack"}
+          </Button>
+        </div>
+      </div>
+
       <div className="rounded-lg border border-white/10 overflow-hidden">
         <Table>
           <TableHeader>
