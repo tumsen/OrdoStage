@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function initSqlitePragmas(client: PrismaClient) {
+  if ((process.env.DATABASE_URL || "").startsWith("postgresql")) return;
   await client.$queryRawUnsafe("PRAGMA journal_mode = WAL;");
   await client.$queryRawUnsafe("PRAGMA foreign_keys = ON;");
   await client.$queryRawUnsafe("PRAGMA busy_timeout = 10000;");
