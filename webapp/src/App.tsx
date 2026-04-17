@@ -32,6 +32,10 @@ import AdminOrgs from "./pages/admin/Orgs";
 import AdminOrgDetail from "./pages/admin/OrgDetail";
 import AdminPricing from "./pages/admin/Pricing";
 import AdminUsers from "./pages/admin/Users";
+import SiteContentAdmin from "./pages/admin/SiteContent";
+import Frontpage from "./pages/Frontpage";
+import PublicPricing from "./pages/PublicPricing";
+import LegalPage from "./pages/LegalPage";
 
 const queryClient = new QueryClient();
 
@@ -70,9 +74,16 @@ const App = () => (
             }
           />
 
+          {/* Public marketing/legal routes */}
+          <Route path="/" element={<Frontpage />} />
+          <Route path="/pricing" element={<PublicPricing />} />
+          <Route path="/terms-of-service" element={<LegalPage />} />
+          <Route path="/privacy-policy" element={<LegalPage />} />
+          <Route path="/refund-policy" element={<LegalPage />} />
+
           {/* Protected routes with sidebar layout */}
           <Route
-            path="/"
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -248,6 +259,18 @@ const App = () => (
                 <AdminRoute>
                   <AdminLayout>
                     <AdminUsers />
+                  </AdminLayout>
+                </AdminRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/site-content"
+            element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <AdminLayout>
+                    <SiteContentAdmin />
                   </AdminLayout>
                 </AdminRoute>
               </ProtectedRoute>

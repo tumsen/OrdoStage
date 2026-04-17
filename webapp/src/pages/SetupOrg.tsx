@@ -16,7 +16,7 @@ export default function SetupOrg() {
     setError("");
     try {
       await api.post("/api/org", { name });
-      navigate("/");
+      navigate("/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create organization";
       setError(message);

@@ -213,6 +213,12 @@ model PricePack {
   active      Boolean @default(true)
 }
 
+model SiteContent {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model InternalBooking {
   id             String                  @id @default(cuid())
   title          String

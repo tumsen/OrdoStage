@@ -32,7 +32,7 @@ export default function Login() {
       if (result.error) { setError(result.error.message || "Invalid email or password"); return; }
       try {
         await api.get<unknown>("/api/org");
-        navigate("/");
+        navigate("/dashboard");
       } catch {
         navigate("/setup-org");
       }

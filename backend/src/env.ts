@@ -11,10 +11,10 @@ const envSchema = z.object({
   BACKEND_URL: z.string().default("http://localhost:3000"),
   // Auth
   BETTER_AUTH_SECRET: z.string().min(1),
-  // Stripe
-  STRIPE_SECRET_KEY: z.string().default("sk_test_placeholder"),
-  STRIPE_WEBHOOK_SECRET: z.string().default("whsec_placeholder"),
-  STRIPE_PUBLISHABLE_KEY: z.string().default("pk_test_placeholder"),
+  // Paddle
+  PADDLE_API_KEY: z.string().optional(),
+  PADDLE_WEBHOOK_SECRET: z.string().optional(),
+  PADDLE_ENV: z.enum(["sandbox", "live"]).default("sandbox"),
   // Email (production)
   RESEND_API_KEY: z.string().optional(),
   FROM_EMAIL: z.string().optional(),

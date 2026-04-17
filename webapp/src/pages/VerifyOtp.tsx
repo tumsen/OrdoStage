@@ -30,7 +30,7 @@ export default function VerifyOtp() {
       try {
         const org = await api.get<unknown>("/api/org");
         if (org) {
-          navigate("/");
+          navigate("/dashboard");
         } else {
           navigate("/setup-org");
         }

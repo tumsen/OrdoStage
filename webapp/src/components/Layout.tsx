@@ -34,7 +34,7 @@ interface OrgData {
 }
 
 const navItems = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/events", label: "Events", icon: CalendarDays },
   { to: "/schedule", label: "Schedule", icon: CalendarRange },
   { to: "/tours", label: "Tours", icon: Route },
@@ -46,7 +46,7 @@ const navItems = [
 ];
 
 const pageTitles: Record<string, string> = {
-  "/": "Dashboard",
+  "/dashboard": "Dashboard",
   "/events": "Events",
   "/events/new": "New Event",
   "/schedule": "Schedule",
@@ -110,8 +110,8 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map(({ to, label, icon: Icon }) => {
           const isActive =
-            to === "/"
-              ? location.pathname === "/"
+            to === "/dashboard"
+              ? location.pathname === "/dashboard"
               : location.pathname === to || location.pathname.startsWith(to + "/");
           return (
             <Link

@@ -357,7 +357,7 @@ function SupportAccessTab({ org }: { org: OrgDetail }) {
         title: variables.mode === "incognito" ? "Incognito support mode enabled" : "Support access enabled",
         description: `You are now entering ${org.name} as ${variables.mode === "incognito" ? "viewer" : role}.`,
       });
-      navigate("/");
+      navigate("/dashboard");
     },
     onError: () => {
       toast({

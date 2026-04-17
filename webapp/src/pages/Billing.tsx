@@ -220,7 +220,7 @@ export default function Billing() {
       <div className="bg-gray-900/50 border border-white/5 rounded-lg p-4 text-gray-400 text-sm space-y-1">
         <p>Credits are shared across your whole organization.</p>
         <p>Adding more users means credits are consumed faster — plan accordingly.</p>
-        <p>Payments are processed securely by Stripe. No subscription, pay as you go.</p>
+        <p>Payments are processed securely by Paddle. No subscription, pay as you go.</p>
       </div>
     </div>
   );

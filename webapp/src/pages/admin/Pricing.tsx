@@ -285,7 +285,7 @@ export default function Pricing() {
       <div className="flex items-start gap-2 p-4 rounded-lg bg-white/[0.02] border border-white/5 text-sm text-white/40">
         <Info size={14} className="flex-shrink-0 mt-0.5" />
         <span>
-          Changes take effect immediately for new purchases. Existing Stripe checkout sessions are not affected.
+          Changes take effect immediately for new purchases. Existing Paddle checkout sessions are not affected.
         </span>
       </div>
     </div>

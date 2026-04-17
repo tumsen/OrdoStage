@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
-import { BarChart3, Building2, Users, Tag, ArrowLeft, Menu } from "lucide-react";
+import { BarChart3, Building2, Users, Tag, ArrowLeft, Menu, FileText } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -15,6 +15,7 @@ const adminNavItems = [
   { to: "/admin/orgs", label: "Organizations", icon: Building2, exact: false },
   { to: "/admin/users", label: "Users", icon: Users, exact: false },
   { to: "/admin/pricing", label: "Pricing", icon: Tag, exact: false },
+  { to: "/admin/site-content", label: "Website Content", icon: FileText, exact: false },
 ];
 
 function AdminSidebarContent({ onNav }: { onNav?: () => void }) {
@@ -67,7 +68,7 @@ function AdminSidebarContent({ onNav }: { onNav?: () => void }) {
       {/* Back to App */}
       <div className="px-3 py-4 border-t border-white/10">
         <Link
-          to="/"
+          to="/dashboard"
           onClick={onNav}
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition-all duration-150"
         >
@@ -94,6 +95,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     if (location.pathname === "/admin/orgs") return "Organizations";
     if (location.pathname === "/admin/users") return "Users";
     if (location.pathname === "/admin/pricing") return "Pricing";
+    if (location.pathname === "/admin/site-content") return "Website Content";
     return "Admin";
   })();
 
@@ -187,7 +189,7 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
           <div className="text-white/50 text-sm mb-4">
             You don't have admin permissions to access this area.
           </div>
-          <Link to="/" className="text-rose-400 underline underline-offset-2 hover:text-rose-300">
+          <Link to="/dashboard" className="text-rose-400 underline underline-offset-2 hover:text-rose-300">
             Back to App
           </Link>
         </div>

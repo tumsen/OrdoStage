@@ -8,6 +8,6 @@ export function GuestRoute({ children }: { children: React.ReactNode }) {
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
     </div>
   );
-  if (session?.user) return <Navigate to="/" replace />;
+  if (session?.user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }

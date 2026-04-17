@@ -22,6 +22,7 @@ import departmentsRouter from "./routes/departments";
 import teamRouter from "./routes/team";
 import toursRouter from "./routes/tours";
 import publicRouter from "./routes/public";
+import siteContentRouter from "./routes/site-content";
 import { seedPacks } from "./seed-packs";
 
 seedPacks().catch(console.error);
@@ -72,7 +73,7 @@ app.route("/api", billingRouter);
 app.use("/api/*", async (c, next) => {
   const path = c.req.path;
 
-  // Skip auth routes and stripe webhook
+  // Skip auth routes and billing webhook
   if (path.startsWith("/api/auth/") || path === "/api/billing/webhook") {
     await next();
     return;
@@ -127,6 +128,7 @@ app.route("/api", scheduleRouter);
 app.route("/api", departmentsRouter);
 app.route("/api", teamRouter);
 app.route("/api", toursRouter);
+app.route("/api", siteContentRouter);
 
 const port = Number(process.env.PORT) || 3000;
 
