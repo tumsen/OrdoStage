@@ -8,6 +8,10 @@ export async function deductCredits(
   const org = await prisma.organization.findUnique({ where: { id: organizationId } });
   if (!org) return { balance: 0, warning: true, blocked: true };
 
+  if (org.unlimitedCredits) {
+    return { balance: 999999999, warning: false, blocked: false };
+  }
+
   const now = new Date();
   const lastDeducted = new Date(org.lastDeductedAt);
   const daysSince = Math.floor(

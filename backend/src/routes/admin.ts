@@ -157,6 +157,27 @@ app.post("/admin/orgs/:id/free-trial", async (c) => {
   return c.json({ data: updatedOrg });
 });
 
+// Set unlimited credits on an org
+app.post("/admin/orgs/:id/unlimited", async (c) => {
+  const body = await c.req.json();
+  const { unlimited } = z
+    .object({ unlimited: z.boolean() })
+    .parse(body);
+
+  const org = await prisma.organization.findUnique({
+    where: { id: c.req.param("id") },
+  });
+  if (!org)
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  const updatedOrg = await prisma.organization.update({
+    where: { id: org.id },
+    data: { unlimitedCredits: unlimited },
+  });
+
+  return c.json({ data: updatedOrg });
+});
+
 // ── Price packs ────────────────────────────────────────────────────────────
 
 app.get("/admin/packs", async (c) => {

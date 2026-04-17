@@ -79,6 +79,7 @@ model Organization {
   departments      Department[]
   tours            Tour[]
   freeTrialUsed    Boolean            @default(false)
+  unlimitedCredits Boolean            @default(false)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 }
