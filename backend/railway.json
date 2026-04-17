@@ -3,5 +3,11 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "preDeployCommand": ["sh", "-c", "bunx prisma db push"],
+    "startCommand": "bun run src/index.ts",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300
   }
 }

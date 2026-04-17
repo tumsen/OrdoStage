@@ -50,12 +50,17 @@ export const auth = betterAuth({
     "https://*.up.railway.app",
     "https://ordostage.com",
     "https://www.ordostage.com",
+    "https://*.onrender.com",
   ],
   socialProviders: {
-    github: {
-      clientId: env.GITHUB_CLIENT_ID as string,
-      clientSecret: env.GITHUB_CLIENT_SECRET as string,
-    },
+    ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+      ? {
+          github: {
+            clientId: env.GITHUB_CLIENT_ID,
+            clientSecret: env.GITHUB_CLIENT_SECRET,
+          },
+        }
+      : {}),
   },
   emailAndPassword: {
     enabled: true,
