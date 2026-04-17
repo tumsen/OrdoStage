@@ -29,7 +29,18 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { TourDetail, TourShow, TourPerson, TourShowPerson, TourPersonNote, Person, CreateTourShow, UpdateTour } from "../../../backend/src/types";
+import type {
+  TourDetail,
+  TourShow,
+  TourPerson,
+  TourTeam,
+  TourShowPerson,
+  TourPersonNote,
+  Person,
+  Department,
+  CreateTourShow,
+  UpdateTour,
+} from "../../../backend/src/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1984,42 +1995,41 @@ function ShowPeopleSection({ show, tour }: { show: TourShow; tour: TourDetail })
 function PeopleTab({ tour }: { tour: TourDetail }) {
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
-  const [selectedPersonId, setSelectedPersonId] = useState("");
-  const [role, setRole] = useState("");
+  const [selectedTeamId, setSelectedTeamId] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const { data: allPeople } = useQuery({
-    queryKey: ["people"],
-    queryFn: () => api.get<Person[]>("/api/people"),
+  const { data: allTeams } = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => api.get<Department[]>("/api/departments"),
   });
 
   const assignMutation = useMutation({
-    mutationFn: ({ personId, role }: { personId: string; role?: string }) =>
-      api.post<TourPerson>(`/api/tours/${tour.id}/people`, { personId, role: role || undefined }),
+    mutationFn: (teamId: string) =>
+      api.post<TourTeam>(`/api/tours/${tour.id}/teams`, { teamId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
       setAddOpen(false);
-      setSelectedPersonId("");
-      setRole("");
+      setSelectedTeamId("");
     },
   });
 
   const removeMutation = useMutation({
-    mutationFn: (assignmentId: string) =>
-      api.delete(`/api/tours/${tour.id}/people/${assignmentId}`),
+    mutationFn: (teamId: string) =>
+      api.delete(`/api/tours/${tour.id}/teams/${teamId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
     },
   });
 
-  const assignedIds = new Set(tour.people.map((tp) => tp.personId));
-  const available = (allPeople ?? []).filter((p) => !assignedIds.has(p.id));
+  const assignedTeamIds = new Set(tour.teams.map((tt) => tt.teamId));
+  const availableTeams = (allTeams ?? []).filter((team) => !assignedTeamIds.has(team.id));
 
   return (
     <div className="space-y-4">
       <p className="text-xs text-white/30 mb-4">Default roster for all shows. Override individual shows below.</p>
       <div className="flex items-center justify-between">
         <span className="text-xs text-white/40">
+          {tour.teams.length} {tour.teams.length === 1 ? "team" : "teams"} ·{" "}
           {tour.people.length} {tour.people.length === 1 ? "person" : "people"}
         </span>
         <Button
@@ -2027,25 +2037,47 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
           onClick={() => setAddOpen(true)}
           className="bg-white/5 hover:bg-white/10 text-white border border-white/10 gap-2 h-8"
         >
-          <Plus size={13} /> Add Person
+          <Plus size={13} /> Add Team
         </Button>
       </div>
 
-      {tour.people.length === 0 ? (
+      {tour.teams.length === 0 ? (
         <div className="py-12 text-center">
           <Users size={24} className="text-white/15 mx-auto mb-3" />
-          <p className="text-white/30 text-sm">No people assigned yet.</p>
+          <p className="text-white/30 text-sm">No teams assigned yet.</p>
           <Button
             size="sm"
             onClick={() => setAddOpen(true)}
             variant="outline"
             className="mt-3 border-white/10 text-white/50 hover:text-white bg-transparent gap-2"
           >
-            <Plus size={12} /> Add Person
+            <Plus size={12} /> Add Team
           </Button>
         </div>
       ) : (
         <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {tour.teams.map((tt: TourTeam) => (
+              <div
+                key={tt.id}
+                className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5"
+              >
+                <span
+                  className="h-2.5 w-2.5 rounded-full border border-white/20"
+                  style={{ backgroundColor: tt.team.color }}
+                />
+                <span className="text-xs text-white/80">{tt.team.name}</span>
+                <button
+                  onClick={() => removeMutation.mutate(tt.teamId)}
+                  className="text-white/25 hover:text-red-400"
+                  disabled={removeMutation.isPending}
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+
           {tour.people.map((tp: TourPerson) => (
             <div
               key={tp.id}
@@ -2079,9 +2111,9 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => removeMutation.mutate(tp.id)}
-                  className="h-7 w-7 text-white/25 hover:text-red-400"
-                  disabled={removeMutation.isPending}
+                  className="h-7 w-7 text-white/10"
+                  disabled
+                  title="People are managed via team assignments"
                 >
                   <X size={13} />
                 </Button>
@@ -2094,41 +2126,29 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="bg-[#16161f] border-white/10 text-white">
           <DialogHeader>
-            <DialogTitle>Add to Tour Roster</DialogTitle>
+            <DialogTitle>Add Team to Tour</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label className="text-white/60 text-xs uppercase tracking-wide">Person</Label>
-              <Select value={selectedPersonId} onValueChange={setSelectedPersonId}>
+              <Label className="text-white/60 text-xs uppercase tracking-wide">Team</Label>
+              <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                 <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                  <SelectValue placeholder="Select a person..." />
+                  <SelectValue placeholder="Select a team..." />
                 </SelectTrigger>
                 <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                  {available.length === 0 ? (
+                  {availableTeams.length === 0 ? (
                     <SelectItem value="__empty__" disabled>
-                      All people already assigned
+                      All teams already assigned
                     </SelectItem>
                   ) : (
-                    available.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                        {p.role ? ` — ${p.role}` : ""}
+                    availableTeams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
                       </SelectItem>
                     ))
                   )}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-white/60 text-xs uppercase tracking-wide">
-                Role for this tour (optional)
-              </Label>
-              <Input
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                placeholder="e.g. Lead Actor, Stage Manager..."
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
-              />
             </div>
           </div>
           <DialogFooter>
@@ -2140,8 +2160,8 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
               Cancel
             </Button>
             <Button
-              disabled={!selectedPersonId || assignMutation.isPending}
-              onClick={() => assignMutation.mutate({ personId: selectedPersonId, role })}
+              disabled={!selectedTeamId || assignMutation.isPending}
+              onClick={() => assignMutation.mutate(selectedTeamId)}
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
             >
               {assignMutation.isPending ? "Adding..." : "Add"}

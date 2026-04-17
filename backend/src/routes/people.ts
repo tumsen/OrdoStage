@@ -17,6 +17,16 @@ function serializePerson(person: {
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
   departmentId: string | null;
+  teamMemberships?: Array<{
+    departmentId: string;
+    role: string | null;
+    department: {
+      id: string;
+      name: string;
+      color: string;
+      createdAt: Date;
+    };
+  }>;
   organizationId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -31,6 +41,17 @@ function serializePerson(person: {
     emergencyContactName: person.emergencyContactName ?? null,
     emergencyContactPhone: person.emergencyContactPhone ?? null,
     departmentId: person.departmentId,
+    teamIds: (person.teamMemberships ?? []).map((membership) => membership.departmentId),
+    teams: (person.teamMemberships ?? []).map((membership) => ({
+      id: membership.department.id,
+      name: membership.department.name,
+      color: membership.department.color,
+      createdAt: membership.department.createdAt.toISOString(),
+    })),
+    teamMemberships: (person.teamMemberships ?? []).map((membership) => ({
+      teamId: membership.departmentId,
+      role: membership.role ?? null,
+    })),
     createdAt: person.createdAt.toISOString(),
     updatedAt: person.updatedAt.toISOString(),
   };
@@ -45,6 +66,11 @@ peopleRouter.get("/people", async (c) => {
   const people = await prisma.person.findMany({
     where: { organizationId: user.organizationId },
     orderBy: { name: "asc" },
+    include: {
+      teamMemberships: {
+        include: { department: true },
+      },
+    },
   });
   return c.json({ data: people.map(serializePerson) });
 });
@@ -60,6 +86,18 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
   }
 
   const body = c.req.valid("json");
+  const uniqueAssignments = Array.from(
+    new Map(body.teamAssignments.map((assignment) => [assignment.teamId, assignment])).values()
+  );
+  const uniqueTeamIds = uniqueAssignments.map((assignment) => assignment.teamId);
+  const teams = await prisma.department.findMany({
+    where: { id: { in: uniqueTeamIds }, organizationId: user.organizationId },
+    select: { id: true },
+  });
+  if (teams.length !== uniqueTeamIds.length) {
+    return c.json({ error: { message: "One or more teams were not found", code: "NOT_FOUND" } }, 404);
+  }
+
   const person = await prisma.person.create({
     data: {
       name: body.name,
@@ -69,8 +107,19 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       address: body.address ?? null,
       emergencyContactName: body.emergencyContactName ?? null,
       emergencyContactPhone: body.emergencyContactPhone ?? null,
-      departmentId: body.departmentId ?? null,
+      departmentId: uniqueTeamIds[0] ?? null,
       organizationId: user.organizationId,
+      teamMemberships: {
+        create: uniqueAssignments.map((assignment) => ({
+          departmentId: assignment.teamId,
+          role: assignment.role ?? null,
+        })),
+      },
+    },
+    include: {
+      teamMemberships: {
+        include: { department: true },
+      },
     },
   });
   return c.json({ data: serializePerson(person) }, 201);
@@ -85,6 +134,11 @@ peopleRouter.get("/people/:id", async (c) => {
   const { id } = c.req.param();
   const person = await prisma.person.findUnique({
     where: { id, organizationId: user.organizationId },
+    include: {
+      teamMemberships: {
+        include: { department: true },
+      },
+    },
   });
   if (!person) {
     return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
@@ -106,10 +160,40 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
   const body = c.req.valid("json");
   const existing = await prisma.person.findUnique({
     where: { id, organizationId: user.organizationId },
+    include: {
+      teamMemberships: {
+        include: { department: true },
+      },
+    },
   });
   if (!existing) {
     return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
   }
+  let nextAssignments = existing.teamMemberships.map((membership) => ({
+    teamId: membership.departmentId,
+    role: membership.role ?? undefined,
+  }));
+  if (body.teamAssignments !== undefined) {
+    const dedupedAssignments = Array.from(
+      new Map(body.teamAssignments.map((assignment) => [assignment.teamId, assignment])).values()
+    );
+    const dedupedTeamIds = dedupedAssignments.map((assignment) => assignment.teamId);
+    if (dedupedAssignments.length === 0) {
+      return c.json(
+        { error: { message: "A person must belong to at least one team", code: "BAD_REQUEST" } },
+        400
+      );
+    }
+    const teams = await prisma.department.findMany({
+      where: { id: { in: dedupedTeamIds }, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (teams.length !== dedupedAssignments.length) {
+      return c.json({ error: { message: "One or more teams were not found", code: "NOT_FOUND" } }, 404);
+    }
+    nextAssignments = dedupedAssignments;
+  }
+
   const person = await prisma.person.update({
     where: { id },
     data: {
@@ -120,7 +204,21 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       ...(body.address !== undefined && { address: body.address }),
       ...(body.emergencyContactName !== undefined && { emergencyContactName: body.emergencyContactName }),
       ...(body.emergencyContactPhone !== undefined && { emergencyContactPhone: body.emergencyContactPhone }),
-      ...(body.departmentId !== undefined && { departmentId: body.departmentId }),
+      ...(body.teamAssignments !== undefined && { departmentId: nextAssignments[0]?.teamId ?? null }),
+      ...(body.teamAssignments !== undefined && {
+        teamMemberships: {
+          deleteMany: {},
+          create: nextAssignments.map((assignment) => ({
+            departmentId: assignment.teamId,
+            role: assignment.role ?? null,
+          })),
+        },
+      }),
+    },
+    include: {
+      teamMemberships: {
+        include: { department: true },
+      },
     },
   });
   return c.json({ data: serializePerson(person) });

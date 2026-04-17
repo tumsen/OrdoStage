@@ -4,6 +4,7 @@ import { env } from "./env";
 import { auth } from "./auth";
 
 type Variables = { user: typeof auth.$Infer.Session.user | null };
+const SUPPORT_EMAILS = ["tumsen@gmail.com"];
 
 export async function adminMiddleware(
   c: Context<{ Variables: Variables }>,
@@ -20,7 +21,10 @@ export async function adminMiddleware(
   const adminEmails = env.ADMIN_EMAILS.split(",")
     .map((e) => e.trim())
     .filter(Boolean);
-  const isAdmin = (user as any).isAdmin || adminEmails.includes(user.email);
+  const isAdmin =
+    (user as any).isAdmin ||
+    adminEmails.includes(user.email) ||
+    SUPPORT_EMAILS.includes(user.email.toLowerCase());
 
   if (!isAdmin)
     return c.json(
@@ -29,7 +33,10 @@ export async function adminMiddleware(
     );
 
   // Auto-promote to admin if in ADMIN_EMAILS
-  if (!(user as any).isAdmin && adminEmails.includes(user.email)) {
+  if (
+    !(user as any).isAdmin &&
+    (adminEmails.includes(user.email) || SUPPORT_EMAILS.includes(user.email.toLowerCase()))
+  ) {
     await prisma.user.update({
       where: { id: user.id },
       data: { isAdmin: true },

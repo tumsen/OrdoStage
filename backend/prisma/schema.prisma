@@ -122,6 +122,7 @@ model Person {
   organization     Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   departmentId     String?
   department       Department?             @relation(fields: [departmentId], references: [id])
+  teamMemberships  PersonTeam[]
   assignments      EventPerson[]
   internalBookings InternalBookingPerson[]
   tourAssignments  TourPerson[]
@@ -244,7 +245,21 @@ model Department {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   people         Person[]
+  teamMembers    PersonTeam[]
+  tourAssignments TourTeam[]
   createdAt      DateTime     @default(now())
+}
+
+model PersonTeam {
+  id           String     @id @default(cuid())
+  personId     String
+  departmentId String
+  person       Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  role         String?
+  createdAt    DateTime   @default(now())
+
+  @@unique([personId, departmentId])
 }
 
 model Tour {
@@ -269,9 +284,21 @@ model Tour {
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   shows            TourShow[]
   people           TourPerson[]
+  teams            TourTeam[]
   personNotes      TourPersonNote[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
+}
+
+model TourTeam {
+  id           String     @id @default(cuid())
+  tourId       String
+  departmentId String
+  tour         Tour       @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([tourId, departmentId])
 }
 
 model TourShow {

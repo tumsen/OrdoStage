@@ -8,6 +8,7 @@ import {
   UpdateTourSchema,
   CreateTourShowSchema,
   UpdateTourShowSchema,
+  AssignTourTeamSchema,
 } from "../types";
 import { canWrite } from "../permissions";
 import { createVibecodeSDK } from "@vibecodeapp/backend-sdk";
@@ -64,6 +65,7 @@ function serializeTourShow(show: any) {
 }
 
 function serializePerson(person: any) {
+  const memberships = person.teamMemberships ?? [];
   return {
     id: person.id,
     name: person.name,
@@ -71,6 +73,19 @@ function serializePerson(person: any) {
     email: person.email,
     phone: person.phone,
     departmentId: person.departmentId,
+    teamIds: memberships.map((membership: any) => membership.departmentId),
+    teams: memberships.map((membership: any) => ({
+      id: membership.department.id,
+      name: membership.department.name,
+      color: membership.department.color,
+      createdAt: membership.department.createdAt instanceof Date
+        ? membership.department.createdAt.toISOString()
+        : membership.department.createdAt,
+    })),
+    teamMemberships: memberships.map((membership: any) => ({
+      teamId: membership.departmentId,
+      role: membership.role ?? null,
+    })),
     createdAt: person.createdAt instanceof Date ? person.createdAt.toISOString() : person.createdAt,
     updatedAt: person.updatedAt instanceof Date ? person.updatedAt.toISOString() : person.updatedAt,
   };
@@ -169,11 +184,29 @@ toursRouter.get("/tours/:id", async (c) => {
       shows: {
         orderBy: [{ order: "asc" }, { date: "asc" }],
         include: {
-          showPeople: { include: { person: true } },
+          showPeople: {
+            include: {
+              person: {
+                include: {
+                  teamMemberships: { include: { department: true } },
+                },
+              },
+            },
+          },
         },
       },
       people: {
-        include: { person: true },
+        include: {
+          person: {
+            include: {
+              teamMemberships: { include: { department: true } },
+            },
+          },
+        },
+      },
+      teams: {
+        include: { department: true },
+        orderBy: { createdAt: "asc" },
       },
       personNotes: {
         include: { person: true },
@@ -197,6 +230,17 @@ toursRouter.get("/tours/:id", async (c) => {
         role: tp.role,
         personalToken: tp.personalToken,
         person: serializePerson(tp.person),
+      })),
+      teams: tour.teams.map((tt: any) => ({
+        id: tt.id,
+        tourId: tt.tourId,
+        teamId: tt.departmentId,
+        team: {
+          id: tt.department.id,
+          name: tt.department.name,
+          color: tt.department.color,
+          createdAt: tt.department.createdAt.toISOString(),
+        },
       })),
       personNotes: (tour.personNotes ?? []).map((n: any) => ({
         id: n.id,
@@ -434,6 +478,142 @@ toursRouter.delete("/tours/:id/shows/:showId", async (c) => {
 
 // POST /api/tours/:id/people — add person to tour
 toursRouter.post(
+  "/tours/:id/teams",
+  zValidator("json", AssignTourTeamSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId)
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    if (!canWrite(user.orgRole))
+      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+
+    const { id } = c.req.param();
+    const body = c.req.valid("json");
+
+    const tour = await prisma.tour.findUnique({
+      where: { id, organizationId: user.organizationId },
+    });
+    if (!tour) {
+      return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+    }
+
+    const team = await prisma.department.findUnique({
+      where: { id: body.teamId, organizationId: user.organizationId },
+    });
+    if (!team) {
+      return c.json({ error: { message: "Team not found", code: "NOT_FOUND" } }, 404);
+    }
+
+    const assignment = await prisma.tourTeam.upsert({
+      where: { tourId_departmentId: { tourId: id, departmentId: body.teamId } },
+      update: {},
+      create: {
+        tourId: id,
+        departmentId: body.teamId,
+      },
+      include: { department: true },
+    });
+
+    const members = await prisma.personTeam.findMany({
+      where: {
+        departmentId: body.teamId,
+        person: { is: { organizationId: user.organizationId } },
+      },
+      select: { personId: true },
+    });
+
+    if (members.length > 0) {
+      for (const member of members) {
+        await prisma.tourPerson.upsert({
+          where: { tourId_personId: { tourId: id, personId: member.personId } },
+          update: {},
+          create: { tourId: id, personId: member.personId },
+        });
+      }
+    }
+
+    return c.json(
+      {
+        data: {
+          id: assignment.id,
+          tourId: assignment.tourId,
+          teamId: assignment.departmentId,
+          team: {
+            id: assignment.department.id,
+            name: assignment.department.name,
+            color: assignment.department.color,
+            createdAt: assignment.department.createdAt.toISOString(),
+          },
+        },
+      },
+      201
+    );
+  }
+);
+
+toursRouter.delete("/tours/:id/teams/:teamId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  if (!canWrite(user.orgRole))
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+
+  const { id, teamId } = c.req.param();
+  const tour = await prisma.tour.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!tour) {
+    return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const existing = await prisma.tourTeam.findUnique({
+    where: { tourId_departmentId: { tourId: id, departmentId: teamId } },
+  });
+  if (!existing) {
+    return c.json({ error: { message: "Team assignment not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  await prisma.tourTeam.delete({
+    where: { tourId_departmentId: { tourId: id, departmentId: teamId } },
+  });
+
+  const remainingMemberships = await prisma.personTeam.findMany({
+    where: {
+      departmentId: {
+        in: (
+          await prisma.tourTeam.findMany({
+            where: { tourId: id },
+            select: { departmentId: true },
+          })
+        ).map((team) => team.departmentId),
+      },
+    },
+    select: { personId: true },
+  });
+  const remainingPersonIds = new Set(remainingMemberships.map((membership) => membership.personId));
+
+  const assignedPeople = await prisma.tourPerson.findMany({
+    where: { tourId: id },
+    select: { personId: true },
+  });
+  const peopleToRemove = assignedPeople
+    .map((assignment) => assignment.personId)
+    .filter((personId) => !remainingPersonIds.has(personId));
+
+  if (peopleToRemove.length > 0) {
+    await prisma.tourPerson.deleteMany({
+      where: {
+        tourId: id,
+        personId: { in: peopleToRemove },
+      },
+    });
+  }
+
+  return new Response(null, { status: 204 });
+});
+
+// POST /api/tours/:id/people — add person to tour
+toursRouter.post(
   "/tours/:id/people",
   zValidator("json", z.object({ personId: z.string(), role: z.string().optional() })),
   async (c) => {
@@ -474,7 +654,13 @@ toursRouter.post(
         personId: body.personId,
         role: body.role ?? null,
       },
-      include: { person: true },
+      include: {
+        person: {
+          include: {
+            teamMemberships: { include: { department: true } },
+          },
+        },
+      },
     });
 
     return c.json(
@@ -557,7 +743,13 @@ toursRouter.post(
       where: { showId_personId: { showId, personId: body.personId } },
       update: { role: body.role ?? null },
       create: { showId, personId: body.personId, role: body.role ?? null },
-      include: { person: true },
+      include: {
+        person: {
+          include: {
+            teamMemberships: { include: { department: true } },
+          },
+        },
+      },
     });
 
     return c.json(

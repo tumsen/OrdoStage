@@ -25,6 +25,7 @@ import publicRouter from "./routes/public";
 import { seedPacks } from "./seed-packs";
 
 seedPacks().catch(console.error);
+const SUPPORT_EMAILS = new Set(["tumsen@gmail.com"]);
 
 const app = new Hono<{
   Variables: {
@@ -79,6 +80,13 @@ app.use("/api/*", async (c, next) => {
 
   const user = c.get("user");
   if (!user?.organizationId) {
+    await next();
+    return;
+  }
+
+  const isSupportAdmin =
+    Boolean((user as any).isAdmin) || SUPPORT_EMAILS.has((user.email || "").toLowerCase());
+  if (isSupportAdmin) {
     await next();
     return;
   }

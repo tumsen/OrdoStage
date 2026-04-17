@@ -218,8 +218,8 @@ export function DepartmentsSection({ canWrite }: DepartmentsSectionProps) {
     <>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wide">Departments</h2>
-          <p className="text-xs text-white/30 mt-0.5">Organise team members into groups</p>
+          <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wide">Teams</h2>
+          <p className="text-xs text-white/30 mt-0.5">Organise people into one or more teams</p>
         </div>
         {canWrite ? (
           <Button
@@ -227,7 +227,7 @@ export function DepartmentsSection({ canWrite }: DepartmentsSectionProps) {
             onClick={() => setShowAddForm(true)}
             className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 h-8"
           >
-            <Plus size={13} /> Add Department
+            <Plus size={13} /> Add Team
           </Button>
         ) : null}
       </div>
@@ -241,7 +241,7 @@ export function DepartmentsSection({ canWrite }: DepartmentsSectionProps) {
           </div>
         ) : (departments ?? []).length === 0 && !showAddForm ? (
           <div className="px-4 py-8 text-center text-white/30 text-sm">
-            No departments yet.
+            No teams yet.
           </div>
         ) : (
           <>
@@ -264,7 +264,7 @@ export function DepartmentsSection({ canWrite }: DepartmentsSectionProps) {
               onClick={() => setShowAddForm(true)}
               className="text-xs text-white/30 hover:text-white/60 flex items-center gap-1.5 transition-colors"
             >
-              <Plus size={12} /> Add another department
+              <Plus size={12} /> Add another team
             </button>
           </div>
         ) : null}
@@ -276,9 +276,9 @@ export function DepartmentsSection({ canWrite }: DepartmentsSectionProps) {
       >
         <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete department?</AlertDialogTitle>
+            <AlertDialogTitle>Delete team?</AlertDialogTitle>
             <AlertDialogDescription className="text-white/50">
-              "{deleteTarget?.name}" will be permanently deleted. Team members in this department will become unassigned.
+              "{deleteTarget?.name}" will be permanently deleted. People in this team will need to be reassigned.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -36,6 +36,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+
+interface Team {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+}
 
 // ── Form schema ───────────────────────────────────────────────────────────────
 
@@ -50,6 +58,14 @@ const PersonFormSchema = z.object({
   address: z.string().optional(),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
+  teamAssignments: z
+    .array(
+      z.object({
+        teamId: z.string(),
+        role: z.string().optional(),
+      })
+    )
+    .min(1, "Pick at least one team"),
 });
 
 type PersonFormValues = z.infer<typeof PersonFormSchema>;
@@ -98,6 +114,10 @@ function PersonFormDialog({
   onSuccess?: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { data: teams } = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => api.get<Team[]>("/api/departments"),
+  });
 
   const { rolePreset: defaultPreset, roleCustom: defaultCustom } = roleToFormValues(person?.role ?? null);
 
@@ -113,6 +133,11 @@ function PersonFormDialog({
           address: person.address ?? "",
           emergencyContactName: person.emergencyContactName ?? "",
           emergencyContactPhone: person.emergencyContactPhone ?? "",
+          teamAssignments:
+            person.teamMemberships?.map((membership) => ({
+              teamId: membership.teamId,
+              role: membership.role ?? "",
+            })) ?? [],
         }
       : {
           name: "",
@@ -123,6 +148,7 @@ function PersonFormDialog({
           address: "",
           emergencyContactName: "",
           emergencyContactPhone: "",
+          teamAssignments: [],
         },
   });
 
@@ -138,6 +164,10 @@ function PersonFormDialog({
         address: values.address || undefined,
         emergencyContactName: values.emergencyContactName || undefined,
         emergencyContactPhone: values.emergencyContactPhone || undefined,
+        teamAssignments: values.teamAssignments.map((assignment) => ({
+          teamId: assignment.teamId,
+          role: assignment.role?.trim() || undefined,
+        })),
       };
       return person
         ? api.put(`/api/people/${person.id}`, payload)
@@ -263,6 +293,65 @@ function PersonFormDialog({
               />
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">Teams *</Label>
+            {teams && teams.length > 0 ? (
+              <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
+                {teams.map((team) => {
+                  const assignments = form.watch("teamAssignments");
+                  const selected = assignments.some((assignment) => assignment.teamId === team.id);
+                  const assignment = assignments.find((entry) => entry.teamId === team.id);
+                  return (
+                    <div key={team.id} className="rounded border border-white/5 px-2 py-2">
+                      <label className="flex items-center gap-2 text-xs text-white/80 hover:text-white cursor-pointer">
+                        <Checkbox
+                          checked={selected}
+                          onCheckedChange={(checked) => {
+                            const current = form.getValues("teamAssignments");
+                            form.setValue(
+                              "teamAssignments",
+                              checked
+                                ? [...current, { teamId: team.id, role: "" }]
+                                : current.filter((entry) => entry.teamId !== team.id),
+                              { shouldValidate: true }
+                            );
+                          }}
+                        />
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full border border-white/20"
+                          style={{ backgroundColor: team.color }}
+                        />
+                        <span>{team.name}</span>
+                      </label>
+                      {selected ? (
+                        <Input
+                          value={assignment?.role ?? ""}
+                          onChange={(e) => {
+                            const current = form.getValues("teamAssignments");
+                            form.setValue(
+                              "teamAssignments",
+                              current.map((entry) =>
+                                entry.teamId === team.id ? { ...entry, role: e.target.value } : entry
+                              ),
+                              { shouldValidate: true }
+                            );
+                          }}
+                          placeholder="Role in this team (optional)"
+                          className="mt-2 h-8 bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                        />
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-amber-300/70">Create a team first in the Team page.</p>
+            )}
+            {form.formState.errors.teamAssignments ? (
+              <p className="text-red-400 text-xs">{form.formState.errors.teamAssignments.message}</p>
+            ) : null}
+          </div>
         </div>
 
         <DialogFooter>
@@ -311,6 +400,14 @@ function PersonCard({
           <RoleBadge role={person.role} />
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
+          {person.teams && person.teams.length > 0 ? (
+            <span className="text-xs text-white/35">
+              Teams: {person.teams.map((team) => {
+                const membership = person.teamMemberships?.find((entry) => entry.teamId === team.id);
+                return membership?.role ? `${team.name} (${membership.role})` : team.name;
+              }).join(", ")}
+            </span>
+          ) : null}
           {person.email ? (
             <a href={`mailto:${person.email}`} className="text-xs text-white/40 hover:text-blue-400 flex items-center gap-1 transition-colors">
               <Mail size={10} />{person.email}

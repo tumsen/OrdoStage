@@ -36,6 +36,11 @@ export const CreateVenueSchema = z.object({
 export const UpdateVenueSchema = CreateVenueSchema.partial();
 
 // Person
+export const PersonTeamMembershipSchema = z.object({
+  teamId: z.string(),
+  role: z.string().nullable(),
+});
+
 export const PersonSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -46,6 +51,9 @@ export const PersonSchema = z.object({
   emergencyContactName: z.string().nullable(),
   emergencyContactPhone: z.string().nullable(),
   departmentId: z.string().nullable(),
+  teamIds: z.array(z.string()),
+  teams: z.array(DepartmentSchema),
+  teamMemberships: z.array(PersonTeamMembershipSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -58,7 +66,14 @@ export const CreatePersonSchema = z.object({
   address: z.string().optional(),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
-  departmentId: z.string().nullable().optional(),
+  teamAssignments: z
+    .array(
+      z.object({
+        teamId: z.string(),
+        role: z.string().optional(),
+      })
+    )
+    .min(1, "At least one team is required"),
 });
 
 export const UpdatePersonSchema = CreatePersonSchema.partial();
@@ -208,6 +223,7 @@ export type CreateDepartment = z.infer<typeof CreateDepartmentSchema>;
 export type Venue = z.infer<typeof VenueSchema>;
 export type CreateVenue = z.infer<typeof CreateVenueSchema>;
 export type Person = z.infer<typeof PersonSchema>;
+export type PersonTeamMembership = z.infer<typeof PersonTeamMembershipSchema>;
 export type CreatePerson = z.infer<typeof CreatePersonSchema>;
 export type Event = z.infer<typeof EventSchema>;
 export type CreateEvent = z.infer<typeof CreateEventSchema>;
@@ -329,6 +345,13 @@ export const TourPersonSchema = z.object({
   person: PersonSchema,
 });
 
+export const TourTeamSchema = z.object({
+  id: z.string(),
+  tourId: z.string(),
+  teamId: z.string(),
+  team: DepartmentSchema,
+});
+
 // Tour
 export const TourSchema = z.object({
   id: z.string(),
@@ -354,7 +377,12 @@ export const TourSchema = z.object({
 export const TourDetailSchema = TourSchema.extend({
   shows: z.array(TourShowSchema),
   people: z.array(TourPersonSchema),
+  teams: z.array(TourTeamSchema),
   personNotes: z.array(TourPersonNoteSchema),
+});
+
+export const AssignTourTeamSchema = z.object({
+  teamId: z.string(),
 });
 
 export const CreateTourSchema = z.object({
@@ -380,9 +408,11 @@ export type TourShow = z.infer<typeof TourShowSchema>;
 export type CreateTourShow = z.infer<typeof CreateTourShowSchema>;
 export type UpdateTourShow = z.infer<typeof UpdateTourShowSchema>;
 export type TourPerson = z.infer<typeof TourPersonSchema>;
+export type TourTeam = z.infer<typeof TourTeamSchema>;
 export type TourShowPerson = z.infer<typeof TourShowPersonSchema>;
 export type Tour = z.infer<typeof TourSchema>;
 export type TourDetail = z.infer<typeof TourDetailSchema>;
 export type CreateTour = z.infer<typeof CreateTourSchema>;
 export type UpdateTour = z.infer<typeof UpdateTourSchema>;
+export type AssignTourTeam = z.infer<typeof AssignTourTeamSchema>;
 // TourPersonNote is already exported above as a named export
