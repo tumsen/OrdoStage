@@ -37,3 +37,7 @@ studio.log
 
 # Prisma generated files (bunx prisma generate)
 /generated/prisma
+
+# Local SQLite dev DB (project uses PostgreSQL; ignore if present)
+prisma/dev.db
+prisma/dev.db-journal
