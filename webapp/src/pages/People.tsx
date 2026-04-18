@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
@@ -56,6 +56,9 @@ const PRESET_ROLES = ["Tour Manager", "Actor", "Tech"] as const;
 
 const PersonFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
+  affiliation: z.enum(["internal", "external"], {
+    required_error: "Choose internal or external",
+  }),
   rolePreset: z.string().optional(),
   roleCustom: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
@@ -76,6 +79,7 @@ const PersonFormSchema = z.object({
       let ok = false;
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
+        if (!r) continue;
         const hasId = Boolean(r.teamId?.trim());
         const hasNew = Boolean(r.newTeamName?.trim());
         if (hasId && hasNew) {
@@ -93,6 +97,43 @@ const PersonFormSchema = z.object({
 });
 
 type PersonFormValues = z.infer<typeof PersonFormSchema>;
+
+type PeopleSortMode = "alphabetical" | "teams" | "internal" | "external";
+
+function sortPeopleList(people: Person[], mode: PeopleSortMode): Person[] {
+  const list = [...people];
+  const teamSortKey = (p: Person) =>
+    [...(p.teams ?? [])]
+      .map((t) => t.name)
+      .sort((a, b) => a.localeCompare(b))
+      .join("\u0000") || "\uffff";
+
+  switch (mode) {
+    case "alphabetical":
+      return list.sort((a, b) => a.name.localeCompare(b.name));
+    case "teams":
+      return list.sort((a, b) => {
+        const cmp = teamSortKey(a).localeCompare(teamSortKey(b));
+        return cmp !== 0 ? cmp : a.name.localeCompare(b.name);
+      });
+    case "internal":
+      return list.sort((a, b) => {
+        const ai = a.affiliation === "internal" ? 0 : 1;
+        const bi = b.affiliation === "internal" ? 0 : 1;
+        if (ai !== bi) return ai - bi;
+        return a.name.localeCompare(b.name);
+      });
+    case "external":
+      return list.sort((a, b) => {
+        const ae = a.affiliation === "external" ? 0 : 1;
+        const be = b.affiliation === "external" ? 0 : 1;
+        if (ae !== be) return ae - be;
+        return a.name.localeCompare(b.name);
+      });
+    default:
+      return list;
+  }
+}
 
 function resolveRole(values: PersonFormValues): string | undefined {
   if (!values.rolePreset || values.rolePreset === "") return undefined;
@@ -124,6 +165,28 @@ function RoleBadge({ role }: { role: string | null }) {
   );
 }
 
+function AffiliationBadge({ affiliation }: { affiliation: Person["affiliation"] }) {
+  const internal = affiliation === "internal";
+  return (
+    <span
+      className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+        internal
+          ? "bg-emerald-950/50 text-emerald-300/90 border-emerald-700/25"
+          : "bg-amber-950/40 text-amber-200/85 border-amber-700/25"
+      }`}
+    >
+      {internal ? "Internal" : "External"}
+    </span>
+  );
+}
+
+const PEOPLE_SORT_OPTIONS: { mode: PeopleSortMode; label: string }[] = [
+  { mode: "alphabetical", label: "Alphabetically" },
+  { mode: "teams", label: "Teams" },
+  { mode: "internal", label: "Internal" },
+  { mode: "external", label: "External" },
+];
+
 // ── Person form dialog ────────────────────────────────────────────────────────
 
 function PersonFormDialog({
@@ -150,6 +213,7 @@ function PersonFormDialog({
     values: person
       ? {
           name: person.name,
+          affiliation: person.affiliation ?? "internal",
           rolePreset: defaultPreset,
           roleCustom: defaultCustom,
           email: person.email ?? "",
@@ -166,6 +230,7 @@ function PersonFormDialog({
         }
       : {
           name: "",
+          affiliation: "internal",
           rolePreset: "",
           roleCustom: "",
           email: "",
@@ -193,6 +258,7 @@ function PersonFormDialog({
     mutationFn: (values: PersonFormValues) => {
       const payload = {
         name: values.name,
+        affiliation: values.affiliation,
         role: resolveRole(values),
         email: values.email || undefined,
         phone: values.phone || undefined,
@@ -229,8 +295,8 @@ function PersonFormDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-1">
-          {/* Name + Role */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Name + affiliation + Role */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-white/50 text-xs uppercase tracking-wide">Name *</Label>
               <Input
@@ -244,6 +310,33 @@ function PersonFormDialog({
             </div>
 
             <div className="space-y-1.5">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Internal / external *</Label>
+              <p className="text-[10px] text-white/30 leading-snug">
+                In-house cast/crew vs contractor or guest — required for everyone in the directory.
+              </p>
+              <Controller
+                control={form.control}
+                name="affiliation"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white mt-1">
+                      <SelectValue placeholder="Select…" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                      <SelectItem value="internal">Internal</SelectItem>
+                      <SelectItem value="external">External</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {form.formState.errors.affiliation ? (
+                <p className="text-red-400 text-xs">{form.formState.errors.affiliation.message}</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5 sm:col-span-2">
               <Label className="text-white/50 text-xs uppercase tracking-wide">Default role</Label>
               <p className="text-[10px] text-white/30 leading-snug">
                 General job title for this person. You can set a different <strong className="text-white/40">role per team</strong> on
@@ -522,6 +615,7 @@ function PersonCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-white/90">{person.name}</span>
+          <AffiliationBadge affiliation={person.affiliation ?? "internal"} />
           <RoleBadge role={person.role} />
           {!isActive ? (
             <span className="text-[10px] uppercase tracking-wide text-white/35 border border-white/10 rounded px-1.5 py-0">
@@ -626,6 +720,7 @@ export default function People() {
   const [addOpen, setAddOpen] = useState(false);
   const [editPerson, setEditPerson] = useState<Person | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<PeopleSortMode>("alphabetical");
   const queryClient = useQueryClient();
 
   const { data: people, isLoading, error } = useQuery({
@@ -642,6 +737,11 @@ export default function People() {
   const deactivateCost = orgCredits?.deactivatePersonCredits ?? 20;
   const creditBal = orgCredits?.credits ?? 0;
   const orgUnlimited = Boolean(orgCredits?.unlimitedCredits);
+
+  const sortedPeople = useMemo(
+    () => sortPeopleList(people ?? [], sortMode),
+    [people, sortMode]
+  );
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/people/${id}`),
@@ -675,6 +775,24 @@ export default function People() {
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+        <span className="text-[10px] uppercase tracking-wide text-white/35">Sort</span>
+        {PEOPLE_SORT_OPTIONS.map(({ mode, label }) => (
+          <label
+            key={mode}
+            className="flex items-center gap-2 cursor-pointer text-white/55 hover:text-white/85 select-none"
+          >
+            <Checkbox
+              checked={sortMode === mode}
+              onCheckedChange={(v) => {
+                if (v === true) setSortMode(mode);
+              }}
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+
       <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
         {isLoading ? (
           <div className="p-5 space-y-3">
@@ -682,7 +800,7 @@ export default function People() {
           </div>
         ) : error ? (
           <div className="py-10 text-center text-red-400 text-sm">Failed to load people.</div>
-        ) : (people ?? []).length === 0 ? (
+        ) : sortedPeople.length === 0 ? (
           <div className="py-12 text-center">
             <User size={24} className="text-white/10 mx-auto mb-3" />
             <p className="text-white/30 text-sm">No contacts yet.</p>
@@ -697,7 +815,7 @@ export default function People() {
           </div>
         ) : (
           <div>
-            {(people ?? []).map((person) => (
+            {sortedPeople.map((person) => (
               <PersonCard
                 key={person.id}
                 person={person}

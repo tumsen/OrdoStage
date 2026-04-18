@@ -83,10 +83,13 @@ export const PersonTeamMembershipSchema = z.object({
   role: z.string().nullable(),
 });
 
+export const PersonAffiliationSchema = z.enum(["internal", "external"]);
+
 export const PersonSchema = z.object({
   id: z.string(),
   name: z.string(),
   role: z.string().nullable(),
+  affiliation: PersonAffiliationSchema,
   email: z.string().nullable(),
   phone: z.string().nullable(),
   address: z.string().nullable(),
@@ -112,6 +115,7 @@ export type TeamAssignmentInput = z.infer<typeof TeamAssignmentInputSchema>;
 
 export const CreatePersonSchema = z.object({
   name: z.string().min(1),
+  affiliation: PersonAffiliationSchema,
   role: z.string().optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),

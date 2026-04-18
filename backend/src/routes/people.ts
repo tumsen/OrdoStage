@@ -60,6 +60,7 @@ function serializePerson(person: {
   id: string;
   name: string;
   role: string | null;
+  affiliation: string;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -81,10 +82,13 @@ function serializePerson(person: {
   createdAt: Date;
   updatedAt: Date;
 }) {
+  const aff =
+    person.affiliation === "external" ? "external" : "internal";
   return {
     id: person.id,
     name: person.name,
     role: person.role,
+    affiliation: aff,
     email: person.email,
     phone: person.phone,
     address: person.address ?? null,
@@ -154,6 +158,7 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
   const person = await prisma.person.create({
     data: {
       name: body.name,
+      affiliation: body.affiliation,
       role: body.role ?? null,
       email: body.email ?? null,
       phone: body.phone ?? null,
@@ -332,6 +337,7 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
     where: { id },
     data: {
       ...(body.name !== undefined && { name: body.name }),
+      ...(body.affiliation !== undefined && { affiliation: body.affiliation }),
       ...(body.role !== undefined && { role: body.role }),
       ...(body.email !== undefined && { email: body.email }),
       ...(body.phone !== undefined && { phone: body.phone }),

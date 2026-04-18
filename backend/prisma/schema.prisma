@@ -161,6 +161,8 @@ model Person {
   showAssignments  TourShowPerson[]
   tourNotes        TourPersonNote[]
   isActive         Boolean                 @default(true)
+  /** Cast/crew: in-house vs contractor — required for new people; existing rows default to internal. */
+  affiliation      String                  @default("internal")
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 }
