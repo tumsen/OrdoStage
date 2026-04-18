@@ -6,12 +6,11 @@ RUN bun install
 
 COPY . .
 
-RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
-
 RUN bunx prisma generate
 
 EXPOSE 3000
 
-# Sync schema before listening. Railway deploy.startCommand overrides Dockerfile CMD,
-# so railway.json must not set startCommand unless it includes this same sequence.
-CMD ["sh", "-c", "bunx prisma db push && exec bun run src/index.ts"]
+# Apply migrations then start. Railway injects DATABASE_URL at runtime (Postgres plugin).
+# If you set a custom Start Command in the Railway dashboard, include:
+#   bunx prisma migrate deploy && bun run start
+CMD ["sh", "-c", "bunx prisma migrate deploy && exec bun run start"]
