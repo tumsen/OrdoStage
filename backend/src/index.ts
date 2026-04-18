@@ -23,6 +23,7 @@ import teamRouter from "./routes/team";
 import toursRouter from "./routes/tours";
 import publicRouter from "./routes/public";
 import siteContentRouter from "./routes/site-content";
+import accountRouter from "./routes/account";
 import { seedPacks } from "./seed-packs";
 import { prisma } from "./prisma";
 
@@ -66,6 +67,11 @@ app.use("/api/*", async (c, next) => {
     return;
   }
   if (path === "/api/me" && c.req.method === "GET") {
+    await next();
+    return;
+  }
+  // Deactivated users may still delete their own login account (typed confirmation).
+  if (path === "/api/me/account" && c.req.method === "DELETE") {
     await next();
     return;
   }
@@ -137,6 +143,14 @@ app.use("/api/*", async (c, next) => {
 
   // Block writes when out of credits
   const method = c.req.method;
+  const exemptCreditBlock =
+    (path.match(/^\/api\/people\/[^/]+\/active$/) && method === "PATCH") ||
+    (path === "/api/me/account" && method === "DELETE");
+  if (exemptCreditBlock) {
+    await next();
+    return;
+  }
+
   if (blocked && ["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
     return c.json(
       {
@@ -153,6 +167,7 @@ app.use("/api/*", async (c, next) => {
 });
 
 // App routes
+app.route("/api", accountRouter);
 app.route("/api", orgRouter);
 app.route("/api", venuesRouter);
 app.route("/api", peopleRouter);

@@ -18,6 +18,13 @@ export default function PublicPricing() {
     queryFn: () => api.get<BillingPack[]>("/api/billing/packs"),
   });
 
+  const { data: siteMeta } = useQuery({
+    queryKey: ["site-content-public"],
+    queryFn: () => api.get<Record<string, string>>("/api/site-content"),
+  });
+
+  const defaultDeactivateCredits = siteMeta?.person_deactivate_credit_default ?? "20";
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       <div className="max-w-6xl mx-auto px-6 py-16">
@@ -25,6 +32,12 @@ export default function PublicPricing() {
           <h1 className="text-3xl font-bold">OrdoStage Pricing</h1>
           <Link to="/" className="text-white/70 hover:text-white text-sm">Back</Link>
         </div>
+        <p className="text-sm text-white/45 max-w-2xl mb-6">
+          Deactivating a contact in your organisation uses credits (default{" "}
+          <strong className="text-white/70">{defaultDeactivateCredits}</strong> credits; organisation owners can change
+          this under Billing). Reactivating a contact is free.
+        </p>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {(packs ?? []).map((pack) => (
             <Card key={pack.packId} className="bg-white/[0.03] border-white/10">

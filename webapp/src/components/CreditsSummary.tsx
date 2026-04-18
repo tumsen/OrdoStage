@@ -12,6 +12,8 @@ export interface OrgCreditsPayload {
   blocked: boolean;
   /** When true, balance is not charged and runway is hidden */
   unlimitedCredits?: boolean;
+  /** Owner-set cost to mark a person inactive (default 20) */
+  deactivatePersonCredits?: number;
 }
 
 interface CreditsSummaryProps {

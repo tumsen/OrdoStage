@@ -1,12 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  Plus, Edit2, Trash2, Phone, Mail, MapPin, ShieldAlert, User
+  Plus, Edit2, Trash2, Phone, Mail, MapPin, ShieldAlert, User,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { usePermissions } from "@/hooks/usePermissions";
+import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
 import type { Person } from "../../../backend/src/types";
@@ -63,11 +66,30 @@ const PersonFormSchema = z.object({
   teamAssignments: z
     .array(
       z.object({
-        teamId: z.string(),
+        teamId: z.string().optional(),
+        newTeamName: z.string().optional(),
         role: z.string().optional(),
       })
     )
-    .min(1, "Pick at least one team"),
+    .min(1, "Pick at least one team")
+    .superRefine((rows, ctx) => {
+      let ok = false;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const hasId = Boolean(r.teamId?.trim());
+        const hasNew = Boolean(r.newTeamName?.trim());
+        if (hasId && hasNew) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Use either an existing team or a new name per row",
+            path: ["teamAssignments", i],
+          });
+          continue;
+        }
+        if (hasId || hasNew) ok = true;
+      }
+      if (!ok) ctx.addIssue({ code: "custom", message: "Select or add at least one team", path: ["teamAssignments"] });
+    }),
 });
 
 type PersonFormValues = z.infer<typeof PersonFormSchema>;
@@ -138,6 +160,7 @@ function PersonFormDialog({
           teamAssignments:
             person.teamMemberships?.map((membership) => ({
               teamId: membership.teamId,
+              newTeamName: "",
               role: membership.role ?? "",
             })) ?? [],
         }
@@ -154,6 +177,16 @@ function PersonFormDialog({
         },
   });
 
+  const [newTeamDraft, setNewTeamDraft] = useState("");
+
+  useEffect(() => {
+    if (!open || person || !teams?.length) return;
+    const cur = form.getValues("teamAssignments");
+    if (cur.length === 0) {
+      form.setValue("teamAssignments", [{ teamId: teams[0].id, newTeamName: "", role: "" }]);
+    }
+  }, [open, person, teams, form]);
+
   const rolePreset = form.watch("rolePreset");
 
   const mutation = useMutation({
@@ -167,7 +200,8 @@ function PersonFormDialog({
         emergencyContactName: values.emergencyContactName || undefined,
         emergencyContactPhone: values.emergencyContactPhone || undefined,
         teamAssignments: values.teamAssignments.map((assignment) => ({
-          teamId: assignment.teamId,
+          teamId: assignment.teamId?.trim() || undefined,
+          newTeamName: assignment.newTeamName?.trim() || undefined,
           role: assignment.role?.trim() || undefined,
         })),
       };
@@ -210,14 +244,18 @@ function PersonFormDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Role</Label>
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Default role</Label>
+              <p className="text-[10px] text-white/30 leading-snug">
+                General job title for this person. You can set a different <strong className="text-white/40">role per team</strong> on
+                the Team page.
+              </p>
               <Controller
                 control={form.control}
                 name="rolePreset"
                 render={({ field }) => (
                   <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                      <SelectValue placeholder="Select role..." />
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white mt-1">
+                      <SelectValue placeholder="Select default role…" />
                     </SelectTrigger>
                     <SelectContent className="bg-[#16161f] border-white/10 text-white">
                       {PRESET_ROLES.map((r) => (
@@ -234,7 +272,7 @@ function PersonFormDialog({
           {/* Custom role input */}
           {rolePreset === "other" ? (
             <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Custom Role</Label>
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Custom default role</Label>
               <Input
                 {...form.register("roleCustom")}
                 placeholder="e.g. Sound Engineer, Driver..."
@@ -298,6 +336,37 @@ function PersonFormDialog({
 
           <div className="space-y-2">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Teams *</Label>
+            <p className="text-[11px] text-white/35">
+              Pick existing teams or add a new name — we create the team if it does not exist. Optional{" "}
+              <strong className="text-white/45">role in team</strong> below can differ from the default role above.
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <Input
+                value={newTeamDraft}
+                onChange={(e) => setNewTeamDraft(e.target.value)}
+                placeholder="New team name…"
+                className="flex-1 min-w-[140px] bg-white/5 border-white/10 text-white placeholder:text-white/25 h-9 text-sm"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-white/15 text-white/80 shrink-0"
+                onClick={() => {
+                  const name = newTeamDraft.trim();
+                  if (!name) return;
+                  const current = form.getValues("teamAssignments");
+                  form.setValue(
+                    "teamAssignments",
+                    [...current, { newTeamName: name, teamId: "", role: "" }],
+                    { shouldValidate: true }
+                  );
+                  setNewTeamDraft("");
+                }}
+              >
+                Add team
+              </Button>
+            </div>
             {teams && teams.length > 0 ? (
               <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
                 {teams.map((team) => {
@@ -314,7 +383,7 @@ function PersonFormDialog({
                             form.setValue(
                               "teamAssignments",
                               checked
-                                ? [...current, { teamId: team.id, role: "" }]
+                                ? [...current, { teamId: team.id, newTeamName: "", role: "" }]
                                 : current.filter((entry) => entry.teamId !== team.id),
                               { shouldValidate: true }
                             );
@@ -348,7 +417,9 @@ function PersonFormDialog({
                 })}
               </div>
             ) : (
-              <p className="text-xs text-amber-300/70">Create a team first in the Team page.</p>
+              <p className="text-xs text-amber-300/70">
+                No teams yet — use &quot;Add team&quot; with a name above, or create teams on the Team page.
+              </p>
             )}
             {form.formState.errors.teamAssignments ? (
               <p className="text-red-400 text-xs">{form.formState.errors.teamAssignments.message}</p>
@@ -383,13 +454,65 @@ function PersonCard({
   person,
   onEdit,
   onDelete,
+  deactivateCreditCost,
+  creditsBalance,
+  unlimitedCredits,
 }: {
   person: Person;
   onEdit: () => void;
   onDelete: () => void;
+  deactivateCreditCost: number;
+  creditsBalance: number;
+  unlimitedCredits: boolean;
 }) {
+  const queryClient = useQueryClient();
+  const { canWrite } = usePermissions();
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+
+  const activeMutation = useMutation({
+    mutationFn: (nextActive: boolean) =>
+      api.patch(`/api/people/${person.id}/active`, { active: nextActive }),
+    onSuccess: (_, nextActive) => {
+      queryClient.invalidateQueries({ queryKey: ["people"] });
+      queryClient.invalidateQueries({ queryKey: ["org"] });
+      setDeactivateOpen(false);
+      toast({
+        title: nextActive ? "Person activated" : "Person deactivated",
+      });
+    },
+    onError: (e: Error) => {
+      toast({
+        title: e.message || "Could not update status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const isActive = person.isActive !== false;
+
+  function onActiveSwitch(checked: boolean) {
+    if (!canWrite) return;
+    if (checked) {
+      activeMutation.mutate(true);
+      return;
+    }
+    if (!unlimitedCredits && creditsBalance < deactivateCreditCost) {
+      toast({
+        title: "Not enough credits",
+        description: `Deactivating costs ${deactivateCreditCost} credits. Top up under Billing.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setDeactivateOpen(true);
+  }
+
   return (
-    <div className="flex items-start gap-4 px-5 py-4 border-b border-white/5 group hover:bg-white/[0.02] transition-colors">
+    <div
+      className={`flex items-start gap-4 px-5 py-4 border-b border-white/5 group hover:bg-white/[0.02] transition-colors ${
+        !isActive ? "opacity-70" : ""
+      }`}
+    >
       {/* Avatar */}
       <div className="w-9 h-9 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
         <User size={15} className="text-white/30" />
@@ -400,6 +523,11 @@ function PersonCard({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-white/90">{person.name}</span>
           <RoleBadge role={person.role} />
+          {!isActive ? (
+            <span className="text-[10px] uppercase tracking-wide text-white/35 border border-white/10 rounded px-1.5 py-0">
+              Inactive
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
           {person.teams && person.teams.length > 0 ? (
@@ -434,15 +562,60 @@ function PersonCard({
         ) : null}
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-white" onClick={onEdit}>
-          <Edit2 size={13} />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-red-400" onClick={onDelete}>
-          <Trash2 size={13} />
-        </Button>
+      {/* Active + actions */}
+      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-white/35 uppercase tracking-wide hidden sm:inline">Active</span>
+          <Switch
+            checked={isActive}
+            disabled={!canWrite || activeMutation.isPending}
+            onCheckedChange={onActiveSwitch}
+            aria-label={isActive ? "Deactivate person" : "Activate person"}
+          />
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-white" onClick={onEdit}>
+            <Edit2 size={13} />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-red-400" onClick={onDelete}>
+            <Trash2 size={13} />
+          </Button>
+        </div>
       </div>
+
+      <AlertDialog open={deactivateOpen} onOpenChange={setDeactivateOpen}>
+        <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate {person.name}?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/50 space-y-2">
+              <p>
+                Inactive contacts stay in your directory but are marked inactive. Reactivating is free.
+              </p>
+              {!unlimitedCredits ? (
+                <p className="text-amber-200/90">
+                  This action uses <strong>{deactivateCreditCost}</strong> credits from your organisation balance
+                  (currently {creditsBalance}).
+                </p>
+              ) : (
+                <p className="text-white/45">Your organisation has unlimited credits.</p>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50"
+              disabled={activeMutation.isPending}
+              onClick={() => activeMutation.mutate(false)}
+            >
+              {activeMutation.isPending ? "Working…" : `Deactivate (${deactivateCreditCost} credits)`}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -462,8 +635,13 @@ export default function People() {
 
   const { data: orgCredits, isLoading: orgLoading } = useQuery({
     queryKey: ["org"],
-    queryFn: () => api.get<OrgCreditsPayload & { unlimitedCredits?: boolean }>("/api/org"),
+    queryFn: () =>
+      api.get<OrgCreditsPayload & { deactivatePersonCredits?: number }>("/api/org"),
   });
+
+  const deactivateCost = orgCredits?.deactivatePersonCredits ?? 20;
+  const creditBal = orgCredits?.credits ?? 0;
+  const orgUnlimited = Boolean(orgCredits?.unlimitedCredits);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/people/${id}`),
@@ -525,6 +703,9 @@ export default function People() {
                 person={person}
                 onEdit={() => setEditPerson(person)}
                 onDelete={() => setDeleteId(person.id)}
+                deactivateCreditCost={deactivateCost}
+                creditsBalance={creditBal}
+                unlimitedCredits={orgUnlimited}
               />
             ))}
             <div className="px-5 py-3 border-t border-white/5">

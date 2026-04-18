@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useSession, signOut } from "@/lib/auth-client";
 import { api } from "@/lib/api";
@@ -20,19 +20,27 @@ function InactiveAccountNotice() {
           Your access to this organization has been turned off. Contact an owner or manager if you need back in.
         </p>
       </div>
-      <Button
-        variant="secondary"
-        onClick={() => {
-          void signOut();
-        }}
-      >
-        Sign out
-      </Button>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Button variant="secondary" asChild>
+          <Link to="/account">Delete my account instead</Link>
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            void signOut();
+          }}
+        >
+          Sign out
+        </Button>
+      </div>
     </div>
   );
 }
 
 export function ProtectedRoute({ children, requireOrg = true }: { children: React.ReactNode; requireOrg?: boolean }) {
+  const location = useLocation();
+  const allowInactiveAccountDeletion = location.pathname === "/account";
+
   const { data: session, isPending } = useSession();
   const email = session?.user?.email?.toLowerCase?.() ?? "";
   const isSupport = email === "tumsen@gmail.com";
@@ -67,7 +75,8 @@ export function ProtectedRoute({ children, requireOrg = true }: { children: Reac
     me.hasOrganization &&
     !me.isActive &&
     !isAdmin &&
-    !isSupport
+    !isSupport &&
+    !allowInactiveAccountDeletion
   ) {
     return <InactiveAccountNotice />;
   }

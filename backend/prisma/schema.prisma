@@ -90,6 +90,8 @@ model Organization {
   autoTopUpLastAttemptAt   DateTime?
   pendingAutoTopUpUrl      String?
   pendingAutoTopUpCreatedAt DateTime?
+  /** Credits charged when setting a person inactive (owner-configurable; default 20). */
+  deactivatePersonCredits Int              @default(20)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   invitations      OrganizationInvitation[]
@@ -158,6 +160,7 @@ model Person {
   tourAssignments  TourPerson[]
   showAssignments  TourShowPerson[]
   tourNotes        TourPersonNote[]
+  isActive         Boolean                 @default(true)
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 }

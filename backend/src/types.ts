@@ -32,6 +32,23 @@ export const CreateDepartmentSchema = z.object({
 
 export const UpdateDepartmentSchema = CreateDepartmentSchema.partial();
 
+export const AddDepartmentMemberSchema = z.object({
+  personId: z.string().min(1),
+  role: z.string().nullable().optional(),
+});
+
+export const UpdateDepartmentMemberRoleSchema = z.object({
+  role: z.string().nullable().optional(),
+});
+
+export const DepartmentMemberSchema = z.object({
+  personId: z.string(),
+  name: z.string(),
+  email: z.string().nullable(),
+  defaultRole: z.string().nullable(),
+  roleInTeam: z.string().nullable(),
+});
+
 // Venue
 export const VenueSchema = z.object({
   id: z.string(),
@@ -79,9 +96,19 @@ export const PersonSchema = z.object({
   teamIds: z.array(z.string()),
   teams: z.array(DepartmentSchema),
   teamMemberships: z.array(PersonTeamMembershipSchema),
+  isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+
+/** Each row picks an existing team (teamId) or creates one by name (newTeamName). */
+export const TeamAssignmentInputSchema = z.object({
+  teamId: z.string().optional(),
+  newTeamName: z.string().optional(),
+  role: z.string().optional(),
+});
+
+export type TeamAssignmentInput = z.infer<typeof TeamAssignmentInputSchema>;
 
 export const CreatePersonSchema = z.object({
   name: z.string().min(1),
@@ -92,16 +119,43 @@ export const CreatePersonSchema = z.object({
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
   teamAssignments: z
-    .array(
-      z.object({
-        teamId: z.string(),
-        role: z.string().optional(),
-      })
-    )
-    .min(1, "At least one team is required"),
+    .array(TeamAssignmentInputSchema)
+    .min(1, "At least one team is required")
+    .superRefine((rows, ctx) => {
+      let anyValid = false;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r) continue;
+        const hasId = Boolean(r.teamId?.trim());
+        const hasNew = Boolean(r.newTeamName?.trim());
+        if (hasId && hasNew) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Use either an existing team or a new team name per row",
+            path: ["teamAssignments", i],
+          });
+          continue;
+        }
+        if (hasId || hasNew) anyValid = true;
+      }
+      if (!anyValid) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Select or add at least one team",
+          path: ["teamAssignments"],
+        });
+      }
+    }),
 });
 
-export const UpdatePersonSchema = CreatePersonSchema.partial();
+export const PersonActiveSchema = z.object({
+  active: z.boolean(),
+});
+
+export const UpdatePersonSchema = CreatePersonSchema.partial().extend({
+  /** Clear profile default role on People (PUT body); team memberships unchanged. */
+  role: z.union([z.string(), z.null()]).optional(),
+});
 
 // Event
 export const EventSchema = z.object({

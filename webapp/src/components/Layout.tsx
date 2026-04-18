@@ -15,6 +15,7 @@ import {
   Route,
   ShieldCheck,
   Sparkles,
+  UserCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,7 @@ const navItems = [
   { to: "/team", label: "Team", icon: UsersRound },
   { to: "/calendars", label: "Calendars", icon: Share2 },
   { to: "/billing", label: "Billing", icon: CreditCard },
+  { to: "/account", label: "Account", icon: UserCircle },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -60,6 +62,7 @@ const pageTitles: Record<string, string> = {
   "/team": "Team",
   "/calendars": "Calendars",
   "/billing": "Billing",
+  "/account": "Account",
 };
 
 function getPageTitle(pathname: string): string {

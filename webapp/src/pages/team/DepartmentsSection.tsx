@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit2, Trash2, Check, X } from "lucide-react";
+import { Plus, Edit2, Trash2, Check, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { TeamDepartmentMembers } from "./TeamDepartmentMembers";
 
 export interface Department {
   id: string;
@@ -63,6 +65,7 @@ interface DeptRowProps {
 function DeptRow({ dept, canWrite, onDelete }: DeptRowProps) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState(dept.name);
   const [color, setColor] = useState(dept.color);
 
@@ -113,33 +116,60 @@ function DeptRow({ dept, canWrite, onDelete }: DeptRowProps) {
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 group hover:bg-white/[0.02] transition-colors">
-      <div
-        className="w-3 h-3 rounded-full flex-shrink-0"
-        style={{ backgroundColor: dept.color }}
-      />
-      <span className="flex-1 text-sm text-white/80">{dept.name}</span>
-      {canWrite ? (
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-white/30 hover:text-white"
-            onClick={() => setEditing(true)}
+    <Collapsible open={open} onOpenChange={setOpen} className="border-b border-white/5">
+      <div className="flex items-center gap-2 px-4 py-3 group hover:bg-white/[0.02] transition-colors">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-2 min-w-0 text-left rounded-md -mx-1 px-1 py-0.5 hover:bg-white/[0.04]"
           >
-            <Edit2 size={13} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-white/30 hover:text-red-400"
-            onClick={() => onDelete(dept.id, dept.name)}
-          >
-            <Trash2 size={13} />
-          </Button>
-        </div>
-      ) : null}
-    </div>
+            <ChevronDown
+              className={cn(
+                "w-4 h-4 text-white/35 shrink-0 transition-transform",
+                open ? "rotate-180" : ""
+              )}
+            />
+            <div
+              className="w-3 h-3 rounded-full flex-shrink-0"
+              style={{ backgroundColor: dept.color }}
+            />
+            <span className="flex-1 text-sm text-white/80 truncate">{dept.name}</span>
+            <span className="text-[10px] text-white/25 uppercase tracking-wide shrink-0 hidden sm:inline">
+              Members
+            </span>
+          </button>
+        </CollapsibleTrigger>
+        {canWrite ? (
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-white/30 hover:text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditing(true);
+              }}
+            >
+              <Edit2 size={13} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-white/30 hover:text-red-400"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(dept.id, dept.name);
+              }}
+            >
+              <Trash2 size={13} />
+            </Button>
+          </div>
+        ) : null}
+      </div>
+      <CollapsibleContent>
+        <TeamDepartmentMembers departmentId={dept.id} expanded={open} canWrite={canWrite} />
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -219,7 +249,9 @@ export function DepartmentsSection({ canWrite }: DepartmentsSectionProps) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wide">Teams</h2>
-          <p className="text-xs text-white/30 mt-0.5">Organise people into one or more teams</p>
+          <p className="text-xs text-white/30 mt-0.5">
+            Expand a team to see who is on it, add people from your directory, and set roles for this team only.
+          </p>
         </div>
         {canWrite ? (
           <Button

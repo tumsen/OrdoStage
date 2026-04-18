@@ -31,6 +31,8 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
     value:
       "## Refund Policy\\n\\nCredit-pack purchases are generally non-refundable once credits are delivered. If a purchase was made in error or technical issues prevented delivery, contact support and we will review your case promptly.",
   },
+  /** Default credits charged to deactivate a person (orgs inherit via DB default; owners can override). */
+  { key: "person_deactivate_credit_default", value: "20" },
 ];
 
 export async function seedPacks() {

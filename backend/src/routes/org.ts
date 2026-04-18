@@ -7,6 +7,10 @@ import { env } from "../env";
 import { canWrite as userCanWrite, isOwner } from "../permissions";
 import { maybeEnqueueAutoTopUp } from "../autoTopup";
 
+const OrgPoliciesSchema = z.object({
+  deactivatePersonCredits: z.number().int().min(0).max(1_000_000),
+});
+
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
 // GET /api/me — current user role from DB (session may omit orgRole in the client)
@@ -98,6 +102,34 @@ const BillingSettingsSchema = z.object({
   autoTopUpEnabled: z.boolean().optional(),
   autoTopUpPackId: z.string().min(1).nullable().optional(),
   autoTopUpThreshold: z.number().int().min(0).max(1_000_000).optional(),
+});
+
+// PATCH /api/org/policies — owner only (credit cost to deactivate a person)
+app.patch("/org/policies", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { orgRole: true },
+  });
+  if (!isOwner(dbUser?.orgRole || "")) {
+    return c.json(
+      { error: { message: "Only the owner can change organization policies", code: "FORBIDDEN" } },
+      403
+    );
+  }
+
+  const body = OrgPoliciesSchema.parse(await c.req.json().catch(() => ({})));
+
+  await prisma.organization.update({
+    where: { id: user.organizationId },
+    data: { deactivatePersonCredits: body.deactivatePersonCredits },
+  });
+
+  return c.json({ data: { ok: true } });
 });
 
 // PATCH /api/org/billing-settings — owner only
