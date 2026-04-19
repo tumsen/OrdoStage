@@ -77,22 +77,50 @@ export function OrdoStageLogo({
   const vb = variant === "sidebar" ? VIEWBOX_SIDEBAR : VIEWBOX_DEFAULT;
   const uid = useId();
 
-  const [focusIndex, setFocusIndex] = useState(2);
+  const [smoothFocus, setSmoothFocus] = useState(2);
+  const targetFocusRef = useRef(2);
+  const smoothFocusRef = useRef(2);
   const lastClientXRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!interactive) return;
     if (typeof window === "undefined") return;
 
-    const sync = (clientX: number) => {
+    const setTarget = (clientX: number) => {
       lastClientXRef.current = clientX;
       const w = window.innerWidth;
       if (w <= 0) return;
-      setFocusIndex(focusIndexFromScreenX(clientX, w));
+      targetFocusRef.current = focusIndexFromScreenX(clientX, w);
     };
 
-    const onMove = (e: MouseEvent) => sync(e.clientX);
-    const onResize = () => sync(lastClientXRef.current);
+    const tick = () => {
+      rafRef.current = null;
+      const tgt = targetFocusRef.current;
+      let prev = smoothFocusRef.current;
+      const alpha = 0.14;
+      let next = prev + (tgt - prev) * alpha;
+      if (Math.abs(tgt - next) < 0.0008) next = tgt;
+      smoothFocusRef.current = next;
+      setSmoothFocus(next);
+      if (Math.abs(tgt - next) > 0.0015) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    };
+
+    const scheduleTick = () => {
+      if (rafRef.current == null) rafRef.current = requestAnimationFrame(tick);
+    };
+
+    const onMove = (e: MouseEvent) => {
+      setTarget(e.clientX);
+      scheduleTick();
+    };
+
+    const onResize = () => {
+      setTarget(lastClientXRef.current);
+      scheduleTick();
+    };
 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("resize", onResize);
@@ -100,24 +128,31 @@ export function OrdoStageLogo({
     const w = window.innerWidth;
     const initialX = w > 0 ? w / 2 : 0;
     lastClientXRef.current = initialX;
-    if (w > 0) sync(initialX);
+    if (w > 0) {
+      const t = focusIndexFromScreenX(initialX, w);
+      targetFocusRef.current = t;
+      smoothFocusRef.current = t;
+      setSmoothFocus(t);
+    }
 
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("resize", onResize);
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
   }, [interactive]);
 
   const strengths = useMemo(() => {
     if (!interactive) return LIGHT_X.map(() => 0);
-    return lampStrengthsFromFocus(focusIndex);
-  }, [interactive, focusIndex]);
+    return lampStrengthsFromFocus(smoothFocus);
+  }, [interactive, smoothFocus]);
 
   const gradId = `${uid}-textGrad`;
+  /** Long easing on top of rAF-smoothed focus so opacity never pops. */
   const beamTransition =
-    "opacity 220ms cubic-bezier(0.35, 0.02, 0.22, 1), fill-opacity 220ms cubic-bezier(0.35, 0.02, 0.22, 1)";
+    "opacity 340ms cubic-bezier(0.35, 0.06, 0.2, 1), fill-opacity 340ms cubic-bezier(0.35, 0.06, 0.2, 1)";
   const bulbTransition =
-    "opacity 200ms cubic-bezier(0.35, 0.02, 0.22, 1), filter 220ms cubic-bezier(0.35, 0.02, 0.22, 1)";
+    "opacity 320ms cubic-bezier(0.35, 0.06, 0.2, 1), filter 340ms cubic-bezier(0.35, 0.06, 0.2, 1)";
 
   const viewBoxAttr = `${vb.x} ${vb.y} ${vb.w} ${vb.h}`;
 
