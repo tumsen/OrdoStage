@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +11,8 @@ import {
   type VisibilityFilters,
 } from "@/components/schedule/ScheduleFilters";
 import { CalendarGrid } from "@/components/schedule/CalendarGrid";
-import { ItemDetailSheet } from "@/components/schedule/ItemDetailSheet";
+import { ItemDetailSheet as _ItemDetailSheet } from "@/components/schedule/ItemDetailSheet"; // unused, kept for reference
+import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { ScheduleLegend } from "@/components/schedule/ScheduleLegend";
 import {
@@ -166,7 +166,6 @@ function YearDiscView({ year, items }: { year: number; items: CalendarItem[] }) 
 }
 
 export default function Schedule() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const today = new Date();
   const [anchorDate, setAnchorDate] = useState(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
@@ -194,17 +193,17 @@ export default function Schedule() {
   });
 
   function handleItemClick(item: CalendarItem) {
-    if (item.kind === "event") {
-      navigate(`/events/${item.id}`);
-    } else {
-      // For bookings, open the detail sheet (editing not yet inline)
-      setSelectedItem(item);
-    }
+    setSelectedItem(item);
   }
 
   function handleDeleteItem(item: CalendarItem) {
     if (item.kind === "event") {
-      navigate(`/events/${item.id}`);
+      if (confirm(`Delete event "${item.title}"? This cannot be undone.`)) {
+        api.delete(`/api/events/${item.id}`).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["schedule"] });
+          toast({ title: "Event deleted" });
+        }).catch(() => toast({ title: "Failed to delete event", variant: "destructive" }));
+      }
     } else {
       if (confirm(`Delete booking "${item.title}"?`)) {
         deleteBookingMutation.mutate(item.id);
@@ -417,10 +416,12 @@ export default function Schedule() {
         )}
       </div>
 
-      {/* Detail sheet */}
-      <ItemDetailSheet
+      {/* Edit sheet — slides in from right for events and bookings */}
+      <EditItemSheet
         item={selectedItem}
         onClose={() => setSelectedItem(null)}
+        venues={venues ?? []}
+        people={people ?? []}
       />
 
       {/* New booking dialog */}
