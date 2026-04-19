@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { deductCredits } from "../credits";
+import { getSignupCreditsForNewOrg } from "../signupCredits";
 import { env } from "../env";
 import { isOwner } from "../permissions";
 import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
@@ -203,13 +204,15 @@ app.post("/org", async (c) => {
   ];
   const isUnlimited = unlimitedEmails.includes(user.email.toLowerCase());
 
+  const signupCredits = await getSignupCreditsForNewOrg();
+
   const org = await prisma.organization.create({
     data: {
       name,
       users: { connect: { id: user.id } },
       ...(isUnlimited
         ? { unlimitedCredits: true, creditBalance: 999999999 }
-        : { creditBalance: 30 }),
+        : { creditBalance: signupCredits }),
     },
   });
 

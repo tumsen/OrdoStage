@@ -139,6 +139,7 @@ export default function Pricing() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "packs"] });
+      queryClient.invalidateQueries({ queryKey: ["public-pricing"] });
       setSavingId(null);
       toast({ title: "Pack updated", description: "Price pack has been saved." });
     },
@@ -158,6 +159,7 @@ export default function Pricing() {
     }) => api.post("/api/admin/packs", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "packs"] });
+      queryClient.invalidateQueries({ queryKey: ["public-pricing"] });
       setNewPackId("");
       setNewDays("");
       setNewLabel("");
@@ -185,6 +187,13 @@ export default function Pricing() {
 
   return (
     <div className="p-6 space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-white">Credit packs</h2>
+        <p className="text-sm text-white/50 mt-1 max-w-2xl">
+          Active packs are shown on the public <span className="text-white/70">/pricing</span> page. Inactive packs are
+          hidden. After you save, visitors see changes on the next page load.
+        </p>
+      </div>
       <div className="rounded-lg border border-white/10 p-4 bg-white/[0.02]">
         <h3 className="text-sm font-semibold text-white/80 mb-3 uppercase tracking-wider">Add Credit Pack</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">

@@ -37,6 +37,8 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   },
   /** Default credits charged to deactivate a person (orgs inherit via DB default; owners can override). */
   { key: "person_deactivate_credit_default", value: "20" },
+  /** Credits for new organisations (also shown on marketing pages). */
+  { key: "signup_credits", value: "30" },
 ];
 
 export async function seedPacks() {

@@ -35,6 +35,7 @@ export default function Frontpage() {
 
   const heroTitle = data?.landing_title?.trim() || DEFAULT_HERO_TITLE;
   const heroSubtitle = data?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
+  const signupCredits = data?.signup_credits?.trim() || "30";
 
   return (
     <div className="text-white">
@@ -46,6 +47,10 @@ export default function Frontpage() {
           </h1>
           <p className="text-lg md:text-xl text-white/75 leading-relaxed">
             {heroSubtitle}
+          </p>
+          <p className="rounded-xl border border-ordo-yellow/35 bg-gradient-to-br from-ordo-magenta/[0.12] to-ordo-violet/[0.08] px-4 py-4 text-[15px] leading-relaxed text-white/90 md:text-base">
+            <span className="font-semibold text-ordo-yellow">{signupCredits} free credits</span> when you create your
+            organisation — enough to try scheduling, riders, tours, and team workflows before you buy a pack.
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button

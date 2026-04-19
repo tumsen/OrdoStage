@@ -23,6 +23,7 @@ export default function PublicPricing() {
   });
 
   const defaultDeactivateCredits = siteMeta?.person_deactivate_credit_default ?? "20";
+  const signupCredits = siteMeta?.signup_credits?.trim() || "30";
 
   return (
     <div className="text-white">
@@ -35,7 +36,7 @@ export default function PublicPricing() {
             <p>No subscriptions, no surprises. Just credits — buy a pack and use them as you need.</p>
             <p>
               When you create an account, you get{" "}
-              <strong className="text-white font-semibold">30 credits</strong> free to test the system.
+              <strong className="text-white font-semibold">{signupCredits} credits</strong> free to test the system.
             </p>
             <p>
               You can also enable <strong className="text-white font-semibold">automatic top-up</strong> under Billing in

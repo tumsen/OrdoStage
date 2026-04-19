@@ -26,6 +26,7 @@ export default function SiteContentAdmin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "site-content"] });
       queryClient.invalidateQueries({ queryKey: ["site-content"] });
+      queryClient.invalidateQueries({ queryKey: ["site-content-public"] });
       toast({ title: "Saved", description: "Website content updated." });
     },
     onError: () => {
@@ -43,6 +44,32 @@ export default function SiteContentAdmin() {
       <p className="text-sm text-white/50">
         Edit landing page and legal texts used on public pages.
       </p>
+
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-white">Signup & public pricing copy</h3>
+        <p className="text-xs text-white/45">
+          These values appear on the public home and pricing pages. New organisations receive the free credit amount when
+          they are first created (after this number is saved).
+        </p>
+        <div className="space-y-2 max-w-xs">
+          <Label htmlFor="signup_credits">Free signup credits</Label>
+          <Input
+            id="signup_credits"
+            type="number"
+            min={0}
+            step={1}
+            value={merged.signup_credits ?? ""}
+            placeholder="30"
+            onChange={(e) => setField("signup_credits", e.target.value)}
+            className="bg-gray-900/80 border-white/10"
+          />
+          <p className="text-xs text-white/35">
+            Credit packs and prices are edited under{" "}
+            <span className="text-white/55">Owner Admin → Pricing</span>; the public /pricing page loads active packs
+            automatically.
+          </p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
