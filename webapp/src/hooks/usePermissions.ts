@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSession } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 
@@ -20,6 +20,7 @@ export function usePermissions() {
     queryFn: () => api.get<MePayload>("/api/me"),
     enabled: Boolean(session?.user),
     staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 
   const sessionRole = (session?.user as Record<string, unknown>)?.orgRole as string | undefined;

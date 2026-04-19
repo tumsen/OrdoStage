@@ -67,14 +67,15 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@vibecodeapp/webapp": "^1.0.7",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^22.19.1",
     "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",
+    "@vibecodeapp/webapp": "^1.0.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.22",
+    "baseline-browser-mapping": "^2.10.20",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^15.15.0",

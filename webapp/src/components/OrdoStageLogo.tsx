@@ -26,33 +26,22 @@ function focusIndexFromScreenX(clientX: number, width: number): number {
   return t * 4;
 }
 
-/**
- * Smooth ramp: distance 0 → 100%, 1 → 75%, 2 → 50%, 3 → 25%, 4+ → tail.
- * Piecewise-linear in “lamp index” space so sliding the pointer eases cleanly.
- */
-function lampFalloff(distance: number): number {
-  const a: [number, number][] = [
-    [0, 1],
-    [1, 0.75],
-    [2, 0.5],
-    [3, 0.25],
-    [4, 0.06],
-  ];
-  if (distance <= 0) return 1;
-  if (distance >= a[a.length - 1]![0]) return a[a.length - 1]![1];
-  for (let k = 0; k < a.length - 1; k++) {
-    const [d0, v0] = a[k]!;
-    const [d1, v1] = a[k + 1]!;
-    if (distance <= d1) {
-      const t = (distance - d0) / (d1 - d0);
-      return v0 + t * (v1 - v0);
-    }
-  }
-  return a[a.length - 1]![1];
+/** Wide Gaussian in lamp-index space → smooth overlap; normalize so peak = 1. */
+const LAMP_SIGMA = 0.72;
+
+/** Map gaussian weight to display 0–1 with gentle gamma for mid-tones. */
+function smoothLevel(raw: number, max: number): number {
+  const n = max > 1e-9 ? raw / max : 0;
+  return Math.pow(Math.min(1, Math.max(0, n)), 0.92);
 }
 
 function lampStrengthsFromFocus(focusIndex: number): number[] {
-  return LIGHT_X.map((_, i) => Math.min(1, lampFalloff(Math.abs(i - focusIndex))));
+  const raw = LIGHT_X.map((_, i) => {
+    const d = i - focusIndex;
+    return Math.exp(-(d * d) / (2 * LAMP_SIGMA * LAMP_SIGMA));
+  });
+  const max = Math.max(...raw, 1e-9);
+  return raw.map((r) => smoothLevel(r, max));
 }
 
 /** Full-width artboard horizontally so “ORDO” Os aren’t clipped in the sidebar crop. */
@@ -98,7 +87,7 @@ export function OrdoStageLogo({
       rafRef.current = null;
       const tgt = targetFocusRef.current;
       const prev = smoothFocusRef.current;
-      const alpha = 0.14;
+      const alpha = 0.085;
       let next = prev + (tgt - prev) * alpha;
       if (Math.abs(tgt - next) < 0.0008) next = tgt;
       smoothFocusRef.current = next;
@@ -148,11 +137,11 @@ export function OrdoStageLogo({
   }, [interactive, smoothFocus]);
 
   const gradId = `${uid}-textGrad`;
-  /** Long easing on top of rAF-smoothed focus so opacity never pops. */
+  /** Long easing + rAF focus = no stepped jumps (10–100% beam range). */
   const beamTransition =
-    "opacity 340ms cubic-bezier(0.35, 0.06, 0.2, 1), fill-opacity 340ms cubic-bezier(0.35, 0.06, 0.2, 1)";
+    "opacity 780ms cubic-bezier(0.25, 0.1, 0.2, 1), fill-opacity 780ms cubic-bezier(0.25, 0.1, 0.2, 1)";
   const bulbTransition =
-    "opacity 320ms cubic-bezier(0.35, 0.06, 0.2, 1), filter 340ms cubic-bezier(0.35, 0.06, 0.2, 1)";
+    "opacity 720ms cubic-bezier(0.25, 0.1, 0.2, 1), filter 780ms cubic-bezier(0.25, 0.1, 0.2, 1)";
 
   const viewBoxAttr = `${vb.x} ${vb.y} ${vb.w} ${vb.h}`;
 
@@ -196,7 +185,7 @@ export function OrdoStageLogo({
 
       {LIGHT_X.map((cx, i) => {
         const s = interactive ? strengths[i] ?? 0 : 0;
-        const glow = 0.76 + s * 0.24;
+        const glow = 0.72 + s * 0.28;
         return (
           <circle
             key={cx}
@@ -206,8 +195,9 @@ export function OrdoStageLogo({
             fill={COLORS[i]}
             style={{
               opacity: glow,
-              filter: s > 0.28 ? `drop-shadow(0 0 ${3 + s * 10}px ${COLORS[i]})` : undefined,
+              filter: s > 0.12 ? `drop-shadow(0 0 ${2 + s * 12}px ${COLORS[i]})` : undefined,
               transition: bulbTransition,
+              willChange: "opacity",
             }}
           />
         );
@@ -215,9 +205,8 @@ export function OrdoStageLogo({
 
       {BEAMS.map((beam, i) => {
         const s = interactive ? strengths[i] ?? 0 : 0;
-        const floor = 0.06;
-        const peak = 0.62;
-        const opacity = interactive ? floor + s * peak : IDLE_BEAM_OPACITY[i];
+        /** 10% (dim) → 100% (full) from smoothed weight; never hard steps. */
+        const opacity = interactive ? 0.1 + 0.9 * s : IDLE_BEAM_OPACITY[i];
         return (
           <path
             key={beam.d}
@@ -226,6 +215,7 @@ export function OrdoStageLogo({
             style={{
               opacity,
               transition: beamTransition,
+              willChange: "opacity",
             }}
           />
         );
@@ -241,7 +231,11 @@ export function OrdoStageLogo({
         fillOpacity={1}
         stroke="none"
         textAnchor="middle"
-        style={{ opacity: 1 }}
+        style={{
+          opacity: 1,
+          filter: "saturate(1.22) brightness(1.08)",
+          paintOrder: "fill markers stroke",
+        }}
       >
         ORDO
       </text>
@@ -255,7 +249,11 @@ export function OrdoStageLogo({
         fillOpacity={1}
         stroke="none"
         textAnchor="middle"
-        style={{ opacity: 1 }}
+        style={{
+          opacity: 1,
+          filter: "saturate(1.22) brightness(1.08)",
+          paintOrder: "fill markers stroke",
+        }}
       >
         STAGE
       </text>

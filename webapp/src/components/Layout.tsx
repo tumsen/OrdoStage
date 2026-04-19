@@ -85,7 +85,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { data: session } = useSession();
-  const { canView, isPending: permsLoading } = usePermissions();
+  const { canView, isPending: permsLoading, me } = usePermissions();
 
   const handleSignOut = async () => {
     await signOut();
@@ -109,20 +109,27 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="px-3 py-4 border-b border-white/10">
+      <div className="px-3 py-4 border-b border-white/10 contain-layout">
         <Link
           to="/dashboard"
           onClick={onNav}
-          className="block w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
+          className="block w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[hsl(45_100%_52%_/_0.6)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d14]"
         >
           <OrdoStageLogo variant="sidebar" className="rounded-md max-h-[7.75rem]" />
         </Link>
       </div>
 
-      {/* Nav */}
+      {/* Nav — avoid showing every link then hiding (blink); skeleton until /api/me */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems
-          .filter((item) => navBypass || permsLoading || canView(item.view))
+        {permsLoading && session?.user && !navBypass && !me ? (
+          <div className="space-y-1.5" aria-hidden>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-10 rounded-lg bg-white/[0.06] animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          navItems
+          .filter((item) => navBypass || canView(item.view))
           .map(({ to, label, icon: Icon }) => {
           const isActive =
             to === "/dashboard"
@@ -134,37 +141,40 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               to={to}
               onClick={onNav}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm border border-transparent",
+                "transition-[color,background-color,border-color,box-shadow] duration-200 ease-out",
                 isActive
-                  ? "bg-red-900/40 text-red-200 border border-red-800/40"
-                  : "text-white/50 hover:text-white/80 hover:bg-white/5"
+                  ? "bg-gradient-to-r from-fuchsia-600/25 via-amber-400/15 to-violet-600/25 text-white border-amber-400/35 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+                  : "text-white/55 hover:text-white hover:bg-white/[0.06] hover:border-white/5"
               )}
             >
-              <Icon size={16} className={isActive ? "text-red-300" : "text-white/40"} />
+              <Icon size={16} className={isActive ? "text-amber-300" : "text-white/45"} />
               <span className="font-medium">{label}</span>
               {isActive ? (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-red-400" />
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]" />
               ) : null}
             </Link>
           );
-        })}
+        })
+        )}
         {canAccessOwnerAdmin ? (
           <Link
             to="/admin"
             onClick={onNav}
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150",
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm border border-transparent",
+              "transition-[color,background-color,border-color] duration-200 ease-out",
               location.pathname === "/admin" || location.pathname.startsWith("/admin/")
-                ? "bg-rose-900/40 text-rose-200 border border-rose-800/40"
-                : "text-rose-300/70 hover:text-rose-200 hover:bg-rose-900/20 border border-rose-900/30"
+                ? "bg-gradient-to-r from-fuchsia-700/30 to-violet-700/30 text-white border-fuchsia-500/35"
+                : "text-fuchsia-200/80 hover:text-white hover:bg-fuchsia-950/35 hover:border-fuchsia-500/25"
             )}
           >
             <ShieldCheck
               size={16}
               className={
                 location.pathname === "/admin" || location.pathname.startsWith("/admin/")
-                  ? "text-rose-300"
-                  : "text-rose-300/70"
+                  ? "text-fuchsia-300"
+                  : "text-fuchsia-300/75"
               }
             />
             <span className="font-medium">Owner Admin</span>
@@ -187,7 +197,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
         ) : null}
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition-all duration-150"
+          className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors duration-200"
         >
           <LogOut size={15} />
           <span>Sign out</span>
