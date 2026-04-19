@@ -55,7 +55,7 @@ app.use(
 );
 
 // Liveness for Railway / Docker — must not touch DB or session (those run after this)
-app.get("/health", (c) => c.json({ status: "ok", version: "1.0.0" }));
+app.get("/health", (c) => c.json({ status: "ok", version: "2.0.0" }));
 
 // Logging
 app.use("*", logger());
