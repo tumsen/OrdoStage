@@ -124,11 +124,11 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
       ) : null}
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="flex-shrink-0 h-14 border-b border-ordo-magenta/25 bg-[#0d0d14]/80 backdrop-blur flex items-center px-4 md:px-6 gap-3">
-          {isMobile ? (
+        {isMobile ? (
+          <header className="flex-shrink-0 h-12 border-b border-ordo-magenta/25 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-white/60 hover:text-white h-8 w-8 -ml-1">
+                <Button variant="ghost" size="icon" className="text-white/60 hover:text-white h-8 w-8">
                   <Menu size={18} />
                 </Button>
               </SheetTrigger>
@@ -136,14 +136,8 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
                 <PublicSidebarContent onNav={() => setMobileOpen(false)} />
               </SheetContent>
             </Sheet>
-          ) : null}
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-semibold text-ordo-magenta uppercase tracking-wider border border-ordo-violet/50 bg-ordo-magenta/10 px-2 py-0.5 rounded shrink-0">
-              Site
-            </span>
-            <h1 className="text-sm font-semibold text-white/80 tracking-wide uppercase truncate">{pageTitle}</h1>
-          </div>
-        </header>
+          </header>
+        ) : null}
 
         <main
           id="main-content"
