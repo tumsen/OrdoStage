@@ -39,7 +39,7 @@ export default function SiteContentAdmin() {
   }
 
   return (
-    <div className="p-6 space-y-4 max-w-4xl">
+    <div className="p-6 space-y-4 max-w-5xl">
       <h2 className="text-lg font-semibold text-white">Website Content</h2>
       <p className="text-sm text-white/50">
         Edit landing page and legal texts used on public pages.

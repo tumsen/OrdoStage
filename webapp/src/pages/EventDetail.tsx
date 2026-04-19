@@ -971,7 +971,7 @@ export default function EventDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-3xl mx-auto space-y-4">
+      <div className="p-6 max-w-5xl mx-auto space-y-4">
         <Skeleton className="h-8 w-48 bg-white/5" />
         <Skeleton className="h-64 w-full rounded-xl bg-white/5" />
       </div>
@@ -990,7 +990,7 @@ export default function EventDetailPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
       <Button
         variant="ghost"
         size="sm"

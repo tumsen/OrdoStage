@@ -140,7 +140,7 @@ export default function Billing() {
   }, [org?.autoTopUpThreshold]);
 
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-4xl">
+    <div className="p-6 md:p-8 space-y-8 max-w-5xl">
       {toast ? (
         <div
           className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${

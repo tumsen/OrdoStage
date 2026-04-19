@@ -2545,7 +2545,7 @@ export default function TourDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-3xl mx-auto space-y-4">
+      <div className="p-6 max-w-5xl mx-auto space-y-4">
         <Skeleton className="h-8 w-48 bg-white/5" />
         <Skeleton className="h-40 w-full rounded-xl bg-white/5" />
         <Skeleton className="h-64 w-full rounded-xl bg-white/5" />
@@ -2568,7 +2568,7 @@ export default function TourDetailPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6">
       <div className="flex gap-6 items-start">
         {/* Main content column */}
         <div className="flex-1 min-w-0 space-y-6">

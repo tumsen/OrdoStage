@@ -6,7 +6,7 @@ export default function Team() {
   const { isOwner, canWrite, canManageTeam } = usePermissions();
 
   return (
-    <div className="p-6 space-y-10 max-w-5xl mx-auto">
+    <div className="p-6 space-y-10">
       <TeamMembersSection isOwner={isOwner} canManageTeam={canManageTeam} />
       <DepartmentsSection canWrite={canWrite} />
     </div>

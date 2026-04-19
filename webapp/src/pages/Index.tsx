@@ -232,7 +232,7 @@ export default function Dashboard() {
     .slice(0, 6);
 
   return (
-    <div className="p-6 space-y-8 max-w-5xl mx-auto">
+    <div className="p-6 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

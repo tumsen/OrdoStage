@@ -41,7 +41,7 @@ export default function Account() {
   }
 
   return (
-    <div className="p-6 space-y-8 max-w-lg mx-auto">
+    <div className="p-6 space-y-8 max-w-2xl">
       <div>
         <h2 className="text-xl font-semibold text-white">Account</h2>
         <p className="text-sm text-white/45 mt-1">Security and account deletion.</p>

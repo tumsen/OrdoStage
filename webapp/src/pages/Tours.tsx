@@ -254,7 +254,7 @@ export default function Tours() {
   const tourToDelete = (tours ?? []).find((t) => t.id === deleteId);
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-6 space-y-6">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-white/40">
