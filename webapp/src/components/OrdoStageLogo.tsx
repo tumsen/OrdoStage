@@ -60,6 +60,7 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
       preserveAspectRatio="xMidYMid meet"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      shapeRendering="geometricPrecision"
       className="pointer-events-none absolute inset-0 z-[2] h-full w-full select-none opacity-100 [opacity:1!important]"
       style={{ opacity: 1, isolation: "isolate" }}
       overflow="visible"
@@ -83,11 +84,12 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
         fill={`url(#${gradId})`}
         fillOpacity={1}
         stroke="#ffffff"
-        strokeWidth={0.55}
-        strokeOpacity={0.92}
+        strokeWidth={1.45}
+        strokeOpacity={0.94}
         strokeLinejoin="round"
         strokeLinecap="round"
         textAnchor="middle"
+        textRendering="geometricPrecision"
         style={{
           opacity: 1,
           paintOrder: "stroke fill",
@@ -104,11 +106,12 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
         fill={`url(#${gradId})`}
         fillOpacity={1}
         stroke="#ffffff"
-        strokeWidth={0.5}
-        strokeOpacity={0.92}
+        strokeWidth={1.05}
+        strokeOpacity={0.94}
         strokeLinejoin="round"
         strokeLinecap="round"
         textAnchor="middle"
+        textRendering="geometricPrecision"
         style={{
           opacity: 1,
           paintOrder: "stroke fill",
