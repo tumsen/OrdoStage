@@ -7,6 +7,7 @@ export interface CalendarItem {
   title: string;
   kind: "event" | "booking";
   type?: BookingType;
+  status?: string;
   startDate: string;
   endDate: string | null;
   raw: EventDetail | InternalBookingDetail;
@@ -20,6 +21,7 @@ export function toCalendarItems(
     id: e.id,
     title: e.title,
     kind: "event",
+    status: e.status,
     startDate: e.startDate,
     endDate: e.endDate,
     raw: e,

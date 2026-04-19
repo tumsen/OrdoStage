@@ -205,6 +205,12 @@ export function OutlookTimeGrid({ days, items, onItemClick, onSelectTimeRange }:
                     title={item.title}
                   >
                     All day - {item.title}
+                    {item.status === "draft" && (
+                      <span className="ml-1 inline-block text-[9px] font-semibold uppercase px-1 py-px rounded bg-ordo-yellow/30 text-ordo-yellow border border-ordo-yellow/50 leading-none align-middle">Draft</span>
+                    )}
+                    {item.status === "cancelled" && (
+                      <span className="ml-1 inline-block text-[9px] font-semibold uppercase px-1 py-px rounded bg-red-950/60 text-red-400 border border-red-700/50 leading-none align-middle">Cancelled</span>
+                    )}
                   </button>
                 ))}
 
@@ -236,7 +242,15 @@ export function OutlookTimeGrid({ days, items, onItemClick, onSelectTimeRange }:
                       style={{ top, height }}
                       title={creatorName ? `${item.title} — ${creatorName}` : item.title}
                     >
-                      <div className="truncate font-semibold text-[11px] leading-tight shrink-0">{item.title}</div>
+                      <div className="truncate font-semibold text-[11px] leading-tight shrink-0">
+                        {item.title}
+                        {item.status === "draft" && (
+                          <span className="ml-1 inline-block text-[9px] font-semibold uppercase px-1 py-px rounded bg-ordo-yellow/30 text-ordo-yellow border border-ordo-yellow/50 leading-none align-middle">Draft</span>
+                        )}
+                        {item.status === "cancelled" && (
+                          <span className="ml-1 inline-block text-[9px] font-semibold uppercase px-1 py-px rounded bg-red-950/60 text-red-400 border border-red-700/50 leading-none align-middle">Cancelled</span>
+                        )}
+                      </div>
                       <div className="truncate opacity-90 text-[10px] leading-tight mt-0.5 flex-1 min-h-0">
                         {clippedStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
                         {clippedEnd.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

@@ -62,7 +62,19 @@ export function CalendarCell({ date, items, isToday, onItemClick }: CalendarCell
             )}
             title={item.title}
           >
-            <span className="block truncate">{item.title}</span>
+            <span className="block truncate">
+              {item.title}
+              {item.status === "draft" && (
+                <span className="ml-1 inline-block text-[9px] font-semibold uppercase px-1 py-px rounded bg-ordo-yellow/30 text-ordo-yellow border border-ordo-yellow/50 leading-none align-middle">
+                  Draft
+                </span>
+              )}
+              {item.status === "cancelled" && (
+                <span className="ml-1 inline-block text-[9px] font-semibold uppercase px-1 py-px rounded bg-red-950/60 text-red-400 border border-red-700/50 leading-none align-middle">
+                  Cancelled
+                </span>
+              )}
+            </span>
             {hasTimedStart(item) ? (
               <span className="block text-[9px] opacity-80 truncate tabular-nums">
                 {new Date(item.startDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
