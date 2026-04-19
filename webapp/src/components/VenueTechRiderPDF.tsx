@@ -108,18 +108,20 @@ export function VenueTechRiderCoverDoc({
   })();
 
   const venueLabel = [show.venueName, show.venueCity].filter(Boolean).join(", ");
-  const visibility = {
-    venue: true,
-    schedule: true,
-    crew: true,
-    technicalRequirements: true,
-    venueContact: true,
-    hotel: true,
-    notes: true,
-    managerContact: true,
-    customFields: true,
-    ...(tour.riderVisibility ?? {}),
-  };
+  const visibility = Object.assign(
+    {
+      venue: true,
+      schedule: true,
+      crew: true,
+      technicalRequirements: true,
+      venueContact: true,
+      hotel: true,
+      notes: true,
+      managerContact: true,
+      customFields: true,
+    },
+    tour.riderVisibility ?? {},
+  );
   const handsNeeded = show.handsNeeded ?? tour.handsNeeded;
   const showDuration = tour.showDuration;
   const hasSchedule =
