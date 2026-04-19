@@ -106,7 +106,7 @@ function PackRow({
 
   const handleSave = () => {
     if (isNaN(parsedAmountCents) || parsedAmountCents < 1) return;
-    onSave(pack.id, {
+    onSave(pack.packId, {
       label: edits.label,
       amountCents: parsedAmountCents,
       active: edits.active,
@@ -276,8 +276,8 @@ export default function Pricing() {
       packRecordId: string;
       data: { label?: string; amountCents?: number; active?: boolean };
     }) => api.put(`/api/admin/packs/${encodeURIComponent(packRecordId)}`, data),
-    onMutate: ({ packRecordId }) => {
-      setSavingId(packRecordId);
+    onMutate: ({ packRecordId: id }) => {
+      setSavingId(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "packs"] });
@@ -330,8 +330,8 @@ export default function Pricing() {
     },
   });
 
-  const handleSave = (packRecordId: string, data: { label?: string; amountCents?: number; active?: boolean }) => {
-    updateMutation.mutate({ packRecordId, data });
+  const handleSave = (packSlug: string, data: { label?: string; amountCents?: number; active?: boolean }) => {
+    updateMutation.mutate({ packRecordId: packSlug, data });
   };
 
   const parsedDays = parseInt(newDays, 10);
@@ -505,8 +505,8 @@ export default function Pricing() {
                   baselinePack={baselinePack}
                   onSave={handleSave}
                   onDelete={setPackToDelete}
-                  isSaving={savingId === pack.id}
-                  isDeleting={Boolean(deleteMutation.isPending && packToDelete?.id === pack.id)}
+                  isSaving={savingId === pack.packId}
+                  isDeleting={Boolean(deleteMutation.isPending && packToDelete?.packId === pack.packId)}
                 />
               ))
             )}
@@ -531,7 +531,7 @@ export default function Pricing() {
             <AlertDialogCancel className="bg-transparent border-white/15 text-white">Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-700 hover:bg-red-600 text-white"
-              onClick={() => packToDelete && deleteMutation.mutate(packToDelete.id)}
+              onClick={() => packToDelete && deleteMutation.mutate(packToDelete.packId)}
             >
               Delete
             </AlertDialogAction>
