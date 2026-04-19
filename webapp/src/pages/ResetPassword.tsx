@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
+import { PublicNav } from "@/components/PublicNav";
 
 const schema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -50,8 +51,9 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+      <PublicNav />
+      <div className="w-full max-w-md mx-auto flex-1 flex items-center justify-center p-4">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <OrdoStageLogo size={88} />

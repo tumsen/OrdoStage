@@ -1,6 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { PublicNav } from "@/components/PublicNav";
 
 type SiteContent = Record<string, string>;
 
@@ -23,6 +24,7 @@ export default function LegalPage() {
 
   return (
     <div className="text-white">
+      <PublicNav />
       <div className="max-w-3xl mx-auto px-6 py-10 md:py-14">
         <h1 className="sr-only">{config.title}</h1>
         <article className="rounded-lg border border-white/10 bg-white/[0.02] p-6">

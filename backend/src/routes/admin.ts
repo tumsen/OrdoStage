@@ -299,16 +299,14 @@ app.delete("/admin/packs/:packId", async (c) => {
   const existing = await prisma.pricePack.findFirst({
     where: { OR: [{ id: segment }, { packId: segment }] },
   });
-  if (!existing) {
-    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
-  }
 
-  const slug = existing.packId;
+  // Use the provided slug for cleanup if we can't find the record (stale UI); otherwise, use canonical packId.
+  const packIdForCleanup = existing?.packId ?? segment;
 
   try {
     await prisma.$transaction([
       prisma.organization.updateMany({
-        where: { autoTopUpPackId: slug },
+        where: { autoTopUpPackId: packIdForCleanup },
         data: {
           autoTopUpPackId: null,
           autoTopUpEnabled: false,
@@ -316,7 +314,10 @@ app.delete("/admin/packs/:packId", async (c) => {
           pendingAutoTopUpCreatedAt: null,
         },
       }),
-      prisma.pricePack.delete({ where: { id: existing.id } }),
+      // Delete by either primary key or packId slug to be robust against UI routing edge cases.
+      prisma.pricePack.deleteMany({
+        where: { OR: [{ id: segment }, { packId: segment }] },
+      }),
     ]);
   } catch (err) {
     console.error("[admin] delete pack failed:", segment, err);

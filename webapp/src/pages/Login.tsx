@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
+import { PublicNav } from "@/components/PublicNav";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -57,8 +58,9 @@ export default function Login() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#030712", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <div style={{ width: "100%", maxWidth: "420px" }}>
+    <div style={{ minHeight: "100vh", background: "#030712", display: "flex", flexDirection: "column" }}>
+      <PublicNav />
+      <div style={{ width: "100%", maxWidth: "420px", margin: "0 auto", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: "16px" }}>
             <OrdoStageLogo size={96} />

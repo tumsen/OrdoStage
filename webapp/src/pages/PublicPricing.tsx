@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
+import { PublicNav } from "@/components/PublicNav";
 
 interface BillingPack {
   id: string;
@@ -22,55 +23,34 @@ export default function PublicPricing() {
     queryFn: () => api.get<Record<string, string>>("/api/site-content"),
   });
 
-  const defaultDeactivateCredits = siteMeta?.person_deactivate_credit_default ?? "20";
   const signupCredits = siteMeta?.signup_credits?.trim() || "30";
+  const pricingTitle = siteMeta?.pricing_page_title?.trim() || "Simple pricing that grows with your team";
+  const pricingIntro =
+    siteMeta?.pricing_intro?.trim() ||
+    [
+      "No subscriptions, no surprises. Just credits — buy a pack and use them as you need.",
+      `When you create an account, you get ${signupCredits} credits free to test the system.`,
+      "You can also enable automatic top-up under Billing in your organisation: choose a credit pack and a balance threshold. When credits fall to that level, we open a checkout so you can refill before work stops — a simple way to keep credits on the account without watching the balance every day.",
+    ].join("\n\n");
+  const pricingNotes =
+    siteMeta?.pricing_notes?.trim() ||
+    [
+      "You'll need at least one active user to keep your account editable.",
+      "If your balance dips to −30 credits, your account switches to view-only mode. Top it up within 30 days and everything goes back to normal — wait longer and the account may be permanently deleted.",
+    ].join("\n");
 
   return (
     <div className="text-white">
+      <PublicNav />
       <div className="max-w-6xl mx-auto px-6 py-12 md:py-16 space-y-10">
         <header className="max-w-3xl space-y-5">
-          <h1 className="text-2xl md:text-3xl font-bold leading-tight tracking-tight">
-            Simple pricing that grows with your team
-          </h1>
-          <div className="space-y-4 text-white/80 leading-relaxed">
-            <p>No subscriptions, no surprises. Just credits — buy a pack and use them as you need.</p>
-            <p>
-              When you create an account, you get{" "}
-              <strong className="text-white font-semibold">{signupCredits} credits</strong> free to test the system.
-            </p>
-            <p>
-              You can also enable <strong className="text-white font-semibold">automatic top-up</strong> under Billing in
-              your organisation: choose a credit pack and a balance threshold. When credits fall to that level, we open a
-              checkout so you can refill before work stops — a simple way to keep credits on the account without watching
-              the balance every day.
-            </p>
-            <p>
-              Every active user costs <strong className="text-white font-semibold">1 credit per day</strong>. Add as many
-              people as your project needs, and only pay for who&apos;s actually active.
-            </p>
-            <p>
-              Need to pause someone? Deactivating a user costs{" "}
-              <strong className="text-white font-semibold">{defaultDeactivateCredits} credits</strong>. Their info stays
-              safe, and bringing them back is completely free.
-            </p>
-            <p>
-              Want to remove someone entirely? Deleting a user is free — though keep in mind it permanently removes them
-              and all their data.
-            </p>
-          </div>
+          <h1 className="text-2xl md:text-3xl font-bold leading-tight tracking-tight">{pricingTitle}</h1>
+          <div className="space-y-4 text-white/80 leading-relaxed whitespace-pre-wrap">{pricingIntro}</div>
         </header>
 
         <section className="max-w-3xl rounded-xl border border-white/10 bg-white/[0.02] p-6 md:p-8 space-y-4">
           <h2 className="text-lg font-semibold text-white">A couple of things to keep in mind</h2>
-          <ul className="list-disc pl-5 space-y-3 text-white/80 leading-relaxed marker:text-ordo-yellow">
-            <li>You&apos;ll need at least one active user to keep your account editable.</li>
-            <li>
-              If your balance dips to <strong className="text-white font-semibold">−30 credits</strong>, your account
-              switches to view-only mode. Top it up within{" "}
-              <strong className="text-white font-semibold">30 days</strong> and everything goes back to normal — wait
-              longer and the account may be permanently deleted.
-            </li>
-          </ul>
+          <div className="text-white/80 leading-relaxed whitespace-pre-wrap">{pricingNotes}</div>
         </section>
 
         <section className="space-y-4">

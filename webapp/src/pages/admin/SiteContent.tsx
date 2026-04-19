@@ -12,7 +12,7 @@ type SiteContent = Record<string, string>;
 export default function SiteContentAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data, isPending, isError } = useQuery({
+  const { data } = useQuery({
     queryKey: ["admin", "site-content"],
     queryFn: () => api.get<SiteContent>("/api/admin/site-content"),
   });
