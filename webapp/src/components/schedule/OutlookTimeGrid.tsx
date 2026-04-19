@@ -244,18 +244,23 @@ export function OutlookTimeGrid({ days, items, onItemClick, onSelectTimeRange }:
                     >
                       <div className="truncate font-semibold text-[11px] leading-tight shrink-0">
                         {item.title}
+                        {venueName && item.kind === "event" ? (
+                          <span className="font-normal opacity-75"> @ {venueName}</span>
+                        ) : null}
+                      </div>
+                      <div className="truncate opacity-90 text-[10px] leading-tight mt-0.5 flex-1 min-h-0 flex items-center gap-1">
+                        <span className="shrink-0">
+                          {clippedStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
+                          {clippedEnd.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {item.kind === "booking" && venueName ? ` · ${venueName}` : ""}
+                          {creatorName ? ` · ${creatorName}` : ""}
+                        </span>
                         {item.status === "draft" && (
-                          <span className="ml-1 inline-block text-[9px] font-semibold uppercase px-1 py-px rounded bg-ordo-yellow/30 text-ordo-yellow border border-ordo-yellow/50 leading-none align-middle">Draft</span>
+                          <span className="shrink-0 text-[9px] font-semibold uppercase px-1 py-px rounded bg-ordo-yellow/30 text-ordo-yellow border border-ordo-yellow/50 leading-none">Draft</span>
                         )}
                         {item.status === "cancelled" && (
-                          <span className="ml-1 inline-block text-[9px] font-semibold uppercase px-1 py-px rounded bg-red-950/60 text-red-400 border border-red-700/50 leading-none align-middle">Cancelled</span>
+                          <span className="shrink-0 text-[9px] font-semibold uppercase px-1 py-px rounded bg-red-950/60 text-red-400 border border-red-700/50 leading-none">Cancelled</span>
                         )}
-                      </div>
-                      <div className="truncate opacity-90 text-[10px] leading-tight mt-0.5 flex-1 min-h-0">
-                        {clippedStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
-                        {clippedEnd.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        {venueName ? ` · ${venueName}` : ""}
-                        {creatorName ? ` · ${creatorName}` : ""}
                       </div>
                     </button>
                   );
