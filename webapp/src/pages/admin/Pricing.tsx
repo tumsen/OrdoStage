@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Info } from "lucide-react";
+import { Info, Trash2 } from "lucide-react";
+import {
+  pickBaselinePack,
+  listPriceCents,
+  savingsPercentFromPrice,
+  priceCentsFromDiscountPercent,
+  formatPercentLabel,
+} from "@/lib/packBaseline";
 
 interface PricePack {
   id: string;
@@ -27,42 +44,112 @@ interface PricePack {
 interface PackEdits {
   label: string;
   amountEuros: string;
+  discountPercent: string;
   active: boolean;
 }
 
 function PackRow({
   pack,
+  baselinePack,
   onSave,
+  onDelete,
   isSaving,
+  isDeleting,
 }: {
   pack: PricePack;
+  baselinePack: PricePack | null;
   onSave: (packId: string, data: { label?: string; amountCents?: number; active?: boolean }) => void;
+  onDelete: (pack: PricePack) => void;
   isSaving: boolean;
+  isDeleting: boolean;
 }) {
   const [edits, setEdits] = useState<PackEdits>({
     label: pack.label,
     amountEuros: (pack.amountCents / 100).toFixed(2),
+    discountPercent: "",
     active: pack.active,
   });
 
+  useEffect(() => {
+    const euros = (pack.amountCents / 100).toFixed(2);
+    let discountPercent = "";
+    if (baselinePack && pack.days > 0) {
+      discountPercent = String(savingsPercentFromPrice(pack.amountCents, pack.days, baselinePack));
+    }
+    setEdits({
+      label: pack.label,
+      amountEuros: euros,
+      discountPercent,
+      active: pack.active,
+    });
+  }, [pack.amountCents, pack.label, pack.active, pack.days, pack.packId, baselinePack]);
+
+  const isBaseline = baselinePack?.packId === pack.packId;
+
+  const parsedAmountCents = Math.round(parseFloat(edits.amountEuros) * 100);
+  const liveSavingsPct =
+    baselinePack && pack.days > 0 && !isNaN(parsedAmountCents)
+      ? savingsPercentFromPrice(parsedAmountCents, pack.days, baselinePack)
+      : 0;
+
+  const eurosPerDay =
+    pack.days > 0 && !isNaN(parsedAmountCents)
+      ? (parsedAmountCents / 100 / pack.days).toFixed(4)
+      : "—";
+
   const isDirty =
-    edits.label !== pack.label ||
-    parseFloat(edits.amountEuros) * 100 !== pack.amountCents ||
-    edits.active !== pack.active;
+    !isNaN(parsedAmountCents) &&
+    parsedAmountCents >= 1 &&
+    (edits.label !== pack.label ||
+      parsedAmountCents !== pack.amountCents ||
+      edits.active !== pack.active);
 
   const handleSave = () => {
-    const amountCents = Math.round(parseFloat(edits.amountEuros) * 100);
-    if (isNaN(amountCents)) return;
+    if (isNaN(parsedAmountCents) || parsedAmountCents < 1) return;
     onSave(pack.packId, {
       label: edits.label,
-      amountCents,
+      amountCents: parsedAmountCents,
       active: edits.active,
     });
   };
 
+  const onPriceChange = (raw: string) => {
+    setEdits((prev) => {
+      const next = { ...prev, amountEuros: raw };
+      const cents = Math.round(parseFloat(raw) * 100);
+      if (baselinePack && pack.days > 0 && !isNaN(cents)) {
+        next.discountPercent = String(savingsPercentFromPrice(cents, pack.days, baselinePack));
+      }
+      return next;
+    });
+  };
+
+  const onPercentChange = (raw: string) => {
+    const p = parseFloat(raw.replace(",", "."));
+    if (!baselinePack || pack.days <= 0 || raw.trim() === "") {
+      setEdits((prev) => ({ ...prev, discountPercent: raw }));
+      return;
+    }
+    if (isNaN(p)) {
+      setEdits((prev) => ({ ...prev, discountPercent: raw }));
+      return;
+    }
+    const cents = priceCentsFromDiscountPercent(p, pack.days, baselinePack);
+    setEdits((prev) => ({
+      ...prev,
+      discountPercent: raw,
+      amountEuros: (cents / 100).toFixed(2),
+    }));
+  };
+
+  const listCents =
+    baselinePack && pack.days > 0 ? listPriceCents(pack.days, baselinePack) : 0;
+
   return (
     <TableRow className="border-white/5 hover:bg-white/[0.02]">
-      <TableCell className="text-white/30 text-xs font-mono">{pack.id.slice(0, 8)}…</TableCell>
+      <TableCell className="text-white/30 text-xs font-mono max-w-[100px] truncate" title={pack.packId}>
+        {pack.packId}
+      </TableCell>
       <TableCell>
         <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-950/60 text-blue-300 border border-blue-800/30">
           {pack.days}d
@@ -72,8 +159,25 @@ function PackRow({
         <Input
           value={edits.label}
           onChange={(e) => setEdits((prev) => ({ ...prev, label: e.target.value }))}
-          className="bg-gray-800 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-rose-500/30 h-8 text-sm w-40"
+          className="bg-gray-800 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-ordo-magenta/30 h-8 text-sm min-w-[7rem]"
         />
+      </TableCell>
+      <TableCell className="text-xs text-white/55 tabular-nums whitespace-nowrap">€{eurosPerDay}/day</TableCell>
+      <TableCell className="text-xs">
+        {baselinePack ? (
+          <span
+            className={`tabular-nums ${liveSavingsPct > 0.05 ? "text-ordo-yellow" : liveSavingsPct < -0.05 ? "text-orange-300/90" : "text-white/45"}`}
+            title={
+              listCents > 0
+                ? `List at smallest-pack rate: €${(listCents / 100).toFixed(2)}`
+                : undefined
+            }
+          >
+            {formatPercentLabel(liveSavingsPct)}
+          </span>
+        ) : (
+          "—"
+        )}
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1">
@@ -83,9 +187,24 @@ function PackRow({
             step="0.01"
             min="0"
             value={edits.amountEuros}
-            onChange={(e) => setEdits((prev) => ({ ...prev, amountEuros: e.target.value }))}
-            className="bg-gray-800 border-white/10 text-white focus-visible:ring-rose-500/30 h-8 text-sm w-24"
+            onChange={(e) => onPriceChange(e.target.value)}
+            className="bg-gray-800 border-white/10 text-white focus-visible:ring-ordo-magenta/30 h-8 text-sm w-[5.5rem]"
           />
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1">
+          <Input
+            type="number"
+            step="0.1"
+            title="% vs list price at smallest-pack rate (negative = markup)"
+            placeholder="0"
+            disabled={!baselinePack || isBaseline}
+            value={edits.discountPercent}
+            onChange={(e) => onPercentChange(e.target.value)}
+            className="bg-gray-800 border-white/10 text-white focus-visible:ring-ordo-magenta/30 h-8 text-sm w-[4.25rem] disabled:opacity-40"
+          />
+          <span className="text-white/35 text-xs">%</span>
         </div>
       </TableCell>
       <TableCell>
@@ -93,7 +212,7 @@ function PackRow({
           <Switch
             checked={edits.active}
             onCheckedChange={(checked) => setEdits((prev) => ({ ...prev, active: checked }))}
-            className="data-[state=checked]:bg-rose-600"
+            className="data-[state=checked]:bg-ordo-magenta"
           />
           <span className="text-xs text-white/40">{edits.active ? "Active" : "Inactive"}</span>
         </div>
@@ -105,12 +224,25 @@ function PackRow({
           disabled={!isDirty || isSaving}
           className={`text-xs h-7 ${
             isDirty
-              ? "bg-rose-700 hover:bg-rose-600 text-white"
+              ? "bg-ordo-magenta/90 hover:bg-ordo-magenta text-white"
               : "bg-white/5 text-white/20 border border-white/10 cursor-default"
           }`}
           variant={isDirty ? "default" : "outline"}
         >
           {isSaving ? "Saving…" : isDirty ? "Save" : "Saved"}
+        </Button>
+      </TableCell>
+      <TableCell>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0 text-white/35 hover:text-red-400 hover:bg-red-950/40"
+          disabled={isDeleting}
+          onClick={() => onDelete(pack)}
+          aria-label={`Delete pack ${pack.label}`}
+        >
+          <Trash2 className="h-4 w-4" />
         </Button>
       </TableCell>
     </TableRow>
@@ -125,15 +257,24 @@ export default function Pricing() {
   const [newDays, setNewDays] = useState("");
   const [newLabel, setNewLabel] = useState("");
   const [newAmountEuros, setNewAmountEuros] = useState("");
+  const [newDiscountPercent, setNewDiscountPercent] = useState("");
+  const [packToDelete, setPackToDelete] = useState<PricePack | null>(null);
 
   const { data: packs, isPending } = useQuery<PricePack[]>({
     queryKey: ["admin", "packs"],
     queryFn: () => api.get<PricePack[]>("/api/admin/packs"),
   });
 
+  const baselinePack = useMemo(() => pickBaselinePack(packs ?? []), [packs]);
+
   const updateMutation = useMutation({
-    mutationFn: ({ packId, data }: { packId: string; data: { label?: string; amountCents?: number; active?: boolean } }) =>
-      api.put(`/api/admin/packs/${packId}`, data),
+    mutationFn: ({
+      packId,
+      data,
+    }: {
+      packId: string;
+      data: { label?: string; amountCents?: number; active?: boolean };
+    }) => api.put(`/api/admin/packs/${packId}`, data),
     onMutate: ({ packId }) => {
       setSavingId(packId);
     },
@@ -164,10 +305,24 @@ export default function Pricing() {
       setNewDays("");
       setNewLabel("");
       setNewAmountEuros("");
+      setNewDiscountPercent("");
       toast({ title: "Pack created", description: "New credit pack has been added." });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create pack.", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (packId: string) => api.delete(`/api/admin/packs/${packId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "packs"] });
+      queryClient.invalidateQueries({ queryKey: ["public-pricing"] });
+      setPackToDelete(null);
+      toast({ title: "Pack deleted", description: "Pack removed and auto top-up cleared where needed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete pack.", variant: "destructive" });
     },
   });
 
@@ -176,27 +331,54 @@ export default function Pricing() {
   };
 
   const parsedDays = parseInt(newDays, 10);
-  const parsedAmountCents = Math.round(parseFloat(newAmountEuros) * 100);
+  const parsedNewAmountCents = Math.round(parseFloat(newAmountEuros) * 100);
+
+  const newListCents =
+    baselinePack && !isNaN(parsedDays) && parsedDays > 0
+      ? listPriceCents(parsedDays, baselinePack)
+      : 0;
+
+  const syncNewPriceFromPercent = (rawPercent: string) => {
+    setNewDiscountPercent(rawPercent);
+    const p = parseFloat(rawPercent.replace(",", "."));
+    if (!baselinePack || isNaN(parsedDays) || parsedDays <= 0 || isNaN(p)) return;
+    const cents = priceCentsFromDiscountPercent(p, parsedDays, baselinePack);
+    setNewAmountEuros((cents / 100).toFixed(2));
+  };
+
+  const syncNewPercentFromPrice = (rawEuros: string) => {
+    setNewAmountEuros(rawEuros);
+    const cents = Math.round(parseFloat(rawEuros) * 100);
+    if (!baselinePack || isNaN(parsedDays) || parsedDays <= 0 || isNaN(cents)) return;
+    setNewDiscountPercent(String(savingsPercentFromPrice(cents, parsedDays, baselinePack)));
+  };
+
   const canCreate =
     !createMutation.isPending &&
     !isNaN(parsedDays) &&
     parsedDays > 0 &&
-    !isNaN(parsedAmountCents) &&
-    parsedAmountCents > 0 &&
+    !isNaN(parsedNewAmountCents) &&
+    parsedNewAmountCents > 0 &&
     newLabel.trim().length > 0;
+
+  const COL_COUNT = 10;
 
   return (
     <div className="p-6 space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-white">Credit packs</h2>
-        <p className="text-sm text-white/50 mt-1 max-w-2xl">
-          Active packs are shown on the public <span className="text-white/70">/pricing</span> page. Inactive packs are
-          hidden. After you save, visitors see changes on the next page load.
+        <p className="text-sm text-white/50 mt-1 max-w-3xl">
+          The <strong className="text-white/70">smallest pack</strong> is the one with the fewest credit-days (tie-break:
+          cheapest). Other packs show <strong className="text-white/70">% vs that list price</strong>. Enter{" "}
+          <strong className="text-white/70">€</strong> or <strong className="text-white/70">%</strong> — the other field
+          updates. Negative % means a markup vs list (campaigns usually use positive % off). Active packs appear on public{" "}
+          <span className="text-white/70">/pricing</span>.
         </p>
       </div>
+
       <div className="rounded-lg border border-white/10 p-4 bg-white/[0.02]">
-        <h3 className="text-sm font-semibold text-white/80 mb-3 uppercase tracking-wider">Add Credit Pack</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <h3 className="text-sm font-semibold text-white/80 mb-3 uppercase tracking-wider">Add credit pack</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
           <Input
             placeholder="Pack ID (optional)"
             value={newPackId}
@@ -208,7 +390,13 @@ export default function Pricing() {
             min="1"
             placeholder="Days (e.g. 750)"
             value={newDays}
-            onChange={(e) => setNewDays(e.target.value)}
+            onChange={(e) => {
+              setNewDays(e.target.value);
+              const d = parseInt(e.target.value, 10);
+              if (baselinePack && !isNaN(d) && d > 0 && !isNaN(parsedNewAmountCents)) {
+                setNewDiscountPercent(String(savingsPercentFromPrice(parsedNewAmountCents, d, baselinePack)));
+              }
+            }}
             className="bg-gray-800 border-white/10 text-white placeholder:text-white/20"
           />
           <Input
@@ -217,15 +405,37 @@ export default function Pricing() {
             onChange={(e) => setNewLabel(e.target.value)}
             className="bg-gray-800 border-white/10 text-white placeholder:text-white/20"
           />
-          <Input
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="Price € (e.g. 49.00)"
-            value={newAmountEuros}
-            onChange={(e) => setNewAmountEuros(e.target.value)}
-            className="bg-gray-800 border-white/10 text-white placeholder:text-white/20"
-          />
+          <div className="flex items-center gap-1">
+            <span className="text-white/40 text-sm">€</span>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Price"
+              value={newAmountEuros}
+              onChange={(e) => syncNewPercentFromPrice(e.target.value)}
+              className="bg-gray-800 border-white/10 text-white placeholder:text-white/20"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              step="0.1"
+              placeholder="% vs list"
+              disabled={!baselinePack || isNaN(parsedDays) || parsedDays <= 0}
+              value={newDiscountPercent}
+              onChange={(e) => syncNewPriceFromPercent(e.target.value)}
+              className="bg-gray-800 border-white/10 text-white placeholder:text-white/20"
+            />
+            <span className="text-white/35 text-sm">%</span>
+          </div>
+          {newListCents > 0 ? (
+            <div className="text-xs text-white/45 flex items-center lg:col-span-1">
+              List @ baseline: €{(newListCents / 100).toFixed(2)}
+            </div>
+          ) : (
+            <div />
+          )}
         </div>
         <div className="mt-3 flex justify-end">
           <Button
@@ -234,35 +444,43 @@ export default function Pricing() {
                 packId: newPackId.trim() || undefined,
                 days: parsedDays,
                 label: newLabel.trim(),
-                amountCents: parsedAmountCents,
+                amountCents: parsedNewAmountCents,
                 active: true,
               })
             }
             disabled={!canCreate}
-            className="bg-rose-700 hover:bg-rose-600 text-white"
+            className="bg-ordo-violet/90 hover:bg-ordo-violet text-white border-0"
           >
-            {createMutation.isPending ? "Creating..." : "Create Pack"}
+            {createMutation.isPending ? "Creating..." : "Create pack"}
           </Button>
         </div>
       </div>
 
-      <div className="rounded-lg border border-white/10 overflow-hidden">
+      <div className="rounded-lg border border-white/10 overflow-hidden overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-white/10 hover:bg-transparent">
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Pack ID</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Days</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Label</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider whitespace-nowrap">
+                € / day
+              </TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">vs smallest</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Price</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider whitespace-nowrap">
+                % vs list
+              </TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Status</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Save</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isPending ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i} className="border-white/5">
-                  {Array.from({ length: 6 }).map((_, j) => (
+                  {Array.from({ length: COL_COUNT }).map((_, j) => (
                     <TableCell key={j}>
                       <div className="h-4 bg-white/5 rounded animate-pulse" />
                     </TableCell>
@@ -271,7 +489,7 @@ export default function Pricing() {
               ))
             ) : !packs?.length ? (
               <TableRow className="border-white/5">
-                <TableCell colSpan={6} className="text-center text-white/30 py-12">
+                <TableCell colSpan={COL_COUNT} className="text-center text-white/30 py-12">
                   No price packs configured
                 </TableCell>
               </TableRow>
@@ -280,8 +498,11 @@ export default function Pricing() {
                 <PackRow
                   key={pack.id}
                   pack={pack}
+                  baselinePack={baselinePack}
                   onSave={handleSave}
-                  isSaving={savingId === pack.id}
+                  onDelete={setPackToDelete}
+                  isSaving={savingId === pack.packId}
+                  isDeleting={Boolean(deleteMutation.isPending && packToDelete?.packId === pack.packId)}
                 />
               ))
             )}
@@ -289,11 +510,36 @@ export default function Pricing() {
         </Table>
       </div>
 
-      {/* Note */}
+      <AlertDialog open={packToDelete != null} onOpenChange={(open) => !open && setPackToDelete(null)}>
+        <AlertDialogContent className="bg-[#0d0d14] border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this pack?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/55">
+              {packToDelete ? (
+                <>
+                  <span className="text-white/80">{packToDelete.label}</span> ({packToDelete.packId}) will be removed.
+                  Organisations that used it for automatic top-up will have that disabled.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-white/15 text-white">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-700 hover:bg-red-600 text-white"
+              onClick={() => packToDelete && deleteMutation.mutate(packToDelete.packId)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex items-start gap-2 p-4 rounded-lg bg-white/[0.02] border border-white/5 text-sm text-white/40">
         <Info size={14} className="flex-shrink-0 mt-0.5" />
         <span>
-          Changes take effect immediately for new purchases. Existing Paddle checkout sessions are not affected.
+          Changes apply to new purchases. Paddle checkouts already opened are unchanged. Deleting a pack clears it from
+          auto top-up settings.
         </span>
       </div>
     </div>

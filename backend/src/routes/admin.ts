@@ -285,6 +285,29 @@ app.put("/admin/packs/:packId", async (c) => {
   return c.json({ data: pack });
 });
 
+app.delete("/admin/packs/:packId", async (c) => {
+  const packId = c.req.param("packId");
+  const existing = await prisma.pricePack.findUnique({ where: { packId } });
+  if (!existing) {
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  await prisma.$transaction([
+    prisma.organization.updateMany({
+      where: { autoTopUpPackId: packId },
+      data: {
+        autoTopUpPackId: null,
+        autoTopUpEnabled: false,
+        pendingAutoTopUpUrl: null,
+        pendingAutoTopUpCreatedAt: null,
+      },
+    }),
+    prisma.pricePack.delete({ where: { packId } }),
+  ]);
+
+  return c.json({ data: { ok: true } });
+});
+
 // ── Users ──────────────────────────────────────────────────────────────────
 
 app.get("/admin/users", async (c) => {
