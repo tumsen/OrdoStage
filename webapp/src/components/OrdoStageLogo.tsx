@@ -16,14 +16,44 @@ const COLORS = ["#ff006e", "#fb5607", "#ffbe0b", "#3a86ff", "#8338ec"] as const;
 /** Idle beam opacity (matches original SVG when not hovered). */
 const IDLE_BEAM_OPACITY = [0.15, 0.15, 0.2, 0.15, 0.15] as const;
 
-/** Narrow Gaussian so one lamp reaches max while neighbours stay clearly dimmer. */
-const BEAM_SIGMA = 27;
+const LAMP_SPACING = 25;
+const FIRST_LAMP_X = 50;
 
-/** 0–1 spotlight weight for each lamp from horizontal position. */
-function beamWeight(mouseX: number, mouseY: number, lightX: number): number {
-  const gx = Math.exp(-((mouseX - lightX) ** 2) / (2 * BEAM_SIGMA * BEAM_SIGMA));
-  const yFade = mouseY >= 50 ? 1 : 0.28 + Math.max(0, mouseY / 50) * 0.72;
-  return Math.min(1, gx * yFade);
+/** Continuous “focus” between lamps 0–4 from horizontal position. */
+function focusIndexFromMouseX(mouseX: number): number {
+  return (mouseX - FIRST_LAMP_X) / LAMP_SPACING;
+}
+
+/**
+ * Smooth ramp: distance 0 → 100%, 1 → 75%, 2 → 50%, 3 → 25%, 4+ → tail.
+ * Piecewise-linear in “lamp index” space so sliding the pointer eases cleanly.
+ */
+function lampFalloff(distance: number): number {
+  const a: [number, number][] = [
+    [0, 1],
+    [1, 0.75],
+    [2, 0.5],
+    [3, 0.25],
+    [4, 0.06],
+  ];
+  if (distance <= 0) return 1;
+  if (distance >= a[a.length - 1]![0]) return a[a.length - 1]![1];
+  for (let k = 0; k < a.length - 1; k++) {
+    const [d0, v0] = a[k]!;
+    const [d1, v1] = a[k + 1]!;
+    if (distance <= d1) {
+      const t = (distance - d0) / (d1 - d0);
+      return v0 + t * (v1 - v0);
+    }
+  }
+  return a[a.length - 1]![1];
+}
+
+/** 0–1 level per lamp while pointer is over the graphic. */
+function lampStrengths(mouseX: number, mouseY: number): number[] {
+  const focus = focusIndexFromMouseX(mouseX);
+  const yFade = mouseY >= 48 ? 1 : 0.22 + Math.max(0, mouseY / 48) * 0.78;
+  return LIGHT_X.map((_, i) => Math.min(1, lampFalloff(Math.abs(i - focus)) * yFade));
 }
 
 /** Default 200×200 artwork. Sidebar crops empty margin so the mark can span the nav width. */
@@ -53,9 +83,7 @@ export function OrdoStageLogo({
   const [mx, setMx] = useState(() => vb.x + vb.w / 2);
   const [my, setMy] = useState(() => vb.y + vb.h * 0.45);
 
-  const strengths = useMemo(() => {
-    return LIGHT_X.map((lx) => beamWeight(mx, my, lx));
-  }, [mx, my]);
+  const strengths = useMemo(() => lampStrengths(mx, my), [mx, my]);
 
   const updatePointer = useCallback(
     (clientX: number, clientY: number) => {
@@ -88,11 +116,10 @@ export function OrdoStageLogo({
   };
 
   const gradId = `${uid}-textGrad`;
-  /** Slow, easing opacity on beams/bulbs for real follow-spot crossfade. */
-  const beamTransition =
-    "opacity 0.55s cubic-bezier(0.33, 0.02, 0.25, 1), fill-opacity 0.55s cubic-bezier(0.33, 0.02, 0.25, 1)";
+  /** Short + smooth: fast follow, no mushy lag. */
+  const beamTransition = "opacity 165ms cubic-bezier(0.4, 0, 0.2, 1), fill-opacity 165ms cubic-bezier(0.4, 0, 0.2, 1)";
   const bulbTransition =
-    "opacity 0.5s cubic-bezier(0.33, 0.02, 0.25, 1), filter 0.55s cubic-bezier(0.33, 0.02, 0.25, 1)";
+    "opacity 165ms cubic-bezier(0.4, 0, 0.2, 1), filter 165ms cubic-bezier(0.4, 0, 0.2, 1)";
 
   const viewBoxAttr = `${vb.x} ${vb.y} ${vb.w} ${vb.h}`;
 
@@ -125,32 +152,15 @@ export function OrdoStageLogo({
       <title>OrdoStage</title>
       <rect width="200" height="200" fill="#111111" />
 
-      <text
-        x="100"
-        y="120"
-        fontFamily="Arial Black, Helvetica, sans-serif"
-        fontSize="48"
-        fontWeight="900"
-        fill="none"
-        stroke="#4a4a55"
-        strokeWidth="2"
-        textAnchor="middle"
-      >
-        ORDO
-      </text>
-      <text
-        x="100"
-        y="155"
-        fontFamily="Arial Black, Helvetica, sans-serif"
-        fontSize="32"
-        fontWeight="900"
-        fill="none"
-        stroke="#4a4a55"
-        strokeWidth="2"
-        textAnchor="middle"
-      >
-        STAGE
-      </text>
+      <defs>
+        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#ff006e" stopOpacity={1} />
+          <stop offset="25%" stopColor="#fb5607" stopOpacity={1} />
+          <stop offset="50%" stopColor="#ffbe0b" stopOpacity={1} />
+          <stop offset="75%" stopColor="#3a86ff" stopOpacity={1} />
+          <stop offset="100%" stopColor="#8338ec" stopOpacity={1} />
+        </linearGradient>
+      </defs>
 
       <rect x="30" y="50" width="140" height="12" fill="#333" rx="2" />
 
@@ -191,16 +201,7 @@ export function OrdoStageLogo({
         );
       })}
 
-      <defs>
-        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#ff006e" stopOpacity={1} />
-          <stop offset="25%" stopColor="#fb5607" stopOpacity={1} />
-          <stop offset="50%" stopColor="#ffbe0b" stopOpacity={1} />
-          <stop offset="75%" stopColor="#3a86ff" stopOpacity={1} />
-          <stop offset="100%" stopColor="#8338ec" stopOpacity={1} />
-        </linearGradient>
-      </defs>
-
+      {/* Gradient wordmark only (drawn last — full rainbow on top). */}
       <text
         x="100"
         y="120"
@@ -209,6 +210,7 @@ export function OrdoStageLogo({
         fontWeight="900"
         fill={`url(#${gradId})`}
         fillOpacity={1}
+        stroke="none"
         textAnchor="middle"
         style={{ opacity: 1 }}
       >
@@ -222,6 +224,7 @@ export function OrdoStageLogo({
         fontWeight="900"
         fill={`url(#${gradId})`}
         fillOpacity={1}
+        stroke="none"
         textAnchor="middle"
         style={{ opacity: 1 }}
       >
