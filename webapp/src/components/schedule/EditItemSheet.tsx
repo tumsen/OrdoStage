@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Trash2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -46,6 +46,51 @@ function toLocal(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// ─── Delete confirmation (type "delete" to confirm) ──────────────────────────
+
+function DeleteConfirmInline({
+  label,
+  onConfirm,
+  onCancel,
+}: {
+  label: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState("");
+  const ready = value.trim().toLowerCase() === "delete";
+  return (
+    <div className="rounded-lg border border-red-800/50 bg-red-950/30 p-4 space-y-3">
+      <p className="text-sm text-red-300 font-medium">Delete {label}?</p>
+      <p className="text-xs text-white/50">
+        This cannot be undone. Type <span className="font-semibold text-white/70">delete</span> to confirm.
+      </p>
+      <input
+        autoFocus
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="delete"
+        className="w-full h-9 px-3 text-sm bg-black/30 border border-red-800/50 rounded-md text-white placeholder:text-white/20 focus:outline-none focus:border-red-500/70"
+      />
+      <div className="flex gap-2 justify-end">
+        <Button variant="ghost" size="sm" className="text-white/50 hover:text-white h-8" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          className="bg-red-700 hover:bg-red-600 text-white border-0 h-8 gap-1.5 disabled:opacity-40"
+          disabled={!ready}
+          onClick={onConfirm}
+        >
+          <Trash2 size={13} />
+          Delete
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Event edit form ──────────────────────────────────────────────────────────
 
 interface EventFormProps {
@@ -76,6 +121,18 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
   );
   const [newPersonId, setNewPersonId] = useState("");
   const [newPersonRole, setNewPersonRole] = useState("");
+  const [showDelete, setShowDelete] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/api/events/${event.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast({ title: "Event deleted" });
+      onClose();
+    },
+    onError: () => toast({ title: "Failed to delete event", variant: "destructive" }),
+  });
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -236,12 +293,28 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
         )}
       </div>
 
-      <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
-        <Button variant="ghost" className="text-white/50 hover:text-white" onClick={onClose}>Cancel</Button>
-        <Button className="bg-indigo-700 hover:bg-indigo-600 text-white border-0" disabled={saveMutation.isPending || !title.trim()}
-          onClick={() => saveMutation.mutate()}>
-          {saveMutation.isPending ? "Saving…" : "Save event"}
-        </Button>
+      <div className="space-y-3 pt-3 border-t border-white/10">
+        {showDelete ? (
+          <DeleteConfirmInline
+            label={`"${event.title}"`}
+            onConfirm={() => deleteMutation.mutate()}
+            onCancel={() => setShowDelete(false)}
+          />
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <Button variant="ghost" size="sm" className="text-red-400/70 hover:text-red-400 hover:bg-red-950/30 gap-1.5 h-8"
+              onClick={() => setShowDelete(true)}>
+              <Trash2 size={13} /> Delete event
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" className="text-white/50 hover:text-white" onClick={onClose}>Cancel</Button>
+              <Button className="bg-indigo-700 hover:bg-indigo-600 text-white border-0" disabled={saveMutation.isPending || !title.trim()}
+                onClick={() => saveMutation.mutate()}>
+                {saveMutation.isPending ? "Saving…" : "Save event"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -271,6 +344,17 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
   );
   const [newPersonId, setNewPersonId] = useState("");
   const [newPersonRole, setNewPersonRole] = useState("");
+  const [showDelete, setShowDelete] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/api/bookings/${booking.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      toast({ title: "Booking deleted" });
+      onClose();
+    },
+    onError: () => toast({ title: "Failed to delete booking", variant: "destructive" }),
+  });
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -385,12 +469,28 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
         )}
       </div>
 
-      <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
-        <Button variant="ghost" className="text-white/50 hover:text-white" onClick={onClose}>Cancel</Button>
-        <Button className="bg-amber-700 hover:bg-amber-600 text-white border-0" disabled={saveMutation.isPending || !title.trim()}
-          onClick={() => saveMutation.mutate()}>
-          {saveMutation.isPending ? "Saving…" : "Save booking"}
-        </Button>
+      <div className="space-y-3 pt-3 border-t border-white/10">
+        {showDelete ? (
+          <DeleteConfirmInline
+            label={`"${booking.title}"`}
+            onConfirm={() => deleteMutation.mutate()}
+            onCancel={() => setShowDelete(false)}
+          />
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <Button variant="ghost" size="sm" className="text-red-400/70 hover:text-red-400 hover:bg-red-950/30 gap-1.5 h-8"
+              onClick={() => setShowDelete(true)}>
+              <Trash2 size={13} /> Delete booking
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" className="text-white/50 hover:text-white" onClick={onClose}>Cancel</Button>
+              <Button className="bg-amber-700 hover:bg-amber-600 text-white border-0" disabled={saveMutation.isPending || !title.trim()}
+                onClick={() => saveMutation.mutate()}>
+                {saveMutation.isPending ? "Saving…" : "Save booking"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
