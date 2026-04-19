@@ -39,7 +39,7 @@ export default function Frontpage() {
 
   return (
     <div className="text-white">
-      <article className="max-w-3xl mx-auto px-6 py-14 md:py-20 space-y-10 md:space-y-12">
+      <article className="max-w-4xl mx-auto px-6 py-14 md:py-20 space-y-10 md:space-y-12">
         {/* Hero */}
         <header className="space-y-6">
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">

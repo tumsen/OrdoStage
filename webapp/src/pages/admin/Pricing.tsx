@@ -368,7 +368,7 @@ export default function Pricing() {
   const COL_COUNT = 10;
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-6 space-y-4 max-w-7xl mx-auto">
       <div>
         <h2 className="text-lg font-semibold text-white">Credit packs</h2>
         <p className="text-sm text-white/50 mt-1 max-w-3xl">
