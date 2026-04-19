@@ -5,7 +5,6 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
-import { PublicNav } from "@/components/PublicNav";
 
 export default function VerifyOtp() {
   const navigate = useNavigate();
@@ -65,9 +64,8 @@ export default function VerifyOtp() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <PublicNav />
-      <div className="w-full max-w-md p-8 mx-auto flex-1 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+      <div className="w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <OrdoStageLogo size={88} />

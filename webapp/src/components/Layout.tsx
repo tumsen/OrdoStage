@@ -56,32 +56,7 @@ const navItems: { to: string; label: string; icon: LucideIcon; view: string }[] 
   { to: "/account", label: "Account", icon: UserCircle, view: "account" },
 ];
 
-const pageTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/events": "Events",
-  "/events/new": "New Event",
-  "/schedule": "Schedule",
-  "/tours": "Tours",
-  "/venues": "Venues",
-  "/people": "People",
-  "/team": "Team",
-  "/calendars": "Calendars",
-  "/billing": "Billing",
-  "/roles": "Roles",
-  "/account": "Account",
-};
-
-function getPageTitle(pathname: string): string {
-  if (pathname.startsWith("/events/") && pathname !== "/events/new") {
-    return "Event Detail";
-  }
-  if (pathname.startsWith("/tours/")) {
-    return "Tour Detail";
-  }
-  return pageTitles[pathname] ?? "OrdoStage";
-}
-
-function SidebarContent({ onNav }: { onNav?: () => void }) {
+export function SidebarContent({ onNav }: { onNav?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { data: session } = useSession();
@@ -278,14 +253,12 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const title = getPageTitle(location.pathname);
 
   useEffect(() => {
-    document.title = `${title} · OrdoStage`;
-  }, [title]);
+    document.title = "OrdoStage";
+  }, []);
 
   return (
     <div className="flex h-screen bg-[#0a0a0f] text-white overflow-hidden">
@@ -304,12 +277,12 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header */}
-        <header className="flex-shrink-0 h-14 border-b border-ordo-violet/20 bg-[#0d0d14]/80 backdrop-blur flex items-center px-4 md:px-6 gap-3">
-          {isMobile ? (
+        {/* Mobile header — only the hamburger, no title */}
+        {isMobile ? (
+          <header className="flex-shrink-0 h-12 border-b border-ordo-violet/20 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-white/60 hover:text-white h-8 w-8 -ml-1">
+                <Button variant="ghost" size="icon" className="text-white/60 hover:text-white h-8 w-8">
                   <Menu size={18} />
                 </Button>
               </SheetTrigger>
@@ -320,9 +293,8 @@ export function Layout({ children }: LayoutProps) {
                 <SidebarContent onNav={() => setMobileOpen(false)} />
               </SheetContent>
             </Sheet>
-          ) : null}
-          <h1 className="text-sm font-semibold text-white/80 tracking-wide uppercase">{title}</h1>
-        </header>
+          </header>
+        ) : null}
 
         {/* Credit warning banner */}
         <CreditBanner />

@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { PublicNav } from "@/components/PublicNav";
 
 type SiteContent = Record<string, string>;
 
@@ -40,7 +39,6 @@ export default function Frontpage() {
 
   return (
     <div className="text-white">
-      <PublicNav />
       <article className="max-w-3xl mx-auto px-6 py-14 md:py-20 space-y-10 md:space-y-12">
         {/* Hero */}
         <header className="space-y-6">

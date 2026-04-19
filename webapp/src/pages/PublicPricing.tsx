@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
-import { PublicNav } from "@/components/PublicNav";
 
 interface BillingPack {
   id: string;
@@ -41,7 +40,6 @@ export default function PublicPricing() {
 
   return (
     <div className="text-white">
-      <PublicNav />
       <div className="max-w-6xl mx-auto px-6 py-12 md:py-16 space-y-10">
         <header className="max-w-3xl space-y-5">
           <h1 className="text-2xl md:text-3xl font-bold leading-tight tracking-tight">{pricingTitle}</h1>
