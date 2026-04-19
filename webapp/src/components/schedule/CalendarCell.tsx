@@ -81,6 +81,9 @@ export function CalendarCell({ date, items, isToday, onItemClick }: CalendarCell
                       ? `–${new Date(item.endDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
                       : ""}
                   </span>
+                  {item.status === "confirmed" && (
+                    <span className="inline-block text-[8px] font-semibold uppercase px-1 py-px rounded bg-emerald-950/60 text-emerald-400 border border-emerald-700/50 leading-none">Confirmed</span>
+                  )}
                   {item.status === "draft" && (
                     <span className="inline-block text-[8px] font-semibold uppercase px-1 py-px rounded bg-ordo-yellow/30 text-ordo-yellow border border-ordo-yellow/50 leading-none">Draft</span>
                   )}
@@ -90,6 +93,9 @@ export function CalendarCell({ date, items, isToday, onItemClick }: CalendarCell
                 </span>
               ) : (
                 <>
+                  {item.status === "confirmed" && (
+                    <span className="block text-[8px] font-semibold uppercase px-1 py-px rounded bg-emerald-950/60 text-emerald-400 border border-emerald-700/50 leading-none w-fit mt-0.5">Confirmed</span>
+                  )}
                   {item.status === "draft" && (
                     <span className="block text-[8px] font-semibold uppercase px-1 py-px rounded bg-ordo-yellow/30 text-ordo-yellow border border-ordo-yellow/50 leading-none w-fit mt-0.5">Draft</span>
                   )}

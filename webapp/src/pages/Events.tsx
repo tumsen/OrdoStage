@@ -130,6 +130,7 @@ export default function Events() {
             filtered.map((event) => {
               const isDraft = event.status === "draft";
               const isCancelled = event.status === "cancelled";
+              const isConfirmed = event.status === "confirmed";
               return (
               <div key={event.id} className="contents group">
                 <div
@@ -140,6 +141,11 @@ export default function Events() {
                     <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
                       {event.title}
                     </span>
+                    {isConfirmed && (
+                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-700/50">
+                        Confirmed
+                      </span>
+                    )}
                     {isDraft && (
                       <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-ordo-yellow/20 text-ordo-yellow border border-ordo-yellow/40">
                         Draft

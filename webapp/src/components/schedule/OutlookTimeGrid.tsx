@@ -54,6 +54,12 @@ type DragPayload = {
 };
 
 function StatusLabel({ status }: { status?: string }) {
+  if (status === "confirmed")
+    return (
+      <span className="shrink-0 text-[8px] font-semibold uppercase px-1 py-px rounded bg-emerald-950/60 text-emerald-400 border border-emerald-700/50 leading-none">
+        Confirmed
+      </span>
+    );
   if (status === "draft")
     return (
       <span className="shrink-0 text-[8px] font-semibold uppercase px-1 py-px rounded bg-ordo-yellow/30 text-ordo-yellow border border-ordo-yellow/50 leading-none">
