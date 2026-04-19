@@ -6,6 +6,7 @@ import { queryClient } from "@/lib/queryClient";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/Layout";
+import { PublicLayout } from "@/components/PublicLayout";
 import { AdminLayout, AdminRoute } from "@/components/AdminLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { GuestRoute } from "@/components/GuestRoute";
@@ -78,13 +79,55 @@ const App = () => (
             }
           />
 
-          {/* Public marketing/legal routes */}
-          <Route path="/" element={<Frontpage />} />
-          <Route path="/pricing" element={<PublicPricing />} />
-          <Route path="/terms-of-service" element={<LegalPage />} />
-          <Route path="/privacy-policy" element={<LegalPage />} />
-          <Route path="/refund-policy" element={<LegalPage />} />
-          <Route path="/accept-invite" element={<AcceptInvite />} />
+          {/* Public marketing/legal routes (same shell as admin: left nav + logo) */}
+          <Route
+            path="/"
+            element={
+              <PublicLayout>
+                <Frontpage />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/pricing"
+            element={
+              <PublicLayout>
+                <PublicPricing />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/terms-of-service"
+            element={
+              <PublicLayout>
+                <LegalPage />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/privacy-policy"
+            element={
+              <PublicLayout>
+                <LegalPage />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/refund-policy"
+            element={
+              <PublicLayout>
+                <LegalPage />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/accept-invite"
+            element={
+              <PublicLayout>
+                <AcceptInvite />
+              </PublicLayout>
+            }
+          />
 
           {/* Protected routes with sidebar layout */}
           <Route
@@ -324,7 +367,14 @@ const App = () => (
           />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
+          <Route
+            path="*"
+            element={
+              <PublicLayout pageTitleOverride="Not found">
+                <NotFound />
+              </PublicLayout>
+            }
+          />
         </Routes>
         </AppErrorBoundary>
       </BrowserRouter>

@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
@@ -22,12 +22,9 @@ export default function LegalPage() {
   const text = data?.[config.key] ?? "";
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
-      <div className="max-w-3xl mx-auto px-6 py-14">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">{config.title}</h1>
-          <Link to="/" className="text-white/70 hover:text-white text-sm">Back</Link>
-        </div>
+    <div className="text-white">
+      <div className="max-w-3xl mx-auto px-6 py-10 md:py-14">
+        <h1 className="sr-only">{config.title}</h1>
         <article className="rounded-lg border border-white/10 bg-white/[0.02] p-6">
           <pre className="whitespace-pre-wrap text-sm leading-7 text-white/80 font-sans">{text}</pre>
         </article>

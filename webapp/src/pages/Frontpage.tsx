@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 import { Card, CardContent } from "@/components/ui/card";
 
 type SiteContent = Record<string, string>;
@@ -21,23 +20,8 @@ export default function Frontpage() {
   const ctaUrl = data?.landing_cta_url ?? "/login";
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
-      <header className="border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center shrink-0">
-            <OrdoStageLogo size={56} />
-          </Link>
-          <div className="flex items-center gap-4 text-sm">
-            <Link to="/pricing" className="text-white/70 hover:text-white">Pricing</Link>
-            <Link to="/terms-of-service" className="text-white/70 hover:text-white">Terms</Link>
-            <Link to="/privacy-policy" className="text-white/70 hover:text-white">Privacy</Link>
-            <Link to="/refund-policy" className="text-white/70 hover:text-white">Refunds</Link>
-            <Link to="/login" className="text-white/70 hover:text-white">Login</Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-6 py-20">
+    <div className="text-white">
+      <div className="max-w-6xl mx-auto px-6 py-16 md:py-20">
         <div className="max-w-3xl">
           <h1 className="text-5xl font-bold leading-tight">{title}</h1>
           <p className="mt-5 text-lg text-white/70">{subtitle}</p>
@@ -71,7 +55,7 @@ export default function Frontpage() {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

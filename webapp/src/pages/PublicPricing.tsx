@@ -1,8 +1,6 @@
-import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
-import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 
 interface BillingPack {
   id: string;
@@ -27,16 +25,9 @@ export default function PublicPricing() {
   const defaultDeactivateCredits = siteMeta?.person_deactivate_credit_default ?? "20";
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
-      <div className="max-w-6xl mx-auto px-6 py-16">
-        <div className="flex items-center justify-between mb-8 gap-4">
-          <div className="flex items-center gap-4 min-w-0">
-            <OrdoStageLogo size={52} className="shrink-0" />
-            <h1 className="text-3xl font-bold truncate">OrdoStage Pricing</h1>
-          </div>
-          <Link to="/" className="text-white/70 hover:text-white text-sm">Back</Link>
-        </div>
-        <p className="text-sm text-white/45 max-w-2xl mb-6">
+    <div className="text-white">
+      <div className="max-w-6xl mx-auto px-6 py-12 md:py-16">
+        <p className="text-sm text-white/45 max-w-2xl mb-8">
           Deactivating a contact in your organisation uses credits (default{" "}
           <strong className="text-white/70">{defaultDeactivateCredits}</strong> credits; organisation owners can change
           this under Billing). Reactivating a contact is free.

@@ -56,16 +56,16 @@ export default function AcceptInvite() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
-        <p className="text-white/50 text-sm">This invitation link is missing a token.</p>
+      <div className="flex min-h-[min(70vh,520px)] items-center justify-center px-6 py-12">
+        <p className="text-white/50 text-sm text-center max-w-md">This invitation link is missing a token.</p>
       </div>
     );
   }
 
   if (isLoading || sessionPending) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
+      <div className="flex min-h-[min(70vh,520px)] items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-400" />
       </div>
     );
   }
@@ -76,7 +76,7 @@ export default function AcceptInvite() {
         ? "This invitation is invalid or has expired."
         : "Could not load invitation.";
     return (
-      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4 p-6">
+      <div className="flex min-h-[min(70vh,520px)] flex-col items-center justify-center gap-4 px-6 py-12">
         <p className="text-white/60 text-sm text-center max-w-md">{msg}</p>
         <Button variant="outline" className="border-white/20 text-white" asChild>
           <Link to="/login">Sign in</Link>
@@ -86,8 +86,8 @@ export default function AcceptInvite() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
-      <div className="w-full max-w-md bg-gray-900 border border-white/10 rounded-xl p-8 space-y-6">
+    <div className="flex min-h-[min(70vh,560px)] items-center justify-center p-6 py-12">
+      <div className="w-full max-w-md rounded-xl border border-white/10 bg-white/[0.03] p-8 space-y-6">
         <div className="text-center">
           <div className="flex justify-center mb-3">
             <OrdoStageLogo size={72} />
@@ -115,13 +115,13 @@ export default function AcceptInvite() {
             <p className="text-xs text-white/40 text-center">
               Sign in with this email address to accept.
             </p>
-            <Button className="w-full bg-purple-600 hover:bg-purple-700" asChild>
+            <Button className="w-full bg-rose-700 hover:bg-rose-600" asChild>
               <Link to={loginHref}>Continue to sign in</Link>
             </Button>
           </div>
         ) : emailMatch ? (
           <Button
-            className="w-full bg-purple-600 hover:bg-purple-700"
+            className="w-full bg-rose-700 hover:bg-rose-600"
             disabled={acceptMutation.isPending}
             onClick={() => acceptMutation.mutate()}
           >
