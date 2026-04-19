@@ -109,13 +109,13 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/10">
+      <div className="px-3 py-4 border-b border-white/10">
         <Link
           to="/dashboard"
           onClick={onNav}
-          className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
+          className="block w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
         >
-          <OrdoStageLogo size={52} className="rounded-md" />
+          <OrdoStageLogo variant="sidebar" className="rounded-md max-h-[7.75rem]" />
         </Link>
       </div>
 

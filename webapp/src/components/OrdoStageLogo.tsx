@@ -22,33 +22,49 @@ function beamStrength(mouseX: number, mouseY: number, lightX: number): number {
   return Math.min(1, gx * yBoost);
 }
 
+/** Default 200×200 artwork. Sidebar crops empty margin so the mark can span the nav width. */
+const VIEWBOX_DEFAULT = { x: 0, y: 0, w: 200, h: 200 } as const;
+/** Tighter crop so the mark uses the nav width without oversized padding. */
+const VIEWBOX_SIDEBAR = { x: 10, y: 36, w: 180, h: 126 } as const;
+
 type OrdoStageLogoProps = {
   className?: string;
-  /** Pixel width & height (square). */
+  /** Pixel width & height (square). Ignored when `variant="sidebar"`. */
   size?: number;
   interactive?: boolean;
+  /** Full width of the left nav; uses a tighter viewBox so the logo reads at ~nav width. */
+  variant?: "default" | "sidebar";
 };
 
-export function OrdoStageLogo({ className, size = 48, interactive = true }: OrdoStageLogoProps) {
+export function OrdoStageLogo({
+  className,
+  size = 48,
+  interactive = true,
+  variant = "default",
+}: OrdoStageLogoProps) {
+  const vb = variant === "sidebar" ? VIEWBOX_SIDEBAR : VIEWBOX_DEFAULT;
   const uid = useId();
   const rootRef = useRef<SVGSVGElement>(null);
   const [inside, setInside] = useState(false);
-  const [mx, setMx] = useState(100);
-  const [my, setMy] = useState(80);
+  const [mx, setMx] = useState(() => vb.x + vb.w / 2);
+  const [my, setMy] = useState(() => vb.y + vb.h * 0.45);
 
   const strengths = useMemo(() => {
     return LIGHT_X.map((lx) => beamStrength(mx, my, lx));
   }, [mx, my]);
 
-  const updatePointer = useCallback((clientX: number, clientY: number) => {
-    const el = rootRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const x = ((clientX - rect.left) / rect.width) * 200;
-    const y = ((clientY - rect.top) / rect.height) * 200;
-    setMx(x);
-    setMy(y);
-  }, []);
+  const updatePointer = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = rootRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const x = vb.x + ((clientX - rect.left) / rect.width) * vb.w;
+      const y = vb.y + ((clientY - rect.top) / rect.height) * vb.h;
+      setMx(x);
+      setMy(y);
+    },
+    [vb],
+  );
 
   const handleMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!interactive) return;
@@ -63,22 +79,35 @@ export function OrdoStageLogo({ className, size = 48, interactive = true }: Ordo
 
   const handleLeave = () => {
     setInside(false);
-    setMx(100);
-    setMy(120);
+    setMx(vb.x + vb.w / 2);
+    setMy(vb.y + vb.h * 0.45);
   };
 
   const gradId = `${uid}-textGrad`;
   const transition = "opacity 320ms ease, fill-opacity 380ms ease";
 
+  const viewBoxAttr = `${vb.x} ${vb.y} ${vb.w} ${vb.h}`;
+
   return (
     <svg
       ref={rootRef}
-      width={size}
-      height={size}
-      viewBox="0 0 200 200"
+      width={variant === "sidebar" ? undefined : size}
+      height={variant === "sidebar" ? undefined : size}
+      viewBox={viewBoxAttr}
+      preserveAspectRatio="xMidYMid meet"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={cn("select-none shrink-0", interactive && "cursor-crosshair", className)}
+      className={cn(
+        "select-none",
+        variant === "sidebar" ? "w-full h-auto min-w-0" : "shrink-0",
+        interactive && "cursor-crosshair",
+        className,
+      )}
+      style={
+        variant === "sidebar"
+          ? { aspectRatio: `${vb.w} / ${vb.h}` }
+          : undefined
+      }
       onMouseEnter={handleEnter}
       onMouseMove={handleMove}
       onMouseLeave={handleLeave}
