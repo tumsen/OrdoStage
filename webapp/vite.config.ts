@@ -19,4 +19,8 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    // Main app chunk is large; code-splitting the whole app is a separate pass
+    chunkSizeWarningLimit: 3500,
+  },
 }));

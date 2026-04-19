@@ -67,7 +67,7 @@ export function NewBookingDialog({ open, onClose, venues, people, initialSlot }:
     } else {
       form.reset(emptyForm);
     }
-  }, [open, initialSlot]);
+  }, [open, initialSlot, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,

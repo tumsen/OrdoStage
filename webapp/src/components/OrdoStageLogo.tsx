@@ -97,7 +97,7 @@ export function OrdoStageLogo({
     const tick = () => {
       rafRef.current = null;
       const tgt = targetFocusRef.current;
-      let prev = smoothFocusRef.current;
+      const prev = smoothFocusRef.current;
       const alpha = 0.14;
       let next = prev + (tgt - prev) * alpha;
       if (Math.abs(tgt - next) < 0.0008) next = tgt;

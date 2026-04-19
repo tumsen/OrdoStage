@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Coins, TrendingUp, AlertTriangle, Infinity } from "lucide-react";
+import { Coins, TrendingUp, AlertTriangle, Infinity as InfinityIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -67,7 +67,7 @@ export function CreditsSummary({ org, isLoading, className, variant = "card" }: 
               <p className="text-lg font-semibold text-white tabular-nums">
                 {unlimited ? (
                   <span className="inline-flex items-center gap-1 text-emerald-400/90">
-                    <Infinity size={18} />
+                    <InfinityIcon size={18} />
                     Not charged
                   </span>
                 ) : (
@@ -85,7 +85,7 @@ export function CreditsSummary({ org, isLoading, className, variant = "card" }: 
               <p className="text-lg font-semibold text-white tabular-nums">
                 {unlimited ? (
                   <span className="inline-flex items-center gap-1 text-emerald-400/90">
-                    <Infinity size={18} />
+                    <InfinityIcon size={18} />
                     Unlimited
                   </span>
                 ) : (
