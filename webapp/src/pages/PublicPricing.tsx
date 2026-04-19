@@ -34,6 +34,12 @@ export default function PublicPricing() {
           <div className="space-y-4 text-white/80 leading-relaxed">
             <p>No subscriptions, no surprises. Just credits — buy a pack and use them as you need.</p>
             <p>
+              You can also enable <strong className="text-white font-semibold">automatic top-up</strong> under Billing in
+              your organisation: choose a credit pack and a balance threshold. When credits fall to that level, we open a
+              checkout so you can refill before work stops — a simple way to keep credits on the account without watching
+              the balance every day.
+            </p>
+            <p>
               Every active user costs <strong className="text-white font-semibold">1 credit per day</strong>. Add as many
               people as your project needs, and only pay for who&apos;s actually active.
             </p>
