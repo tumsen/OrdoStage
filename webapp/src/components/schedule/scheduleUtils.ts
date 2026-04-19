@@ -173,3 +173,56 @@ export const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December",
 ];
 export const DOW_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// ─── Overlap column layout ────────────────────────────────────────────────────
+
+export interface TimedBlock {
+  item: CalendarItem;
+  start: Date;
+  end: Date;
+  hasExplicitTime: boolean;
+}
+
+export interface LaidOutBlock extends TimedBlock {
+  colIndex: number;
+  totalCols: number;
+}
+
+/**
+ * Assigns non-overlapping column slots to timed blocks so they render side-by-side
+ * instead of stacking. Works per-day column.
+ */
+export function computeOverlapLayout(blocks: TimedBlock[]): LaidOutBlock[] {
+  if (blocks.length === 0) return [];
+
+  const sorted = [...blocks].sort((a, b) => a.start.getTime() - b.start.getTime());
+  const colEndTimes: Date[] = [];
+
+  const assigned: Array<TimedBlock & { colIndex: number; totalCols: number }> = sorted.map(
+    (entry) => {
+      let colIndex = -1;
+      for (let c = 0; c < colEndTimes.length; c++) {
+        if (entry.start.getTime() >= colEndTimes[c]!.getTime()) {
+          colIndex = c;
+          colEndTimes[c] = entry.end;
+          break;
+        }
+      }
+      if (colIndex === -1) {
+        colIndex = colEndTimes.length;
+        colEndTimes.push(entry.end);
+      }
+      return { ...entry, colIndex, totalCols: 1 };
+    }
+  );
+
+  // Re-calculate totalCols = highest colIndex among all concurrently overlapping items + 1
+  for (const r of assigned) {
+    const concurrent = assigned.filter(
+      (o) => r.start.getTime() < o.end.getTime() && r.end.getTime() > o.start.getTime()
+    );
+    r.totalCols = Math.max(...concurrent.map((c) => c.colIndex)) + 1;
+  }
+
+  return assigned;
+}

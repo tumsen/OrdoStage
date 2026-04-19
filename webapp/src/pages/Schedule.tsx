@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +23,7 @@ import {
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
+import { toast } from "@/hooks/use-toast";
 
 interface ScheduleData {
   events: EventDetail[];
@@ -164,6 +166,8 @@ function YearDiscView({ year, items }: { year: number; items: CalendarItem[] }) 
 }
 
 export default function Schedule() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const today = new Date();
   const [anchorDate, setAnchorDate] = useState(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
@@ -179,6 +183,34 @@ export default function Schedule() {
     private: true,
     other: true,
   });
+
+  const deleteBookingMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/bookings/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      toast({ title: "Booking deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete booking", variant: "destructive" }),
+  });
+
+  function handleItemClick(item: CalendarItem) {
+    if (item.kind === "event") {
+      navigate(`/events/${item.id}`);
+    } else {
+      // For bookings, open the detail sheet (editing not yet inline)
+      setSelectedItem(item);
+    }
+  }
+
+  function handleDeleteItem(item: CalendarItem) {
+    if (item.kind === "event") {
+      navigate(`/events/${item.id}`);
+    } else {
+      if (confirm(`Delete booking "${item.title}"?`)) {
+        deleteBookingMutation.mutate(item.id);
+      }
+    }
+  }
 
   const { from, to } = getRange(viewMode, anchorDate);
 
@@ -314,7 +346,7 @@ export default function Schedule() {
                       year={anchorDate.getFullYear()}
                       month={m}
                       items={visibleItems}
-                      onItemClick={setSelectedItem}
+                      onItemClick={handleItemClick}
                     />
                   </div>
                 ))}
@@ -326,7 +358,7 @@ export default function Schedule() {
                 year={anchorDate.getFullYear()}
                 month={anchorDate.getMonth()}
                 items={visibleItems}
-                onItemClick={setSelectedItem}
+                onItemClick={handleItemClick}
               />
             ) : viewMode === "week" || viewMode === "day" ? (
               <div className="space-y-2">
@@ -336,7 +368,8 @@ export default function Schedule() {
                 <OutlookTimeGrid
                   days={getRangeDays(viewMode, anchorDate)}
                   items={visibleItems}
-                  onItemClick={setSelectedItem}
+                  onItemClick={handleItemClick}
+                  onDeleteItem={handleDeleteItem}
                   onSelectTimeRange={(start, end) => {
                     setBookingSlot({
                       startDate: toDatetimeLocalValue(start),
