@@ -1,4 +1,4 @@
-import { useCallback, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const LIGHT_X = [50, 75, 100, 125, 150] as const;
@@ -16,12 +16,14 @@ const COLORS = ["#ff006e", "#fb5607", "#ffbe0b", "#3a86ff", "#8338ec"] as const;
 /** Idle beam opacity (matches original SVG when not hovered). */
 const IDLE_BEAM_OPACITY = [0.15, 0.15, 0.2, 0.15, 0.15] as const;
 
-const LAMP_SPACING = 25;
-const FIRST_LAMP_X = 50;
-
-/** Continuous “focus” between lamps 0–4 from horizontal position. */
-function focusIndexFromMouseX(mouseX: number): number {
-  return (mouseX - FIRST_LAMP_X) / LAMP_SPACING;
+/**
+ * Map screen X to lamp focus 0–4: left edge → lamp 0, horizontal center → 2 (yellow),
+ * right edge → lamp 4.
+ */
+function focusIndexFromScreenX(clientX: number, width: number): number {
+  if (width <= 0) return 2;
+  const t = clientX / width;
+  return t * 4;
 }
 
 /**
@@ -49,24 +51,20 @@ function lampFalloff(distance: number): number {
   return a[a.length - 1]![1];
 }
 
-/** 0–1 level per lamp while pointer is over the graphic. */
-function lampStrengths(mouseX: number, mouseY: number): number[] {
-  const focus = focusIndexFromMouseX(mouseX);
-  const yFade = mouseY >= 48 ? 1 : 0.22 + Math.max(0, mouseY / 48) * 0.78;
-  return LIGHT_X.map((_, i) => Math.min(1, lampFalloff(Math.abs(i - focus)) * yFade));
+function lampStrengthsFromFocus(focusIndex: number): number[] {
+  return LIGHT_X.map((_, i) => Math.min(1, lampFalloff(Math.abs(i - focusIndex))));
 }
 
-/** Default 200×200 artwork. Sidebar crops empty margin so the mark can span the nav width. */
+/** Full-width artboard horizontally so “ORDO” Os aren’t clipped in the sidebar crop. */
 const VIEWBOX_DEFAULT = { x: 0, y: 0, w: 200, h: 200 } as const;
-/** Tighter crop; bottom clears extended beams (see BEAM_FLOOR_Y). */
-const VIEWBOX_SIDEBAR = { x: 10, y: 36, w: 180, h: 146 } as const;
+const VIEWBOX_SIDEBAR = { x: 0, y: 36, w: 200, h: 146 } as const;
 
 type OrdoStageLogoProps = {
   className?: string;
   /** Pixel width & height (square). Ignored when `variant="sidebar"`. */
   size?: number;
   interactive?: boolean;
-  /** Full width of the left nav; uses a tighter viewBox so the logo reads at ~nav width. */
+  /** Full width of the left nav; uses a tighter viewBox so the mark uses nav width. */
   variant?: "default" | "sidebar";
 };
 
@@ -78,64 +76,64 @@ export function OrdoStageLogo({
 }: OrdoStageLogoProps) {
   const vb = variant === "sidebar" ? VIEWBOX_SIDEBAR : VIEWBOX_DEFAULT;
   const uid = useId();
-  const rootRef = useRef<SVGSVGElement>(null);
-  const [inside, setInside] = useState(false);
-  const [mx, setMx] = useState(() => vb.x + vb.w / 2);
-  const [my, setMy] = useState(() => vb.y + vb.h * 0.45);
 
-  const strengths = useMemo(() => lampStrengths(mx, my), [mx, my]);
+  const [focusIndex, setFocusIndex] = useState(2);
+  const lastClientXRef = useRef(0);
 
-  const updatePointer = useCallback(
-    (clientX: number, clientY: number) => {
-      const el = rootRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const x = vb.x + ((clientX - rect.left) / rect.width) * vb.w;
-      const y = vb.y + ((clientY - rect.top) / rect.height) * vb.h;
-      setMx(x);
-      setMy(y);
-    },
-    [vb],
-  );
-
-  const handleMove = (e: React.MouseEvent<SVGSVGElement>) => {
+  useEffect(() => {
     if (!interactive) return;
-    updatePointer(e.clientX, e.clientY);
-  };
+    if (typeof window === "undefined") return;
 
-  const handleEnter = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!interactive) return;
-    setInside(true);
-    updatePointer(e.clientX, e.clientY);
-  };
+    const sync = (clientX: number) => {
+      lastClientXRef.current = clientX;
+      const w = window.innerWidth;
+      if (w <= 0) return;
+      setFocusIndex(focusIndexFromScreenX(clientX, w));
+    };
 
-  const handleLeave = () => {
-    setInside(false);
-    setMx(vb.x + vb.w / 2);
-    setMy(vb.y + vb.h * 0.45);
-  };
+    const onMove = (e: MouseEvent) => sync(e.clientX);
+    const onResize = () => sync(lastClientXRef.current);
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("resize", onResize);
+
+    const w = window.innerWidth;
+    const initialX = w > 0 ? w / 2 : 0;
+    lastClientXRef.current = initialX;
+    if (w > 0) sync(initialX);
+
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [interactive]);
+
+  const strengths = useMemo(() => {
+    if (!interactive) return LIGHT_X.map(() => 0);
+    return lampStrengthsFromFocus(focusIndex);
+  }, [interactive, focusIndex]);
 
   const gradId = `${uid}-textGrad`;
-  /** Short + smooth: fast follow, no mushy lag. */
-  const beamTransition = "opacity 165ms cubic-bezier(0.4, 0, 0.2, 1), fill-opacity 165ms cubic-bezier(0.4, 0, 0.2, 1)";
+  const beamTransition =
+    "opacity 220ms cubic-bezier(0.35, 0.02, 0.22, 1), fill-opacity 220ms cubic-bezier(0.35, 0.02, 0.22, 1)";
   const bulbTransition =
-    "opacity 165ms cubic-bezier(0.4, 0, 0.2, 1), filter 165ms cubic-bezier(0.4, 0, 0.2, 1)";
+    "opacity 200ms cubic-bezier(0.35, 0.02, 0.22, 1), filter 220ms cubic-bezier(0.35, 0.02, 0.22, 1)";
 
   const viewBoxAttr = `${vb.x} ${vb.y} ${vb.w} ${vb.h}`;
 
   return (
     <svg
-      ref={rootRef}
       width={variant === "sidebar" ? undefined : size}
       height={variant === "sidebar" ? undefined : size}
       viewBox={viewBoxAttr}
       preserveAspectRatio="xMidYMid meet"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      overflow="visible"
       className={cn(
         "select-none",
         variant === "sidebar" ? "w-full h-auto min-w-0" : "shrink-0",
-        interactive && "cursor-crosshair",
+        interactive && "pointer-events-none",
         className,
       )}
       style={
@@ -143,9 +141,6 @@ export function OrdoStageLogo({
           ? { aspectRatio: `${vb.w} / ${vb.h}` }
           : undefined
       }
-      onMouseEnter={handleEnter}
-      onMouseMove={handleMove}
-      onMouseLeave={handleLeave}
       aria-hidden
       role="img"
     >
@@ -165,7 +160,7 @@ export function OrdoStageLogo({
       <rect x="30" y="50" width="140" height="12" fill="#333" rx="2" />
 
       {LIGHT_X.map((cx, i) => {
-        const s = inside ? strengths[i] : 0;
+        const s = interactive ? strengths[i] ?? 0 : 0;
         const glow = 0.76 + s * 0.24;
         return (
           <circle
@@ -184,10 +179,10 @@ export function OrdoStageLogo({
       })}
 
       {BEAMS.map((beam, i) => {
-        const s = inside ? strengths[i] : 0;
+        const s = interactive ? strengths[i] ?? 0 : 0;
         const floor = 0.06;
         const peak = 0.62;
-        const opacity = inside ? floor + s * peak : IDLE_BEAM_OPACITY[i];
+        const opacity = interactive ? floor + s * peak : IDLE_BEAM_OPACITY[i];
         return (
           <path
             key={beam.d}
@@ -201,7 +196,6 @@ export function OrdoStageLogo({
         );
       })}
 
-      {/* Gradient wordmark only (drawn last — full rainbow on top). */}
       <text
         x="100"
         y="120"
