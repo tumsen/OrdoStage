@@ -47,6 +47,7 @@ export default function SiteContentAdmin() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Landing Title</Label>
+          <p className="text-xs text-white/40">Leave empty to use the default home page headline.</p>
           <Input value={merged.landing_title ?? ""} onChange={(e) => setField("landing_title", e.target.value)} />
         </div>
         <div className="space-y-2">
@@ -55,6 +56,7 @@ export default function SiteContentAdmin() {
         </div>
         <div className="space-y-2 md:col-span-2">
           <Label>Landing Subtitle</Label>
+          <p className="text-xs text-white/40">Leave empty to use the default hero paragraph under the headline.</p>
           <Textarea value={merged.landing_subtitle ?? ""} onChange={(e) => setField("landing_subtitle", e.target.value)} />
         </div>
         <div className="space-y-2 md:col-span-2">

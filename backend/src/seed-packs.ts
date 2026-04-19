@@ -8,13 +8,17 @@ const DEFAULT_PACKS = [
 ];
 
 const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
-  { key: "landing_title", value: "OrdoStage for Theaters" },
+  {
+    key: "landing_title",
+    value:
+      "Ordo Stage is a planning platform built for theatres, venues, and touring productions.",
+  },
   {
     key: "landing_subtitle",
     value:
-      "Plan productions, coordinate teams, and run tours from one platform built for theater operations.",
+      "It brings everything together in one place — from the first booking to the final curtain call.",
   },
-  { key: "landing_cta_text", value: "Start Using OrdoStage" },
+  { key: "landing_cta_text", value: "Get started" },
   { key: "landing_cta_url", value: "/login" },
   {
     key: "terms_content",

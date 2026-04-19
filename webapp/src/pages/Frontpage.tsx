@@ -5,6 +5,12 @@ import { Button } from "@/components/ui/button";
 
 type SiteContent = Record<string, string>;
 
+/** Defaults match marketing copy when Website Content fields are empty. */
+const DEFAULT_HERO_TITLE =
+  "Ordo Stage is a planning platform built for theatres, venues, and touring productions.";
+const DEFAULT_HERO_SUBTITLE =
+  "It brings everything together in one place — from the first booking to the final curtain call.";
+
 function SectionDivider() {
   return (
     <div
@@ -27,16 +33,19 @@ export default function Frontpage() {
   const ctaText = data?.landing_cta_text ?? "Get started";
   const ctaUrl = data?.landing_cta_url ?? "/login";
 
+  const heroTitle = data?.landing_title?.trim() || DEFAULT_HERO_TITLE;
+  const heroSubtitle = data?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
+
   return (
     <div className="text-white">
       <article className="max-w-3xl mx-auto px-6 py-14 md:py-20 space-y-10 md:space-y-12">
         {/* Hero */}
         <header className="space-y-6">
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">
-            Ordo Stage is a planning platform built for theatres, venues, and touring productions.
+            {heroTitle}
           </h1>
           <p className="text-lg md:text-xl text-white/75 leading-relaxed">
-            It brings everything together in one place — from the first booking to the final curtain call.
+            {heroSubtitle}
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
