@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -58,7 +58,7 @@ function PackRow({
 }: {
   pack: PricePack;
   baselinePack: PricePack | null;
-  onSave: (packId: string, data: { label?: string; amountCents?: number; active?: boolean }) => void;
+  onSave: (packRecordId: string, data: { label?: string; amountCents?: number; active?: boolean }) => void;
   onDelete: (pack: PricePack) => void;
   isSaving: boolean;
   isDeleting: boolean;
@@ -106,7 +106,7 @@ function PackRow({
 
   const handleSave = () => {
     if (isNaN(parsedAmountCents) || parsedAmountCents < 1) return;
-    onSave(pack.packId, {
+    onSave(pack.id, {
       label: edits.label,
       amountCents: parsedAmountCents,
       active: edits.active,
@@ -252,6 +252,7 @@ function PackRow({
 export default function Pricing() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  /** PricePack primary key (cuid), used in PUT/DELETE URLs — avoids slug encoding/proxy edge cases. */
   const [savingId, setSavingId] = useState<string | null>(null);
   const [newPackId, setNewPackId] = useState("");
   const [newDays, setNewDays] = useState("");
@@ -269,14 +270,14 @@ export default function Pricing() {
 
   const updateMutation = useMutation({
     mutationFn: ({
-      packId,
+      packRecordId,
       data,
     }: {
-      packId: string;
+      packRecordId: string;
       data: { label?: string; amountCents?: number; active?: boolean };
-    }) => api.put(`/api/admin/packs/${packId}`, data),
-    onMutate: ({ packId }) => {
-      setSavingId(packId);
+    }) => api.put(`/api/admin/packs/${encodeURIComponent(packRecordId)}`, data),
+    onMutate: ({ packRecordId }) => {
+      setSavingId(packRecordId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "packs"] });
@@ -284,9 +285,10 @@ export default function Pricing() {
       setSavingId(null);
       toast({ title: "Pack updated", description: "Price pack has been saved." });
     },
-    onError: () => {
+    onError: (err) => {
       setSavingId(null);
-      toast({ title: "Error", description: "Failed to update pack.", variant: "destructive" });
+      const msg = isApiError(err) ? err.message : "Failed to update pack.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
 
@@ -314,20 +316,22 @@ export default function Pricing() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (packId: string) => api.delete(`/api/admin/packs/${packId}`),
+    mutationFn: (packRecordId: string) =>
+      api.delete(`/api/admin/packs/${encodeURIComponent(packRecordId)}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "packs"] });
       queryClient.invalidateQueries({ queryKey: ["public-pricing"] });
       setPackToDelete(null);
       toast({ title: "Pack deleted", description: "Pack removed and auto top-up cleared where needed." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to delete pack.", variant: "destructive" });
+    onError: (err) => {
+      const msg = isApiError(err) ? err.message : "Failed to delete pack.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
 
-  const handleSave = (packId: string, data: { label?: string; amountCents?: number; active?: boolean }) => {
-    updateMutation.mutate({ packId, data });
+  const handleSave = (packRecordId: string, data: { label?: string; amountCents?: number; active?: boolean }) => {
+    updateMutation.mutate({ packRecordId, data });
   };
 
   const parsedDays = parseInt(newDays, 10);
@@ -501,8 +505,8 @@ export default function Pricing() {
                   baselinePack={baselinePack}
                   onSave={handleSave}
                   onDelete={setPackToDelete}
-                  isSaving={savingId === pack.packId}
-                  isDeleting={Boolean(deleteMutation.isPending && packToDelete?.packId === pack.packId)}
+                  isSaving={savingId === pack.id}
+                  isDeleting={Boolean(deleteMutation.isPending && packToDelete?.id === pack.id)}
                 />
               ))
             )}
@@ -527,7 +531,7 @@ export default function Pricing() {
             <AlertDialogCancel className="bg-transparent border-white/15 text-white">Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-700 hover:bg-red-600 text-white"
-              onClick={() => packToDelete && deleteMutation.mutate(packToDelete.packId)}
+              onClick={() => packToDelete && deleteMutation.mutate(packToDelete.id)}
             >
               Delete
             </AlertDialogAction>

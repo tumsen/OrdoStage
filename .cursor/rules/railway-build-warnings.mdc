@@ -1,0 +1,13 @@
+---
+description: When Railway deploy/build logs show warnings, fix them in Dockerfile, Prisma, Vite, and deps until builds are clean.
+globs: Dockerfile,**/Dockerfile*,**/railway.json,**/vite.config.ts,backend/package.json,webapp/package.json
+alwaysApply: false
+---
+
+# Railway build warnings
+
+When the user shares Railway output or wants deploy noise reduced:
+
+1. Prefer pulling logs locally with a configured token: `bun run railway:logs` (see `.env.railway.example`). Default script targets **build** logs (`--build`, ~500 lines).
+2. Treat **npm/bun peer deprecation**, **Prisma generate hints**, and **Vite baseline-browser-mapping** messages as actionable where there is a safe fix (flags, upgrades, `--no-hints`, browserlist refresh).
+3. Do not commit secrets: never add `RAILWAY_TOKEN` to tracked files.

@@ -12,7 +12,7 @@ type SiteContent = Record<string, string>;
 export default function SiteContentAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data } = useQuery({
+  const { data, isPending, isError } = useQuery({
     queryKey: ["admin", "site-content"],
     queryFn: () => api.get<SiteContent>("/api/admin/site-content"),
   });
@@ -92,16 +92,75 @@ export default function SiteContentAdmin() {
         </div>
       </div>
 
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-4">
+        <h3 className="text-sm font-semibold text-white">Company &amp; legal contact</h3>
+        <p className="text-xs text-white/45">
+          Optional structured fields for reference, marketing, or future pages. Legal pages below still control the exact
+          text visitors see unless you align these values with your Terms / Privacy bodies.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Product / brand name</Label>
+            <Input
+              placeholder="Ordo Stage"
+              value={merged.company_brand ?? ""}
+              onChange={(e) => setField("company_brand", e.target.value)}
+              className="bg-gray-900/80 border-white/10"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Legal entity</Label>
+            <Input
+              placeholder="Schwifty"
+              value={merged.company_entity ?? ""}
+              onChange={(e) => setField("company_entity", e.target.value)}
+              className="bg-gray-900/80 border-white/10"
+            />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>Address</Label>
+            <Input
+              placeholder="Strandgade 1, 5700 Svendborg, Denmark"
+              value={merged.company_address ?? ""}
+              onChange={(e) => setField("company_address", e.target.value)}
+              className="bg-gray-900/80 border-white/10"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>VAT number</Label>
+            <Input
+              placeholder="DK28625383"
+              value={merged.company_vat ?? ""}
+              onChange={(e) => setField("company_vat", e.target.value)}
+              className="bg-gray-900/80 border-white/10"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Contact email</Label>
+            <Input
+              type="email"
+              placeholder="mail@ordostage.com"
+              value={merged.company_email ?? ""}
+              onChange={(e) => setField("company_email", e.target.value)}
+              className="bg-gray-900/80 border-white/10"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-2">
         <Label>Terms of Service</Label>
+        <p className="text-xs text-white/40">Full text shown on /terms-of-service.</p>
         <Textarea className="min-h-48" value={merged.terms_content ?? ""} onChange={(e) => setField("terms_content", e.target.value)} />
       </div>
       <div className="space-y-2">
         <Label>Privacy Policy</Label>
+        <p className="text-xs text-white/40">Full text shown on /privacy-policy.</p>
         <Textarea className="min-h-48" value={merged.privacy_content ?? ""} onChange={(e) => setField("privacy_content", e.target.value)} />
       </div>
       <div className="space-y-2">
         <Label>Refund Policy</Label>
+        <p className="text-xs text-white/40">Full text shown on /refund-policy.</p>
         <Textarea className="min-h-48" value={merged.refund_content ?? ""} onChange={(e) => setField("refund_content", e.target.value)} />
       </div>
 

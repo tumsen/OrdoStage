@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "railway:logs": "bash scripts/railway-logs.sh"
+  },
   "dependencies": {},
   "devDependencies": {
     "prisma": "6"

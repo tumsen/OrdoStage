@@ -156,6 +156,12 @@ app.use("/api/*", async (c, next) => {
     return;
   }
 
+  // Owner-admin routes enforce access in adminMiddleware; never block writes due to org credits.
+  if (path.startsWith("/api/admin")) {
+    await next();
+    return;
+  }
+
   const user = c.get("user");
   if (!user?.organizationId) {
     await next();

@@ -1,14 +1,14 @@
 FROM oven/bun:1-alpine AS base
 WORKDIR /app
 
-# Copy package files
+# Quieter CI installs (fewer lines Railway labels as warnings); reproducible backend lockfile.
+ENV CI=true
+
 COPY package.json bun.lock ./
-COPY backend/package.json ./backend/
+COPY backend/package.json backend/bun.lock ./backend/
 
-# Install backend dependencies
-RUN cd backend && bun install --frozen-lockfile
+RUN cd backend && bun install --frozen-lockfile --silent
 
-# Copy backend source (cache bust: v2)
 COPY backend/ ./backend/
 
 # Switch Prisma provider to PostgreSQL for production
@@ -18,7 +18,7 @@ RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' backend/prisma/schem
 RUN sed -i '/PRAGMA/d' backend/src/prisma.ts && sed -i '/initSqlitePragmas/d' backend/src/prisma.ts
 
 # Generate Prisma client
-RUN cd backend && bunx prisma generate
+RUN cd backend && bunx prisma generate --no-hints
 
 EXPOSE 3000
 

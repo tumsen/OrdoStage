@@ -1,12 +1,14 @@
 FROM oven/bun:1-alpine
 WORKDIR /app
 
-COPY package.json ./
-RUN bun install
+ENV CI=true
+
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --silent
 
 COPY . .
 
-RUN bunx prisma generate
+RUN bunx prisma generate --no-hints
 
 EXPOSE 3000
 

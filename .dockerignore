@@ -1,0 +1,11 @@
+# Smaller, safer build context; keep .env and secrets out of the image
+**/.env
+**/.env.local
+**/.env.production
+**/.env.*.local
+!**/.env.example
+**/node_modules
+.git
+**/.DS_Store
+**/prisma/dev.db
+**/prisma/*.db-journal

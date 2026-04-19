@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || "";
+/** Normalize so `/api/...` never becomes `//api/...` when backend URL has a trailing slash. */
+const API_BASE_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
 
 class ApiError extends Error {
   constructor(message: string, public status: number, public data?: unknown) {
