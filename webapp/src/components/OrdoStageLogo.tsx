@@ -1,4 +1,4 @@
-import { memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
 const LIGHT_X = [50, 75, 100, 125, 150] as const;
@@ -48,10 +48,8 @@ type OrdoStageLogoProps = {
 
 /** Static wordmark in its own memoized SVG so rAF beam updates never repaint the type. */
 const OrdoStageWordmark = memo(function OrdoStageWordmark({
-  gradId,
   viewBoxAttr,
 }: {
-  gradId: string;
   viewBoxAttr: string;
 }) {
   return (
@@ -62,20 +60,10 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
       xmlns="http://www.w3.org/2000/svg"
       shapeRendering="geometricPrecision"
       className="pointer-events-none absolute inset-0 z-[2] h-full w-full select-none"
-      style={{ opacity: 1, isolation: "isolate" }}
       overflow="visible"
       aria-hidden
     >
-      <defs>
-        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#ff006e" stopOpacity={1} />
-          <stop offset="25%" stopColor="#fb5607" stopOpacity={1} />
-          <stop offset="50%" stopColor="#ffbe0b" stopOpacity={1} />
-          <stop offset="75%" stopColor="#3a86ff" stopOpacity={1} />
-          <stop offset="100%" stopColor="#8338ec" stopOpacity={1} />
-        </linearGradient>
-      </defs>
-      {/* Stroke-only layer first (solid white), then fill — outline never shares opacity with the gradient. */}
+      {/* Stroke-only: letter interiors stay transparent so beams (SVG below) show through. */}
       <text
         x={100}
         y={120}
@@ -90,22 +78,6 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
         strokeLinecap="round"
         textAnchor="middle"
         textRendering="geometricPrecision"
-        style={{ opacity: 1 }}
-      >
-        ORDO
-      </text>
-      <text
-        x={100}
-        y={120}
-        fontFamily="Arial Black, Helvetica, sans-serif"
-        fontSize={48}
-        fontWeight="900"
-        fill={`url(#${gradId})`}
-        fillOpacity={1}
-        stroke="none"
-        textAnchor="middle"
-        textRendering="geometricPrecision"
-        style={{ opacity: 1 }}
       >
         ORDO
       </text>
@@ -123,22 +95,6 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
         strokeLinecap="round"
         textAnchor="middle"
         textRendering="geometricPrecision"
-        style={{ opacity: 1 }}
-      >
-        STAGE
-      </text>
-      <text
-        x={100}
-        y={155}
-        fontFamily="Arial Black, Helvetica, sans-serif"
-        fontSize={32}
-        fontWeight="900"
-        fill={`url(#${gradId})`}
-        fillOpacity={1}
-        stroke="none"
-        textAnchor="middle"
-        textRendering="geometricPrecision"
-        style={{ opacity: 1 }}
       >
         STAGE
       </text>
@@ -286,8 +242,6 @@ export function OrdoStageLogo({
   variant = "default",
 }: OrdoStageLogoProps) {
   const vb = variant === "sidebar" ? VIEWBOX_SIDEBAR : VIEWBOX_DEFAULT;
-  const uid = useId();
-  const gradId = `${uid}-textGrad`;
   const viewBoxAttr = useMemo(
     () => `${vb.x} ${vb.y} ${vb.w} ${vb.h}`,
     [vb],
@@ -309,7 +263,7 @@ export function OrdoStageLogo({
       style={wrapperStyle}
     >
       <OrdoStageBeamRig interactive={interactive} viewBoxAttr={viewBoxAttr} />
-      <OrdoStageWordmark gradId={gradId} viewBoxAttr={viewBoxAttr} />
+      <OrdoStageWordmark viewBoxAttr={viewBoxAttr} />
     </div>
   );
 }
