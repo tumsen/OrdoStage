@@ -57,7 +57,6 @@ export default function Roles() {
 
   const [mode, setMode] = useState<"closed" | "new" | "edit">("closed");
   const [editRow, setEditRow] = useState<RoleRow | null>(null);
-  const [newSlug, setNewSlug] = useState("");
   const [newName, setNewName] = useState("");
   const [draftName, setDraftName] = useState("");
   const [draftViews, setDraftViews] = useState<string[]>([]);
@@ -70,7 +69,6 @@ export default function Roles() {
       setDraftActions([...editRow.actions]);
     }
     if (mode === "new" && catalog) {
-      setNewSlug("");
       setNewName("");
       setDraftViews(catalog.views.map((v) => v.id));
       setDraftActions([]);
@@ -90,10 +88,7 @@ export default function Roles() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (mode === "new") {
-        const slug = newSlug.trim().toLowerCase().replace(/\s+/g, "_");
-        if (!/^[a-z][a-z0-9_]*$/.test(slug)) {
-          throw new Error("Slug: lowercase letters, numbers, underscore; start with a letter.");
-        }
+        const slug = newName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "role";
         await api.post("/api/org/role-definitions", {
           slug,
           name: newName.trim() || slug,
@@ -303,22 +298,19 @@ export default function Roles() {
           {mode === "new" ? (
             <div className="space-y-3 py-1 shrink-0">
               <div>
-                <Label className="text-white/50 text-xs">Slug</Label>
-                <Input
-                  value={newSlug}
-                  onChange={(e) => setNewSlug(e.target.value)}
-                  placeholder="e.g. producer"
-                  className="bg-white/5 border-white/10 mt-1"
-                />
-              </div>
-              <div>
-                <Label className="text-white/50 text-xs">Display name</Label>
+                <Label className="text-white/50 text-xs">Role name</Label>
                 <Input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Producer"
+                  placeholder="e.g. Producer"
                   className="bg-white/5 border-white/10 mt-1"
+                  autoFocus
                 />
+                {newName.trim() ? (
+                  <p className="text-[11px] text-white/30 mt-1">
+                    Slug: <code className="text-white/45">{newName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}</code>
+                  </p>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -350,7 +342,7 @@ export default function Roles() {
             {isOwner ? (
               <Button
                 className="bg-red-900 hover:bg-red-800"
-                disabled={saveMutation.isPending || (mode === "new" && !newSlug.trim())}
+                disabled={saveMutation.isPending || (mode === "new" && !newName.trim())}
                 onClick={() => saveMutation.mutate()}
               >
                 {saveMutation.isPending ? "Saving…" : "Save"}

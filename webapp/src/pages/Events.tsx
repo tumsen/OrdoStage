@@ -127,14 +127,29 @@ export default function Events() {
                 : "No events match your filters."}
             </div>
           ) : (
-            filtered.map((event) => (
+            filtered.map((event) => {
+              const isDraft = event.status === "draft";
+              const isCancelled = event.status === "cancelled";
+              return (
               <div key={event.id} className="contents group">
                 <div
                   className="px-5 py-3.5 border-b border-white/5 cursor-pointer"
                   onClick={() => navigate(`/events/${event.id}`)}
                 >
-                  <div className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
-                    {event.title}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
+                      {event.title}
+                    </span>
+                    {isDraft && (
+                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-ordo-yellow/20 text-ordo-yellow border border-ordo-yellow/40">
+                        Draft
+                      </span>
+                    )}
+                    {isCancelled && (
+                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-700/50">
+                        Cancelled
+                      </span>
+                    )}
                   </div>
                   {event.tags ? (
                     <div className="text-xs text-white/30 mt-0.5 truncate">{event.tags}</div>
@@ -171,7 +186,8 @@ export default function Events() {
                   </Button>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
