@@ -113,14 +113,6 @@ const App = () => (
             }
           />
           <Route
-            path="/refund-policy"
-            element={
-              <PublicLayout>
-                <LegalPage />
-              </PublicLayout>
-            }
-          />
-          <Route
             path="/accept-invite"
             element={
               <PublicLayout>

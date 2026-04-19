@@ -158,11 +158,6 @@ export default function SiteContentAdmin() {
         <p className="text-xs text-white/40">Full text shown on /privacy-policy.</p>
         <Textarea className="min-h-48" value={merged.privacy_content ?? ""} onChange={(e) => setField("privacy_content", e.target.value)} />
       </div>
-      <div className="space-y-2">
-        <Label>Refund Policy</Label>
-        <p className="text-xs text-white/40">Full text shown on /refund-policy.</p>
-        <Textarea className="min-h-48" value={merged.refund_content ?? ""} onChange={(e) => setField("refund_content", e.target.value)} />
-      </div>
 
       <Button
         onClick={() => updateMutation.mutate(merged)}

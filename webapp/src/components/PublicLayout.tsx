@@ -5,7 +5,6 @@ import {
   Home,
   LogIn,
   Menu,
-  RotateCcw,
   Shield,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -21,7 +20,6 @@ const navItems: { to: string; label: string; icon: LucideIcon; exact?: boolean }
   { to: "/pricing", label: "Pricing", icon: CreditCard },
   { to: "/terms-of-service", label: "Terms", icon: FileText },
   { to: "/privacy-policy", label: "Privacy", icon: Shield },
-  { to: "/refund-policy", label: "Refunds", icon: RotateCcw },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -29,7 +27,6 @@ const pageTitles: Record<string, string> = {
   "/pricing": "Pricing",
   "/terms-of-service": "Terms of Service",
   "/privacy-policy": "Privacy Policy",
-  "/refund-policy": "Refund Policy",
   "/accept-invite": "Invitation",
 };
 
