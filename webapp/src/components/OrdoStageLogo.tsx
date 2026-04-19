@@ -2,32 +2,34 @@ import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const LIGHT_X = [50, 75, 100, 125, 150] as const;
+/** Beam floor y — below STAGE baseline (~155) so wash reads under the wordmark. */
+const BEAM_FLOOR_Y = 178;
+
 const BEAMS = [
-  { d: "M 50 62 L 30 150 L 70 150 Z", fill: "#ff006e" },
-  { d: "M 75 62 L 55 150 L 95 150 Z", fill: "#fb5607" },
-  { d: "M 100 62 L 80 150 L 120 150 Z", fill: "#ffbe0b" },
-  { d: "M 125 62 L 105 150 L 145 150 Z", fill: "#3a86ff" },
-  { d: "M 150 62 L 130 150 L 170 150 Z", fill: "#8338ec" },
+  { d: `M 50 62 L 28 ${BEAM_FLOOR_Y} L 72 ${BEAM_FLOOR_Y} Z`, fill: "#ff006e" },
+  { d: `M 75 62 L 53 ${BEAM_FLOOR_Y} L 97 ${BEAM_FLOOR_Y} Z`, fill: "#fb5607" },
+  { d: `M 100 62 L 78 ${BEAM_FLOOR_Y} L 122 ${BEAM_FLOOR_Y} Z`, fill: "#ffbe0b" },
+  { d: `M 125 62 L 103 ${BEAM_FLOOR_Y} L 147 ${BEAM_FLOOR_Y} Z`, fill: "#3a86ff" },
+  { d: `M 150 62 L 128 ${BEAM_FLOOR_Y} L 172 ${BEAM_FLOOR_Y} Z`, fill: "#8338ec" },
 ] as const;
 const COLORS = ["#ff006e", "#fb5607", "#ffbe0b", "#3a86ff", "#8338ec"] as const;
 /** Idle beam opacity (matches original SVG when not hovered). */
 const IDLE_BEAM_OPACITY = [0.15, 0.15, 0.2, 0.15, 0.15] as const;
 
-/** Broad Gaussian = soft handoff left↔right like overlapping stage spots. */
-const BEAM_SIGMA = 56;
+/** Narrow Gaussian so one lamp reaches max while neighbours stay clearly dimmer. */
+const BEAM_SIGMA = 27;
 
-/** 0–1 spotlight weight for each lamp from horizontal position (theatrical fade). */
+/** 0–1 spotlight weight for each lamp from horizontal position. */
 function beamWeight(mouseX: number, mouseY: number, lightX: number): number {
   const gx = Math.exp(-((mouseX - lightX) ** 2) / (2 * BEAM_SIGMA * BEAM_SIGMA));
-  /** Slight wash when pointer is above the truss; full in the beam cone. */
   const yFade = mouseY >= 50 ? 1 : 0.28 + Math.max(0, mouseY / 50) * 0.72;
   return Math.min(1, gx * yFade);
 }
 
 /** Default 200×200 artwork. Sidebar crops empty margin so the mark can span the nav width. */
 const VIEWBOX_DEFAULT = { x: 0, y: 0, w: 200, h: 200 } as const;
-/** Tighter crop so the mark uses the nav width without oversized padding. */
-const VIEWBOX_SIDEBAR = { x: 10, y: 36, w: 180, h: 126 } as const;
+/** Tighter crop; bottom clears extended beams (see BEAM_FLOOR_Y). */
+const VIEWBOX_SIDEBAR = { x: 10, y: 36, w: 180, h: 146 } as const;
 
 type OrdoStageLogoProps = {
   className?: string;
@@ -173,9 +175,9 @@ export function OrdoStageLogo({
 
       {BEAMS.map((beam, i) => {
         const s = inside ? strengths[i] : 0;
-        const floor = 0.07;
-        const peak = 0.58;
-        const opacity = inside ? floor + s ** 0.92 * peak : IDLE_BEAM_OPACITY[i];
+        const floor = 0.06;
+        const peak = 0.62;
+        const opacity = inside ? floor + s * peak : IDLE_BEAM_OPACITY[i];
         return (
           <path
             key={beam.d}
@@ -191,11 +193,11 @@ export function OrdoStageLogo({
 
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#ff006e" />
-          <stop offset="25%" stopColor="#fb5607" />
-          <stop offset="50%" stopColor="#ffbe0b" />
-          <stop offset="75%" stopColor="#3a86ff" />
-          <stop offset="100%" stopColor="#8338ec" />
+          <stop offset="0%" stopColor="#ff006e" stopOpacity={1} />
+          <stop offset="25%" stopColor="#fb5607" stopOpacity={1} />
+          <stop offset="50%" stopColor="#ffbe0b" stopOpacity={1} />
+          <stop offset="75%" stopColor="#3a86ff" stopOpacity={1} />
+          <stop offset="100%" stopColor="#8338ec" stopOpacity={1} />
         </linearGradient>
       </defs>
 
@@ -206,6 +208,7 @@ export function OrdoStageLogo({
         fontSize="48"
         fontWeight="900"
         fill={`url(#${gradId})`}
+        fillOpacity={1}
         textAnchor="middle"
         style={{ opacity: 1 }}
       >
@@ -218,6 +221,7 @@ export function OrdoStageLogo({
         fontSize="32"
         fontWeight="900"
         fill={`url(#${gradId})`}
+        fillOpacity={1}
         textAnchor="middle"
         style={{ opacity: 1 }}
       >
