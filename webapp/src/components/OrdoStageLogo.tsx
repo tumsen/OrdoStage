@@ -13,13 +13,15 @@ const COLORS = ["#ff006e", "#fb5607", "#ffbe0b", "#3a86ff", "#8338ec"] as const;
 /** Idle beam opacity (matches original SVG when not hovered). */
 const IDLE_BEAM_OPACITY = [0.15, 0.15, 0.2, 0.15, 0.15] as const;
 
-/** Gaussian-ish falloff: strongest when mouse aligns with that light horizontally. */
-function beamStrength(mouseX: number, mouseY: number, lightX: number): number {
-  const sigma = 42;
-  const gx = Math.exp(-((mouseX - lightX) ** 2) / (2 * sigma * sigma));
-  /** Slightly favor pointer below the bar (into the beams). */
-  const yBoost = mouseY >= 52 ? 1 : 0.65 + (mouseY / 52) * 0.35;
-  return Math.min(1, gx * yBoost);
+/** Broad Gaussian = soft handoff left↔right like overlapping stage spots. */
+const BEAM_SIGMA = 56;
+
+/** 0–1 spotlight weight for each lamp from horizontal position (theatrical fade). */
+function beamWeight(mouseX: number, mouseY: number, lightX: number): number {
+  const gx = Math.exp(-((mouseX - lightX) ** 2) / (2 * BEAM_SIGMA * BEAM_SIGMA));
+  /** Slight wash when pointer is above the truss; full in the beam cone. */
+  const yFade = mouseY >= 50 ? 1 : 0.28 + Math.max(0, mouseY / 50) * 0.72;
+  return Math.min(1, gx * yFade);
 }
 
 /** Default 200×200 artwork. Sidebar crops empty margin so the mark can span the nav width. */
@@ -50,7 +52,7 @@ export function OrdoStageLogo({
   const [my, setMy] = useState(() => vb.y + vb.h * 0.45);
 
   const strengths = useMemo(() => {
-    return LIGHT_X.map((lx) => beamStrength(mx, my, lx));
+    return LIGHT_X.map((lx) => beamWeight(mx, my, lx));
   }, [mx, my]);
 
   const updatePointer = useCallback(
@@ -84,7 +86,11 @@ export function OrdoStageLogo({
   };
 
   const gradId = `${uid}-textGrad`;
-  const transition = "opacity 320ms ease, fill-opacity 380ms ease";
+  /** Slow, easing opacity on beams/bulbs for real follow-spot crossfade. */
+  const beamTransition =
+    "opacity 0.55s cubic-bezier(0.33, 0.02, 0.25, 1), fill-opacity 0.55s cubic-bezier(0.33, 0.02, 0.25, 1)";
+  const bulbTransition =
+    "opacity 0.5s cubic-bezier(0.33, 0.02, 0.25, 1), filter 0.55s cubic-bezier(0.33, 0.02, 0.25, 1)";
 
   const viewBoxAttr = `${vb.x} ${vb.y} ${vb.w} ${vb.h}`;
 
@@ -124,7 +130,7 @@ export function OrdoStageLogo({
         fontSize="48"
         fontWeight="900"
         fill="none"
-        stroke="#222"
+        stroke="#4a4a55"
         strokeWidth="2"
         textAnchor="middle"
       >
@@ -137,7 +143,7 @@ export function OrdoStageLogo({
         fontSize="32"
         fontWeight="900"
         fill="none"
-        stroke="#222"
+        stroke="#4a4a55"
         strokeWidth="2"
         textAnchor="middle"
       >
@@ -148,7 +154,7 @@ export function OrdoStageLogo({
 
       {LIGHT_X.map((cx, i) => {
         const s = inside ? strengths[i] : 0;
-        const glow = 0.72 + s * 0.28;
+        const glow = 0.76 + s * 0.24;
         return (
           <circle
             key={cx}
@@ -158,8 +164,8 @@ export function OrdoStageLogo({
             fill={COLORS[i]}
             style={{
               opacity: glow,
-              filter: s > 0.35 ? `drop-shadow(0 0 ${4 + s * 8}px ${COLORS[i]})` : undefined,
-              transition,
+              filter: s > 0.28 ? `drop-shadow(0 0 ${3 + s * 10}px ${COLORS[i]})` : undefined,
+              transition: bulbTransition,
             }}
           />
         );
@@ -167,9 +173,9 @@ export function OrdoStageLogo({
 
       {BEAMS.map((beam, i) => {
         const s = inside ? strengths[i] : 0;
-        const base = 0.08;
-        const peak = 0.52;
-        const opacity = inside ? base + s * peak : IDLE_BEAM_OPACITY[i];
+        const floor = 0.07;
+        const peak = 0.58;
+        const opacity = inside ? floor + s ** 0.92 * peak : IDLE_BEAM_OPACITY[i];
         return (
           <path
             key={beam.d}
@@ -177,7 +183,7 @@ export function OrdoStageLogo({
             fill={beam.fill}
             style={{
               opacity,
-              transition,
+              transition: beamTransition,
             }}
           />
         );
@@ -201,10 +207,7 @@ export function OrdoStageLogo({
         fontWeight="900"
         fill={`url(#${gradId})`}
         textAnchor="middle"
-        style={{
-          opacity: inside ? 0.92 + Math.max(...strengths) * 0.08 : 0.88,
-          transition,
-        }}
+        style={{ opacity: 1 }}
       >
         ORDO
       </text>
@@ -216,10 +219,7 @@ export function OrdoStageLogo({
         fontWeight="900"
         fill={`url(#${gradId})`}
         textAnchor="middle"
-        style={{
-          opacity: inside ? 0.92 + Math.max(...strengths) * 0.08 : 0.88,
-          transition,
-        }}
+        style={{ opacity: 1 }}
       >
         STAGE
       </text>
