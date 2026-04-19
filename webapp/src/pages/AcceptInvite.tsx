@@ -115,13 +115,16 @@ export default function AcceptInvite() {
             <p className="text-xs text-white/40 text-center">
               Sign in with this email address to accept.
             </p>
-            <Button className="w-full bg-rose-700 hover:bg-rose-600" asChild>
+            <Button
+              className="w-full bg-gradient-to-r from-ordo-magenta to-ordo-violet hover:opacity-95 text-white border-0"
+              asChild
+            >
               <Link to={loginHref}>Continue to sign in</Link>
             </Button>
           </div>
         ) : emailMatch ? (
           <Button
-            className="w-full bg-rose-700 hover:bg-rose-600"
+            className="w-full bg-gradient-to-r from-ordo-magenta to-ordo-violet hover:opacity-95 text-white border-0"
             disabled={acceptMutation.isPending}
             onClick={() => acceptMutation.mutate()}
           >

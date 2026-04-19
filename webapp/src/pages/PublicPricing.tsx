@@ -40,7 +40,7 @@ export default function PublicPricing() {
                 <div className="text-sm text-white/50">{pack.label}</div>
                 <div className="mt-2 text-3xl font-bold">{pack.days}</div>
                 <div className="text-xs text-white/50">credit days</div>
-                <div className="mt-4 text-xl font-semibold text-rose-300">
+                <div className="mt-4 text-xl font-semibold text-ordo-yellow">
                   EUR {(pack.amountCents / 100).toFixed(2)}
                 </div>
               </CardContent>

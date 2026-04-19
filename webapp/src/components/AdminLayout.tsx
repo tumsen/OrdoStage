@@ -26,7 +26,7 @@ function AdminSidebarContent({ onNav }: { onNav?: () => void }) {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/10">
-        <Link to="/admin" onClick={onNav} className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50">
+        <Link to="/admin" onClick={onNav} className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#ffbe0b]/55">
           <OrdoStageLogo size={44} />
           <div>
             <div className="text-white font-semibold text-xs tracking-wide">Admin</div>
@@ -49,14 +49,14 @@ function AdminSidebarContent({ onNav }: { onNav?: () => void }) {
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150",
                 isActive
-                  ? "bg-rose-900/40 text-rose-200 border border-rose-800/40"
+                  ? "bg-gradient-to-r from-ordo-magenta/30 via-ordo-yellow/15 to-ordo-violet/30 text-white border border-ordo-yellow/40"
                   : "text-white/50 hover:text-white/80 hover:bg-white/5"
               )}
             >
-              <Icon size={16} className={isActive ? "text-rose-300" : "text-white/40"} />
+              <Icon size={16} className={isActive ? "text-ordo-yellow" : "text-white/40"} />
               <span className="font-medium">{label}</span>
               {isActive ? (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-rose-400" />
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-ordo-yellow" />
               ) : null}
             </Link>
           );
@@ -109,7 +109,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="flex-shrink-0 h-14 border-b border-rose-900/30 bg-[#0d0d14]/80 backdrop-blur flex items-center px-4 md:px-6 gap-3">
+        <header className="flex-shrink-0 h-14 border-b border-ordo-violet/25 bg-[#0d0d14]/80 backdrop-blur flex items-center px-4 md:px-6 gap-3">
           {isMobile ? (
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
@@ -126,7 +126,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </Sheet>
           ) : null}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-rose-500 uppercase tracking-wider border border-rose-800/50 bg-rose-950/40 px-2 py-0.5 rounded">
+            <span className="text-xs font-semibold text-ordo-yellow uppercase tracking-wider border border-ordo-magenta/45 bg-ordo-violet/25 px-2 py-0.5 rounded">
               Admin
             </span>
             <h1 className="text-sm font-semibold text-white/80 tracking-wide uppercase">{pageTitle}</h1>
@@ -156,7 +156,7 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
   if (sessionPending || (session?.user && adminPending)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ordo-yellow" />
       </div>
     );
   }
@@ -165,9 +165,9 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f]">
         <div className="text-center">
-          <div className="text-rose-400 text-2xl font-bold mb-2">Access Denied</div>
+          <div className="text-ordo-magenta text-2xl font-bold mb-2">Access Denied</div>
           <div className="text-white/50 text-sm mb-4">You must be logged in to access this area.</div>
-          <Link to="/login" className="text-rose-400 underline underline-offset-2 hover:text-rose-300">
+          <Link to="/login" className="text-ordo-yellow underline underline-offset-2 hover:text-white">
             Go to Login
           </Link>
         </div>
@@ -180,14 +180,14 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f]">
         <div className="text-center max-w-md px-6">
-          <div className="w-16 h-16 rounded-full bg-rose-950/60 border border-rose-800/40 flex items-center justify-center mx-auto mb-4">
-            <span className="text-rose-400 text-2xl">!</span>
+          <div className="w-16 h-16 rounded-full bg-ordo-violet/35 border border-ordo-magenta/35 flex items-center justify-center mx-auto mb-4">
+            <span className="text-ordo-yellow text-2xl">!</span>
           </div>
-          <div className="text-rose-400 text-xl font-bold mb-2">Access Denied</div>
+          <div className="text-ordo-magenta text-xl font-bold mb-2">Access Denied</div>
           <div className="text-white/50 text-sm mb-4">
             You don't have admin permissions to access this area.
           </div>
-          <Link to="/dashboard" className="text-rose-400 underline underline-offset-2 hover:text-rose-300">
+          <Link to="/dashboard" className="text-ordo-yellow underline underline-offset-2 hover:text-white">
             Back to App
           </Link>
         </div>

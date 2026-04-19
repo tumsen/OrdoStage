@@ -19,7 +19,7 @@ All colors MUST be HSL.
     --popover: 240 10% 6%;
     --popover-foreground: 0 0% 95%;
 
-    /* OrdoStage logo palette → UI tokens (HSL components, no hsl() wrapper) */
+    /* OrdoStage logo / beam strip (see OrdoStageLogo). Also: tailwind `ordo.*` in tailwind.config.ts */
     --brand-magenta: 328 100% 50%;
     --brand-orange: 16 97% 51%;
     --brand-yellow: 45 100% 52%;

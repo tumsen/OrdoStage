@@ -26,7 +26,10 @@ export default function Frontpage() {
           <h1 className="text-5xl font-bold leading-tight">{title}</h1>
           <p className="mt-5 text-lg text-white/70">{subtitle}</p>
           <div className="mt-8 flex items-center gap-3">
-            <Button asChild className="bg-rose-700 hover:bg-rose-600">
+            <Button
+              asChild
+              className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
+            >
               <Link to={ctaUrl}>{ctaText}</Link>
             </Button>
             <Button asChild variant="outline" className="border-white/20 text-white bg-transparent">

@@ -113,7 +113,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
         <Link
           to="/dashboard"
           onClick={onNav}
-          className="block w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[hsl(45_100%_52%_/_0.6)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d14]"
+          className="block w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#ffbe0b]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d14]"
         >
           <OrdoStageLogo variant="sidebar" className="rounded-md max-h-[7.75rem]" />
         </Link>
@@ -144,14 +144,14 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm border border-transparent",
                 "transition-[color,background-color,border-color,box-shadow] duration-200 ease-out",
                 isActive
-                  ? "bg-gradient-to-r from-fuchsia-600/25 via-amber-400/15 to-violet-600/25 text-white border-amber-400/35 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+                  ? "bg-gradient-to-r from-ordo-magenta/28 via-ordo-yellow/18 to-ordo-violet/28 text-white border-ordo-yellow/40 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
                   : "text-white/55 hover:text-white hover:bg-white/[0.06] hover:border-white/5"
               )}
             >
-              <Icon size={16} className={isActive ? "text-amber-300" : "text-white/45"} />
+              <Icon size={16} className={isActive ? "text-ordo-yellow" : "text-white/45"} />
               <span className="font-medium">{label}</span>
               {isActive ? (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]" />
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-ordo-yellow shadow-[0_0_10px_rgba(255,190,59,0.65)]" />
               ) : null}
             </Link>
           );
@@ -165,16 +165,16 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm border border-transparent",
               "transition-[color,background-color,border-color] duration-200 ease-out",
               location.pathname === "/admin" || location.pathname.startsWith("/admin/")
-                ? "bg-gradient-to-r from-fuchsia-700/30 to-violet-700/30 text-white border-fuchsia-500/35"
-                : "text-fuchsia-200/80 hover:text-white hover:bg-fuchsia-950/35 hover:border-fuchsia-500/25"
+                ? "bg-gradient-to-r from-ordo-magenta/35 to-ordo-violet/35 text-white border-ordo-magenta/45"
+                : "text-ordo-magenta/85 hover:text-white hover:bg-ordo-violet/15 hover:border-ordo-magenta/30 border-transparent"
             )}
           >
             <ShieldCheck
               size={16}
               className={
                 location.pathname === "/admin" || location.pathname.startsWith("/admin/")
-                  ? "text-fuchsia-300"
-                  : "text-fuchsia-300/75"
+                  ? "text-ordo-yellow"
+                  : "text-ordo-magenta/75"
               }
             />
             <span className="font-medium">Owner Admin</span>
@@ -186,8 +186,8 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
       <div className="px-3 py-4 border-t border-white/10 space-y-2">
         {session?.user ? (
           <div className="flex items-center gap-2 px-3 py-2">
-            <div className="w-7 h-7 rounded-full bg-purple-700/60 flex items-center justify-center flex-shrink-0">
-              <span className="text-purple-200 text-xs font-semibold">{initials || "?"}</span>
+            <div className="w-7 h-7 rounded-full bg-ordo-violet/45 ring-1 ring-ordo-magenta/25 flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-xs font-semibold">{initials || "?"}</span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-white/70 text-xs truncate">{userName}</div>
@@ -229,14 +229,14 @@ function CreditBanner() {
 
   if (org.pendingAutoTopUpUrl) {
     return (
-      <div className="flex-shrink-0 bg-indigo-950/80 border-b border-indigo-500/30 px-4 py-2 flex items-center gap-2 text-sm">
-        <Sparkles size={14} className="text-indigo-300 flex-shrink-0" />
-        <span className="text-indigo-200">
+      <div className="flex-shrink-0 bg-ordo-blue/15 border-b border-ordo-blue/35 px-4 py-2 flex items-center gap-2 text-sm">
+        <Sparkles size={14} className="text-ordo-blue flex-shrink-0" />
+        <span className="text-blue-100/95">
           Credits are low — a checkout is ready for your automatic top-up. Complete payment to add credits.
         </span>
         <a
           href={org.pendingAutoTopUpUrl}
-          className="ml-auto text-indigo-100 underline underline-offset-2 hover:text-white whitespace-nowrap"
+          className="ml-auto text-white/95 underline underline-offset-2 hover:text-ordo-yellow whitespace-nowrap"
         >
           Pay now →
         </a>
@@ -258,12 +258,12 @@ function CreditBanner() {
 
   if (org.warning && daysLeft <= 30) {
     return (
-      <div className="flex-shrink-0 bg-amber-950/70 border-b border-amber-800/40 px-4 py-2 flex items-center gap-2 text-sm">
-        <AlertTriangle size={14} className="text-amber-400 flex-shrink-0" />
-        <span className="text-amber-300">
+      <div className="flex-shrink-0 bg-ordo-orange/15 border-b border-ordo-yellow/35 px-4 py-2 flex items-center gap-2 text-sm">
+        <AlertTriangle size={14} className="text-ordo-yellow flex-shrink-0" />
+        <span className="text-ordo-yellow/95">
           Low credits: {daysLeft} {daysLeft === 1 ? "day" : "days"} remaining. Top up to avoid read-only mode.
         </span>
-        <Link to="/billing" className="ml-auto text-amber-200 underline underline-offset-2 hover:text-white whitespace-nowrap">
+        <Link to="/billing" className="ml-auto text-ordo-yellow underline underline-offset-2 hover:text-white whitespace-nowrap">
           Buy Credits →
         </Link>
       </div>
@@ -305,7 +305,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="flex-shrink-0 h-14 border-b border-white/10 bg-[#0d0d14]/80 backdrop-blur flex items-center px-4 md:px-6 gap-3">
+        <header className="flex-shrink-0 h-14 border-b border-ordo-violet/20 bg-[#0d0d14]/80 backdrop-blur flex items-center px-4 md:px-6 gap-3">
           {isMobile ? (
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>

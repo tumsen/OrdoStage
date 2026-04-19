@@ -63,6 +63,14 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        /** OrdoStage beam / wordmark gradient — use across UI */
+        ordo: {
+          magenta: "#ff006e",
+          orange: "#fb5607",
+          yellow: "#ffbe0b",
+          blue: "#3a86ff",
+          violet: "#8338ec",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

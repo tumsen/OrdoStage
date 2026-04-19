@@ -54,6 +54,9 @@ app.use(
   })
 );
 
+// Liveness for Railway / Docker — must not touch DB or session (those run after this)
+app.get("/health", (c) => c.json({ status: "ok", version: "1.0.0" }));
+
 // Logging
 app.use("*", logger());
 
@@ -136,9 +139,6 @@ app.use("/api/*", async (c, next) => {
 
 // Auth handler
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
-
-// Health check endpoint
-app.get("/health", (c) => c.json({ status: "ok", version: "1.0.0" }));
 
 // Public routes (no auth required — mount before credit check middleware)
 app.route("/api/public", publicRouter);

@@ -22,4 +22,4 @@ RUN cd backend && bunx prisma generate
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "cd /app/backend && bunx prisma db push && bun run src/index.ts"]
+CMD ["sh", "-c", "cd /app/backend && bunx prisma migrate deploy && exec bun run src/index.ts"]
