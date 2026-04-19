@@ -60,7 +60,8 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
       preserveAspectRatio="xMidYMid meet"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="pointer-events-none absolute inset-0 h-full w-full select-none"
+      className="pointer-events-none absolute inset-0 z-[2] h-full w-full select-none opacity-100 [opacity:1!important]"
+      style={{ opacity: 1, isolation: "isolate" }}
       overflow="visible"
       aria-hidden
     >
@@ -81,12 +82,15 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
         fontWeight="900"
         fill={`url(#${gradId})`}
         fillOpacity={1}
-        stroke="none"
+        stroke="#ffffff"
+        strokeWidth={0.55}
+        strokeOpacity={0.92}
+        strokeLinejoin="round"
+        strokeLinecap="round"
         textAnchor="middle"
         style={{
           opacity: 1,
-          filter: "saturate(1.22) brightness(1.09)",
-          paintOrder: "fill markers stroke",
+          paintOrder: "stroke fill",
         }}
       >
         ORDO
@@ -99,12 +103,15 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
         fontWeight="900"
         fill={`url(#${gradId})`}
         fillOpacity={1}
-        stroke="none"
+        stroke="#ffffff"
+        strokeWidth={0.5}
+        strokeOpacity={0.92}
+        strokeLinejoin="round"
+        strokeLinecap="round"
         textAnchor="middle"
         style={{
           opacity: 1,
-          filter: "saturate(1.22) brightness(1.09)",
-          paintOrder: "fill markers stroke",
+          paintOrder: "stroke fill",
         }}
       >
         STAGE
@@ -196,7 +203,7 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr }: BeamRigProps) {
       preserveAspectRatio="xMidYMid meet"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="absolute inset-0 h-full w-full"
+      className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
       overflow="visible"
     >
       <title>OrdoStage</title>
