@@ -34,6 +34,10 @@ export default function PublicPricing() {
           <div className="space-y-4 text-white/80 leading-relaxed">
             <p>No subscriptions, no surprises. Just credits — buy a pack and use them as you need.</p>
             <p>
+              When you create an account, you get{" "}
+              <strong className="text-white font-semibold">30 credits</strong> free to test the system.
+            </p>
+            <p>
               You can also enable <strong className="text-white font-semibold">automatic top-up</strong> under Billing in
               your organisation: choose a credit pack and a balance threshold. When credits fall to that level, we open a
               checkout so you can refill before work stops — a simple way to keep credits on the account without watching

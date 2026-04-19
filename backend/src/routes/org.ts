@@ -207,7 +207,9 @@ app.post("/org", async (c) => {
     data: {
       name,
       users: { connect: { id: user.id } },
-      ...(isUnlimited && { unlimitedCredits: true, creditBalance: 999999999 }),
+      ...(isUnlimited
+        ? { unlimitedCredits: true, creditBalance: 999999999 }
+        : { creditBalance: 30 }),
     },
   });
 
