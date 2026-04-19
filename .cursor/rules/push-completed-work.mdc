@@ -1,0 +1,14 @@
+---
+description: Commit and push finished work so the user can test on deploy; never commit secrets.
+alwaysApply: true
+---
+
+# Push completed work
+
+When a task is done or a coherent batch of changes is ready:
+
+1. **Never stage or commit secrets** — do not add `**/.env`, credential files, or keys. If they show as modified, leave them unstaged (use `git restore --staged` after a broad add if needed).
+2. Review **`git status`**, stage the right paths, then **`git commit`** with a clear message (what changed and why).
+3. **`git push`** the current branch to **`origin`** so the user can test (CI/deploy). Do this by default after completing implementation work.
+
+Skip push only if the user asked for local-only changes, push fails (permissions/network), or there is nothing to commit.

@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 
 const schema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -52,8 +53,10 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🎭</div>
-          <h1 className="text-3xl font-bold text-white">OrdoStage</h1>
+          <div className="flex justify-center mb-4">
+            <OrdoStageLogo size={88} />
+          </div>
+          <h1 className="sr-only">OrdoStage</h1>
           <p className="text-gray-400 mt-2">Set a new password</p>
         </div>
         <div className="bg-gray-900 border border-white/10 rounded-xl p-6">

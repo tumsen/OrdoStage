@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { CreateEventSchema, UpdateEventSchema, AssignPersonSchema } from "../types";
-import { canWrite } from "../permissions";
+import { canAction } from "../requestRole";
 
 const eventsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -224,7 +224,7 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.events")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -278,7 +278,7 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.events")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -322,7 +322,7 @@ eventsRouter.delete("/events/:id", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.events")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -343,7 +343,7 @@ eventsRouter.post("/events/:id/people", zValidator("json", AssignPersonSchema), 
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.events")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -399,7 +399,7 @@ eventsRouter.delete("/events/:id/people/:personId", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.events")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 

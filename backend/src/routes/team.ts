@@ -3,7 +3,8 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { CreateInvitationSchema, UpdateRoleSchema } from "../types";
-import { isOwner, canManageTeam } from "../permissions";
+import { isOwner } from "../permissions";
+import { canManageTeamRequest } from "../requestRole";
 import { env } from "../env";
 
 const INVITE_DAYS = 14;
@@ -76,7 +77,7 @@ teamRouter.get("/team/invitations", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  if (!canManageTeam(user.orgRole)) {
+  if (!canManageTeamRequest(c)) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -104,7 +105,7 @@ teamRouter.post("/team/invitations", zValidator("json", CreateInvitationSchema),
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  if (!canManageTeam(user.orgRole)) {
+  if (!canManageTeamRequest(c)) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -170,7 +171,7 @@ teamRouter.delete("/team/invitations/:id", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  if (!canManageTeam(user.orgRole)) {
+  if (!canManageTeamRequest(c)) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -296,7 +297,7 @@ teamRouter.put("/team/:userId/active", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  if (!canManageTeam(user.orgRole)) {
+  if (!canManageTeamRequest(c)) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 

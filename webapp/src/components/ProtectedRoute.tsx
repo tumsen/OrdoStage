@@ -1,15 +1,8 @@
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { useSession, signOut } from "@/lib/auth-client";
-import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-
-type MePayload = {
-  orgRole: string;
-  canWrite: boolean;
-  hasOrganization: boolean;
-  isActive: boolean;
-};
+import { viewIdForPath } from "@/lib/viewPath";
+import { usePermissions } from "@/hooks/usePermissions";
 
 function InactiveAccountNotice() {
   return (
@@ -46,12 +39,7 @@ export function ProtectedRoute({ children, requireOrg = true }: { children: Reac
   const isSupport = email === "tumsen@gmail.com";
   const isAdmin = Boolean((session?.user as unknown as { isAdmin?: boolean } | undefined)?.isAdmin) || isSupport;
 
-  const { data: me, isPending: mePending } = useQuery({
-    queryKey: ["me", "permissions"],
-    queryFn: () => api.get<MePayload>("/api/me"),
-    enabled: Boolean(session?.user),
-    staleTime: 60_000,
-  });
+  const { me, canView, isPending: permsLoading } = usePermissions();
 
   if (isPending) {
     return (
@@ -62,7 +50,7 @@ export function ProtectedRoute({ children, requireOrg = true }: { children: Reac
   }
   if (!session?.user) return <Navigate to="/login" replace />;
 
-  if (session.user && mePending) {
+  if (session.user && permsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-950">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
@@ -84,5 +72,19 @@ export function ProtectedRoute({ children, requireOrg = true }: { children: Reac
   if (requireOrg && !isAdmin && !(session.user as unknown as { organizationId?: string }).organizationId) {
     return <Navigate to="/setup-org" replace />;
   }
+
+  const vid = viewIdForPath(location.pathname);
+  if (
+    vid &&
+    me &&
+    me.hasOrganization &&
+    !isAdmin &&
+    !isSupport &&
+    !permsLoading &&
+    !canView(vid)
+  ) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return <>{children}</>;
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { api } from "@/lib/api";
+import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -59,8 +60,10 @@ export default function Login() {
     <div style={{ minHeight: "100vh", background: "#030712", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
       <div style={{ width: "100%", maxWidth: "420px" }}>
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div style={{ fontSize: "64px", marginBottom: "16px" }}>🎭</div>
-          <h1 style={{ fontSize: "28px", fontWeight: "bold", color: "white", margin: 0 }}>OrdoStage</h1>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "16px" }}>
+            <OrdoStageLogo size={96} />
+          </div>
+          <h1 className="sr-only">OrdoStage</h1>
           <p style={{ color: "#9ca3af", marginTop: "8px" }}>Run your productions with confidence</p>
         </div>
 

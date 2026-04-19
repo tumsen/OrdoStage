@@ -16,7 +16,9 @@ import {
   ShieldCheck,
   Sparkles,
   UserCircle,
+  KeyRound,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -25,6 +27,8 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { useSession, signOut } from "@/lib/auth-client";
 import { api } from "@/lib/api";
+import { usePermissions } from "@/hooks/usePermissions";
+import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 
 interface OrgData {
   id: string;
@@ -38,17 +42,18 @@ interface OrgData {
   pendingAutoTopUpUrl?: string | null;
 }
 
-const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/events", label: "Events", icon: CalendarDays },
-  { to: "/schedule", label: "Schedule", icon: CalendarRange },
-  { to: "/tours", label: "Tours", icon: Route },
-  { to: "/venues", label: "Venues", icon: MapPin },
-  { to: "/people", label: "People", icon: Users },
-  { to: "/team", label: "Team", icon: UsersRound },
-  { to: "/calendars", label: "Calendars", icon: Share2 },
-  { to: "/billing", label: "Billing", icon: CreditCard },
-  { to: "/account", label: "Account", icon: UserCircle },
+const navItems: { to: string; label: string; icon: LucideIcon; view: string }[] = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, view: "dashboard" },
+  { to: "/events", label: "Events", icon: CalendarDays, view: "events" },
+  { to: "/schedule", label: "Schedule", icon: CalendarRange, view: "schedule" },
+  { to: "/tours", label: "Tours", icon: Route, view: "tours" },
+  { to: "/venues", label: "Venues", icon: MapPin, view: "venues" },
+  { to: "/people", label: "People", icon: Users, view: "people" },
+  { to: "/team", label: "Team", icon: UsersRound, view: "team" },
+  { to: "/calendars", label: "Calendars", icon: Share2, view: "calendars" },
+  { to: "/billing", label: "Billing", icon: CreditCard, view: "billing" },
+  { to: "/roles", label: "Roles", icon: KeyRound, view: "roles" },
+  { to: "/account", label: "Account", icon: UserCircle, view: "account" },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -62,6 +67,7 @@ const pageTitles: Record<string, string> = {
   "/team": "Team",
   "/calendars": "Calendars",
   "/billing": "Billing",
+  "/roles": "Roles",
   "/account": "Account",
 };
 
@@ -79,6 +85,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { data: session } = useSession();
+  const { canView, isPending: permsLoading } = usePermissions();
 
   const handleSignOut = async () => {
     await signOut();
@@ -91,6 +98,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   const isAdmin = Boolean((session?.user as Record<string, unknown> | undefined)?.isAdmin);
   const isSupportUser = userEmail.toLowerCase() === "tumsen@gmail.com";
   const canAccessOwnerAdmin = isAdmin || isSupportUser;
+  const navBypass = canAccessOwnerAdmin;
   const initials = userName
     .split(" ")
     .map((part: string) => part[0])
@@ -101,21 +109,21 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="px-6 py-6 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-red-900/80 flex items-center justify-center">
-            <span className="text-red-200 text-sm font-bold">O</span>
-          </div>
-          <div>
-            <div className="text-white font-semibold text-sm tracking-wide">ORDO</div>
-            <div className="text-white/40 text-xs tracking-widest uppercase">Stage</div>
-          </div>
-        </div>
+      <div className="px-5 py-5 border-b border-white/10">
+        <Link
+          to="/dashboard"
+          onClick={onNav}
+          className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
+        >
+          <OrdoStageLogo size={52} className="rounded-md" />
+        </Link>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map(({ to, label, icon: Icon }) => {
+        {navItems
+          .filter((item) => navBypass || permsLoading || canView(item.view))
+          .map(({ to, label, icon: Icon }) => {
           const isActive =
             to === "/dashboard"
               ? location.pathname === "/dashboard"

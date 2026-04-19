@@ -5,6 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { RoleBadge } from "@/pages/team/RoleBadge";
 import { toast } from "@/components/ui/use-toast";
+import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 
 type InvitePreview = {
   organizationName: string;
@@ -88,7 +89,9 @@ export default function AcceptInvite() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
       <div className="w-full max-w-md bg-gray-900 border border-white/10 rounded-xl p-8 space-y-6">
         <div className="text-center">
-          <div className="text-4xl mb-3">🎭</div>
+          <div className="flex justify-center mb-3">
+            <OrdoStageLogo size={72} />
+          </div>
           <h1 className="text-xl font-semibold text-white">Organisation invitation</h1>
           <p className="text-sm text-white/45 mt-2">
             You&apos;ve been invited to join{" "}

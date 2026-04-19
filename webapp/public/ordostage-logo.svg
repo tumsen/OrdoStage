@@ -1,7 +1,27 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="96" fill="#0F0F14"/>
-  <path d="M256 108C173.7 108 107 174.7 107 257C107 339.3 173.7 406 256 406C338.3 406 405 339.3 405 257" stroke="#B91C1C" stroke-width="28" stroke-linecap="round"/>
-  <path d="M153 257C153 200.7 199.7 154 256 154C312.3 154 359 200.7 359 257" stroke="#E5E7EB" stroke-opacity="0.9" stroke-width="20" stroke-linecap="round"/>
-  <path d="M256 185L287 257L256 329L225 257L256 185Z" fill="#B91C1C"/>
-  <circle cx="256" cy="257" r="18" fill="#F3F4F6"/>
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#111111"/>
+  <text x="100" y="120" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" fill="none" stroke="#222" stroke-width="2" text-anchor="middle">ORDO</text>
+  <text x="100" y="155" font-family="Arial Black, sans-serif" font-size="32" font-weight="900" fill="none" stroke="#222" stroke-width="2" text-anchor="middle">STAGE</text>
+  <rect x="30" y="50" width="140" height="12" fill="#333" rx="2"/>
+  <circle cx="50" cy="56" r="6" fill="#ff006e"/>
+  <circle cx="75" cy="56" r="6" fill="#fb5607"/>
+  <circle cx="100" cy="56" r="6" fill="#ffbe0b"/>
+  <circle cx="125" cy="56" r="6" fill="#3a86ff"/>
+  <circle cx="150" cy="56" r="6" fill="#8338ec"/>
+  <path d="M 50 62 L 30 150 L 70 150 Z" fill="#ff006e" opacity="0.15"/>
+  <path d="M 75 62 L 55 150 L 95 150 Z" fill="#fb5607" opacity="0.15"/>
+  <path d="M 100 62 L 80 150 L 120 150 Z" fill="#ffbe0b" opacity="0.2"/>
+  <path d="M 125 62 L 105 150 L 145 150 Z" fill="#3a86ff" opacity="0.15"/>
+  <path d="M 150 62 L 130 150 L 170 150 Z" fill="#8338ec" opacity="0.15"/>
+  <defs>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff006e;stop-opacity:1" />
+      <stop offset="25%" style="stop-color:#fb5607;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ffbe0b;stop-opacity:1" />
+      <stop offset="75%" style="stop-color:#3a86ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8338ec;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <text x="100" y="120" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" fill="url(#textGrad)" text-anchor="middle">ORDO</text>
+  <text x="100" y="155" font-family="Arial Black, sans-serif" font-size="32" font-weight="900" fill="url(#textGrad)" text-anchor="middle">STAGE</text>
 </svg>

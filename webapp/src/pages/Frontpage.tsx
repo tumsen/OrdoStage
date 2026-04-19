@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 import { Card, CardContent } from "@/components/ui/card";
 
 type SiteContent = Record<string, string>;
@@ -23,7 +24,9 @@ export default function Frontpage() {
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       <header className="border-b border-white/10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="font-semibold tracking-wide">OrdoStage</div>
+          <Link to="/" className="flex items-center shrink-0">
+            <OrdoStageLogo size={56} />
+          </Link>
           <div className="flex items-center gap-4 text-sm">
             <Link to="/pricing" className="text-white/70 hover:text-white">Pricing</Link>
             <Link to="/terms-of-service" className="text-white/70 hover:text-white">Terms</Link>

@@ -8,7 +8,7 @@ import {
   AddDepartmentMemberSchema,
   UpdateDepartmentMemberRoleSchema,
 } from "../types";
-import { canWrite } from "../permissions";
+import { canAction } from "../requestRole";
 
 const departmentsRouter = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -90,7 +90,7 @@ departmentsRouter.post(
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-    if (!canWrite(user.orgRole)) {
+    if (!canAction(c, "write.departments")) {
       return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
     }
 
@@ -162,7 +162,7 @@ departmentsRouter.patch(
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-    if (!canWrite(user.orgRole)) {
+    if (!canAction(c, "write.departments")) {
       return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
     }
 
@@ -216,7 +216,7 @@ departmentsRouter.delete("/departments/:id/members/:personId", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.departments")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -282,7 +282,7 @@ departmentsRouter.post("/departments", zValidator("json", CreateDepartmentSchema
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.departments")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -307,7 +307,7 @@ departmentsRouter.put(
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-    if (!canWrite(user.orgRole)) {
+    if (!canAction(c, "write.departments")) {
       return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
     }
 
@@ -339,7 +339,7 @@ departmentsRouter.delete("/departments/:id", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.departments")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 

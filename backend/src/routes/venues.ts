@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { CreateVenueSchema, UpdateVenueSchema } from "../types";
-import { canWrite } from "../permissions";
+import { canAction } from "../requestRole";
 import { env } from "../env";
 
 const venuesRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
@@ -105,7 +105,7 @@ venuesRouter.post("/venues", zValidator("json", CreateVenueSchema), async (c) =>
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.venues")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -148,7 +148,7 @@ venuesRouter.put("/venues/:id", zValidator("json", UpdateVenueSchema), async (c)
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.venues")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -184,7 +184,7 @@ venuesRouter.delete("/venues/:id", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.venues")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 

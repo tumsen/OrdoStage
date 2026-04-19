@@ -4,6 +4,7 @@ import { authClient } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 
 export default function VerifyOtp() {
   const navigate = useNavigate();
@@ -66,8 +67,10 @@ export default function VerifyOtp() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
       <div className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🎭</div>
-          <h1 className="text-3xl font-bold text-white">OrdoStage</h1>
+          <div className="flex justify-center mb-4">
+            <OrdoStageLogo size={88} />
+          </div>
+          <h1 className="sr-only">OrdoStage</h1>
         </div>
         <div className="bg-gray-900 border border-white/10 rounded-xl p-6">
           <h2 className="text-xl font-semibold text-white mb-1">Enter your code</h2>

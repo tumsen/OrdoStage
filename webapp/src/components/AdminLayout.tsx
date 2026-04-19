@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 
 const adminNavItems = [
   { to: "/admin", label: "Dashboard", icon: BarChart3, exact: true },
@@ -25,16 +26,14 @@ function AdminSidebarContent({ onNav }: { onNav?: () => void }) {
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="px-6 py-6 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-rose-900/80 flex items-center justify-center">
-            <span className="text-rose-200 text-sm font-bold">A</span>
-          </div>
+      <div className="px-5 py-5 border-b border-white/10">
+        <Link to="/admin" onClick={onNav} className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50">
+          <OrdoStageLogo size={44} />
           <div>
-            <div className="text-white font-semibold text-sm tracking-wide">ADMIN</div>
-            <div className="text-white/40 text-xs tracking-widest uppercase">Panel</div>
+            <div className="text-white font-semibold text-xs tracking-wide">Admin</div>
+            <div className="text-white/40 text-[10px] tracking-widest uppercase">Panel</div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Nav */}

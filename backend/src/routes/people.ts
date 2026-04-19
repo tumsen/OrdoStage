@@ -8,7 +8,7 @@ import {
   PersonActiveSchema,
   type TeamAssignmentInput,
 } from "../types";
-import { canWrite } from "../permissions";
+import { canAction } from "../requestRole";
 
 const TEAM_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#84cc16", "#06b6d4"];
 
@@ -136,7 +136,7 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.people")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -210,7 +210,7 @@ peopleRouter.patch("/people/:id/active", zValidator("json", PersonActiveSchema),
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.people")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -291,7 +291,7 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.people")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -370,7 +370,7 @@ peopleRouter.delete("/people/:id", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.people")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 

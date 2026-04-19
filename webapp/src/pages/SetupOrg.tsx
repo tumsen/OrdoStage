@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 
 export default function SetupOrg() {
   const navigate = useNavigate();
@@ -28,7 +29,9 @@ export default function SetupOrg() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
       <div className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🎭</div>
+          <div className="flex justify-center mb-4">
+            <OrdoStageLogo size={88} />
+          </div>
           <h1 className="text-3xl font-bold text-white">Welcome!</h1>
           <p className="text-gray-400 mt-2">Let's set up your organization</p>
         </div>

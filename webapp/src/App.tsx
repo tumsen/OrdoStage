@@ -25,6 +25,7 @@ import ResetPassword from "./pages/ResetPassword";
 import SetupOrg from "./pages/SetupOrg";
 import Billing from "./pages/Billing";
 import Account from "./pages/Account";
+import Roles from "./pages/Roles";
 import Tours from "./pages/Tours";
 import TourDetail from "./pages/TourDetail";
 import PublicTourSchedule from "./pages/PublicTourSchedule";
@@ -152,6 +153,16 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <Team />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/roles"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Roles />
                 </Layout>
               </ProtectedRoute>
             }

@@ -10,7 +10,7 @@ import {
   UpdateTourShowSchema,
   AssignTourTeamSchema,
 } from "../types";
-import { canWrite } from "../permissions";
+import { canAction } from "../requestRole";
 import { createVibecodeSDK } from "@vibecodeapp/backend-sdk";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
@@ -184,7 +184,7 @@ toursRouter.post("/tours", zValidator("json", CreateTourSchema), async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.tours")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -307,7 +307,7 @@ toursRouter.put("/tours/:id", zValidator("json", UpdateTourSchema), async (c) =>
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.tours")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -358,7 +358,7 @@ toursRouter.delete("/tours/:id", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.tours")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -380,7 +380,7 @@ toursRouter.post("/tours/:id/shows", zValidator("json", CreateTourShowSchema), a
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.tours")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -439,7 +439,7 @@ toursRouter.put(
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-    if (!canWrite(user.orgRole)) {
+    if (!canAction(c, "write.tours")) {
       return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
     }
 
@@ -504,7 +504,7 @@ toursRouter.delete("/tours/:id/shows/:showId", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.tours")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -537,7 +537,7 @@ toursRouter.post(
     const user = c.get("user");
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-    if (!canWrite(user.orgRole))
+    if (!canAction(c, "write.tours"))
       return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
 
     const { id } = c.req.param();
@@ -608,7 +608,7 @@ toursRouter.delete("/tours/:id/teams/:teamId", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  if (!canWrite(user.orgRole))
+  if (!canAction(c, "write.tours"))
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
 
   const { id, teamId } = c.req.param();
@@ -674,7 +674,7 @@ toursRouter.post(
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-    if (!canWrite(user.orgRole)) {
+    if (!canAction(c, "write.tours")) {
       return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
     }
 
@@ -738,7 +738,7 @@ toursRouter.delete("/tours/:id/people/:personId", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canWrite(user.orgRole)) {
+  if (!canAction(c, "write.tours")) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
 
@@ -774,7 +774,7 @@ toursRouter.post(
     const user = c.get("user");
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-    if (!canWrite(user.orgRole))
+    if (!canAction(c, "write.tours"))
       return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
 
     const { id, showId } = c.req.param();
@@ -825,7 +825,7 @@ toursRouter.delete("/tours/:id/shows/:showId/people/:assignmentId", async (c) =>
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  if (!canWrite(user.orgRole))
+  if (!canAction(c, "write.tours"))
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
 
   const { id, showId, assignmentId } = c.req.param();
@@ -851,7 +851,7 @@ toursRouter.post("/tours/:id/tech-rider", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  if (!canWrite(user.orgRole))
+  if (!canAction(c, "write.tours"))
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
 
   const { id } = c.req.param();
@@ -908,7 +908,7 @@ toursRouter.delete("/tours/:id/tech-rider", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  if (!canWrite(user.orgRole))
+  if (!canAction(c, "write.tours"))
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
 
   const { id } = c.req.param();
@@ -1023,7 +1023,7 @@ toursRouter.put(
     const user = c.get("user");
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-    if (!canWrite(user.orgRole))
+    if (!canAction(c, "write.tours"))
       return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
 
     const { id, showId, personId } = c.req.param();

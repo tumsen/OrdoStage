@@ -26,6 +26,9 @@ import toursRouter from "./routes/tours";
 import publicRouter from "./routes/public";
 import siteContentRouter from "./routes/site-content";
 import accountRouter from "./routes/account";
+import roleDefinitionsRouter from "./routes/roleDefinitions";
+import type { EffectiveRole } from "./effectiveRole";
+import { resolveEffectiveRole } from "./effectiveRole";
 import { seedPacks } from "./seed-packs";
 import { prisma } from "./prisma";
 
@@ -36,6 +39,7 @@ const app = new Hono<{
   Variables: {
     user: typeof auth.$Infer.Session.user | null;
     session: typeof auth.$Infer.Session.session | null;
+    effectiveRole?: EffectiveRole;
   };
 }>();
 
@@ -99,6 +103,34 @@ app.use("/api/*", async (c, next) => {
       403
     );
   }
+  await next();
+});
+
+// Org RBAC (canWrite / team.invite derived from RoleDefinition rows)
+app.use("/api/*", async (c, next) => {
+  if (
+    c.req.path.startsWith("/api/auth/") ||
+    c.req.path === "/api/billing/webhook" ||
+    c.req.path.startsWith("/api/public")
+  ) {
+    await next();
+    return;
+  }
+  const sessionUser = c.get("user");
+  if (!sessionUser?.id || !sessionUser.organizationId) {
+    await next();
+    return;
+  }
+  const dbUser = await prisma.user.findUnique({
+    where: { id: sessionUser.id },
+    select: { organizationId: true, orgRole: true, isActive: true },
+  });
+  const eff = await resolveEffectiveRole(prisma, {
+    organizationId: dbUser?.organizationId ?? undefined,
+    orgRole: dbUser?.orgRole,
+    isActive: dbUser?.isActive,
+  });
+  c.set("effectiveRole", eff);
   await next();
 });
 
@@ -170,6 +202,7 @@ app.use("/api/*", async (c, next) => {
 
 // App routes
 app.route("/api", accountRouter);
+app.route("/api", roleDefinitionsRouter);
 app.route("/api", orgRouter);
 app.route("/api", venuesRouter);
 app.route("/api", peopleRouter);

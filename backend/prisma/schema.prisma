@@ -95,6 +95,29 @@ model Organization {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   invitations      OrganizationInvitation[]
+  roleDefinitions  RoleDefinition[]
+}
+
+/** Per-organization role: `slug` matches `User.orgRole` for assigned members. */
+model RoleDefinition {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  slug           String
+  name           String
+  description    String?
+  /** Nav / areas this role can see. */
+  views          String[] @default([])
+  /** What this role can do (create, manage, billing, etc.). */
+  actions        String[] @default([])
+  sortOrder      Int      @default(0)
+  /** System slugs (owner, manager, member) — not deletable. */
+  isSystem       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
 }
 
 model OrganizationInvitation {

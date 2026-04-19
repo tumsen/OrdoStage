@@ -4,7 +4,8 @@ import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { deductCredits } from "../credits";
 import { env } from "../env";
-import { canWrite as userCanWrite, isOwner } from "../permissions";
+import { isOwner } from "../permissions";
+import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
 import { maybeEnqueueAutoTopUp } from "../autoTopup";
 
 const OrgPoliciesSchema = z.object({
@@ -28,12 +29,20 @@ app.get("/me", async (c) => {
   }
   const orgRole = dbUser.orgRole || "viewer";
   const isActive = dbUser.isActive;
+  const eff = await resolveEffectiveRole(prisma, {
+    organizationId: dbUser.organizationId,
+    orgRole,
+    isActive,
+  });
   return c.json({
     data: {
       orgRole,
-      canWrite: isActive && userCanWrite(orgRole),
+      canWrite: eff.canWrite,
+      canManageTeam: eff.canManageTeam,
       hasOrganization: Boolean(dbUser.organizationId),
       isActive,
+      views: eff.views,
+      actions: eff.actions,
     },
   });
 });
@@ -204,6 +213,8 @@ app.post("/org", async (c) => {
 
   // Update user role to owner
   await prisma.user.update({ where: { id: user.id }, data: { orgRole: "owner" } });
+
+  await ensureSystemRoles(prisma, org.id);
 
   return c.json({ data: org }, 201);
 });
