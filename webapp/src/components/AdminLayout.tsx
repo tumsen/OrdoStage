@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { BarChart3, Building2, Users, Tag, ArrowLeft, Menu, FileText } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,6 @@ const adminNavItems = [
 
 function AdminSidebarContent({ onNav }: { onNav?: () => void }) {
   const location = useLocation();
-  const navigate = useNavigate();
 
   return (
     <div className="flex flex-col h-full">
@@ -147,7 +146,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 export function AdminRoute({ children }: { children: React.ReactNode }) {
   const { data: session, isPending: sessionPending } = useSession();
 
-  const { data: adminStats, isPending: adminPending, error } = useQuery({
+  const { isPending: adminPending, error } = useQuery({
     queryKey: ["admin", "stats"],
     queryFn: () => api.get("/api/admin/stats"),
     enabled: !!session?.user,

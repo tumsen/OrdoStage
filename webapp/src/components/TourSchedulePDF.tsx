@@ -420,14 +420,6 @@ function addDaysPDF(d: Date, n: number): Date {
   return r;
 }
 
-function getISOWeekStartPDF(d: Date): Date {
-  const r = new Date(d);
-  r.setHours(0, 0, 0, 0);
-  const dow = r.getDay();
-  r.setDate(r.getDate() - ((dow + 6) % 7));
-  return r;
-}
-
 const DOW_PDF = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
 function formatPDFDate(dateStr: string | null | undefined): string {

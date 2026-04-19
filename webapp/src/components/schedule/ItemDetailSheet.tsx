@@ -4,7 +4,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Badge } from "@/components/ui/badge";
 import { MapPin, Clock, Users, Tag, UserCircle } from "lucide-react";
 import type { CalendarItem } from "./scheduleUtils";
 import { formatTime, itemColor } from "./scheduleUtils";

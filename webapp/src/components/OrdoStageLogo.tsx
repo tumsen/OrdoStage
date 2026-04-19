@@ -61,7 +61,7 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       shapeRendering="geometricPrecision"
-      className="pointer-events-none absolute inset-0 z-[2] h-full w-full select-none opacity-100 [opacity:1!important]"
+      className="pointer-events-none absolute inset-0 z-[2] h-full w-full select-none"
       style={{ opacity: 1, isolation: "isolate" }}
       overflow="visible"
       aria-hidden
@@ -75,47 +75,70 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
           <stop offset="100%" stopColor="#8338ec" stopOpacity={1} />
         </linearGradient>
       </defs>
+      {/* Stroke-only layer first (solid white), then fill — outline never shares opacity with the gradient. */}
       <text
-        x="100"
-        y="120"
+        x={100}
+        y={120}
         fontFamily="Arial Black, Helvetica, sans-serif"
-        fontSize="48"
+        fontSize={48}
         fontWeight="900"
-        fill={`url(#${gradId})`}
-        fillOpacity={1}
-        stroke="#ffffff"
-        strokeWidth={1.45}
+        fill="none"
+        stroke="rgb(255, 255, 255)"
+        strokeWidth={2.2}
         strokeOpacity={1}
         strokeLinejoin="round"
         strokeLinecap="round"
         textAnchor="middle"
         textRendering="geometricPrecision"
-        style={{
-          opacity: 1,
-          paintOrder: "stroke fill",
-        }}
+        style={{ opacity: 1 }}
       >
         ORDO
       </text>
       <text
-        x="100"
-        y="155"
+        x={100}
+        y={120}
         fontFamily="Arial Black, Helvetica, sans-serif"
-        fontSize="32"
+        fontSize={48}
         fontWeight="900"
         fill={`url(#${gradId})`}
         fillOpacity={1}
-        stroke="#ffffff"
-        strokeWidth={1.05}
+        stroke="none"
+        textAnchor="middle"
+        textRendering="geometricPrecision"
+        style={{ opacity: 1 }}
+      >
+        ORDO
+      </text>
+      <text
+        x={100}
+        y={155}
+        fontFamily="Arial Black, Helvetica, sans-serif"
+        fontSize={32}
+        fontWeight="900"
+        fill="none"
+        stroke="rgb(255, 255, 255)"
+        strokeWidth={1.65}
         strokeOpacity={1}
         strokeLinejoin="round"
         strokeLinecap="round"
         textAnchor="middle"
         textRendering="geometricPrecision"
-        style={{
-          opacity: 1,
-          paintOrder: "stroke fill",
-        }}
+        style={{ opacity: 1 }}
+      >
+        STAGE
+      </text>
+      <text
+        x={100}
+        y={155}
+        fontFamily="Arial Black, Helvetica, sans-serif"
+        fontSize={32}
+        fontWeight="900"
+        fill={`url(#${gradId})`}
+        fillOpacity={1}
+        stroke="none"
+        textAnchor="middle"
+        textRendering="geometricPrecision"
+        style={{ opacity: 1 }}
       >
         STAGE
       </text>

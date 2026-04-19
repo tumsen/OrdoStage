@@ -119,7 +119,6 @@ function YearDiscView({ year, items }: { year: number; items: CalendarItem[] }) 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {Array.from({ length: 12 }).map((_, month) => {
-        const start = new Date(year, month, 1);
         const end = new Date(year, month + 1, 0);
         const daysInMonth = end.getDate();
         let occupiedDays = 0;

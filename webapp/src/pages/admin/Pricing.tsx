@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -138,7 +137,7 @@ export default function Pricing() {
     onMutate: ({ packId }) => {
       setSavingId(packId);
     },
-    onSuccess: (_, { packId }) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "packs"] });
       setSavingId(null);
       toast({ title: "Pack updated", description: "Price pack has been saved." });

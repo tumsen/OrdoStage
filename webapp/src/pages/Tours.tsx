@@ -34,7 +34,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { formatDateShort } from "@/lib/dateUtils";
 
 // Tour has _count from the list endpoint
 type TourWithCount = Tour & { _count: { shows: number; people: number } };
