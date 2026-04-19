@@ -57,8 +57,8 @@ scheduleRouter.get("/schedule", async (c) => {
     from || to
       ? {
           startDate: {
-            ...(from ? { gte: new Date(from) } : {}),
-            ...(to ? { lte: new Date(to) } : {}),
+            ...(from ? { gte: new Date(`${from}T00:00:00.000Z`) } : {}),
+            ...(to ? { lt: new Date(new Date(`${to}T00:00:00.000Z`).getTime() + 86_400_000) } : {}),
           },
         }
       : {};
