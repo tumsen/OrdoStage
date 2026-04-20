@@ -13,7 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
 import type { Person } from "../../../backend/src/types";
-import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { AddressFields, type Address, EMPTY_ADDRESS } from "@/components/AddressFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,7 +64,12 @@ const PersonFormSchema = z.object({
   roleCustom: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
-  address: z.string().optional(),
+  addressStreet:  z.string().optional(),
+  addressNumber:  z.string().optional(),
+  addressZip:     z.string().optional(),
+  addressCity:    z.string().optional(),
+  addressState:   z.string().optional(),
+  addressCountry: z.string().optional(),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
   teamAssignments: z
@@ -219,7 +224,12 @@ function PersonFormDialog({
           roleCustom: defaultCustom,
           email: person.email ?? "",
           phone: person.phone ?? "",
-          address: person.address ?? "",
+          addressStreet:  person.addressStreet  ?? "",
+          addressNumber:  person.addressNumber  ?? "",
+          addressZip:     person.addressZip     ?? "",
+          addressCity:    person.addressCity    ?? "",
+          addressState:   person.addressState   ?? "",
+          addressCountry: person.addressCountry ?? "",
           emergencyContactName: person.emergencyContactName ?? "",
           emergencyContactPhone: person.emergencyContactPhone ?? "",
           teamAssignments:
@@ -236,7 +246,12 @@ function PersonFormDialog({
           roleCustom: "",
           email: "",
           phone: "",
-          address: "",
+          addressStreet:  "",
+          addressNumber:  "",
+          addressZip:     "",
+          addressCity:    "",
+          addressState:   "",
+          addressCountry: "",
           emergencyContactName: "",
           emergencyContactPhone: "",
           teamAssignments: [],
@@ -263,7 +278,12 @@ function PersonFormDialog({
         role: resolveRole(values),
         email: values.email || undefined,
         phone: values.phone || undefined,
-        address: values.address || undefined,
+        addressStreet:  values.addressStreet  || undefined,
+        addressNumber:  values.addressNumber  || undefined,
+        addressZip:     values.addressZip     || undefined,
+        addressCity:    values.addressCity    || undefined,
+        addressState:   values.addressState   || undefined,
+        addressCountry: values.addressCountry || undefined,
         emergencyContactName: values.emergencyContactName || undefined,
         emergencyContactPhone: values.emergencyContactPhone || undefined,
         teamAssignments: values.teamAssignments.map((assignment) => ({
@@ -402,16 +422,23 @@ function PersonFormDialog({
           {/* Address */}
           <div className="space-y-1.5">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Address</Label>
-            <Controller
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <AddressAutocomplete
-                  value={field.value ?? ""}
-                  onChange={field.onChange}
-                  placeholder="Street, City, Country"
-                />
-              )}
+            <AddressFields
+              value={{
+                street:  form.watch("addressStreet")  ?? "",
+                number:  form.watch("addressNumber")  ?? "",
+                zip:     form.watch("addressZip")     ?? "",
+                city:    form.watch("addressCity")    ?? "",
+                state:   form.watch("addressState")   ?? "",
+                country: form.watch("addressCountry") ?? "",
+              }}
+              onChange={(addr: Address) => {
+                form.setValue("addressStreet",  addr.street);
+                form.setValue("addressNumber",  addr.number);
+                form.setValue("addressZip",     addr.zip);
+                form.setValue("addressCity",    addr.city);
+                form.setValue("addressState",   addr.state);
+                form.setValue("addressCountry", addr.country);
+              }}
             />
           </div>
 
@@ -649,9 +676,18 @@ function PersonCard({
               <Phone size={10} />{person.phone}
             </a>
           ) : null}
-          {person.address ? (
+          {(person.addressStreet || person.addressCity || person.addressCountry) ? (
             <span className="text-xs text-white/30 flex items-center gap-1">
-              <MapPin size={10} />{person.address}
+              <MapPin size={10} />
+              {[
+                person.addressStreet && person.addressNumber
+                  ? `${person.addressStreet} ${person.addressNumber}`
+                  : person.addressStreet,
+                person.addressZip && person.addressCity
+                  ? `${person.addressZip} ${person.addressCity}`
+                  : person.addressCity,
+                person.addressCountry,
+              ].filter(Boolean).join(", ")}
             </span>
           ) : null}
         </div>

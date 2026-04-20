@@ -22,11 +22,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
-import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { AddressFields, type Address, EMPTY_ADDRESS } from "@/components/AddressFields";
 
 const VenueFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  address: z.string().optional(),
+  addressStreet:  z.string().optional(),
+  addressNumber:  z.string().optional(),
+  addressZip:     z.string().optional(),
+  addressCity:    z.string().optional(),
+  addressState:   z.string().optional(),
+  addressCountry: z.string().optional(),
   capacity: z.union([z.literal(""), z.coerce.number().int().min(0)]),
   width: z.string().optional(),
   length: z.string().optional(),
@@ -112,7 +117,6 @@ function CustomFieldsEditor({
   );
 }
 
-const AddressInput = AddressAutocomplete;
 
 function VenueRow({
   venue,
@@ -131,7 +135,12 @@ function VenueRow({
     resolver: zodResolver(VenueFormSchema),
     values: {
       name: venue.name,
-      address: venue.address ?? "",
+      addressStreet:  venue.addressStreet  ?? "",
+      addressNumber:  venue.addressNumber  ?? "",
+      addressZip:     venue.addressZip     ?? "",
+      addressCity:    venue.addressCity    ?? "",
+      addressState:   venue.addressState   ?? "",
+      addressCountry: venue.addressCountry ?? "",
       capacity: venue.capacity ?? "",
       width: venue.width ?? "",
       length: venue.length ?? "",
@@ -145,7 +154,12 @@ function VenueRow({
     mutationFn: (data: VenueFormValues) => {
       const payload = {
         name: data.name,
-        address: data.address || undefined,
+        addressStreet:  data.addressStreet  || undefined,
+        addressNumber:  data.addressNumber  || undefined,
+        addressZip:     data.addressZip     || undefined,
+        addressCity:    data.addressCity    || undefined,
+        addressState:   data.addressState   || undefined,
+        addressCountry: data.addressCountry || undefined,
         capacity: data.capacity === "" ? undefined : Number(data.capacity),
         width: data.width?.trim() || undefined,
         length: data.length?.trim() || undefined,
@@ -174,9 +188,23 @@ function VenueRow({
           />
         </td>
         <td className="px-5 py-3 hidden sm:table-cell">
-          <AddressInput
-            value={form.watch("address") ?? ""}
-            onChange={(value) => form.setValue("address", value)}
+          <AddressFields
+            value={{
+              street:  form.watch("addressStreet")  ?? "",
+              number:  form.watch("addressNumber")  ?? "",
+              zip:     form.watch("addressZip")     ?? "",
+              city:    form.watch("addressCity")    ?? "",
+              state:   form.watch("addressState")   ?? "",
+              country: form.watch("addressCountry") ?? "",
+            }}
+            onChange={(addr: Address) => {
+              form.setValue("addressStreet",  addr.street);
+              form.setValue("addressNumber",  addr.number);
+              form.setValue("addressZip",     addr.zip);
+              form.setValue("addressCity",    addr.city);
+              form.setValue("addressState",   addr.state);
+              form.setValue("addressCountry", addr.country);
+            }}
           />
         </td>
         <td className="px-5 py-3 hidden md:table-cell">
@@ -246,7 +274,19 @@ function VenueRow({
   return (
     <tr className="border-b border-white/5 group hover:bg-white/[0.02] transition-colors">
       <td className="px-5 py-3.5 text-sm font-medium text-white/90">{venue.name}</td>
-      <td className="px-5 py-3.5 text-sm text-white/50 hidden sm:table-cell">{venue.address ?? "—"}</td>
+      <td className="px-5 py-3.5 text-sm text-white/50 hidden sm:table-cell">
+        {venue.addressStreet || venue.addressCity || venue.addressCountry
+          ? [
+              venue.addressStreet && venue.addressNumber
+                ? `${venue.addressStreet} ${venue.addressNumber}`
+                : venue.addressStreet,
+              venue.addressZip && venue.addressCity
+                ? `${venue.addressZip} ${venue.addressCity}`
+                : venue.addressCity,
+              venue.addressCountry,
+            ].filter(Boolean).join(", ")
+          : "—"}
+      </td>
       <td className="px-5 py-3.5 text-sm text-white/50 hidden md:table-cell">
         <div>{venue.capacity != null ? venue.capacity.toLocaleString() : "—"}</div>
         <div className="text-[11px] text-white/30">
@@ -292,7 +332,12 @@ function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite
     resolver: zodResolver(VenueFormSchema),
     defaultValues: {
       name: "",
-      address: "",
+      addressStreet:  "",
+      addressNumber:  "",
+      addressZip:     "",
+      addressCity:    "",
+      addressState:   "",
+      addressCountry: "",
       capacity: "",
       width: "",
       length: "",
@@ -308,7 +353,12 @@ function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite
     mutationFn: (data: VenueFormValues) => {
       const payload = {
         name: data.name,
-        address: data.address || undefined,
+        addressStreet:  data.addressStreet  || undefined,
+        addressNumber:  data.addressNumber  || undefined,
+        addressZip:     data.addressZip     || undefined,
+        addressCity:    data.addressCity    || undefined,
+        addressState:   data.addressState   || undefined,
+        addressCountry: data.addressCountry || undefined,
         capacity: data.capacity === "" ? undefined : Number(data.capacity),
         width: data.width?.trim() || undefined,
         length: data.length?.trim() || undefined,
@@ -341,9 +391,23 @@ function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite
         )}
       </td>
       <td className="px-5 py-3 hidden sm:table-cell">
-        <AddressInput
-          value={form.watch("address") ?? ""}
-          onChange={(value) => form.setValue("address", value)}
+        <AddressFields
+          value={{
+            street:  form.watch("addressStreet")  ?? "",
+            number:  form.watch("addressNumber")  ?? "",
+            zip:     form.watch("addressZip")     ?? "",
+            city:    form.watch("addressCity")    ?? "",
+            state:   form.watch("addressState")   ?? "",
+            country: form.watch("addressCountry") ?? "",
+          }}
+          onChange={(addr: Address) => {
+            form.setValue("addressStreet",  addr.street);
+            form.setValue("addressNumber",  addr.number);
+            form.setValue("addressZip",     addr.zip);
+            form.setValue("addressCity",    addr.city);
+            form.setValue("addressState",   addr.state);
+            form.setValue("addressCountry", addr.country);
+          }}
         />
       </td>
       <td className="px-5 py-3 hidden md:table-cell">

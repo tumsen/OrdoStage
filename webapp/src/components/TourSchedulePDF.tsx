@@ -468,7 +468,7 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
   const hasTimeline =
     show.getInTime || show.rehearsalTime || show.soundcheckTime || show.doorsTime || show.showTime;
   const hasContact = show.contactName || show.contactPhone || show.contactEmail;
-  const hasHotel = show.hotelName || show.hotelAddress || show.hotelPhone || show.hotelCheckIn || show.hotelCheckOut;
+  const hasHotel = show.hotelName || show.hotelStreet || show.hotelCity || show.hotelPhone || show.hotelCheckIn || show.hotelCheckOut;
   const hasTravelOrCatering = show.travelInfo || show.cateringInfo;
 
   return (
@@ -491,14 +491,21 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
 
       <View style={styles.showCardBody}>
         {/* Venue address */}
-        {show.venueAddress ? (
-          <View style={[styles.showBlock, { marginBottom: 8 }]} wrap={false}>
-            <Text style={[styles.cellLabel, { marginBottom: 2 }]}>Venue Address</Text>
-            <Link src={`https://maps.google.com/?q=${encodeURIComponent(show.venueAddress ?? "")}`} style={styles.addressLink}>
-              {show.venueAddress}
-            </Link>
-          </View>
-        ) : null}
+        {(show.venueStreet || show.venueCity || show.venueCountry) ? (() => {
+          const va = [
+            show.venueStreet && show.venueNumber ? `${show.venueStreet} ${show.venueNumber}` : show.venueStreet,
+            show.venueZip && show.venueCity ? `${show.venueZip} ${show.venueCity}` : show.venueCity,
+            show.venueCountry,
+          ].filter(Boolean).join(", ");
+          return (
+            <View style={[styles.showBlock, { marginBottom: 8 }]} wrap={false}>
+              <Text style={[styles.cellLabel, { marginBottom: 2 }]}>Venue Address</Text>
+              <Link src={`https://maps.google.com/?q=${encodeURIComponent(va)}`} style={styles.addressLink}>
+                {va}
+              </Link>
+            </View>
+          );
+        })() : null}
 
         {/* Timeline */}
         {hasTimeline ? (
@@ -539,14 +546,21 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
               </Text>
             ) : null}
             <View style={styles.twoColGrid}>
-              {show.hotelAddress ? (
-                <View style={styles.twoColCell}>
-                  <Text style={styles.cellLabel}>Address</Text>
-                  <Link src={`https://maps.google.com/?q=${encodeURIComponent(show.hotelAddress ?? "")}`} style={styles.addressLink}>
-                    {show.hotelAddress}
-                  </Link>
-                </View>
-              ) : null}
+              {(show.hotelStreet || show.hotelCity) ? (() => {
+                const ha = [
+                  show.hotelStreet && show.hotelNumber ? `${show.hotelStreet} ${show.hotelNumber}` : show.hotelStreet,
+                  show.hotelZip && show.hotelCity ? `${show.hotelZip} ${show.hotelCity}` : show.hotelCity,
+                  show.hotelCountry,
+                ].filter(Boolean).join(", ");
+                return (
+                  <View style={styles.twoColCell}>
+                    <Text style={styles.cellLabel}>Address</Text>
+                    <Link src={`https://maps.google.com/?q=${encodeURIComponent(ha)}`} style={styles.addressLink}>
+                      {ha}
+                    </Link>
+                  </View>
+                );
+              })() : null}
               <InfoCell label="Phone" value={show.hotelPhone} />
             </View>
             <View style={[styles.twoColGrid, { marginTop: 4 }]}>
@@ -591,8 +605,8 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
 function TravelToNext({ currentShow, nextShow }: { currentShow: TourShow; nextShow: TourShow }) {
   const hasTravelInfo = currentShow.travelTimeMinutes || currentShow.distanceKm;
   const nextVenue = [nextShow.venueCity, nextShow.venueName].filter(Boolean).join(", ");
-  const currentAddr = currentShow.venueAddress || currentShow.venueName || "";
-  const nextAddr = nextShow.venueAddress || nextShow.venueName || "";
+  const currentAddr = currentShow.venueStreet || currentShow.venueCity || currentShow.venueName || "";
+  const nextAddr = nextShow.venueStreet || nextShow.venueCity || nextShow.venueName || "";
   const directionsUrl = currentAddr && nextAddr
     ? `https://www.google.com/maps/dir/${encodeURIComponent(currentAddr)}/${encodeURIComponent(nextAddr)}`
     : null;

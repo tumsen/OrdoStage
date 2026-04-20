@@ -63,7 +63,12 @@ function serializePerson(person: {
   affiliation: string;
   email: string | null;
   phone: string | null;
-  address: string | null;
+  addressStreet:  string | null;
+  addressNumber:  string | null;
+  addressZip:     string | null;
+  addressCity:    string | null;
+  addressState:   string | null;
+  addressCountry: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
   departmentId: string | null;
@@ -91,7 +96,12 @@ function serializePerson(person: {
     affiliation: aff,
     email: person.email,
     phone: person.phone,
-    address: person.address ?? null,
+    addressStreet:  person.addressStreet  ?? null,
+    addressNumber:  person.addressNumber  ?? null,
+    addressZip:     person.addressZip     ?? null,
+    addressCity:    person.addressCity    ?? null,
+    addressState:   person.addressState   ?? null,
+    addressCountry: person.addressCountry ?? null,
     emergencyContactName: person.emergencyContactName ?? null,
     emergencyContactPhone: person.emergencyContactPhone ?? null,
     departmentId: person.departmentId,
@@ -162,7 +172,12 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       role: body.role ?? null,
       email: body.email ?? null,
       phone: body.phone ?? null,
-      address: body.address ?? null,
+      addressStreet:  body.addressStreet  ?? null,
+      addressNumber:  body.addressNumber  ?? null,
+      addressZip:     body.addressZip     ?? null,
+      addressCity:    body.addressCity    ?? null,
+      addressState:   body.addressState   ?? null,
+      addressCountry: body.addressCountry ?? null,
       emergencyContactName: body.emergencyContactName ?? null,
       emergencyContactPhone: body.emergencyContactPhone ?? null,
       departmentId: teamIds[0] ?? null,
@@ -341,7 +356,12 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       ...(body.role !== undefined && { role: body.role }),
       ...(body.email !== undefined && { email: body.email }),
       ...(body.phone !== undefined && { phone: body.phone }),
-      ...(body.address !== undefined && { address: body.address }),
+      ...(body.addressStreet  !== undefined && { addressStreet:  body.addressStreet }),
+      ...(body.addressNumber  !== undefined && { addressNumber:  body.addressNumber }),
+      ...(body.addressZip     !== undefined && { addressZip:     body.addressZip }),
+      ...(body.addressCity    !== undefined && { addressCity:    body.addressCity }),
+      ...(body.addressState   !== undefined && { addressState:   body.addressState }),
+      ...(body.addressCountry !== undefined && { addressCountry: body.addressCountry }),
       ...(body.emergencyContactName !== undefined && { emergencyContactName: body.emergencyContactName }),
       ...(body.emergencyContactPhone !== undefined && { emergencyContactPhone: body.emergencyContactPhone }),
       ...(body.teamAssignments !== undefined && { departmentId: nextAssignments[0]?.teamId ?? null }),

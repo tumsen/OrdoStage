@@ -13,7 +13,12 @@ function serializeDate(d: Date) {
 function serializeVenue(venue: {
   id: string;
   name: string;
-  address: string | null;
+  addressStreet:  string | null;
+  addressNumber:  string | null;
+  addressZip:     string | null;
+  addressCity:    string | null;
+  addressState:   string | null;
+  addressCountry: string | null;
   capacity: number | null;
   notes: string | null;
   organizationId: string;

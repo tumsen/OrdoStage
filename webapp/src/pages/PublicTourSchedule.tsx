@@ -213,19 +213,26 @@ function PublicShowCard({ show, dayNumber }: { show: TourShow; dayNumber: number
       {/* Expanded */}
       {expanded ? (
         <div className="px-5 py-4 space-y-4 border-t border-gray-100">
-          {show.venueAddress ? (
-            <div>
-              <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Address</div>
-              <a
-                href={`https://maps.google.com/?q=${encodeURIComponent(show.venueAddress)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-              >
-                <MapPin size={12} />{show.venueAddress}
-              </a>
-            </div>
-          ) : null}
+          {(show.venueStreet || show.venueCity || show.venueCountry) ? (() => {
+            const va = [
+              show.venueStreet && show.venueNumber ? `${show.venueStreet} ${show.venueNumber}` : show.venueStreet,
+              show.venueZip && show.venueCity ? `${show.venueZip} ${show.venueCity}` : show.venueCity,
+              show.venueCountry,
+            ].filter(Boolean).join(", ");
+            return (
+              <div>
+                <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Address</div>
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(va)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  <MapPin size={12} />{va}
+                </a>
+              </div>
+            );
+          })() : null}
 
           {(show.getInTime || show.rehearsalTime || show.soundcheckTime || show.doorsTime || show.showTime) ? (
             <div>
@@ -262,21 +269,28 @@ function PublicShowCard({ show, dayNumber }: { show: TourShow; dayNumber: number
             </div>
           ) : null}
 
-          {(show.hotelName || show.hotelAddress) ? (
+          {(show.hotelName || show.hotelStreet || show.hotelCity) ? (
             <div>
               <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Hotel</div>
               <div className="text-sm">
                 {show.hotelName ? <div className="font-medium text-gray-700">{show.hotelName}</div> : null}
-                {show.hotelAddress ? (
-                  <a
-                    href={`https://maps.google.com/?q=${encodeURIComponent(show.hotelAddress)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
-                  >
-                    <MapPin size={11} />{show.hotelAddress}
-                  </a>
-                ) : null}
+                {(show.hotelStreet || show.hotelCity) ? (() => {
+                  const ha = [
+                    show.hotelStreet && show.hotelNumber ? `${show.hotelStreet} ${show.hotelNumber}` : show.hotelStreet,
+                    show.hotelZip && show.hotelCity ? `${show.hotelZip} ${show.hotelCity}` : show.hotelCity,
+                    show.hotelCountry,
+                  ].filter(Boolean).join(", ");
+                  return (
+                    <a
+                      href={`https://maps.google.com/?q=${encodeURIComponent(ha)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
+                    >
+                      <MapPin size={11} />{ha}
+                    </a>
+                  );
+                })() : null}
                 {(show.hotelCheckIn || show.hotelCheckOut) ? (
                   <div className="text-gray-500 mt-1 text-xs">
                     {show.hotelCheckIn ? `Check-in: ${show.hotelCheckIn}` : ""}

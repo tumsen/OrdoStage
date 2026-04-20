@@ -137,7 +137,12 @@ app.post("/billing/webhook", async (c) => {
           select: {
             name: true,
             invoiceName: true,
-            invoiceAddress: true,
+            invoiceStreet: true,
+            invoiceNumber: true,
+            invoiceZip: true,
+            invoiceCity: true,
+            invoiceState: true,
+            invoiceCountry: true,
             invoiceVat: true,
             invoiceEmail: true,
           },
@@ -164,7 +169,20 @@ app.post("/billing/webhook", async (c) => {
               invoiceNumber,
               orgNameSnapshot: org?.name ?? null,
               invoiceNameSnapshot: org?.invoiceName ?? null,
-              invoiceAddressSnapshot: org?.invoiceAddress ?? null,
+              invoiceAddressSnapshot: org
+                ? [
+                    org.invoiceStreet && org.invoiceNumber
+                      ? `${org.invoiceStreet} ${org.invoiceNumber}`
+                      : org.invoiceStreet,
+                    org.invoiceZip && org.invoiceCity
+                      ? `${org.invoiceZip} ${org.invoiceCity}`
+                      : org.invoiceCity,
+                    org.invoiceState,
+                    org.invoiceCountry,
+                  ]
+                    .filter(Boolean)
+                    .join(", ") || null
+                : null,
               invoiceVatSnapshot: org?.invoiceVat ?? null,
               invoiceEmailSnapshot: org?.invoiceEmail ?? null,
               packLabelSnapshot: pack?.label ?? null,
@@ -198,7 +216,20 @@ app.post("/billing/webhook", async (c) => {
           sellerVat: SELLER.vat,
           sellerEmail: SELLER.email,
           buyerName: org?.invoiceName ?? org?.name ?? "Customer",
-          buyerAddress: org?.invoiceAddress ?? null,
+          buyerAddress: org
+            ? [
+                org.invoiceStreet && org.invoiceNumber
+                  ? `${org.invoiceStreet} ${org.invoiceNumber}`
+                  : org.invoiceStreet,
+                org.invoiceZip && org.invoiceCity
+                  ? `${org.invoiceZip} ${org.invoiceCity}`
+                  : org.invoiceCity,
+                org.invoiceState,
+                org.invoiceCountry,
+              ]
+                .filter(Boolean)
+                .join(", ") || null
+            : null,
           buyerVat: org?.invoiceVat ?? null,
           buyerEmail: org?.invoiceEmail ?? null,
           packLabel: pack?.label ?? `${days} days`,

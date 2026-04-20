@@ -75,6 +75,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
+import { AddressFields, type Address } from "@/components/AddressFields";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { downloadVenueTechRider, printVenueTechRider, uploadVenueTechRiderForSharing } from "@/lib/downloadVenueTechRider";
 import { TourCalendarView } from "@/components/TourCalendarView";
@@ -534,7 +535,11 @@ const emptyShowForm = {
   showTime: "",
   venueCity: "",
   venueName: "",
-  venueAddress: "",
+  venueStreet:  "",
+  venueNumber:  "",
+  venueZip:     "",
+  venueState:   "",
+  venueCountry: "",
   contactName: "",
   contactPhone: "",
   contactEmail: "",
@@ -543,7 +548,12 @@ const emptyShowForm = {
   soundcheckTime: "",
   doorsTime: "",
   hotelName: "",
-  hotelAddress: "",
+  hotelStreet:  "",
+  hotelNumber:  "",
+  hotelZip:     "",
+  hotelCity:    "",
+  hotelState:   "",
+  hotelCountry: "",
   hotelPhone: "",
   hotelCheckIn: "",
   hotelCheckOut: "",
@@ -563,9 +573,13 @@ function showToForm(show: TourShow): ShowFormState {
     toLocation: show.toLocation ?? "",
     date: show.date,
     showTime: show.showTime ?? "",
-    venueCity: show.venueCity ?? "",
-    venueName: show.venueName ?? "",
-    venueAddress: show.venueAddress ?? "",
+    venueCity:    show.venueCity    ?? "",
+    venueName:    show.venueName    ?? "",
+    venueStreet:  show.venueStreet  ?? "",
+    venueNumber:  show.venueNumber  ?? "",
+    venueZip:     show.venueZip     ?? "",
+    venueState:   show.venueState   ?? "",
+    venueCountry: show.venueCountry ?? "",
     contactName: show.contactName ?? "",
     contactPhone: show.contactPhone ?? "",
     contactEmail: show.contactEmail ?? "",
@@ -573,8 +587,13 @@ function showToForm(show: TourShow): ShowFormState {
     rehearsalTime: show.rehearsalTime ?? "",
     soundcheckTime: show.soundcheckTime ?? "",
     doorsTime: show.doorsTime ?? "",
-    hotelName: show.hotelName ?? "",
-    hotelAddress: show.hotelAddress ?? "",
+    hotelName:    show.hotelName    ?? "",
+    hotelStreet:  show.hotelStreet  ?? "",
+    hotelNumber:  show.hotelNumber  ?? "",
+    hotelZip:     show.hotelZip     ?? "",
+    hotelCity:    show.hotelCity    ?? "",
+    hotelState:   show.hotelState   ?? "",
+    hotelCountry: show.hotelCountry ?? "",
     hotelPhone: show.hotelPhone ?? "",
     hotelCheckIn: show.hotelCheckIn ?? "",
     hotelCheckOut: show.hotelCheckOut ?? "",
@@ -593,8 +612,12 @@ function formToPayload(form: ShowFormState): CreateTourShow {
   if (form.toLocation) payload.toLocation = form.toLocation;
   if (form.showTime) payload.showTime = form.showTime;
   if (form.venueCity) payload.venueCity = form.venueCity;
-  if (form.venueName) payload.venueName = form.venueName;
-  if (form.venueAddress) payload.venueAddress = form.venueAddress;
+  if (form.venueName)    payload.venueName    = form.venueName;
+  if (form.venueStreet)  payload.venueStreet  = form.venueStreet;
+  if (form.venueNumber)  payload.venueNumber  = form.venueNumber;
+  if (form.venueZip)     payload.venueZip     = form.venueZip;
+  if (form.venueState)   payload.venueState   = form.venueState;
+  if (form.venueCountry) payload.venueCountry = form.venueCountry;
   if (form.contactName) payload.contactName = form.contactName;
   if (form.contactPhone) payload.contactPhone = form.contactPhone;
   if (form.contactEmail) payload.contactEmail = form.contactEmail;
@@ -602,8 +625,13 @@ function formToPayload(form: ShowFormState): CreateTourShow {
   if (form.rehearsalTime) payload.rehearsalTime = form.rehearsalTime;
   if (form.soundcheckTime) payload.soundcheckTime = form.soundcheckTime;
   if (form.doorsTime) payload.doorsTime = form.doorsTime;
-  if (form.hotelName) payload.hotelName = form.hotelName;
-  if (form.hotelAddress) payload.hotelAddress = form.hotelAddress;
+  if (form.hotelName)    payload.hotelName    = form.hotelName;
+  if (form.hotelStreet)  payload.hotelStreet  = form.hotelStreet;
+  if (form.hotelNumber)  payload.hotelNumber  = form.hotelNumber;
+  if (form.hotelZip)     payload.hotelZip     = form.hotelZip;
+  if (form.hotelCity)    payload.hotelCity    = form.hotelCity;
+  if (form.hotelState)   payload.hotelState   = form.hotelState;
+  if (form.hotelCountry) payload.hotelCountry = form.hotelCountry;
   if (form.hotelPhone) payload.hotelPhone = form.hotelPhone;
   if (form.hotelCheckIn) payload.hotelCheckIn = form.hotelCheckIn;
   if (form.hotelCheckOut) payload.hotelCheckOut = form.hotelCheckOut;
@@ -788,10 +816,23 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
                 </div>
                 <div className="space-y-2">
                   <Label className="text-white/60 text-xs uppercase tracking-wide">Venue Address</Label>
-                  <AddressAutocomplete
-                    value={form.venueAddress}
-                    onChange={(v) => setField("venueAddress", v)}
-                    placeholder="Full address"
+                  <AddressFields
+                    value={{
+                      street:  form.venueStreet,
+                      number:  form.venueNumber,
+                      zip:     form.venueZip,
+                      city:    form.venueCity,
+                      state:   form.venueState,
+                      country: form.venueCountry,
+                    }}
+                    onChange={(addr: Address) => {
+                      setField("venueStreet",  addr.street);
+                      setField("venueNumber",  addr.number);
+                      setField("venueZip",     addr.zip);
+                      setField("venueCity",    addr.city);
+                      setField("venueState",   addr.state);
+                      setField("venueCountry", addr.country);
+                    }}
                   />
                 </div>
               </div>
@@ -888,10 +929,23 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
               </div>
               <div className="space-y-2">
                 <Label className="text-white/60 text-xs uppercase tracking-wide">Address</Label>
-                <AddressAutocomplete
-                  value={form.hotelAddress}
-                  onChange={(v) => setField("hotelAddress", v)}
-                  placeholder="Hotel address"
+                <AddressFields
+                  value={{
+                    street:  form.hotelStreet,
+                    number:  form.hotelNumber,
+                    zip:     form.hotelZip,
+                    city:    form.hotelCity,
+                    state:   form.hotelState,
+                    country: form.hotelCountry,
+                  }}
+                  onChange={(addr: Address) => {
+                    setField("hotelStreet",  addr.street);
+                    setField("hotelNumber",  addr.number);
+                    setField("hotelZip",     addr.zip);
+                    setField("hotelCity",    addr.city);
+                    setField("hotelState",   addr.state);
+                    setField("hotelCountry", addr.country);
+                  }}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -1031,7 +1085,12 @@ function buildTechRiderText(tour: TourDetail, show: TourShow, pdfUrl?: string | 
   lines.push(``);
   lines.push(`Tour: ${tour.name}`);
   if (visibility.venue && venue) lines.push(`Venue: ${venue}`);
-  if (visibility.venue && show.venueAddress) lines.push(`Address: ${show.venueAddress}`);
+  const venueAddrStr = [
+    show.venueStreet && show.venueNumber ? `${show.venueStreet} ${show.venueNumber}` : show.venueStreet,
+    show.venueZip && show.venueCity ? `${show.venueZip} ${show.venueCity}` : show.venueCity,
+    show.venueCountry,
+  ].filter(Boolean).join(", ");
+  if (visibility.venue && venueAddrStr) lines.push(`Address: ${venueAddrStr}`);
   lines.push(`Date: ${date}`);
   lines.push(``);
 
@@ -1288,7 +1347,7 @@ function ShowCard({
   });
 
   const hasTimes = show.getInTime || show.rehearsalTime || show.soundcheckTime || show.doorsTime;
-  const hasHotel = show.hotelName || show.hotelAddress;
+  const hasHotel = show.hotelName || show.hotelStreet || show.hotelCity;
   const hasContact = show.contactName || show.contactPhone || show.contactEmail;
   const hasLogistics = show.travelInfo || show.cateringInfo || show.notes;
 
@@ -1446,20 +1505,27 @@ function ShowCard({
                 </div>
               </div>
             ) : null}
-            {show.type !== "travel" && show.venueAddress ? (
-              <div>
-                <div className="text-xs text-white/35 uppercase tracking-wide mb-1">Venue Address</div>
-                <a
-                  href={mapsUrl(show.venueAddress)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1"
-                >
-                  <MapPin size={11} />
-                  {show.venueAddress}
-                </a>
-              </div>
-            ) : null}
+            {show.type !== "travel" && (show.venueStreet || show.venueCity || show.venueCountry) ? (() => {
+              const addr = [
+                show.venueStreet && show.venueNumber ? `${show.venueStreet} ${show.venueNumber}` : show.venueStreet,
+                show.venueZip && show.venueCity ? `${show.venueZip} ${show.venueCity}` : show.venueCity,
+                show.venueCountry,
+              ].filter(Boolean).join(", ");
+              return (
+                <div>
+                  <div className="text-xs text-white/35 uppercase tracking-wide mb-1">Venue Address</div>
+                  <a
+                    href={mapsUrl(addr)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1"
+                  >
+                    <MapPin size={11} />
+                    {addr}
+                  </a>
+                </div>
+              );
+            })() : null}
 
             {hasTimes ? (
               <div>
@@ -1523,12 +1589,19 @@ function ShowCard({
                 <div className="text-xs text-white/35 uppercase tracking-wide mb-2">Hotel</div>
                 <div className="flex flex-col gap-1">
                   {show.hotelName ? <span className="text-sm font-medium text-white/75">{show.hotelName}</span> : null}
-                  {show.hotelAddress ? (
-                    <a href={mapsUrl(show.hotelAddress)} target="_blank" rel="noopener noreferrer"
-                       className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1">
-                      <MapPin size={10} />{show.hotelAddress}
-                    </a>
-                  ) : null}
+                  {(show.hotelStreet || show.hotelCity) ? (() => {
+                    const ha = [
+                      show.hotelStreet && show.hotelNumber ? `${show.hotelStreet} ${show.hotelNumber}` : show.hotelStreet,
+                      show.hotelZip && show.hotelCity ? `${show.hotelZip} ${show.hotelCity}` : show.hotelCity,
+                      show.hotelCountry,
+                    ].filter(Boolean).join(", ");
+                    return (
+                      <a href={mapsUrl(ha)} target="_blank" rel="noopener noreferrer"
+                         className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1">
+                        <MapPin size={10} />{ha}
+                      </a>
+                    );
+                  })() : null}
                   <div className="flex flex-wrap gap-3">
                     {show.hotelPhone ? <span className="text-xs text-white/50">{show.hotelPhone}</span> : null}
                     {show.hotelCheckIn ? <span className="text-xs text-white/40">Check-in: {show.hotelCheckIn}</span> : null}
@@ -1559,7 +1632,7 @@ function ShowCard({
               </div>
             ) : null}
 
-            {!show.venueAddress && !hasTimes && !hasContact && !hasHotel && !hasLogistics ? (
+            {!show.venueStreet && !show.venueCity && !hasTimes && !hasContact && !hasHotel && !hasLogistics ? (
               <div className="text-sm text-white/25 text-center py-2">No additional details.</div>
             ) : null}
 
@@ -1805,8 +1878,8 @@ interface TravelConnectorProps {
 
 function TravelConnector({ currentShow, nextShow }: TravelConnectorProps) {
   const nextVenueLabel = [nextShow.venueCity, nextShow.venueName].filter(Boolean).join(" · ");
-  const nextAddress = nextShow.venueAddress || nextShow.venueName || nextShow.venueCity;
-  const currentAddress = currentShow.venueAddress || currentShow.venueName || currentShow.venueCity;
+  const nextAddress = nextShow.venueStreet || nextShow.venueName || nextShow.venueCity;
+  const currentAddress = currentShow.venueStreet || currentShow.venueName || currentShow.venueCity;
 
   const etd = (currentShow.travelTimeMinutes && nextShow.getInTime)
     ? computeLatestETD(currentShow.travelTimeMinutes, nextShow.getInTime)

@@ -97,7 +97,12 @@ model Organization {
   deactivatePersonCredits Int              @default(20)
   /** Company / invoice information (optional — used on generated PDF invoices). */
   invoiceName      String?
-  invoiceAddress   String?
+  invoiceStreet    String?
+  invoiceNumber    String?
+  invoiceZip       String?
+  invoiceCity      String?
+  invoiceState     String?
+  invoiceCountry   String?
   invoiceVat       String?
   invoiceEmail     String?
   invoicePhone     String?
@@ -183,7 +188,12 @@ model CreditPurchase {
 model Venue {
   id               String             @id @default(cuid())
   name             String
-  address          String?
+  addressStreet    String?
+  addressNumber    String?
+  addressZip       String?
+  addressCity      String?
+  addressState     String?
+  addressCountry   String?
   capacity         Int?
   width            String?
   length           String?
@@ -204,7 +214,12 @@ model Person {
   role             String?
   email            String?
   phone                 String?
-  address               String?
+  addressStreet         String?
+  addressNumber         String?
+  addressZip            String?
+  addressCity           String?
+  addressState          String?
+  addressCountry        String?
   emergencyContactName  String?
   emergencyContactPhone String?
   organizationId   String
@@ -417,13 +432,22 @@ model TourShow {
   soundcheckTime String?
   doorsTime      String?
   venueName      String?
-  venueAddress   String?
+  venueStreet    String?
+  venueNumber    String?
+  venueZip       String?
   venueCity      String?
+  venueState     String?
+  venueCountry   String?
   contactName    String?
   contactPhone   String?
   contactEmail   String?
   hotelName      String?
-  hotelAddress   String?
+  hotelStreet    String?
+  hotelNumber    String?
+  hotelZip       String?
+  hotelCity      String?
+  hotelState     String?
+  hotelCountry   String?
   hotelPhone     String?
   hotelCheckIn   String?
   hotelCheckOut  String?

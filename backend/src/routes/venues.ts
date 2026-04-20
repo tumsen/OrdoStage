@@ -27,7 +27,12 @@ function parseCustomFields(value: string | null | undefined) {
 function serializeVenue(venue: {
   id: string;
   name: string;
-  address: string | null;
+  addressStreet:  string | null;
+  addressNumber:  string | null;
+  addressZip:     string | null;
+  addressCity:    string | null;
+  addressState:   string | null;
+  addressCountry: string | null;
   capacity: number | null;
   width: string | null;
   length: string | null;
@@ -99,6 +104,50 @@ venuesRouter.get("/venues/address-search", async (c) => {
   return c.json({ data: predictions });
 });
 
+// GET /api/venues/address-details?placeId=... — returns structured address components
+venuesRouter.get("/venues/address-details", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const placeId = c.req.query("placeId")?.trim();
+  if (!placeId) return c.json({ data: null });
+
+  if (!env.GOOGLE_MAPS_API_KEY) return c.json({ data: null });
+
+  const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
+  url.searchParams.set("place_id", placeId);
+  url.searchParams.set("fields", "address_components");
+  url.searchParams.set("key", env.GOOGLE_MAPS_API_KEY);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) return c.json({ data: null });
+
+  type Component = { long_name: string; short_name: string; types: string[] };
+  const payload = (await response.json()) as {
+    result?: { address_components?: Component[] };
+  };
+
+  const components = payload.result?.address_components ?? [];
+
+  function get(type: string, short = false): string {
+    const c = components.find((comp) => comp.types.includes(type));
+    return c ? (short ? c.short_name : c.long_name) : "";
+  }
+
+  return c.json({
+    data: {
+      street: get("route"),
+      number: get("street_number"),
+      zip: get("postal_code"),
+      city: get("locality") || get("postal_town"),
+      state: get("administrative_area_level_1"),
+      country: get("country"),
+    },
+  });
+});
+
 // POST /api/venues
 venuesRouter.post("/venues", zValidator("json", CreateVenueSchema), async (c) => {
   const user = c.get("user");
@@ -113,7 +162,12 @@ venuesRouter.post("/venues", zValidator("json", CreateVenueSchema), async (c) =>
   const venue = await prisma.venue.create({
     data: {
       name: body.name,
-      address: body.address ?? null,
+      addressStreet:  body.addressStreet  ?? null,
+      addressNumber:  body.addressNumber  ?? null,
+      addressZip:     body.addressZip     ?? null,
+      addressCity:    body.addressCity    ?? null,
+      addressState:   body.addressState   ?? null,
+      addressCountry: body.addressCountry ?? null,
       capacity: body.capacity ?? null,
       width: body.width ?? null,
       length: body.length ?? null,
@@ -164,7 +218,12 @@ venuesRouter.put("/venues/:id", zValidator("json", UpdateVenueSchema), async (c)
     where: { id },
     data: {
       ...(body.name !== undefined && { name: body.name }),
-      ...(body.address !== undefined && { address: body.address }),
+      ...(body.addressStreet  !== undefined && { addressStreet:  body.addressStreet }),
+      ...(body.addressNumber  !== undefined && { addressNumber:  body.addressNumber }),
+      ...(body.addressZip     !== undefined && { addressZip:     body.addressZip }),
+      ...(body.addressCity    !== undefined && { addressCity:    body.addressCity }),
+      ...(body.addressState   !== undefined && { addressState:   body.addressState }),
+      ...(body.addressCountry !== undefined && { addressCountry: body.addressCountry }),
       ...(body.capacity !== undefined && { capacity: body.capacity }),
       ...(body.width !== undefined && { width: body.width }),
       ...(body.length !== undefined && { length: body.length }),

@@ -29,7 +29,7 @@ function buildICS(
     endDate: Date | null;
     status: string;
     tags: string | null;
-    venue: { name: string; address: string | null; capacity: number | null } | null;
+    venue: { name: string; addressStreet: string | null; addressCity: string | null; addressCountry: string | null; capacity: number | null } | null;
     people: Array<{ person: { name: string; role: string | null }; role: string | null }>;
   }>
 ): string {
@@ -72,8 +72,9 @@ function buildICS(
       // Location: venue name + address
       let location: string | null = null;
       if (event.venue) {
-        const loc = event.venue.address
-          ? `${event.venue.name}, ${event.venue.address}`
+        const addrParts = [event.venue.addressStreet, event.venue.addressCity, event.venue.addressCountry].filter(Boolean);
+        const loc = addrParts.length > 0
+          ? `${event.venue.name}, ${addrParts.join(", ")}`
           : event.venue.name;
         location = `LOCATION:${escapeICSText(loc)}`;
       }
@@ -217,7 +218,7 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
     where,
     orderBy: { startDate: "asc" },
     include: {
-      venue: { select: { name: true, address: true, capacity: true } },
+      venue: { select: { name: true, addressStreet: true, addressCity: true, addressCountry: true, capacity: true } },
       people: {
         include: {
           person: {

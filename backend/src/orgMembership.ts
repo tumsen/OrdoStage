@@ -15,20 +15,37 @@ export async function reassignUsersBeforeOrgDelete(
     select: {
       name: true,
       invoiceName: true,
-      invoiceAddress: true,
+      invoiceStreet: true,
+      invoiceNumber: true,
+      invoiceZip: true,
+      invoiceCity: true,
+      invoiceState: true,
+      invoiceCountry: true,
       invoiceVat: true,
       invoiceEmail: true,
     },
   });
 
   if (org) {
+    const parts = [
+      org.invoiceStreet && org.invoiceNumber
+        ? `${org.invoiceStreet} ${org.invoiceNumber}`
+        : org.invoiceStreet ?? null,
+      org.invoiceZip && org.invoiceCity
+        ? `${org.invoiceZip} ${org.invoiceCity}`
+        : org.invoiceCity ?? null,
+      org.invoiceState ?? null,
+      org.invoiceCountry ?? null,
+    ].filter(Boolean);
+    const composedAddress = parts.length ? parts.join(", ") : null;
+
     // Only update rows that don't already have a snapshot (idempotent).
     await prisma.creditPurchase.updateMany({
       where: { organizationId, orgNameSnapshot: null },
       data: {
         orgNameSnapshot: org.name,
         invoiceNameSnapshot: org.invoiceName,
-        invoiceAddressSnapshot: org.invoiceAddress,
+        invoiceAddressSnapshot: composedAddress,
         invoiceVatSnapshot: org.invoiceVat,
         invoiceEmailSnapshot: org.invoiceEmail,
       },

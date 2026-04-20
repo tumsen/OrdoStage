@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
-import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { AddressFields, type Address, EMPTY_ADDRESS } from "@/components/AddressFields";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -55,12 +55,12 @@ export default function Billing() {
   const [showDeleteOrg, setShowDeleteOrg] = useState(false);
   const [inv, setInv] = useState({
     invoiceName: "",
-    invoiceAddress: "",
     invoiceVat: "",
     invoiceEmail: "",
     invoicePhone: "",
     invoiceContact: "",
   });
+  const [invAddress, setInvAddress] = useState<Address>(EMPTY_ADDRESS);
   const [invSaving, setInvSaving] = useState(false);
 
   const { data: org, isLoading } = useQuery<OrgBillingData>({
@@ -141,7 +141,12 @@ export default function Billing() {
   interface InvoiceInfo {
     name: string;
     invoiceName: string | null;
-    invoiceAddress: string | null;
+    invoiceStreet: string | null;
+    invoiceNumber: string | null;
+    invoiceZip: string | null;
+    invoiceCity: string | null;
+    invoiceState: string | null;
+    invoiceCountry: string | null;
     invoiceVat: string | null;
     invoiceEmail: string | null;
     invoicePhone: string | null;
@@ -158,11 +163,18 @@ export default function Billing() {
     if (!invoiceInfo) return;
     setInv({
       invoiceName: invoiceInfo.invoiceName ?? "",
-      invoiceAddress: invoiceInfo.invoiceAddress ?? "",
       invoiceVat: invoiceInfo.invoiceVat ?? "",
       invoiceEmail: invoiceInfo.invoiceEmail ?? "",
       invoicePhone: invoiceInfo.invoicePhone ?? "",
       invoiceContact: invoiceInfo.invoiceContact ?? "",
+    });
+    setInvAddress({
+      street:  invoiceInfo.invoiceStreet  ?? "",
+      number:  invoiceInfo.invoiceNumber  ?? "",
+      zip:     invoiceInfo.invoiceZip     ?? "",
+      city:    invoiceInfo.invoiceCity    ?? "",
+      state:   invoiceInfo.invoiceState   ?? "",
+      country: invoiceInfo.invoiceCountry ?? "",
     });
   }, [invoiceInfo]);
 
@@ -265,14 +277,9 @@ export default function Billing() {
                   onChange={(e) => setInv((s) => ({ ...s, invoiceVat: e.target.value }))}
                 />
               </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label className="text-white/70">Full address</Label>
-                <AddressAutocomplete
-                  variant="default"
-                  placeholder="Strandgade 1, 5700 Svendborg, Denmark"
-                  value={inv.invoiceAddress}
-                  onChange={(v) => setInv((s) => ({ ...s, invoiceAddress: v }))}
-                />
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label className="text-white/70">Address</Label>
+                <AddressFields value={invAddress} onChange={setInvAddress} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-white/70">Billing email</Label>
@@ -312,7 +319,15 @@ export default function Billing() {
                 onClick={async () => {
                   setInvSaving(true);
                   try {
-                    await api.patch("/api/org/invoice-info", inv);
+                    await api.patch("/api/org/invoice-info", {
+                      ...inv,
+                      invoiceStreet:  invAddress.street  || null,
+                      invoiceNumber:  invAddress.number  || null,
+                      invoiceZip:     invAddress.zip     || null,
+                      invoiceCity:    invAddress.city    || null,
+                      invoiceState:   invAddress.state   || null,
+                      invoiceCountry: invAddress.country || null,
+                    });
                     queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
                     setToast({ type: "success", message: "Invoice information saved." });
                   } catch {

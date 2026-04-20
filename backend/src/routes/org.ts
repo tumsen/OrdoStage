@@ -252,7 +252,12 @@ app.get("/org/invoice-info", async (c) => {
     select: {
       name: true,
       invoiceName: true,
-      invoiceAddress: true,
+      invoiceStreet: true,
+      invoiceNumber: true,
+      invoiceZip: true,
+      invoiceCity: true,
+      invoiceState: true,
+      invoiceCountry: true,
       invoiceVat: true,
       invoiceEmail: true,
       invoicePhone: true,
@@ -264,11 +269,16 @@ app.get("/org/invoice-info", async (c) => {
 });
 
 const InvoiceInfoSchema = z.object({
-  invoiceName: z.string().max(200).optional(),
-  invoiceAddress: z.string().max(500).optional(),
-  invoiceVat: z.string().max(60).optional(),
-  invoiceEmail: z.string().email().max(200).optional().or(z.literal("")),
-  invoicePhone: z.string().max(60).optional(),
+  invoiceName:    z.string().max(200).optional(),
+  invoiceStreet:  z.string().max(200).optional(),
+  invoiceNumber:  z.string().max(30).optional(),
+  invoiceZip:     z.string().max(20).optional(),
+  invoiceCity:    z.string().max(100).optional(),
+  invoiceState:   z.string().max(100).optional(),
+  invoiceCountry: z.string().max(100).optional(),
+  invoiceVat:     z.string().max(60).optional(),
+  invoiceEmail:   z.string().email().max(200).optional().or(z.literal("")),
+  invoicePhone:   z.string().max(60).optional(),
   invoiceContact: z.string().max(200).optional(),
 });
 
