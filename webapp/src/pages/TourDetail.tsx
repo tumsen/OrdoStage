@@ -75,6 +75,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { downloadVenueTechRider, printVenueTechRider, uploadVenueTechRiderForSharing } from "@/lib/downloadVenueTechRider";
 import { TourCalendarView } from "@/components/TourCalendarView";
 import { useToast } from "@/hooks/use-toast";
@@ -726,20 +727,18 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label className="text-white/60 text-xs uppercase tracking-wide">From</Label>
-                  <Input
+                  <AddressAutocomplete
                     value={form.fromLocation}
-                    onChange={(e) => setField("fromLocation", e.target.value)}
+                    onChange={(v) => setField("fromLocation", v)}
                     placeholder="Departing city / location"
-                    className={fieldCls}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-white/60 text-xs uppercase tracking-wide">To</Label>
-                  <Input
+                  <AddressAutocomplete
                     value={form.toLocation}
-                    onChange={(e) => setField("toLocation", e.target.value)}
+                    onChange={(v) => setField("toLocation", v)}
                     placeholder="Arriving city / location"
-                    className={fieldCls}
                   />
                 </div>
               </div>
@@ -789,11 +788,10 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
                 </div>
                 <div className="space-y-2">
                   <Label className="text-white/60 text-xs uppercase tracking-wide">Venue Address</Label>
-                  <Input
+                  <AddressAutocomplete
                     value={form.venueAddress}
-                    onChange={(e) => setField("venueAddress", e.target.value)}
+                    onChange={(v) => setField("venueAddress", v)}
                     placeholder="Full address"
-                    className={fieldCls}
                   />
                 </div>
               </div>
@@ -890,11 +888,10 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
               </div>
               <div className="space-y-2">
                 <Label className="text-white/60 text-xs uppercase tracking-wide">Address</Label>
-                <Input
+                <AddressAutocomplete
                   value={form.hotelAddress}
-                  onChange={(e) => setField("hotelAddress", e.target.value)}
+                  onChange={(v) => setField("hotelAddress", v)}
                   placeholder="Hotel address"
-                  className={fieldCls}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">

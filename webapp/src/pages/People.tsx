@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
 import type { Person } from "../../../backend/src/types";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -401,10 +402,16 @@ function PersonFormDialog({
           {/* Address */}
           <div className="space-y-1.5">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Address</Label>
-            <Input
-              {...form.register("address")}
-              placeholder="Street, City, Country"
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
+            <Controller
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <AddressAutocomplete
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  placeholder="Street, City, Country"
+                />
+              )}
             />
           </div>
 

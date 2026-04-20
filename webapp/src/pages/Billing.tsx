@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -266,11 +267,11 @@ export default function Billing() {
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label className="text-white/70">Full address</Label>
-                <Input
-                  className="bg-gray-800 border-white/10 text-white"
+                <AddressAutocomplete
+                  variant="default"
                   placeholder="Strandgade 1, 5700 Svendborg, Denmark"
                   value={inv.invoiceAddress}
-                  onChange={(e) => setInv((s) => ({ ...s, invoiceAddress: e.target.value }))}
+                  onChange={(v) => setInv((s) => ({ ...s, invoiceAddress: v }))}
                 />
               </div>
               <div className="space-y-1.5">

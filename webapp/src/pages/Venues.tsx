@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 
 const VenueFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -111,64 +112,7 @@ function CustomFieldsEditor({
   );
 }
 
-function AddressInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const [predictions, setPredictions] = useState<Array<{ placeId: string; description: string }>>([]);
-  const [open, setOpen] = useState(false);
-
-  async function searchAddresses(query: string) {
-    if (query.trim().length < 3) {
-      setPredictions([]);
-      return;
-    }
-    try {
-      const results = await api.get<Array<{ placeId: string; description: string }>>(
-        `/api/venues/address-search?q=${encodeURIComponent(query)}`
-      );
-      setPredictions(results);
-      setOpen(true);
-    } catch {
-      setPredictions([]);
-    }
-  }
-
-  return (
-    <div className="relative">
-      <Input
-        value={value}
-        onChange={(e) => {
-          const next = e.target.value;
-          onChange(next);
-          searchAddresses(next);
-        }}
-        placeholder="Address (Google search enabled)"
-        className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-      />
-      {open && predictions.length > 0 ? (
-        <div className="absolute z-20 mt-1 w-full rounded-md border border-white/10 bg-[#16161f] shadow-lg overflow-hidden">
-          {predictions.slice(0, 6).map((prediction) => (
-            <button
-              key={prediction.placeId}
-              type="button"
-              onClick={() => {
-                onChange(prediction.description);
-                setOpen(false);
-              }}
-              className="w-full px-2 py-1.5 text-left text-xs text-white/80 hover:bg-white/10"
-            >
-              {prediction.description}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
+const AddressInput = AddressAutocomplete;
 
 function VenueRow({
   venue,
