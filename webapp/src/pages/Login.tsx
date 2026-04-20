@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import { SidebarContent } from "@/components/Layout";
+import { completePostAuthenticationNavigation } from "@/lib/postAuthRouting";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ export default function Login() {
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
+  const [orgName, setOrgName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -29,23 +31,30 @@ export default function Login() {
     if (mode === "signup") {
       if (password !== confirm) { setError("Passwords do not match"); return; }
       if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
+      if (!orgName.trim()) { setError("Organization name is required"); return; }
       setLoading(true);
       const result = await authClient.signUp.email({ email: email.trim(), password, name: name.trim() });
+      if (result.error) {
+        setLoading(false);
+        setError(result.error.message || "Sign up failed");
+        return;
+      }
+      try {
+        await api.post("/api/org", { name: orgName.trim() });
+      } catch (e: unknown) {
+        setLoading(false);
+        const msg = e instanceof Error ? e.message : "Could not create your organization";
+        setError(msg);
+        return;
+      }
       setLoading(false);
-      if (result.error) { setError(result.error.message || "Sign up failed"); return; }
-      navigate(returnTo || "/setup-org");
+      await completePostAuthenticationNavigation(navigate, { returnTo });
     } else {
       setLoading(true);
       const result = await authClient.signIn.email({ email: email.trim(), password });
       setLoading(false);
       if (result.error) { setError(result.error.message || "Invalid email or password"); return; }
-      if (returnTo) { navigate(returnTo); return; }
-      try {
-        await api.get<unknown>("/api/org");
-        navigate("/dashboard");
-      } catch {
-        navigate("/setup-org");
-      }
+      await completePostAuthenticationNavigation(navigate, { returnTo });
     }
   };
 
@@ -90,10 +99,24 @@ export default function Login() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === "signup" && (
-                <div>
-                  <label className="block text-xs text-white/50 mb-1.5 uppercase tracking-wide">Name</label>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Your full name" className={inputCls} />
-                </div>
+                <>
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1.5 uppercase tracking-wide">Your full name</label>
+                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Jane Doe" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1.5 uppercase tracking-wide">Organization name</label>
+                    <input
+                      type="text"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      required
+                      placeholder="e.g. Riverside Theatre Company"
+                      className={inputCls}
+                    />
+                    <p className="text-[11px] text-white/35 mt-1.5">Shown to your team inside Ordo Stage. You can change it later under Billing.</p>
+                  </div>
+                </>
               )}
 
               <div>

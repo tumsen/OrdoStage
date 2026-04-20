@@ -4,6 +4,7 @@ import { auth } from "../auth";
 import { adminMiddleware } from "../admin-middleware";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { z } from "zod";
+import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 
 const app = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -45,7 +46,7 @@ app.get("/admin/orgs", async (c) => {
   const orgs = await prisma.organization.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      _count: { select: { users: true, events: true, people: true } },
+      _count: { select: { users: true, memberships: true, events: true, people: true } },
       creditPurchases: {
         select: { days: true, amountCents: true },
       },
@@ -73,14 +74,18 @@ app.get("/admin/orgs/:id", async (c) => {
   const org = await prisma.organization.findUnique({
     where: { id: c.req.param("id") },
     include: {
-      users: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          orgRole: true,
-          createdAt: true,
+      memberships: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              createdAt: true,
+            },
+          },
         },
+        orderBy: { user: { name: "asc" } },
       },
       creditLogs: { orderBy: { createdAt: "desc" }, take: 50 },
       creditPurchases: { orderBy: { createdAt: "desc" }, take: 20 },
@@ -89,7 +94,27 @@ app.get("/admin/orgs/:id", async (c) => {
   });
   if (!org)
     return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
-  return c.json({ data: org });
+
+  const users = org.memberships.map((m) => ({
+    id: m.user.id,
+    name: m.user.name,
+    email: m.user.email,
+    orgRole: m.orgRole,
+    createdAt: m.user.createdAt,
+  }));
+
+  const { memberships: _m, ...rest } = org;
+  return c.json({ data: { ...rest, users } });
+});
+
+app.delete("/admin/orgs/:id", async (c) => {
+  const id = c.req.param("id");
+  const org = await prisma.organization.findUnique({ where: { id }, select: { id: true } });
+  if (!org) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  await reassignUsersBeforeOrgDelete(prisma, id);
+  await prisma.organization.delete({ where: { id } });
+  return new Response(null, { status: 204 });
 });
 
 // ── Credit management ──────────────────────────────────────────────────────

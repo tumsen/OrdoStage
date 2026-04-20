@@ -22,7 +22,7 @@ interface OrgUser {
   id: string;
   name: string | null;
   email: string;
-  role: string;
+  orgRole: string;
   createdAt: string;
 }
 
@@ -439,12 +439,12 @@ function UsersTab({ users }: { users: OrgUser[] }) {
                 <TableCell>
                   <Badge
                     className={
-                      user.role === "owner"
+                      user.orgRole === "owner"
                         ? "bg-rose-950/60 text-rose-400 border-rose-800/40 text-xs"
                         : "bg-white/5 text-white/50 border-white/10 text-xs"
                     }
                   >
-                    {user.role}
+                    {user.orgRole}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-white/40 text-sm">{formatDate(user.createdAt)}</TableCell>
@@ -498,11 +498,24 @@ function HistoryTab({ logs }: { logs: CreditLog[] }) {
 
 export default function OrgDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: org, isPending } = useQuery<OrgDetail>({
     queryKey: ["admin", "orgs", id],
     queryFn: () => api.get<OrgDetail>(`/api/admin/orgs/${id}`),
     enabled: !!id,
+  });
+
+  const deleteOrgMutation = useMutation({
+    mutationFn: () => api.delete(`/api/admin/orgs/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
+      toast({ title: "Organization deleted" });
+      navigate("/admin/orgs");
+    },
+    onError: () => toast({ title: "Failed to delete organization", variant: "destructive" }),
   });
 
   if (isPending) {
@@ -589,6 +602,29 @@ export default function OrgDetail() {
           <HistoryTab logs={org.creditLogs} />
         </TabsContent>
       </Tabs>
+
+      <Card className="bg-gray-900 border-red-900/40 border mt-8">
+        <CardHeader>
+          <CardTitle className="text-red-300 text-base">Danger zone</CardTitle>
+          <p className="text-white/40 text-sm font-normal">
+            Delete this organization and all related data from the platform. This cannot be undone.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-red-800/50 text-red-300 hover:bg-red-950/40"
+            disabled={deleteOrgMutation.isPending}
+            onClick={() => {
+              if (!confirm(`Permanently delete "${org.name}" and all of its data?`)) return;
+              deleteOrgMutation.mutate();
+            }}
+          >
+            {deleteOrgMutation.isPending ? "Deleting…" : "Delete organization"}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

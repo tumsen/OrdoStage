@@ -24,6 +24,8 @@ model User {
   isAdmin        Boolean       @default(false)
   isActive       Boolean       @default(true)
   bookingsCreated InternalBooking[] @relation("BookingCreatedBy")
+  /** All organizations this account belongs to (current org is `organizationId` + matching `orgRole`). */
+  organizationMemberships OrganizationMembership[]
 }
 
 model Session {
@@ -71,6 +73,7 @@ model Organization {
   creditBalance    Int                @default(0)
   lastDeductedAt   DateTime           @default(now())
   users            User[]
+  memberships      OrganizationMembership[]
   venues           Venue[]
   events           Event[]
   people           Person[]
@@ -92,10 +95,32 @@ model Organization {
   pendingAutoTopUpCreatedAt DateTime?
   /** Credits charged when setting a person inactive (owner-configurable; default 20). */
   deactivatePersonCredits Int              @default(20)
+  /** Company / invoice information (optional — used on generated PDF invoices). */
+  invoiceName      String?
+  invoiceAddress   String?
+  invoiceVat       String?
+  invoiceEmail     String?
+  invoicePhone     String?
+  invoiceContact   String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   invitations      OrganizationInvitation[]
   roleDefinitions  RoleDefinition[]
+}
+
+/** User membership in an organization (role is per org). `User.organizationId` is the active workspace. */
+model OrganizationMembership {
+  id               String       @id @default(cuid())
+  userId           String
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  orgRole          String       @default("member")
+  createdAt        DateTime     @default(now())
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
 }
 
 /** Per-organization role: `slug` matches `User.orgRole` for assigned members. */
@@ -136,12 +161,21 @@ model OrganizationInvitation {
 }
 
 model CreditPurchase {
-  id              String       @id @default(cuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id])
+  id              String        @id @default(cuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   days            Int
   amountCents     Int
-  stripeSessionId String?      @unique
+  stripeSessionId String?       @unique
+  /** Sequential invoice number (e.g. INV-0001). */
+  invoiceNumber   String?       @unique
+  /** Snapshots taken at purchase time so the record survives org deletion. */
+  orgNameSnapshot        String?
+  invoiceNameSnapshot    String?
+  invoiceAddressSnapshot String?
+  invoiceVatSnapshot     String?
+  invoiceEmailSnapshot   String?
+  packLabelSnapshot      String?
   createdAt       DateTime     @default(now())
 }
 

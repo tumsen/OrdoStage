@@ -1,8 +1,10 @@
 import { Link, Navigate, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useSession, signOut } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { viewIdForPath } from "@/lib/viewPath";
 import { usePermissions } from "@/hooks/usePermissions";
+import { api } from "@/lib/api";
 
 function InactiveAccountNotice() {
   return (
@@ -41,6 +43,14 @@ export function ProtectedRoute({ children, requireOrg = true }: { children: Reac
 
   const { me, canView, isPending: permsLoading } = usePermissions();
 
+  const orgId = (session?.user as unknown as { organizationId?: string } | undefined)?.organizationId;
+  const { data: orgMemberships, isPending: membershipsLoading } = useQuery({
+    queryKey: ["org-memberships"],
+    queryFn: () =>
+      api.get<{ organizationId: string; name: string; orgRole: string }[]>("/api/org/memberships"),
+    enabled: Boolean(session?.user && requireOrg && !orgId && !isAdmin),
+  });
+
   if (isPending) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-950">
@@ -69,7 +79,17 @@ export function ProtectedRoute({ children, requireOrg = true }: { children: Reac
     return <InactiveAccountNotice />;
   }
 
-  if (requireOrg && !isAdmin && !(session.user as unknown as { organizationId?: string }).organizationId) {
+  if (requireOrg && !isAdmin && !orgId) {
+    if (membershipsLoading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-950">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
+        </div>
+      );
+    }
+    if (orgMemberships && orgMemberships.length > 0) {
+      return <Navigate to="/select-org" replace />;
+    }
     return <Navigate to="/setup-org" replace />;
   }
 

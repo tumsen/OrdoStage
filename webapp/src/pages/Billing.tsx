@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { authClient } from "@/lib/auth-client";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreditCard, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { CreditCard, CheckCircle, XCircle, RefreshCw, Trash2 } from "lucide-react";
 import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Label } from "@/components/ui/label";
@@ -48,6 +49,18 @@ export default function Billing() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [thresholdDraft, setThresholdDraft] = useState("");
+  const [orgNameDraft, setOrgNameDraft] = useState("");
+  const [deleteWord, setDeleteWord] = useState("");
+  const [showDeleteOrg, setShowDeleteOrg] = useState(false);
+  const [inv, setInv] = useState({
+    invoiceName: "",
+    invoiceAddress: "",
+    invoiceVat: "",
+    invoiceEmail: "",
+    invoicePhone: "",
+    invoiceContact: "",
+  });
+  const [invSaving, setInvSaving] = useState(false);
 
   const { data: org, isLoading } = useQuery<OrgBillingData>({
     queryKey: ["org"],
@@ -139,6 +152,60 @@ export default function Billing() {
     if (org?.autoTopUpThreshold !== undefined) setThresholdDraft(String(org.autoTopUpThreshold));
   }, [org?.autoTopUpThreshold]);
 
+  useEffect(() => {
+    if (org?.name) setOrgNameDraft(org.name);
+  }, [org?.name]);
+
+  interface InvoiceInfo {
+    name: string;
+    invoiceName: string | null;
+    invoiceAddress: string | null;
+    invoiceVat: string | null;
+    invoiceEmail: string | null;
+    invoicePhone: string | null;
+    invoiceContact: string | null;
+  }
+
+  const { data: invoiceInfo } = useQuery<InvoiceInfo>({
+    queryKey: ["org-invoice-info"],
+    queryFn: () => api.get<InvoiceInfo>("/api/org/invoice-info"),
+    enabled: isOwner,
+  });
+
+  useEffect(() => {
+    if (!invoiceInfo) return;
+    setInv({
+      invoiceName: invoiceInfo.invoiceName ?? "",
+      invoiceAddress: invoiceInfo.invoiceAddress ?? "",
+      invoiceVat: invoiceInfo.invoiceVat ?? "",
+      invoiceEmail: invoiceInfo.invoiceEmail ?? "",
+      invoicePhone: invoiceInfo.invoicePhone ?? "",
+      invoiceContact: invoiceInfo.invoiceContact ?? "",
+    });
+  }, [invoiceInfo]);
+
+  const renameOrgMutation = useMutation({
+    mutationFn: (name: string) => api.patch<{ ok: boolean }>("/api/org", { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org"] });
+      setToast({ type: "success", message: "Organization name updated." });
+    },
+    onError: () => setToast({ type: "error", message: "Could not update organization name." }),
+  });
+
+  const deleteOrgMutation = useMutation({
+    mutationFn: () => api.deleteWithBody<{ ok: boolean }>("/api/org", { confirm: "delete" }),
+    onSuccess: async () => {
+      await authClient.getSession();
+      queryClient.invalidateQueries({ queryKey: ["org"] });
+      queryClient.invalidateQueries({ queryKey: ["org-memberships"] });
+      queryClient.invalidateQueries({ queryKey: ["me", "permissions"] });
+      setToast({ type: "success", message: "Organization deleted." });
+      window.location.assign("/select-org");
+    },
+    onError: () => setToast({ type: "error", message: "Could not delete organization." }),
+  });
+
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-5xl mx-auto">
       {toast ? (
@@ -162,6 +229,176 @@ export default function Billing() {
       </div>
 
       <CreditsSummary org={org} isLoading={isLoading} variant="card" />
+
+      {isOwner && org ? (
+        <Card className="bg-gray-900 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base">Organization name</CardTitle>
+            <p className="text-gray-400 text-sm font-normal">This name is shown to your team in the app and in invitations.</p>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="space-y-2 flex-1 max-w-md">
+              <Label className="text-white/70">Name</Label>
+              <Input
+                className="bg-gray-800 border-white/10 text-white"
+                value={orgNameDraft}
+                onChange={(e) => setOrgNameDraft(e.target.value)}
+                onBlur={() => {
+                  const n = orgNameDraft.trim();
+                  if (!n || n === org.name) return;
+                  renameOrgMutation.mutate(n);
+                }}
+                disabled={renameOrgMutation.isPending}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isOwner ? (
+        <Card className="bg-gray-900 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base">Company &amp; invoice information</CardTitle>
+            <p className="text-gray-400 text-sm font-normal">
+              Used on PDF invoices automatically sent when you buy credits. Leave blank to use your organization name only.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-white/70">Legal entity / company name</Label>
+                <Input
+                  className="bg-gray-800 border-white/10 text-white"
+                  placeholder="Acme Theatre ApS"
+                  value={inv.invoiceName}
+                  onChange={(e) => setInv((s) => ({ ...s, invoiceName: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/70">VAT number</Label>
+                <Input
+                  className="bg-gray-800 border-white/10 text-white"
+                  placeholder="DK12345678"
+                  value={inv.invoiceVat}
+                  onChange={(e) => setInv((s) => ({ ...s, invoiceVat: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-white/70">Full address</Label>
+                <Input
+                  className="bg-gray-800 border-white/10 text-white"
+                  placeholder="Strandgade 1, 5700 Svendborg, Denmark"
+                  value={inv.invoiceAddress}
+                  onChange={(e) => setInv((s) => ({ ...s, invoiceAddress: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/70">Billing email</Label>
+                <Input
+                  type="email"
+                  className="bg-gray-800 border-white/10 text-white"
+                  placeholder="invoices@yourcompany.com"
+                  value={inv.invoiceEmail}
+                  onChange={(e) => setInv((s) => ({ ...s, invoiceEmail: e.target.value }))}
+                />
+                <p className="text-[11px] text-white/35">PDF invoices are sent to this address after each purchase.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/70">Phone</Label>
+                <Input
+                  className="bg-gray-800 border-white/10 text-white"
+                  placeholder="+45 12 34 56 78"
+                  value={inv.invoicePhone}
+                  onChange={(e) => setInv((s) => ({ ...s, invoicePhone: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/70">Contact person</Label>
+                <Input
+                  className="bg-gray-800 border-white/10 text-white"
+                  placeholder="Jane Doe"
+                  value={inv.invoiceContact}
+                  onChange={(e) => setInv((s) => ({ ...s, invoiceContact: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="pt-1">
+              <button
+                type="button"
+                disabled={invSaving}
+                className="px-4 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+                onClick={async () => {
+                  setInvSaving(true);
+                  try {
+                    await api.patch("/api/org/invoice-info", inv);
+                    queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
+                    setToast({ type: "success", message: "Invoice information saved." });
+                  } catch {
+                    setToast({ type: "error", message: "Could not save invoice information." });
+                  } finally {
+                    setInvSaving(false);
+                  }
+                }}
+              >
+                {invSaving ? "Saving…" : "Save invoice info"}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isOwner && org ? (
+        <Card className="bg-gray-900 border-red-950/40 border">
+          <CardHeader>
+            <CardTitle className="text-red-300 text-base flex items-center gap-2">
+              <Trash2 size={16} />
+              Delete organization
+            </CardTitle>
+            <p className="text-red-200/50 text-sm font-normal">
+              Permanently deletes all events, people, venues, tours, and billing data for{" "}
+              <span className="text-white/70">{org.name}</span>. Other organizations you belong to are not affected.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {showDeleteOrg ? (
+              <div className="rounded-lg border border-red-800/50 bg-red-950/25 p-4 space-y-3 max-w-md">
+                <p className="text-sm text-red-200">
+                  Type <span className="font-semibold text-white">delete</span> to confirm (not case sensitive).
+                </p>
+                <Input
+                  className="bg-gray-900 border-red-800/40 text-white"
+                  value={deleteWord}
+                  onChange={(e) => setDeleteWord(e.target.value)}
+                  placeholder="delete"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="border-white/10" onClick={() => { setShowDeleteOrg(false); setDeleteWord(""); }}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-red-700 hover:bg-red-600 text-white border-0"
+                    disabled={deleteOrgMutation.isPending || deleteWord.trim().toLowerCase() !== "delete"}
+                    onClick={() => deleteOrgMutation.mutate()}
+                  >
+                    {deleteOrgMutation.isPending ? "Deleting…" : "Delete forever"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-red-800/50 text-red-300 hover:bg-red-950/40"
+                onClick={() => setShowDeleteOrg(true)}
+              >
+                Delete this organization…
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {org?.pendingAutoTopUpUrl && !org.unlimitedCredits ? (
         <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 text-sm">

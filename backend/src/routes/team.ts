@@ -45,28 +45,31 @@ teamRouter.get("/team", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  const members = await prisma.user.findMany({
+  const memberships = await prisma.organizationMembership.findMany({
     where: { organizationId: user.organizationId },
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      orgRole: true,
-      isActive: true,
-      createdAt: true,
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          isActive: true,
+          createdAt: true,
+        },
+      },
     },
+    orderBy: { user: { name: "asc" } },
   });
 
-  const serialized = members.map((m) => ({
-    id: m.id,
-    name: m.name,
-    email: m.email,
-    orgRole: m.orgRole,
-    isActive: m.isActive,
+  const serialized = memberships.map((row) => ({
+    id: row.user.id,
+    name: row.user.name,
+    email: row.user.email,
+    orgRole: row.orgRole,
+    isActive: row.user.isActive,
     departmentId: null as string | null,
     department: null as { id: string; name: string; color: string; createdAt: string } | null,
-    createdAt: m.createdAt.toISOString(),
+    createdAt: row.user.createdAt.toISOString(),
   }));
 
   return c.json({ data: serialized });
@@ -119,11 +122,15 @@ teamRouter.post("/team/invitations", zValidator("json", CreateInvitationSchema),
   if (!org) return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser?.organizationId === user.organizationId) {
-    return c.json({ error: { message: "That user is already in your organization", code: "BAD_REQUEST" } }, 400);
-  }
-  if (existingUser?.organizationId && existingUser.organizationId !== user.organizationId) {
-    return c.json({ error: { message: "That email belongs to another organization", code: "BAD_REQUEST" } }, 400);
+  if (existingUser) {
+    const already = await prisma.organizationMembership.findUnique({
+      where: {
+        userId_organizationId: { userId: existingUser.id, organizationId: user.organizationId },
+      },
+    });
+    if (already) {
+      return c.json({ error: { message: "That user is already in your organization", code: "BAD_REQUEST" } }, 400);
+    }
   }
 
   await prisma.organizationInvitation.deleteMany({
@@ -222,11 +229,18 @@ teamRouter.post("/team/invitations/accept", async (c) => {
     );
   }
 
-  if (dbUser.organizationId && dbUser.organizationId !== invite.organizationId) {
-    return c.json({ error: { message: "You already belong to another organization", code: "BAD_REQUEST" } }, 400);
-  }
-
   await prisma.$transaction([
+    prisma.organizationMembership.upsert({
+      where: {
+        userId_organizationId: { userId: user.id, organizationId: invite.organizationId },
+      },
+      create: {
+        userId: user.id,
+        organizationId: invite.organizationId,
+        orgRole: invite.orgRole,
+      },
+      update: { orgRole: invite.orgRole },
+    }),
     prisma.user.update({
       where: { id: user.id },
       data: {
@@ -257,33 +271,52 @@ teamRouter.put("/team/:userId/role", zValidator("json", UpdateRoleSchema), async
   const { userId } = c.req.param();
   const body = c.req.valid("json");
 
-  const target = await prisma.user.findUnique({
-    where: { id: userId },
+  const targetMem = await prisma.organizationMembership.findUnique({
+    where: {
+      userId_organizationId: { userId, organizationId: user.organizationId },
+    },
+    include: { user: true },
   });
 
-  if (!target || target.organizationId !== user.organizationId) {
+  if (!targetMem) {
     return c.json({ error: { message: "User not found", code: "NOT_FOUND" } }, 404);
   }
 
-  const updated = await prisma.user.update({
-    where: { id: userId },
+  await prisma.organizationMembership.update({
+    where: {
+      userId_organizationId: { userId, organizationId: user.organizationId },
+    },
     data: { orgRole: body.role },
+  });
+
+  if (targetMem.user.organizationId === user.organizationId) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { orgRole: body.role },
+    });
+  }
+
+  const updated = await prisma.user.findUnique({
+    where: { id: userId },
     select: {
       id: true,
       name: true,
       email: true,
-      orgRole: true,
       isActive: true,
       createdAt: true,
+      organizationId: true,
     },
   });
+  if (!updated) {
+    return c.json({ error: { message: "User not found", code: "NOT_FOUND" } }, 404);
+  }
 
   return c.json({
     data: {
       id: updated.id,
       name: updated.name,
       email: updated.email,
-      orgRole: updated.orgRole,
+      orgRole: body.role,
       isActive: updated.isActive,
       departmentId: null as string | null,
       department: null as { id: string; name: string; color: string; createdAt: string } | null,
@@ -312,12 +345,17 @@ teamRouter.put("/team/:userId/active", async (c) => {
     return c.json({ error: { message: "You cannot change your own active status", code: "FORBIDDEN" } }, 403);
   }
 
-  const target = await prisma.user.findUnique({ where: { id: userId } });
-  if (!target || target.organizationId !== user.organizationId) {
+  const targetMem = await prisma.organizationMembership.findUnique({
+    where: {
+      userId_organizationId: { userId, organizationId: user.organizationId },
+    },
+    include: { user: true },
+  });
+  if (!targetMem) {
     return c.json({ error: { message: "User not found", code: "NOT_FOUND" } }, 404);
   }
 
-  if (target.orgRole === "owner" && !isOwner(user.orgRole)) {
+  if (targetMem.orgRole === "owner" && !isOwner(user.orgRole)) {
     return c.json({ error: { message: "Only the owner can deactivate an owner", code: "FORBIDDEN" } }, 403);
   }
 
@@ -349,23 +387,39 @@ teamRouter.delete("/team/:userId", async (c) => {
     return c.json({ error: { message: "Cannot remove yourself", code: "FORBIDDEN" } }, 403);
   }
 
-  const target = await prisma.user.findUnique({
-    where: { id: userId },
+  const targetMem = await prisma.organizationMembership.findUnique({
+    where: {
+      userId_organizationId: { userId, organizationId: user.organizationId },
+    },
+    include: { user: true },
   });
 
-  if (!target || target.organizationId !== user.organizationId) {
+  if (!targetMem) {
     return c.json({ error: { message: "User not found", code: "NOT_FOUND" } }, 404);
   }
 
-  await prisma.session.deleteMany({ where: { userId } });
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      organizationId: null,
-      orgRole: "viewer",
-      isActive: true,
+  await prisma.organizationMembership.delete({
+    where: {
+      userId_organizationId: { userId, organizationId: user.organizationId },
     },
   });
+
+  const other = await prisma.organizationMembership.findFirst({
+    where: { userId, organizationId: { not: user.organizationId } },
+  });
+
+  if (targetMem.user.organizationId === user.organizationId) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        organizationId: other?.organizationId ?? null,
+        orgRole: other?.orgRole ?? "member",
+        isActive: true,
+      },
+    });
+  }
+
+  await prisma.session.deleteMany({ where: { userId } });
 
   return new Response(null, { status: 204 });
 });

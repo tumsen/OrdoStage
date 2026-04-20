@@ -29,6 +29,7 @@ import { useSession, signOut } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import { usePermissions } from "@/hooks/usePermissions";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
+import { OrgWorkspaceMenu } from "@/components/OrgWorkspaceMenu";
 
 interface OrgData {
   id: string;
@@ -93,6 +94,8 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
           <OrdoStageLogo variant="sidebar" className="rounded-md max-h-[7.75rem]" />
         </Link>
       </div>
+
+      <OrgWorkspaceMenu onNav={onNav} />
 
       {/* Nav — avoid showing every link then hiding (blink); skeleton until /api/me */}
       <nav className="flex-1 px-3 py-4 space-y-1">

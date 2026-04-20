@@ -94,6 +94,10 @@ export const api = {
   delete: <T>(endpoint: string, options?: RequestInit) =>
     request<T>(endpoint, { ...options, method: "DELETE" }),
 
+  /** DELETE with a JSON body (e.g. typed confirmation). */
+  deleteWithBody: <T>(endpoint: string, data: unknown) =>
+    request<T>(endpoint, { method: "DELETE", body: JSON.stringify(data) }),
+
   // Escape hatch for non-JSON endpoints
   raw: rawRequest,
 };

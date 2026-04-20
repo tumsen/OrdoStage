@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { api } from "@/lib/api";
+import { completePostAuthenticationNavigation } from "@/lib/postAuthRouting";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
@@ -39,22 +40,9 @@ export default function VerifyOtp() {
             /* user can open /accept-invite manually */
           }
         }
-        if (returnTo) {
-          navigate(returnTo);
-          return;
-        }
-        const org = await api.get<unknown>("/api/org");
-        if (org) {
-          navigate("/dashboard");
-        } else {
-          navigate("/setup-org");
-        }
+        await completePostAuthenticationNavigation(navigate, { returnTo });
       } catch {
-        if (returnTo) {
-          navigate(returnTo);
-          return;
-        }
-        navigate("/setup-org");
+        await completePostAuthenticationNavigation(navigate, { returnTo });
       }
     }
   };

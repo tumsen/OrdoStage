@@ -8,6 +8,7 @@ import { env } from "../env";
 import { isOwner } from "../permissions";
 import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
 import { maybeEnqueueAutoTopUp } from "../autoTopup";
+import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 
 const OrgPoliciesSchema = z.object({
   deactivatePersonCredits: z.number().int().min(0).max(1_000_000),
@@ -21,10 +22,13 @@ app.get("/me", async (c) => {
   if (!sessionUser?.id) {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   }
-  const dbUser = await prisma.user.findUnique({
-    where: { id: sessionUser.id },
-    select: { orgRole: true, organizationId: true, isActive: true },
-  });
+  const [dbUser, membershipCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: sessionUser.id },
+      select: { orgRole: true, organizationId: true, isActive: true },
+    }),
+    prisma.organizationMembership.count({ where: { userId: sessionUser.id } }),
+  ]);
   if (!dbUser) {
     return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
   }
@@ -35,17 +39,68 @@ app.get("/me", async (c) => {
     orgRole,
     isActive,
   });
+  const hasOrganization = membershipCount > 0 || Boolean(dbUser.organizationId);
   return c.json({
     data: {
       orgRole,
       canWrite: eff.canWrite,
       canManageTeam: eff.canManageTeam,
-      hasOrganization: Boolean(dbUser.organizationId),
+      hasOrganization,
       isActive,
       views: eff.views,
       actions: eff.actions,
     },
   });
+});
+
+// GET /api/org/memberships — organizations this user belongs to (no active org required)
+app.get("/org/memberships", async (c) => {
+  const user = c.get("user");
+  if (!user?.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const rows = await prisma.organizationMembership.findMany({
+    where: { userId: user.id },
+    include: { organization: { select: { id: true, name: true } } },
+    orderBy: { organization: { name: "asc" } },
+  });
+
+  return c.json({
+    data: rows.map((r) => ({
+      organizationId: r.organizationId,
+      name: r.organization.name,
+      orgRole: r.orgRole,
+    })),
+  });
+});
+
+// POST /api/org/switch — set active organization (must be a member)
+app.post("/org/switch", async (c) => {
+  const user = c.get("user");
+  if (!user?.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const { organizationId } = z.object({ organizationId: z.string().min(1) }).parse(body);
+
+  const mem = await prisma.organizationMembership.findUnique({
+    where: { userId_organizationId: { userId: user.id, organizationId } },
+  });
+  if (!mem) {
+    return c.json(
+      { error: { message: "You are not a member of that organization", code: "NOT_MEMBER" } },
+      403
+    );
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { organizationId, orgRole: mem.orgRole },
+  });
+
+  return c.json({ data: { ok: true, organizationId, orgRole: mem.orgRole } });
 });
 
 // GET /api/org — get current org info + credit status
@@ -68,8 +123,11 @@ app.get("/org", async (c) => {
 
   const credits = await deductCredits(user.organizationId);
 
-  const activeUserCount = await prisma.user.count({
-    where: { organizationId: user.organizationId, isActive: true },
+  const activeUserCount = await prisma.organizationMembership.count({
+    where: {
+      organizationId: user.organizationId,
+      user: { isActive: true },
+    },
   });
 
   const origin =
@@ -78,7 +136,7 @@ app.get("/org", async (c) => {
 
   const org = await prisma.organization.findUnique({
     where: { id: user.organizationId },
-    include: { _count: { select: { users: true } } },
+    include: { _count: { select: { users: true, memberships: true } } },
   });
 
   if (!org) {
@@ -183,19 +241,131 @@ app.patch("/org/billing-settings", async (c) => {
   return c.json({ data: { ok: true } });
 });
 
-// POST /api/org — create org (called after first login)
+// GET /api/org/invoice-info — fetch current org's invoice/company info (owner/manager)
+app.get("/org/invoice-info", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: {
+      name: true,
+      invoiceName: true,
+      invoiceAddress: true,
+      invoiceVat: true,
+      invoiceEmail: true,
+      invoicePhone: true,
+      invoiceContact: true,
+    },
+  });
+  if (!org) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  return c.json({ data: org });
+});
+
+const InvoiceInfoSchema = z.object({
+  invoiceName: z.string().max(200).optional(),
+  invoiceAddress: z.string().max(500).optional(),
+  invoiceVat: z.string().max(60).optional(),
+  invoiceEmail: z.string().email().max(200).optional().or(z.literal("")),
+  invoicePhone: z.string().max(60).optional(),
+  invoiceContact: z.string().max(200).optional(),
+});
+
+// PATCH /api/org/invoice-info — update company info (owner only)
+app.patch("/org/invoice-info", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { orgRole: true },
+  });
+  if (!isOwner(dbUser?.orgRole || "")) {
+    return c.json(
+      { error: { message: "Only the owner can update invoice information", code: "FORBIDDEN" } },
+      403
+    );
+  }
+  const body = InvoiceInfoSchema.parse(await c.req.json().catch(() => ({})));
+  const data: Record<string, string | null> = {};
+  for (const [k, v] of Object.entries(body)) {
+    data[k] = v?.trim() || null;
+  }
+  await prisma.organization.update({ where: { id: user.organizationId }, data });
+  return c.json({ data: { ok: true } });
+});
+
+// PATCH /api/org — rename organization (owner only)
+app.patch("/org", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { orgRole: true },
+  });
+  if (!isOwner(dbUser?.orgRole || "")) {
+    return c.json(
+      { error: { message: "Only the owner can rename the organization", code: "FORBIDDEN" } },
+      403
+    );
+  }
+
+  const { name } = z.object({ name: z.string().min(1).max(200) }).parse(await c.req.json().catch(() => ({})));
+
+  await prisma.organization.update({
+    where: { id: user.organizationId },
+    data: { name: name.trim() },
+  });
+
+  return c.json({ data: { ok: true } });
+});
+
+// DELETE /api/org — delete entire organization (owner only; type "delete" to confirm)
+app.delete("/org", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const confirm = typeof body.confirm === "string" ? body.confirm.trim().toLowerCase() : "";
+  if (confirm !== "delete") {
+    return c.json(
+      { error: { message: 'Send JSON body { "confirm": "delete" } to permanently delete this organization.', code: "BAD_REQUEST" } },
+      400
+    );
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { orgRole: true, organizationId: true },
+  });
+  if (!dbUser?.organizationId || !isOwner(dbUser.orgRole)) {
+    return c.json(
+      { error: { message: "Only the organization owner can delete it", code: "FORBIDDEN" } },
+      403
+    );
+  }
+
+  const orgId = dbUser.organizationId;
+  await reassignUsersBeforeOrgDelete(prisma, orgId);
+  await prisma.organization.delete({ where: { id: orgId } });
+
+  return c.json({ data: { ok: true } });
+});
+
+// POST /api/org — create org (new workspace; user becomes owner and is switched into it)
 app.post("/org", async (c) => {
   const user = c.get("user");
   if (!user) return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
   const body = await c.req.json();
-  const { name } = z.object({ name: z.string().min(1) }).parse(body);
-
-  // Check if user already has an org
-  const existingUser = await prisma.user.findUnique({ where: { id: user.id } });
-  if (existingUser?.organizationId) {
-    return c.json({ error: { message: "Already in an organization", code: "ALREADY_IN_ORG" } }, 400);
-  }
+  const { name } = z.object({ name: z.string().min(1).max(200) }).parse(body);
 
   const unlimitedEmails = [
     "tumsen@gmail.com",
@@ -208,16 +378,21 @@ app.post("/org", async (c) => {
 
   const org = await prisma.organization.create({
     data: {
-      name,
-      users: { connect: { id: user.id } },
+      name: name.trim(),
       ...(isUnlimited
         ? { unlimitedCredits: true, creditBalance: 999999999 }
         : { creditBalance: signupCredits }),
     },
   });
 
-  // Update user role to owner
-  await prisma.user.update({ where: { id: user.id }, data: { orgRole: "owner" } });
+  await prisma.organizationMembership.create({
+    data: { userId: user.id, organizationId: org.id, orgRole: "owner" },
+  });
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { organizationId: org.id, orgRole: "owner" },
+  });
 
   await ensureSystemRoles(prisma, org.id);
 

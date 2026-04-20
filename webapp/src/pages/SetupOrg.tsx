@@ -33,7 +33,9 @@ export default function SetupOrg() {
             <OrdoStageLogo size={88} />
           </div>
           <h1 className="text-3xl font-bold text-white">Welcome!</h1>
-          <p className="text-gray-400 mt-2">Let's set up your organization</p>
+          <p className="text-gray-400 mt-2">
+            Create an additional workspace, or finish setup if you signed in with GitHub before naming your organization.
+          </p>
         </div>
         <div className="bg-gray-900 border border-white/10 rounded-xl p-6">
           <h2 className="text-xl font-semibold text-white mb-1">Name your organization</h2>

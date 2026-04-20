@@ -24,6 +24,7 @@ import VerifyOtp from "./pages/VerifyOtp";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import SetupOrg from "./pages/SetupOrg";
+import SelectOrg from "./pages/SelectOrg";
 import Billing from "./pages/Billing";
 import Account from "./pages/Account";
 import Roles from "./pages/Roles";
@@ -75,6 +76,14 @@ const App = () => (
             element={
               <ProtectedRoute requireOrg={false}>
                 <SetupOrg />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/select-org"
+            element={
+              <ProtectedRoute requireOrg={false}>
+                <SelectOrg />
               </ProtectedRoute>
             }
           />

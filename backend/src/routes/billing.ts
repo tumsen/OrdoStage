@@ -4,6 +4,15 @@ import { prisma } from "../prisma";
 import { env } from "../env";
 import { auth } from "../auth";
 import { createPaddleCheckoutUrl, isPaddleConfigured } from "../paddleCheckout";
+import { generateAndSendInvoice } from "../invoiceEmail";
+
+/** Seller defaults (fall back if no site-content set). */
+const SELLER = {
+  name: "Schwifty",
+  address: "Strandgade 1, 5700 Svendborg, Denmark",
+  vat: "DK28625383",
+  email: "mail@ordostage.com",
+} as const;
 
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -115,39 +124,87 @@ app.post("/billing/webhook", async (c) => {
     const organizationId = event.data.custom_data?.organizationId;
     const days = Number(event.data.custom_data?.days ?? 0);
     const amountCents = Number(event.data.custom_data?.amountCents ?? 0);
+    const packId: string | undefined = (event.data.custom_data as Record<string, unknown> | undefined)?.packId as string | undefined;
 
     if (organizationId && days > 0 && amountCents > 0) {
       const existing = await prisma.creditPurchase.findUnique({
         where: { stripeSessionId: transactionId },
       });
       if (!existing) {
-        await prisma.$transaction([
-          prisma.creditPurchase.create({
+        // Fetch org info for snapshot + invoice
+        const org = await prisma.organization.findUnique({
+          where: { id: organizationId },
+          select: {
+            name: true,
+            invoiceName: true,
+            invoiceAddress: true,
+            invoiceVat: true,
+            invoiceEmail: true,
+          },
+        });
+
+        // Fetch pack label for snapshot
+        const pack = packId
+          ? await prisma.pricePack.findUnique({ where: { packId }, select: { label: true } })
+          : null;
+
+        // Generate sequential invoice number
+        const purchaseCount = await prisma.creditPurchase.count({
+          where: { invoiceNumber: { not: null } },
+        });
+        const invoiceNumber = `INV-${String(purchaseCount + 1).padStart(4, "0")}`;
+
+        const purchase = await prisma.$transaction(async (tx) => {
+          const p = await tx.creditPurchase.create({
             data: {
               organizationId,
               days,
               amountCents,
-              // Reuse existing unique field for provider transaction id.
               stripeSessionId: transactionId,
+              invoiceNumber,
+              orgNameSnapshot: org?.name ?? null,
+              invoiceNameSnapshot: org?.invoiceName ?? null,
+              invoiceAddressSnapshot: org?.invoiceAddress ?? null,
+              invoiceVatSnapshot: org?.invoiceVat ?? null,
+              invoiceEmailSnapshot: org?.invoiceEmail ?? null,
+              packLabelSnapshot: pack?.label ?? null,
             },
-          }),
-          prisma.organization.update({
+          });
+          await tx.organization.update({
             where: { id: organizationId },
             data: {
               creditBalance: { increment: days },
               pendingAutoTopUpUrl: null,
               pendingAutoTopUpCreatedAt: null,
             },
-          }),
-          prisma.creditLog.create({
+          });
+          await tx.creditLog.create({
             data: {
               organizationId,
               delta: days,
               reason: "purchase",
-              note: `Paddle transaction ${transactionId}`,
+              note: `Paddle transaction ${transactionId} · ${invoiceNumber}`,
             },
-          }),
-        ]);
+          });
+          return p;
+        });
+
+        // Generate & email invoice (non-blocking — don't fail the webhook if email fails)
+        generateAndSendInvoice({
+          invoiceNumber,
+          date: purchase.createdAt,
+          sellerName: SELLER.name,
+          sellerAddress: SELLER.address,
+          sellerVat: SELLER.vat,
+          sellerEmail: SELLER.email,
+          buyerName: org?.invoiceName ?? org?.name ?? "Customer",
+          buyerAddress: org?.invoiceAddress ?? null,
+          buyerVat: org?.invoiceVat ?? null,
+          buyerEmail: org?.invoiceEmail ?? null,
+          packLabel: pack?.label ?? `${days} days`,
+          days,
+          amountCents,
+        }).catch((e) => console.error("[INVOICE]", e));
       }
     }
   }

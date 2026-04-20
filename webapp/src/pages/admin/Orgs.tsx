@@ -13,7 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 interface OrgSummary {
   id: string;
@@ -24,7 +26,7 @@ interface OrgSummary {
   createdAt: string;
   totalPurchasedDays: number;
   totalPurchasedCents: number;
-  _count: { users: number; events: number; people: number };
+  _count: { users: number; events: number; people: number; memberships?: number };
 }
 
 function formatDate(dateStr: string): string {
@@ -59,10 +61,20 @@ function CreditBadge({ balance }: { balance: number }) {
 
 export default function Orgs() {
   const [search, setSearch] = useState("");
+  const queryClient = useQueryClient();
 
   const { data: orgs, isPending } = useQuery<OrgSummary[]>({
     queryKey: ["admin", "orgs"],
     queryFn: () => api.get<OrgSummary[]>("/api/admin/orgs"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/admin/orgs/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
+      toast({ title: "Organization deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete organization", variant: "destructive" }),
   });
 
   const filtered = (orgs ?? []).filter((o) =>
@@ -123,7 +135,9 @@ export default function Orgs() {
               filtered.map((org) => (
                 <TableRow key={org.id} className="border-white/5 hover:bg-white/[0.02]">
                   <TableCell className="font-medium text-white/80">{org.name}</TableCell>
-                  <TableCell className="text-white/50">{org._count.users}</TableCell>
+                  <TableCell className="text-white/50">
+                    {org._count.memberships ?? org._count.users}
+                  </TableCell>
                   <TableCell className="text-white/50">{org._count.people}</TableCell>
                   <TableCell className="text-white/50">{org._count.events}</TableCell>
                   <TableCell>
@@ -144,14 +158,29 @@ export default function Orgs() {
                   </TableCell>
                   <TableCell className="text-white/40 text-sm">{formatDate(org.createdAt)}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      asChild
-                      size="sm"
-                      variant="outline"
-                      className="border-white/10 text-white/60 hover:bg-white/5 hover:text-white text-xs"
-                    >
-                      <Link to={`/admin/orgs/${org.id}`}>Manage</Link>
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="border-white/10 text-white/60 hover:bg-white/5 hover:text-white text-xs"
+                      >
+                        <Link to={`/admin/orgs/${org.id}`}>Manage</Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-900/50 text-red-400/80 hover:bg-red-950/40 hover:text-red-300 text-xs px-2"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => {
+                          if (!confirm(`Permanently delete organization "${org.name}" and all data?`)) return;
+                          deleteMutation.mutate(org.id);
+                        }}
+                        title="Delete organization"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
