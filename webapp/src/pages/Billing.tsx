@@ -27,7 +27,7 @@ interface OrgBillingData extends OrgCreditsPayload {
   autoTopUpPackId: string | null;
   autoTopUpThreshold: number;
   pendingAutoTopUpUrl: string | null;
-  deactivatePersonCredits?: number;
+
 }
 
 interface CheckoutResponse {
@@ -85,25 +85,6 @@ export default function Billing() {
     },
   });
 
-  const [deactivateCostDraft, setDeactivateCostDraft] = useState("");
-
-  useEffect(() => {
-    if (org?.deactivatePersonCredits !== undefined) {
-      setDeactivateCostDraft(String(org.deactivatePersonCredits));
-    }
-  }, [org?.deactivatePersonCredits]);
-
-  const policiesMutation = useMutation({
-    mutationFn: (deactivatePersonCredits: number) =>
-      api.patch<{ ok: boolean }>("/api/org/policies", { deactivatePersonCredits }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["org"] });
-      setToast({ type: "success", message: "Organisation policies saved." });
-    },
-    onError: () => {
-      setToast({ type: "error", message: "Could not save policies." });
-    },
-  });
 
   const settingsMutation = useMutation({
     mutationFn: (body: {
@@ -415,39 +396,6 @@ export default function Billing() {
         </div>
       ) : null}
 
-      {isOwner ? (
-        <Card className="bg-gray-900 border-white/10">
-          <CardHeader>
-            <CardTitle className="text-white text-base">People — deactivation credit cost</CardTitle>
-            <p className="text-gray-400 text-sm font-normal">
-              When someone turns off &quot;Active&quot; for a contact, this many credits are deducted once.
-              Reactivating is free. Platform default is shown on the public pricing page; you can override it here.
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-col sm:flex-row sm:items-end gap-3">
-            <div className="space-y-2 flex-1 max-w-xs">
-              <Label className="text-white/70">Credits per deactivation</Label>
-              <Input
-                type="number"
-                min={0}
-                className="bg-gray-800 border-white/10 text-white"
-                value={deactivateCostDraft}
-                onChange={(e) => setDeactivateCostDraft(e.target.value)}
-                onBlur={() => {
-                  const n = Number.parseInt(deactivateCostDraft, 10);
-                  if (Number.isNaN(n) || n < 0) {
-                    setDeactivateCostDraft(String(org?.deactivatePersonCredits ?? 20));
-                    return;
-                  }
-                  if (n === org?.deactivatePersonCredits) return;
-                  policiesMutation.mutate(n);
-                }}
-                disabled={policiesMutation.isPending}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
 
       {isOwner ? (
         <Card className="bg-gray-900 border-white/10">
