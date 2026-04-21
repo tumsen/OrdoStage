@@ -208,8 +208,8 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
             y2={BEAM_FLOOR_Y + BEAM_CURVE_DEPTH}
             gradientUnits="userSpaceOnUse"
           >
-            <stop offset="0%" stopColor={beam.fill} stopOpacity="0.2" />
-            <stop offset="58%" stopColor={beam.fill} stopOpacity="0.52" />
+            <stop offset="0%" stopColor={beam.fill} stopOpacity="0.44" />
+            <stop offset="58%" stopColor={beam.fill} stopOpacity="0.6" />
             <stop offset="82%" stopColor={beam.fill} stopOpacity="0.74" />
             <stop offset="100%" stopColor={beam.fill} stopOpacity="0.56" />
           </linearGradient>
@@ -245,28 +245,14 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
         const topLeftX = beam.topX - LAMP_RADIUS;
         const topRightX = beam.topX + LAMP_RADIUS;
         const d = `M ${topLeftX} ${BEAM_TOP_Y} L ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} L ${topRightX} ${BEAM_TOP_Y} Z`;
-        const floorRx = Math.max(8, (beam.rightX - beam.leftX) * 0.44);
         const floorShadowOpacity = 0.16 + (interactive ? s * 0.14 : 0);
+        const floorBackD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH - 3.8} ${beam.leftX} ${BEAM_FLOOR_Y} Z`;
+        const floorFrontD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH - 1.7} ${beam.rightX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH - 4.8} ${beam.leftX} ${BEAM_FLOOR_Y} Z`;
         return (
           <g key={`${beam.topX}-${beam.leftX}-${beam.rightX}`} style={{ opacity, willChange: "opacity" }}>
             <path d={d} fill={`url(#${gradientPrefix}-beam-grad-${i})`} />
-            {/* Floor hit: two filled ellipses (back + front), no strokes/lines */}
-            <ellipse
-              cx={beam.topX}
-              cy={BEAM_FLOOR_Y - 0.9}
-              rx={floorRx}
-              ry={2.4}
-              fill={beam.floorBack}
-              style={{ mixBlendMode: "multiply", opacity: floorShadowOpacity }}
-            />
-            <ellipse
-              cx={beam.topX}
-              cy={BEAM_FLOOR_Y - 0.15}
-              rx={floorRx * 0.98}
-              ry={2.55}
-              fill={beam.floorFront}
-              style={{ mixBlendMode: "multiply", opacity: floorShadowOpacity * 0.92 }}
-            />
+            <path d={floorBackD} fill={beam.floorBack} style={{ mixBlendMode: "multiply", opacity: floorShadowOpacity }} />
+            <path d={floorFrontD} fill={beam.floorFront} style={{ mixBlendMode: "multiply", opacity: floorShadowOpacity * 0.92 }} />
           </g>
         );
       })}
