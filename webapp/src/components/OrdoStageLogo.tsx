@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 const LIGHT_X = [50, 75, 100, 125, 150] as const;
 const BEAM_FLOOR_Y = 178;
-const BEAM_TOP_Y = 62;
+const BEAM_TOP_Y = 56;
 const BEAM_CURVE_DEPTH = 12;
 const LAMP_RADIUS = 6;
 
