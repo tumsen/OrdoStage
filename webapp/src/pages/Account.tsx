@@ -16,6 +16,7 @@ import {
 import { signOut } from "@/lib/auth-client";
 import { usePreferences } from "@/hooks/usePreferences";
 import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
+import { useI18n } from "@/lib/i18n";
 
 const CONFIRM_PHRASE = "DELETETHISACCOUNT";
 
@@ -23,6 +24,7 @@ export default function Account() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { effective, isLoading } = usePreferences();
+  const { t } = useI18n();
   const [phrase, setPhrase] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -37,14 +39,14 @@ export default function Account() {
     },
     onError: (e: unknown) => {
       if (isApiError(e)) setPrefsError(e.message);
-      else setPrefsError("Could not save preference.");
+      else setPrefsError(t("account.savePrefError"));
     },
   });
 
   async function onDeleteAccount() {
     setError("");
     if (phrase !== CONFIRM_PHRASE) {
-      setError(`Type ${CONFIRM_PHRASE} exactly (all caps).`);
+      setError(t("account.phraseError", { phrase: CONFIRM_PHRASE }));
       return;
     }
     setLoading(true);
@@ -59,7 +61,7 @@ export default function Account() {
       if (isApiError(e)) {
         setError(e.message);
       } else {
-        setError("Could not delete account.");
+        setError(t("account.deleteError"));
       }
     } finally {
       setLoading(false);
@@ -69,20 +71,20 @@ export default function Account() {
   return (
     <div className="p-6 space-y-8 max-w-2xl mx-auto">
       <div>
-        <h2 className="text-xl font-semibold text-white">Account</h2>
-        <p className="text-sm text-white/45 mt-1">Personal settings, security and account deletion.</p>
+        <h2 className="text-xl font-semibold text-white">{t("account.title")}</h2>
+        <p className="text-sm text-white/45 mt-1">{t("account.subtitle")}</p>
       </div>
 
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
         <div>
-          <p className="text-sm font-medium text-white">Personal display preferences</p>
+          <p className="text-sm font-medium text-white">{t("account.preferencesTitle")}</p>
           <p className="text-xs text-white/50 mt-1">
-            Your choices override the organization defaults for your own account.
+            {t("account.preferencesHint")}
           </p>
         </div>
         <div className="grid sm:grid-cols-3 gap-3">
           <div className="space-y-2">
-            <Label className="text-white/70 text-xs uppercase tracking-wide">Language</Label>
+            <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.language")}</Label>
             <Select
               value={effective?.language ?? "en"}
               disabled={isLoading || updatePrefsMutation.isPending}
@@ -92,14 +94,14 @@ export default function Account() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="da">Danish</SelectItem>
-                <SelectItem value="de">German</SelectItem>
+                <SelectItem value="en">{t("common.english")}</SelectItem>
+                <SelectItem value="da">{t("common.danish")}</SelectItem>
+                <SelectItem value="de">{t("common.german")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-white/70 text-xs uppercase tracking-wide">Time format</Label>
+            <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.timeFormat")}</Label>
             <Select
               value={effective?.timeFormat ?? "24h"}
               disabled={isLoading || updatePrefsMutation.isPending}
@@ -109,13 +111,13 @@ export default function Account() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                <SelectItem value="24h">24-hour</SelectItem>
-                <SelectItem value="12h">12-hour</SelectItem>
+                <SelectItem value="24h">{t("common.clock24")}</SelectItem>
+                <SelectItem value="12h">{t("common.clock12")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-white/70 text-xs uppercase tracking-wide">Distance</Label>
+            <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.distance")}</Label>
             <Select
               value={effective?.distanceUnit ?? "km"}
               disabled={isLoading || updatePrefsMutation.isPending}
@@ -125,8 +127,8 @@ export default function Account() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                <SelectItem value="km">Kilometers (km)</SelectItem>
-                <SelectItem value="mi">Miles (mi)</SelectItem>
+                <SelectItem value="km">{t("common.kilometers")}</SelectItem>
+                <SelectItem value="mi">{t("common.miles")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -138,17 +140,15 @@ export default function Account() {
         <div className="flex gap-3">
           <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <p className="text-sm font-medium text-white">Delete your login account</p>
+            <p className="text-sm font-medium text-white">{t("account.deleteTitle")}</p>
             <p className="text-xs text-white/50 leading-relaxed">
-              This removes your OrdoStage login and sessions. If you are the only member of your organization,
-              the organization and its data are deleted. If you are an owner with other members, transfer ownership first
-              (Team page).
+              {t("account.deleteHint")}
             </p>
           </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor="delete-phrase" className="text-white/70 text-xs uppercase tracking-wide">
-            Type {CONFIRM_PHRASE} to confirm
+            {t("account.typeConfirm", { phrase: CONFIRM_PHRASE })}
           </Label>
           <Input
             id="delete-phrase"
@@ -167,7 +167,7 @@ export default function Account() {
           disabled={loading || phrase !== CONFIRM_PHRASE}
           onClick={onDeleteAccount}
         >
-          {loading ? "Deleting…" : "Delete my account permanently"}
+          {loading ? t("account.deleting") : t("account.deleteCta")}
         </Button>
       </div>
     </div>

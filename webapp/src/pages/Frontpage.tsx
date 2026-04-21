@@ -2,14 +2,15 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 
 type SiteContent = Record<string, string>;
 
 /** Defaults match marketing copy when Website Content fields are empty. */
 const DEFAULT_HERO_TITLE =
-  "Ordo Stage is a planning platform built for theatres, venues, and touring productions.";
+  "OrdoStage is launching soon — production management built for theaters.";
 const DEFAULT_HERO_SUBTITLE =
-  "It brings everything together in one place — from the first booking to the final curtain call.";
+  "Plan productions, coordinate teams, manage venues, and keep schedules in sync — in one platform.";
 
 function SectionDivider() {
   return (
@@ -42,6 +43,29 @@ export default function Frontpage() {
       <article className="max-w-4xl mx-auto px-6 py-14 md:py-20 space-y-10 md:space-y-12">
         {/* Hero */}
         <header className="space-y-6">
+          <div className="relative flex justify-center md:justify-start">
+            <div
+              aria-hidden
+              className="absolute inset-x-8 -inset-y-6 rounded-[2.2rem] bg-[radial-gradient(circle_at_50%_36%,rgba(255,190,11,0.24),rgba(251,86,7,0.18)_28%,rgba(131,56,236,0.22)_52%,rgba(10,10,15,0)_74%)] blur-2xl"
+            />
+            <div
+              aria-hidden
+              className="absolute left-1/2 top-1/2 h-[78%] w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15 shadow-[0_0_52px_rgba(255,190,59,0.24),0_0_94px_rgba(131,56,236,0.2)] animate-pulse"
+            />
+            <div
+              aria-hidden
+              className="absolute left-1/2 top-1/2 h-[88%] w-[82%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/8 opacity-80"
+              style={{
+                maskImage:
+                  "conic-gradient(from 120deg, transparent 0deg, rgba(255,255,255,1) 90deg, transparent 180deg, rgba(255,255,255,1) 250deg, transparent 320deg)",
+              }}
+            />
+            <OrdoStageLogo
+              variant="sidebar"
+              interactive
+              className="relative z-[1] w-full max-w-[300px] md:max-w-[380px]"
+            />
+          </div>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">
             {heroTitle}
           </h1>
@@ -50,7 +74,7 @@ export default function Frontpage() {
           </p>
           <p className="rounded-xl border border-ordo-yellow/35 bg-gradient-to-br from-ordo-magenta/[0.12] to-ordo-violet/[0.08] px-4 py-4 text-[15px] leading-relaxed text-white/90 md:text-base">
             <span className="font-semibold text-ordo-yellow">{signupCredits} free credits</span> when you create your
-            organisation — enough to try scheduling, riders, tours, and team workflows before you buy a pack.
+            organization — enough to test scheduling, technical riders, tours, and team workflows before you buy a pack.
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button

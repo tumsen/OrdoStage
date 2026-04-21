@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
+import { useI18n } from "@/lib/i18n";
 
 interface OrgBillingData extends OrgCreditsPayload {
   id: string;
@@ -66,6 +67,7 @@ export default function Billing() {
   });
   const [invAddress, setInvAddress] = useState<Address>(EMPTY_ADDRESS);
   const [invSaving, setInvSaving] = useState(false);
+  const { t } = useI18n();
 
   const { data: org, isLoading } = useQuery<OrgBillingData>({
     queryKey: ["org"],
@@ -112,10 +114,10 @@ export default function Billing() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["org"] });
       queryClient.invalidateQueries({ queryKey: ["preferences"] });
-      setToast({ type: "success", message: "Organization defaults updated." });
+      setToast({ type: "success", message: t("billing.updated") });
     },
     onError: (e: Error) => {
-      setToast({ type: "error", message: e.message || "Could not update organization defaults." });
+      setToast({ type: "error", message: e.message || t("billing.updateError") });
     },
   });
 
@@ -269,14 +271,14 @@ export default function Billing() {
       {isOwner && org ? (
         <Card className="bg-gray-900 border-white/10">
           <CardHeader>
-            <CardTitle className="text-white text-base">Organization default language and formats</CardTitle>
+            <CardTitle className="text-white text-base">{t("billing.orgDefaultsTitle")}</CardTitle>
             <p className="text-gray-400 text-sm font-normal">
-              This is the default for new members. Each user can still choose personal settings in their Account page.
+              {t("billing.orgDefaultsHint")}
             </p>
           </CardHeader>
           <CardContent className="grid sm:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label className="text-white/70">Default language</Label>
+              <Label className="text-white/70">{t("billing.defaultLanguage")}</Label>
               <Select
                 value={org.defaultLanguage ?? "en"}
                 onValueChange={(value) =>
@@ -292,14 +294,14 @@ export default function Billing() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1a24] border-white/10">
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="da">Danish</SelectItem>
-                  <SelectItem value="de">German</SelectItem>
+                  <SelectItem value="en">{t("common.english")}</SelectItem>
+                  <SelectItem value="da">{t("common.danish")}</SelectItem>
+                  <SelectItem value="de">{t("common.german")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-white/70">Default time format</Label>
+              <Label className="text-white/70">{t("billing.defaultTimeFormat")}</Label>
               <Select
                 value={org.defaultTimeFormat ?? "24h"}
                 onValueChange={(value) =>
@@ -315,13 +317,13 @@ export default function Billing() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1a24] border-white/10">
-                  <SelectItem value="24h">24-hour</SelectItem>
-                  <SelectItem value="12h">12-hour</SelectItem>
+                  <SelectItem value="24h">{t("common.clock24")}</SelectItem>
+                  <SelectItem value="12h">{t("common.clock12")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-white/70">Default distance unit</Label>
+              <Label className="text-white/70">{t("billing.defaultDistance")}</Label>
               <Select
                 value={org.defaultDistanceUnit ?? "km"}
                 onValueChange={(value) =>
@@ -337,8 +339,8 @@ export default function Billing() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1a24] border-white/10">
-                  <SelectItem value="km">Kilometers (km)</SelectItem>
-                  <SelectItem value="mi">Miles (mi)</SelectItem>
+                  <SelectItem value="km">{t("common.kilometers")}</SelectItem>
+                  <SelectItem value="mi">{t("common.miles")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

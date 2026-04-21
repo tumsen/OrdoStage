@@ -30,6 +30,7 @@ import { api } from "@/lib/api";
 import { usePermissions } from "@/hooks/usePermissions";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 import { OrgWorkspaceMenu } from "@/components/OrgWorkspaceMenu";
+import { useI18n } from "@/lib/i18n";
 
 interface OrgData {
   id: string;
@@ -43,18 +44,18 @@ interface OrgData {
   pendingAutoTopUpUrl?: string | null;
 }
 
-const navItems: { to: string; label: string; icon: LucideIcon; view: string }[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, view: "dashboard" },
-  { to: "/events", label: "Events", icon: CalendarDays, view: "events" },
-  { to: "/schedule", label: "Schedule", icon: CalendarRange, view: "schedule" },
-  { to: "/tours", label: "Tours", icon: Route, view: "tours" },
-  { to: "/venues", label: "Venues", icon: MapPin, view: "venues" },
-  { to: "/people", label: "People", icon: Users, view: "people" },
-  { to: "/team", label: "Team", icon: UsersRound, view: "team" },
-  { to: "/calendars", label: "Calendars", icon: Share2, view: "calendars" },
-  { to: "/billing", label: "Billing", icon: CreditCard, view: "billing" },
-  { to: "/roles", label: "Roles", icon: KeyRound, view: "roles" },
-  { to: "/account", label: "Account", icon: UserCircle, view: "account" },
+const navItems: { to: string; labelKey: string; icon: LucideIcon; view: string }[] = [
+  { to: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard, view: "dashboard" },
+  { to: "/events", labelKey: "nav.events", icon: CalendarDays, view: "events" },
+  { to: "/schedule", labelKey: "nav.schedule", icon: CalendarRange, view: "schedule" },
+  { to: "/tours", labelKey: "nav.tours", icon: Route, view: "tours" },
+  { to: "/venues", labelKey: "nav.venues", icon: MapPin, view: "venues" },
+  { to: "/people", labelKey: "nav.people", icon: Users, view: "people" },
+  { to: "/team", labelKey: "nav.team", icon: UsersRound, view: "team" },
+  { to: "/calendars", labelKey: "nav.calendars", icon: Share2, view: "calendars" },
+  { to: "/billing", labelKey: "nav.billing", icon: CreditCard, view: "billing" },
+  { to: "/roles", labelKey: "nav.roles", icon: KeyRound, view: "roles" },
+  { to: "/account", labelKey: "nav.account", icon: UserCircle, view: "account" },
 ];
 
 export function SidebarContent({ onNav }: { onNav?: () => void }) {
@@ -62,6 +63,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
   const navigate = useNavigate();
   const { data: session } = useSession();
   const { canView, isPending: permsLoading, me } = usePermissions();
+  const { t } = useI18n();
 
   const handleSignOut = async () => {
     await signOut();
@@ -108,7 +110,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
         ) : (
           navItems
           .filter((item) => navBypass || canView(item.view))
-          .map(({ to, label, icon: Icon }) => {
+          .map(({ to, labelKey, icon: Icon }) => {
           const isActive =
             to === "/dashboard"
               ? location.pathname === "/dashboard"
@@ -127,7 +129,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
               )}
             >
               <Icon size={16} className={isActive ? "text-ordo-yellow" : "text-white/45"} />
-              <span className="font-medium">{label}</span>
+              <span className="font-medium">{t(labelKey)}</span>
               {isActive ? (
                 <div className="ml-auto w-1.5 h-1.5 rounded-full bg-ordo-yellow shadow-[0_0_10px_rgba(255,190,59,0.65)]" />
               ) : null}
@@ -155,7 +157,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
                   : "text-ordo-magenta/75"
               }
             />
-            <span className="font-medium">Owner Admin</span>
+            <span className="font-medium">{t("nav.ownerAdmin")}</span>
           </Link>
         ) : null}
       </nav>
@@ -178,7 +180,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
           className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors duration-200"
         >
           <LogOut size={15} />
-          <span>Sign out</span>
+          <span>{t("nav.signOut")}</span>
         </button>
       </div>
     </div>
@@ -191,6 +193,7 @@ function CreditBanner() {
     queryFn: () => api.get<OrgData>("/api/org"),
     staleTime: 60_000,
   });
+  const { t } = useI18n();
 
   if (!org) return null;
 
@@ -210,13 +213,13 @@ function CreditBanner() {
       <div className="flex-shrink-0 bg-ordo-blue/15 border-b border-ordo-blue/35 px-4 py-2 flex items-center gap-2 text-sm">
         <Sparkles size={14} className="text-ordo-blue flex-shrink-0" />
         <span className="text-blue-100/95">
-          Credits are low — a checkout is ready for your automatic top-up. Complete payment to add credits.
+          {t("credits.autoTopupReady")}
         </span>
         <a
           href={org.pendingAutoTopUpUrl}
           className="ml-auto text-white/95 underline underline-offset-2 hover:text-ordo-yellow whitespace-nowrap"
         >
-          Pay now →
+          {t("credits.payNow")}
         </a>
       </div>
     );
@@ -226,9 +229,9 @@ function CreditBanner() {
     return (
       <div className="flex-shrink-0 bg-red-950/80 border-b border-red-800/50 px-4 py-2 flex items-center gap-2 text-sm">
         <XCircle size={14} className="text-red-400 flex-shrink-0" />
-        <span className="text-red-300">No credits remaining. Your account is in read-only mode.</span>
+        <span className="text-red-300">{t("credits.noCreditsReadOnly")}</span>
         <Link to="/billing" className="ml-auto text-red-200 underline underline-offset-2 hover:text-white whitespace-nowrap">
-          Buy Credits →
+          {t("credits.buyCredits")}
         </Link>
       </div>
     );
@@ -239,10 +242,13 @@ function CreditBanner() {
       <div className="flex-shrink-0 bg-ordo-orange/15 border-b border-ordo-yellow/35 px-4 py-2 flex items-center gap-2 text-sm">
         <AlertTriangle size={14} className="text-ordo-yellow flex-shrink-0" />
         <span className="text-ordo-yellow/95">
-          Low credits: {daysLeft} {daysLeft === 1 ? "day" : "days"} remaining. Top up to avoid read-only mode.
+          {t("credits.lowCredits", {
+            days: daysLeft,
+            daysLabel: daysLeft === 1 ? t("credits.day") : t("credits.days"),
+          })}
         </span>
         <Link to="/billing" className="ml-auto text-ordo-yellow underline underline-offset-2 hover:text-white whitespace-nowrap">
-          Buy Credits →
+          {t("credits.buyCredits")}
         </Link>
       </div>
     );
@@ -258,6 +264,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     document.title = "OrdoStage";
@@ -269,7 +276,7 @@ export function Layout({ children }: LayoutProps) {
         href="#main-content"
         className="absolute left-4 top-0 z-[200] -translate-y-full bg-red-900 px-4 py-2 text-sm text-white shadow-lg transition-transform focus:translate-y-4 focus:outline-none focus:ring-2 focus:ring-white/40"
       >
-        Skip to main content
+        {t("common.skipToContent")}
       </a>
       {/* Desktop Sidebar */}
       {!isMobile ? (

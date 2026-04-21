@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { OrgMembershipDTO } from "@/lib/postAuthRouting";
+import { useI18n } from "@/lib/i18n";
 
 interface OrgData {
   id: string;
@@ -20,6 +21,7 @@ interface OrgData {
 
 export function OrgWorkspaceMenu({ onNav }: { onNav?: () => void }) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   const { data: org } = useQuery<OrgData>({
     queryKey: ["org"],
@@ -54,12 +56,12 @@ export function OrgWorkspaceMenu({ onNav }: { onNav?: () => void }) {
   }
 
   const currentId = org?.id;
-  const label = org?.name ?? memberships.find((m) => m.organizationId === currentId)?.name ?? "Organization";
+  const label = org?.name ?? memberships.find((m) => m.organizationId === currentId)?.name ?? t("nav.organizationFallback");
 
   if (memberships.length === 1) {
     return (
       <div className="px-3 py-2 border-b border-white/10">
-        <div className="text-[10px] uppercase tracking-wider text-white/35 font-medium">Workspace</div>
+        <div className="text-[10px] uppercase tracking-wider text-white/35 font-medium">{t("nav.workspace")}</div>
         <div className="text-sm text-white/80 font-medium truncate mt-0.5" title={label}>
           {label}
         </div>
@@ -76,14 +78,14 @@ export function OrgWorkspaceMenu({ onNav }: { onNav?: () => void }) {
             className="w-full h-auto py-2 px-2 flex items-center gap-2 justify-between text-left text-white/90 hover:text-white hover:bg-white/5"
           >
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-wider text-white/35 font-medium">Workspace</div>
+              <div className="text-[10px] uppercase tracking-wider text-white/35 font-medium">{t("nav.workspace")}</div>
               <div className="text-sm font-medium truncate">{label}</div>
             </div>
             <ChevronsUpDown size={16} className="text-white/35 flex-shrink-0" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56 bg-[#16161f] border-white/10 text-white" align="start">
-          <DropdownMenuLabel className="text-white/50 text-xs font-normal">Switch organization</DropdownMenuLabel>
+          <DropdownMenuLabel className="text-white/50 text-xs font-normal">{t("nav.switchOrganization")}</DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-white/10" />
           {memberships.map((m) => (
             <DropdownMenuItem
@@ -97,7 +99,7 @@ export function OrgWorkspaceMenu({ onNav }: { onNav?: () => void }) {
             >
               <span className="truncate flex-1">{m.name}</span>
               {m.organizationId === currentId ? (
-                <span className="text-[10px] text-ordo-yellow ml-2 flex-shrink-0">current</span>
+                <span className="text-[10px] text-ordo-yellow ml-2 flex-shrink-0">{t("nav.current")}</span>
               ) : null}
             </DropdownMenuItem>
           ))}
