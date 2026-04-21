@@ -5,6 +5,7 @@ const LIGHT_X = [50, 75, 100, 125, 150] as const;
 const BEAM_FLOOR_Y = 178;
 const BEAM_TOP_Y = 62;
 const BEAM_CURVE_DEPTH = 12;
+const LAMP_RADIUS = 6;
 
 const BEAMS = [
   { topX: 50, leftX: 28, rightX: 72, fill: "#ff006e" },
@@ -243,18 +244,20 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
       {BEAMS.map((beam, i) => {
         const s = interactive ? strengths[i] ?? 0 : 0;
         const opacity = interactive ? s : IDLE_BEAM_OPACITY[i];
-        const d = `M ${beam.topX} ${BEAM_TOP_Y} L ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} Z`;
-        const floorRx = Math.max(9, (beam.rightX - beam.leftX) * 0.46);
-        const floorShadowOpacity = 0.2 + (interactive ? s * 0.18 : 0);
+        const topLeftX = beam.topX - LAMP_RADIUS;
+        const topRightX = beam.topX + LAMP_RADIUS;
+        const d = `M ${topLeftX} ${BEAM_TOP_Y} L ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} L ${topRightX} ${BEAM_TOP_Y} Z`;
+        const floorCurveD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y}`;
+        const floorShadowOpacity = 0.18 + (interactive ? s * 0.16 : 0);
         return (
           <g key={`${beam.topX}-${beam.leftX}-${beam.rightX}`} style={{ opacity, willChange: "opacity" }}>
             <path d={d} fill={`url(#${gradientPrefix}-beam-grad-${i})`} />
-            <ellipse
-              cx={beam.topX}
-              cy={BEAM_FLOOR_Y - 0.5}
-              rx={floorRx}
-              ry={3.1}
-              fill={beam.fill}
+            <path
+              d={floorCurveD}
+              fill="none"
+              stroke={beam.fill}
+              strokeWidth={6}
+              strokeLinecap="round"
               style={{ mixBlendMode: "multiply", opacity: floorShadowOpacity }}
             />
           </g>
