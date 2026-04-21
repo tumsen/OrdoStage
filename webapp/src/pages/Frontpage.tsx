@@ -31,25 +31,13 @@ export default function Frontpage() {
         className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/curtain-bg.png')" }}
       />
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-black/45" />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(255,196,78,0.22),rgba(9,9,15,0.72)_62%)]"
-      />
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-black/18" />
 
       <div className="absolute left-4 top-4 z-[2] w-[180px] sm:w-[220px] md:w-[260px]">
         <OrdoStageLogo variant="sidebar" interactive className="w-full" />
       </div>
 
       <main className="relative z-[1] mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-6 px-6 pb-10 pt-28 text-center md:pt-32">
-        <div className="relative w-full max-w-[560px]">
-          <div
-            aria-hidden
-            className="absolute inset-x-[8%] -inset-y-8 rounded-[3rem] bg-[radial-gradient(circle_at_50%_38%,rgba(255,190,11,0.22),rgba(251,86,7,0.18)_35%,rgba(131,56,236,0.2)_58%,rgba(9,9,15,0)_82%)] blur-3xl"
-          />
-          <OrdoStageLogo variant="sidebar" interactive className="relative z-[1] mx-auto w-full" />
-        </div>
-
         <div className="max-w-3xl space-y-4">
           <h1 className="text-2xl font-bold leading-tight tracking-tight md:text-4xl">{heroTitle}</h1>
           <p className="text-base leading-relaxed text-white/85 md:text-xl">{heroSubtitle}</p>
@@ -59,6 +47,10 @@ export default function Frontpage() {
           </p>
           <p className="text-xs leading-relaxed text-ordo-yellow/90 md:text-sm">
             We are in private rollout now. Early access theaters will be onboarded first.
+          </p>
+          <p className="text-sm leading-relaxed text-white/90 md:text-base">
+            Early-bird tester offer: theaters that join testing get unlimited use for 6 months.
+            Email <a href="mailto:mail@ordostage.com" className="underline underline-offset-2 hover:text-ordo-yellow">mail@ordostage.com</a>.
           </p>
         </div>
 
