@@ -9,6 +9,7 @@ import {
   layoutTimedBlockInDay,
   computeOverlapLayout,
 } from "./scheduleUtils";
+import { usePreferences } from "@/hooks/usePreferences";
 
 const HOUR_HEIGHT = 48;
 const SNAP_MINUTES = 15;
@@ -35,8 +36,8 @@ function getSnappedRangeMinutes(startY: number, currentY: number, columnTop: num
   return { lo: Math.min(m0, m1), hi: Math.max(m0, m1) };
 }
 
-function formatDragTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+function formatDragTime(d: Date, hour12: boolean): string {
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12 });
 }
 
 function minutesToDate(day: Date, minutesFromMidnight: number): Date {
@@ -82,6 +83,7 @@ export function OutlookTimeGrid({
   onDeleteItem,
   onSelectTimeRange,
 }: OutlookTimeGridProps) {
+  const { effective } = usePreferences();
   const totalHeight = 24 * HOUR_HEIGHT;
   const hours = Array.from({ length: 24 }).map((_, h) => h);
 
@@ -138,10 +140,10 @@ export function OutlookTimeGrid({
           {days.map((d) => (
             <div key={d.toISOString()} className="border-b border-l border-white/10 bg-white/[0.02] px-2 py-2">
               <div className="text-xs text-white/80 font-medium">
-                {d.toLocaleDateString("en-US", { weekday: "short" })}
+                {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { weekday: "short" })}
               </div>
               <div className="text-[11px] text-white/40">
-                {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { month: "short", day: "numeric" })}
               </div>
             </div>
           ))}
@@ -229,7 +231,7 @@ export function OutlookTimeGrid({
                     style={{ top: topPx, height: hPx }}
                   >
                     <div className="text-[10px] font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
-                      {formatDragTime(startAt)} – {formatDragTime(endAt)}
+                      {formatDragTime(startAt, effective?.timeFormat === "12h")} – {formatDragTime(endAt, effective?.timeFormat === "12h")}
                     </div>
                     <div className="text-[9px] text-white/85 leading-tight mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
                       {durMin} min
@@ -279,7 +281,15 @@ export function OutlookTimeGrid({
                   // Very thin block → rotate text
                   const isThin = height < 28 || totalCols >= 4;
 
-                  const timeLabel = `${clippedStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}–${clippedEnd.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+                  const timeLabel = `${clippedStart.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: effective?.timeFormat === "12h",
+                  })}–${clippedEnd.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: effective?.timeFormat === "12h",
+                  })}`;
                   const tooltipText = [item.title, venueName && `@ ${venueName}`, timeLabel, item.status].filter(Boolean).join(" · ");
 
                   return (

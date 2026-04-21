@@ -24,6 +24,7 @@ import {
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
 import { toast } from "@/hooks/use-toast";
+import { usePreferences } from "@/hooks/usePreferences";
 
 interface ScheduleData {
   events: EventDetail[];
@@ -87,23 +88,23 @@ function getRange(mode: ScheduleViewMode, anchorDate: Date): { from: string; to:
   return { from: toISODate(fromDate), to: toISODate(toDate) };
 }
 
-function rangeLabel(mode: ScheduleViewMode, date: Date): string {
+function rangeLabel(mode: ScheduleViewMode, date: Date, locale: string): string {
   if (mode === "year") return String(date.getFullYear());
   if (mode === "yeardisc") return `Year Disc ${date.getFullYear()}`;
   if (mode === "month") return formatMonthLabel(date.getFullYear(), date.getMonth());
   if (mode === "week") {
     const fromDate = startOfWeek(date);
     const toDate = addDays(fromDate, 6);
-    return `${fromDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${toDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+    return `${fromDate.toLocaleDateString(locale, { month: "short", day: "numeric" })} - ${toDate.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })}`;
   }
   if (mode === "day") {
-    return date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    return date.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }
   const toDate = addDays(date, 6);
-  return `Next 7 days (${date.toLocaleDateString("en-US", {
+  return `Next 7 days (${date.toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
-  })} - ${toDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`;
+  })} - ${toDate.toLocaleDateString(locale, { month: "short", day: "numeric" })})`;
 }
 
 function getRangeDays(mode: ScheduleViewMode, anchorDate: Date): Date[] {
@@ -167,6 +168,13 @@ function YearDiscView({ year, items }: { year: number; items: CalendarItem[] }) 
 
 export default function Schedule() {
   const queryClient = useQueryClient();
+  const { effective } = usePreferences();
+  const locale =
+    effective?.language === "da"
+      ? "da-DK"
+      : effective?.language === "de"
+        ? "de-DE"
+        : "en-US";
   const today = new Date();
   const [anchorDate, setAnchorDate] = useState(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
@@ -299,7 +307,7 @@ export default function Schedule() {
             <ChevronLeft size={16} />
           </Button>
           <h2 className="text-base font-semibold text-white/90 min-w-[160px] text-center">
-            {rangeLabel(viewMode, anchorDate)}
+            {rangeLabel(viewMode, anchorDate, locale)}
           </h2>
           <Button
             variant="ghost"
@@ -385,7 +393,7 @@ export default function Schedule() {
                   return (
                     <div key={date.toISOString()} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
                       <div className="text-xs text-white/40 mb-2">
-                        {date.toLocaleDateString("en-US", {
+                        {date.toLocaleDateString(locale, {
                           weekday: "short",
                           month: "short",
                           day: "numeric",

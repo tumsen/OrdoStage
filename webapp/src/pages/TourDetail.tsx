@@ -80,6 +80,8 @@ import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { downloadVenueTechRider, printVenueTechRider, uploadVenueTechRiderForSharing } from "@/lib/downloadVenueTechRider";
 import { TourCalendarView } from "@/components/TourCalendarView";
 import { useToast } from "@/hooks/use-toast";
+import { usePreferences } from "@/hooks/usePreferences";
+import { formatDistanceKm } from "@/lib/preferences";
 
 // ── Google Maps helpers ───────────────────────────────────────────────────────
 
@@ -988,7 +990,9 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/60 text-xs uppercase tracking-wide">Distance to Next (km)</Label>
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">
+                    Distance to Next (km)
+                  </Label>
                   <Input
                     type="number"
                     value={form.distanceKm}
@@ -1877,6 +1881,7 @@ interface TravelConnectorProps {
 }
 
 function TravelConnector({ currentShow, nextShow }: TravelConnectorProps) {
+  const { effective } = usePreferences();
   const nextVenueLabel = [nextShow.venueCity, nextShow.venueName].filter(Boolean).join(" · ");
   const nextAddress = nextShow.venueStreet || nextShow.venueName || nextShow.venueCity;
   const currentAddress = currentShow.venueStreet || currentShow.venueName || currentShow.venueCity;
@@ -1903,7 +1908,9 @@ function TravelConnector({ currentShow, nextShow }: TravelConnectorProps) {
           </span>
         ) : null}
         {currentShow.distanceKm ? (
-          <span className="text-xs text-white/30">{currentShow.distanceKm} km</span>
+          <span className="text-xs text-white/30">
+            {formatDistanceKm(currentShow.distanceKm, effective?.distanceUnit ?? "km")}
+          </span>
         ) : null}
         {currentShow.travelTimeMinutes ? (
           <span className="text-xs text-white/30">{formatTravelTime(currentShow.travelTimeMinutes)}</span>

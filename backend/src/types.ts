@@ -1,5 +1,21 @@
 import { z } from "zod";
 
+export const LanguageSchema = z.enum(["en", "da", "de"]);
+export const TimeFormatSchema = z.enum(["12h", "24h"]);
+export const DistanceUnitSchema = z.enum(["km", "mi"]);
+
+export const UserPreferencesSchema = z.object({
+  language: LanguageSchema,
+  timeFormat: TimeFormatSchema,
+  distanceUnit: DistanceUnitSchema,
+});
+
+export const PreferencesPayloadSchema = z.object({
+  organizationDefaults: UserPreferencesSchema,
+  userPreferences: UserPreferencesSchema,
+  effective: UserPreferencesSchema,
+});
+
 export const CustomFieldSchema = z.object({
   key: z.string().min(1),
   value: z.string().optional().default(""),

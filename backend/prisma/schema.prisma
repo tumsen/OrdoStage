@@ -26,6 +26,9 @@ model User {
   bookingsCreated InternalBooking[] @relation("BookingCreatedBy")
   /** All organizations this account belongs to (current org is `organizationId` + matching `orgRole`). */
   organizationMemberships OrganizationMembership[]
+  preferredLanguage String?
+  preferredTimeFormat String?
+  preferredDistanceUnit String?
 }
 
 model Session {
@@ -70,6 +73,9 @@ model Verification {
 model Organization {
   id               String             @id @default(cuid())
   name             String
+  defaultLanguage  String             @default("en")
+  defaultTimeFormat String            @default("24h")
+  defaultDistanceUnit String          @default("km")
   creditBalance    Int                @default(0)
   lastDeductedAt   DateTime           @default(now())
   users            User[]

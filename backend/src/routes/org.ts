@@ -9,12 +9,29 @@ import { isOwner } from "../permissions";
 import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
 import { maybeEnqueueAutoTopUp } from "../autoTopup";
 import { reassignUsersBeforeOrgDelete } from "../orgMembership";
+import { DistanceUnitSchema, LanguageSchema, TimeFormatSchema } from "../types";
 
 const OrgPoliciesSchema = z.object({
   deactivatePersonCredits: z.number().int().min(0).max(1_000_000),
 });
 
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
+
+const DEFAULT_LANGUAGE = "en" as const;
+const DEFAULT_TIME_FORMAT = "24h" as const;
+const DEFAULT_DISTANCE_UNIT = "km" as const;
+
+const OrgPreferencesSchema = z.object({
+  language: LanguageSchema,
+  timeFormat: TimeFormatSchema,
+  distanceUnit: DistanceUnitSchema,
+});
+
+const UserPreferencesPatchSchema = z.object({
+  language: LanguageSchema.optional(),
+  timeFormat: TimeFormatSchema.optional(),
+  distanceUnit: DistanceUnitSchema.optional(),
+});
 
 // GET /api/me — current user role from DB (session may omit orgRole in the client)
 app.get("/me", async (c) => {
@@ -51,6 +68,82 @@ app.get("/me", async (c) => {
       actions: eff.actions,
     },
   });
+});
+
+// GET /api/preferences — effective locale/time/unit preferences for current user
+app.get("/preferences", async (c) => {
+  const sessionUser = c.get("user");
+  if (!sessionUser?.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: sessionUser.id },
+    select: {
+      organizationId: true,
+      preferredLanguage: true,
+      preferredTimeFormat: true,
+      preferredDistanceUnit: true,
+    },
+  });
+  if (!dbUser) {
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const orgDefaults = dbUser.organizationId
+    ? await prisma.organization.findUnique({
+        where: { id: dbUser.organizationId },
+        select: {
+          defaultLanguage: true,
+          defaultTimeFormat: true,
+          defaultDistanceUnit: true,
+        },
+      })
+    : null;
+
+  const defaults = {
+    language: orgDefaults?.defaultLanguage ?? DEFAULT_LANGUAGE,
+    timeFormat: orgDefaults?.defaultTimeFormat ?? DEFAULT_TIME_FORMAT,
+    distanceUnit: orgDefaults?.defaultDistanceUnit ?? DEFAULT_DISTANCE_UNIT,
+  };
+
+  const userPreferences = {
+    language: dbUser.preferredLanguage ?? defaults.language,
+    timeFormat: dbUser.preferredTimeFormat ?? defaults.timeFormat,
+    distanceUnit: dbUser.preferredDistanceUnit ?? defaults.distanceUnit,
+  };
+
+  return c.json({
+    data: {
+      organizationDefaults: defaults,
+      userPreferences,
+      effective: userPreferences,
+    },
+  });
+});
+
+// PATCH /api/preferences — update current user's preference overrides
+app.patch("/preferences", async (c) => {
+  const sessionUser = c.get("user");
+  if (!sessionUser?.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const body = UserPreferencesPatchSchema.parse(await c.req.json().catch(() => ({})));
+  if (Object.keys(body).length === 0) {
+    return c.json({ error: { message: "No changes", code: "BAD_REQUEST" } }, 400);
+  }
+
+  await prisma.user.update({
+    where: { id: sessionUser.id },
+    data: {
+      preferredLanguage: body.language,
+      preferredTimeFormat: body.timeFormat,
+      preferredDistanceUnit: body.distanceUnit,
+    },
+  });
+
+  return c.json({ data: { ok: true } });
 });
 
 // GET /api/org/memberships — organizations this user belongs to (no active org required)
@@ -236,6 +329,37 @@ app.patch("/org/billing-settings", async (c) => {
   await prisma.organization.update({
     where: { id: user.organizationId },
     data,
+  });
+
+  return c.json({ data: { ok: true } });
+});
+
+// PATCH /api/org/preferences — owner sets organization default locale/unit preferences
+app.patch("/org/preferences", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { orgRole: true },
+  });
+  if (!isOwner(dbUser?.orgRole || "")) {
+    return c.json(
+      { error: { message: "Only the owner can change organization preferences", code: "FORBIDDEN" } },
+      403
+    );
+  }
+
+  const body = OrgPreferencesSchema.parse(await c.req.json().catch(() => ({})));
+  await prisma.organization.update({
+    where: { id: user.organizationId },
+    data: {
+      defaultLanguage: body.language,
+      defaultTimeFormat: body.timeFormat,
+      defaultDistanceUnit: body.distanceUnit,
+    },
   });
 
   return c.json({ data: { ok: true } });
