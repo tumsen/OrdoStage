@@ -246,8 +246,8 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
         const topRightX = beam.topX + LAMP_RADIUS;
         const d = `M ${topLeftX} ${BEAM_TOP_Y} L ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} L ${topRightX} ${BEAM_TOP_Y} Z`;
         const floorShadowOpacity = 0.16 + (interactive ? s * 0.14 : 0);
-        const floorBackD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH - 3.8} ${beam.leftX} ${BEAM_FLOOR_Y} Z`;
-        const floorFrontD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH - 1.7} ${beam.rightX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH - 4.8} ${beam.leftX} ${BEAM_FLOOR_Y} Z`;
+        const floorBackD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y - BEAM_CURVE_DEPTH * 0.52} ${beam.leftX} ${BEAM_FLOOR_Y} Z`;
+        const floorFrontD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH - 1.8} ${beam.rightX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y - BEAM_CURVE_DEPTH * 0.38} ${beam.leftX} ${BEAM_FLOOR_Y} Z`;
         return (
           <g key={`${beam.topX}-${beam.leftX}-${beam.rightX}`} style={{ opacity, willChange: "opacity" }}>
             <path d={d} fill={`url(#${gradientPrefix}-beam-grad-${i})`} />
