@@ -19,10 +19,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
 
 interface OrgBillingData extends OrgCreditsPayload {
   id: string;
   name: string;
+  defaultLanguage?: Language;
+  defaultTimeFormat?: TimeFormat;
+  defaultDistanceUnit?: DistanceUnit;
   unlimitedCredits?: boolean;
   autoTopUpEnabled: boolean;
   autoTopUpPackId: string | null;
@@ -99,6 +103,19 @@ export default function Billing() {
     },
     onError: (e: Error) => {
       setToast({ type: "error", message: e.message || "Could not save settings." });
+    },
+  });
+
+  const orgPreferencesMutation = useMutation({
+    mutationFn: (body: { language: Language; timeFormat: TimeFormat; distanceUnit: DistanceUnit }) =>
+      api.patch<{ ok: boolean }>("/api/org/preferences", body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org"] });
+      queryClient.invalidateQueries({ queryKey: ["preferences"] });
+      setToast({ type: "success", message: "Organization defaults updated." });
+    },
+    onError: (e: Error) => {
+      setToast({ type: "error", message: e.message || "Could not update organization defaults." });
     },
   });
 
@@ -244,6 +261,86 @@ export default function Billing() {
                 }}
                 disabled={renameOrgMutation.isPending}
               />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isOwner && org ? (
+        <Card className="bg-gray-900 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base">Organization default language and formats</CardTitle>
+            <p className="text-gray-400 text-sm font-normal">
+              This is the default for new members. Each user can still choose personal settings in their Account page.
+            </p>
+          </CardHeader>
+          <CardContent className="grid sm:grid-cols-3 gap-3">
+            <div className="space-y-2">
+              <Label className="text-white/70">Default language</Label>
+              <Select
+                value={org.defaultLanguage ?? "en"}
+                onValueChange={(value) =>
+                  orgPreferencesMutation.mutate({
+                    language: value as Language,
+                    timeFormat: org.defaultTimeFormat ?? "24h",
+                    distanceUnit: org.defaultDistanceUnit ?? "km",
+                  })
+                }
+                disabled={orgPreferencesMutation.isPending}
+              >
+                <SelectTrigger className="bg-gray-800 border-white/10 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a24] border-white/10">
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="da">Danish</SelectItem>
+                  <SelectItem value="de">German</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white/70">Default time format</Label>
+              <Select
+                value={org.defaultTimeFormat ?? "24h"}
+                onValueChange={(value) =>
+                  orgPreferencesMutation.mutate({
+                    language: org.defaultLanguage ?? "en",
+                    timeFormat: value as TimeFormat,
+                    distanceUnit: org.defaultDistanceUnit ?? "km",
+                  })
+                }
+                disabled={orgPreferencesMutation.isPending}
+              >
+                <SelectTrigger className="bg-gray-800 border-white/10 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a24] border-white/10">
+                  <SelectItem value="24h">24-hour</SelectItem>
+                  <SelectItem value="12h">12-hour</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white/70">Default distance unit</Label>
+              <Select
+                value={org.defaultDistanceUnit ?? "km"}
+                onValueChange={(value) =>
+                  orgPreferencesMutation.mutate({
+                    language: org.defaultLanguage ?? "en",
+                    timeFormat: org.defaultTimeFormat ?? "24h",
+                    distanceUnit: value as DistanceUnit,
+                  })
+                }
+                disabled={orgPreferencesMutation.isPending}
+              >
+                <SelectTrigger className="bg-gray-800 border-white/10 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a24] border-white/10">
+                  <SelectItem value="km">Kilometers (km)</SelectItem>
+                  <SelectItem value="mi">Miles (mi)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>

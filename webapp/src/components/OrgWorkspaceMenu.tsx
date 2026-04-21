@@ -41,6 +41,7 @@ export function OrgWorkspaceMenu({ onNav }: { onNav?: () => void }) {
       queryClient.invalidateQueries({ queryKey: ["org"] });
       queryClient.invalidateQueries({ queryKey: ["org-memberships"] });
       queryClient.invalidateQueries({ queryKey: ["me", "permissions"] });
+      queryClient.invalidateQueries({ queryKey: ["preferences"] });
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
       queryClient.invalidateQueries({ queryKey: ["events"] });
       onNav?.();
