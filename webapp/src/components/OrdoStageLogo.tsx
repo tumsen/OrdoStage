@@ -225,16 +225,17 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
         const opacity = interactive ? s : IDLE_BEAM_OPACITY[i];
         const d = `M ${beam.topX} ${BEAM_TOP_Y} L ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} Z`;
         const backFloorCurveD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y - BEAM_CURVE_DEPTH * 0.7} ${beam.rightX} ${BEAM_FLOOR_Y}`;
+        const lineContrast = 0.38 + (interactive ? s * 0.22 : 0);
         return (
           <g key={`${beam.topX}-${beam.leftX}-${beam.rightX}`} style={{ opacity, willChange: "opacity" }}>
             <path d={d} fill={beam.fill} />
             <path
               d={backFloorCurveD}
               fill="none"
-              stroke="rgba(255,255,255,0.34)"
+              stroke={beam.fill}
               strokeWidth="1"
               strokeLinecap="round"
-              style={{ mixBlendMode: "screen" }}
+              style={{ mixBlendMode: "multiply", opacity: lineContrast }}
             />
           </g>
         );
