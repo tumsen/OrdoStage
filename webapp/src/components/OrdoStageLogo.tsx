@@ -248,7 +248,7 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
         const topRightX = beam.topX + LAMP_RADIUS;
         const d = `M ${topLeftX} ${BEAM_TOP_Y} L ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} L ${topRightX} ${BEAM_TOP_Y} Z`;
         const floorCurveD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y}`;
-        const floorShadowOpacity = 0.18 + (interactive ? s * 0.16 : 0);
+        const floorShadowOpacity = 0.08 + (interactive ? s * 0.1 : 0);
         return (
           <g key={`${beam.topX}-${beam.leftX}-${beam.rightX}`} style={{ opacity, willChange: "opacity" }}>
             <path d={d} fill={`url(#${gradientPrefix}-beam-grad-${i})`} />
@@ -256,7 +256,7 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
               d={floorCurveD}
               fill="none"
               stroke={beam.fill}
-              strokeWidth={6}
+              strokeWidth={2.2}
               strokeLinecap="round"
               style={{ mixBlendMode: "multiply", opacity: floorShadowOpacity }}
             />
