@@ -3,13 +3,15 @@ import { cn } from "@/lib/utils";
 
 const LIGHT_X = [50, 75, 100, 125, 150] as const;
 const BEAM_FLOOR_Y = 178;
+const BEAM_TOP_Y = 62;
+const BEAM_CURVE_DEPTH = 12;
 
 const BEAMS = [
-  { d: `M 50 62 L 28 ${BEAM_FLOOR_Y} L 72 ${BEAM_FLOOR_Y} Z`, fill: "#ff006e", leftX: 28, rightX: 72 },
-  { d: `M 75 62 L 53 ${BEAM_FLOOR_Y} L 97 ${BEAM_FLOOR_Y} Z`, fill: "#fb5607", leftX: 53, rightX: 97 },
-  { d: `M 100 62 L 78 ${BEAM_FLOOR_Y} L 122 ${BEAM_FLOOR_Y} Z`, fill: "#ffbe0b", leftX: 78, rightX: 122 },
-  { d: `M 125 62 L 103 ${BEAM_FLOOR_Y} L 147 ${BEAM_FLOOR_Y} Z`, fill: "#3a86ff", leftX: 103, rightX: 147 },
-  { d: `M 150 62 L 128 ${BEAM_FLOOR_Y} L 172 ${BEAM_FLOOR_Y} Z`, fill: "#8338ec", leftX: 128, rightX: 172 },
+  { topX: 50, leftX: 28, rightX: 72, fill: "#ff006e" },
+  { topX: 75, leftX: 53, rightX: 97, fill: "#fb5607" },
+  { topX: 100, leftX: 78, rightX: 122, fill: "#ffbe0b" },
+  { topX: 125, leftX: 103, rightX: 147, fill: "#3a86ff" },
+  { topX: 150, leftX: 128, rightX: 172, fill: "#8338ec" },
 ] as const;
 const COLORS = ["#ff006e", "#fb5607", "#ffbe0b", "#3a86ff", "#8338ec"] as const;
 const IDLE_BEAM_OPACITY = [0.15, 0.15, 0.2, 0.15, 0.15] as const;
@@ -221,14 +223,14 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
       {BEAMS.map((beam, i) => {
         const s = interactive ? strengths[i] ?? 0 : 0;
         const opacity = interactive ? s : IDLE_BEAM_OPACITY[i];
-        const spread = beam.rightX - beam.leftX;
-        const tipRadius = Math.max(5, spread * 0.22);
+        const d = `M ${beam.topX} ${BEAM_TOP_Y} L ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} Z`;
         return (
-          <g key={beam.d} style={{ opacity, willChange: "opacity" }}>
-            <path d={beam.d} fill={beam.fill} />
-            <circle cx={beam.leftX} cy={BEAM_FLOOR_Y} r={tipRadius} fill={beam.fill} />
-            <circle cx={beam.rightX} cy={BEAM_FLOOR_Y} r={tipRadius} fill={beam.fill} />
-          </g>
+          <path
+            key={`${beam.topX}-${beam.leftX}-${beam.rightX}`}
+            d={d}
+            fill={beam.fill}
+            style={{ opacity, willChange: "opacity" }}
+          />
         );
       })}
     </svg>
