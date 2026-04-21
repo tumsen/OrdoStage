@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
 const LIGHT_X = [50, 75, 100, 125, 150] as const;
@@ -113,6 +113,7 @@ type BeamRigProps = {
 
 /** Rig + beams only — state updates here do not touch the memoized wordmark. */
 function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigProps) {
+  const gradientPrefix = useId().replace(/:/g, "");
   const [smoothFocus, setSmoothFocus] = useState(2);
   const targetFocusRef = useRef(2);
   const smoothFocusRef = useRef(2);
@@ -197,6 +198,25 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
 
       <rect x="30" y="50" width="140" height="12" fill="#333" rx="2" />
 
+      <defs>
+        {BEAMS.map((beam, i) => (
+          <linearGradient
+            key={`${gradientPrefix}-beam-grad-${i}`}
+            id={`${gradientPrefix}-beam-grad-${i}`}
+            x1={beam.topX}
+            y1={BEAM_TOP_Y}
+            x2={beam.topX}
+            y2={BEAM_FLOOR_Y + BEAM_CURVE_DEPTH}
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stopColor={beam.fill} stopOpacity="0.2" />
+            <stop offset="58%" stopColor={beam.fill} stopOpacity="0.52" />
+            <stop offset="82%" stopColor={beam.fill} stopOpacity="0.74" />
+            <stop offset="100%" stopColor={beam.fill} stopOpacity="0.56" />
+          </linearGradient>
+        ))}
+      </defs>
+
       {LIGHT_X.map((cx, i) => {
         const s = interactive ? strengths[i] ?? 0 : 0;
         const t = (s - MIN_S) / (1 - MIN_S);
@@ -224,19 +244,9 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
         const s = interactive ? strengths[i] ?? 0 : 0;
         const opacity = interactive ? s : IDLE_BEAM_OPACITY[i];
         const d = `M ${beam.topX} ${BEAM_TOP_Y} L ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} Z`;
-        const backFloorCurveD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y - BEAM_CURVE_DEPTH * 0.7} ${beam.rightX} ${BEAM_FLOOR_Y}`;
-        const lineContrast = 0.38 + (interactive ? s * 0.22 : 0);
         return (
           <g key={`${beam.topX}-${beam.leftX}-${beam.rightX}`} style={{ opacity, willChange: "opacity" }}>
-            <path d={d} fill={beam.fill} />
-            <path
-              d={backFloorCurveD}
-              fill="none"
-              stroke={beam.fill}
-              strokeWidth="1"
-              strokeLinecap="round"
-              style={{ mixBlendMode: "multiply", opacity: lineContrast }}
-            />
+            <path d={d} fill={`url(#${gradientPrefix}-beam-grad-${i})`} />
           </g>
         );
       })}
