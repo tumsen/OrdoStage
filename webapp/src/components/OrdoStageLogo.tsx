@@ -197,8 +197,6 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
       <title>OrdoStage</title>
       {showBackdrop ? <rect width="200" height="200" fill="#111111" /> : null}
 
-      <rect x="30" y="50" width="140" height="12" fill="#333" rx="2" />
-
       <defs>
         {BEAMS.map((beam, i) => (
           <linearGradient
