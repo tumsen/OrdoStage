@@ -244,9 +244,19 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
         const s = interactive ? strengths[i] ?? 0 : 0;
         const opacity = interactive ? s : IDLE_BEAM_OPACITY[i];
         const d = `M ${beam.topX} ${BEAM_TOP_Y} L ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} Z`;
+        const floorRx = Math.max(9, (beam.rightX - beam.leftX) * 0.46);
+        const floorShadowOpacity = 0.2 + (interactive ? s * 0.18 : 0);
         return (
           <g key={`${beam.topX}-${beam.leftX}-${beam.rightX}`} style={{ opacity, willChange: "opacity" }}>
             <path d={d} fill={`url(#${gradientPrefix}-beam-grad-${i})`} />
+            <ellipse
+              cx={beam.topX}
+              cy={BEAM_FLOOR_Y - 0.5}
+              rx={floorRx}
+              ry={3.1}
+              fill={beam.fill}
+              style={{ mixBlendMode: "multiply", opacity: floorShadowOpacity }}
+            />
           </g>
         );
       })}
