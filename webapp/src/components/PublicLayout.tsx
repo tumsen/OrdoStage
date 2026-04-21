@@ -100,6 +100,7 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const pageTitle = pageTitleOverride ?? getPublicPageTitle(location.pathname);
+  const isMaintenanceSplash = location.pathname === "/";
 
   useEffect(() => {
     document.title = `${pageTitle} · OrdoStage`;
@@ -114,14 +115,14 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
         Skip to main content
       </a>
 
-      {!isMobile ? (
+      {!isMobile && !isMaintenanceSplash ? (
         <aside className="w-56 flex-shrink-0 bg-[#0d0d14] border-r border-white/10 flex flex-col">
           <PublicSidebarContent />
         </aside>
       ) : null}
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {isMobile ? (
+        {isMobile && !isMaintenanceSplash ? (
           <header className="flex-shrink-0 h-12 border-b border-ordo-magenta/25 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>

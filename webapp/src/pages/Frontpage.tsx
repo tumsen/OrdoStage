@@ -12,19 +12,6 @@ const DEFAULT_HERO_TITLE =
 const DEFAULT_HERO_SUBTITLE =
   "Plan productions, coordinate teams, manage venues, and keep schedules in sync — in one platform.";
 
-function SectionDivider() {
-  return (
-    <div
-      className="my-14 md:my-16 flex items-center gap-4"
-      aria-hidden
-    >
-      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-ordo-magenta/50 to-transparent" />
-      <div className="h-px w-16 bg-gradient-to-r from-ordo-yellow/60 to-ordo-violet/60 opacity-90" />
-      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-ordo-violet/50 to-transparent" />
-    </div>
-  );
-}
-
 export default function Frontpage() {
   const { data } = useQuery({
     queryKey: ["site-content"],
@@ -36,142 +23,65 @@ export default function Frontpage() {
 
   const heroTitle = data?.landing_title?.trim() || DEFAULT_HERO_TITLE;
   const heroSubtitle = data?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
-  const signupCredits = data?.signup_credits?.trim() || "30";
-
   return (
-    <div className="text-white">
-      <article className="max-w-4xl mx-auto px-6 py-14 md:py-20 space-y-10 md:space-y-12">
-        {/* Hero */}
-        <header className="space-y-6">
-          <div className="relative flex justify-center md:justify-start">
-            <div
-              aria-hidden
-              className="absolute inset-x-8 -inset-y-6 rounded-[2.2rem] bg-[radial-gradient(circle_at_50%_36%,rgba(255,190,11,0.24),rgba(251,86,7,0.18)_28%,rgba(131,56,236,0.22)_52%,rgba(10,10,15,0)_74%)] blur-2xl"
-            />
-            <div
-              aria-hidden
-              className="absolute left-1/2 top-1/2 h-[78%] w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15 shadow-[0_0_52px_rgba(255,190,59,0.24),0_0_94px_rgba(131,56,236,0.2)] animate-pulse"
-            />
-            <div
-              aria-hidden
-              className="absolute left-1/2 top-1/2 h-[88%] w-[82%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/8 opacity-80"
-              style={{
-                maskImage:
-                  "conic-gradient(from 120deg, transparent 0deg, rgba(255,255,255,1) 90deg, transparent 180deg, rgba(255,255,255,1) 250deg, transparent 320deg)",
-              }}
-            />
-            <OrdoStageLogo
-              variant="sidebar"
-              interactive
-              className="relative z-[1] w-full max-w-[300px] md:max-w-[380px]"
-            />
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">
-            {heroTitle}
-          </h1>
-          <p className="text-lg md:text-xl text-white/75 leading-relaxed">
-            {heroSubtitle}
-          </p>
-          <p className="rounded-xl border border-ordo-yellow/35 bg-gradient-to-br from-ordo-magenta/[0.12] to-ordo-violet/[0.08] px-4 py-4 text-[15px] leading-relaxed text-white/90 md:text-base">
-            <span className="font-semibold text-ordo-yellow">{signupCredits} free credits</span> when you create your
-            organization — enough to test scheduling, technical riders, tours, and team workflows before you buy a pack.
-          </p>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Button
-              asChild
-              className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
-            >
-              <Link to={ctaUrl}>{ctaText}</Link>
-            </Button>
-            <Button asChild variant="outline" className="border-white/20 text-white bg-transparent hover:bg-white/5">
-              <Link to="/pricing">View pricing</Link>
-            </Button>
-          </div>
-        </header>
+    <div className="relative min-h-screen overflow-hidden bg-[#09090f] text-white">
+      {/* Curtain borders */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-0 w-[11vw] min-w-[44px] max-w-[140px] bg-[radial-gradient(circle_at_10%_50%,rgba(255,70,120,0.45),rgba(121,22,63,0.88)_48%,rgba(59,11,32,0.98)_76%)] shadow-[inset_-18px_0_30px_rgba(0,0,0,0.55)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-[11vw] min-w-[44px] max-w-[140px] bg-[radial-gradient(circle_at_90%_50%,rgba(255,70,120,0.45),rgba(121,22,63,0.88)_48%,rgba(59,11,32,0.98)_76%)] shadow-[inset_18px_0_30px_rgba(0,0,0,0.55)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-0 right-0 top-0 h-10 bg-gradient-to-b from-[#5d1638] via-[#4d102f] to-transparent"
+      />
 
-        {/* From Planning to Show */}
-        <section className="space-y-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-white">From Planning to Show</h2>
-          <p className="text-white/75 leading-relaxed">
-            Manage the full production workflow with tools designed for live events:
-          </p>
-          <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-yellow">
-            <li>Create events and schedules</li>
-            <li>Add documents, contracts, and technical riders</li>
-            <li>Coordinate staff, resources, and timings</li>
-            <li>Share plans with teams, artists, and technicians</li>
-            <li>Keep everyone updated in real time</li>
-          </ul>
-        </section>
+      {/* Stage glow */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_26%,rgba(255,190,11,0.28),rgba(251,86,7,0.16)_26%,rgba(131,56,236,0.18)_44%,rgba(9,9,15,0.94)_78%)]"
+      />
 
-        <SectionDivider />
+      <main className="relative z-[1] mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center gap-8 px-8 py-16 text-center">
+        <div className="relative w-full max-w-[860px]">
+          <div
+            aria-hidden
+            className="absolute inset-x-[6%] -inset-y-8 rounded-[3rem] bg-[radial-gradient(circle_at_50%_38%,rgba(255,190,11,0.24),rgba(251,86,7,0.18)_35%,rgba(131,56,236,0.2)_58%,rgba(9,9,15,0)_82%)] blur-3xl"
+          />
+          <OrdoStageLogo
+            variant="sidebar"
+            interactive
+            className="relative z-[1] mx-auto w-full max-w-[820px]"
+          />
+        </div>
 
-        {/* Venue Planning */}
-        <section className="space-y-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-white">Venue Planning</h2>
-          <p className="text-white/75 leading-relaxed">
-            From contract to execution, Ordo Stage helps venues stay organized.
+        <div className="max-w-3xl space-y-5">
+          <h1 className="text-3xl font-bold leading-tight tracking-tight md:text-5xl">{heroTitle}</h1>
+          <p className="text-lg leading-relaxed text-white/80 md:text-2xl">{heroSubtitle}</p>
+          <p className="text-base leading-relaxed text-white/70 md:text-lg">
+            Expect production planning built for theater workflows, shared scheduling for events and tours, team
+            coordination across departments, and venue plus technical details organized in one platform.
           </p>
-          <p className="text-white/75 leading-relaxed">
-            Enter your event date and times once, then use the same information everywhere:
+          <p className="text-sm leading-relaxed text-ordo-yellow/90 md:text-base">
+            We are in private rollout now. Early access theaters will be onboarded first.
           </p>
-          <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-magenta">
-            <li>Internal calendars</li>
-            <li>Staff schedules</li>
-            <li>Resource planning</li>
-            <li>Front-of-house displays</li>
-            <li>Foyer screens</li>
-            <li>Daily overviews</li>
-          </ul>
-          <p className="text-white/90 font-medium pt-2 leading-relaxed">
-            No duplicate entries. No scattered spreadsheets. No confusion.
-          </p>
-        </section>
+        </div>
 
-        <SectionDivider />
-
-        {/* Tour Planning */}
-        <section className="space-y-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-white">Tour Planning</h2>
-          <p className="text-white/75 leading-relaxed">
-            Plan an entire tour with consistency across every stop.
-          </p>
-          <p className="text-white/75 leading-relaxed">Upload your standard materials such as:</p>
-          <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-violet">
-            <li>Technical riders</li>
-            <li>Lighting plans</li>
-            <li>Stage plots</li>
-            <li>Production notes</li>
-          </ul>
-          <p className="text-white/75 leading-relaxed pt-2">
-            Ordo Stage can automatically apply venue-specific details such as:
-          </p>
-          <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-blue">
-            <li>Get-in times</li>
-            <li>Load-out times</li>
-            <li>Local schedules</li>
-            <li>Venue requirements</li>
-            <li>Contact details</li>
-          </ul>
-          <p className="text-white/75 leading-relaxed pt-2">
-            Artists and crew can view both the full tour schedule and detailed plans for each venue.
-          </p>
-        </section>
-
-        <SectionDivider />
-
-        {/* Built for Live Production */}
-        <section className="space-y-5 rounded-xl border border-white/10 bg-white/[0.02] p-6 md:p-8">
-          <h2 className="text-xl md:text-2xl font-semibold text-white">Built for Live Production</h2>
-          <p className="text-white/75 leading-relaxed">
-            Whether you run a single venue or manage a multi-city tour, Ordo Stage helps you stay in control,
-            save time, and keep every production moving smoothly.
-          </p>
-          <p className="text-lg md:text-xl font-semibold leading-snug bg-gradient-to-r from-ordo-magenta via-ordo-yellow to-ordo-violet bg-clip-text text-transparent">
-            Create events. Plan smarter. Deliver better shows.
-          </p>
-        </section>
-      </article>
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <Button
+            asChild
+            className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
+          >
+            <Link to={ctaUrl}>{ctaText}</Link>
+          </Button>
+          <Button asChild variant="outline" className="border-white/25 text-white bg-white/[0.02] hover:bg-white/5">
+            <Link to="/pricing">View pricing</Link>
+          </Button>
+        </div>
+      </main>
     </div>
   );
 }
