@@ -5,14 +5,6 @@ import { Button } from "@/components/ui/button";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 
 type SiteContent = Record<string, string>;
-type BillingPack = {
-  id: string;
-  packId: string;
-  days: number;
-  label: string;
-  amountCents: number;
-  active: boolean;
-};
 
 /** Defaults match marketing copy when Website Content fields are empty. */
 const DEFAULT_HERO_TITLE =
@@ -26,16 +18,8 @@ export default function Frontpage() {
     queryFn: () => api.get<SiteContent>("/api/site-content"),
   });
 
-  const { data: packs } = useQuery({
-    queryKey: ["public-pricing", "packs"],
-    queryFn: () => api.get<BillingPack[]>("/api/billing/packs"),
-  });
-
   const heroTitle = siteContent?.landing_title?.trim() || DEFAULT_HERO_TITLE;
   const heroSubtitle = siteContent?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
-  const pricingTitle =
-    siteContent?.pricing_page_title?.trim() || "Simple pricing that grows with your team";
-  const signupCredits = siteContent?.signup_credits?.trim() || "30";
   return (
     <div className="relative min-h-screen overflow-hidden text-white">
       {/* User-provided curtain image background */}
@@ -70,33 +54,39 @@ export default function Frontpage() {
         </section>
 
         <section className="w-full max-w-4xl space-y-5 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm md:p-7">
-          <h2 className="text-center text-xl font-semibold text-white md:text-2xl">{pricingTitle}</h2>
-          <p className="text-sm leading-relaxed text-white/85 md:text-base">
-            No subscriptions or hidden fees. Every active user uses 1 credit per day.
-            New organizations get {signupCredits} free credits to test the platform.
-          </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {(packs ?? []).map((pack) => {
-              const euros = (pack.amountCents / 100).toFixed(2);
-              const perDay = pack.days > 0 ? (pack.amountCents / 100 / pack.days).toFixed(3) : null;
-              return (
-                <div
-                  key={pack.packId}
-                  className="rounded-xl border border-white/15 bg-white/[0.04] p-4 space-y-2"
-                >
-                  <div className="text-xs font-medium uppercase tracking-wide text-white/60">{pack.label}</div>
-                  <div className="text-3xl font-bold text-white">{pack.days}</div>
-                  <div className="flex items-end justify-between border-t border-white/10 pt-2">
-                    <div className="text-lg font-semibold text-ordo-yellow">EUR {euros}</div>
-                    {perDay ? <div className="text-xs text-white/50">EUR {perDay}/day</div> : null}
-                  </div>
-                </div>
-              );
-            })}
+          <h2 className="text-center text-xl font-semibold text-white md:text-2xl">
+            What OrdoStage can do for your theater
+          </h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4">
+              <h3 className="text-base font-semibold text-white">Production planning in one place</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/80">
+                Build complete productions with run sheets, notes, timing, responsibilities and attached files so every
+                department works from the same source.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4">
+              <h3 className="text-base font-semibold text-white">Events, tours and venues connected</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/80">
+                Coordinate venue requirements, technical rider details, people, travel legs and show dates without
+                duplicating data across separate tools.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4">
+              <h3 className="text-base font-semibold text-white">Shared scheduling across teams</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/80">
+                Keep production, operations, FOH and technical teams synchronized with up-to-date calendars and clear
+                change visibility when plans shift.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4">
+              <h3 className="text-base font-semibold text-white">Built for real stage workflows</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/80">
+                Designed specifically for theaters and live productions with practical tools for rehearsals, get-in/get-out,
+                venue communication and execution day control.
+              </p>
+            </div>
           </div>
-          {(!packs || packs.length === 0) ? (
-            <p className="text-sm text-white/60">Pricing packs will be shown here shortly.</p>
-          ) : null}
           <p className="text-sm text-white/80">
             Access is invite-only during rollout. Use your early-bird login to enter the platform.
           </p>
