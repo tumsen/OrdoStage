@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { PublicLayout } from "@/components/PublicLayout";
 import { AdminLayout, AdminRoute } from "@/components/AdminLayout";
@@ -20,9 +20,6 @@ import Team from "./pages/Team";
 import Calendars from "./pages/Calendars";
 import Schedule from "./pages/Schedule";
 import Login from "./pages/Login";
-import VerifyOtp from "./pages/VerifyOtp";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
 import SetupOrg from "./pages/SetupOrg";
 import SelectOrg from "./pages/SelectOrg";
 import Billing from "./pages/Billing";
@@ -32,7 +29,6 @@ import Tours from "./pages/Tours";
 import TourDetail from "./pages/TourDetail";
 import PublicTourSchedule from "./pages/PublicTourSchedule";
 import PersonalTourView from "./pages/PersonalTourView";
-import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminOrgs from "./pages/admin/Orgs";
 import AdminOrgDetail from "./pages/admin/OrgDetail";
@@ -40,9 +36,6 @@ import AdminPricing from "./pages/admin/Pricing";
 import AdminUsers from "./pages/admin/Users";
 import SiteContentAdmin from "./pages/admin/SiteContent";
 import Frontpage from "./pages/Frontpage";
-import PublicPricing from "./pages/PublicPricing";
-import LegalPage from "./pages/LegalPage";
-import AcceptInvite from "./pages/AcceptInvite";
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -58,14 +51,6 @@ const App = () => (
             element={
               <GuestRoute>
                 <Login />
-              </GuestRoute>
-            }
-          />
-          <Route
-            path="/verify-otp"
-            element={
-              <GuestRoute>
-                <VerifyOtp />
               </GuestRoute>
             }
           />
@@ -97,39 +82,6 @@ const App = () => (
               </PublicLayout>
             }
           />
-          <Route
-            path="/pricing"
-            element={
-              <PublicLayout>
-                <PublicPricing />
-              </PublicLayout>
-            }
-          />
-          <Route
-            path="/terms-of-service"
-            element={
-              <PublicLayout>
-                <LegalPage />
-              </PublicLayout>
-            }
-          />
-          <Route
-            path="/privacy-policy"
-            element={
-              <PublicLayout>
-                <LegalPage />
-              </PublicLayout>
-            }
-          />
-          <Route
-            path="/accept-invite"
-            element={
-              <PublicLayout>
-                <AcceptInvite />
-              </PublicLayout>
-            }
-          />
-
           {/* Protected routes with sidebar layout */}
           <Route
             path="/dashboard"
@@ -346,36 +298,26 @@ const App = () => (
             }
           />
 
-          {/* Public routes (no auth required) */}
-          <Route path="/t/:token" element={<PublicTourSchedule />} />
-          <Route path="/p/:personalToken" element={<PersonalTourView />} />
-
+          {/* Protected share routes during private rollout */}
           <Route
-            path="/forgot-password"
+            path="/t/:token"
             element={
-              <GuestRoute>
-                <ForgotPassword />
-              </GuestRoute>
+              <ProtectedRoute>
+                <PublicTourSchedule />
+              </ProtectedRoute>
             }
           />
           <Route
-            path="/reset-password"
+            path="/p/:personalToken"
             element={
-              <GuestRoute>
-                <ResetPassword />
-              </GuestRoute>
+              <ProtectedRoute>
+                <PersonalTourView />
+              </ProtectedRoute>
             }
           />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route
-            path="*"
-            element={
-              <PublicLayout pageTitleOverride="Not found">
-                <NotFound />
-              </PublicLayout>
-            }
-          />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </AppErrorBoundary>
       </BrowserRouter>
