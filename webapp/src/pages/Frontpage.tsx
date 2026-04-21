@@ -18,8 +18,8 @@ export default function Frontpage() {
     queryFn: () => api.get<SiteContent>("/api/site-content"),
   });
 
-  const ctaText = data?.landing_cta_text ?? "Get started";
-  const ctaUrl = data?.landing_cta_url ?? "/login";
+  const ctaText = "Apply for Early Access";
+  const ctaUrl = "mailto:mail@ordostage.com?subject=Early%20Access%20Request%20-%20OrdoStage";
 
   const heroTitle = data?.landing_title?.trim() || DEFAULT_HERO_TITLE;
   const heroSubtitle = data?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
@@ -34,7 +34,7 @@ export default function Frontpage() {
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-black/18" />
 
       <div className="absolute left-4 top-4 z-[2] w-[180px] sm:w-[220px] md:w-[260px]">
-        <OrdoStageLogo variant="sidebar" interactive className="w-full" />
+        <OrdoStageLogo variant="sidebar" interactive showBackdrop={false} className="w-full" />
       </div>
 
       <main className="relative z-[1] mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-6 px-6 pb-10 pt-28 text-center md:pt-32">
@@ -55,12 +55,12 @@ export default function Frontpage() {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-          <Button
-            asChild
-            className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
+          <a
+            href={ctaUrl}
+            className="inline-flex items-center rounded-xl bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-95"
           >
-            <Link to={ctaUrl}>{ctaText}</Link>
-          </Button>
+            {ctaText}
+          </a>
           <Button asChild variant="outline" className="border-white/25 text-white bg-white/[0.02] hover:bg-white/5">
             <Link to="/pricing">View pricing</Link>
           </Button>

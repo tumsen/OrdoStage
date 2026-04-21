@@ -52,16 +52,6 @@ export const auth = betterAuth({
     "https://www.ordostage.com",
     "https://*.onrender.com",
   ],
-  socialProviders: {
-    ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
-      ? {
-          github: {
-            clientId: env.GITHUB_CLIENT_ID,
-            clientSecret: env.GITHUB_CLIENT_SECRET,
-          },
-        }
-      : {}),
-  },
   emailAndPassword: {
     enabled: true,
     async sendResetPassword({ user, token }: { user: { email: string }; token: string }) {
