@@ -24,53 +24,45 @@ export default function Frontpage() {
   const heroTitle = data?.landing_title?.trim() || DEFAULT_HERO_TITLE;
   const heroSubtitle = data?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#09090f] text-white">
-      {/* Curtain borders */}
+    <div className="relative min-h-screen overflow-hidden text-white">
+      {/* User-provided curtain image background */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-0 w-[11vw] min-w-[44px] max-w-[140px] bg-[radial-gradient(circle_at_10%_50%,rgba(255,70,120,0.45),rgba(121,22,63,0.88)_48%,rgba(59,11,32,0.98)_76%)] shadow-[inset_-18px_0_30px_rgba(0,0,0,0.55)]"
+        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/curtain-bg.png')" }}
       />
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-black/45" />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-0 w-[11vw] min-w-[44px] max-w-[140px] bg-[radial-gradient(circle_at_90%_50%,rgba(255,70,120,0.45),rgba(121,22,63,0.88)_48%,rgba(59,11,32,0.98)_76%)] shadow-[inset_18px_0_30px_rgba(0,0,0,0.55)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-0 right-0 top-0 h-10 bg-gradient-to-b from-[#5d1638] via-[#4d102f] to-transparent"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(255,196,78,0.22),rgba(9,9,15,0.72)_62%)]"
       />
 
-      {/* Stage glow */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_26%,rgba(255,190,11,0.28),rgba(251,86,7,0.16)_26%,rgba(131,56,236,0.18)_44%,rgba(9,9,15,0.94)_78%)]"
-      />
+      <div className="absolute left-4 top-4 z-[2] w-[180px] sm:w-[220px] md:w-[260px]">
+        <OrdoStageLogo variant="sidebar" interactive className="w-full" />
+      </div>
 
-      <main className="relative z-[1] mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center gap-8 px-8 py-16 text-center">
-        <div className="relative w-full max-w-[860px]">
+      <main className="relative z-[1] mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-6 px-6 pb-10 pt-28 text-center md:pt-32">
+        <div className="relative w-full max-w-[560px]">
           <div
             aria-hidden
-            className="absolute inset-x-[6%] -inset-y-8 rounded-[3rem] bg-[radial-gradient(circle_at_50%_38%,rgba(255,190,11,0.24),rgba(251,86,7,0.18)_35%,rgba(131,56,236,0.2)_58%,rgba(9,9,15,0)_82%)] blur-3xl"
+            className="absolute inset-x-[8%] -inset-y-8 rounded-[3rem] bg-[radial-gradient(circle_at_50%_38%,rgba(255,190,11,0.22),rgba(251,86,7,0.18)_35%,rgba(131,56,236,0.2)_58%,rgba(9,9,15,0)_82%)] blur-3xl"
           />
-          <OrdoStageLogo
-            variant="sidebar"
-            interactive
-            className="relative z-[1] mx-auto w-full max-w-[820px]"
-          />
+          <OrdoStageLogo variant="sidebar" interactive className="relative z-[1] mx-auto w-full" />
         </div>
 
-        <div className="max-w-3xl space-y-5">
-          <h1 className="text-3xl font-bold leading-tight tracking-tight md:text-5xl">{heroTitle}</h1>
-          <p className="text-lg leading-relaxed text-white/80 md:text-2xl">{heroSubtitle}</p>
-          <p className="text-base leading-relaxed text-white/70 md:text-lg">
+        <div className="max-w-3xl space-y-4">
+          <h1 className="text-2xl font-bold leading-tight tracking-tight md:text-4xl">{heroTitle}</h1>
+          <p className="text-base leading-relaxed text-white/85 md:text-xl">{heroSubtitle}</p>
+          <p className="text-sm leading-relaxed text-white/80 md:text-base">
             Expect production planning built for theater workflows, shared scheduling for events and tours, team
             coordination across departments, and venue plus technical details organized in one platform.
           </p>
-          <p className="text-sm leading-relaxed text-ordo-yellow/90 md:text-base">
+          <p className="text-xs leading-relaxed text-ordo-yellow/90 md:text-sm">
             We are in private rollout now. Early access theaters will be onboarded first.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
           <Button
             asChild
             className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
