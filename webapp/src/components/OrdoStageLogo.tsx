@@ -8,11 +8,11 @@ const BEAM_CURVE_DEPTH = 12;
 const LAMP_RADIUS = 6;
 
 const BEAMS = [
-  { topX: 50, leftX: 28, rightX: 72, fill: "#ff006e" },
-  { topX: 75, leftX: 53, rightX: 97, fill: "#fb5607" },
-  { topX: 100, leftX: 78, rightX: 122, fill: "#ffbe0b" },
-  { topX: 125, leftX: 103, rightX: 147, fill: "#3a86ff" },
-  { topX: 150, leftX: 128, rightX: 172, fill: "#8338ec" },
+  { topX: 50, leftX: 28, rightX: 72, fill: "#ff006e", floorFill: "#d1005a" },
+  { topX: 75, leftX: 53, rightX: 97, fill: "#fb5607", floorFill: "#d94700" },
+  { topX: 100, leftX: 78, rightX: 122, fill: "#ffbe0b", floorFill: "#d9a200" },
+  { topX: 125, leftX: 103, rightX: 147, fill: "#3a86ff", floorFill: "#2d6ed1" },
+  { topX: 150, leftX: 128, rightX: 172, fill: "#8338ec", floorFill: "#6a2dbe" },
 ] as const;
 const COLORS = ["#ff006e", "#fb5607", "#ffbe0b", "#3a86ff", "#8338ec"] as const;
 const IDLE_BEAM_OPACITY = [0.15, 0.15, 0.2, 0.15, 0.15] as const;
@@ -247,17 +247,17 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
         const topLeftX = beam.topX - LAMP_RADIUS;
         const topRightX = beam.topX + LAMP_RADIUS;
         const d = `M ${topLeftX} ${BEAM_TOP_Y} L ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y} L ${topRightX} ${BEAM_TOP_Y} Z`;
-        const floorCurveD = `M ${beam.leftX} ${BEAM_FLOOR_Y} Q ${beam.topX} ${BEAM_FLOOR_Y + BEAM_CURVE_DEPTH} ${beam.rightX} ${BEAM_FLOOR_Y}`;
-        const floorShadowOpacity = 0.08 + (interactive ? s * 0.1 : 0);
+        const floorRx = Math.max(8, (beam.rightX - beam.leftX) * 0.44);
+        const floorShadowOpacity = 0.18 + (interactive ? s * 0.14 : 0);
         return (
           <g key={`${beam.topX}-${beam.leftX}-${beam.rightX}`} style={{ opacity, willChange: "opacity" }}>
             <path d={d} fill={`url(#${gradientPrefix}-beam-grad-${i})`} />
-            <path
-              d={floorCurveD}
-              fill="none"
-              stroke={beam.fill}
-              strokeWidth={2.2}
-              strokeLinecap="round"
+            <ellipse
+              cx={beam.topX}
+              cy={BEAM_FLOOR_Y - 0.35}
+              rx={floorRx}
+              ry={2.7}
+              fill={beam.floorFill}
               style={{ mixBlendMode: "multiply", opacity: floorShadowOpacity }}
             />
           </g>
