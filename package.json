@@ -1,4 +1,5 @@
 {
+  "name": "ordostage",
   "scripts": {
     "railway:logs": "bash scripts/railway-logs.sh"
   },
