@@ -20,6 +20,8 @@ import Team from "./pages/Team";
 import Calendars from "./pages/Calendars";
 import Schedule from "./pages/Schedule";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import SetupOrg from "./pages/SetupOrg";
 import SelectOrg from "./pages/SelectOrg";
 import Billing from "./pages/Billing";
@@ -36,6 +38,8 @@ import AdminPricing from "./pages/admin/Pricing";
 import AdminUsers from "./pages/admin/Users";
 import SiteContentAdmin from "./pages/admin/SiteContent";
 import Frontpage from "./pages/Frontpage";
+import PublicPricing from "./pages/PublicPricing";
+import LegalPage from "./pages/LegalPage";
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -51,6 +55,22 @@ const App = () => (
             element={
               <GuestRoute>
                 <Login />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <GuestRoute>
+                <ForgotPassword />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <GuestRoute>
+                <ResetPassword />
               </GuestRoute>
             }
           />
@@ -79,6 +99,38 @@ const App = () => (
             element={
               <PublicLayout>
                 <Frontpage />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/pricing"
+            element={
+              <PublicLayout>
+                <PublicPricing />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/terms-of-service"
+            element={
+              <PublicLayout>
+                <LegalPage />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/privacy-policy"
+            element={
+              <PublicLayout>
+                <LegalPage />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/refund-policy"
+            element={
+              <PublicLayout>
+                <LegalPage />
               </PublicLayout>
             }
           />

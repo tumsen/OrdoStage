@@ -1,29 +1,17 @@
 import { Link, useLocation } from "react-router-dom";
-import {
-  CreditCard,
-  FileText,
-  Home,
-  LogIn,
-  Menu,
-  Shield,
-} from "lucide-react";
+import { CreditCard, FileText, LogIn, Menu, Sparkles } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
-import { api } from "@/lib/api";
-import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
-import { isPublicFlagOn } from "@/lib/publicSiteFlags";
 
-const navItems: { to: string; label: string; icon: LucideIcon; exact?: boolean }[] = [
-  { to: "/", label: "Home", icon: Home, exact: true },
-  { to: "/pricing", label: "Pricing", icon: CreditCard },
-  { to: "/terms-of-service", label: "Terms", icon: FileText },
-  { to: "/privacy-policy", label: "Privacy", icon: Shield },
+const navItems: { label: string; icon: LucideIcon; to: string; homeHash?: string; exact?: boolean }[] = [
+  { to: "/", label: "Features", icon: Sparkles, homeHash: "features" },
+  { to: "/pricing", label: "Pricing", icon: CreditCard, exact: true },
+  { to: "/terms-of-service", label: "Terms", icon: FileText, exact: true },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -42,6 +30,20 @@ function getPublicPageTitle(pathname: string): string {
 function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
   const location = useLocation();
 
+  function isNavActive(
+    to: string,
+    exact: boolean | undefined,
+    homeHash: string | undefined
+  ): boolean {
+    if (homeHash) {
+      return location.pathname === "/" && location.hash === `#${homeHash}`;
+    }
+    if (exact) {
+      return location.pathname === to;
+    }
+    return location.pathname === to || location.pathname.startsWith(`${to}/`);
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-4 border-b border-white/10 contain-layout">
@@ -54,15 +56,14 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map(({ to, label, icon: Icon, exact }) => {
-          const isActive = exact
-            ? location.pathname === to
-            : location.pathname === to || location.pathname.startsWith(to + "/");
+      <nav className="flex-1 px-3 py-4 space-y-1" aria-label="Homepage sections and legal">
+        {navItems.map(({ to, label, icon: Icon, exact, homeHash }) => {
+          const isActive = isNavActive(to, exact, homeHash);
+          const linkTo = homeHash ? { pathname: "/" as const, hash: homeHash } : to;
           return (
             <Link
-              key={to}
-              to={to}
+              key={label + (homeHash ?? to)}
+              to={linkTo}
               onClick={onNav}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150",
@@ -99,22 +100,10 @@ interface PublicLayoutProps {
   pageTitleOverride?: string;
 }
 
-type SiteMap = Record<string, string>;
-
 export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps) {
-  const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const pageTitle = pageTitleOverride ?? getPublicPageTitle(location.pathname);
-  const siteLang = useSiteContentLanguage();
-  const { data: site } = useQuery({
-    queryKey: ["site-content", siteLang],
-    queryFn: () => api.get<SiteMap>(`/api/site-content?language=${encodeURIComponent(siteLang)}`),
-  });
-  const maintenance = site ? isPublicFlagOn(site.public_maintenance_mode, false) : false;
-  const earlyBird = site ? isPublicFlagOn(site.public_early_bird_landing, true) : true;
-  /** Home without sidebar: maintenance splash, or long early-bird page. “Live” home uses sidebar (e.g. Paddle on /pricing). */
-  const isFullBleedHome = location.pathname === "/" && (maintenance || earlyBird);
 
   useEffect(() => {
     document.title = `${pageTitle} · OrdoStage`;
@@ -129,14 +118,14 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
         Skip to main content
       </a>
 
-      {!isMobile && !isFullBleedHome ? (
+      {!isMobile ? (
         <aside className="w-56 flex-shrink-0 bg-[#0d0d14] border-r border-white/10 flex flex-col">
           <PublicSidebarContent />
         </aside>
       ) : null}
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {isMobile && !isFullBleedHome ? (
+        {isMobile ? (
           <header className="flex-shrink-0 h-12 border-b border-ordo-magenta/25 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>

@@ -118,8 +118,8 @@ export default function SiteContentAdmin() {
           />
         </div>
         <p className="text-[11px] text-ordo-yellow/80">
-          Paddle: set both to off for a public home with sidebar; visitors can open /pricing and log in. Maintenance hides
-          the marketing home entirely.
+          Paddle: use the live home (both off) for the shortest path to Pricing and sign-up. Maintenance mode keeps the
+          same sidebar; the main area is a short notice plus a Features section.
         </p>
       </div>
 
