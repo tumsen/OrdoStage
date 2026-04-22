@@ -1,4 +1,4 @@
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -8,10 +8,37 @@ import { isPublicFlagOn } from "@/lib/publicSiteFlags";
 
 type SiteContent = Record<string, string>;
 
-const DEFAULT_HERO_TITLE =
-  "OrdoStage is launching soon — production management built for theaters.";
-const DEFAULT_HERO_SUBTITLE =
-  "Plan productions, coordinate teams, manage venues, and keep schedules in sync — in one platform.";
+const W = {
+  landing_title: "OrdoStage",
+  landing_subtitle: "The operating platform for theaters, venues, and touring productions",
+  landing_lead:
+    "Stop managing productions across spreadsheets, emails, and shared drives. OrdoStage brings your entire operation into one place — from first rehearsal to closing night.",
+  landing_section_heading: "Built for how live performance actually works:",
+  landing_section_body:
+    "Planning that follows your workflow, not a generic project manager. Shared scheduling across venues, tours, and departments. Technical riders, venue specs, and team coordination — all connected, always current.",
+  landing_closing: "For theaters. For venues. For touring companies. For the people running the show.",
+  landing_postscript:
+    "We are in private rollout now. Early access theaters will be onboarded first. Early-bird tester offer: theaters that join testing get unlimited use for 6 months. Contact: mail@ordostage.com",
+} as const;
+
+function useWelcomeCopy(site: SiteContent | undefined) {
+  return useMemo(() => {
+    const ps = site?.landing_postscript;
+    const postscript =
+      ps !== undefined && String(ps).trim() === ""
+        ? ""
+        : String(ps?.trim() || W.landing_postscript);
+    return {
+      title: site?.landing_title?.trim() || W.landing_title,
+      subtitle: site?.landing_subtitle?.trim() || W.landing_subtitle,
+      lead: site?.landing_lead?.trim() || W.landing_lead,
+      sectionHeading: site?.landing_section_heading?.trim() || W.landing_section_heading,
+      sectionBody: site?.landing_section_body?.trim() || W.landing_section_body,
+      closing: site?.landing_closing?.trim() || W.landing_closing,
+      postscript,
+    };
+  }, [site]);
+}
 
 const curtainBg = (
   <>
@@ -47,12 +74,56 @@ function FrontShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function WelcomeHero({
+  title,
+  subtitle,
+  lead,
+  titleClass = "md:text-4xl",
+}: {
+  title: string;
+  subtitle: string;
+  lead: string;
+  titleClass?: string;
+}) {
+  return (
+    <section className="w-full max-w-3xl space-y-4 text-center">
+      <h1 className={`text-2xl font-bold leading-tight tracking-tight ${titleClass}`}>{title}</h1>
+      <p className="text-base font-medium leading-relaxed text-white/90 md:text-xl">{subtitle}</p>
+      <p className="text-sm leading-relaxed text-white/85 md:text-base text-left sm:text-center">{lead}</p>
+    </section>
+  );
+}
+
+function FeatureBlock({
+  sectionHeading,
+  sectionBody,
+  closing,
+}: {
+  sectionHeading: string;
+  sectionBody: string;
+  closing: string;
+}) {
+  return (
+    <section
+      id="features"
+      className="w-full max-w-3xl scroll-mt-6 space-y-4 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm sm:p-7"
+    >
+      <h2 className="text-lg font-semibold text-white md:text-xl text-center sm:text-left">{sectionHeading}</h2>
+      <p className="text-sm leading-relaxed text-white/88 md:text-base">{sectionBody}</p>
+      <p className="text-sm font-medium leading-relaxed text-ordo-yellow/90 md:text-base text-center sm:text-left">
+        {closing}
+      </p>
+    </section>
+  );
+}
+
 function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefined }) {
   const title =
     siteContent?.public_maintenance_title?.trim() || "We will be back soon";
   const subtitle =
     siteContent?.public_maintenance_subtitle?.trim() ||
     "OrdoStage is being updated. Please try again in a little while.";
+  const welcome = useWelcomeCopy(siteContent);
   return (
     <FrontShell>
       <HashScroll />
@@ -63,14 +134,20 @@ function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefi
         </section>
 
         <section
-          id="features"
           className="mx-auto w-full max-w-2xl scroll-mt-6 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm md:p-6"
+          id="features"
         >
           <h2 className="text-lg font-semibold text-white">Features</h2>
           <p className="mt-3 text-sm leading-relaxed text-white/80">
-            OrdoStage is production and scheduling software for theaters: productions, events, tours, venues, and teams in
-            one place. For credit packs, automatic top-up, and billing, see <Link to="/pricing" className="text-ordo-yellow hover:underline">Pricing</Link> after we are back, or <Link to="/login" className="text-ordo-yellow hover:underline">log in</Link> with your
-            account.
+            {welcome.lead} See{" "}
+            <Link to="/pricing" className="text-ordo-yellow hover:underline">
+              Pricing
+            </Link>{" "}
+            and{" "}
+            <Link to="/login" className="text-ordo-yellow hover:underline">
+              Log in
+            </Link>{" "}
+            from the menu when the site is back.
           </p>
         </section>
       </main>
@@ -79,69 +156,20 @@ function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefi
 }
 
 function EarlyBirdFrontpage({ siteContent }: { siteContent: SiteContent | undefined }) {
-  const heroTitle = siteContent?.landing_title?.trim() || DEFAULT_HERO_TITLE;
-  const heroSubtitle = siteContent?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
+  const welcome = useWelcomeCopy(siteContent);
   return (
     <FrontShell>
       <HashScroll />
-      <main className="relative z-[1] mx-auto flex min-h-full max-w-5xl flex-col items-center justify-start gap-10 px-4 pb-12 pt-6 text-center sm:px-6 md:pt-8">
-        <section className="max-w-3xl space-y-4">
-          <h1 className="text-2xl font-bold leading-tight tracking-tight md:text-4xl">{heroTitle}</h1>
-          <p className="text-base leading-relaxed text-white/85 md:text-xl">{heroSubtitle}</p>
-          <p className="text-sm leading-relaxed text-white/80 md:text-base">
-            Expect production planning built for theater workflows, shared scheduling for events and tours, team
-            coordination across departments, and venue plus technical details organized in one platform.
-          </p>
-          <p className="text-sm leading-relaxed text-ordo-yellow/90 md:text-base">
-            We are in private rollout now. Early access theaters will be onboarded first.
-          </p>
-          <p className="text-sm leading-relaxed text-white/90 md:text-base">
-            Early-bird tester offer: theaters that join testing get unlimited use for 6 months. Contact: mail@ordostage.com
-          </p>
-        </section>
-
-        <section
-          id="features"
-          className="w-full max-w-4xl scroll-mt-6 space-y-5 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm md:p-7"
-        >
-          <h2 className="text-center text-xl font-semibold text-white md:text-2xl">
-            What OrdoStage can do for your theater
-          </h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4">
-              <h3 className="text-base font-semibold text-white">Production planning in one place</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/80">
-                Build complete productions with run sheets, notes, timing, responsibilities and attached files so every
-                department works from the same source.
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4">
-              <h3 className="text-base font-semibold text-white">Events, tours and venues connected</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/80">
-                Coordinate venue requirements, technical rider details, people, travel legs and show dates without
-                duplicating data across separate tools.
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4">
-              <h3 className="text-base font-semibold text-white">Shared scheduling across teams</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/80">
-                Keep production, operations, FOH and technical teams synchronized with up-to-date calendars and clear
-                change visibility when plans shift.
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4">
-              <h3 className="text-base font-semibold text-white">Built for real stage workflows</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/80">
-                Designed specifically for theaters and live productions with practical tools for rehearsals, get-in/get-out,
-                venue communication and execution day control.
-              </p>
-            </div>
-          </div>
-          <p className="text-sm text-white/80">
-            Access is invite-only during rollout. Use your early-bird login to enter the platform.
-          </p>
-        </section>
-
+      <main className="relative z-[1] mx-auto flex min-h-full max-w-3xl flex-col items-center justify-start gap-8 px-4 pb-12 pt-6 sm:px-6 md:pt-8">
+        <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} />
+        <FeatureBlock
+          sectionHeading={welcome.sectionHeading}
+          sectionBody={welcome.sectionBody}
+          closing={welcome.closing}
+        />
+        {welcome.postscript ? (
+          <p className="w-full max-w-3xl text-sm leading-relaxed text-white/80 text-center">{welcome.postscript}</p>
+        ) : null}
         <div className="pb-2">
           <Button
             asChild
@@ -156,8 +184,7 @@ function EarlyBirdFrontpage({ siteContent }: { siteContent: SiteContent | undefi
 }
 
 function LiveFrontpage({ siteContent }: { siteContent: SiteContent | undefined }) {
-  const heroTitle = siteContent?.landing_title?.trim() || DEFAULT_HERO_TITLE;
-  const heroSubtitle = siteContent?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
+  const welcome = useWelcomeCopy(siteContent);
   const ctaText = siteContent?.landing_cta_text?.trim() || "View pricing & sign up";
   const ctaPath = siteContent?.landing_cta_url?.trim() || "/pricing";
   const ctaExternal = /^https?:\/\//i.test(ctaPath);
@@ -165,28 +192,16 @@ function LiveFrontpage({ siteContent }: { siteContent: SiteContent | undefined }
     <FrontShell>
       <HashScroll />
       <main className="relative z-[1] mx-auto flex min-h-full max-w-3xl flex-col items-center justify-start gap-8 px-4 pb-12 pt-6 text-center sm:px-6 md:pt-8">
-        <section className="max-w-2xl space-y-4">
-          <h1 className="text-2xl font-bold leading-tight tracking-tight md:text-4xl">{heroTitle}</h1>
-          <p className="text-base leading-relaxed text-white/85 md:text-lg">{heroSubtitle}</p>
-          <p className="text-sm leading-relaxed text-white/70">
-            Check <strong>Features</strong> in the sidebar to jump to product highlights. Use <strong>Pricing</strong> for
-            credit packs and Paddle checkout after sign-up. <strong>Terms</strong> covers legal use of the service.
-          </p>
-        </section>
-
-        <section
-          id="features"
-          className="w-full max-w-2xl scroll-mt-6 space-y-3 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm md:p-6"
-        >
-          <h2 className="text-center text-lg font-semibold text-white">Features at a glance</h2>
-          <ul className="list-inside list-disc text-sm text-white/80 space-y-2">
-            <li>Productions, events, and tours in one schedule</li>
-            <li>Venue and tech rider information linked to the right people</li>
-            <li>Departments, roles, and read/write access for your org</li>
-            <li>Credits and billing: see Pricing for day packs and automatic top-up</li>
-          </ul>
-        </section>
-
+        <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} titleClass="md:text-4xl" />
+        <p className="w-full max-w-2xl text-sm leading-relaxed text-white/70">
+          Use the sidebar to jump to <strong>Features</strong>, or open <strong>Pricing</strong> for credit packs.{" "}
+          <strong>Terms</strong> and <strong>Privacy</strong> are there too.
+        </p>
+        <FeatureBlock
+          sectionHeading={welcome.sectionHeading}
+          sectionBody={welcome.sectionBody}
+          closing={welcome.closing}
+        />
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           {ctaExternal ? (
             <Button

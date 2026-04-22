@@ -180,8 +180,8 @@ export default function SiteContentAdmin() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Landing Title</Label>
-          <p className="text-xs text-white/40">Leave empty to use the default home page headline.</p>
+          <Label>Landing title (brand)</Label>
+          <p className="text-xs text-white/40">Usually OrdoStage — leave empty to use the default.</p>
           <Input value={merged.landing_title ?? ""} onChange={(e) => setField("landing_title", e.target.value)} />
         </div>
         <div className="space-y-2">
@@ -192,8 +192,8 @@ export default function SiteContentAdmin() {
           />
         </div>
         <div className="space-y-2 md:col-span-2">
-          <Label>Landing Subtitle</Label>
-          <p className="text-xs text-white/40">Leave empty to use the default hero paragraph under the headline.</p>
+          <Label>Landing tagline</Label>
+          <p className="text-xs text-white/40">One line under the title (e.g. operating platform for…).</p>
           <Textarea
             value={merged.landing_subtitle ?? ""}
             onChange={(e) => setField("landing_subtitle", e.target.value)}
@@ -202,6 +202,52 @@ export default function SiteContentAdmin() {
         <div className="space-y-2 md:col-span-2">
           <Label>Landing CTA URL</Label>
           <Input value={merged.landing_cta_url ?? ""} onChange={(e) => setField("landing_cta_url", e.target.value)} />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-4 max-w-4xl">
+        <h3 className="text-sm font-semibold text-white">Home page — main story</h3>
+        <p className="text-xs text-white/45">Shown on the public home: hero, then the #features block (headline, body, closing). Postscript is mainly for early-bird / rollout (optional).</p>
+        <div className="space-y-2">
+          <Label>Lead paragraph</Label>
+          <Textarea
+            className="min-h-[80px] bg-gray-900/80 border-white/10"
+            value={merged.landing_lead ?? ""}
+            onChange={(e) => setField("landing_lead", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Section headline (#features)</Label>
+          <Input
+            className="bg-gray-900/80 border-white/10"
+            value={merged.landing_section_heading ?? ""}
+            onChange={(e) => setField("landing_section_heading", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Section body</Label>
+          <Textarea
+            className="min-h-[100px] bg-gray-900/80 border-white/10"
+            value={merged.landing_section_body ?? ""}
+            onChange={(e) => setField("landing_section_body", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Closing line</Label>
+          <Textarea
+            className="min-h-[64px] bg-gray-900/80 border-white/10"
+            value={merged.landing_closing ?? ""}
+            onChange={(e) => setField("landing_closing", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Postscript (early-bird; leave empty to hide on translated locales if you clear it)</Label>
+          <Textarea
+            className="min-h-[72px] bg-gray-900/80 border-white/10"
+            value={merged.landing_postscript ?? ""}
+            onChange={(e) => setField("landing_postscript", e.target.value)}
+            placeholder="Rollout and contact lines…"
+          />
         </div>
       </div>
 

@@ -13,18 +13,36 @@ const DEFAULT_PACKS = [
 ];
 
 const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
-  {
-    key: "landing_title",
-    value:
-      "Ordo Stage is a planning platform built for theatres, venues, and touring productions.",
-  },
+  { key: "landing_title", value: "OrdoStage" },
   {
     key: "landing_subtitle",
-    value:
-      "It brings everything together in one place — from the first booking to the final curtain call.",
+    value: "The operating platform for theaters, venues, and touring productions",
   },
-  { key: "landing_cta_text", value: "Get started" },
-  { key: "landing_cta_url", value: "/login" },
+  {
+    key: "landing_lead",
+    value:
+      "Stop managing productions across spreadsheets, emails, and shared drives. OrdoStage brings your entire operation into one place — from first rehearsal to closing night.",
+  },
+  {
+    key: "landing_section_heading",
+    value: "Built for how live performance actually works:",
+  },
+  {
+    key: "landing_section_body",
+    value:
+      "Planning that follows your workflow, not a generic project manager. Shared scheduling across venues, tours, and departments. Technical riders, venue specs, and team coordination — all connected, always current.",
+  },
+  {
+    key: "landing_closing",
+    value: "For theaters. For venues. For touring companies. For the people running the show.",
+  },
+  {
+    key: "landing_postscript",
+    value:
+      "We are in private rollout now. Early access theaters will be onboarded first. Early-bird tester offer: theaters that join testing get unlimited use for 6 months. Contact: mail@ordostage.com",
+  },
+  { key: "landing_cta_text", value: "View pricing" },
+  { key: "landing_cta_url", value: "/pricing" },
   { key: "terms_content", value: DEFAULT_TERMS_CONTENT },
   { key: "privacy_content", value: DEFAULT_PRIVACY_CONTENT },
   { key: "refund_content", value: DEFAULT_REFUND_CONTENT },
