@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { CreditCard, FileText, LogIn, Menu, Sparkles } from "lucide-react";
+import { CreditCard, FileText, LogIn, Menu, Shield, Sparkles } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ const navItems: { label: string; icon: LucideIcon; to: string; homeHash?: string
   { to: "/", label: "Features", icon: Sparkles, homeHash: "features" },
   { to: "/pricing", label: "Pricing", icon: CreditCard, exact: true },
   { to: "/terms-of-service", label: "Terms", icon: FileText, exact: true },
+  { to: "/privacy-policy", label: "Privacy", icon: Shield, exact: true },
 ];
 
 const pageTitles: Record<string, string> = {

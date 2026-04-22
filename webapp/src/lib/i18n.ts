@@ -114,7 +114,7 @@ const en = {
         "Free signup credits are stored in English and apply to all organizations. Set “Content language” to English to edit this value.",
       publicHomeMode: "Public home (global)",
       publicHomeModeHint:
-        "Applies in every language. The public shell always has a left menu (Features, Pricing, Terms). Turn off both modes for the shorter “live” home; turn on maintenance for a minimal notice, or early-bird for the long welcome page.",
+        "Applies in every language. The public shell always has a left menu (Features, Pricing, Terms, Privacy). Turn off both modes for the shorter “live” home; turn on maintenance for a minimal notice, or early-bird for the long welcome page.",
       maintenanceMode: "Maintenance welcome screen",
       maintenanceModeHint: "Replaces the home page with a short “back soon” message. No marketing sidebar.",
       earlyBirdMode: "Early-bird / private rollout home",
