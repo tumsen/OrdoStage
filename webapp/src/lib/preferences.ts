@@ -2,6 +2,9 @@ export type Language = "en" | "da" | "de";
 export type TimeFormat = "12h" | "24h";
 export type DistanceUnit = "km" | "mi";
 
+/** Languages available in the app and Owner Admin translations. Add new codes here and in backend `LanguageSchema`. */
+export const SUPPORTED_LANGUAGES: ReadonlyArray<Language> = ["en", "da", "de"];
+
 export interface PreferenceSet {
   language: Language;
   timeFormat: TimeFormat;
@@ -28,6 +31,15 @@ export function languageLabel(language: Language): string {
 
 export function localeForLanguage(language: Language): string {
   return LOCALE_MAP[language];
+}
+
+/** Browsers report BCP-47; map to site language codes. */
+export function getBrowserLanguage(): Language {
+  if (typeof navigator === "undefined") return "en";
+  const nav = (navigator.language || "en").toLowerCase();
+  if (nav.startsWith("da")) return "da";
+  if (nav.startsWith("de")) return "de";
+  return "en";
 }
 
 export function formatDistanceKm(distanceKm: number, unit: DistanceUnit): string {

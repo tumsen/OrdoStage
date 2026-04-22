@@ -77,9 +77,9 @@ export async function seedPacks() {
 
   for (const item of DEFAULT_SITE_CONTENT) {
     await prisma.siteContent.upsert({
-      where: { key: item.key },
+      where: { key_locale: { key: item.key, locale: "en" } },
       update: {},
-      create: item,
+      create: { key: item.key, locale: "en", value: item.value },
     });
   }
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -6,31 +6,52 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminI18n } from "@/lib/i18n";
+import { SUPPORTED_LANGUAGES, type Language, languageLabel } from "@/lib/preferences";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type SiteContent = Record<string, string>;
 
 export default function SiteContentAdmin() {
   const { toast } = useToast();
+  const { t } = useAdminI18n();
   const queryClient = useQueryClient();
-  const { data } = useQuery({
-    queryKey: ["admin", "site-content"],
-    queryFn: () => api.get<SiteContent>("/api/admin/site-content"),
-  });
-
+  const [contentLanguage, setContentLanguage] = useState<Language>("en");
   const [form, setForm] = useState<SiteContent>({});
+
+  useEffect(() => {
+    setForm({});
+  }, [contentLanguage]);
+
+  const { data } = useQuery({
+    queryKey: ["admin", "site-content", contentLanguage],
+    queryFn: () =>
+      api.get<SiteContent>(`/api/admin/site-content?language=${encodeURIComponent(contentLanguage)}`),
+  });
 
   const merged = { ...(data ?? {}), ...form };
 
   const updateMutation = useMutation({
-    mutationFn: (payload: SiteContent) => api.put<SiteContent>("/api/admin/site-content", payload),
+    mutationFn: (payload: SiteContent) =>
+      api.put<SiteContent>(
+        `/api/admin/site-content?language=${encodeURIComponent(contentLanguage)}`,
+        payload
+      ),
     onSuccess: () => {
+      setForm({});
       queryClient.invalidateQueries({ queryKey: ["admin", "site-content"] });
       queryClient.invalidateQueries({ queryKey: ["site-content"] });
       queryClient.invalidateQueries({ queryKey: ["site-content-public"] });
-      toast({ title: "Saved", description: "Website content updated." });
+      toast({ title: t("admin.siteContent.saved") });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to save website content.", variant: "destructive" });
+      toast({ title: t("admin.siteContent.saveError"), variant: "destructive" });
     },
   });
 
@@ -40,36 +61,63 @@ export default function SiteContentAdmin() {
 
   return (
     <div className="p-6 space-y-4 max-w-5xl mx-auto">
-      <h2 className="text-lg font-semibold text-white">Website Content</h2>
-      <p className="text-sm text-white/50">
-        Edit landing page and legal texts used on public pages.
-      </p>
+      <h2 className="text-lg font-semibold text-white">{t("admin.siteContent.title")}</h2>
+      <p className="text-sm text-white/50">{t("admin.siteContent.subtitle")}</p>
 
-      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-white">Signup & public pricing copy</h3>
-        <p className="text-xs text-white/45">
-          These values appear on the public home and pricing pages. New organisations receive the free credit amount when
-          they are first created (after this number is saved).
-        </p>
-        <div className="space-y-2 max-w-xs">
-          <Label htmlFor="signup_credits">Free signup credits</Label>
-          <Input
-            id="signup_credits"
-            type="number"
-            min={0}
-            step={1}
-            value={merged.signup_credits ?? ""}
-            placeholder="30"
-            onChange={(e) => setField("signup_credits", e.target.value)}
-            className="bg-gray-900/80 border-white/10"
-          />
-          <p className="text-xs text-white/35">
-            Credit packs and prices are edited under{" "}
-            <span className="text-white/55">Owner Admin → Pricing</span>; the public /pricing page loads active packs
-            automatically.
-          </p>
+      <div className="rounded-lg border border-ordo-yellow/25 bg-ordo-violet/10 p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-white">{t("admin.siteContent.sectionTranslations")}</h3>
+        <p className="text-xs text-white/50">{t("admin.siteContent.editLocaleHint")}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 max-w-md">
+          <Label htmlFor="content-language" className="text-white/80 shrink-0">
+            {t("admin.siteContent.contentLanguage")}
+          </Label>
+          <Select
+            value={contentLanguage}
+            onValueChange={(v) => setContentLanguage(v as Language)}
+            aria-label={t("admin.siteContent.contentLanguage")}
+          >
+            <SelectTrigger id="content-language" className="bg-gray-900/80 border-white/10 text-white w-full sm:w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <SelectItem key={lang} value={lang}>
+                  {languageLabel(lang)} ({lang})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
+
+      {contentLanguage === "en" ? (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-white">Signup &amp; public pricing copy</h3>
+          <p className="text-xs text-white/45">
+            These values appear on the public home and pricing pages. New organisations receive the free credit amount
+            when they are first created (after this number is saved).
+          </p>
+          <div className="space-y-2 max-w-xs">
+            <Label htmlFor="signup_credits">Free signup credits</Label>
+            <Input
+              id="signup_credits"
+              type="number"
+              min={0}
+              step={1}
+              value={merged.signup_credits ?? ""}
+              placeholder="30"
+              onChange={(e) => setField("signup_credits", e.target.value)}
+              className="bg-gray-900/80 border-white/10"
+            />
+            <p className="text-xs text-white/35">
+              Credit packs and prices are edited under <span className="text-white/55">Owner Admin → Pricing</span>;
+              the public /pricing page loads active packs automatically.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-white/45 max-w-2xl">{t("admin.siteContent.creditsEnOnly")}</p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -79,12 +127,18 @@ export default function SiteContentAdmin() {
         </div>
         <div className="space-y-2">
           <Label>Landing CTA Text</Label>
-          <Input value={merged.landing_cta_text ?? ""} onChange={(e) => setField("landing_cta_text", e.target.value)} />
+          <Input
+            value={merged.landing_cta_text ?? ""}
+            onChange={(e) => setField("landing_cta_text", e.target.value)}
+          />
         </div>
         <div className="space-y-2 md:col-span-2">
           <Label>Landing Subtitle</Label>
           <p className="text-xs text-white/40">Leave empty to use the default hero paragraph under the headline.</p>
-          <Textarea value={merged.landing_subtitle ?? ""} onChange={(e) => setField("landing_subtitle", e.target.value)} />
+          <Textarea
+            value={merged.landing_subtitle ?? ""}
+            onChange={(e) => setField("landing_subtitle", e.target.value)}
+          />
         </div>
         <div className="space-y-2 md:col-span-2">
           <Label>Landing CTA URL</Label>
@@ -95,8 +149,8 @@ export default function SiteContentAdmin() {
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-4">
         <h3 className="text-sm font-semibold text-white">Company &amp; legal contact</h3>
         <p className="text-xs text-white/45">
-          Optional structured fields for reference, marketing, or future pages. Legal pages below still control the exact
-          text visitors see unless you align these values with your Terms / Privacy bodies.
+          Optional structured fields for reference, marketing, or future pages. Legal pages below still control the
+          exact text visitors see unless you align these values with your Terms / Privacy bodies.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -151,12 +205,20 @@ export default function SiteContentAdmin() {
       <div className="space-y-2">
         <Label>Terms of Service</Label>
         <p className="text-xs text-white/40">Full text shown on /terms-of-service.</p>
-        <Textarea className="min-h-48" value={merged.terms_content ?? ""} onChange={(e) => setField("terms_content", e.target.value)} />
+        <Textarea
+          className="min-h-48"
+          value={merged.terms_content ?? ""}
+          onChange={(e) => setField("terms_content", e.target.value)}
+        />
       </div>
       <div className="space-y-2">
         <Label>Privacy Policy</Label>
         <p className="text-xs text-white/40">Full text shown on /privacy-policy.</p>
-        <Textarea className="min-h-48" value={merged.privacy_content ?? ""} onChange={(e) => setField("privacy_content", e.target.value)} />
+        <Textarea
+          className="min-h-48"
+          value={merged.privacy_content ?? ""}
+          onChange={(e) => setField("privacy_content", e.target.value)}
+        />
       </div>
 
       <Button
@@ -164,7 +226,7 @@ export default function SiteContentAdmin() {
         disabled={updateMutation.isPending}
         className="bg-rose-700 hover:bg-rose-600"
       >
-        {updateMutation.isPending ? "Saving..." : "Save Website Content"}
+        {updateMutation.isPending ? t("admin.siteContent.saving") : t("admin.siteContent.save")}
       </Button>
     </div>
   );

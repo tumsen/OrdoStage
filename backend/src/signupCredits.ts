@@ -8,7 +8,7 @@ const FALLBACK = 30;
  * Configured in Owner Admin → Website Content → "Free signup credits".
  */
 export async function getSignupCreditsForNewOrg(): Promise<number> {
-  const row = await prisma.siteContent.findUnique({ where: { key: KEY } });
+  const row = await prisma.siteContent.findUnique({ where: { key_locale: { key: KEY, locale: "en" } } });
   const raw = row?.value?.trim();
   if (raw == null || raw === "") return FALLBACK;
   const n = parseInt(raw, 10);

@@ -325,9 +325,12 @@ model PricePack {
 }
 
 model SiteContent {
-  key       String   @id
+  key       String
+  locale    String   @default("en")
   value     String
   updatedAt DateTime @updatedAt
+
+  @@id([key, locale])
 }
 
 model InternalBooking {

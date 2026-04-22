@@ -1,4 +1,5 @@
 import { localeForLanguage, type Language } from "@/lib/preferences";
+import { useAdminPanelLanguage } from "@/contexts/AdminPanelLanguageContext";
 import { usePreferences } from "@/hooks/usePreferences";
 
 type Primitive = string | number | boolean | null | undefined;
@@ -77,6 +78,42 @@ const en = {
     miles: "Miles (mi)",
     skipToContent: "Skip to main content",
   },
+  admin: {
+    uiLanguage: "Admin panel language",
+    badge: "Admin",
+    panel: "Panel",
+    backToApp: "Back to app",
+    nav: {
+      dashboard: "Dashboard",
+      organizations: "Organizations",
+      users: "Users",
+      pricing: "Pricing",
+      websiteContent: "Website content",
+    },
+    pageTitle: {
+      dashboard: "Dashboard",
+      organizations: "Organizations",
+      orgDetail: "Organization detail",
+      users: "Users",
+      pricing: "Pricing",
+      websiteContent: "Website content",
+      unknown: "Admin",
+    },
+    siteContent: {
+      sectionTranslations: "Translations",
+      editLocaleHint:
+        "Edit public website copy for each language. Empty values fall back to English. New languages: add them in code (preferences + backend), then translate here.",
+      contentLanguage: "Content language",
+      title: "Website content",
+      subtitle: "Edit landing page and legal texts used on public pages.",
+      saving: "Saving...",
+      save: "Save website content",
+      saved: "Saved",
+      saveError: "Failed to save website content.",
+      creditsEnOnly:
+        "Free signup credits are stored in English and apply to all organizations. Set “Content language” to English to edit this value.",
+    },
+  },
 };
 
 const da: DeepPartial<typeof en> = {
@@ -122,6 +159,35 @@ const da: DeepPartial<typeof en> = {
     miles: "Miles (mi)",
     skipToContent: "Spring til indhold",
   },
+  admin: {
+    uiLanguage: "Sprog i admin-panelet",
+    panel: "Panel",
+    backToApp: "Tilbage til appen",
+    nav: {
+      dashboard: "Oversigt",
+      organizations: "Organisationer",
+      users: "Brugere",
+      pricing: "Priser",
+      websiteContent: "Websideindhold",
+    },
+    pageTitle: {
+      dashboard: "Oversigt",
+      organizations: "Organisationer",
+      orgDetail: "Organisation",
+      users: "Brugere",
+      pricing: "Priser",
+      websiteContent: "Websideindhold",
+      unknown: "Admin",
+    },
+    siteContent: {
+      sectionTranslations: "Oversættelser",
+      editLocaleHint:
+        "Redigér offentlig websidetekst for hvert sprog. Tomme felter falder tilbage til engelsk.",
+      contentLanguage: "Indholdssprog",
+      creditsEnOnly:
+        "Gratis tilmeldingskreditter gemmes på engelsk for hele produktet. Vælg engelsk under “Indholdssprog” for at redigere værdien.",
+    },
+  },
 };
 
 const de: DeepPartial<typeof en> = {
@@ -166,6 +232,35 @@ const de: DeepPartial<typeof en> = {
     miles: "Meilen (mi)",
     skipToContent: "Zum Inhalt springen",
   },
+  admin: {
+    uiLanguage: "Admin-Sprache",
+    panel: "Panel",
+    backToApp: "Zurueck zur App",
+    nav: {
+      dashboard: "Uebersicht",
+      organizations: "Organisationen",
+      users: "Benutzer",
+      pricing: "Preise",
+      websiteContent: "Webseiten-Inhalt",
+    },
+    pageTitle: {
+      dashboard: "Uebersicht",
+      organizations: "Organisationen",
+      orgDetail: "Organisation",
+      users: "Benutzer",
+      pricing: "Preise",
+      websiteContent: "Webseiten-Inhalt",
+      unknown: "Admin",
+    },
+    siteContent: {
+      sectionTranslations: "Uebersetzungen",
+      editLocaleHint:
+        "Oeffentliche Webseitentexte pro Sprache bearbeiten. Leere Felder nutzen Englisch als Fallback.",
+      contentLanguage: "Inhaltssprache",
+      creditsEnOnly:
+        "Kostenlose Anmelde-Credits werden einmalig auf Englisch gespeichert. Stellen Sie “Inhaltssprache” auf Englisch, um den Wert zu bearbeiten.",
+    },
+  },
 };
 
 function deepMerge<T extends Record<string, unknown>>(base: T, override: DeepPartial<T>): T {
@@ -191,8 +286,6 @@ function deepMerge<T extends Record<string, unknown>>(base: T, override: DeepPar
   }
   return out as T;
 }
-
-export const SUPPORTED_LANGUAGES: ReadonlyArray<Language> = ["en", "da", "de"];
 
 const catalogs: Record<Language, typeof en> = {
   en,
@@ -235,4 +328,14 @@ export function useI18n() {
 
   return { language, locale, t };
 }
+
+/** UI strings for the Owner Admin shell (uses panel language, not org/user preference). */
+export function useAdminI18n() {
+  const { language, setLanguage } = useAdminPanelLanguage();
+  const locale = localeForLanguage(language);
+  const t = (key: TranslationKey, vars?: Record<string, Primitive>) => translate(language, key, vars);
+  return { language, setLanguage, locale, t };
+}
+
+export { SUPPORTED_LANGUAGES } from "@/lib/preferences";
 

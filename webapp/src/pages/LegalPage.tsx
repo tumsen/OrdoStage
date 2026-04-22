@@ -1,6 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 
 type SiteContent = Record<string, string>;
 
@@ -12,11 +13,12 @@ const mapByPath: Record<string, { title: string; key: string }> = {
 
 export default function LegalPage() {
   const location = useLocation();
+  const siteLang = useSiteContentLanguage();
   const config = mapByPath[location.pathname] ?? mapByPath["/terms-of-service"];
 
   const { data } = useQuery({
-    queryKey: ["site-content"],
-    queryFn: () => api.get<SiteContent>("/api/site-content"),
+    queryKey: ["site-content", siteLang],
+    queryFn: () => api.get<SiteContent>(`/api/site-content?language=${encodeURIComponent(siteLang)}`),
   });
 
   const text = data?.[config.key] ?? "";

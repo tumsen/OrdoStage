@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
+import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 
 type SiteContent = Record<string, string>;
 
@@ -13,9 +14,10 @@ const DEFAULT_HERO_SUBTITLE =
   "Plan productions, coordinate teams, manage venues, and keep schedules in sync — in one platform.";
 
 export default function Frontpage() {
+  const siteLang = useSiteContentLanguage();
   const { data: siteContent } = useQuery({
-    queryKey: ["site-content"],
-    queryFn: () => api.get<SiteContent>("/api/site-content"),
+    queryKey: ["site-content", siteLang],
+    queryFn: () => api.get<SiteContent>(`/api/site-content?language=${encodeURIComponent(siteLang)}`),
   });
 
   const heroTitle = siteContent?.landing_title?.trim() || DEFAULT_HERO_TITLE;

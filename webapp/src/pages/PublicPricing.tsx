@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 
 interface BillingPack {
   id: string;
@@ -23,14 +24,15 @@ function SectionDivider() {
 }
 
 export default function PublicPricing() {
+  const siteLang = useSiteContentLanguage();
   const { data: packs } = useQuery({
     queryKey: ["public-pricing", "packs"],
     queryFn: () => api.get<BillingPack[]>("/api/billing/packs"),
   });
 
   const { data: siteMeta } = useQuery({
-    queryKey: ["site-content-public"],
-    queryFn: () => api.get<Record<string, string>>("/api/site-content"),
+    queryKey: ["site-content-public", siteLang],
+    queryFn: () => api.get<Record<string, string>>(`/api/site-content?language=${encodeURIComponent(siteLang)}`),
   });
 
   const signupCredits = siteMeta?.signup_credits?.trim() || "30";
