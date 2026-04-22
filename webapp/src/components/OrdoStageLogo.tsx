@@ -47,7 +47,6 @@ type OrdoStageLogoProps = {
   size?: number;
   interactive?: boolean;
   variant?: "default" | "sidebar";
-  showBackdrop?: boolean;
 };
 
 /** Static wordmark in its own memoized SVG so rAF beam updates never repaint the type. */
@@ -109,11 +108,10 @@ const OrdoStageWordmark = memo(function OrdoStageWordmark({
 type BeamRigProps = {
   interactive: boolean;
   viewBoxAttr: string;
-  showBackdrop: boolean;
 };
 
 /** Rig + beams only — state updates here do not touch the memoized wordmark. */
-function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigProps) {
+function OrdoStageBeamRig({ interactive, viewBoxAttr }: BeamRigProps) {
   const gradientPrefix = useId().replace(/:/g, "");
   const [smoothFocus, setSmoothFocus] = useState(2);
   const targetFocusRef = useRef(2);
@@ -195,7 +193,6 @@ function OrdoStageBeamRig({ interactive, viewBoxAttr, showBackdrop }: BeamRigPro
       overflow="visible"
     >
       <title>OrdoStage</title>
-      {showBackdrop ? <rect width="200" height="200" fill="#111111" /> : null}
 
       <defs>
         {BEAMS.map((beam, i) => (
@@ -265,7 +262,6 @@ export function OrdoStageLogo({
   size = 48,
   interactive = true,
   variant = "default",
-  showBackdrop = true,
 }: OrdoStageLogoProps) {
   const vb = variant === "sidebar" ? VIEWBOX_SIDEBAR : VIEWBOX_DEFAULT;
   const viewBoxAttr = useMemo(
@@ -288,7 +284,7 @@ export function OrdoStageLogo({
       )}
       style={wrapperStyle}
     >
-      <OrdoStageBeamRig interactive={interactive} viewBoxAttr={viewBoxAttr} showBackdrop={showBackdrop} />
+      <OrdoStageBeamRig interactive={interactive} viewBoxAttr={viewBoxAttr} />
       <OrdoStageWordmark viewBoxAttr={viewBoxAttr} />
     </div>
   );

@@ -31,7 +31,7 @@ export default function Frontpage() {
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-black/18" />
 
       <div className="absolute left-4 top-4 z-[2] w-[180px] sm:w-[220px] md:w-[260px]">
-        <OrdoStageLogo variant="sidebar" interactive showBackdrop={false} className="w-full" />
+        <OrdoStageLogo variant="sidebar" interactive className="w-full" />
       </div>
 
       <main className="relative z-[1] mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-start gap-10 px-6 pb-12 pt-28 text-center md:pt-32">
