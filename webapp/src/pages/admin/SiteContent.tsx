@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminI18n } from "@/lib/i18n";
 import { SUPPORTED_LANGUAGES, type Language, languageLabel } from "@/lib/preferences";
+import { isPublicFlagOn } from "@/lib/publicSiteFlags";
 import {
   Select,
   SelectContent,
@@ -55,6 +57,24 @@ export default function SiteContentAdmin() {
     },
   });
 
+  const { data: enSnapshot } = useQuery({
+    queryKey: ["admin", "site-content", "en"],
+    queryFn: () => api.get<SiteContent>("/api/admin/site-content?language=en"),
+  });
+
+  const flagMutation = useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      api.put<SiteContent>(`/api/admin/site-content?language=${encodeURIComponent("en")}`, { [key]: value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "site-content"] });
+      queryClient.invalidateQueries({ queryKey: ["site-content"] });
+      queryClient.invalidateQueries({ queryKey: ["site-content-public"] });
+    },
+    onError: () => {
+      toast({ title: t("admin.siteContent.flagSaveError"), variant: "destructive" });
+    },
+  });
+
   function setField(key: string, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -63,6 +83,45 @@ export default function SiteContentAdmin() {
     <div className="p-6 space-y-4 max-w-5xl mx-auto">
       <h2 className="text-lg font-semibold text-white">{t("admin.siteContent.title")}</h2>
       <p className="text-sm text-white/50">{t("admin.siteContent.subtitle")}</p>
+
+      <div className="rounded-lg border border-ordo-magenta/30 bg-[#0d0d18] p-4 space-y-4 max-w-2xl">
+        <div>
+          <h3 className="text-sm font-semibold text-white">{t("admin.siteContent.publicHomeMode")}</h3>
+          <p className="text-xs text-white/50 mt-1">{t("admin.siteContent.publicHomeModeHint")}</p>
+        </div>
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <Label className="text-white/90">{t("admin.siteContent.maintenanceMode")}</Label>
+            <p className="text-xs text-white/45 mt-0.5">{t("admin.siteContent.maintenanceModeHint")}</p>
+          </div>
+          <Switch
+            checked={isPublicFlagOn(enSnapshot?.public_maintenance_mode, false)}
+            disabled={flagMutation.isPending || enSnapshot === undefined}
+            onCheckedChange={(on) => {
+              flagMutation.mutate({ key: "public_maintenance_mode", value: on ? "1" : "0" });
+            }}
+            aria-label={t("admin.siteContent.maintenanceMode")}
+          />
+        </div>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Label className="text-white/90">{t("admin.siteContent.earlyBirdMode")}</Label>
+            <p className="text-xs text-white/45 mt-0.5">{t("admin.siteContent.earlyBirdModeHint")}</p>
+          </div>
+          <Switch
+            checked={isPublicFlagOn(enSnapshot?.public_early_bird_landing, true)}
+            disabled={flagMutation.isPending || enSnapshot === undefined}
+            onCheckedChange={(on) => {
+              flagMutation.mutate({ key: "public_early_bird_landing", value: on ? "1" : "0" });
+            }}
+            aria-label={t("admin.siteContent.earlyBirdMode")}
+          />
+        </div>
+        <p className="text-[11px] text-ordo-yellow/80">
+          Paddle: set both to off for a public home with sidebar; visitors can open /pricing and log in. Maintenance hides
+          the marketing home entirely.
+        </p>
+      </div>
 
       <div className="rounded-lg border border-ordo-yellow/25 bg-ordo-violet/10 p-4 space-y-3">
         <h3 className="text-sm font-semibold text-white">{t("admin.siteContent.sectionTranslations")}</h3>

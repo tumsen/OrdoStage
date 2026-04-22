@@ -9,11 +9,15 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
+import { api } from "@/lib/api";
+import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
+import { isPublicFlagOn } from "@/lib/publicSiteFlags";
 
 const navItems: { to: string; label: string; icon: LucideIcon; exact?: boolean }[] = [
   { to: "/", label: "Home", icon: Home, exact: true },
@@ -95,12 +99,22 @@ interface PublicLayoutProps {
   pageTitleOverride?: string;
 }
 
+type SiteMap = Record<string, string>;
+
 export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps) {
   const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const pageTitle = pageTitleOverride ?? getPublicPageTitle(location.pathname);
-  const isMaintenanceSplash = location.pathname === "/";
+  const siteLang = useSiteContentLanguage();
+  const { data: site } = useQuery({
+    queryKey: ["site-content", siteLang],
+    queryFn: () => api.get<SiteMap>(`/api/site-content?language=${encodeURIComponent(siteLang)}`),
+  });
+  const maintenance = site ? isPublicFlagOn(site.public_maintenance_mode, false) : false;
+  const earlyBird = site ? isPublicFlagOn(site.public_early_bird_landing, true) : true;
+  /** Home without sidebar: maintenance splash, or long early-bird page. “Live” home uses sidebar (e.g. Paddle on /pricing). */
+  const isFullBleedHome = location.pathname === "/" && (maintenance || earlyBird);
 
   useEffect(() => {
     document.title = `${pageTitle} · OrdoStage`;
@@ -115,14 +129,14 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
         Skip to main content
       </a>
 
-      {!isMobile && !isMaintenanceSplash ? (
+      {!isMobile && !isFullBleedHome ? (
         <aside className="w-56 flex-shrink-0 bg-[#0d0d14] border-r border-white/10 flex flex-col">
           <PublicSidebarContent />
         </aside>
       ) : null}
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {isMobile && !isMaintenanceSplash ? (
+        {isMobile && !isFullBleedHome ? (
           <header className="flex-shrink-0 h-12 border-b border-ordo-magenta/25 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>

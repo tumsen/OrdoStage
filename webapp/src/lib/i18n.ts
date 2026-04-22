@@ -112,6 +112,14 @@ const en = {
       saveError: "Failed to save website content.",
       creditsEnOnly:
         "Free signup credits are stored in English and apply to all organizations. Set “Content language” to English to edit this value.",
+      publicHomeMode: "Public home (global)",
+      publicHomeModeHint:
+        "Applies in every language. For Paddle and public checkout, turn both off: visitors get the full layout with Home, Pricing, and legal links. Maintenance overrides the early-bird page.",
+      maintenanceMode: "Maintenance welcome screen",
+      maintenanceModeHint: "Replaces the home page with a short “back soon” message. No marketing sidebar.",
+      earlyBirdMode: "Early-bird / private rollout home",
+      earlyBirdModeHint: "Long single-page welcome (current rollout design). Off: compact live home with nav to Pricing and Log in.",
+      flagSaveError: "Could not update that setting.",
     },
   },
 };
@@ -186,6 +194,9 @@ const da: DeepPartial<typeof en> = {
       contentLanguage: "Indholdssprog",
       creditsEnOnly:
         "Gratis tilmeldingskreditter gemmes på engelsk for hele produktet. Vælg engelsk under “Indholdssprog” for at redigere værdien.",
+      publicHomeMode: "Offentlig forside (globalt)",
+      publicHomeModeHint:
+        "Gælder alle sprog. For Paddle: slå begge fra, så besøgende får fuld navigation inkl. Priser.",
     },
   },
 };
@@ -259,6 +270,9 @@ const de: DeepPartial<typeof en> = {
       contentLanguage: "Inhaltssprache",
       creditsEnOnly:
         "Kostenlose Anmelde-Credits werden einmalig auf Englisch gespeichert. Stellen Sie “Inhaltssprache” auf Englisch, um den Wert zu bearbeiten.",
+      publicHomeMode: "Oeffentliche Startseite (global)",
+      publicHomeModeHint:
+        "Fuer alle Sprachen. Fuer Paddle beide ausschalten, damit Navigation und Preise sichtbar sind.",
     },
   },
 };

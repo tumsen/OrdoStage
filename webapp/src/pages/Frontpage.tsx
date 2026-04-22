@@ -4,43 +4,67 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
+import { isPublicFlagOn } from "@/lib/publicSiteFlags";
 
 type SiteContent = Record<string, string>;
 
-/** Defaults match marketing copy when Website Content fields are empty. */
 const DEFAULT_HERO_TITLE =
   "OrdoStage is launching soon — production management built for theaters.";
 const DEFAULT_HERO_SUBTITLE =
   "Plan productions, coordinate teams, manage venues, and keep schedules in sync — in one platform.";
 
-export default function Frontpage() {
-  const siteLang = useSiteContentLanguage();
-  const { data: siteContent } = useQuery({
-    queryKey: ["site-content", siteLang],
-    queryFn: () => api.get<SiteContent>(`/api/site-content?language=${encodeURIComponent(siteLang)}`),
-  });
+const curtainBg = (
+  <>
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: "url('/curtain-bg.png')" }}
+    />
+    <div aria-hidden className="pointer-events-none absolute inset-0 bg-black/18" />
+  </>
+);
 
-  const heroTitle = siteContent?.landing_title?.trim() || DEFAULT_HERO_TITLE;
-  const heroSubtitle = siteContent?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
+function FrontShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen overflow-hidden text-white">
-      {/* User-provided curtain image background */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/curtain-bg.png')" }}
-      />
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-black/18" />
-
+      {curtainBg}
       <div className="absolute left-4 top-4 z-[2] w-[180px] sm:w-[220px] md:w-[260px]">
         <OrdoStageLogo variant="sidebar" interactive className="w-full" />
       </div>
+      {children}
+    </div>
+  );
+}
 
+function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefined }) {
+  const title =
+    siteContent?.public_maintenance_title?.trim() || "We will be back soon";
+  const subtitle =
+    siteContent?.public_maintenance_subtitle?.trim() ||
+    "OrdoStage is being updated. Please try again in a little while.";
+  return (
+    <FrontShell>
+      <main className="relative z-[1] mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-6 px-6 pb-12 pt-28 text-center">
+        <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">{title}</h1>
+        <p className="text-base leading-relaxed text-white/85">{subtitle}</p>
+        <p className="text-xs text-white/45">You can still open Terms and Privacy from the direct URLs if you need them.</p>
+      </main>
+    </FrontShell>
+  );
+}
+
+function EarlyBirdFrontpage({
+  siteContent,
+}: {
+  siteContent: SiteContent | undefined;
+}) {
+  const heroTitle = siteContent?.landing_title?.trim() || DEFAULT_HERO_TITLE;
+  const heroSubtitle = siteContent?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
+  return (
+    <FrontShell>
       <main className="relative z-[1] mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-start gap-10 px-6 pb-12 pt-28 text-center md:pt-32">
         <section className="max-w-3xl space-y-4">
-          <h1 className="text-2xl font-bold leading-tight tracking-tight md:text-4xl">
-            {heroTitle}
-          </h1>
+          <h1 className="text-2xl font-bold leading-tight tracking-tight md:text-4xl">{heroTitle}</h1>
           <p className="text-base leading-relaxed text-white/85 md:text-xl">{heroSubtitle}</p>
           <p className="text-sm leading-relaxed text-white/80 md:text-base">
             Expect production planning built for theater workflows, shared scheduling for events and tours, team
@@ -103,6 +127,69 @@ export default function Frontpage() {
           </Button>
         </div>
       </main>
-    </div>
+    </FrontShell>
   );
+}
+
+function LiveFrontpage({ siteContent }: { siteContent: SiteContent | undefined }) {
+  const heroTitle = siteContent?.landing_title?.trim() || DEFAULT_HERO_TITLE;
+  const heroSubtitle = siteContent?.landing_subtitle?.trim() || DEFAULT_HERO_SUBTITLE;
+  const ctaText = siteContent?.landing_cta_text?.trim() || "View pricing & sign up";
+  const ctaPath = siteContent?.landing_cta_url?.trim() || "/pricing";
+  const ctaExternal = /^https?:\/\//i.test(ctaPath);
+  return (
+    <FrontShell>
+      <main className="relative z-[1] mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-start gap-8 px-6 pb-12 pt-28 text-center md:pt-32">
+        <section className="max-w-2xl space-y-4">
+          <h1 className="text-2xl font-bold leading-tight tracking-tight md:text-4xl">{heroTitle}</h1>
+          <p className="text-base leading-relaxed text-white/85 md:text-lg">{heroSubtitle}</p>
+          <p className="text-sm leading-relaxed text-white/70">
+            See credit packs, terms, and privacy in the left navigation. You can run Paddle checkout from Billing after
+            you create an account, or use Pricing to understand packs first.
+          </p>
+        </section>
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          {ctaExternal ? (
+            <Button
+              asChild
+              className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
+            >
+              <a href={ctaPath} target="_blank" rel="noreferrer">
+                {ctaText}
+              </a>
+            </Button>
+          ) : (
+            <Button
+              asChild
+              className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
+            >
+              <Link to={ctaPath || "/pricing"}>{ctaText}</Link>
+            </Button>
+          )}
+          <Button asChild variant="outline" className="border-white/25 text-white/90 bg-white/5 hover:bg-white/10">
+            <Link to="/login">Log in</Link>
+          </Button>
+        </div>
+      </main>
+    </FrontShell>
+  );
+}
+
+export default function Frontpage() {
+  const siteLang = useSiteContentLanguage();
+  const { data: siteContent } = useQuery({
+    queryKey: ["site-content", siteLang],
+    queryFn: () => api.get<SiteContent>(`/api/site-content?language=${encodeURIComponent(siteLang)}`),
+  });
+
+  const maintenance = isPublicFlagOn(siteContent?.public_maintenance_mode, false);
+  const earlyBird = isPublicFlagOn(siteContent?.public_early_bird_landing, true);
+
+  if (maintenance) {
+    return <MaintenanceWelcome siteContent={siteContent} />;
+  }
+  if (earlyBird) {
+    return <EarlyBirdFrontpage siteContent={siteContent} />;
+  }
+  return <LiveFrontpage siteContent={siteContent} />;
 }

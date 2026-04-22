@@ -41,6 +41,17 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
     key: "pricing_page_title",
     value: "Simple pricing that grows with your team",
   },
+  /** Global (English row is source of truth; merged for all languages). 1 = on, 0 = off. */
+  { key: "public_maintenance_mode", value: "0" },
+  { key: "public_early_bird_landing", value: "1" },
+  {
+    key: "public_maintenance_title",
+    value: "We will be back soon",
+  },
+  {
+    key: "public_maintenance_subtitle",
+    value: "OrdoStage is being updated. Please try again in a little while.",
+  },
   {
     key: "pricing_intro",
     value: [

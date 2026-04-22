@@ -60,6 +60,14 @@ function mergeSiteContentForLanguage(rows: SiteContentRow[], language: z.infer<t
     }
     out[row.key] = row.value;
   }
+  // Global public-mode flags: always use English row so /pricing and Paddle work consistently worldwide.
+  const globalPublicKeys = ["public_maintenance_mode", "public_early_bird_landing"] as const;
+  for (const key of globalPublicKeys) {
+    const en = enRows.find((r) => r.key === key);
+    if (en && en.value.trim() !== "") {
+      out[key] = en.value.trim();
+    }
+  }
   return out;
 }
 
