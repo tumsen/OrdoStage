@@ -9,6 +9,7 @@ import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 const app = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
 }>();
+const PROTECTED_ADMIN_EMAILS = new Set(["tumsen@gmail.com"]);
 
 // Apply admin middleware to all routes
 app.use("/admin/*", adminMiddleware);
@@ -443,6 +444,37 @@ app.patch("/admin/users/:userId", async (c) => {
   });
 
   return c.json({ data: mapAdminUserListRow(updated) });
+});
+
+app.delete("/admin/users/:userId", async (c) => {
+  const userId = c.req.param("userId");
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, isAdmin: true },
+  });
+  if (!existing) {
+    return c.json({ error: { message: "User not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  if (PROTECTED_ADMIN_EMAILS.has(existing.email.toLowerCase())) {
+    return c.json(
+      { error: { message: "This protected admin user cannot be deleted.", code: "PROTECTED_USER" } },
+      403
+    );
+  }
+
+  if (existing.isAdmin) {
+    const adminCount = await prisma.user.count({ where: { isAdmin: true } });
+    if (adminCount <= 1) {
+      return c.json(
+        { error: { message: "Cannot delete the last platform admin.", code: "LAST_ADMIN" } },
+        400
+      );
+    }
+  }
+
+  await prisma.user.delete({ where: { id: existing.id } });
+  return new Response(null, { status: 204 });
 });
 
 app.post("/admin/users/grant-admin", async (c) => {

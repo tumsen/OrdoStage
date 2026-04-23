@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/auth-client";
 
@@ -86,6 +86,21 @@ export default function Users() {
     },
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: (userId: string) => api.delete(`/api/admin/users/${userId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      toast({
+        title: "User deleted",
+        description: "The admin user account was removed.",
+      });
+    },
+    onError: (err) => {
+      const msg = isApiError(err) ? err.message : "Could not delete user.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    },
+  });
+
   const filtered = (users ?? []).filter((u) => {
     const q = search.toLowerCase();
     return (
@@ -94,7 +109,7 @@ export default function Users() {
     );
   });
 
-  const COL_COUNT = 6;
+  const COL_COUNT = 7;
 
   return (
     <div className="p-6 space-y-4 max-w-7xl mx-auto">
@@ -156,6 +171,7 @@ export default function Users() {
                 Admin
               </TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Joined</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -177,7 +193,8 @@ export default function Users() {
               </TableRow>
             ) : (
               filtered.map((user) => {
-                const busy = toggleAdminMutation.isPending;
+                const busy = toggleAdminMutation.isPending || deleteUserMutation.isPending;
+                const isProtected = user.email.toLowerCase() === "tumsen@gmail.com";
                 return (
                   <TableRow key={user.id} className="border-white/5 hover:bg-white/[0.02]">
                     <TableCell>
@@ -230,6 +247,24 @@ export default function Users() {
                       </div>
                     </TableCell>
                     <TableCell className="text-white/40 text-sm">{formatDate(user.createdAt)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy || isProtected}
+                        className="text-red-300 hover:text-red-200 hover:bg-red-950/30 disabled:opacity-40"
+                        onClick={() => {
+                          const typed = window.prompt(
+                            `Delete ${user.email}? This is permanent.\n\nType DELETE to confirm.`
+                          );
+                          if (typed !== "DELETE") return;
+                          deleteUserMutation.mutate(user.id);
+                        }}
+                      >
+                        <Trash2 size={14} className="mr-1.5" />
+                        Delete
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })
@@ -240,7 +275,8 @@ export default function Users() {
       {session?.user?.id ? (
         <p className="text-xs text-white/35 max-w-2xl">
           To revoke your own admin access, turn off the switch on your row — unless you are the only admin, in which case
-          add another admin first.
+          add another admin first. Deleting an admin user requires typing <span className="text-white/60">DELETE</span>.
+          The protected account <span className="text-white/60">tumsen@gmail.com</span> cannot be deleted.
         </p>
       ) : null}
     </div>
