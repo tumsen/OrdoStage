@@ -207,7 +207,10 @@ export default function Billing() {
   });
 
   const deleteOrgMutation = useMutation({
-    mutationFn: () => api.deleteWithBody<{ ok: boolean }>("/api/org", { confirm: "delete" }),
+    mutationFn: () =>
+      api.deleteWithBody<{ ok: boolean }>("/api/org", {
+        confirm: `DELETE ${org?.name ?? ""}`,
+      }),
     onSuccess: async () => {
       await authClient.getSession();
       queryClient.invalidateQueries({ queryKey: ["org"] });
@@ -459,13 +462,13 @@ export default function Billing() {
             {showDeleteOrg ? (
               <div className="rounded-lg border border-red-800/50 bg-red-950/25 p-4 space-y-3 max-w-md">
                 <p className="text-sm text-red-200">
-                  Type <span className="font-semibold text-white">delete</span> to confirm (not case sensitive).
+                  Type <span className="font-semibold text-white">DELETE {org.name}</span> to confirm.
                 </p>
                 <Input
                   className="bg-gray-900 border-red-800/40 text-white"
                   value={deleteWord}
                   onChange={(e) => setDeleteWord(e.target.value)}
-                  placeholder="delete"
+                  placeholder={`DELETE ${org.name}`}
                   autoFocus
                 />
                 <div className="flex gap-2">
@@ -475,7 +478,7 @@ export default function Billing() {
                   <Button
                     size="sm"
                     className="bg-red-700 hover:bg-red-600 text-white border-0"
-                    disabled={deleteOrgMutation.isPending || deleteWord.trim().toLowerCase() !== "delete"}
+                    disabled={deleteOrgMutation.isPending || deleteWord.trim() !== `DELETE ${org.name}`}
                     onClick={() => deleteOrgMutation.mutate()}
                   >
                     {deleteOrgMutation.isPending ? "Deleting…" : "Delete forever"}

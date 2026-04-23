@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Plus, Trash2, Eye, Route } from "lucide-react";
 import { api } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Tour, CreateTour } from "../../../backend/src/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -389,7 +390,11 @@ export default function Tours() {
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => { if (deleteId) deleteMutation.mutate(deleteId); }}
+              onClick={() => {
+                if (!deleteId) return;
+                if (!confirmDeleteAction(`tour "${tourToDelete?.name ?? ""}"`)) return;
+                deleteMutation.mutate(deleteId);
+              }}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}

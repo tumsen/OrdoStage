@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { TeamMemberRow, type TeamMember } from "./TeamMemberRow";
 import { useSession } from "@/lib/auth-client";
 import { toast } from "@/components/ui/use-toast";
@@ -135,7 +136,10 @@ export function TeamMembersSection({ isOwner, canManageTeam }: TeamMembersSectio
                   <button
                     type="button"
                     className="text-xs text-white/35 hover:text-red-400"
-                    onClick={() => cancelInviteMutation.mutate(inv.id)}
+                    onClick={() => {
+                      if (!confirmDeleteAction(`invitation for ${inv.email}`)) return;
+                      cancelInviteMutation.mutate(inv.id);
+                    }}
                   >
                     Cancel
                   </button>
@@ -272,7 +276,11 @@ export function TeamMembersSection({ isOwner, canManageTeam }: TeamMembersSectio
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => { if (removeTarget) removeMutation.mutate(removeTarget.id); }}
+              onClick={() => {
+                if (!removeTarget) return;
+                if (!confirmDeleteAction(`team member "${removeTarget.name}"`)) return;
+                removeMutation.mutate(removeTarget.id);
+              }}
             >
               Remove
             </AlertDialogAction>

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Plus, Trash2, Eye, Filter } from "lucide-react";
 import { api } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Event } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
@@ -213,7 +214,11 @@ export default function Events() {
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => { if (deleteId) deleteMutation.mutate(deleteId); }}
+              onClick={() => {
+                if (!deleteId) return;
+                if (!confirmDeleteAction("event")) return;
+                deleteMutation.mutate(deleteId);
+              }}
             >
               Delete
             </AlertDialogAction>

@@ -2,8 +2,10 @@ import { Hono } from "hono";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 
+const ACCOUNT_DELETE_PHRASE = "DELETE";
+
 /**
- * DELETE /api/me/account — irreversible; body must be { phrase: "DELETETHISACCOUNT" }
+ * DELETE /api/me/account — irreversible; body must be { phrase: "DELETE" }
  */
 const accountRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -19,11 +21,11 @@ accountRouter.delete("/me/account", async (c) => {
   } catch {
     body = {};
   }
-  if (body.phrase !== "DELETETHISACCOUNT") {
+  if (body.phrase !== ACCOUNT_DELETE_PHRASE) {
     return c.json(
       {
         error: {
-          message: 'Confirmation phrase required: send JSON { "phrase": "DELETETHISACCOUNT" }',
+          message: `Confirmation phrase required: send JSON { "phrase": "${ACCOUNT_DELETE_PHRASE}" }`,
           code: "BAD_REQUEST",
         },
       },

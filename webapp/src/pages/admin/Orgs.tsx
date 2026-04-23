@@ -16,6 +16,7 @@ import {
 import { Search, Trash2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { confirmDeleteOrganizationByName } from "@/lib/deleteConfirm";
 
 interface OrgSummary {
   id: string;
@@ -79,7 +80,8 @@ export default function Orgs() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/api/admin/orgs/${id}`),
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      api.deleteWithBody(`/api/admin/orgs/${id}`, { confirm: `DELETE ${name}` }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
       toast({ title: "Organization deleted" });
@@ -239,20 +241,15 @@ export default function Orgs() {
                         className="border-red-900/50 text-red-400/80 hover:bg-red-950/40 hover:text-red-300 text-xs px-2"
                         disabled={deleteMutation.isPending}
                         onClick={() => {
-                          const expected = `DELETE ${org.name}`;
-                          const typed = window.prompt(
-                            `DO YOU WANT TO DELETE "${org.name}"?\n\nType exactly:\n${expected}`
-                          );
-                          if (!typed) return;
-                          if (typed.trim() !== expected) {
+                          if (!confirmDeleteOrganizationByName(org.name)) {
                             toast({
                               title: "Delete cancelled",
-                              description: `Type exactly: ${expected}`,
+                              description: `Type exactly: DELETE ${org.name}`,
                               variant: "destructive",
                             });
                             return;
                           }
-                          deleteMutation.mutate(org.id);
+                          deleteMutation.mutate({ id: org.id, name: org.name });
                         }}
                         title="Delete organization"
                       >

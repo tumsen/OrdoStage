@@ -18,7 +18,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
 import { useI18n } from "@/lib/i18n";
 
-const CONFIRM_PHRASE = "DELETETHISACCOUNT";
+const CONFIRM_PHRASE = "DELETE";
 
 export default function Account() {
   const navigate = useNavigate();

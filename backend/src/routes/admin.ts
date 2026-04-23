@@ -250,8 +250,23 @@ app.post("/admin/orgs/:id/grant-org-admin", async (c) => {
 
 app.delete("/admin/orgs/:id", async (c) => {
   const id = c.req.param("id");
-  const org = await prisma.organization.findUnique({ where: { id }, select: { id: true } });
+  const org = await prisma.organization.findUnique({ where: { id }, select: { id: true, name: true } });
   if (!org) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  const body = await c.req.json().catch(() => ({} as { confirm?: string }));
+  const confirm = typeof body.confirm === "string" ? body.confirm.trim() : "";
+  const expected = `DELETE ${org.name}`;
+  if (confirm !== expected) {
+    return c.json(
+      {
+        error: {
+          message: `Send JSON body { "confirm": "${expected}" } to permanently delete this organization.`,
+          code: "BAD_REQUEST",
+        },
+      },
+      400
+    );
+  }
 
   await reassignUsersBeforeOrgDelete(prisma, id);
   await prisma.organization.delete({ where: { id } });

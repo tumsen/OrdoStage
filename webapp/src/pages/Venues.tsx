@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Edit2, Trash2, Check, X } from "lucide-react";
 import { api } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Venue } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -567,7 +568,11 @@ export default function Venues() {
             <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => { if (deleteId) deleteMutation.mutate(deleteId); }}
+              onClick={() => {
+                if (!deleteId) return;
+                if (!confirmDeleteAction("venue")) return;
+                deleteMutation.mutate(deleteId);
+              }}
             >
               Delete
             </AlertDialogAction>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
+import { confirmDeleteOrganizationByName } from "@/lib/deleteConfirm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -618,7 +619,8 @@ export default function OrgDetail() {
   });
 
   const deleteOrgMutation = useMutation({
-    mutationFn: () => api.delete(`/api/admin/orgs/${id}`),
+    mutationFn: () =>
+      api.deleteWithBody(`/api/admin/orgs/${id}`, { confirm: `DELETE ${org?.name ?? ""}` }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
       toast({ title: "Organization deleted" });
@@ -728,14 +730,10 @@ export default function OrgDetail() {
             className="border-red-800/50 text-red-300 hover:bg-red-950/40"
             disabled={deleteOrgMutation.isPending}
             onClick={() => {
-              const phrase = `DELETE ${org.name}`;
-              const typed = window.prompt(
-                `DO YOU WANT TO DELETE "${org.name}"?\n\nType exactly:\n${phrase}`
-              );
-              if (typed !== phrase) {
+              if (!confirmDeleteOrganizationByName(org.name)) {
                 toast({
                   title: "Delete cancelled",
-                  description: `Type exactly: ${phrase}`,
+                  description: `Type exactly: DELETE ${org.name}`,
                   variant: "destructive",
                 });
                 return;

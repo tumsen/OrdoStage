@@ -458,21 +458,15 @@ app.patch("/org", async (c) => {
   return c.json({ data: { ok: true } });
 });
 
-// DELETE /api/org — delete entire organization (owner only; type "delete" to confirm)
+// DELETE /api/org — delete entire organization (owner only; type "DELETE <ORG NAME>" to confirm)
 app.delete("/org", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   }
 
-  const body = await c.req.json().catch(() => ({}));
-  const confirm = typeof body.confirm === "string" ? body.confirm.trim().toLowerCase() : "";
-  if (confirm !== "delete") {
-    return c.json(
-      { error: { message: 'Send JSON body { "confirm": "delete" } to permanently delete this organization.', code: "BAD_REQUEST" } },
-      400
-    );
-  }
+  const body = await c.req.json().catch(() => ({} as { confirm?: string }));
+  const confirm = typeof body.confirm === "string" ? body.confirm.trim() : "";
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
@@ -486,6 +480,26 @@ app.delete("/org", async (c) => {
   }
 
   const orgId = dbUser.organizationId;
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { name: true },
+  });
+  if (!org) {
+    return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
+  }
+  const expected = `DELETE ${org.name}`;
+  if (confirm !== expected) {
+    return c.json(
+      {
+        error: {
+          message: `Send JSON body { "confirm": "${expected}" } to permanently delete this organization.`,
+          code: "BAD_REQUEST",
+        },
+      },
+      400
+    );
+  }
+
   await reassignUsersBeforeOrgDelete(prisma, orgId);
   await prisma.organization.delete({ where: { id: orgId } });
 

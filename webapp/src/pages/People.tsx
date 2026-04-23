@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
 import type { Person } from "../../../backend/src/types";
 import { AddressFields, type Address, EMPTY_ADDRESS } from "@/components/AddressFields";
@@ -906,7 +907,11 @@ export default function People() {
             <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => { if (deleteId) deleteMutation.mutate(deleteId); }}
+              onClick={() => {
+                if (!deleteId) return;
+                if (!confirmDeleteAction("person")) return;
+                deleteMutation.mutate(deleteId);
+              }}
             >
               Delete
             </AlertDialogAction>

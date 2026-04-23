@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { toast } from "@/hooks/use-toast";
 import type { CalendarItem } from "./scheduleUtils";
 import type {
@@ -46,7 +47,7 @@ function toLocal(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// ─── Delete confirmation (type "delete" to confirm) ──────────────────────────
+// ─── Delete confirmation (type "DELETE" to confirm) ──────────────────────────
 
 function DeleteConfirmInline({
   label,
@@ -58,19 +59,19 @@ function DeleteConfirmInline({
   onCancel: () => void;
 }) {
   const [value, setValue] = useState("");
-  const ready = value.trim().toLowerCase() === "delete";
+  const ready = value.trim() === "DELETE";
   return (
     <div className="rounded-lg border border-red-800/50 bg-red-950/30 p-4 space-y-3">
       <p className="text-sm text-red-300 font-medium">Delete {label}?</p>
       <p className="text-xs text-white/50">
-        This cannot be undone. Type <span className="font-semibold text-white/70">delete</span> to confirm.
+        This cannot be undone. Type <span className="font-semibold text-white/70">DELETE</span> to confirm.
       </p>
       <input
         autoFocus
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="delete"
+        placeholder="DELETE"
         className="w-full h-9 px-3 text-sm bg-black/30 border border-red-800/50 rounded-md text-white placeholder:text-white/20 focus:outline-none focus:border-red-500/70"
       />
       <div className="flex gap-2 justify-end">
@@ -262,6 +263,7 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
             </div>
             <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-red-400 flex-shrink-0"
               onClick={() => {
+                if (!confirmDeleteAction(`person assignment "${ap.person?.name ?? ap.personId}"`)) return;
                 setAssignedPeople((prev) => prev.filter((p) => p.id !== ap.id));
                 removeMutation.mutate(ap.id);
               }}>

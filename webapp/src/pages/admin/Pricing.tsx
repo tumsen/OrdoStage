@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { Info, Trash2 } from "lucide-react";
 import {
   pickBaselinePack,
@@ -531,7 +532,11 @@ export default function Pricing() {
             <AlertDialogCancel className="bg-transparent border-white/15 text-white">Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-700 hover:bg-red-600 text-white"
-              onClick={() => packToDelete && deleteMutation.mutate(packToDelete.packId)}
+              onClick={() => {
+                if (!packToDelete) return;
+                if (!confirmDeleteAction(`price pack "${packToDelete.label}"`)) return;
+                deleteMutation.mutate(packToDelete.packId);
+              }}
             >
               Delete
             </AlertDialogAction>

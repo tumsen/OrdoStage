@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { api } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { TeamDepartmentMembers } from "./TeamDepartmentMembers";
@@ -319,7 +320,11 @@ export function DepartmentsSection({ canWrite }: DepartmentsSectionProps) {
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); }}
+              onClick={() => {
+                if (!deleteTarget) return;
+                if (!confirmDeleteAction(`team "${deleteTarget.name}"`)) return;
+                deleteMutation.mutate(deleteTarget.id);
+              }}
             >
               Delete
             </AlertDialogAction>

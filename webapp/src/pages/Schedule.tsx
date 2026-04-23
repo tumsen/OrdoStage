@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { EventDetail, InternalBookingDetail, Venue, Person } from "../../../backend/src/types";
 import {
   ScheduleFilters,
@@ -206,16 +207,14 @@ export default function Schedule() {
 
   function handleDeleteItem(item: CalendarItem) {
     if (item.kind === "event") {
-      if (confirm(`Delete event "${item.title}"? This cannot be undone.`)) {
-        api.delete(`/api/events/${item.id}`).then(() => {
-          queryClient.invalidateQueries({ queryKey: ["schedule"] });
-          toast({ title: "Event deleted" });
-        }).catch(() => toast({ title: "Failed to delete event", variant: "destructive" }));
-      }
+      if (!confirmDeleteAction(`event "${item.title}"`)) return;
+      api.delete(`/api/events/${item.id}`).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["schedule"] });
+        toast({ title: "Event deleted" });
+      }).catch(() => toast({ title: "Failed to delete event", variant: "destructive" }));
     } else {
-      if (confirm(`Delete booking "${item.title}"?`)) {
-        deleteBookingMutation.mutate(item.id);
-      }
+      if (!confirmDeleteAction(`booking "${item.title}"`)) return;
+      deleteBookingMutation.mutate(item.id);
     }
   }
 

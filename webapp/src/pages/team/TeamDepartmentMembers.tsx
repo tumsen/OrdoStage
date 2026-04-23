@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, UserMinus, UserPlus, X } from "lucide-react";
 import { api, isApiError } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Person } from "../../../../backend/src/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -219,7 +220,9 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
             <AlertDialogAction
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
               onClick={() => {
-                if (removeTarget) removeMutation.mutate(removeTarget.personId);
+                if (!removeTarget) return;
+                if (!confirmDeleteAction(`team member "${removeTarget.name}"`)) return;
+                removeMutation.mutate(removeTarget.personId);
               }}
               disabled={removeMutation.isPending}
             >

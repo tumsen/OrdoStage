@@ -29,6 +29,7 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type {
   TourDetail,
   TourShow,
@@ -1852,7 +1853,10 @@ function ShowCard({
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => deleteMutation.mutate()}
+              onClick={() => {
+                if (!confirmDeleteAction(`show on ${formatShowDate(show.date)}`)) return;
+                deleteMutation.mutate();
+              }}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
@@ -2135,7 +2139,10 @@ function ShowPeopleSection({ show, tour }: { show: TourShow; tour: TourDetail })
                 </div>
                 {isOverridden ? (
                   <button
-                    onClick={() => removeMutation.mutate(p.id)}
+                    onClick={() => {
+                      if (!confirmDeleteAction(`show assignment "${name}"`)) return;
+                      removeMutation.mutate(p.id);
+                    }}
                     disabled={removeMutation.isPending}
                     className="text-white/20 hover:text-red-400 ml-1"
                   >
@@ -2283,7 +2290,10 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
                 />
                 <span className="text-xs text-white/80">{tt.team.name}</span>
                 <button
-                  onClick={() => removeMutation.mutate(tt.teamId)}
+                  onClick={() => {
+                    if (!confirmDeleteAction(`team assignment "${tt.team.name}"`)) return;
+                    removeMutation.mutate(tt.teamId);
+                  }}
                   className="text-white/25 hover:text-red-400"
                   disabled={removeMutation.isPending}
                 >
@@ -2555,7 +2565,10 @@ function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => removeMutation.mutate()}
+            onClick={() => {
+              if (!confirmDeleteAction("attached PDF")) return;
+              removeMutation.mutate();
+            }}
             disabled={removeMutation.isPending}
             className="h-6 px-2 text-white/30 hover:text-red-400"
           >

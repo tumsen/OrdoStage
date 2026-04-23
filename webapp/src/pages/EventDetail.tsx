@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Edit2, Trash2, Plus, X, Download, Upload } from "lucide-react";
 import { api } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { EventDetail, Person, EventPerson, Document } from "@/lib/types";
 import type { Department } from "../../../backend/src/types";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -641,7 +642,10 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
             <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => deleteMutation.mutate()}
+              onClick={() => {
+                if (!confirmDeleteAction(`event "${event.title}"`)) return;
+                deleteMutation.mutate();
+              }}
             >
               Delete
             </AlertDialogAction>
@@ -724,7 +728,10 @@ function PeopleTab({ event }: { event: EventDetail }) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => removeMutation.mutate(ep.id)}
+                onClick={() => {
+                  if (!confirmDeleteAction(`person assignment "${ep.person.name}"`)) return;
+                  removeMutation.mutate(ep.id);
+                }}
                 className="h-7 w-7 text-white/25 hover:text-red-400"
               >
                 <X size={13} />
@@ -946,7 +953,11 @@ function DocumentsTab({ event }: { event: EventDetail }) {
             <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => { if (deleteDocId) deleteMutation.mutate(deleteDocId); }}
+              onClick={() => {
+                if (!deleteDocId) return;
+                if (!confirmDeleteAction("document")) return;
+                deleteMutation.mutate(deleteDocId);
+              }}
             >
               Delete
             </AlertDialogAction>

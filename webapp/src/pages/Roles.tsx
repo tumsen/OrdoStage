@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 
 type Catalog = {
   views: { id: string; label: string; path: string }[];
@@ -268,7 +269,8 @@ export default function Roles() {
                       title={r.assignedUserCount > 0 ? "Reassign users first" : "Delete role"}
                       onClick={() => {
                         if (r.assignedUserCount > 0) return;
-                        if (confirm(`Delete role “${r.name}”?`)) deleteMutation.mutate(r.id);
+                        if (!confirmDeleteAction(`role "${r.name}"`)) return;
+                        deleteMutation.mutate(r.id);
                       }}
                     >
                       <Trash2 size={14} />
