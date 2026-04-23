@@ -9,6 +9,7 @@ import {
   type TeamAssignmentInput,
 } from "../types";
 import { canAction } from "../requestRole";
+import { isPostgresDatabaseUrl } from "../databaseUrl";
 
 const TEAM_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#84cc16", "#06b6d4"];
 
@@ -147,6 +148,43 @@ peopleRouter.get("/people", async (c) => {
     },
   });
   return c.json({ data: people.map(serializePerson) });
+});
+
+// GET /api/people/me — current user's linked person profile in active organization
+peopleRouter.get("/people/me", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!user.email) {
+    return c.json({ data: null });
+  }
+
+  let person = await prisma.person.findFirst({
+    where: {
+      organizationId: user.organizationId,
+      email: user.email,
+    },
+    include: {
+      teamMemberships: { include: { department: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (!person && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
+    person = await prisma.person.findFirst({
+      where: {
+        organizationId: user.organizationId,
+        email: { equals: user.email, mode: "insensitive" },
+      },
+      include: {
+        teamMemberships: { include: { department: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  return c.json({ data: person ? serializePerson(person) : null });
 });
 
 // POST /api/people
