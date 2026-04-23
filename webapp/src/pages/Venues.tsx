@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
-import { AddressFields, type Address } from "@/components/AddressFields";
+import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
 
 const VenueFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -277,16 +277,49 @@ function VenueRow({
       <td className="px-5 py-3.5 text-sm font-medium text-white/90">{venue.name}</td>
       <td className="px-5 py-3.5 text-sm text-white/50 hidden sm:table-cell">
         {venue.addressStreet || venue.addressCity || venue.addressCountry
-          ? [
-              venue.addressStreet && venue.addressNumber
-                ? `${venue.addressStreet} ${venue.addressNumber}`
-                : venue.addressStreet,
-              venue.addressZip && venue.addressCity
-                ? `${venue.addressZip} ${venue.addressCity}`
-                : venue.addressCity,
-              venue.addressCountry,
-            ].filter(Boolean).join(", ")
+          ? formatAddress({
+              street: venue.addressStreet,
+              number: venue.addressNumber,
+              zip: venue.addressZip,
+              city: venue.addressCity,
+              state: venue.addressState,
+              country: venue.addressCountry,
+            })
           : "—"}
+        {venue.addressStreet || venue.addressCity || venue.addressCountry ? (
+          <div className="mt-1 flex gap-3 text-[11px]">
+            <a
+              href={googleMapsUrl({
+                street: venue.addressStreet,
+                number: venue.addressNumber,
+                zip: venue.addressZip,
+                city: venue.addressCity,
+                state: venue.addressState,
+                country: venue.addressCountry,
+              })}
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-300 hover:text-blue-200"
+            >
+              Google Maps
+            </a>
+            <a
+              href={appleMapsUrl({
+                street: venue.addressStreet,
+                number: venue.addressNumber,
+                zip: venue.addressZip,
+                city: venue.addressCity,
+                state: venue.addressState,
+                country: venue.addressCountry,
+              })}
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-300 hover:text-blue-200"
+            >
+              Apple Maps
+            </a>
+          </div>
+        ) : null}
       </td>
       <td className="px-5 py-3.5 text-sm text-white/50 hidden md:table-cell">
         <div>{venue.capacity != null ? venue.capacity.toLocaleString() : "—"}</div>

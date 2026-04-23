@@ -14,7 +14,7 @@ import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
 import type { Person, PersonDocument } from "../../../backend/src/types";
-import { AddressFields, type Address } from "@/components/AddressFields";
+import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -940,18 +940,49 @@ function PersonCard({
             </a>
           ) : null}
           {(person.addressStreet || person.addressCity || person.addressCountry) ? (
-            <span className="text-xs text-white/30 flex items-center gap-1">
-              <MapPin size={10} />
-              {[
-                person.addressStreet && person.addressNumber
-                  ? `${person.addressStreet} ${person.addressNumber}`
-                  : person.addressStreet,
-                person.addressZip && person.addressCity
-                  ? `${person.addressZip} ${person.addressCity}`
-                  : person.addressCity,
-                person.addressCountry,
-              ].filter(Boolean).join(", ")}
-            </span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/30">
+              <span className="flex items-center gap-1">
+                <MapPin size={10} />
+                {formatAddress({
+                  street: person.addressStreet,
+                  number: person.addressNumber,
+                  zip: person.addressZip,
+                  city: person.addressCity,
+                  state: person.addressState,
+                  country: person.addressCountry,
+                })}
+              </span>
+              <a
+                href={googleMapsUrl({
+                  street: person.addressStreet,
+                  number: person.addressNumber,
+                  zip: person.addressZip,
+                  city: person.addressCity,
+                  state: person.addressState,
+                  country: person.addressCountry,
+                })}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-300 hover:text-blue-200"
+              >
+                Google Maps
+              </a>
+              <a
+                href={appleMapsUrl({
+                  street: person.addressStreet,
+                  number: person.addressNumber,
+                  zip: person.addressZip,
+                  city: person.addressCity,
+                  state: person.addressState,
+                  country: person.addressCountry,
+                })}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-300 hover:text-blue-200"
+              >
+                Apple Maps
+              </a>
+            </div>
           ) : null}
         </div>
         {(person.emergencyContactName || person.emergencyContactPhone) ? (
