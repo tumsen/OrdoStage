@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { MapPin, Search } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 
 export interface Address {
   street: string;
@@ -52,6 +52,7 @@ export function AddressFields({ value, onChange, disabled = false }: Props) {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchStatus, setSearchStatus] = useState<string>("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -71,6 +72,7 @@ export function AddressFields({ value, onChange, disabled = false }: Props) {
     if (q.trim().length < 3) {
       setPredictions([]);
       setOpen(false);
+      setSearchStatus("");
       return;
     }
     debounceRef.current = setTimeout(async () => {
@@ -80,8 +82,17 @@ export function AddressFields({ value, onChange, disabled = false }: Props) {
         );
         setPredictions(results ?? []);
         setOpen((results ?? []).length > 0);
+        setSearchStatus(
+          (results ?? []).length === 0
+            ? "No address suggestions found."
+            : ""
+        );
       } catch {
         setPredictions([]);
+        setOpen(false);
+        setSearchStatus(
+          "Google Maps search is not configured yet. You can still type the address manually."
+        );
       }
     }, 300);
   }
@@ -105,8 +116,13 @@ export function AddressFields({ value, onChange, disabled = false }: Props) {
           country: details.country || value.country,
         });
       }
-    } catch {
-      // silently ignore — user can fill fields manually
+      setSearchStatus("");
+    } catch (e) {
+      setSearchStatus(
+        isApiError(e)
+          ? e.message
+          : "Could not fetch address details. You can fill fields manually."
+      );
     } finally {
       setLoading(false);
       setQuery("");
@@ -161,6 +177,9 @@ export function AddressFields({ value, onChange, disabled = false }: Props) {
           </ul>
         ) : null}
       </div>
+      {searchStatus ? (
+        <p className="text-[11px] text-white/45">{searchStatus}</p>
+      ) : null}
 
       {/* Structured fields */}
       <div className="grid grid-cols-3 gap-2">

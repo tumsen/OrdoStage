@@ -31,6 +31,7 @@ export function AddressAutocomplete({
 }: Props) {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [open, setOpen] = useState(false);
+  const [hint, setHint] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +50,7 @@ export function AddressAutocomplete({
     if (query.trim().length < 3) {
       setPredictions([]);
       setOpen(false);
+      setHint("");
       return;
     }
     debounceRef.current = setTimeout(async () => {
@@ -58,8 +60,11 @@ export function AddressAutocomplete({
         );
         setPredictions(results ?? []);
         setOpen((results ?? []).length > 0);
+        setHint((results ?? []).length > 0 ? "" : "No address suggestions found.");
       } catch {
         setPredictions([]);
+        setOpen(false);
+        setHint("Google Maps search is not configured yet. You can still type the address manually.");
       }
     }, 300);
   }
@@ -111,6 +116,7 @@ export function AddressAutocomplete({
           ))}
         </ul>
       ) : null}
+      {hint ? <p className="mt-1 text-[11px] text-white/45">{hint}</p> : null}
     </div>
   );
 }

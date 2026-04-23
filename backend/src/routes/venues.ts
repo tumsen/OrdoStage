@@ -77,7 +77,15 @@ venuesRouter.get("/venues/address-search", async (c) => {
   }
 
   if (!env.GOOGLE_MAPS_API_KEY) {
-    return c.json({ data: [] });
+    return c.json(
+      {
+        error: {
+          message: "Google Maps address search is not configured on the server.",
+          code: "GOOGLE_MAPS_NOT_CONFIGURED",
+        },
+      },
+      503
+    );
   }
 
   const url = new URL("https://maps.googleapis.com/maps/api/place/autocomplete/json");
@@ -114,7 +122,17 @@ venuesRouter.get("/venues/address-details", async (c) => {
   const placeId = c.req.query("placeId")?.trim();
   if (!placeId) return c.json({ data: null });
 
-  if (!env.GOOGLE_MAPS_API_KEY) return c.json({ data: null });
+  if (!env.GOOGLE_MAPS_API_KEY) {
+    return c.json(
+      {
+        error: {
+          message: "Google Maps address details are not configured on the server.",
+          code: "GOOGLE_MAPS_NOT_CONFIGURED",
+        },
+      },
+      503
+    );
+  }
 
   const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
   url.searchParams.set("place_id", placeId);
