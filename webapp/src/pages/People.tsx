@@ -13,7 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
-import type { Person } from "../../../backend/src/types";
+import type { Person, PersonDocument } from "../../../backend/src/types";
 import { AddressFields, type Address } from "@/components/AddressFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useSession } from "@/lib/auth-client";
 
 interface Team {
   id: string;
@@ -194,6 +195,67 @@ const PEOPLE_SORT_OPTIONS: { mode: PeopleSortMode; label: string }[] = [
   { mode: "external", label: "External" },
 ];
 
+const PERSON_DOCUMENT_TYPE_OPTIONS = [
+  "passport",
+  "driver_license",
+  "certificate",
+  "visa",
+  "contract",
+  "medical",
+  "other",
+] as const;
+
+async function uploadPersonPhoto(personId: string, file: File): Promise<void> {
+  const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+  const formData = new FormData();
+  formData.append("file", file);
+  const resp = await fetch(`${baseUrl}/api/people/${personId}/photo`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  if (!resp.ok) {
+    let message = "Failed to upload photo.";
+    try {
+      const parsed = await resp.json();
+      const maybe = (parsed as { error?: { message?: string } })?.error?.message;
+      if (typeof maybe === "string" && maybe.trim()) message = maybe;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+}
+
+async function uploadPersonDocument(
+  personId: string,
+  file: File,
+  name: string,
+  type: string
+): Promise<void> {
+  const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("name", name.trim() || file.name);
+  formData.append("type", type.trim() || "other");
+  const resp = await fetch(`${baseUrl}/api/people/${personId}/documents`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  if (!resp.ok) {
+    let message = "Failed to upload document.";
+    try {
+      const parsed = await resp.json();
+      const maybe = (parsed as { error?: { message?: string } })?.error?.message;
+      if (typeof maybe === "string" && maybe.trim()) message = maybe;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+}
+
 // ── Person form dialog ────────────────────────────────────────────────────────
 
 function PersonFormDialog({
@@ -260,6 +322,17 @@ function PersonFormDialog({
   });
 
   const [newTeamDraft, setNewTeamDraft] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docName, setDocName] = useState("");
+  const [docType, setDocType] = useState<(typeof PERSON_DOCUMENT_TYPE_OPTIONS)[number]>("other");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const { data: personDocuments } = useQuery<PersonDocument[]>({
+    queryKey: ["people", person?.id, "documents"],
+    queryFn: () => api.get<PersonDocument[]>(`/api/people/${person!.id}/documents`),
+    enabled: Boolean(person?.id),
+  });
 
   useEffect(() => {
     if (!open || person || !teams?.length) return;
@@ -297,21 +370,72 @@ function PersonFormDialog({
         ? api.put(`/api/people/${person.id}`, payload)
         : api.post<Person>("/api/people", payload);
     },
-    onSuccess: () => {
+    onSuccess: async (result) => {
+      const personId = person?.id ?? (result as Person).id;
+      if (personId && photoFile) {
+        await uploadPersonPhoto(personId, photoFile);
+      }
+      if (personId && docFile) {
+        await uploadPersonDocument(personId, docFile, docName || docFile.name, docType);
+      }
       queryClient.invalidateQueries({ queryKey: ["people"] });
+      if (personId) {
+        queryClient.invalidateQueries({ queryKey: ["people", personId, "documents"] });
+      }
+      setPhotoFile(null);
+      setDocFile(null);
+      setDocName("");
+      setDocType("other");
+      setUploadError(null);
       onOpenChange(false);
       form.reset();
       onSuccess?.();
     },
+    onError: (e: Error) => {
+      setUploadError(e.message || "Could not save person.");
+    },
+  });
+
+  const removePhotoMutation = useMutation({
+    mutationFn: () => api.delete(`/api/people/${person!.id}/photo`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["people"] });
+    },
+  });
+
+  const uploadDocMutation = useMutation({
+    mutationFn: async () => {
+      if (!person?.id || !docFile) return;
+      await uploadPersonDocument(person.id, docFile, docName || docFile.name, docType);
+    },
+    onSuccess: () => {
+      setDocFile(null);
+      setDocName("");
+      setDocType("other");
+      if (person?.id) {
+        queryClient.invalidateQueries({ queryKey: ["people", person.id, "documents"] });
+      }
+    },
+    onError: (e: Error) => setUploadError(e.message || "Could not upload document."),
+  });
+
+  const deleteDocMutation = useMutation({
+    mutationFn: (docId: string) => api.delete(`/api/people/documents/${docId}`),
+    onSuccess: () => {
+      if (person?.id) {
+        queryClient.invalidateQueries({ queryKey: ["people", person.id, "documents"] });
+      }
+    },
   });
 
   function handleSubmit(values: PersonFormValues) {
+    setUploadError(null);
     mutation.mutate(values);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-lg">
+      <DialogContent className="bg-[#16161f] border-white/10 text-white w-[95vw] max-w-[1200px] max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{person ? "Edit Person" : "Add Person"}</DialogTitle>
         </DialogHeader>
@@ -553,6 +677,122 @@ function PersonFormDialog({
               <p className="text-red-400 text-xs">{form.formState.errors.teamAssignments.message}</p>
             ) : null}
           </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Profile image</Label>
+              <p className="text-[11px] text-white/35">
+                Upload a profile image (jpg/png/webp). For new people, the image is uploaded right after you click Add Person.
+              </p>
+              {person?.hasPhoto ? (
+                <img
+                  src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
+                  alt={`${person.name} profile`}
+                  className="h-24 w-24 rounded-md object-cover border border-white/10"
+                />
+              ) : null}
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+                className="bg-white/5 border-white/10 text-white file:text-white"
+              />
+              {person?.hasPhoto ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-white/15 text-white/70"
+                  disabled={removePhotoMutation.isPending}
+                  onClick={() => removePhotoMutation.mutate()}
+                >
+                  {removePhotoMutation.isPending ? "Deleting…" : "Delete image"}
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Documents</Label>
+              <p className="text-[11px] text-white/35">
+                Add passport, driver license, certificates, contracts, or other files.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <Input
+                  placeholder="Document name"
+                  value={docName}
+                  onChange={(e) => setDocName(e.target.value)}
+                  className="sm:col-span-2 bg-white/5 border-white/10 text-white placeholder:text-white/25"
+                />
+                <Select value={docType} onValueChange={(v) => setDocType(v as (typeof PERSON_DOCUMENT_TYPE_OPTIONS)[number])}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                    {PERSON_DOCUMENT_TYPE_OPTIONS.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Input
+                type="file"
+                onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                className="bg-white/5 border-white/10 text-white file:text-white"
+              />
+              {person ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-indigo-700 hover:bg-indigo-600 text-white"
+                  disabled={uploadDocMutation.isPending || !docFile}
+                  onClick={() => uploadDocMutation.mutate()}
+                >
+                  {uploadDocMutation.isPending ? "Uploading…" : "Upload document now"}
+                </Button>
+              ) : (
+                <p className="text-[11px] text-white/35">
+                  For new people, the selected document is uploaded after you click Add Person.
+                </p>
+              )}
+              {personDocuments && personDocuments.length > 0 ? (
+                <div className="rounded border border-white/10 divide-y divide-white/5">
+                  {personDocuments.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs">
+                      <div className="min-w-0">
+                        <div className="text-white/80 truncate">{doc.name}</div>
+                        <div className="text-white/35 truncate">
+                          {doc.type} · {doc.filename}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/documents/${doc.id}/download`}
+                          className="text-blue-300 hover:text-blue-200"
+                        >
+                          Download
+                        </a>
+                        <button
+                          type="button"
+                          className="text-red-300 hover:text-red-200"
+                          onClick={() => {
+                            if (!confirmDeleteAction(`document "${doc.name}"`)) return;
+                            deleteDocMutation.mutate(doc.id);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {uploadError ? (
+            <p className="text-red-400 text-xs">{uploadError}</p>
+          ) : null}
         </div>
 
         <DialogFooter>
@@ -582,6 +822,8 @@ function PersonCard({
   person,
   onEdit,
   onDelete,
+  canEditPerson,
+  canDeletePerson,
   deactivateCreditCost,
   creditsBalance,
   unlimitedCredits,
@@ -589,6 +831,8 @@ function PersonCard({
   person: Person;
   onEdit: () => void;
   onDelete: () => void;
+  canEditPerson: boolean;
+  canDeletePerson: boolean;
   deactivateCreditCost: number;
   creditsBalance: number;
   unlimitedCredits: boolean;
@@ -712,12 +956,16 @@ function PersonCard({
           />
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-white" onClick={onEdit}>
-            <Edit2 size={13} />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-red-400" onClick={onDelete}>
-            <Trash2 size={13} />
-          </Button>
+          {canEditPerson ? (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-white" onClick={onEdit}>
+              <Edit2 size={13} />
+            </Button>
+          ) : null}
+          {canDeletePerson ? (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-red-400" onClick={onDelete}>
+              <Trash2 size={13} />
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -766,6 +1014,8 @@ export default function People() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<PeopleSortMode>("alphabetical");
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const { canWrite } = usePermissions();
 
   const { data: people, isLoading, error } = useQuery({
     queryKey: ["people"],
@@ -860,15 +1110,26 @@ export default function People() {
         ) : (
           <div>
             {sortedPeople.map((person) => (
+              (() => {
+                const sessionEmail = session?.user?.email?.toLowerCase() ?? null;
+                const personEmail = person.email?.toLowerCase() ?? null;
+                const canEditPerson =
+                  canWrite || Boolean(sessionEmail && personEmail && sessionEmail === personEmail);
+                const canDeletePerson = canWrite;
+                return (
               <PersonCard
                 key={person.id}
                 person={person}
                 onEdit={() => setEditPerson(person)}
                 onDelete={() => setDeleteId(person.id)}
+                canEditPerson={canEditPerson}
+                canDeletePerson={canDeletePerson}
                 deactivateCreditCost={deactivateCost}
                 creditsBalance={creditBal}
                 unlimitedCredits={orgUnlimited}
               />
+                );
+              })()
             ))}
             <div className="px-5 py-3 border-t border-white/5">
               <button

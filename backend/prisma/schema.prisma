@@ -228,10 +228,15 @@ model Person {
   addressCountry        String?
   emergencyContactName  String?
   emergencyContactPhone String?
+  photoData         Bytes?
+  photoFilename     String?
+  photoMimeType     String?
+  photoUpdatedAt    DateTime?
   organizationId   String
   organization     Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   departmentId     String?
   department       Department?             @relation(fields: [departmentId], references: [id])
+  documents        PersonDocument[]
   teamMemberships  PersonTeam[]
   assignments      EventPerson[]
   internalBookings InternalBookingPerson[]
@@ -243,6 +248,18 @@ model Person {
   affiliation      String                  @default("internal")
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
+}
+
+model PersonDocument {
+  id         String   @id @default(cuid())
+  personId   String
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  name       String
+  type       String   @default("other")
+  filename   String
+  data       Bytes
+  mimeType   String   @default("application/octet-stream")
+  createdAt  DateTime @default(now())
 }
 
 model Event {

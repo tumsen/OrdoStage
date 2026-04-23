@@ -71,6 +71,8 @@ function serializePerson(person: {
   addressCountry: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
+  photoData?: Uint8Array | null;
+  photoUpdatedAt?: Date | null;
   departmentId: string | null;
   isActive?: boolean;
   teamMemberships?: Array<{
@@ -104,6 +106,8 @@ function serializePerson(person: {
     addressCountry: person.addressCountry ?? null,
     emergencyContactName: person.emergencyContactName ?? null,
     emergencyContactPhone: person.emergencyContactPhone ?? null,
+    hasPhoto: Boolean(person.photoData),
+    photoUpdatedAt: person.photoUpdatedAt ? person.photoUpdatedAt.toISOString() : null,
     departmentId: person.departmentId,
     isActive: person.isActive ?? true,
     teamIds: (person.teamMemberships ?? []).map((membership) => membership.departmentId),
@@ -120,6 +124,11 @@ function serializePerson(person: {
     createdAt: person.createdAt.toISOString(),
     updatedAt: person.updatedAt.toISOString(),
   };
+}
+
+function canEditOwnProfile(user: { email: string }, personEmail: string | null): boolean {
+  if (!personEmail) return false;
+  return personEmail.toLowerCase() === user.email.toLowerCase();
 }
 
 // GET /api/people
@@ -306,10 +315,6 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  if (!canAction(c, "write.people")) {
-    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
-  }
-
   const { id } = c.req.param();
   const body = c.req.valid("json");
   const existing = await prisma.person.findUnique({
@@ -322,6 +327,23 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
   });
   if (!existing) {
     return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+  }
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, existing.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  if (!canWritePeople && body.teamAssignments !== undefined) {
+    return c.json(
+      { error: { message: "Only managers can change team assignments.", code: "FORBIDDEN" } },
+      403
+    );
+  }
+  if (!canWritePeople && body.affiliation !== undefined) {
+    return c.json(
+      { error: { message: "Only managers can change affiliation.", code: "FORBIDDEN" } },
+      403
+    );
   }
   let nextAssignments: Array<{ teamId: string; role?: string | undefined }> = existing.teamMemberships.map(
     (membership) => ({
@@ -382,6 +404,229 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
     },
   });
   return c.json({ data: serializePerson(person) });
+});
+
+// GET /api/people/:id/documents
+peopleRouter.get("/people/:id/documents", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { id } = c.req.param();
+  const person = await prisma.person.findUnique({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true },
+  });
+  if (!person) {
+    return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+  }
+  const docs = await prisma.personDocument.findMany({
+    where: { personId: person.id },
+    select: {
+      id: true,
+      personId: true,
+      name: true,
+      type: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  return c.json({
+    data: docs.map((d) => ({ ...d, createdAt: d.createdAt.toISOString() })),
+  });
+});
+
+// POST /api/people/:id/photo
+peopleRouter.post("/people/:id/photo", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { id } = c.req.param();
+  const person = await prisma.person.findUnique({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true, email: true },
+  });
+  if (!person) {
+    return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+  }
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, person.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  const formData = await c.req.parseBody();
+  const file = formData["file"];
+  if (!file || typeof file === "string") {
+    return c.json({ error: { message: "Photo file is required", code: "BAD_REQUEST" } }, 400);
+  }
+  if (!file.type.startsWith("image/")) {
+    return c.json({ error: { message: "Photo must be an image", code: "BAD_REQUEST" } }, 400);
+  }
+  const bytes = Buffer.from(await file.arrayBuffer());
+  await prisma.person.update({
+    where: { id: person.id },
+    data: {
+      photoData: bytes,
+      photoFilename: file.name,
+      photoMimeType: file.type || "application/octet-stream",
+      photoUpdatedAt: new Date(),
+    },
+  });
+  return c.json({ data: { ok: true } }, 201);
+});
+
+// GET /api/people/:id/photo
+peopleRouter.get("/people/:id/photo", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { id } = c.req.param();
+  const person = await prisma.person.findUnique({
+    where: { id, organizationId: user.organizationId },
+    select: { photoData: true, photoMimeType: true, photoFilename: true },
+  });
+  if (!person || !person.photoData) {
+    return c.json({ error: { message: "Photo not found", code: "NOT_FOUND" } }, 404);
+  }
+  return new Response(person.photoData, {
+    headers: {
+      "Content-Type": person.photoMimeType || "application/octet-stream",
+      "Content-Disposition": `inline; filename="${person.photoFilename || "photo"}"`,
+      "Content-Length": String(person.photoData.length),
+      "Cache-Control": "private, max-age=60",
+    },
+  });
+});
+
+// DELETE /api/people/:id/photo
+peopleRouter.delete("/people/:id/photo", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { id } = c.req.param();
+  const person = await prisma.person.findUnique({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true, email: true },
+  });
+  if (!person) {
+    return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+  }
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, person.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  await prisma.person.update({
+    where: { id: person.id },
+    data: {
+      photoData: null,
+      photoFilename: null,
+      photoMimeType: null,
+      photoUpdatedAt: null,
+    },
+  });
+  return new Response(null, { status: 204 });
+});
+
+// POST /api/people/:id/documents
+peopleRouter.post("/people/:id/documents", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { id } = c.req.param();
+  const person = await prisma.person.findUnique({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true, email: true },
+  });
+  if (!person) {
+    return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+  }
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, person.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  const formData = await c.req.parseBody();
+  const file = formData["file"];
+  const name = formData["name"];
+  const type = formData["type"];
+  if (!file || typeof file === "string") {
+    return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
+  }
+  const rawName = typeof name === "string" && name.trim() ? name.trim() : file.name;
+  const rawType = typeof type === "string" && type.trim() ? type.trim() : "other";
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const document = await prisma.personDocument.create({
+    data: {
+      personId: person.id,
+      name: rawName,
+      type: rawType,
+      filename: file.name,
+      data: bytes,
+      mimeType: file.type || "application/octet-stream",
+    },
+    select: {
+      id: true,
+      personId: true,
+      name: true,
+      type: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+  });
+  return c.json({ data: { ...document, createdAt: document.createdAt.toISOString() } }, 201);
+});
+
+// GET /api/people/documents/:docId/download
+peopleRouter.get("/people/documents/:docId/download", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { docId } = c.req.param();
+  const doc = await prisma.personDocument.findFirst({
+    where: { id: docId, person: { organizationId: user.organizationId } },
+  });
+  if (!doc) {
+    return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+  return new Response(doc.data, {
+    headers: {
+      "Content-Type": doc.mimeType,
+      "Content-Disposition": `attachment; filename="${doc.filename}"`,
+      "Content-Length": String(doc.data.length),
+    },
+  });
+});
+
+// DELETE /api/people/documents/:docId
+peopleRouter.delete("/people/documents/:docId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { docId } = c.req.param();
+  const doc = await prisma.personDocument.findFirst({
+    where: { id: docId, person: { organizationId: user.organizationId } },
+    select: { id: true, person: { select: { email: true } } },
+  });
+  if (!doc) {
+    return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, doc.person.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  await prisma.personDocument.delete({ where: { id: doc.id } });
+  return new Response(null, { status: 204 });
 });
 
 // DELETE /api/people/:id

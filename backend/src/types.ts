@@ -126,6 +126,8 @@ export const PersonSchema = z.object({
   addressCountry: z.string().nullable(),
   emergencyContactName: z.string().nullable(),
   emergencyContactPhone: z.string().nullable(),
+  hasPhoto: z.boolean().optional(),
+  photoUpdatedAt: z.string().nullable().optional(),
   departmentId: z.string().nullable(),
   teamIds: z.array(z.string()),
   teams: z.array(DepartmentSchema),
@@ -133,6 +135,16 @@ export const PersonSchema = z.object({
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+export const PersonDocumentSchema = z.object({
+  id: z.string(),
+  personId: z.string(),
+  name: z.string(),
+  type: z.string(),
+  filename: z.string(),
+  mimeType: z.string(),
+  createdAt: z.string(),
 });
 
 /** Each row picks an existing team (teamId) or creates one by name (newTeamName). */
@@ -366,6 +378,7 @@ export type RiderVisibility = z.infer<typeof RiderVisibilitySchema>;
 export type Venue = z.infer<typeof VenueSchema>;
 export type CreateVenue = z.infer<typeof CreateVenueSchema>;
 export type Person = z.infer<typeof PersonSchema>;
+export type PersonDocument = z.infer<typeof PersonDocumentSchema>;
 export type PersonTeamMembership = z.infer<typeof PersonTeamMembershipSchema>;
 export type CreatePerson = z.infer<typeof CreatePersonSchema>;
 export type Event = z.infer<typeof EventSchema>;
