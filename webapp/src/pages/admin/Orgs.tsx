@@ -21,6 +21,7 @@ interface OrgSummary {
   id: string;
   name: string;
   creditBalance: number;
+  unlimitedCredits?: boolean;
   discountPercent: number;
   freeTrialUsed: boolean;
   createdAt: string;
@@ -37,7 +38,14 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function CreditBadge({ balance }: { balance: number }) {
+function CreditBadge({ balance, unlimited }: { balance: number; unlimited?: boolean }) {
+  if (unlimited) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
+        ∞
+      </span>
+    );
+  }
   if (balance <= 0) {
     return (
       <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-950/60 text-red-400 border border-red-800/40">
@@ -141,7 +149,7 @@ export default function Orgs() {
                   <TableCell className="text-white/50">{org._count.people}</TableCell>
                   <TableCell className="text-white/50">{org._count.events}</TableCell>
                   <TableCell>
-                    <CreditBadge balance={org.creditBalance} />
+                    <CreditBadge balance={org.creditBalance} unlimited={org.unlimitedCredits} />
                   </TableCell>
                   <TableCell className="text-white/50">
                     {org.discountPercent > 0 ? `${org.discountPercent}%` : "—"}

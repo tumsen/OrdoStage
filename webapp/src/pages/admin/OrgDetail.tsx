@@ -213,7 +213,7 @@ function CreditsTab({ org }: { org: OrgDetail }) {
           <div className="text-white/40 text-xs uppercase tracking-wider mb-0.5">Current Balance</div>
           {org.unlimitedCredits ? (
             <div className="text-3xl font-bold text-emerald-400">
-              Unlimited <span className="text-sm font-normal text-white/40">credits</span>
+              ∞ <span className="text-sm font-normal text-white/40">credits</span>
             </div>
           ) : (
             <div className={`text-3xl font-bold ${org.creditBalance <= 0 ? "text-red-400" : org.creditBalance <= 30 ? "text-amber-400" : "text-white"}`}>

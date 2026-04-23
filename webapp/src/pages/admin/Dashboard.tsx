@@ -27,6 +27,7 @@ interface OrgSummary {
   id: string;
   name: string;
   creditBalance: number;
+  unlimitedCredits?: boolean;
   freeTrialUsed: boolean;
   createdAt: string;
   _count: { users: number; events: number };
@@ -79,11 +80,13 @@ export default function Dashboard() {
     queryFn: () => api.get<OrgSummary[]>("/api/admin/orgs"),
   });
 
-  const lowCreditOrgs = orgs?.filter((o) => o.creditBalance < 30) ?? [];
+  const lowCreditOrgs = orgs?.filter((o) => !o.unlimitedCredits && o.creditBalance < 30) ?? [];
 
+  const finiteOrgs = (orgs ?? []).filter((o) => !o.unlimitedCredits);
+  const hasUnlimitedOrg = (orgs ?? []).some((o) => Boolean(o.unlimitedCredits));
   const avgCreditBalance =
-    orgs && orgs.length > 0
-      ? Math.round(orgs.reduce((sum, o) => sum + o.creditBalance, 0) / orgs.length)
+    finiteOrgs.length > 0
+      ? Math.round(finiteOrgs.reduce((sum, o) => sum + o.creditBalance, 0) / finiteOrgs.length)
       : 0;
 
   if (statsPending) {
@@ -125,7 +128,7 @@ export default function Dashboard() {
         />
         <StatCard
           title="Avg Credit Balance"
-          value={`${avgCreditBalance} days`}
+          value={hasUnlimitedOrg ? "∞ days" : `${avgCreditBalance} days`}
           icon={CreditCard}
         />
       </div>
