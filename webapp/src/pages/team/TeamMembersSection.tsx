@@ -265,7 +265,7 @@ export function TeamMembersSection({ isOwner, canManageTeam }: TeamMembersSectio
       >
         <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove team member?</AlertDialogTitle>
+            <AlertDialogTitle>Delete team member?</AlertDialogTitle>
             <AlertDialogDescription className="text-white/50">
               {removeTarget?.name} will be removed from the organisation. They will need to be re-invited to regain access.
             </AlertDialogDescription>
@@ -282,7 +282,7 @@ export function TeamMembersSection({ isOwner, canManageTeam }: TeamMembersSectio
                 removeMutation.mutate(removeTarget.id);
               }}
             >
-              Remove
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

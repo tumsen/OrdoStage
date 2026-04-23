@@ -481,7 +481,7 @@ export default function Billing() {
                     disabled={deleteOrgMutation.isPending || deleteWord.trim() !== `DELETE ${org.name}`}
                     onClick={() => deleteOrgMutation.mutate()}
                   >
-                    {deleteOrgMutation.isPending ? "Deleting…" : "Delete forever"}
+                    {deleteOrgMutation.isPending ? "Deleting…" : "Delete organization"}
                   </Button>
                 </div>
               </div>

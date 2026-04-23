@@ -208,7 +208,7 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
       <AlertDialog open={removeTarget !== null} onOpenChange={(o) => { if (!o) setRemoveTarget(null); }}>
         <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove from this team?</AlertDialogTitle>
+            <AlertDialogTitle>Delete team member?</AlertDialogTitle>
             <AlertDialogDescription className="text-white/50">
               {removeTarget
                 ? `${removeTarget.name} will be removed from this team only. They must stay on at least one other team.`
@@ -226,7 +226,7 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
               }}
               disabled={removeMutation.isPending}
             >
-              {removeMutation.isPending ? "Removing…" : "Remove"}
+              {removeMutation.isPending ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
