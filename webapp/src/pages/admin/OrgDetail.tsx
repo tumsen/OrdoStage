@@ -668,7 +668,18 @@ export default function OrgDetail() {
             className="border-red-800/50 text-red-300 hover:bg-red-950/40"
             disabled={deleteOrgMutation.isPending}
             onClick={() => {
-              if (!confirm(`Permanently delete "${org.name}" and all of its data?`)) return;
+              const phrase = `DELETE ${org.name}`;
+              const typed = window.prompt(
+                `DO YOU WANT TO DELETE "${org.name}"?\n\nType exactly:\n${phrase}`
+              );
+              if (typed !== phrase) {
+                toast({
+                  title: "Delete cancelled",
+                  description: `Type exactly: ${phrase}`,
+                  variant: "destructive",
+                });
+                return;
+              }
               deleteOrgMutation.mutate();
             }}
           >
