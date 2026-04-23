@@ -235,7 +235,13 @@ app.post("/admin/orgs/:id/unlimited", async (c) => {
 
   const updatedOrg = await prisma.organization.update({
     where: { id: org.id },
-    data: { unlimitedCredits: unlimited },
+    data: unlimited
+      ? { unlimitedCredits: true }
+      : {
+          unlimitedCredits: false,
+          // Unlimited mode uses a sentinel balance; reset to zero when disabling.
+          creditBalance: org.creditBalance === 999999999 ? 0 : org.creditBalance,
+        },
   });
 
   return c.json({ data: updatedOrg });
