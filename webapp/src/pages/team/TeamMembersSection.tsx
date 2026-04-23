@@ -102,6 +102,17 @@ export function TeamMembersSection({ isOwner, canManageTeam }: TeamMembersSectio
     },
   });
 
+  const resendInviteMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/api/team/invitations/${id}/resend`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["team", "invitations"] });
+      toast({ title: "Invitation resent", description: "A new invitation email has been sent." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not resend invitation", description: err.message, variant: "destructive" });
+    },
+  });
+
   return (
     <>
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
@@ -133,6 +144,14 @@ export function TeamMembersSection({ isOwner, canManageTeam }: TeamMembersSectio
                 <span className="truncate">{inv.email}</span>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <RoleBadge role={inv.orgRole} />
+                  <button
+                    type="button"
+                    className="text-xs text-white/35 hover:text-indigo-300 disabled:opacity-50"
+                    disabled={resendInviteMutation.isPending}
+                    onClick={() => resendInviteMutation.mutate(inv.id)}
+                  >
+                    Resend
+                  </button>
                   <button
                     type="button"
                     className="text-xs text-white/35 hover:text-red-400"

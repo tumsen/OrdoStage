@@ -192,6 +192,52 @@ teamRouter.delete("/team/invitations/:id", async (c) => {
   return new Response(null, { status: 204 });
 });
 
+// POST /api/team/invitations/:id/resend — resend pending invite email
+teamRouter.post("/team/invitations/:id/resend", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  if (!canManageTeamRequest(c)) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+
+  const { id } = c.req.param();
+  const invite = await prisma.organizationInvitation.findFirst({
+    where: { id, organizationId: user.organizationId, acceptedAt: null },
+    include: { organization: { select: { name: true } } },
+  });
+  if (!invite) {
+    return c.json({ error: { message: "Invitation not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  // Refresh expiry so a resent invitation is always valid for a full period.
+  const refreshed = await prisma.organizationInvitation.update({
+    where: { id: invite.id },
+    data: { expiresAt: new Date(Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000) },
+  });
+
+  const url = inviteAcceptUrl(refreshed.token);
+  try {
+    await sendInvitationEmail(refreshed.email, invite.organization.name, url);
+  } catch (e) {
+    console.error("[INVITE RESEND EMAIL]", e);
+    return c.json(
+      { error: { message: "Failed to send invitation email", code: "EMAIL_SEND_FAILED" } },
+      502
+    );
+  }
+
+  return c.json({
+    data: {
+      id: refreshed.id,
+      email: refreshed.email,
+      orgRole: refreshed.orgRole,
+      expiresAt: refreshed.expiresAt.toISOString(),
+      createdAt: refreshed.createdAt.toISOString(),
+    },
+  });
+});
+
 // POST /api/team/invitations/accept — authenticated user accepts invite
 teamRouter.post("/team/invitations/accept", async (c) => {
   const user = c.get("user");
