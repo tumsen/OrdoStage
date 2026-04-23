@@ -896,12 +896,12 @@ function PersonCard({
       }`}
     >
       {/* Avatar */}
-      <div className="w-11 h-11 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+      <div className="w-11 h-11 rounded-full overflow-hidden bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
         {person.hasPhoto ? (
           <img
             src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
             alt={person.name}
-            className="h-11 w-11 rounded-full object-cover"
+            className="h-full w-full object-cover"
           />
         ) : (
           <User size={17} className="text-white/30" />
