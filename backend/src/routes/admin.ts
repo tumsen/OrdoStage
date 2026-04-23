@@ -5,6 +5,8 @@ import { adminMiddleware } from "../admin-middleware";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { z } from "zod";
 import { reassignUsersBeforeOrgDelete } from "../orgMembership";
+import { ensureSystemRoles } from "../effectiveRole";
+import { getSignupCreditsForNewOrg } from "../signupCredits";
 
 const app = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -71,6 +73,76 @@ app.get("/admin/orgs", async (c) => {
   });
 });
 
+app.post("/admin/orgs", async (c) => {
+  const body = await c.req.json();
+  const { name, ownerEmail } = z
+    .object({
+      name: z.string().min(1),
+      ownerEmail: z.string().email().optional(),
+    })
+    .parse(body);
+
+  const signupCredits = await getSignupCreditsForNewOrg();
+  const created = await prisma.organization.create({
+    data: {
+      name: name.trim(),
+      creditBalance: signupCredits,
+    },
+    select: { id: true, name: true, createdAt: true },
+  });
+  await ensureSystemRoles(prisma, created.id);
+
+  let warning: string | null = null;
+  let assignedOwner: { id: string; email: string; name: string | null } | null = null;
+  if (ownerEmail) {
+    const trimmed = ownerEmail.trim();
+    const normalized = trimmed.toLowerCase();
+    let target =
+      (await prisma.user.findUnique({
+        where: { email: normalized },
+        select: { id: true, email: true, name: true, organizationId: true },
+      })) ??
+      (await prisma.user.findUnique({
+        where: { email: trimmed },
+        select: { id: true, email: true, name: true, organizationId: true },
+      }));
+
+    if (!target && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
+      target = await prisma.user.findFirst({
+        where: { email: { equals: trimmed, mode: "insensitive" } },
+        select: { id: true, email: true, name: true, organizationId: true },
+      });
+    }
+
+    if (!target) {
+      warning = `Organization "${created.name}" was created, but no user found for owner email ${trimmed}.`;
+      return c.json({ data: { organization: created, assignedOwner, warning } }, 201);
+    }
+
+    await prisma.organizationMembership.upsert({
+      where: { userId_organizationId: { userId: target.id, organizationId: created.id } },
+      create: { userId: target.id, organizationId: created.id, orgRole: "owner" },
+      update: { orgRole: "owner" },
+    });
+
+    if (!target.organizationId) {
+      await prisma.user.update({
+        where: { id: target.id },
+        data: { organizationId: created.id, orgRole: "owner" },
+      });
+    } else if (target.organizationId === created.id) {
+      await prisma.user.update({
+        where: { id: target.id },
+        data: { orgRole: "owner" },
+      });
+    }
+
+    assignedOwner = { id: target.id, email: target.email, name: target.name };
+  }
+
+  return c.json({ data: { organization: created, assignedOwner, warning } }, 201);
+});
+
 app.get("/admin/orgs/:id", async (c) => {
   const org = await prisma.organization.findUnique({
     where: { id: c.req.param("id") },
@@ -106,6 +178,74 @@ app.get("/admin/orgs/:id", async (c) => {
 
   const { memberships: _m, ...rest } = org;
   return c.json({ data: { ...rest, users } });
+});
+
+app.post("/admin/orgs/:id/grant-org-admin", async (c) => {
+  const orgId = c.req.param("id");
+  const body = await c.req.json();
+  const { email } = z.object({ email: z.string().email() }).parse(body);
+  const trimmed = email.trim();
+  const normalized = trimmed.toLowerCase();
+
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { id: true, name: true },
+  });
+  if (!org) {
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  let target =
+    (await prisma.user.findUnique({
+      where: { email: normalized },
+      select: { id: true, email: true, name: true, organizationId: true },
+    })) ??
+    (await prisma.user.findUnique({
+      where: { email: trimmed },
+      select: { id: true, email: true, name: true, organizationId: true },
+    }));
+
+  if (!target && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
+    target = await prisma.user.findFirst({
+      where: { email: { equals: trimmed, mode: "insensitive" } },
+      select: { id: true, email: true, name: true, organizationId: true },
+    });
+  }
+  if (!target) {
+    return c.json(
+      { error: { message: "No user found with that email address.", code: "NOT_FOUND" } },
+      404
+    );
+  }
+
+  await prisma.organizationMembership.upsert({
+    where: { userId_organizationId: { userId: target.id, organizationId: org.id } },
+    create: { userId: target.id, organizationId: org.id, orgRole: "owner" },
+    update: { orgRole: "owner" },
+  });
+
+  if (!target.organizationId) {
+    await prisma.user.update({
+      where: { id: target.id },
+      data: { organizationId: org.id, orgRole: "owner" },
+    });
+  } else if (target.organizationId === org.id) {
+    await prisma.user.update({
+      where: { id: target.id },
+      data: { orgRole: "owner" },
+    });
+  }
+
+  return c.json({
+    data: {
+      id: target.id,
+      email: target.email,
+      name: target.name,
+      organizationId: org.id,
+      organizationName: org.name,
+      orgRole: "owner",
+    },
+  });
 });
 
 app.delete("/admin/orgs/:id", async (c) => {

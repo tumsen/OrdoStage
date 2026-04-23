@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,8 @@ function CreditBadge({ balance, unlimited }: { balance: number; unlimited?: bool
 
 export default function Orgs() {
   const [search, setSearch] = useState("");
+  const [newOrgName, setNewOrgName] = useState("");
+  const [newOrgAdminEmail, setNewOrgAdminEmail] = useState("");
   const queryClient = useQueryClient();
 
   const { data: orgs, isPending } = useQuery<OrgSummary[]>({
@@ -85,12 +87,68 @@ export default function Orgs() {
     onError: () => toast({ title: "Failed to delete organization", variant: "destructive" }),
   });
 
+  const createOrgMutation = useMutation({
+    mutationFn: (payload: { name: string; ownerEmail?: string }) =>
+      api.post<{ organization: { id: string; name: string }; warning?: string | null }>("/api/admin/orgs", payload),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
+      setNewOrgName("");
+      setNewOrgAdminEmail("");
+      toast({
+        title: "Organization created",
+        description: data.warning ?? undefined,
+      });
+    },
+    onError: (err) =>
+      toast({
+        title: "Failed to create organization",
+        description: isApiError(err) ? err.message : undefined,
+        variant: "destructive",
+      }),
+  });
+
   const filtered = (orgs ?? []).filter((o) =>
     o.name.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="p-6 space-y-4">
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3 max-w-2xl">
+        <h3 className="text-sm font-semibold text-white">Create organization</h3>
+        <p className="text-xs text-white/45">
+          Create a new organization and optionally grant org admin (owner role) to an existing user email.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          <Input
+            placeholder="Organization name"
+            value={newOrgName}
+            onChange={(e) => setNewOrgName(e.target.value)}
+            className="bg-gray-900 border-white/10 text-white placeholder:text-white/30"
+          />
+          <Input
+            placeholder="Org admin email (optional)"
+            type="email"
+            value={newOrgAdminEmail}
+            onChange={(e) => setNewOrgAdminEmail(e.target.value)}
+            className="bg-gray-900 border-white/10 text-white placeholder:text-white/30"
+          />
+        </div>
+        <div>
+          <Button
+            className="bg-rose-700 hover:bg-rose-600"
+            disabled={createOrgMutation.isPending || newOrgName.trim().length === 0}
+            onClick={() =>
+              createOrgMutation.mutate({
+                name: newOrgName.trim(),
+                ownerEmail: newOrgAdminEmail.trim() || undefined,
+              })
+            }
+          >
+            {createOrgMutation.isPending ? "Creating..." : "Create organization"}
+          </Button>
+        </div>
+      </div>
+
       {/* Search */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -461,47 +461,107 @@ function SupportAccessTab({ org }: { org: OrgDetail }) {
   );
 }
 
-function UsersTab({ users }: { users: OrgUser[] }) {
+function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [grantEmail, setGrantEmail] = useState("");
+
+  const grantOrgAdminMutation = useMutation({
+    mutationFn: (email: string) =>
+      api.post(`/api/admin/orgs/${orgId}/grant-org-admin`, { email }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      setGrantEmail("");
+      toast({
+        title: "Organization admin granted",
+        description: "User now has owner role in this organization.",
+      });
+    },
+    onError: (err) => {
+      toast({
+        title: "Error",
+        description: isApiError(err) ? err.message : "Failed to grant organization admin.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
-    <div className="rounded-lg border border-white/10 overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-white/10 hover:bg-transparent">
-            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Name</TableHead>
-            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Email</TableHead>
-            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Role</TableHead>
-            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Joined</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.length === 0 ? (
-            <TableRow className="border-white/5">
-              <TableCell colSpan={4} className="text-center text-white/30 py-10">
-                No users in this organization
-              </TableCell>
+    <div className="space-y-4">
+      <Card className="bg-gray-900 border border-white/10">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-white/70">Grant organization admin</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-white/40">
+            Grants owner role in this organization only (not OrdoStage platform admin).
+          </p>
+          <div className="flex flex-wrap gap-2 items-end max-w-xl">
+            <div className="flex-1 min-w-[220px] space-y-1">
+              <label htmlFor="grant-org-admin-email" className="text-xs text-white/40">
+                User email
+              </label>
+              <Input
+                id="grant-org-admin-email"
+                type="email"
+                placeholder="name@example.com"
+                value={grantEmail}
+                onChange={(e) => setGrantEmail(e.target.value)}
+                className="bg-gray-800 border-white/10 text-white placeholder:text-white/25"
+              />
+            </div>
+            <Button
+              className="bg-rose-700 hover:bg-rose-600"
+              disabled={grantOrgAdminMutation.isPending || grantEmail.trim().length === 0}
+              onClick={() => grantOrgAdminMutation.mutate(grantEmail.trim())}
+            >
+              {grantOrgAdminMutation.isPending ? "Granting..." : "Grant org admin"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="rounded-lg border border-white/10 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-white/10 hover:bg-transparent">
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Name</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Email</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Role</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Joined</TableHead>
             </TableRow>
-          ) : (
-            users.map((user) => (
-              <TableRow key={user.id} className="border-white/5 hover:bg-white/[0.02]">
-                <TableCell className="text-white/80">{user.name ?? "—"}</TableCell>
-                <TableCell className="text-white/50">{user.email}</TableCell>
-                <TableCell>
-                  <Badge
-                    className={
-                      user.orgRole === "owner"
-                        ? "bg-rose-950/60 text-rose-400 border-rose-800/40 text-xs"
-                        : "bg-white/5 text-white/50 border-white/10 text-xs"
-                    }
-                  >
-                    {user.orgRole}
-                  </Badge>
+          </TableHeader>
+          <TableBody>
+            {users.length === 0 ? (
+              <TableRow className="border-white/5">
+                <TableCell colSpan={4} className="text-center text-white/30 py-10">
+                  No users in this organization
                 </TableCell>
-                <TableCell className="text-white/40 text-sm">{formatDate(user.createdAt)}</TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : (
+              users.map((user) => (
+                <TableRow key={user.id} className="border-white/5 hover:bg-white/[0.02]">
+                  <TableCell className="text-white/80">{user.name ?? "—"}</TableCell>
+                  <TableCell className="text-white/50">{user.email}</TableCell>
+                  <TableCell>
+                    <Badge
+                      className={
+                        user.orgRole === "owner"
+                          ? "bg-rose-950/60 text-rose-400 border-rose-800/40 text-xs"
+                          : "bg-white/5 text-white/50 border-white/10 text-xs"
+                      }
+                    >
+                      {user.orgRole}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-white/40 text-sm">{formatDate(user.createdAt)}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
@@ -646,7 +706,7 @@ export default function OrgDetail() {
         </TabsContent>
 
         <TabsContent value="users" className="mt-4">
-          <UsersTab users={org.users} />
+          <UsersTab orgId={org.id} users={org.users} />
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
