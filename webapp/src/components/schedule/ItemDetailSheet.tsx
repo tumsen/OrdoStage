@@ -32,6 +32,21 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-900/40 text-red-300 border border-red-700/40",
 };
 
+function formatAddress(parts: {
+  street?: string | null;
+  number?: string | null;
+  zip?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+}): string | null {
+  const line1 = [parts.street, parts.number].filter(Boolean).join(" ").trim();
+  const line2 = [parts.zip, parts.city].filter(Boolean).join(" ").trim();
+  const tail = [parts.state, parts.country].filter(Boolean).join(", ").trim();
+  const full = [line1, line2, tail].filter(Boolean).join(", ").trim();
+  return full || null;
+}
+
 export function ItemDetailSheet({ item, onClose }: ItemDetailSheetProps) {
   const raw = item?.raw;
 
@@ -99,8 +114,24 @@ export function ItemDetailSheet({ item, onClose }: ItemDetailSheetProps) {
                   <MapPin size={14} className="text-white/30 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="text-sm text-white/70 font-medium">{raw.venue.name}</div>
-                    {raw.venue.address ? (
-                      <div className="text-xs text-white/40 mt-0.5">{raw.venue.address}</div>
+                    {formatAddress({
+                      street: raw.venue.addressStreet,
+                      number: raw.venue.addressNumber,
+                      zip: raw.venue.addressZip,
+                      city: raw.venue.addressCity,
+                      state: raw.venue.addressState,
+                      country: raw.venue.addressCountry,
+                    }) ? (
+                      <div className="text-xs text-white/40 mt-0.5">
+                        {formatAddress({
+                          street: raw.venue.addressStreet,
+                          number: raw.venue.addressNumber,
+                          zip: raw.venue.addressZip,
+                          city: raw.venue.addressCity,
+                          state: raw.venue.addressState,
+                          country: raw.venue.addressCountry,
+                        })}
+                      </div>
                     ) : null}
                     {raw.venue.capacity ? (
                       <div className="text-xs text-white/30 mt-0.5">Capacity: {raw.venue.capacity}</div>

@@ -89,6 +89,21 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   );
 }
 
+function formatAddress(parts: {
+  street?: string | null;
+  number?: string | null;
+  zip?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+}): string | null {
+  const line1 = [parts.street, parts.number].filter(Boolean).join(" ").trim();
+  const line2 = [parts.zip, parts.city].filter(Boolean).join(" ").trim();
+  const tail = [parts.state, parts.country].filter(Boolean).join(", ").trim();
+  const full = [line1, line2, tail].filter(Boolean).join(", ").trim();
+  return full || null;
+}
+
 export function VenueTechRiderCoverDoc({
   tour,
   show,
@@ -131,7 +146,23 @@ export function VenueTechRiderCoverDoc({
     show.doorsTime ||
     show.showTime;
   const hasContact = show.contactName || show.contactPhone || show.contactEmail;
-  const hasHotel = show.hotelName || show.hotelAddress;
+  const venueAddress = formatAddress({
+    street: show.venueStreet,
+    number: show.venueNumber,
+    zip: show.venueZip,
+    city: show.venueCity,
+    state: show.venueState,
+    country: show.venueCountry,
+  });
+  const hotelAddress = formatAddress({
+    street: show.hotelStreet,
+    number: show.hotelNumber,
+    zip: show.hotelZip,
+    city: show.hotelCity,
+    state: show.hotelState,
+    country: show.hotelCountry,
+  });
+  const hasHotel = show.hotelName || hotelAddress;
 
   return (
     <Document title={`Tech Rider — ${venueLabel || formattedDate}`}>
@@ -145,10 +176,10 @@ export function VenueTechRiderCoverDoc({
         </View>
 
         {/* Venue address */}
-        {visibility.venue && show.venueAddress ? (
+        {visibility.venue && venueAddress ? (
           <View style={{ marginBottom: 14 }}>
             <Text style={S.sectionTitle}>Venue</Text>
-            <Text style={S.addressLine}>{show.venueAddress}</Text>
+            <Text style={S.addressLine}>{venueAddress}</Text>
           </View>
         ) : null}
 
@@ -212,8 +243,8 @@ export function VenueTechRiderCoverDoc({
             {show.hotelName ? (
               <Text style={[S.contactName, { marginBottom: 2 }]}>{show.hotelName}</Text>
             ) : null}
-            {show.hotelAddress ? (
-              <Text style={S.addressLine}>{show.hotelAddress}</Text>
+            {hotelAddress ? (
+              <Text style={S.addressLine}>{hotelAddress}</Text>
             ) : null}
             {(show.hotelCheckIn || show.hotelCheckOut) ? (
               <Text style={S.contactDetail}>

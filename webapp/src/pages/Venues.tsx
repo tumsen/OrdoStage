@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
-import { AddressFields, type Address, EMPTY_ADDRESS } from "@/components/AddressFields";
+import { AddressFields, type Address } from "@/components/AddressFields";
 
 const VenueFormSchema = z.object({
   name: z.string().min(1, "Name is required"),

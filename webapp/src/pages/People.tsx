@@ -14,7 +14,7 @@ import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
 import type { Person } from "../../../backend/src/types";
-import { AddressFields, type Address, EMPTY_ADDRESS } from "@/components/AddressFields";
+import { AddressFields, type Address } from "@/components/AddressFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
