@@ -126,6 +126,7 @@ export const PersonSchema = z.object({
   addressCountry: z.string().nullable(),
   emergencyContactName: z.string().nullable(),
   emergencyContactPhone: z.string().nullable(),
+  notes: z.string().nullable().optional(),
   hasPhoto: z.boolean().optional(),
   photoUpdatedAt: z.string().nullable().optional(),
   departmentId: z.string().nullable(),
@@ -170,6 +171,7 @@ export const CreatePersonSchema = z.object({
   addressCountry: z.string().optional(),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
+  notes: z.string().optional(),
   teamAssignments: z
     .array(TeamAssignmentInputSchema)
     .min(1, "At least one team is required")

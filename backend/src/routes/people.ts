@@ -72,6 +72,7 @@ function serializePerson(person: {
   addressCountry: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
+  notes?: string | null;
   photoData?: Uint8Array | null;
   photoUpdatedAt?: Date | null;
   departmentId: string | null;
@@ -107,6 +108,7 @@ function serializePerson(person: {
     addressCountry: person.addressCountry ?? null,
     emergencyContactName: person.emergencyContactName ?? null,
     emergencyContactPhone: person.emergencyContactPhone ?? null,
+    notes: person.notes ?? null,
     hasPhoto: Boolean(person.photoData),
     photoUpdatedAt: person.photoUpdatedAt ? person.photoUpdatedAt.toISOString() : null,
     departmentId: person.departmentId,
@@ -227,6 +229,7 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       addressCountry: body.addressCountry ?? null,
       emergencyContactName: body.emergencyContactName ?? null,
       emergencyContactPhone: body.emergencyContactPhone ?? null,
+      ...(body.notes !== undefined && { notes: body.notes ?? null }),
       departmentId: teamIds[0] ?? null,
       organizationId: user.organizationId,
       teamMemberships: {
@@ -424,6 +427,7 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       ...(body.addressCountry !== undefined && { addressCountry: body.addressCountry }),
       ...(body.emergencyContactName !== undefined && { emergencyContactName: body.emergencyContactName }),
       ...(body.emergencyContactPhone !== undefined && { emergencyContactPhone: body.emergencyContactPhone }),
+      ...(body.notes !== undefined && { notes: body.notes }),
       ...(body.teamAssignments !== undefined && { departmentId: nextAssignments[0]?.teamId ?? null }),
       ...(body.teamAssignments !== undefined && {
         teamMemberships: {

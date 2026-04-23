@@ -228,6 +228,7 @@ model Person {
   addressCountry        String?
   emergencyContactName  String?
   emergencyContactPhone String?
+  notes            String?
   photoData         Bytes?
   photoFilename     String?
   photoMimeType     String?

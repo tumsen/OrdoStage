@@ -74,6 +74,7 @@ const PersonFormSchema = z.object({
   addressCountry: z.string().optional(),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
+  notes: z.string().optional(),
   teamAssignments: z
     .array(
       z.object({
@@ -295,6 +296,7 @@ function PersonFormDialog({
           addressCountry: person.addressCountry ?? "",
           emergencyContactName: person.emergencyContactName ?? "",
           emergencyContactPhone: person.emergencyContactPhone ?? "",
+          notes: person.notes ?? "",
           teamAssignments:
             person.teamMemberships?.map((membership) => ({
               teamId: membership.teamId,
@@ -317,6 +319,7 @@ function PersonFormDialog({
           addressCountry: "",
           emergencyContactName: "",
           emergencyContactPhone: "",
+          notes: "",
           teamAssignments: [],
         },
   });
@@ -360,6 +363,7 @@ function PersonFormDialog({
         addressCountry: values.addressCountry || undefined,
         emergencyContactName: values.emergencyContactName || undefined,
         emergencyContactPhone: values.emergencyContactPhone || undefined,
+        notes: values.notes || undefined,
         teamAssignments: values.teamAssignments.map((assignment) => ({
           teamId: assignment.teamId?.trim() || undefined,
           newTeamName: assignment.newTeamName?.trim() || undefined,
@@ -457,9 +461,6 @@ function PersonFormDialog({
 
             <div className="space-y-1.5">
               <Label className="text-white/50 text-xs uppercase tracking-wide">Internal / external *</Label>
-              <p className="text-[10px] text-white/30 leading-snug">
-                In-house cast/crew vs contractor or guest — required for everyone in the directory.
-              </p>
               <Controller
                 control={form.control}
                 name="affiliation"
@@ -584,6 +585,15 @@ function PersonFormDialog({
                 className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
+            <textarea
+              {...form.register("notes")}
+              placeholder="Notes about this person..."
+              className="min-h-[90px] w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/30"
+            />
           </div>
 
           <div className="space-y-2">
@@ -887,7 +897,15 @@ function PersonCard({
     >
       {/* Avatar */}
       <div className="w-9 h-9 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-        <User size={15} className="text-white/30" />
+        {person.hasPhoto ? (
+          <img
+            src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
+            alt={person.name}
+            className="h-9 w-9 rounded-full object-cover"
+          />
+        ) : (
+          <User size={15} className="text-white/30" />
+        )}
       </div>
 
       {/* Info */}
@@ -940,6 +958,11 @@ function PersonCard({
           <div className="mt-1 text-xs text-white/25 flex items-center gap-1.5">
             <ShieldAlert size={10} className="text-amber-400/40" />
             Emergency: {[person.emergencyContactName, person.emergencyContactPhone].filter(Boolean).join(" · ")}
+          </div>
+        ) : null}
+        {person.notes ? (
+          <div className="mt-1 text-xs text-white/35 line-clamp-2">
+            Notes: {person.notes}
           </div>
         ) : null}
       </div>
