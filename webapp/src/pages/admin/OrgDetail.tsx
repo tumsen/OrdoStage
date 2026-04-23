@@ -46,6 +46,7 @@ interface OrgDetail {
   id: string;
   name: string;
   creditBalance: number;
+  unlimitedCredits: boolean;
   discountPercent: number;
   discountNote: string | null;
   freeTrialUsed: boolean;
@@ -172,6 +173,19 @@ function CreditsTab({ org }: { org: OrgDetail }) {
     },
   });
 
+  const unlimitedMutation = useMutation({
+    mutationFn: (data: { unlimited: boolean }) =>
+      api.post(`/api/admin/orgs/${org.id}/unlimited`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
+      toast({ title: "Unlimited setting updated" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update unlimited setting.", variant: "destructive" });
+    },
+  });
+
   const handleCreditSubmit = () => {
     const delta = parseInt(creditDelta, 10);
     if (isNaN(delta)) return;
@@ -197,9 +211,15 @@ function CreditsTab({ org }: { org: OrgDetail }) {
         </div>
         <div>
           <div className="text-white/40 text-xs uppercase tracking-wider mb-0.5">Current Balance</div>
-          <div className={`text-3xl font-bold ${org.creditBalance <= 0 ? "text-red-400" : org.creditBalance <= 30 ? "text-amber-400" : "text-white"}`}>
-            {org.creditBalance} <span className="text-sm font-normal text-white/40">days</span>
-          </div>
+          {org.unlimitedCredits ? (
+            <div className="text-3xl font-bold text-emerald-400">
+              Unlimited <span className="text-sm font-normal text-white/40">credits</span>
+            </div>
+          ) : (
+            <div className={`text-3xl font-bold ${org.creditBalance <= 0 ? "text-red-400" : org.creditBalance <= 30 ? "text-amber-400" : "text-white"}`}>
+              {org.creditBalance} <span className="text-sm font-normal text-white/40">days</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -236,6 +256,35 @@ function CreditsTab({ org }: { org: OrgDetail }) {
             >
               {creditMutation.isPending ? "Saving..." : "Apply Credits"}
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Unlimited credits */}
+        <Card className="bg-gray-900 border border-white/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-white/70">Unlimited Credits</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-white/40">
+              Toggle unlimited credit mode for this organization. When enabled, credit deductions and balance limits are bypassed.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => unlimitedMutation.mutate({ unlimited: true })}
+                disabled={unlimitedMutation.isPending || org.unlimitedCredits}
+                className="bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40"
+              >
+                {org.unlimitedCredits ? "Unlimited enabled" : "Enable unlimited"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => unlimitedMutation.mutate({ unlimited: false })}
+                disabled={unlimitedMutation.isPending || !org.unlimitedCredits}
+                className="border-white/15 text-white/80 hover:bg-white/5 disabled:opacity-40"
+              >
+                Disable unlimited
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -560,14 +609,16 @@ export default function OrgDetail() {
           <CreditCard size={16} className="text-white/30" />
           <div
             className={`text-lg font-bold ${
-              org.creditBalance <= 0
+              org.unlimitedCredits
+                ? "text-emerald-400"
+                : org.creditBalance <= 0
                 ? "text-red-400"
                 : org.creditBalance <= 30
                 ? "text-amber-400"
                 : "text-white"
             }`}
           >
-            {org.creditBalance}
+            {org.unlimitedCredits ? "∞" : org.creditBalance}
           </div>
           <div className="text-xs text-white/40">Credits</div>
         </div>
