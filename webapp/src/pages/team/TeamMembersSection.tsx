@@ -154,7 +154,7 @@ export function TeamMembersSection({ isOwner, canManageTeam }: TeamMembersSectio
                 <div className="min-w-0">
                   <p className="truncate">{inv.email}</p>
                   <p className="text-[11px] text-white/35">
-                    Last sent {formatInviteDateTime(inv.createdAt)}
+                    Last sent {formatInviteDateTime(inv.createdAt)} • Expires {formatInviteDateTime(inv.expiresAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
