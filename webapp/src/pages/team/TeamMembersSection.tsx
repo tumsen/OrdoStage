@@ -49,6 +49,16 @@ type InvitationRow = {
   createdAt: string;
 };
 
+function formatInviteDateTime(value: string): string {
+  return new Date(value).toLocaleString("da-DK", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function TeamMembersSection({ isOwner, canManageTeam }: TeamMembersSectionProps) {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
@@ -141,7 +151,12 @@ export function TeamMembersSection({ isOwner, canManageTeam }: TeamMembersSectio
                 key={inv.id}
                 className="flex items-center justify-between gap-3 text-sm text-white/70"
               >
-                <span className="truncate">{inv.email}</span>
+                <div className="min-w-0">
+                  <p className="truncate">{inv.email}</p>
+                  <p className="text-[11px] text-white/35">
+                    Last sent {formatInviteDateTime(inv.createdAt)}
+                  </p>
+                </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <RoleBadge role={inv.orgRole} />
                   <button

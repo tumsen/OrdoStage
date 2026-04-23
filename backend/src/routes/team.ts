@@ -210,10 +210,16 @@ teamRouter.post("/team/invitations/:id/resend", async (c) => {
     return c.json({ error: { message: "Invitation not found", code: "NOT_FOUND" } }, 404);
   }
 
-  // Refresh expiry so a resent invitation is always valid for a full period.
-  const refreshed = await prisma.organizationInvitation.update({
-    where: { id: invite.id },
-    data: { expiresAt: new Date(Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000) },
+  // Recreate invitation so createdAt reflects the latest send time.
+  await prisma.organizationInvitation.delete({ where: { id: invite.id } });
+  const refreshed = await prisma.organizationInvitation.create({
+    data: {
+      organizationId: invite.organizationId,
+      email: invite.email,
+      orgRole: invite.orgRole,
+      invitedById: user.id,
+      expiresAt: new Date(Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000),
+    },
   });
 
   const url = inviteAcceptUrl(refreshed.token);
