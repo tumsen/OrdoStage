@@ -204,7 +204,6 @@ app.get("/org", async (c) => {
 
   const unlimitedEmails = [
     "tumsen@gmail.com",
-    "thomas@baggaardteatret.dk",
     ...env.UNLIMITED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
   ];
   if (unlimitedEmails.includes(user.email.toLowerCase())) {
@@ -503,7 +502,6 @@ app.post("/org", async (c) => {
 
   const unlimitedEmails = [
     "tumsen@gmail.com",
-    "thomas@baggaardteatret.dk",
     ...env.UNLIMITED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
   ];
   const isUnlimited = unlimitedEmails.includes(user.email.toLowerCase());

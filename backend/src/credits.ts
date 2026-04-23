@@ -2,7 +2,7 @@ import { prisma } from "./prisma";
 
 export const CREDIT_WARNING_THRESHOLD = 30; // days
 
-const ALWAYS_UNLIMITED = ["tumsen@gmail.com", "thomas@baggaardteatret.dk"];
+const ALWAYS_UNLIMITED = ["tumsen@gmail.com"];
 
 export async function deductCredits(
   organizationId: string
