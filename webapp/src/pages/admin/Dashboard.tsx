@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Users, DollarSign, CreditCard, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface RecentPurchase {
   id: string;
@@ -70,6 +72,9 @@ function StatCard({
 }
 
 export default function Dashboard() {
+  const [testEmail, setTestEmail] = useState("");
+  const [emailStatus, setEmailStatus] = useState("");
+
   const { data: stats, isPending: statsPending } = useQuery<AdminStats>({
     queryKey: ["admin", "stats"],
     queryFn: () => api.get<AdminStats>("/api/admin/stats"),
@@ -88,6 +93,17 @@ export default function Dashboard() {
     finiteOrgs.length > 0
       ? Math.round(finiteOrgs.reduce((sum, o) => sum + o.creditBalance, 0) / finiteOrgs.length)
       : 0;
+
+  const testEmailMutation = useMutation({
+    mutationFn: (to: string) => api.post<{ ok: boolean }>("/api/admin/email/test", { to }),
+    onSuccess: () => {
+      setEmailStatus("Test email sent successfully.");
+      setTestEmail("");
+    },
+    onError: (err) => {
+      setEmailStatus(isApiError(err) ? err.message : "Could not send test email.");
+    },
+  });
 
   if (statsPending) {
     return (
@@ -225,6 +241,36 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="bg-gray-900 border border-white/10 max-w-xl">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-white/70 uppercase tracking-wider">
+            Email Test
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-white/45">
+            Send a test email to verify Resend is configured correctly on backend.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              type="email"
+              placeholder="you@example.com"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/25"
+            />
+            <Button
+              disabled={testEmailMutation.isPending || testEmail.trim().length === 0}
+              onClick={() => testEmailMutation.mutate(testEmail.trim())}
+              className="bg-indigo-700 hover:bg-indigo-600 text-white"
+            >
+              {testEmailMutation.isPending ? "Sending..." : "Send test"}
+            </Button>
+          </div>
+          {emailStatus ? <p className="text-xs text-white/60">{emailStatus}</p> : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }

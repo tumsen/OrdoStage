@@ -7,6 +7,7 @@ import { z } from "zod";
 import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 import { ensureSystemRoles } from "../effectiveRole";
 import { getSignupCreditsForNewOrg } from "../signupCredits";
+import { env } from "../env";
 
 const app = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -41,6 +42,39 @@ app.get("/admin/stats", async (c) => {
       recentPurchases,
     },
   });
+});
+
+app.post("/admin/email/test", async (c) => {
+  const body = await c.req.json();
+  const { to } = z.object({ to: z.string().email() }).parse(body);
+
+  if (!env.RESEND_API_KEY || !env.FROM_EMAIL) {
+    return c.json(
+      {
+        error: {
+          message: "Resend is not configured. Set RESEND_API_KEY and FROM_EMAIL on backend service.",
+          code: "EMAIL_NOT_CONFIGURED",
+        },
+      },
+      503
+    );
+  }
+
+  const { Resend } = await import("resend");
+  const resend = new Resend(env.RESEND_API_KEY);
+
+  await resend.emails.send({
+    from: env.FROM_EMAIL,
+    to,
+    subject: "OrdoStage test email",
+    html: `
+      <p>This is a test email from <strong>OrdoStage Owner Admin</strong>.</p>
+      <p>If you received this, your Resend setup works.</p>
+      <p style="color:#666;font-size:12px">Sent at ${new Date().toISOString()}</p>
+    `,
+  });
+
+  return c.json({ data: { ok: true } });
 });
 
 // ── Organizations ──────────────────────────────────────────────────────────
