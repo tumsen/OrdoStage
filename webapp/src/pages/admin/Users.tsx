@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, isApiError } from "@/lib/api";
+import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -254,10 +255,7 @@ export default function Users() {
                         disabled={busy || isProtected}
                         className="text-red-300 hover:text-red-200 hover:bg-red-950/30 disabled:opacity-40"
                         onClick={() => {
-                          const typed = window.prompt(
-                            `Delete ${user.email}? This is permanent.\n\nType DELETE to confirm.`
-                          );
-                          if (typed !== "DELETE") return;
+                          if (!confirmDeleteAction(user.email)) return;
                           deleteUserMutation.mutate(user.id);
                         }}
                       >

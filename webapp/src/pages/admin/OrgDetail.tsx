@@ -733,7 +733,7 @@ export default function OrgDetail() {
               if (!confirmDeleteOrganizationByName(org.name)) {
                 toast({
                   title: "Delete cancelled",
-                  description: `Type exactly: DELETE ${org.name}`,
+                  description: `Type DELETE ${org.name} to confirm.`,
                   variant: "destructive",
                 });
                 return;
