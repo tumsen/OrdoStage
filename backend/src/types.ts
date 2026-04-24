@@ -166,52 +166,59 @@ export const TeamAssignmentInputSchema = z.object({
 
 export type TeamAssignmentInput = z.infer<typeof TeamAssignmentInputSchema>;
 
-export const CreatePersonSchema = z.object({
-  name: z.string().min(1),
-  affiliation: PersonAffiliationSchema,
-  role: z.string().optional(),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  addressStreet:  z.string().optional(),
-  addressNumber:  z.string().optional(),
-  addressZip:     z.string().optional(),
-  addressCity:    z.string().optional(),
-  addressState:   z.string().optional(),
-  addressCountry: z.string().optional(),
-  emergencyContactName: z.string().optional(),
-  emergencyContactPhone: z.string().optional(),
-  notes: z.string().optional(),
-  /** Required when `email` is set — defines app access (permission group / RoleDefinition). */
-  permissionGroupId: z.string().min(1).optional(),
-  teamAssignments: z
-    .array(TeamAssignmentInputSchema)
-    .min(1, "At least one team is required")
-    .superRefine((rows, ctx) => {
-      let anyValid = false;
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        if (!r) continue;
-        const hasId = Boolean(r.teamId?.trim());
-        const hasNew = Boolean(r.newTeamName?.trim());
-        if (hasId && hasNew) {
-          ctx.addIssue({
-            code: "custom",
-            message: "Use either an existing team or a new team name per row",
-            path: ["teamAssignments", i],
-          });
-          continue;
-        }
-        if (hasId || hasNew) anyValid = true;
-      }
-      if (!anyValid) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Select or add at least one team",
-          path: ["teamAssignments"],
-        });
-      }
-    }),
-})
+/** Shared row rules for create vs update; Zod v4 forbids `.partial()` on objects with refinements, so update uses this explicitly. */
+function refineTeamAssignmentInputRows(
+  rows: TeamAssignmentInput[],
+  ctx: z.core.$RefinementCtx<TeamAssignmentInput[] | undefined>,
+) {
+  let anyValid = false;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r) continue;
+    const hasId = Boolean(r.teamId?.trim());
+    const hasNew = Boolean(r.newTeamName?.trim());
+    if (hasId && hasNew) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Use either an existing team or a new team name per row",
+        path: ["teamAssignments", i],
+      });
+      continue;
+    }
+    if (hasId || hasNew) anyValid = true;
+  }
+  if (!anyValid) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Select or add at least one team",
+      path: ["teamAssignments"],
+    });
+  }
+}
+
+export const CreatePersonSchema = z
+  .object({
+    name: z.string().min(1),
+    affiliation: PersonAffiliationSchema,
+    role: z.string().optional(),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
+    addressStreet: z.string().optional(),
+    addressNumber: z.string().optional(),
+    addressZip: z.string().optional(),
+    addressCity: z.string().optional(),
+    addressState: z.string().optional(),
+    addressCountry: z.string().optional(),
+    emergencyContactName: z.string().optional(),
+    emergencyContactPhone: z.string().optional(),
+    notes: z.string().optional(),
+    /** Required when `email` is set — defines app access (permission group / RoleDefinition). */
+    permissionGroupId: z.string().min(1).optional(),
+    teamAssignments: z
+      .array(TeamAssignmentInputSchema)
+      .min(1, "At least one team is required")
+      .superRefine(refineTeamAssignmentInputRows),
+  })
   .superRefine((data, ctx) => {
     if (data.email?.trim() && !data.permissionGroupId?.trim()) {
       ctx.addIssue({
@@ -226,11 +233,33 @@ export const PersonActiveSchema = z.object({
   active: z.boolean(),
 });
 
-export const UpdatePersonSchema = CreatePersonSchema.partial().extend({
-  /** Clear profile default role on People (PUT body); team memberships unchanged. */
-  role: z.union([z.string(), z.null()]).optional(),
-  permissionGroupId: z.string().min(1).nullable().optional(),
-});
+/** All fields optional; must not use `CreatePersonSchema.partial()` — Zod v4 disallows `.partial()` on refined object schemas. */
+export const UpdatePersonSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    affiliation: PersonAffiliationSchema.optional(),
+    /** Clear profile default role on People (PUT body); team memberships unchanged. */
+    role: z.union([z.string(), z.null()]).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
+    addressStreet: z.string().optional(),
+    addressNumber: z.string().optional(),
+    addressZip: z.string().optional(),
+    addressCity: z.string().optional(),
+    addressState: z.string().optional(),
+    addressCountry: z.string().optional(),
+    emergencyContactName: z.string().optional(),
+    emergencyContactPhone: z.string().optional(),
+    notes: z.string().optional(),
+    permissionGroupId: z.string().min(1).nullable().optional(),
+    teamAssignments: z
+      .array(TeamAssignmentInputSchema)
+      .optional()
+      .superRefine((rows, ctx) => {
+        if (rows === undefined) return;
+        refineTeamAssignmentInputRows(rows, ctx);
+      }),
+  });
 
 // Event
 export const EventSchema = z.object({
