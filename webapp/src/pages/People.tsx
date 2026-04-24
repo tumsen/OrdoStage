@@ -150,9 +150,13 @@ function resolveRole(values: PersonFormValues): string | undefined {
   return values.rolePreset;
 }
 
-function roleToFormValues(role: string | null): { rolePreset: string; roleCustom: string } {
+/** `knownDirect` = preset + org role-definition display names (anything else uses "Other" + free text). */
+function roleToFormValues(
+  role: string | null,
+  knownDirect: Set<string>
+): { rolePreset: string; roleCustom: string } {
   if (!role) return { rolePreset: "", roleCustom: "" };
-  if ((PRESET_ROLES as readonly string[]).includes(role)) return { rolePreset: role, roleCustom: "" };
+  if (knownDirect.has(role)) return { rolePreset: role, roleCustom: "" };
   return { rolePreset: "other", roleCustom: role };
 }
 
@@ -259,6 +263,8 @@ async function uploadPersonDocument(
 
 // ── Person form dialog ────────────────────────────────────────────────────────
 
+type OrgRoleDefRow = { name: string };
+
 function PersonFormDialog({
   open,
   onOpenChange,
@@ -276,7 +282,30 @@ function PersonFormDialog({
     queryFn: () => api.get<Team[]>("/api/departments"),
   });
 
-  const { rolePreset: defaultPreset, roleCustom: defaultCustom } = roleToFormValues(person?.role ?? null);
+  const { data: orgRoleRows = [] } = useQuery({
+    queryKey: ["role-definitions"],
+    queryFn: () => api.get<OrgRoleDefRow[]>("/api/org/role-definitions"),
+    enabled: open,
+  });
+
+  const defaultRoleOptions = useMemo(() => {
+    const preset = new Set<string>(PRESET_ROLES);
+    const fromOrg = orgRoleRows
+      .map((r) => r.name.trim())
+      .filter((n) => n && !preset.has(n));
+    const unique = [...new Set(fromOrg)].sort((a, b) => a.localeCompare(b));
+    return [...PRESET_ROLES, ...unique];
+  }, [orgRoleRows]);
+
+  const knownRolePickerValues = useMemo(
+    () => new Set<string>([...defaultRoleOptions]),
+    [defaultRoleOptions]
+  );
+
+  const { rolePreset: defaultPreset, roleCustom: defaultCustom } = useMemo(
+    () => roleToFormValues(person?.role ?? null, knownRolePickerValues),
+    [person?.role, knownRolePickerValues]
+  );
 
   const form = useForm<PersonFormValues>({
     resolver: zodResolver(PersonFormSchema),
@@ -487,7 +516,11 @@ function PersonFormDialog({
               <Label className="text-white/50 text-xs uppercase tracking-wide">Default role</Label>
               <p className="text-[10px] text-white/30 leading-snug">
                 General job title for this person. You can set a different <strong className="text-white/40">role per team</strong> on
-                the Team page.
+                the Team page. Custom roles you add under{" "}
+                <Link to="/roles" className="text-rose-300/90 hover:underline">
+                  Roles
+                </Link>{" "}
+                also appear in this list.
               </p>
               <Controller
                 control={form.control}
@@ -498,7 +531,7 @@ function PersonFormDialog({
                       <SelectValue placeholder="Select default role…" />
                     </SelectTrigger>
                     <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                      {PRESET_ROLES.map((r) => (
+                      {defaultRoleOptions.map((r) => (
                         <SelectItem key={r} value={r}>{r}</SelectItem>
                       ))}
                       <SelectItem value="other">Other...</SelectItem>
