@@ -132,6 +132,7 @@ app.use("/api/*", async (c, next) => {
     organizationId: dbUser?.organizationId ?? undefined,
     orgRole: dbUser?.orgRole,
     isActive: dbUser?.isActive,
+    userId: sessionUser.id,
   });
   c.set("effectiveRole", eff);
   await next();

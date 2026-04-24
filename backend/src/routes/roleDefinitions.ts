@@ -1,11 +1,21 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
-import { isOwner } from "../permissions";
+import { isOwner, isAdmin } from "../permissions";
+import { canAction } from "../requestRole";
 import { ensureSystemRoles } from "../effectiveRole";
 import { ALL_ACTION_IDS, ALL_VIEW_IDS, ACTION_DEFS, VIEW_DEFS } from "../roleCatalog";
+
+function canManagePermissionGroups(
+  c: Context,
+  orgRole: string | null | undefined
+): boolean {
+  if (isOwner(orgRole) || isAdmin(orgRole)) return true;
+  return canAction(c, "roles.manage");
+}
 
 const CreateSchema = z.object({
   slug: z
@@ -89,14 +99,17 @@ roleDefRouter.post("/org/role-definitions", zValidator("json", CreateSchema), as
     where: { id: sessionUser.id },
     select: { orgRole: true },
   });
-  if (!isOwner(dbUser?.orgRole)) {
-    return c.json({ error: { message: "Only the owner can create roles", code: "FORBIDDEN" } }, 403);
+  if (!canManagePermissionGroups(c, dbUser?.orgRole)) {
+    return c.json(
+      { error: { message: "You do not have permission to create permission groups", code: "FORBIDDEN" } },
+      403
+    );
   }
 
   const body = c.req.valid("json");
-  const reserved = new Set(["owner", "manager", "member"]);
+  const reserved = new Set(["owner", "admin"]);
   if (reserved.has(body.slug)) {
-    return c.json({ error: { message: "That slug is reserved for system roles", code: "BAD_REQUEST" } }, 400);
+    return c.json({ error: { message: "That slug is reserved for a system group", code: "BAD_REQUEST" } }, 400);
   }
 
   const views = body.views.filter((id) => ALL_VIEW_IDS.includes(id));
@@ -140,8 +153,11 @@ roleDefRouter.patch("/org/role-definitions/:id", zValidator("json", PatchSchema)
     where: { id: sessionUser.id },
     select: { orgRole: true },
   });
-  if (!isOwner(dbUser?.orgRole)) {
-    return c.json({ error: { message: "Only the owner can edit roles", code: "FORBIDDEN" } }, 403);
+  if (!canManagePermissionGroups(c, dbUser?.orgRole)) {
+    return c.json(
+      { error: { message: "You do not have permission to edit permission groups", code: "FORBIDDEN" } },
+      403
+    );
   }
 
   const { id } = c.req.param();
@@ -152,6 +168,12 @@ roleDefRouter.patch("/org/role-definitions/:id", zValidator("json", PatchSchema)
   });
   if (!existing) {
     return c.json({ error: { message: "Role not found", code: "NOT_FOUND" } }, 404);
+  }
+  if (existing.slug === "owner") {
+    return c.json(
+      { error: { message: "The system Owner group cannot be changed.", code: "FORBIDDEN" } },
+      403
+    );
   }
 
   const data: {
@@ -164,7 +186,13 @@ roleDefRouter.patch("/org/role-definitions/:id", zValidator("json", PatchSchema)
   if (body.name !== undefined) data.name = body.name;
   if (body.description !== undefined) data.description = body.description;
   if (body.views !== undefined) data.views = body.views.filter((x) => ALL_VIEW_IDS.includes(x));
-  if (body.actions !== undefined) data.actions = body.actions.filter((x) => ALL_ACTION_IDS.includes(x));
+  if (body.actions !== undefined) {
+    let act = body.actions.filter((x) => ALL_ACTION_IDS.includes(x));
+    if (existing.slug === "admin") {
+      act = act.filter((a) => a !== "org.delete");
+    }
+    data.actions = act;
+  }
   if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder;
 
   const updated = await prisma.roleDefinition.update({
@@ -185,8 +213,11 @@ roleDefRouter.delete("/org/role-definitions/:id", async (c) => {
     where: { id: sessionUser.id },
     select: { orgRole: true },
   });
-  if (!isOwner(dbUser?.orgRole)) {
-    return c.json({ error: { message: "Only the owner can delete roles", code: "FORBIDDEN" } }, 403);
+  if (!canManagePermissionGroups(c, dbUser?.orgRole)) {
+    return c.json(
+      { error: { message: "You do not have permission to delete permission groups", code: "FORBIDDEN" } },
+      403
+    );
   }
 
   const { id } = c.req.param();
@@ -197,8 +228,8 @@ roleDefRouter.delete("/org/role-definitions/:id", async (c) => {
   if (!existing) {
     return c.json({ error: { message: "Role not found", code: "NOT_FOUND" } }, 404);
   }
-  if (existing.isSystem) {
-    return c.json({ error: { message: "System roles cannot be deleted", code: "FORBIDDEN" } }, 403);
+  if (existing.slug === "owner" || existing.slug === "admin") {
+    return c.json({ error: { message: "System groups cannot be deleted", code: "FORBIDDEN" } }, 403);
   }
 
   const assigned = await prisma.user.count({
@@ -209,6 +240,21 @@ roleDefRouter.delete("/org/role-definitions/:id", async (c) => {
       {
         error: {
           message: `Cannot delete: ${assigned} user(s) still have this role. Reassign them first.`,
+          code: "BAD_REQUEST",
+        },
+      },
+      400
+    );
+  }
+
+  const peopleUsing = await prisma.person.count({
+    where: { organizationId: sessionUser.organizationId, permissionGroupId: id },
+  });
+  if (peopleUsing > 0) {
+    return c.json(
+      {
+        error: {
+          message: `Cannot delete: ${peopleUsing} person(s) are assigned this group. Reassign them first.`,
           code: "BAD_REQUEST",
         },
       },

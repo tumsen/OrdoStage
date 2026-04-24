@@ -133,6 +133,15 @@ export const PersonSchema = z.object({
   teamIds: z.array(z.string()),
   teams: z.array(DepartmentSchema),
   teamMemberships: z.array(PersonTeamMembershipSchema),
+  permissionGroupId: z.string().nullable().optional(),
+  permissionGroup: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      slug: z.string(),
+    })
+    .nullable()
+    .optional(),
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -172,6 +181,8 @@ export const CreatePersonSchema = z.object({
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
   notes: z.string().optional(),
+  /** Required when `email` is set — defines app access (permission group / RoleDefinition). */
+  permissionGroupId: z.string().min(1).optional(),
   teamAssignments: z
     .array(TeamAssignmentInputSchema)
     .min(1, "At least one team is required")
@@ -200,7 +211,16 @@ export const CreatePersonSchema = z.object({
         });
       }
     }),
-});
+})
+  .superRefine((data, ctx) => {
+    if (data.email?.trim() && !data.permissionGroupId?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Select a permission group when the person has an email (required for app access).",
+        path: ["permissionGroupId"],
+      });
+    }
+  });
 
 export const PersonActiveSchema = z.object({
   active: z.boolean(),
@@ -209,6 +229,7 @@ export const PersonActiveSchema = z.object({
 export const UpdatePersonSchema = CreatePersonSchema.partial().extend({
   /** Clear profile default role on People (PUT body); team memberships unchanged. */
   role: z.union([z.string(), z.null()]).optional(),
+  permissionGroupId: z.string().min(1).nullable().optional(),
 });
 
 // Event

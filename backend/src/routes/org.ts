@@ -5,7 +5,7 @@ import { auth } from "../auth";
 import { deductCredits } from "../credits";
 import { getSignupCreditsForNewOrg } from "../signupCredits";
 import { env } from "../env";
-import { isOwner } from "../permissions";
+import { canAction } from "../requestRole";
 import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
 import { maybeEnqueueAutoTopUp } from "../autoTopup";
 import { reassignUsersBeforeOrgDelete } from "../orgMembership";
@@ -55,6 +55,7 @@ app.get("/me", async (c) => {
     organizationId: dbUser.organizationId,
     orgRole,
     isActive,
+    userId: sessionUser.id,
   });
   const hasOrganization = membershipCount > 0 || Boolean(dbUser.organizationId);
   return c.json({
@@ -264,20 +265,16 @@ const BillingSettingsSchema = z.object({
   autoTopUpThreshold: z.number().int().min(0).max(1_000_000).optional(),
 });
 
-// PATCH /api/org/policies — owner only (credit cost to deactivate a person)
+// PATCH /api/org/policies
 app.patch("/org/policies", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { orgRole: true },
-  });
-  if (!isOwner(dbUser?.orgRole || "")) {
+  if (!canAction(c, "org.policies")) {
     return c.json(
-      { error: { message: "Only the owner can change organization policies", code: "FORBIDDEN" } },
+      { error: { message: "You do not have permission to change organization policies", code: "FORBIDDEN" } },
       403
     );
   }
@@ -292,20 +289,16 @@ app.patch("/org/policies", async (c) => {
   return c.json({ data: { ok: true } });
 });
 
-// PATCH /api/org/billing-settings — owner only
+// PATCH /api/org/billing-settings
 app.patch("/org/billing-settings", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { orgRole: true },
-  });
-  if (!isOwner(dbUser?.orgRole || "")) {
+  if (!canAction(c, "billing.manage")) {
     return c.json(
-      { error: { message: "Only the owner can change billing settings", code: "FORBIDDEN" } },
+      { error: { message: "You do not have permission to change billing settings", code: "FORBIDDEN" } },
       403
     );
   }
@@ -333,20 +326,16 @@ app.patch("/org/billing-settings", async (c) => {
   return c.json({ data: { ok: true } });
 });
 
-// PATCH /api/org/preferences — owner sets organization default locale/unit preferences
+// PATCH /api/org/preferences
 app.patch("/org/preferences", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { orgRole: true },
-  });
-  if (!isOwner(dbUser?.orgRole || "")) {
+  if (!canAction(c, "org.update")) {
     return c.json(
-      { error: { message: "Only the owner can change organization preferences", code: "FORBIDDEN" } },
+      { error: { message: "You do not have permission to change organization defaults", code: "FORBIDDEN" } },
       403
     );
   }
@@ -405,19 +394,15 @@ const InvoiceInfoSchema = z.object({
   invoiceContact: z.string().max(200).optional(),
 });
 
-// PATCH /api/org/invoice-info — update company info (owner only)
+// PATCH /api/org/invoice-info
 app.patch("/org/invoice-info", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   }
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { orgRole: true },
-  });
-  if (!isOwner(dbUser?.orgRole || "")) {
+  if (!canAction(c, "billing.manage")) {
     return c.json(
-      { error: { message: "Only the owner can update invoice information", code: "FORBIDDEN" } },
+      { error: { message: "You do not have permission to update invoice information", code: "FORBIDDEN" } },
       403
     );
   }
@@ -430,20 +415,16 @@ app.patch("/org/invoice-info", async (c) => {
   return c.json({ data: { ok: true } });
 });
 
-// PATCH /api/org — rename organization (owner only)
+// PATCH /api/org — rename organization
 app.patch("/org", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { orgRole: true },
-  });
-  if (!isOwner(dbUser?.orgRole || "")) {
+  if (!canAction(c, "org.update")) {
     return c.json(
-      { error: { message: "Only the owner can rename the organization", code: "FORBIDDEN" } },
+      { error: { message: "You do not have permission to rename the organization", code: "FORBIDDEN" } },
       403
     );
   }
@@ -458,11 +439,18 @@ app.patch("/org", async (c) => {
   return c.json({ data: { ok: true } });
 });
 
-// DELETE /api/org — delete entire organization (owner only; type "DELETE <ORG NAME>" to confirm)
+// DELETE /api/org — type "DELETE <ORG NAME>" to confirm
 app.delete("/org", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  if (!canAction(c, "org.delete")) {
+    return c.json(
+      { error: { message: "You do not have permission to delete the organization", code: "FORBIDDEN" } },
+      403
+    );
   }
 
   const body = await c.req.json().catch(() => ({} as { confirm?: string }));
@@ -470,12 +458,12 @@ app.delete("/org", async (c) => {
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { orgRole: true, organizationId: true },
+    select: { organizationId: true },
   });
-  if (!dbUser?.organizationId || !isOwner(dbUser.orgRole)) {
+  if (!dbUser?.organizationId) {
     return c.json(
-      { error: { message: "Only the organization owner can delete it", code: "FORBIDDEN" } },
-      403
+      { error: { message: "Organization not found", code: "NOT_FOUND" } },
+      404
     );
   }
 

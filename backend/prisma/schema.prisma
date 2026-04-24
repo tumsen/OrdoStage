@@ -147,8 +147,9 @@ model RoleDefinition {
   /** What this role can do (create, manage, billing, etc.). */
   actions        String[] @default([])
   sortOrder      Int      @default(0)
-  /** System slugs (owner, manager, member) — not deletable. */
+  /** System: only `owner` and `admin` groups are protected. */
   isSystem       Boolean  @default(false)
+  people         Person[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -244,6 +245,9 @@ model Person {
   tourAssignments  TourPerson[]
   showAssignments  TourShowPerson[]
   tourNotes        TourPersonNote[]
+  /** App access for users linked by email uses this permission group (RoleDefinition). */
+  permissionGroupId String?
+  permissionGroup   RoleDefinition?        @relation(fields: [permissionGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   isActive         Boolean                 @default(true)
   /** Cast/crew: in-house vs contractor — required for new people; existing rows default to internal. */
   affiliation      String                  @default("internal")

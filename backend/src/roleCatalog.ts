@@ -10,7 +10,7 @@ export const VIEW_DEFS: { id: string; label: string; path: string }[] = [
   { id: "calendars", label: "Calendars", path: "/calendars" },
   { id: "billing", label: "Billing", path: "/billing" },
   { id: "account", label: "Account", path: "/account" },
-  { id: "roles", label: "Roles", path: "/roles" },
+  { id: "roles", label: "Permission groups", path: "/roles" },
 ];
 
 /** Things a user can do beyond opening a page. */
@@ -30,7 +30,9 @@ export const ACTION_DEFS: {
   { id: "billing.view", label: "View billing & credits", group: "billing" },
   { id: "billing.manage", label: "Purchase credits & billing settings", group: "billing" },
   { id: "org.policies", label: "Org policies (e.g. deactivate credit cost)", group: "organization" },
-  { id: "roles.manage", label: "Define roles & permissions", group: "organization" },
+  { id: "org.update", label: "Rename and general organization settings", group: "organization" },
+  { id: "org.delete", label: "Delete the entire organization", group: "organization" },
+  { id: "roles.manage", label: "Create & edit permission groups (except system groups)", group: "organization" },
   { id: "account.danger", label: "Danger zone (delete account)", group: "account" },
 ];
 
@@ -55,7 +57,8 @@ export const LEGACY_PRESETS: Record<
   manager: {
     views: allExceptViews(["roles"]),
     actions: ALL_ACTION_IDS.filter(
-      (a) => !["org.policies", "roles.manage", "billing.manage"].includes(a)
+      (a) =>
+        !["org.policies", "org.update", "org.delete", "roles.manage", "billing.manage"].includes(a)
     ),
   },
   member: {
@@ -66,10 +69,17 @@ export const LEGACY_PRESETS: Record<
           "team.invite",
           "billing.manage",
           "org.policies",
+          "org.update",
+          "org.delete",
           "roles.manage",
           "account.danger",
         ].includes(a)
     ),
+  },
+  /** System template: all actions except org.delete (enforced in resolve for slug `admin`). */
+  admin: {
+    views: [...ALL_VIEW_IDS],
+    actions: ALL_ACTION_IDS.filter((a) => a !== "org.delete"),
   },
 };
 
@@ -86,26 +96,18 @@ export function systemRoleSeeds(): Array<{
     {
       slug: "owner",
       name: "Owner",
-      description: "Full access to the organization.",
+      description: "System: full access. This group cannot be edited or deleted.",
       sortOrder: 0,
       views: [...LEGACY_PRESETS.owner!.views],
       actions: [...LEGACY_PRESETS.owner!.actions],
     },
     {
-      slug: "manager",
-      name: "Manager",
-      description: "Run day-to-day production; invite team; no org-wide billing or policies.",
+      slug: "admin",
+      name: "Admin",
+      description: "System: all permissions except deleting the organization. Editable; cannot be deleted.",
       sortOrder: 1,
-      views: [...LEGACY_PRESETS.manager!.views],
-      actions: [...LEGACY_PRESETS.manager!.actions],
-    },
-    {
-      slug: "member",
-      name: "Member",
-      description: "Work in the directory, schedule, and tours; cannot invite or change roles.",
-      sortOrder: 2,
-      views: [...LEGACY_PRESETS.member!.views],
-      actions: [...LEGACY_PRESETS.member!.actions],
+      views: [...LEGACY_PRESETS.admin!.views],
+      actions: [...LEGACY_PRESETS.admin!.actions],
     },
   ];
 }

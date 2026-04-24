@@ -50,6 +50,7 @@ export function usePermissions() {
     canView,
     canAction,
     isOwner: orgRole === "owner",
+    isAdmin: orgRole === "admin",
     orgRole,
     isActive,
     views,

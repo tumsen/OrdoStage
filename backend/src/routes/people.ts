@@ -15,6 +15,69 @@ const TEAM_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#84
 
 const peopleRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
+/** Validates RoleDefinition for this org; owner group only for the org owner user’s email. */
+async function assertValidPermissionGroup(
+  organizationId: string,
+  groupId: string | null | undefined,
+  personEmail: string | null | undefined
+): Promise<void> {
+  if (!groupId) {
+    if (personEmail?.trim()) {
+      throw new Error("Permission group is required when the person has an email.");
+    }
+    return;
+  }
+  const g = await prisma.roleDefinition.findFirst({
+    where: { id: groupId, organizationId },
+  });
+  if (!g) {
+    throw new Error("Invalid permission group.");
+  }
+  if (g.slug === "owner") {
+    const e = personEmail?.trim();
+    if (!e) {
+      throw new Error("The Owner group can only be assigned when the person has the owner’s email.");
+    }
+    const owner = await prisma.user.findFirst({
+      where: { organizationId, orgRole: "owner" },
+      select: { email: true },
+    });
+    if (!owner || owner.email.toLowerCase() !== e.toLowerCase()) {
+      throw new Error("The Owner group can only be assigned to the organization owner.");
+    }
+  }
+}
+
+/** Keeps `User.orgRole` in sync when a linked account matches this person’s email. */
+async function syncUserOrgRoleFromPerson(
+  organizationId: string,
+  personEmail: string | null | undefined,
+  permissionGroupId: string | null | undefined
+): Promise<void> {
+  if (!personEmail?.trim() || !permissionGroupId) return;
+  const g = await prisma.roleDefinition.findFirst({
+    where: { id: permissionGroupId, organizationId },
+    select: { slug: true },
+  });
+  if (!g) return;
+  let u = await prisma.user.findUnique({ where: { email: personEmail.trim().toLowerCase() } });
+  if (!u && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
+    u = await prisma.user.findFirst({
+      where: { email: { equals: personEmail.trim(), mode: "insensitive" } },
+    });
+  }
+  if (!u || u.organizationId !== organizationId) return;
+  await prisma.user.update({
+    where: { id: u.id },
+    data: { orgRole: g.slug },
+  });
+  await prisma.organizationMembership.upsert({
+    where: { userId_organizationId: { userId: u.id, organizationId } },
+    create: { userId: u.id, organizationId, orgRole: g.slug },
+    update: { orgRole: g.slug },
+  });
+}
+
 /** Resolve checkbox teamIds + typed new team names → unique department memberships. */
 async function resolveAssignmentTeamIds(
   organizationId: string,
@@ -90,6 +153,8 @@ function serializePerson(person: {
   organizationId: string;
   createdAt: Date;
   updatedAt: Date;
+  permissionGroupId?: string | null;
+  permissionGroup?: { id: string; name: string; slug: string } | null;
 }) {
   const aff =
     person.affiliation === "external" ? "external" : "internal";
@@ -98,6 +163,14 @@ function serializePerson(person: {
     name: person.name,
     role: person.role,
     affiliation: aff,
+    permissionGroupId: person.permissionGroupId ?? null,
+    permissionGroup: person.permissionGroup
+      ? {
+          id: person.permissionGroup.id,
+          name: person.permissionGroup.name,
+          slug: person.permissionGroup.slug,
+        }
+      : null,
     email: person.email,
     phone: person.phone,
     addressStreet:  person.addressStreet  ?? null,
@@ -147,6 +220,7 @@ peopleRouter.get("/people", async (c) => {
       teamMemberships: {
         include: { department: true },
       },
+      permissionGroup: { select: { id: true, name: true, slug: true } },
     },
   });
   return c.json({ data: people.map(serializePerson) });
@@ -169,6 +243,7 @@ peopleRouter.get("/people/me", async (c) => {
     },
     include: {
       teamMemberships: { include: { department: true } },
+      permissionGroup: { select: { id: true, name: true, slug: true } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -181,6 +256,7 @@ peopleRouter.get("/people/me", async (c) => {
       },
       include: {
         teamMemberships: { include: { department: true } },
+        permissionGroup: { select: { id: true, name: true, slug: true } },
       },
       orderBy: { createdAt: "asc" },
     });
@@ -200,6 +276,13 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
   }
 
   const body = c.req.valid("json");
+  try {
+    await assertValidPermissionGroup(user.organizationId, body.permissionGroupId, body.email);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Invalid permission group";
+    return c.json({ error: { message, code: "BAD_REQUEST" } }, 400);
+  }
+
   const resolved = await resolveAssignmentTeamIds(user.organizationId, body.teamAssignments);
   if (resolved.length === 0) {
     return c.json({ error: { message: "Could not resolve any team assignments", code: "BAD_REQUEST" } }, 400);
@@ -230,6 +313,7 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       emergencyContactName: body.emergencyContactName ?? null,
       emergencyContactPhone: body.emergencyContactPhone ?? null,
       ...(body.notes !== undefined && { notes: body.notes ?? null }),
+      ...(body.permissionGroupId && { permissionGroupId: body.permissionGroupId }),
       departmentId: teamIds[0] ?? null,
       organizationId: user.organizationId,
       teamMemberships: {
@@ -243,8 +327,10 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       teamMemberships: {
         include: { department: true },
       },
+      permissionGroup: { select: { id: true, name: true, slug: true } },
     },
   });
+  await syncUserOrgRoleFromPerson(user.organizationId, person.email, person.permissionGroupId);
   return c.json({ data: serializePerson(person) }, 201);
 });
 
@@ -261,6 +347,7 @@ peopleRouter.get("/people/:id", async (c) => {
       teamMemberships: {
         include: { department: true },
       },
+      permissionGroup: { select: { id: true, name: true, slug: true } },
     },
   });
   if (!person) {
@@ -386,6 +473,24 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       403
     );
   }
+  if (body.permissionGroupId !== undefined && !canWritePeople) {
+    return c.json(
+      { error: { message: "You cannot change the permission group for this person.", code: "FORBIDDEN" } },
+      403
+    );
+  }
+  const nextEmail =
+    body.email !== undefined ? (body.email?.trim() ? body.email : null) : existing.email;
+  if (body.permissionGroupId !== undefined || body.email !== undefined) {
+    const nextGroupId =
+      body.permissionGroupId !== undefined ? body.permissionGroupId : existing.permissionGroupId;
+    try {
+      await assertValidPermissionGroup(user.organizationId, nextGroupId, nextEmail);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Invalid permission group";
+      return c.json({ error: { message, code: "BAD_REQUEST" } }, 400);
+    }
+  }
   let nextAssignments: Array<{ teamId: string; role?: string | undefined }> = existing.teamMemberships.map(
     (membership) => ({
       teamId: membership.departmentId,
@@ -428,6 +533,7 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       ...(body.emergencyContactName !== undefined && { emergencyContactName: body.emergencyContactName }),
       ...(body.emergencyContactPhone !== undefined && { emergencyContactPhone: body.emergencyContactPhone }),
       ...(body.notes !== undefined && { notes: body.notes }),
+      ...(body.permissionGroupId !== undefined && { permissionGroupId: body.permissionGroupId }),
       ...(body.teamAssignments !== undefined && { departmentId: nextAssignments[0]?.teamId ?? null }),
       ...(body.teamAssignments !== undefined && {
         teamMemberships: {
@@ -443,8 +549,10 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       teamMemberships: {
         include: { department: true },
       },
+      permissionGroup: { select: { id: true, name: true, slug: true } },
     },
   });
+  await syncUserOrgRoleFromPerson(user.organizationId, person.email, person.permissionGroupId);
   return c.json({ data: serializePerson(person) });
 });
 

@@ -10,6 +10,11 @@ export function isOwner(orgRole: OrgRoleInput): boolean {
   return orgRole === "owner";
 }
 
+/** System permission group: admin (editable except reserved rules). */
+export function isAdmin(orgRole: OrgRoleInput): boolean {
+  return orgRole === "admin";
+}
+
 /** Invite members and set inactive; owners and managers. */
 export function canManageTeam(orgRole: OrgRoleInput): boolean {
   if (orgRole == null) return false;

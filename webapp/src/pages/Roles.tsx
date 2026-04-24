@@ -44,7 +44,8 @@ const GROUP_LABEL: Record<string, string> = {
 
 export default function Roles() {
   const queryClient = useQueryClient();
-  const { isOwner } = usePermissions();
+  const { isOwner, isAdmin, canAction } = usePermissions();
+  const canManageGroups = isOwner || isAdmin || canAction("roles.manage");
 
   const { data: catalog } = useQuery({
     queryKey: ["role-definitions", "catalog"],
@@ -199,7 +200,7 @@ export default function Roles() {
         <div>
           <div className="flex items-center gap-2 text-white/90">
             <KeyRound className="w-5 h-5 text-red-400/90" />
-            <h1 className="text-lg font-semibold">Roles</h1>
+            <h1 className="text-lg font-semibold">Permission groups</h1>
           </div>
           <p className="text-sm text-white/40 mt-1 max-w-xl">
             Define what each role can <strong className="text-white/55">see</strong> in the sidebar and what they can{" "}
@@ -207,7 +208,7 @@ export default function Roles() {
             them from the Team page.
           </p>
         </div>
-        {isOwner ? (
+        {canManageGroups ? (
           <Button
             size="sm"
             onClick={openCreate}
@@ -218,7 +219,7 @@ export default function Roles() {
         ) : null}
       </div>
 
-      {!isOwner ? (
+      {!canManageGroups ? (
         <p className="text-sm text-amber-200/80 border border-amber-500/25 rounded-lg px-4 py-3 bg-amber-950/20">
           Only the <strong className="text-amber-100">organization owner</strong> can create or edit role definitions.
         </p>
@@ -255,11 +256,15 @@ export default function Roles() {
                   <span className="text-white/40">Do:</span> {r.actions.length} actions
                 </p>
               </div>
-              {isOwner ? (
+              {canManageGroups ? (
                 <div className="flex items-center gap-2 shrink-0">
-                  <Button variant="outline" size="sm" className="border-white/15" onClick={() => openEdit(r)}>
-                    <Pencil size={13} className="mr-1.5" /> Edit
-                  </Button>
+                  {r.slug === "owner" ? (
+                    <span className="text-[10px] text-white/30 max-w-[120px] text-right">System — not editable</span>
+                  ) : (
+                    <Button variant="outline" size="sm" className="border-white/15" onClick={() => openEdit(r)}>
+                      <Pencil size={13} className="mr-1.5" /> Edit
+                    </Button>
+                  )}
                   {!r.isSystem ? (
                     <Button
                       variant="ghost"
@@ -341,7 +346,7 @@ export default function Roles() {
             >
               Cancel
             </Button>
-            {isOwner ? (
+            {canManageGroups ? (
               <Button
                 className="bg-red-900 hover:bg-red-800"
                 disabled={saveMutation.isPending || (mode === "new" && !newName.trim())}

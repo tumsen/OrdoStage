@@ -75,6 +75,8 @@ const PersonFormSchema = z.object({
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
   notes: z.string().optional(),
+  /** App access: RoleDefinition id from GET /api/org/role-definitions. Required if email is set. */
+  permissionGroupId: z.string().optional(),
   teamAssignments: z
     .array(
       z.object({
@@ -103,7 +105,16 @@ const PersonFormSchema = z.object({
       }
       if (!ok) ctx.addIssue({ code: "custom", message: "Select or add at least one team", path: ["teamAssignments"] });
     }),
-});
+})
+  .superRefine((data, ctx) => {
+    if (data.email?.trim() && !data.permissionGroupId?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Select a permission group (required for app access when the person has an email).",
+        path: ["permissionGroupId"],
+      });
+    }
+  });
 
 type PersonFormValues = z.infer<typeof PersonFormSchema>;
 
@@ -150,13 +161,9 @@ function resolveRole(values: PersonFormValues): string | undefined {
   return values.rolePreset;
 }
 
-/** `knownDirect` = preset + org role-definition display names (anything else uses "Other" + free text). */
-function roleToFormValues(
-  role: string | null,
-  knownDirect: Set<string>
-): { rolePreset: string; roleCustom: string } {
+function roleToFormValues(role: string | null): { rolePreset: string; roleCustom: string } {
   if (!role) return { rolePreset: "", roleCustom: "" };
-  if (knownDirect.has(role)) return { rolePreset: role, roleCustom: "" };
+  if ((PRESET_ROLES as readonly string[]).includes(role)) return { rolePreset: role, roleCustom: "" };
   return { rolePreset: "other", roleCustom: role };
 }
 
@@ -263,7 +270,7 @@ async function uploadPersonDocument(
 
 // ── Person form dialog ────────────────────────────────────────────────────────
 
-type OrgRoleDefRow = { name: string };
+type RoleDefRow = { id: string; name: string; slug: string };
 
 function PersonFormDialog({
   open,
@@ -277,34 +284,21 @@ function PersonFormDialog({
   onSuccess?: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { canWrite: canWriteOrg } = usePermissions();
   const { data: teams } = useQuery({
     queryKey: ["departments"],
     queryFn: () => api.get<Team[]>("/api/departments"),
   });
 
-  const { data: orgRoleRows = [] } = useQuery({
+  const { data: permissionGroupRows = [] } = useQuery({
     queryKey: ["role-definitions"],
-    queryFn: () => api.get<OrgRoleDefRow[]>("/api/org/role-definitions"),
+    queryFn: () => api.get<RoleDefRow[]>("/api/org/role-definitions"),
     enabled: open,
   });
 
-  const defaultRoleOptions = useMemo(() => {
-    const preset = new Set<string>(PRESET_ROLES);
-    const fromOrg = orgRoleRows
-      .map((r) => r.name.trim())
-      .filter((n) => n && !preset.has(n));
-    const unique = [...new Set(fromOrg)].sort((a, b) => a.localeCompare(b));
-    return [...PRESET_ROLES, ...unique];
-  }, [orgRoleRows]);
-
-  const knownRolePickerValues = useMemo(
-    () => new Set<string>([...defaultRoleOptions]),
-    [defaultRoleOptions]
-  );
-
   const { rolePreset: defaultPreset, roleCustom: defaultCustom } = useMemo(
-    () => roleToFormValues(person?.role ?? null, knownRolePickerValues),
-    [person?.role, knownRolePickerValues]
+    () => roleToFormValues(person?.role ?? null),
+    [person?.role]
   );
 
   const form = useForm<PersonFormValues>({
@@ -315,6 +309,7 @@ function PersonFormDialog({
           affiliation: person.affiliation ?? "internal",
           rolePreset: defaultPreset,
           roleCustom: defaultCustom,
+          permissionGroupId: person.permissionGroupId ?? "",
           email: person.email ?? "",
           phone: person.phone ?? "",
           addressStreet:  person.addressStreet  ?? "",
@@ -338,6 +333,7 @@ function PersonFormDialog({
           affiliation: "internal",
           rolePreset: "",
           roleCustom: "",
+          permissionGroupId: "",
           email: "",
           phone: "",
           addressStreet:  "",
@@ -393,6 +389,9 @@ function PersonFormDialog({
         emergencyContactName: values.emergencyContactName || undefined,
         emergencyContactPhone: values.emergencyContactPhone || undefined,
         notes: values.notes || undefined,
+        ...(values.permissionGroupId?.trim()
+          ? { permissionGroupId: values.permissionGroupId.trim() }
+          : {}),
         teamAssignments: values.teamAssignments.map((assignment) => ({
           teamId: assignment.teamId?.trim() || undefined,
           newTeamName: assignment.newTeamName?.trim() || undefined,
@@ -515,12 +514,8 @@ function PersonFormDialog({
             <div className="space-y-1.5 sm:col-span-2">
               <Label className="text-white/50 text-xs uppercase tracking-wide">Default role</Label>
               <p className="text-[10px] text-white/30 leading-snug">
-                General job title for this person. You can set a different <strong className="text-white/40">role per team</strong> on
-                the Team page. Custom roles you add under{" "}
-                <Link to="/roles" className="text-rose-300/90 hover:underline">
-                  Roles
-                </Link>{" "}
-                also appear in this list.
+                Job title in the directory. You can set a different <strong className="text-white/40">role per team</strong> on the
+                Team page. App access is not controlled here; use the permission group below (when the person has an email).
               </p>
               <Controller
                 control={form.control}
@@ -531,7 +526,7 @@ function PersonFormDialog({
                       <SelectValue placeholder="Select default role…" />
                     </SelectTrigger>
                     <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                      {defaultRoleOptions.map((r) => (
+                      {PRESET_ROLES.map((r) => (
                         <SelectItem key={r} value={r}>{r}</SelectItem>
                       ))}
                       <SelectItem value="other">Other...</SelectItem>
@@ -576,6 +571,48 @@ function PersonFormDialog({
                 className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">
+              Permission group{form.watch("email")?.trim() ? " *" : ""}
+            </Label>
+            <p className="text-[10px] text-white/30 leading-snug">
+              If this person has an email, you must select a group so their login works. Groups and what they can do are edited
+              only under{" "}
+              <Link to="/roles" className="text-rose-300/90 hover:underline">
+                Permission groups
+              </Link>
+              . Owner and Admin are system groups.
+            </p>
+            <Controller
+              control={form.control}
+              name="permissionGroupId"
+              render={({ field }) => (
+                <Select
+                  value={field.value ?? ""}
+                  onValueChange={field.onChange}
+                  disabled={!canWriteOrg}
+                >
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder="Select a permission group…" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-[min(50vh,320px)]">
+                    {[...permissionGroupRows]
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.name}
+                          {g.slug === "owner" || g.slug === "admin" ? ` (${g.slug})` : ""}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {form.formState.errors.permissionGroupId ? (
+              <p className="text-red-400 text-xs">{form.formState.errors.permissionGroupId.message as string}</p>
+            ) : null}
           </div>
 
           {/* Address */}
