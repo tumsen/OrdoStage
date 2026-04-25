@@ -50,6 +50,29 @@ function applyRounding(cents: number, mode: RoundingMode, unit: RoundingUnit): n
   return Math.max(Math.round(scaled) * step, 1);
 }
 
+function recomputeLinkedRows(
+  rows: Record<string, CurrencyRow>,
+  rates: Record<string, number>
+): { next: Record<string, CurrencyRow>; changed: boolean } {
+  const base = Number(rows[BASE_CURRENCY]?.userDailyRateCents ?? "0");
+  if (!Number.isFinite(base) || base <= 0) return { next: rows, changed: false };
+  let changed = false;
+  const next: Record<string, CurrencyRow> = { ...rows };
+  for (const currency of Object.keys(next)) {
+    if (currency === BASE_CURRENCY) continue;
+    const row = next[currency];
+    if (!row.followBaseCurrency) continue;
+    const fx = rates[currency];
+    if (!fx || !Number.isFinite(fx)) continue;
+    const roundedText = String(applyRounding(base * fx, row.roundingMode, row.roundingUnit));
+    if (row.userDailyRateCents !== roundedText) {
+      next[currency] = { ...row, userDailyRateCents: roundedText };
+      changed = true;
+    }
+  }
+  return { next, changed };
+}
+
 export default function Pricing() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -118,29 +141,19 @@ export default function Pricing() {
   }, [fetchUsdRates]);
 
   useEffect(() => {
-    const base = Number(currencyRows[BASE_CURRENCY]?.userDailyRateCents ?? "0");
-    if (!Number.isFinite(base) || base <= 0) return;
     if (Object.keys(currencyRows).length === 0) return;
     setCurrencyRows((prev) => {
-      let changed = false;
-      const next: Record<string, CurrencyRow> = { ...prev };
-      for (const currency of Object.keys(next)) {
-        if (currency === BASE_CURRENCY) continue;
-        const row = next[currency];
-        if (!row.followBaseCurrency) continue;
-        const fx = fxRates[currency];
-        if (!fx || !Number.isFinite(fx)) continue;
-        const raw = base * fx;
-        const rounded = applyRounding(raw, row.roundingMode, row.roundingUnit);
-        const roundedText = String(rounded);
-        if (row.userDailyRateCents !== roundedText) {
-          next[currency] = { ...row, userDailyRateCents: roundedText };
-          changed = true;
-        }
-      }
+      const { next, changed } = recomputeLinkedRows(prev, fxRates);
       return changed ? next : prev;
     });
   }, [currencyRows, fxRates]);
+
+  const applyUsdRecalculationNow = () => {
+    setCurrencyRows((prev) => {
+      const { next, changed } = recomputeLinkedRows(prev, fxRates);
+      return changed ? next : prev;
+    });
+  };
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -194,6 +207,9 @@ export default function Pricing() {
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => fetchUsdRates()} disabled={fxLoading}>
                 {fxLoading ? "Loading rates..." : "Refresh USD rates"}
+              </Button>
+              <Button variant="outline" onClick={applyUsdRecalculationNow} disabled={fxLoading || isPending}>
+                Apply USD recalculation now
               </Button>
               {fxUpdatedAt ? <span className="text-[11px] text-white/45">Updated: {fxUpdatedAt}</span> : null}
             </div>
