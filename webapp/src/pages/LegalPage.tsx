@@ -22,13 +22,19 @@ export default function LegalPage() {
   });
 
   const text = data?.[config.key] ?? "";
+  const termsDeletionNotice =
+    "No credit card is required to start. If you decide not to continue, you can simply stop paying. Accounts with an unpaid negative balance for 30 days may be permanently deleted, including associated organization data.";
+  const renderedText =
+    config.key === "terms_content" && !text.includes(termsDeletionNotice)
+      ? `${text}\n\n9. Negative balance and service deletion\n${termsDeletionNotice}`
+      : text;
 
   return (
     <div className="text-white">
       <div className="w-full px-6 py-10 md:py-14">
         <h1 className="sr-only">{config.title}</h1>
         <article className="rounded-lg border border-white/10 bg-white/[0.02] p-6">
-          <pre className="whitespace-pre-wrap text-sm leading-7 text-white/80 font-sans">{text}</pre>
+          <pre className="whitespace-pre-wrap text-sm leading-7 text-white/80 font-sans">{renderedText}</pre>
         </article>
       </div>
     </div>

@@ -24,6 +24,8 @@ We are not responsible for any losses — financial or otherwise — resulting f
 5. Billing and payments
 Ordo Stage uses postpaid invoicing based on monthly usage. Invoices are due within the payment period stated on the invoice (default 7 days).
 If an invoice remains unpaid after the due date, the organization may be switched to view-only mode until payment is received.
+No credit card is required to start. If you decide not to continue, you can simply stop paying.
+Accounts with an unpaid negative balance for 30 days may be permanently deleted, including associated organization data.
 6. Limitation of liability
 To the fullest extent permitted by law, Ordo Stage and its operators shall not be liable for any indirect, incidental, special, or consequential damages, including but not limited to loss of data, loss of revenue, or loss of business, arising from your use of or inability to use the service.
 Our total liability to you for any claim shall not exceed the amount you paid to Ordo Stage in the 30 days prior to the claim.
