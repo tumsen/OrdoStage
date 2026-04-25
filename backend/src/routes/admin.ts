@@ -86,10 +86,17 @@ app.get("/admin/stats", async (c) => {
 
 app.get("/admin/billing/settings", async (c) => {
   await ensureCurrencyPriceMonthRollover(prisma);
-  const [cfg, currencyPrices] = await Promise.all([getBillingConfig(prisma), prisma.billingCurrencyPrice.findMany()]);
+  const [cfg, currencyPrices, baseRow] = await Promise.all([
+    getBillingConfig(prisma),
+    prisma.billingCurrencyPrice.findMany(),
+    prisma.$queryRaw<Array<{ baseCurrencyCode: string | null }>>`
+      SELECT "baseCurrencyCode" FROM "BillingConfig" WHERE "id" = 'default' LIMIT 1
+    `,
+  ]);
   return c.json({
     data: {
       ...cfg,
+      baseCurrencyCode: baseRow[0]?.baseCurrencyCode || "USD",
       currencyPrices: currencyPrices.map((p) => ({
         currencyCode: p.currencyCode,
         userDailyRateCents: p.userDailyRateCents,
@@ -154,6 +161,7 @@ app.patch("/admin/billing/settings", async (c) => {
           })
         )
         .optional(),
+      baseCurrencyCode: z.string().length(3).optional(),
       paymentDueDays: z.number().int().min(1).max(30).optional(),
     })
     .parse(body);
@@ -161,9 +169,21 @@ app.patch("/admin/billing/settings", async (c) => {
   await ensureCurrencyPriceMonthRollover(prisma);
   const cfg = await prisma.billingConfig.upsert({
     where: { id: "default" },
-    create: { id: "default", paymentDueDays: parsed.paymentDueDays ?? 7 },
-    update: { ...(parsed.paymentDueDays !== undefined ? { paymentDueDays: parsed.paymentDueDays } : {}) },
+    create: {
+      id: "default",
+      paymentDueDays: parsed.paymentDueDays ?? 7,
+    },
+    update: {
+      ...(parsed.paymentDueDays !== undefined ? { paymentDueDays: parsed.paymentDueDays } : {}),
+    },
   });
+  if (parsed.baseCurrencyCode !== undefined) {
+    await prisma.$executeRaw`
+      UPDATE "BillingConfig"
+      SET "baseCurrencyCode" = ${parsed.baseCurrencyCode.toUpperCase()}
+      WHERE "id" = 'default'
+    `;
+  }
   if (parsed.currencyPrices?.length) {
     await prisma.$transaction(
       parsed.currencyPrices.map((row) =>
@@ -188,10 +208,16 @@ app.patch("/admin/billing/settings", async (c) => {
       )
     );
   }
-  const prices = await prisma.billingCurrencyPrice.findMany();
+  const [prices, baseRow] = await Promise.all([
+    prisma.billingCurrencyPrice.findMany(),
+    prisma.$queryRaw<Array<{ baseCurrencyCode: string | null }>>`
+      SELECT "baseCurrencyCode" FROM "BillingConfig" WHERE "id" = 'default' LIMIT 1
+    `,
+  ]);
   return c.json({
     data: {
       ...cfg,
+      baseCurrencyCode: baseRow[0]?.baseCurrencyCode || "USD",
       currencyPrices: prices.map((p) => ({
         currencyCode: p.currencyCode,
         userDailyRateCents: p.userDailyRateCents,

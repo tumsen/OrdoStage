@@ -5,12 +5,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type CurrencyRow = {
   userDailyRateCents: string;
   nextMonthUserDailyRateCents: string;
 };
-const BASE_CURRENCY = "USD";
 const CURRENCY_COUNTRY_LABELS: Record<string, string> = {
   USD: "United States",
   EUR: "Eurozone",
@@ -33,12 +33,16 @@ function formatMajorFromCents(centsText: string): string {
   return (cents / 100).toFixed(2);
 }
 
-function calculateBaseComparison(rows: Record<string, CurrencyRow>, rates: Record<string, number>): Record<string, number | null> {
-  const base = Number(rows[BASE_CURRENCY]?.userDailyRateCents ?? "0");
+function calculateBaseComparison(
+  rows: Record<string, CurrencyRow>,
+  rates: Record<string, number>,
+  baseCurrency: string
+): Record<string, number | null> {
+  const base = Number(rows[baseCurrency]?.userDailyRateCents ?? "0");
   const calculated: Record<string, number | null> = {};
   if (!Number.isFinite(base) || base <= 0) return calculated;
   for (const currency of Object.keys(rows)) {
-    if (currency === BASE_CURRENCY) continue;
+    if (currency === baseCurrency) continue;
     const fx = rates[currency];
     if (!fx || !Number.isFinite(fx)) continue;
     calculated[currency] = Math.max(Math.round(base * fx), 1);
@@ -52,6 +56,7 @@ export default function Pricing() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     paymentDueDays: "7",
+    baseCurrencyCode: "USD",
   });
   const [currencyRows, setCurrencyRows] = useState<Record<string, CurrencyRow>>({});
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
@@ -62,6 +67,7 @@ export default function Pricing() {
 
   const { data, isPending } = useQuery<{
     paymentDueDays: number;
+    baseCurrencyCode?: string;
     currencyPrices: Array<{
       currencyCode: string;
       userDailyRateCents: number;
@@ -86,21 +92,23 @@ export default function Pricing() {
     setCurrencyRows(rowMap);
     setForm({
       paymentDueDays: String(data.paymentDueDays),
+      baseCurrencyCode: data.baseCurrencyCode || "USD",
     });
   }, [data]);
 
-  const fetchUsdRates = useCallback(async () => {
+  const fetchBaseRates = useCallback(async () => {
     setFxLoading(true);
     setFxError(null);
     try {
+      const base = (form.baseCurrencyCode || "USD").toUpperCase();
       const data = await api.get<{ base: string; rates: Record<string, number>; updatedAt?: string | null }>(
-        `/api/admin/billing/fx-rates?base=USD&t=${Date.now()}`
+        `/api/admin/billing/fx-rates?base=${encodeURIComponent(base)}&t=${Date.now()}`
       );
       if (!data.rates) throw new Error("No rates in response");
       setFxRates(data.rates);
       setFxUpdatedAt(data.updatedAt ?? null);
       setFxRefreshedAt(new Date().toISOString());
-      toast({ title: "USD rates refreshed" });
+      toast({ title: `${base} rates refreshed` });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to fetch rates.";
       setFxError(msg);
@@ -108,24 +116,25 @@ export default function Pricing() {
     } finally {
       setFxLoading(false);
     }
-  }, [toast]);
+  }, [toast, form.baseCurrencyCode]);
 
   useEffect(() => {
-    fetchUsdRates().catch(() => {});
-  }, [fetchUsdRates]);
+    fetchBaseRates().catch(() => {});
+  }, [fetchBaseRates]);
 
   useEffect(() => {
     const id = setInterval(() => {
-      fetchUsdRates().catch(() => {});
+      fetchBaseRates().catch(() => {});
     }, 10 * 60 * 1000);
     return () => clearInterval(id);
-  }, [fetchUsdRates]);
-  const calculatedRows = calculateBaseComparison(currencyRows, fxRates);
+  }, [fetchBaseRates]);
+  const calculatedRows = calculateBaseComparison(currencyRows, fxRates, form.baseCurrencyCode || "USD");
 
   const saveMutation = useMutation({
     mutationFn: () =>
       api.patch("/api/admin/billing/settings", {
         paymentDueDays: Number(form.paymentDueDays),
+        baseCurrencyCode: form.baseCurrencyCode,
         currencyPrices: Object.entries(currencyRows)
           .filter(([, row]) => row.userDailyRateCents.trim().length > 0)
           .map(([currencyCode, row]) => ({
@@ -168,11 +177,12 @@ export default function Pricing() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <p className="text-xs text-white/60">
-              Manual prices per currency with compact fields. Base currency is <span className="text-white font-medium">{BASE_CURRENCY}</span>.
+              Manual prices per currency with compact fields. Base currency is{" "}
+              <span className="text-white font-medium">{form.baseCurrencyCode || "USD"}</span>.
             </p>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => fetchUsdRates()} disabled={fxLoading}>
-                {fxLoading ? "Loading rates..." : "Refresh USD rates"}
+              <Button variant="outline" onClick={() => fetchBaseRates()} disabled={fxLoading}>
+                {fxLoading ? "Loading rates..." : "Refresh base rates"}
               </Button>
               {fxRefreshedAt ? (
                 <span className="text-[11px] text-white/45">Checked: {new Date(fxRefreshedAt).toLocaleString()}</span>
@@ -185,30 +195,45 @@ export default function Pricing() {
 
           <div className="space-y-2 overflow-x-auto">
             <div className="grid min-w-[760px] grid-cols-12 gap-2 text-xs text-white/45 px-1 whitespace-nowrap">
-              <p className="col-span-4">Currency / Country</p>
+              <p className="col-span-4">Base / Currency</p>
               <p className="col-span-2">Current</p>
               <p className="col-span-2">Next month</p>
               <p className="col-span-2">Base calculation</p>
             </div>
-            {(data?.supportedCurrencies ?? []).map((currency) => {
+            {[...(data?.supportedCurrencies ?? [])]
+              .sort((a, b) => {
+                if (a === form.baseCurrencyCode) return -1;
+                if (b === form.baseCurrencyCode) return 1;
+                return a.localeCompare(b);
+              })
+              .map((currency) => {
               const row = currencyRows[currency] ?? {
                 userDailyRateCents: "",
                 nextMonthUserDailyRateCents: "",
               };
               const calculatedValue =
-                currency === BASE_CURRENCY
+                currency === form.baseCurrencyCode
                   ? row.userDailyRateCents || ""
                   : calculatedRows[currency] != null
                     ? String(calculatedRows[currency])
                     : "";
               const rateLabel =
-                currency === BASE_CURRENCY ? "1.000000" : fxRates[currency] != null ? fxRates[currency].toFixed(6) : "-";
+                currency === form.baseCurrencyCode ? "1.000000" : fxRates[currency] != null ? fxRates[currency].toFixed(6) : "-";
               return (
                 <div key={currency} className="grid min-w-[760px] grid-cols-12 gap-2 items-center whitespace-nowrap">
                   <div className="col-span-4">
-                    <p className="text-xs text-white font-medium">
-                      {currency} - {CURRENCY_COUNTRY_LABELS[currency] ?? "Other"}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={currency === form.baseCurrencyCode}
+                        onCheckedChange={(checked) => {
+                          if (!checked) return;
+                          setForm((prev) => ({ ...prev, baseCurrencyCode: currency }));
+                        }}
+                      />
+                      <p className="text-xs text-white font-medium">
+                        {currency} - {CURRENCY_COUNTRY_LABELS[currency] ?? "Other"}
+                      </p>
+                    </div>
                   </div>
                   <Input
                     className="col-span-2 h-7 text-xs px-2"
