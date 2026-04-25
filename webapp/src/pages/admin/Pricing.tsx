@@ -246,26 +246,32 @@ export default function Pricing() {
                       </p>
                     </div>
                   </div>
-                  <Input
-                    className="col-span-2 h-7 text-xs px-2"
-                    value={row.userDailyRateCents}
-                    onChange={(e) =>
-                      setCurrencyRows((prev) => ({
-                        ...prev,
-                        [currency]: { ...row, userDailyRateCents: e.target.value },
-                      }))
-                    }
-                  />
-                  <Input
-                    className="col-span-2 h-7 text-xs px-2"
-                    value={row.nextMonthUserDailyRateCents}
-                    onChange={(e) =>
-                      setCurrencyRows((prev) => ({
-                        ...prev,
-                        [currency]: { ...row, nextMonthUserDailyRateCents: e.target.value },
-                      }))
-                    }
-                  />
+                  <div className="col-span-2 flex items-center gap-1">
+                    <Input
+                      className="h-7 text-xs px-2"
+                      value={row.userDailyRateCents}
+                      onChange={(e) =>
+                        setCurrencyRows((prev) => ({
+                          ...prev,
+                          [currency]: { ...row, userDailyRateCents: e.target.value },
+                        }))
+                      }
+                    />
+                    <span className="text-[10px] text-white/45">{currency}</span>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-1">
+                    <Input
+                      className="h-7 text-xs px-2"
+                      value={row.nextMonthUserDailyRateCents}
+                      onChange={(e) =>
+                        setCurrencyRows((prev) => ({
+                          ...prev,
+                          [currency]: { ...row, nextMonthUserDailyRateCents: e.target.value },
+                        }))
+                      }
+                    />
+                    <span className="text-[10px] text-white/45">{currency}</span>
+                  </div>
                   <Input
                     className="col-span-2 h-7 text-xs px-2"
                     value={calculatedValue || "-"}
