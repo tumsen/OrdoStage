@@ -53,10 +53,11 @@ function applyRounding(cents: number, mode: RoundingMode, unit: RoundingUnit): n
 function recomputeLinkedRows(
   rows: Record<string, CurrencyRow>,
   rates: Record<string, number>
-): { next: Record<string, CurrencyRow>; changed: boolean } {
+): { next: Record<string, CurrencyRow>; changed: boolean; changedCount: number } {
   const base = Number(rows[BASE_CURRENCY]?.userDailyRateCents ?? "0");
-  if (!Number.isFinite(base) || base <= 0) return { next: rows, changed: false };
+  if (!Number.isFinite(base) || base <= 0) return { next: rows, changed: false, changedCount: 0 };
   let changed = false;
+  let changedCount = 0;
   const next: Record<string, CurrencyRow> = { ...rows };
   for (const currency of Object.keys(next)) {
     if (currency === BASE_CURRENCY) continue;
@@ -68,9 +69,10 @@ function recomputeLinkedRows(
     if (row.userDailyRateCents !== roundedText) {
       next[currency] = { ...row, userDailyRateCents: roundedText };
       changed = true;
+      changedCount += 1;
     }
   }
-  return { next, changed };
+  return { next, changed, changedCount };
 }
 
 export default function Pricing() {
@@ -122,19 +124,21 @@ export default function Pricing() {
     setFxLoading(true);
     setFxError(null);
     try {
-      const res = await fetch("https://open.er-api.com/v6/latest/USD");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = (await res.json()) as { rates?: Record<string, number>; time_last_update_utc?: string };
-      if (!json.rates) throw new Error("No rates in response");
-      setFxRates(json.rates);
-      setFxUpdatedAt(json.time_last_update_utc ?? null);
+      const data = await api.get<{ base: string; rates: Record<string, number>; updatedAt?: string | null }>(
+        "/api/admin/billing/fx-rates?base=USD"
+      );
+      if (!data.rates) throw new Error("No rates in response");
+      setFxRates(data.rates);
+      setFxUpdatedAt(data.updatedAt ?? null);
+      toast({ title: "USD rates refreshed" });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to fetch rates.";
       setFxError(msg);
+      toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setFxLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     fetchUsdRates().catch(() => {});
@@ -149,10 +153,21 @@ export default function Pricing() {
   }, [currencyRows, fxRates]);
 
   const applyUsdRecalculationNow = () => {
+    let changedCount = 0;
     setCurrencyRows((prev) => {
-      const { next, changed } = recomputeLinkedRows(prev, fxRates);
+      const result = recomputeLinkedRows(prev, fxRates);
+      changedCount = result.changedCount;
+      const { next, changed } = result;
       return changed ? next : prev;
     });
+    if (changedCount > 0) {
+      toast({ title: "Recalculated", description: `Updated ${changedCount} linked currency rows.` });
+    } else {
+      toast({
+        title: "No changes",
+        description: "No linked currencies were updated. Check follow-base checkboxes and USD rate.",
+      });
+    }
   };
 
   const saveMutation = useMutation({

@@ -100,6 +100,47 @@ app.get("/admin/billing/settings", async (c) => {
   });
 });
 
+app.get("/admin/billing/fx-rates", async (c) => {
+  const base = (c.req.query("base") || "USD").toUpperCase();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`https://open.er-api.com/v6/latest/${encodeURIComponent(base)}`, {
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return c.json(
+        { error: { message: `FX rate lookup failed (${response.status}).`, code: "FX_LOOKUP_FAILED" } },
+        502
+      );
+    }
+    const json = (await response.json()) as {
+      rates?: Record<string, number>;
+      time_last_update_utc?: string;
+    };
+    if (!json.rates) {
+      return c.json(
+        { error: { message: "FX rate lookup returned no rates.", code: "FX_LOOKUP_EMPTY" } },
+        502
+      );
+    }
+    return c.json({
+      data: {
+        base,
+        rates: json.rates,
+        updatedAt: json.time_last_update_utc ?? null,
+      },
+    });
+  } catch {
+    return c.json(
+      { error: { message: "FX rate lookup request failed.", code: "FX_LOOKUP_FAILED" } },
+      502
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
 app.patch("/admin/billing/settings", async (c) => {
   const body = await c.req.json();
   const parsed = z
