@@ -112,30 +112,21 @@ export default function PublicPricing() {
 
         {/* Hero */}
         <header className="space-y-6">
+          <div className="space-y-1">
+            <p className="text-sm uppercase tracking-wide text-white/60">Price per user</p>
+            <p className="text-3xl md:text-4xl font-bold text-white">
+              {userCurrency} {formatMajorFromCents(selectedPriceCents)} / day
+            </p>
+            <p className="text-lg md:text-xl text-white/80">
+              {userCurrency} {formatMajorFromCents(perUserMonthlyCents)} / month
+            </p>
+          </div>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">
             {pricingTitle}
           </h1>
           <p className="text-lg md:text-xl text-white/75 leading-relaxed">
             Monthly postpaid billing based on real usage days.
           </p>
-          <p className="rounded-xl border border-ordo-yellow/35 bg-gradient-to-br from-ordo-magenta/[0.12] to-ordo-violet/[0.08] px-4 py-4 text-[15px] leading-relaxed text-white/90 md:text-base">
-            Invoices are issued on the first day of each month for previous-month usage, with a 7-day payment window.
-          </p>
-          <p className="rounded-xl border border-red-400/35 bg-red-500/[0.08] px-4 py-4 text-[15px] leading-relaxed text-white/90 md:text-base">
-            No credit card is required to start. If you decide not to continue, you can simply stop paying. Accounts with an unpaid negative balance for 30 days may be permanently deleted, including associated organization data.
-          </p>
-          <div className="rounded-xl border border-white/15 bg-white/[0.04] px-4 py-4">
-            <p className="text-sm text-white/65">Daily user price for your region</p>
-            <p className="text-2xl font-bold text-white mt-1">
-              {userCurrency} {formatMajorFromCents(selectedPriceCents)}
-            </p>
-            <p className="text-sm text-white/75 mt-1">
-              Per user / month ({daysInMonth} days): {userCurrency} {formatMajorFromCents(perUserMonthlyCents)}
-            </p>
-            <p className="text-xs text-white/50 mt-1">
-              Currency auto-selected from your locale/country. Base currency: {publicPricing?.baseCurrencyCode || "USD"}.
-            </p>
-          </div>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
               asChild
@@ -159,6 +150,9 @@ export default function PublicPricing() {
           <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-yellow">
             <li>Invoice generated on the 1st for the previous month</li>
             <li>Payment due within 7 days</li>
+            <li>No credit card is required to start</li>
+            <li>If you do not want to continue, simply stop paying</li>
+            <li>If a negative balance remains unpaid for 30 days, the account may be permanently deleted</li>
             <li>If unpaid after due date, organization switches to view-only</li>
             <li>Full access is restored automatically after payment</li>
           </ul>
