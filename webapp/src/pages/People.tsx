@@ -436,6 +436,7 @@ function PersonFormDialog({
   const [docDoesNotExpire, setDocDoesNotExpire] = useState(false);
   const [docType, setDocType] = useState<(typeof PERSON_DOCUMENT_TYPE_OPTIONS)[number]>("other");
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [teamPickerOpen, setTeamPickerOpen] = useState(false);
 
   const canEditPersonDocs =
     canWriteOrg ||
@@ -461,7 +462,7 @@ function PersonFormDialog({
   const rolePreset = form.watch("rolePreset");
   const watchedAssignments = form.watch("teamAssignments");
   const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
-  const availableTeamsToAdd = (teams ?? []).filter((t) => !selectedTeamIds.has(t.id));
+  const sortedTeams = [...(teams ?? [])].sort((a, b) => a.name.localeCompare(b.name));
 
   const mutation = useMutation({
     mutationFn: (values: PersonFormValues) => {
@@ -828,36 +829,24 @@ function PersonFormDialog({
             {canWriteOrg ? (
               <>
                 <p className="text-[11px] text-white/35">
-                  Add existing teams from the dropdown. Only teams the person is not already part of are listed.
+                  Use "Edit teams" to check which teams this person belongs to.
                 </p>
                 {teams && teams.length > 0 ? (
                   <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
-                    <Select
-                      value=""
-                      onValueChange={(teamId) => {
-                        if (!teamId) return;
-                        const current = form.getValues("teamAssignments");
-                        if (current.some((entry) => entry.teamId === teamId)) return;
-                        form.setValue("teamAssignments", [...current, { teamId, role: "" }], {
-                          shouldValidate: true,
-                        });
-                      }}
-                    >
-                      <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white">
-                        <SelectValue placeholder="Add team…" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-[min(45vh,260px)]">
-                        {availableTeamsToAdd.length === 0 ? (
-                          <div className="px-2 py-1.5 text-xs text-white/45">All teams already assigned</div>
-                        ) : (
-                          availableTeamsToAdd.map((team) => (
-                            <SelectItem key={team.id} value={team.id}>
-                              {team.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-white/55">
+                        {selectedTeamIds.size} team{selectedTeamIds.size === 1 ? "" : "s"} selected
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 border-white/15 text-white/85"
+                        onClick={() => setTeamPickerOpen(true)}
+                      >
+                        Edit teams
+                      </Button>
+                    </div>
 
                     <div className="space-y-2">
                       {watchedAssignments.map((assignment) => {
@@ -865,30 +854,12 @@ function PersonFormDialog({
                         if (!team) return null;
                         return (
                           <div key={team.id} className="rounded border border-white/5 px-2 py-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 text-xs text-white/85">
+                            <div className="flex items-center gap-2 text-xs text-white/85">
                                 <span
                                   className="inline-block h-2.5 w-2.5 rounded-full border border-white/20"
                                   style={{ backgroundColor: team.color }}
                                 />
                                 <span>{team.name}</span>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-[11px] text-red-300 hover:text-red-200 hover:bg-red-950/30"
-                                onClick={() => {
-                                  const current = form.getValues("teamAssignments");
-                                  form.setValue(
-                                    "teamAssignments",
-                                    current.filter((entry) => entry.teamId !== team.id),
-                                    { shouldValidate: true }
-                                  );
-                                }}
-                              >
-                                Remove
-                              </Button>
                             </div>
                             <Input
                               value={assignment.role ?? ""}
@@ -925,6 +896,60 @@ function PersonFormDialog({
               <p className="text-red-400 text-xs">{form.formState.errors.teamAssignments.message}</p>
             ) : null}
           </div>
+
+          <Dialog open={teamPickerOpen} onOpenChange={setTeamPickerOpen}>
+            <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Select teams</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+                {sortedTeams.map((team) => {
+                  const checked = selectedTeamIds.has(team.id);
+                  return (
+                    <label
+                      key={team.id}
+                      className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-2 py-2 cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          const on = v === true;
+                          const current = form.getValues("teamAssignments");
+                          if (on) {
+                            if (current.some((entry) => entry.teamId === team.id)) return;
+                            form.setValue("teamAssignments", [...current, { teamId: team.id, role: "" }], {
+                              shouldValidate: true,
+                            });
+                          } else {
+                            form.setValue(
+                              "teamAssignments",
+                              current.filter((entry) => entry.teamId !== team.id),
+                              { shouldValidate: true }
+                            );
+                          }
+                        }}
+                      />
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-full border border-white/20"
+                        style={{ backgroundColor: team.color }}
+                      />
+                      <span className="text-sm text-white/85">{team.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-white/10 text-white/70 bg-transparent"
+                  onClick={() => setTeamPickerOpen(false)}
+                >
+                  Done
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <div className="flex flex-col gap-4 w-full min-w-0">
             <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3 w-full max-w-md">
