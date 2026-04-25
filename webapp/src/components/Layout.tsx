@@ -51,6 +51,13 @@ const navItems: { to: string; labelKey: string; icon: LucideIcon; view: string }
   { to: "/account", labelKey: "nav.account", icon: UserCircle, view: "account" },
 ];
 
+const publicNavItems: Array<{ to: string; label: string; icon: LucideIcon }> = [
+  { to: "/", label: "Features", icon: LayoutDashboard },
+  { to: "/pricing", label: "Pricing", icon: CalendarDays },
+  { to: "/terms-of-service", label: "Terms", icon: ShieldCheck },
+  { to: "/privacy-policy", label: "Privacy", icon: UserCircle },
+];
+
 export function SidebarContent({ onNav }: { onNav?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -94,7 +101,44 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
 
       {/* Nav — avoid showing every link then hiding (blink); skeleton until /api/me */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {permsLoading && session?.user && !navBypass && !me ? (
+        {!session?.user ? (
+          <>
+            {publicNavItems.map(({ to, label, icon: Icon }) => {
+              const isActive = location.pathname === to;
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  onClick={onNav}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm border border-transparent",
+                    "transition-[color,background-color,border-color] duration-200 ease-out",
+                    isActive
+                      ? "bg-gradient-to-r from-ordo-magenta/28 via-ordo-yellow/18 to-ordo-violet/28 text-white border-ordo-yellow/40"
+                      : "text-white/55 hover:text-white hover:bg-white/[0.06] hover:border-white/5"
+                  )}
+                >
+                  <Icon size={16} className={isActive ? "text-ordo-yellow" : "text-white/45"} />
+                  <span className="font-medium">{label}</span>
+                </Link>
+              );
+            })}
+            <Link
+              to="/login"
+              onClick={onNav}
+              className={cn(
+                "mt-2 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm border border-transparent",
+                "transition-[color,background-color,border-color] duration-200 ease-out",
+                location.pathname === "/login"
+                  ? "bg-gradient-to-r from-ordo-magenta/35 to-ordo-violet/35 text-white border-ordo-magenta/45"
+                  : "text-ordo-magenta/85 hover:text-white hover:bg-ordo-violet/15 hover:border-ordo-magenta/30"
+              )}
+            >
+              <LogOut size={15} className={location.pathname === "/login" ? "text-ordo-yellow" : "text-ordo-magenta/75"} />
+              <span className="font-medium">Log in / Sign up</span>
+            </Link>
+          </>
+        ) : permsLoading && !navBypass && !me ? (
           <div className="space-y-1.5" aria-hidden>
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-10 rounded-lg bg-white/[0.06] animate-pulse" />
@@ -170,6 +214,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
         ) : null}
         <button
           onClick={handleSignOut}
+          disabled={!session?.user}
           className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors duration-200"
         >
           <LogOut size={15} />
