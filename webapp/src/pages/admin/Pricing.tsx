@@ -35,12 +35,6 @@ const CURRENCY_COUNTRY_LABELS: Record<string, string> = {
   HRK: "Croatia",
 };
 
-function roundingStepCents(unit: RoundingUnit): number {
-  if (unit === "whole") return 100;
-  if (unit === "0") return 10;
-  return 1;
-}
-
 function formatMajorFromCents(centsText: string): string {
   const cents = Number(centsText);
   if (!Number.isFinite(cents)) return "-";
@@ -48,12 +42,21 @@ function formatMajorFromCents(centsText: string): string {
 }
 
 function applyRounding(cents: number, mode: RoundingMode, unit: RoundingUnit): number {
-  const step = roundingStepCents(unit);
-  if (step <= 1) return Math.max(Math.round(cents), 1);
-  const scaled = cents / step;
-  if (mode === "up") return Math.max(Math.ceil(scaled) * step, 1);
-  if (mode === "down") return Math.max(Math.floor(scaled) * step, 1);
-  return Math.max(Math.round(scaled) * step, 1);
+  const decimals = unit === "whole" ? 0 : unit === "0" ? 1 : 2;
+  const major = cents / 100;
+  const factor = 10 ** decimals;
+  const scaled = major * factor;
+  let roundedScaled: number;
+  if (mode === "up") {
+    roundedScaled = Math.ceil(scaled - 1e-9);
+  } else if (mode === "down") {
+    roundedScaled = Math.floor(scaled + 1e-9);
+  } else {
+    roundedScaled = Math.round(scaled);
+  }
+  const roundedMajor = roundedScaled / factor;
+  const roundedCents = Math.round(roundedMajor * 100);
+  return Math.max(roundedCents, 1);
 }
 
 function calculateLinkedRows(
