@@ -1,21 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-type RoundingMode = "nearest" | "up" | "down";
-type RoundingUnit = "whole" | "0" | "00";
 
 type CurrencyRow = {
   userDailyRateCents: string;
-  followBaseCurrency: boolean;
-  roundingMode: RoundingMode;
-  roundingUnit: RoundingUnit;
 };
 
 const BASE_CURRENCY = "USD";
@@ -41,25 +33,7 @@ function formatMajorFromCents(centsText: string): string {
   return (cents / 100).toFixed(2);
 }
 
-function applyRounding(cents: number, mode: RoundingMode, unit: RoundingUnit): number {
-  const decimals = unit === "whole" ? 0 : unit === "0" ? 1 : 2;
-  const major = cents / 100;
-  const factor = 10 ** decimals;
-  const scaled = major * factor;
-  let roundedScaled: number;
-  if (mode === "up") {
-    roundedScaled = Math.ceil(scaled - 1e-9);
-  } else if (mode === "down") {
-    roundedScaled = Math.floor(scaled + 1e-9);
-  } else {
-    roundedScaled = Math.round(scaled);
-  }
-  const roundedMajor = roundedScaled / factor;
-  const roundedCents = Math.round(roundedMajor * 100);
-  return Math.max(roundedCents, 1);
-}
-
-function calculateLinkedRows(
+function calculateBaseComparison(
   rows: Record<string, CurrencyRow>,
   rates: Record<string, number>
 ): Record<string, number | null> {
@@ -68,11 +42,9 @@ function calculateLinkedRows(
   if (!Number.isFinite(base) || base <= 0) return calculated;
   for (const currency of Object.keys(rows)) {
     if (currency === BASE_CURRENCY) continue;
-    const row = rows[currency];
-    if (!row.followBaseCurrency) continue;
     const fx = rates[currency];
     if (!fx || !Number.isFinite(fx)) continue;
-    calculated[currency] = applyRounding(base * fx, row.roundingMode, row.roundingUnit);
+    calculated[currency] = Math.max(Math.round(base * fx), 1);
   }
   return calculated;
 }
@@ -95,9 +67,6 @@ export default function Pricing() {
     currencyPrices: Array<{
       currencyCode: string;
       userDailyRateCents: number;
-      followBaseCurrency?: boolean;
-      roundingMode?: RoundingMode;
-      roundingUnit?: RoundingUnit;
     }>;
     supportedCurrencies: string[];
   }>({
@@ -112,9 +81,6 @@ export default function Pricing() {
       const found = data.currencyPrices.find((p) => p.currencyCode === currency);
       rowMap[currency] = {
         userDailyRateCents: String(found?.userDailyRateCents ?? ""),
-        followBaseCurrency: Boolean(found?.followBaseCurrency),
-        roundingMode: found?.roundingMode ?? "nearest",
-        roundingUnit: found?.roundingUnit ?? "00",
       };
     }
     setCurrencyRows(rowMap);
@@ -148,33 +114,14 @@ export default function Pricing() {
     fetchUsdRates().catch(() => {});
   }, [fetchUsdRates]);
 
-  const calculatedRows = calculateLinkedRows(currencyRows, fxRates);
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchUsdRates().catch(() => {});
+    }, 10 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [fetchUsdRates]);
 
-  const applyUsdRecalculationNow = () => {
-    let changedCount = 0;
-    setCurrencyRows((prev) => {
-      const calculated = calculateLinkedRows(prev, fxRates);
-      const next: Record<string, CurrencyRow> = { ...prev };
-      for (const currency of Object.keys(calculated)) {
-        const value = calculated[currency];
-        if (value == null) continue;
-        const nextText = String(value);
-        if (next[currency] && next[currency].userDailyRateCents !== nextText) {
-          next[currency] = { ...next[currency], userDailyRateCents: nextText };
-          changedCount += 1;
-        }
-      }
-      return changedCount > 0 ? next : prev;
-    });
-    if (changedCount > 0) {
-      toast({ title: "Recalculated", description: `Updated ${changedCount} linked currency rows.` });
-    } else {
-      toast({
-        title: "No changes",
-        description: "No linked currencies were updated. Check follow-base checkboxes and USD rate.",
-      });
-    }
-  };
+  const calculatedRows = useMemo(() => calculateBaseComparison(currencyRows, fxRates), [currencyRows, fxRates]);
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -185,9 +132,6 @@ export default function Pricing() {
           .map(([currencyCode, row]) => ({
             currencyCode,
             userDailyRateCents: Number(row.userDailyRateCents),
-            followBaseCurrency: row.followBaseCurrency,
-            roundingMode: row.roundingMode,
-            roundingUnit: row.roundingUnit,
           })),
       }),
     onSuccess: () => {
@@ -223,16 +167,12 @@ export default function Pricing() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <p className="text-xs text-white/60">
-              Standard currency: <span className="text-white font-medium">{BASE_CURRENCY}</span>. One row per currency.
+              Manual prices per currency. Comparison is calculated from base <span className="text-white font-medium">{BASE_CURRENCY}</span>.
             </p>
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => fetchUsdRates()} disabled={fxLoading}>
                 {fxLoading ? "Loading rates..." : "Refresh USD rates"}
               </Button>
-              <Button variant="outline" onClick={applyUsdRecalculationNow} disabled={fxLoading || isPending}>
-                Apply USD recalculation now
-              </Button>
-              {fxUpdatedAt ? <span className="text-[11px] text-white/45">Updated: {fxUpdatedAt}</span> : null}
             </div>
           </div>
 
@@ -241,19 +181,14 @@ export default function Pricing() {
           <div className="space-y-2 overflow-x-auto">
             <div className="grid min-w-[1200px] grid-cols-12 gap-3 text-xs text-white/45 px-1 whitespace-nowrap">
               <p className="col-span-3">Currency / Country</p>
-              <p className="col-span-1">Current price</p>
-              <p className="col-span-1">Follow base</p>
-              <p className="col-span-2">Rounding rule</p>
-              <p className="col-span-1">Round to</p>
+              <p className="col-span-2">Current price (manual)</p>
               <p className="col-span-2">FX rate (1 USD {"->"} currency)</p>
-              <p className="col-span-2">Calculated price</p>
+              <p className="col-span-2">Base comparison price</p>
+              <p className="col-span-3">Difference vs base comparison</p>
             </div>
             {(data?.supportedCurrencies ?? []).map((currency) => {
               const row = currencyRows[currency] ?? {
                 userDailyRateCents: "",
-                followBaseCurrency: false,
-                roundingMode: "nearest" as RoundingMode,
-                roundingUnit: "00" as RoundingUnit,
               };
               const fxRate = currency === BASE_CURRENCY ? 1 : fxRates[currency];
               const calculatedValue =
@@ -262,6 +197,9 @@ export default function Pricing() {
                   : calculatedRows[currency] != null
                     ? String(calculatedRows[currency])
                     : "";
+              const currentNum = Number(row.userDailyRateCents || "0");
+              const calcNum = Number(calculatedValue || "0");
+              const diff = Number.isFinite(currentNum) && Number.isFinite(calcNum) ? currentNum - calcNum : 0;
               return (
                 <div key={currency} className="grid min-w-[1200px] grid-cols-12 gap-3 items-center whitespace-nowrap">
                   <div className="col-span-3">
@@ -270,7 +208,7 @@ export default function Pricing() {
                     </p>
                   </div>
                   <Input
-                    className="col-span-1"
+                    className="col-span-2"
                     value={row.userDailyRateCents}
                     onChange={(e) =>
                       setCurrencyRows((prev) => ({
@@ -279,60 +217,15 @@ export default function Pricing() {
                       }))
                     }
                   />
-                  <div className="col-span-1 flex items-center">
-                    <Checkbox
-                      checked={currency === BASE_CURRENCY ? false : row.followBaseCurrency}
-                      disabled={currency === BASE_CURRENCY}
-                      onCheckedChange={(checked) =>
-                        setCurrencyRows((prev) => ({
-                          ...prev,
-                          [currency]: { ...row, followBaseCurrency: Boolean(checked) },
-                        }))
-                      }
-                    />
-                  </div>
-                  <Select
-                    value={row.roundingMode}
-                    onValueChange={(value: RoundingMode) =>
-                      setCurrencyRows((prev) => ({
-                        ...prev,
-                        [currency]: { ...row, roundingMode: value },
-                      }))
-                    }
-                    disabled={currency === BASE_CURRENCY || !row.followBaseCurrency}
-                  >
-                    <SelectTrigger className="col-span-2">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="nearest">Nearest</SelectItem>
-                      <SelectItem value="up">Up</SelectItem>
-                      <SelectItem value="down">Down</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={row.roundingUnit}
-                    onValueChange={(value: RoundingUnit) =>
-                      setCurrencyRows((prev) => ({
-                        ...prev,
-                        [currency]: { ...row, roundingUnit: value },
-                      }))
-                    }
-                    disabled={currency === BASE_CURRENCY || !row.followBaseCurrency}
-                  >
-                    <SelectTrigger className="col-span-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="whole">Nearest whole</SelectItem>
-                      <SelectItem value="0">Nearest .0</SelectItem>
-                      <SelectItem value="00">Nearest .00</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <Input className="col-span-2" value={fxRate ? fxRate.toFixed(6) : ""} readOnly />
                   <Input
                     className="col-span-2"
                     value={calculatedValue ? `${calculatedValue} (${formatMajorFromCents(calculatedValue)})` : ""}
+                    readOnly
+                  />
+                  <Input
+                    className="col-span-3"
+                    value={`${diff >= 0 ? "+" : ""}${diff} (${diff >= 0 ? "+" : ""}${(diff / 100).toFixed(2)})`}
                     readOnly
                   />
                 </div>
