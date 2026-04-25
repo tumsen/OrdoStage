@@ -262,7 +262,7 @@ export default function Pricing() {
                   />
                   <Input
                     className="col-span-2 h-7 text-xs px-2"
-                    value={calculatedValue ? `${calculatedValue} (${formatMajorFromCents(calculatedValue)}) @ ${rateLabel}` : "-"}
+                    value={calculatedValue ? `${formatMajorFromCents(calculatedValue)} @ ${rateLabel}` : "-"}
                     readOnly
                   />
                 </div>
