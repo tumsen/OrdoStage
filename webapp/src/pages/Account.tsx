@@ -144,6 +144,7 @@ export default function Account() {
   });
   const [companyAddress, setCompanyAddress] = useState<Address>(EMPTY_ADDRESS);
   const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null);
+  const [companyLogoPreviewUrl, setCompanyLogoPreviewUrl] = useState<string | null>(null);
 
   const { data: companyInfo } = useQuery<{
     name: string;
@@ -344,6 +345,16 @@ export default function Account() {
   }, [companyInfo]);
 
   useEffect(() => {
+    if (!companyLogoFile) {
+      setCompanyLogoPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(companyLogoFile);
+    setCompanyLogoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [companyLogoFile]);
+
+  useEffect(() => {
     if (!permissionState || !permissionsDoc) return;
     setPermissionDraft(
       normalizeDocumentPermissions(
@@ -509,32 +520,44 @@ export default function Account() {
                 className="h-20 max-w-[240px] rounded border border-white/10 bg-white object-contain p-2"
               />
             ) : null}
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setCompanyLogoFile(e.target.files?.[0] ?? null)}
-                className="max-w-md bg-white/5 border-white/10 text-white file:text-white"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="border-white/10 text-white/80 bg-transparent"
-                disabled={!companyLogoFile || uploadCompanyLogoMutation.isPending}
-                onClick={() => uploadCompanyLogoMutation.mutate()}
-              >
-                {uploadCompanyLogoMutation.isPending ? "Uploading..." : "Upload logo"}
-              </Button>
-              {companyInfo?.hasCompanyLogo ? (
+            <div className="flex flex-wrap items-start gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setCompanyLogoFile(e.target.files?.[0] ?? null)}
+                  className="max-w-md bg-white/5 border-white/10 text-white file:text-white"
+                />
                 <Button
                   type="button"
                   variant="outline"
-                  className="border-white/10 text-white/70 bg-transparent"
-                  disabled={removeCompanyLogoMutation.isPending}
-                  onClick={() => removeCompanyLogoMutation.mutate()}
+                  className="border-white/10 text-white/80 bg-transparent"
+                  disabled={!companyLogoFile || uploadCompanyLogoMutation.isPending}
+                  onClick={() => uploadCompanyLogoMutation.mutate()}
                 >
-                  {removeCompanyLogoMutation.isPending ? "Removing..." : "Remove logo"}
+                  {uploadCompanyLogoMutation.isPending ? "Uploading..." : "Upload logo"}
                 </Button>
+                {companyInfo?.hasCompanyLogo ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-white/10 text-white/70 bg-transparent"
+                    disabled={removeCompanyLogoMutation.isPending}
+                    onClick={() => removeCompanyLogoMutation.mutate()}
+                  >
+                    {removeCompanyLogoMutation.isPending ? "Removing..." : "Remove logo"}
+                  </Button>
+                ) : null}
+              </div>
+              {companyLogoPreviewUrl ? (
+                <div className="rounded border border-white/10 bg-white/5 p-2">
+                  <p className="mb-1 text-[10px] uppercase tracking-wide text-white/40">New logo preview</p>
+                  <img
+                    src={companyLogoPreviewUrl}
+                    alt="New company logo preview"
+                    className="h-20 max-w-[200px] object-contain"
+                  />
+                </div>
               ) : null}
             </div>
           </div>
