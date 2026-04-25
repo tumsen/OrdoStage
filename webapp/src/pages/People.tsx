@@ -381,6 +381,11 @@ function PersonFormDialog({
     queryFn: () => api.get<RoleDefRow[]>("/api/org/role-definitions"),
     enabled: open,
   });
+  const { data: mePerson } = useQuery<Person | null>({
+    queryKey: ["people", "me"],
+    queryFn: () => api.get<Person | null>("/api/people/me"),
+    enabled: open,
+  });
 
   const { rolePreset: defaultPreset, roleCustom: defaultCustom } = useMemo(
     () => roleToFormValues(person?.role ?? null),
@@ -451,12 +456,7 @@ function PersonFormDialog({
       person?.email?.trim() &&
         session?.user?.email?.toLowerCase() === person.email?.trim().toLowerCase()
     );
-  const isSelfPerson =
-    Boolean(
-      person?.email?.trim() &&
-      session?.user?.email &&
-      session.user.email.toLowerCase() === person.email.trim().toLowerCase()
-    );
+  const isSelfPerson = Boolean(person?.id && mePerson?.id && person.id === mePerson.id);
 
   const { data: personDocuments } = useQuery<PersonDocument[]>({
     queryKey: ["people", person?.id, "documents"],
