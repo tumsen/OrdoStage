@@ -966,7 +966,7 @@ function PersonFormDialog({
                     <Button
                       type="button"
                       size="sm"
-                      className="bg-indigo-700 hover:bg-indigo-600 text-white whitespace-nowrap"
+                      className="ml-auto bg-indigo-700 hover:bg-indigo-600 text-white whitespace-nowrap"
                       disabled={uploadDocMutation.isPending || !docFile}
                       onClick={() => uploadDocMutation.mutate()}
                     >

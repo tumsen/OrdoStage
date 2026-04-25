@@ -106,6 +106,23 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
         <span className="text-white/35 truncate min-w-[10rem]" title={`${doc.type} · ${doc.filename}`}>
           {doc.type} · {doc.filename}
         </span>
+      </div>
+      <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+        {expiry.kind === "forever" && (
+          <Badge className="border border-violet-500/50 bg-violet-800/40 text-violet-100 tabular-nums whitespace-nowrap" title="Does not expire">
+            <span>∞</span>
+          </Badge>
+        )}
+        {expiry.kind === "ok" && (
+          <Badge className="border border-emerald-500/50 bg-emerald-600/30 text-emerald-100 whitespace-nowrap">
+            {expiry.daysLeft === 0
+              ? "Last day"
+              : `${expiry.daysLeft} day${expiry.daysLeft === 1 ? "" : "s"} left`}
+          </Badge>
+        )}
+        {expiry.kind === "expired" && (
+          <Badge className="border border-red-500/50 bg-red-800/50 text-red-100 whitespace-nowrap">Expired</Badge>
+        )}
         {canEdit ? (
           <>
             <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-white/55 whitespace-nowrap">
@@ -135,23 +152,6 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
             Expires {formatDateForDateInput(doc.expiresAt) || "—"}
           </span>
         ) : null}
-        {expiry.kind === "forever" && (
-          <Badge className="border border-violet-500/50 bg-violet-800/40 text-violet-100 tabular-nums whitespace-nowrap" title="Does not expire">
-            <span>∞</span>
-          </Badge>
-        )}
-        {expiry.kind === "ok" && (
-          <Badge className="border border-emerald-500/50 bg-emerald-600/30 text-emerald-100 whitespace-nowrap">
-            {expiry.daysLeft === 0
-              ? "Last day"
-              : `${expiry.daysLeft} day${expiry.daysLeft === 1 ? "" : "s"} left`}
-          </Badge>
-        )}
-        {expiry.kind === "expired" && (
-          <Badge className="border border-red-500/50 bg-red-800/50 text-red-100 whitespace-nowrap">Expired</Badge>
-        )}
-      </div>
-      <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
         {canEdit && (
           <Button
             type="button"
