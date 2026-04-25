@@ -19,6 +19,7 @@ import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
 import { useI18n } from "@/lib/i18n";
 import type { Person, PersonDocument } from "../../../backend/src/types";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
+import { PersonDocumentListRow } from "@/components/PersonDocumentListRow";
 
 const CONFIRM_PHRASE = "DELETE";
 
@@ -38,13 +39,17 @@ async function uploadPersonDocument(
   personId: string,
   file: File,
   name: string,
-  type: string
+  type: string,
+  expiresAtYmd?: string
 ): Promise<void> {
   const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
   const formData = new FormData();
   formData.append("file", file);
   formData.append("name", name.trim() || file.name);
   formData.append("type", type.trim() || "other");
+  if (expiresAtYmd?.trim()) {
+    formData.append("expiresAt", expiresAtYmd.trim());
+  }
   const resp = await fetch(`${baseUrl}/api/people/${personId}/documents`, {
     method: "POST",
     credentials: "include",
@@ -67,6 +72,7 @@ export default function Account() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
+  const [docExpires, setDocExpires] = useState("");
   const [docType, setDocType] = useState("other");
 
   const { data: mePerson } = useQuery<Person | null>({
@@ -115,7 +121,7 @@ export default function Account() {
         emergencyContactPhone: profileDraft.emergencyContactPhone.trim() || undefined,
       });
       if (photoFile) await uploadPersonPhoto(mePerson.id, photoFile);
-      if (docFile) await uploadPersonDocument(mePerson.id, docFile, docName, docType);
+      if (docFile) await uploadPersonDocument(mePerson.id, docFile, docName, docType, docExpires);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["people", "me"] });
@@ -124,6 +130,7 @@ export default function Account() {
       setPhotoFile(null);
       setDocFile(null);
       setDocName("");
+      setDocExpires("");
       setDocType("other");
       setProfileMessage("Profile saved.");
     },
@@ -143,6 +150,19 @@ export default function Account() {
 
   const deleteDocMutation = useMutation({
     mutationFn: (docId: string) => api.delete(`/api/people/documents/${docId}`),
+    onSuccess: () => {
+      if (mePerson?.id) queryClient.invalidateQueries({ queryKey: ["people", mePerson.id, "documents"] });
+    },
+  });
+
+  const updateDocMutation = useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: { name: string; expiresAt: string | null };
+    }) => api.patch<PersonDocument>(`/api/people/documents/${id}`, { name: body.name, expiresAt: body.expiresAt }),
     onSuccess: () => {
       if (mePerson?.id) queryClient.invalidateQueries({ queryKey: ["people", mePerson.id, "documents"] });
     },
@@ -340,6 +360,15 @@ export default function Account() {
                   onChange={(e) => setDocName(e.target.value)}
                   className="bg-white/5 border-white/10 text-white"
                 />
+                <div className="space-y-1">
+                  <Label className="text-white/50 text-[10px]">Expiration (optional)</Label>
+                  <input
+                    type="date"
+                    value={docExpires}
+                    onChange={(e) => setDocExpires(e.target.value)}
+                    className="w-full max-w-[220px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-sm"
+                  />
+                </div>
                 <Input
                   placeholder="Document type (passport, certificate, etc)"
                   value={docType}
@@ -352,32 +381,19 @@ export default function Account() {
                   className="bg-white/5 border-white/10 text-white file:text-white"
                 />
                 {myDocs && myDocs.length > 0 ? (
-                  <div className="rounded border border-white/10 divide-y divide-white/5">
+                  <div className="rounded border border-white/10">
                     {myDocs.map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs">
-                        <div className="min-w-0">
-                          <div className="text-white/80 truncate">{doc.name}</div>
-                          <div className="text-white/35 truncate">{doc.type} · {doc.filename}</div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <a
-                            href={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/documents/${doc.id}/download`}
-                            className="text-blue-300 hover:text-blue-200"
-                          >
-                            Download
-                          </a>
-                          <button
-                            type="button"
-                            className="text-red-300 hover:text-red-200"
-                            onClick={() => {
-                              if (!confirmDeleteAction(`document "${doc.name}"`)) return;
-                              deleteDocMutation.mutate(doc.id);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
+                      <PersonDocumentListRow
+                        key={doc.id}
+                        doc={doc}
+                        canEdit
+                        isSaving={updateDocMutation.isPending && updateDocMutation.variables?.id === doc.id}
+                        isDeleting={deleteDocMutation.isPending && deleteDocMutation.variables === doc.id}
+                        onSave={async (id, body) => {
+                          await updateDocMutation.mutateAsync({ id, body });
+                        }}
+                        onDelete={(id) => deleteDocMutation.mutate(id)}
+                      />
                     ))}
                   </div>
                 ) : null}

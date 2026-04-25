@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSession } from "@/lib/auth-client";
+import { PersonDocumentListRow } from "@/components/PersonDocumentListRow";
 
 interface Team {
   id: string;
@@ -243,13 +244,17 @@ async function uploadPersonDocument(
   personId: string,
   file: File,
   name: string,
-  type: string
+  type: string,
+  expiresAtYmd?: string
 ): Promise<void> {
   const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
   const formData = new FormData();
   formData.append("file", file);
   formData.append("name", name.trim() || file.name);
   formData.append("type", type.trim() || "other");
+  if (expiresAtYmd?.trim()) {
+    formData.append("expiresAt", expiresAtYmd.trim());
+  }
   const resp = await fetch(`${baseUrl}/api/people/${personId}/documents`, {
     method: "POST",
     credentials: "include",
@@ -285,6 +290,7 @@ function PersonFormDialog({
 }) {
   const queryClient = useQueryClient();
   const { canWrite: canWriteOrg } = usePermissions();
+  const { data: session } = useSession();
   const { data: teams } = useQuery({
     queryKey: ["departments"],
     queryFn: () => api.get<Team[]>("/api/departments"),
@@ -353,8 +359,16 @@ function PersonFormDialog({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
+  const [docExpires, setDocExpires] = useState("");
   const [docType, setDocType] = useState<(typeof PERSON_DOCUMENT_TYPE_OPTIONS)[number]>("other");
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const canEditPersonDocs =
+    canWriteOrg ||
+    Boolean(
+      person?.email?.trim() &&
+        session?.user?.email?.toLowerCase() === person.email?.trim().toLowerCase()
+    );
 
   const { data: personDocuments } = useQuery<PersonDocument[]>({
     queryKey: ["people", person?.id, "documents"],
@@ -408,7 +422,13 @@ function PersonFormDialog({
         await uploadPersonPhoto(personId, photoFile);
       }
       if (personId && docFile) {
-        await uploadPersonDocument(personId, docFile, docName || docFile.name, docType);
+        await uploadPersonDocument(
+          personId,
+          docFile,
+          docName || docFile.name,
+          docType,
+          docExpires
+        );
       }
       queryClient.invalidateQueries({ queryKey: ["people"] });
       if (personId) {
@@ -417,6 +437,7 @@ function PersonFormDialog({
       setPhotoFile(null);
       setDocFile(null);
       setDocName("");
+      setDocExpires("");
       setDocType("other");
       setUploadError(null);
       onOpenChange(false);
@@ -438,11 +459,18 @@ function PersonFormDialog({
   const uploadDocMutation = useMutation({
     mutationFn: async () => {
       if (!person?.id || !docFile) return;
-      await uploadPersonDocument(person.id, docFile, docName || docFile.name, docType);
+      await uploadPersonDocument(
+        person.id,
+        docFile,
+        docName || docFile.name,
+        docType,
+        docExpires
+      );
     },
     onSuccess: () => {
       setDocFile(null);
       setDocName("");
+      setDocExpires("");
       setDocType("other");
       if (person?.id) {
         queryClient.invalidateQueries({ queryKey: ["people", person.id, "documents"] });
@@ -453,6 +481,26 @@ function PersonFormDialog({
 
   const deleteDocMutation = useMutation({
     mutationFn: (docId: string) => api.delete(`/api/people/documents/${docId}`),
+    onSuccess: () => {
+      if (person?.id) {
+        queryClient.invalidateQueries({ queryKey: ["people", person.id, "documents"] });
+      }
+    },
+  });
+
+  const updateDocMutation = useMutation({
+    mutationFn: async ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: { name: string; expiresAt: string | null };
+    }) => {
+      return api.patch<PersonDocument>(`/api/people/documents/${id}`, {
+        name: body.name,
+        expiresAt: body.expiresAt,
+      });
+    },
     onSuccess: () => {
       if (person?.id) {
         queryClient.invalidateQueries({ queryKey: ["people", person.id, "documents"] });
@@ -815,12 +863,21 @@ function PersonFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="sm:col-span-3 space-y-1">
+                  <Label className="text-white/40 text-[10px]">Expiration (optional)</Label>
+                  <input
+                    type="date"
+                    value={docExpires}
+                    onChange={(e) => setDocExpires(e.target.value)}
+                    className="w-full sm:max-w-[200px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs"
+                  />
+                </div>
+                <Input
+                  type="file"
+                  onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                  className="sm:col-span-3 bg-white/5 border-white/10 text-white file:text-white"
+                />
               </div>
-              <Input
-                type="file"
-                onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
-                className="bg-white/5 border-white/10 text-white file:text-white"
-              />
               {person ? (
                 <Button
                   type="button"
@@ -837,34 +894,21 @@ function PersonFormDialog({
                 </p>
               )}
               {personDocuments && personDocuments.length > 0 ? (
-                <div className="rounded border border-white/10 divide-y divide-white/5">
+                <div className="rounded border border-white/10">
                   {personDocuments.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs">
-                      <div className="min-w-0">
-                        <div className="text-white/80 truncate">{doc.name}</div>
-                        <div className="text-white/35 truncate">
-                          {doc.type} · {doc.filename}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <a
-                          href={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/documents/${doc.id}/download`}
-                          className="text-blue-300 hover:text-blue-200"
-                        >
-                          Download
-                        </a>
-                        <button
-                          type="button"
-                          className="text-red-300 hover:text-red-200"
-                          onClick={() => {
-                            if (!confirmDeleteAction(`document "${doc.name}"`)) return;
-                            deleteDocMutation.mutate(doc.id);
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
+                    <PersonDocumentListRow
+                      key={doc.id}
+                      doc={doc}
+                      canEdit={canEditPersonDocs}
+                      isSaving={
+                        updateDocMutation.isPending && updateDocMutation.variables?.id === doc.id
+                      }
+                      isDeleting={deleteDocMutation.isPending && deleteDocMutation.variables === doc.id}
+                      onSave={async (id, body) => {
+                        await updateDocMutation.mutateAsync({ id, body });
+                      }}
+                      onDelete={(id) => deleteDocMutation.mutate(id)}
+                    />
                   ))}
                 </div>
               ) : null}

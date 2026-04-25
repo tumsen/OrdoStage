@@ -264,6 +264,8 @@ model PersonDocument {
   filename   String
   data       Bytes
   mimeType   String   @default("application/octet-stream")
+  /** When the document is considered expired (e.g. passport); null = no expiry. */
+  expiresAt  DateTime?
   createdAt  DateTime @default(now())
 }
 

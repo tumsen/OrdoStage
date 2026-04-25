@@ -6,12 +6,27 @@ import {
   CreatePersonSchema,
   UpdatePersonSchema,
   PersonActiveSchema,
+  UpdatePersonDocumentSchema,
   type TeamAssignmentInput,
 } from "../types";
 import { canAction } from "../requestRole";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
 
 const TEAM_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#84cc16", "#06b6d4"];
+
+/** `YYYY-MM-DD` (local calendar day) or any date string `Date` can parse. */
+function parsePersonDocumentExpiresAtInput(raw: unknown): Date | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (!s) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) {
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 const peopleRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -579,12 +594,17 @@ peopleRouter.get("/people/:id/documents", async (c) => {
       type: true,
       filename: true,
       mimeType: true,
+      expiresAt: true,
       createdAt: true,
     },
     orderBy: { createdAt: "desc" },
   });
   return c.json({
-    data: docs.map((d) => ({ ...d, createdAt: d.createdAt.toISOString() })),
+    data: docs.map((d) => ({
+      ...d,
+      createdAt: d.createdAt.toISOString(),
+      expiresAt: d.expiresAt ? d.expiresAt.toISOString() : null,
+    })),
   });
 });
 
@@ -706,11 +726,20 @@ peopleRouter.post("/people/:id/documents", async (c) => {
   const file = formData["file"];
   const name = formData["name"];
   const type = formData["type"];
+  const expiresField = formData["expiresAt"];
   if (!file || typeof file === "string") {
     return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
   }
   const rawName = typeof name === "string" && name.trim() ? name.trim() : file.name;
   const rawType = typeof type === "string" && type.trim() ? type.trim() : "other";
+  let expiresAt: Date | null = null;
+  if (typeof expiresField === "string" && expiresField.trim()) {
+    const d = parsePersonDocumentExpiresAtInput(expiresField);
+    if (!d) {
+      return c.json({ error: { message: "Invalid expiration date", code: "BAD_REQUEST" } }, 400);
+    }
+    expiresAt = d;
+  }
   const bytes = Buffer.from(await file.arrayBuffer());
   const document = await prisma.personDocument.create({
     data: {
@@ -720,6 +749,7 @@ peopleRouter.post("/people/:id/documents", async (c) => {
       filename: file.name,
       data: bytes,
       mimeType: file.type || "application/octet-stream",
+      expiresAt,
     },
     select: {
       id: true,
@@ -728,10 +758,74 @@ peopleRouter.post("/people/:id/documents", async (c) => {
       type: true,
       filename: true,
       mimeType: true,
+      expiresAt: true,
       createdAt: true,
     },
   });
-  return c.json({ data: { ...document, createdAt: document.createdAt.toISOString() } }, 201);
+  return c.json(
+    {
+      data: {
+        ...document,
+        createdAt: document.createdAt.toISOString(),
+        expiresAt: document.expiresAt ? document.expiresAt.toISOString() : null,
+      },
+    },
+    201
+  );
+});
+
+// PATCH /api/people/documents/:docId — name & expiration (metadata)
+peopleRouter.patch("/people/documents/:docId", zValidator("json", UpdatePersonDocumentSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { docId } = c.req.param();
+  const body = c.req.valid("json");
+  const doc = await prisma.personDocument.findFirst({
+    where: { id: docId, person: { organizationId: user.organizationId } },
+    select: { id: true, person: { select: { email: true } } },
+  });
+  if (!doc) {
+    return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, doc.person.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  if (body.expiresAt !== undefined && body.expiresAt !== null) {
+    const d = parsePersonDocumentExpiresAtInput(body.expiresAt);
+    if (!d) {
+      return c.json({ error: { message: "Invalid expiration date", code: "BAD_REQUEST" } }, 400);
+    }
+  }
+  const updated = await prisma.personDocument.update({
+    where: { id: doc.id },
+    data: {
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.expiresAt !== undefined && {
+        expiresAt: body.expiresAt === null ? null : parsePersonDocumentExpiresAtInput(body.expiresAt),
+      }),
+    },
+    select: {
+      id: true,
+      personId: true,
+      name: true,
+      type: true,
+      filename: true,
+      mimeType: true,
+      expiresAt: true,
+      createdAt: true,
+    },
+  });
+  return c.json({
+    data: {
+      ...updated,
+      createdAt: updated.createdAt.toISOString(),
+      expiresAt: updated.expiresAt ? updated.expiresAt.toISOString() : null,
+    },
+  });
 });
 
 // GET /api/people/documents/:docId/download

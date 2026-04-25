@@ -154,7 +154,15 @@ export const PersonDocumentSchema = z.object({
   type: z.string(),
   filename: z.string(),
   mimeType: z.string(),
+  /** ISO datetime, or null if no expiration (optional for older clients). */
+  expiresAt: z.string().datetime().nullable().optional(),
   createdAt: z.string(),
+});
+
+export const UpdatePersonDocumentSchema = z.object({
+  name: z.string().min(1).optional(),
+  /** YYYY-MM-DD, ISO 8601 string, or null to clear. */
+  expiresAt: z.union([z.string().min(1), z.null()]).optional(),
 });
 
 /** Each row picks an existing team (teamId) or creates one by name (newTeamName). */
