@@ -88,76 +88,70 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
   );
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-2 py-2 text-xs border-b border-white/5 last:border-0 w-full min-w-0">
-      <div className="min-w-0 flex-1 w-full space-y-1.5">
+    <div className="flex items-center gap-2 px-2 py-2 text-xs border-b border-white/5 last:border-0 w-full min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         {canEdit ? (
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="h-8 w-full min-w-0 bg-white/5 border-white/10 text-white"
+            className="h-7 w-[14rem] min-w-[10rem] bg-white/5 border-white/10 text-white"
             placeholder="Document name"
             aria-label="Document name"
           />
         ) : (
-          <div className="text-white/80 truncate" title={doc.name}>
+          <div className="text-white/80 truncate min-w-[10rem] max-w-[16rem]" title={doc.name}>
             {doc.name}
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-2 text-white/35">
-          <span>
-            {doc.type} · {doc.filename}
+        <span className="text-white/35 truncate min-w-[10rem]" title={`${doc.type} · ${doc.filename}`}>
+          {doc.type} · {doc.filename}
+        </span>
+        {canEdit ? (
+          <>
+            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-white/55 whitespace-nowrap">
+              <Checkbox
+                checked={doesNotExpire}
+                onCheckedChange={(v) => {
+                  const on = v === true;
+                  setDoesNotExpire(on);
+                  if (on) setExpires("");
+                }}
+                className="border-white/30 data-[state=checked]:bg-violet-600"
+              />
+              <span>Does not expire</span>
+            </label>
+            <input
+              type="date"
+              value={expires}
+              disabled={doesNotExpire}
+              onChange={(e) => setExpires(e.target.value)}
+              className="h-7 rounded border border-white/10 bg-white/5 px-1.5 py-0 text-white text-[11px] disabled:opacity-40 disabled:cursor-not-allowed"
+            />
+          </>
+        ) : doc.doesNotExpire ? (
+          <span className="text-white/40 whitespace-nowrap">No expiry (∞)</span>
+        ) : doc.expiresAt ? (
+          <span className="text-white/40 whitespace-nowrap">
+            Expires {formatDateForDateInput(doc.expiresAt) || "—"}
           </span>
-          {canEdit && (
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3 text-white/50">
-              <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-white/55">
-                <Checkbox
-                  checked={doesNotExpire}
-                  onCheckedChange={(v) => {
-                    const on = v === true;
-                    setDoesNotExpire(on);
-                    if (on) setExpires("");
-                  }}
-                  className="border-white/30 data-[state=checked]:bg-violet-600"
-                />
-                <span>Does not expire</span>
-              </label>
-              <div className="flex items-center gap-1.5 min-h-[1.5rem]">
-                <span className="text-[10px] uppercase tracking-wide">Expires</span>
-                <input
-                  type="date"
-                  value={expires}
-                  disabled={doesNotExpire}
-                  onChange={(e) => setExpires(e.target.value)}
-                  className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-white text-[11px] disabled:opacity-40 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-          )}
-          {!canEdit && doc.doesNotExpire ? (
-            <span className="text-white/40">· No expiry ( ∞ )</span>
-          ) : !canEdit && doc.expiresAt ? (
-            <span className="text-white/40">· Expires {formatDateForDateInput(doc.expiresAt) || "—"}</span>
-          ) : null}
-          {expiry.kind === "forever" && (
-            <Badge className="border border-violet-500/50 bg-violet-800/40 text-violet-100 tabular-nums" title="Does not expire">
-              <span>∞</span>
-            </Badge>
-          )}
-          {expiry.kind === "ok" && (
-            <Badge
-              className="border border-emerald-500/50 bg-emerald-600/30 text-emerald-100"
-            >
-              {expiry.daysLeft === 0
-                ? "Last day"
-                : `${expiry.daysLeft} day${expiry.daysLeft === 1 ? "" : "s"} left`}
-            </Badge>
-          )}
-          {expiry.kind === "expired" && (
-            <Badge className="border border-red-500/50 bg-red-800/50 text-red-100">Expired</Badge>
-          )}
-        </div>
+        ) : null}
+        {expiry.kind === "forever" && (
+          <Badge className="border border-violet-500/50 bg-violet-800/40 text-violet-100 tabular-nums whitespace-nowrap" title="Does not expire">
+            <span>∞</span>
+          </Badge>
+        )}
+        {expiry.kind === "ok" && (
+          <Badge className="border border-emerald-500/50 bg-emerald-600/30 text-emerald-100 whitespace-nowrap">
+            {expiry.daysLeft === 0
+              ? "Last day"
+              : `${expiry.daysLeft} day${expiry.daysLeft === 1 ? "" : "s"} left`}
+          </Badge>
+        )}
+        {expiry.kind === "expired" && (
+          <Badge className="border border-red-500/50 bg-red-800/50 text-red-100 whitespace-nowrap">Expired</Badge>
+        )}
       </div>
-      <div className="flex items-center flex-wrap gap-2 shrink-0 sm:justify-end">
+      <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
         {canEdit && (
           <Button
             type="button"

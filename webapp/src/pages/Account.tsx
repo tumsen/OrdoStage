@@ -379,47 +379,46 @@ export default function Account() {
 
               <div className="space-y-2 w-full min-w-0">
                 <Label className="text-white/70 text-xs uppercase tracking-wide">Documents</Label>
-                <Input
-                  placeholder="Document name"
-                  value={docName}
-                  onChange={(e) => setDocName(e.target.value)}
-                  className="bg-white/5 border-white/10 text-white"
-                />
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm text-white/55 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={docDoesNotExpire}
-                      onChange={(e) => {
-                        setDocDoesNotExpire(e.target.checked);
-                        if (e.target.checked) setDocExpires("");
-                      }}
-                      className="rounded border-white/30 accent-violet-600"
+                <div className="overflow-x-auto">
+                  <div className="flex items-center gap-2 min-w-[980px]">
+                    <Input
+                      placeholder="Document name"
+                      value={docName}
+                      onChange={(e) => setDocName(e.target.value)}
+                      className="w-[220px] bg-white/5 border-white/10 text-white"
                     />
-                    <span>Does not expire</span>
-                  </label>
-                  <div className="space-y-1">
-                    <Label className="text-white/50 text-[10px]">Expiration (optional)</Label>
+                    <Input
+                      placeholder="Document type"
+                      value={docType}
+                      onChange={(e) => setDocType(e.target.value)}
+                      className="w-[170px] bg-white/5 border-white/10 text-white"
+                    />
+                    <label className="flex items-center gap-2 text-sm text-white/55 cursor-pointer whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={docDoesNotExpire}
+                        onChange={(e) => {
+                          setDocDoesNotExpire(e.target.checked);
+                          if (e.target.checked) setDocExpires("");
+                        }}
+                        className="rounded border-white/30 accent-violet-600"
+                      />
+                      <span>Does not expire</span>
+                    </label>
                     <input
                       type="date"
                       value={docExpires}
                       disabled={docDoesNotExpire}
                       onChange={(e) => setDocExpires(e.target.value)}
-                      className="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-sm disabled:opacity-40"
+                      className="h-9 w-[150px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-sm disabled:opacity-40"
+                    />
+                    <Input
+                      type="file"
+                      onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                      className="w-[230px] bg-white/5 border-white/10 text-white file:text-white"
                     />
                   </div>
                 </div>
-                <Input
-                  placeholder="Document type (passport, certificate, etc)"
-                  value={docType}
-                  onChange={(e) => setDocType(e.target.value)}
-                  className="bg-white/5 border-white/10 text-white"
-                />
-                <Input
-                  type="file"
-                  onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
-                  className="bg-white/5 border-white/10 text-white file:text-white"
-                />
                 {myDocs && myDocs.length > 0 ? (
                   <div className="rounded border border-white/10">
                     {myDocs.map((doc) => (

@@ -919,27 +919,27 @@ function PersonFormDialog({
               <p className="text-[11px] text-white/35">
                 Add passport, driver license, certificates, contracts, or other files.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Input
-                  placeholder="Document name"
-                  value={docName}
-                  onChange={(e) => setDocName(e.target.value)}
-                  className="sm:col-span-2 bg-white/5 border-white/10 text-white placeholder:text-white/25"
-                />
-                <Select value={docType} onValueChange={(v) => setDocType(v as (typeof PERSON_DOCUMENT_TYPE_OPTIONS)[number])}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                    {PERSON_DOCUMENT_TYPE_OPTIONS.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {value.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="sm:col-span-3 space-y-2">
-                  <label className="flex items-center gap-2 text-[11px] text-white/55 cursor-pointer">
+              <div className="overflow-x-auto">
+                <div className="flex items-center gap-2 min-w-[980px]">
+                  <Input
+                    placeholder="Document name"
+                    value={docName}
+                    onChange={(e) => setDocName(e.target.value)}
+                    className="w-[220px] bg-white/5 border-white/10 text-white placeholder:text-white/25"
+                  />
+                  <Select value={docType} onValueChange={(v) => setDocType(v as (typeof PERSON_DOCUMENT_TYPE_OPTIONS)[number])}>
+                    <SelectTrigger className="w-[170px] bg-white/5 border-white/10 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                      {PERSON_DOCUMENT_TYPE_OPTIONS.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value.replace(/_/g, " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <label className="flex items-center gap-2 text-[11px] text-white/55 cursor-pointer whitespace-nowrap">
                     <Checkbox
                       checked={docDoesNotExpire}
                       onCheckedChange={(v) => {
@@ -950,38 +950,36 @@ function PersonFormDialog({
                     />
                     <span>Does not expire</span>
                   </label>
-                  <div className="space-y-1">
-                    <Label className="text-white/40 text-[10px]">Expiration (optional)</Label>
-                    <input
-                      type="date"
-                      value={docExpires}
-                      disabled={docDoesNotExpire}
-                      onChange={(e) => setDocExpires(e.target.value)}
-                      className="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs disabled:opacity-40"
-                    />
-                  </div>
+                  <input
+                    type="date"
+                    value={docExpires}
+                    disabled={docDoesNotExpire}
+                    onChange={(e) => setDocExpires(e.target.value)}
+                    className="h-9 w-[150px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs disabled:opacity-40"
+                  />
+                  <Input
+                    type="file"
+                    onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                    className="w-[230px] bg-white/5 border-white/10 text-white file:text-white"
+                  />
+                  {person ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-indigo-700 hover:bg-indigo-600 text-white whitespace-nowrap"
+                      disabled={uploadDocMutation.isPending || !docFile}
+                      onClick={() => uploadDocMutation.mutate()}
+                    >
+                      {uploadDocMutation.isPending ? "Uploading…" : "Upload document"}
+                    </Button>
+                  ) : null}
                 </div>
-                <Input
-                  type="file"
-                  onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
-                  className="sm:col-span-3 bg-white/5 border-white/10 text-white file:text-white"
-                />
               </div>
-              {person ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  className="bg-indigo-700 hover:bg-indigo-600 text-white"
-                  disabled={uploadDocMutation.isPending || !docFile}
-                  onClick={() => uploadDocMutation.mutate()}
-                >
-                  {uploadDocMutation.isPending ? "Uploading…" : "Upload document now"}
-                </Button>
-              ) : (
+              {!person ? (
                 <p className="text-[11px] text-white/35">
                   For new people, the selected document is uploaded after you click Add Person.
                 </p>
-              )}
+              ) : null}
               {personDocuments && personDocuments.length > 0 ? (
                 <div className="rounded border border-white/10">
                   {personDocuments.map((doc) => (
