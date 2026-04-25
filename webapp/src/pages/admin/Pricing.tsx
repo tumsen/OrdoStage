@@ -41,6 +41,12 @@ function roundingStepCents(unit: RoundingUnit): number {
   return 1;
 }
 
+function formatMajorFromCents(centsText: string): string {
+  const cents = Number(centsText);
+  if (!Number.isFinite(cents)) return "-";
+  return (cents / 100).toFixed(2);
+}
+
 function applyRounding(cents: number, mode: RoundingMode, unit: RoundingUnit): number {
   const step = roundingStepCents(unit);
   if (step <= 1) return Math.max(Math.round(cents), 1);
@@ -78,7 +84,8 @@ export default function Pricing() {
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
   const [fxLoading, setFxLoading] = useState(false);
   const [fxError, setFxError] = useState<string | null>(null);
-  const [fxUpdatedAt, setFxUpdatedAt] = useState<string | null>(null);
+  const [fxUpdatedAt, setFxUpdatedAt] = useState<string | null>(null); // Provider update time
+  const [fxRefreshedAt, setFxRefreshedAt] = useState<string | null>(null); // Local fetch time
 
   const { data, isPending } = useQuery<{
     paymentDueDays: number;
@@ -118,11 +125,12 @@ export default function Pricing() {
     setFxError(null);
     try {
       const data = await api.get<{ base: string; rates: Record<string, number>; updatedAt?: string | null }>(
-        "/api/admin/billing/fx-rates?base=USD"
+        `/api/admin/billing/fx-rates?base=USD&t=${Date.now()}`
       );
       if (!data.rates) throw new Error("No rates in response");
       setFxRates(data.rates);
       setFxUpdatedAt(data.updatedAt ?? null);
+      setFxRefreshedAt(new Date().toISOString());
       toast({ title: "USD rates refreshed" });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to fetch rates.";
@@ -227,14 +235,14 @@ export default function Pricing() {
 
           {fxError ? <p className="text-xs text-red-300">Rate lookup failed: {fxError}</p> : null}
 
-          <div className="space-y-2">
-            <div className="grid grid-cols-12 gap-3 text-xs text-white/45 px-1">
-              <p className="col-span-2">Currency / Country</p>
+          <div className="space-y-2 overflow-x-auto">
+            <div className="grid min-w-[1200px] grid-cols-12 gap-3 text-xs text-white/45 px-1 whitespace-nowrap">
+              <p className="col-span-3">Currency / Country</p>
               <p className="col-span-1">Current price</p>
-              <p className="col-span-2">Follow base</p>
+              <p className="col-span-1">Follow base</p>
               <p className="col-span-2">Rounding rule</p>
-              <p className="col-span-2">Round to</p>
-              <p className="col-span-3">FX rate (1 USD {"->"} currency)</p>
+              <p className="col-span-1">Round to</p>
+              <p className="col-span-2">FX rate (1 USD {"->"} currency)</p>
               <p className="col-span-2">Calculated price</p>
             </div>
             {(data?.supportedCurrencies ?? []).map((currency) => {
@@ -252,8 +260,8 @@ export default function Pricing() {
                     ? String(calculatedRows[currency])
                     : "";
               return (
-                <div key={currency} className="grid grid-cols-12 gap-3 items-center">
-                  <div className="col-span-2">
+                <div key={currency} className="grid min-w-[1200px] grid-cols-12 gap-3 items-center whitespace-nowrap">
+                  <div className="col-span-3">
                     <p className="text-sm text-white font-medium">
                       {currency} - {CURRENCY_COUNTRY_LABELS[currency] ?? "Other"}
                     </p>
@@ -268,7 +276,7 @@ export default function Pricing() {
                       }))
                     }
                   />
-                  <div className="col-span-2 flex items-center">
+                  <div className="col-span-1 flex items-center">
                     <Checkbox
                       checked={currency === BASE_CURRENCY ? false : row.followBaseCurrency}
                       disabled={currency === BASE_CURRENCY}
@@ -309,7 +317,7 @@ export default function Pricing() {
                     }
                     disabled={currency === BASE_CURRENCY || !row.followBaseCurrency}
                   >
-                    <SelectTrigger className="col-span-2">
+                    <SelectTrigger className="col-span-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -318,11 +326,19 @@ export default function Pricing() {
                       <SelectItem value="00">Nearest .00</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Input className="col-span-3" value={fxRate ? fxRate.toFixed(6) : ""} readOnly />
-                  <Input className="col-span-2" value={calculatedValue} readOnly />
+                  <Input className="col-span-2" value={fxRate ? fxRate.toFixed(6) : ""} readOnly />
+                  <Input
+                    className="col-span-2"
+                    value={calculatedValue ? `${calculatedValue} (${formatMajorFromCents(calculatedValue)})` : ""}
+                    readOnly
+                  />
                 </div>
               );
             })}
+          </div>
+          <div className="text-[11px] text-white/45 flex flex-wrap gap-x-4 gap-y-1">
+            {fxRefreshedAt ? <span>Refreshed: {new Date(fxRefreshedAt).toLocaleString()}</span> : null}
+            {fxUpdatedAt ? <span>Provider update: {fxUpdatedAt}</span> : null}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
