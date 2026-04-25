@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { SidebarContent } from "@/components/Layout";
 import { completePostAuthenticationNavigation } from "@/lib/postAuthRouting";
@@ -60,6 +60,9 @@ export default function Login() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs text-white/50 uppercase tracking-wide">Password</label>
+                  <Link to="/forgot-password" className="text-xs text-violet-400 hover:text-violet-300 transition-colors">
+                    Forgot password?
+                  </Link>
                 </div>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" className={inputCls} />
               </div>
