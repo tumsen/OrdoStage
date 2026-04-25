@@ -181,7 +181,7 @@ model CreditPurchase {
   organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   days            Int
   amountCents     Int
-  paddleTransactionId String?   @unique @map("stripeSessionId")
+  paddleTransactionId String?   @unique
   /** Sequential invoice number (e.g. INV-0001). */
   invoiceNumber   String?       @unique
   /** Snapshots taken at purchase time so the record survives org deletion. */
