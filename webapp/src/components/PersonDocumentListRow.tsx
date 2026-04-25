@@ -179,12 +179,14 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
         >
           Download
         </a>
-        {canManagePermissions && onEditPermissions ? (
+        {onEditPermissions ? (
           <Button
             type="button"
             size="sm"
             variant="outline"
             className="h-7 text-[11px] border-white/20 text-white/75"
+            disabled={!canManagePermissions}
+            title={canManagePermissions ? "Set document visibility" : "Only the document owner can set visibility"}
             onClick={() => onEditPermissions(doc)}
           >
             Permissions
