@@ -5,6 +5,7 @@ import React from "react";
 import type { JSXElementConstructor, ReactElement } from "react";
 import { VenueTechRiderCoverDoc } from "@/components/VenueTechRiderPDF";
 import type { TourDetail, TourShow } from "../../../backend/src/types";
+import { fetchOrgCompanyProfileForReports } from "@/lib/orgCompanyProfile";
 
 // ── Internal helper: generate the merged PDF blob ────────────────────────────
 
@@ -12,10 +13,11 @@ async function generateVenueTechRiderBlob(
   tour: TourDetail,
   show: TourShow
 ): Promise<Blob> {
+  const company = await fetchOrgCompanyProfileForReports().catch(() => null);
   // 1. Generate the variable cover page
   const coverElement = React.createElement(
     VenueTechRiderCoverDoc,
-    { tour, show }
+    { tour, show, company }
   ) as unknown as ReactElement<DocumentProps, JSXElementConstructor<DocumentProps>>;
   const coverBlob = await pdf(coverElement).toBlob();
   const coverBuffer = await coverBlob.arrayBuffer();

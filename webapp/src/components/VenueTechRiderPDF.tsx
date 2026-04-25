@@ -1,5 +1,6 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { TourDetail, TourShow } from "../../../backend/src/types";
+import type { OrgCompanyProfile } from "@/lib/orgCompanyProfile";
 
 const S = StyleSheet.create({
   page: {
@@ -77,6 +78,18 @@ const S = StyleSheet.create({
   },
   footerText: { fontSize: 8, color: "#555" },
   footerBold: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#111" },
+  brandRow: {
+    borderTopWidth: 0.5,
+    borderTopColor: "#ddd",
+    marginTop: 8,
+    paddingTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  brandText: { fontSize: 8, color: "#444" },
+  brandLogo: { width: 72, height: 28, objectFit: "contain" },
 });
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
@@ -107,9 +120,11 @@ function formatAddress(parts: {
 export function VenueTechRiderCoverDoc({
   tour,
   show,
+  company,
 }: {
   tour: TourDetail;
   show: TourShow;
+  company?: OrgCompanyProfile | null;
 }) {
   const formattedDate = (() => {
     const d = new Date(show.date);
@@ -295,6 +310,20 @@ export function VenueTechRiderCoverDoc({
             <Text style={S.footerBold}>Technical specifications follow →</Text>
           ) : null}
         </View>
+        {company ? (
+          <View style={S.brandRow}>
+            <Text style={S.brandText}>
+              {[
+                company.invoiceName || company.name,
+                company.invoiceEmail || null,
+                company.invoicePhone || null,
+              ]
+                .filter(Boolean)
+                .join("  ·  ")}
+            </Text>
+            {company.logoDataUrl ? <Image src={company.logoDataUrl} style={S.brandLogo} /> : null}
+          </View>
+        ) : null}
       </Page>
     </Document>
   );

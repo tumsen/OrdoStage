@@ -374,10 +374,16 @@ app.get("/org/invoice-info", async (c) => {
       invoiceEmail: true,
       invoicePhone: true,
       invoiceContact: true,
+      companyLogoUpdatedAt: true,
     },
   });
   if (!org) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
-  return c.json({ data: org });
+  return c.json({
+    data: {
+      ...org,
+      hasCompanyLogo: Boolean(org.companyLogoUpdatedAt),
+    },
+  });
 });
 
 const InvoiceInfoSchema = z.object({
@@ -412,6 +418,87 @@ app.patch("/org/invoice-info", async (c) => {
     data[k] = v?.trim() || null;
   }
   await prisma.organization.update({ where: { id: user.organizationId }, data });
+  return c.json({ data: { ok: true } });
+});
+
+// POST /api/org/company-logo — upload company logo (owner/billing manager)
+app.post("/org/company-logo", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "billing.manage")) {
+    return c.json(
+      { error: { message: "You do not have permission to update company branding", code: "FORBIDDEN" } },
+      403
+    );
+  }
+  const formData = await c.req.parseBody();
+  const file = formData["file"];
+  if (!file || typeof file === "string") {
+    return c.json({ error: { message: "Image file is required", code: "BAD_REQUEST" } }, 400);
+  }
+  const mime = (file as File).type || "application/octet-stream";
+  if (!mime.startsWith("image/")) {
+    return c.json({ error: { message: "Only image files are allowed", code: "BAD_REQUEST" } }, 400);
+  }
+  const buffer = Buffer.from(await (file as File).arrayBuffer());
+  if (buffer.length > 2_000_000) {
+    return c.json({ error: { message: "Logo must be 2MB or smaller", code: "BAD_REQUEST" } }, 400);
+  }
+  await prisma.organization.update({
+    where: { id: user.organizationId },
+    data: {
+      companyLogoData: buffer,
+      companyLogoMimeType: mime,
+      companyLogoUpdatedAt: new Date(),
+    },
+  });
+  return c.json({ data: { ok: true } }, 201);
+});
+
+// GET /api/org/company-logo — get company logo bytes (authenticated)
+app.get("/org/company-logo", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { companyLogoData: true, companyLogoMimeType: true, companyLogoUpdatedAt: true },
+  });
+  if (!org?.companyLogoData) {
+    return c.json({ error: { message: "Company logo not found", code: "NOT_FOUND" } }, 404);
+  }
+  return new Response(org.companyLogoData, {
+    headers: {
+      "Content-Type": org.companyLogoMimeType || "image/png",
+      "Content-Disposition": "inline; filename=\"company-logo\"",
+      "Cache-Control": org.companyLogoUpdatedAt ? "private, max-age=300" : "private, no-cache",
+    },
+  });
+});
+
+// DELETE /api/org/company-logo — remove company logo (owner/billing manager)
+app.delete("/org/company-logo", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "billing.manage")) {
+    return c.json(
+      { error: { message: "You do not have permission to update company branding", code: "FORBIDDEN" } },
+      403
+    );
+  }
+  await prisma.organization.update({
+    where: { id: user.organizationId },
+    data: {
+      companyLogoData: null,
+      companyLogoMimeType: null,
+      companyLogoUpdatedAt: null,
+    },
+  });
   return c.json({ data: { ok: true } });
 });
 

@@ -13,6 +13,8 @@ export interface InvoiceData {
   buyerAddress?: string | null;
   buyerVat?: string | null;
   buyerEmail?: string | null;
+  buyerLogoData?: Uint8Array | null;
+  buyerLogoMimeType?: string | null;
   /** Line item */
   packLabel: string;
   days: number;
@@ -112,6 +114,25 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Uint8Array>
   // --- Buyer block (right column) ---
   let by = 710;
   const BL = 320;
+  if (data.buyerLogoData && data.buyerLogoMimeType) {
+    try {
+      const image = data.buyerLogoMimeType.includes("png")
+        ? await doc.embedPng(data.buyerLogoData)
+        : await doc.embedJpg(data.buyerLogoData);
+      const maxW = 120;
+      const maxH = 42;
+      const scaled = image.scale(Math.min(maxW / image.width, maxH / image.height));
+      page.drawImage(image, {
+        x: R - maxW,
+        y: by - scaled.height + 6,
+        width: scaled.width,
+        height: scaled.height,
+      });
+      by -= 46;
+    } catch {
+      // Ignore invalid image bytes and continue invoice generation.
+    }
+  }
   page.drawText("To", { x: BL, y: by, size: 8, font: bold, color: grey });
   by -= 14;
   page.drawText(data.buyerName, { x: BL, y: by, size: 10, font: bold, color: black });

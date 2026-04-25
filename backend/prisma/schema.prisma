@@ -113,6 +113,9 @@ model Organization {
   invoiceEmail     String?
   invoicePhone     String?
   invoiceContact   String?
+  companyLogoData     Bytes?
+  companyLogoMimeType String?
+  companyLogoUpdatedAt DateTime?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   invitations      OrganizationInvitation[]

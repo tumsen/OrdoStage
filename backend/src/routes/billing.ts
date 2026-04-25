@@ -145,6 +145,8 @@ app.post("/billing/webhook", async (c) => {
             invoiceCountry: true,
             invoiceVat: true,
             invoiceEmail: true,
+            companyLogoData: true,
+            companyLogoMimeType: true,
           },
         });
 
@@ -232,6 +234,8 @@ app.post("/billing/webhook", async (c) => {
             : null,
           buyerVat: org?.invoiceVat ?? null,
           buyerEmail: org?.invoiceEmail ?? null,
+          buyerLogoData: org?.companyLogoData ?? null,
+          buyerLogoMimeType: org?.companyLogoMimeType ?? null,
           packLabel: pack?.label ?? `${days} days`,
           days,
           amountCents,

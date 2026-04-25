@@ -21,6 +21,8 @@ import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
 import { useI18n } from "@/lib/i18n";
 import type { Person, PersonDocument } from "../../../backend/src/types";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
+import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/AddressFields";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   PersonDocumentListRow,
   type PersonDocumentListRowHandle,
@@ -77,6 +79,8 @@ export default function Account() {
   const queryClient = useQueryClient();
   const { effective, isLoading } = usePreferences();
   const { t } = useI18n();
+  const { canAction } = usePermissions();
+  const canManageBranding = canAction("billing.manage");
 
   const [phrase, setPhrase] = useState("");
   const [loading, setLoading] = useState(false);
@@ -130,6 +134,36 @@ export default function Account() {
     emergencyContactName: "",
     emergencyContactPhone: "",
   });
+  const [companyDraft, setCompanyDraft] = useState({
+    invoiceName: "",
+    invoiceVat: "",
+    invoiceEmail: "",
+    invoicePhone: "",
+    invoiceContact: "",
+  });
+  const [companyAddress, setCompanyAddress] = useState<Address>(EMPTY_ADDRESS);
+  const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null);
+
+  const { data: companyInfo } = useQuery<{
+    name: string;
+    invoiceName: string | null;
+    invoiceStreet: string | null;
+    invoiceNumber: string | null;
+    invoiceZip: string | null;
+    invoiceCity: string | null;
+    invoiceState: string | null;
+    invoiceCountry: string | null;
+    invoiceVat: string | null;
+    invoiceEmail: string | null;
+    invoicePhone: string | null;
+    invoiceContact: string | null;
+    hasCompanyLogo?: boolean;
+    companyLogoUpdatedAt?: string | null;
+  }>({
+    queryKey: ["org-invoice-info"],
+    queryFn: () => api.get("/api/org/invoice-info"),
+    enabled: canManageBranding,
+  });
 
   const updatePrefsMutation = useMutation({
     mutationFn: (body: Partial<{ language: Language; timeFormat: TimeFormat; distanceUnit: DistanceUnit }>) =>
@@ -142,6 +176,55 @@ export default function Account() {
       if (isApiError(e)) setPrefsError(e.message);
       else setPrefsError(t("account.savePrefError"));
     },
+  });
+
+  const saveCompanyMutation = useMutation({
+    mutationFn: async () => {
+      await api.patch("/api/org/invoice-info", {
+        ...companyDraft,
+        invoiceStreet: companyAddress.street || null,
+        invoiceNumber: companyAddress.number || null,
+        invoiceZip: companyAddress.zip || null,
+        invoiceCity: companyAddress.city || null,
+        invoiceState: companyAddress.state || null,
+        invoiceCountry: companyAddress.country || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
+      setProfileMessage("Company information saved.");
+    },
+    onError: (e: Error) => setProfileMessage(e.message || "Could not save company information."),
+  });
+
+  const uploadCompanyLogoMutation = useMutation({
+    mutationFn: async () => {
+      if (!companyLogoFile) return;
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+      const formData = new FormData();
+      formData.append("file", companyLogoFile);
+      const resp = await fetch(`${baseUrl}/api/org/company-logo`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!resp.ok) throw new Error("Could not upload company logo.");
+    },
+    onSuccess: () => {
+      setCompanyLogoFile(null);
+      queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
+      setProfileMessage("Company logo updated.");
+    },
+    onError: (e: Error) => setProfileMessage(e.message || "Could not upload company logo."),
+  });
+
+  const removeCompanyLogoMutation = useMutation({
+    mutationFn: () => api.delete("/api/org/company-logo"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
+      setProfileMessage("Company logo removed.");
+    },
+    onError: (e: Error) => setProfileMessage(e.message || "Could not remove company logo."),
   });
 
   const saveProfileMutation = useMutation({
@@ -239,6 +322,25 @@ export default function Account() {
       emergencyContactPhone: mePerson.emergencyContactPhone ?? "",
     });
   }, [mePerson?.id]);
+
+  useEffect(() => {
+    if (!companyInfo) return;
+    setCompanyDraft({
+      invoiceName: companyInfo.invoiceName ?? "",
+      invoiceVat: companyInfo.invoiceVat ?? "",
+      invoiceEmail: companyInfo.invoiceEmail ?? "",
+      invoicePhone: companyInfo.invoicePhone ?? "",
+      invoiceContact: companyInfo.invoiceContact ?? "",
+    });
+    setCompanyAddress({
+      street: companyInfo.invoiceStreet ?? "",
+      number: companyInfo.invoiceNumber ?? "",
+      zip: companyInfo.invoiceZip ?? "",
+      city: companyInfo.invoiceCity ?? "",
+      state: companyInfo.invoiceState ?? "",
+      country: companyInfo.invoiceCountry ?? "",
+    });
+  }, [companyInfo]);
 
   useEffect(() => {
     if (!permissionState || !permissionsDoc) return;
@@ -342,6 +444,109 @@ export default function Account() {
         </div>
         {prefsError ? <p className="text-xs text-red-400">{prefsError}</p> : null}
       </div>
+
+      {canManageBranding ? (
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-white">Company information & branding</p>
+            <p className="text-xs text-white/50 mt-1">
+              Used on generated reports and documents (invoice PDFs and venue tech rider files).
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-xs uppercase tracking-wide">Company name</Label>
+              <Input
+                value={companyDraft.invoiceName}
+                onChange={(e) => setCompanyDraft((s) => ({ ...s, invoiceName: e.target.value }))}
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-xs uppercase tracking-wide">VAT number</Label>
+              <Input
+                value={companyDraft.invoiceVat}
+                onChange={(e) => setCompanyDraft((s) => ({ ...s, invoiceVat: e.target.value }))}
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label className="text-white/70 text-xs uppercase tracking-wide">Company address</Label>
+              <AddressFields value={companyAddress} onChange={setCompanyAddress} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-xs uppercase tracking-wide">Email</Label>
+              <Input
+                value={companyDraft.invoiceEmail}
+                onChange={(e) => setCompanyDraft((s) => ({ ...s, invoiceEmail: e.target.value }))}
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-xs uppercase tracking-wide">Phone</Label>
+              <Input
+                value={companyDraft.invoicePhone}
+                onChange={(e) => setCompanyDraft((s) => ({ ...s, invoicePhone: e.target.value }))}
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-xs uppercase tracking-wide">Contact person</Label>
+              <Input
+                value={companyDraft.invoiceContact}
+                onChange={(e) => setCompanyDraft((s) => ({ ...s, invoiceContact: e.target.value }))}
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-white/70 text-xs uppercase tracking-wide">Company logo</Label>
+            {companyInfo?.hasCompanyLogo ? (
+              <img
+                src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/org/company-logo?ts=${companyInfo.companyLogoUpdatedAt ?? ""}`}
+                alt="Company logo"
+                className="h-20 max-w-[240px] rounded border border-white/10 bg-white object-contain p-2"
+              />
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setCompanyLogoFile(e.target.files?.[0] ?? null)}
+                className="max-w-md bg-white/5 border-white/10 text-white file:text-white"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="border-white/10 text-white/80 bg-transparent"
+                disabled={!companyLogoFile || uploadCompanyLogoMutation.isPending}
+                onClick={() => uploadCompanyLogoMutation.mutate()}
+              >
+                {uploadCompanyLogoMutation.isPending ? "Uploading..." : "Upload logo"}
+              </Button>
+              {companyInfo?.hasCompanyLogo ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-white/10 text-white/70 bg-transparent"
+                  disabled={removeCompanyLogoMutation.isPending}
+                  onClick={() => removeCompanyLogoMutation.mutate()}
+                >
+                  {removeCompanyLogoMutation.isPending ? "Removing..." : "Remove logo"}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <Button
+            type="button"
+            className="bg-indigo-700 hover:bg-indigo-600"
+            disabled={saveCompanyMutation.isPending}
+            onClick={() => saveCompanyMutation.mutate()}
+          >
+            {saveCompanyMutation.isPending ? "Saving..." : "Save company information"}
+          </Button>
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
         <div>
