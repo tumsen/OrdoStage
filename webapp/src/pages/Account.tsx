@@ -192,12 +192,36 @@ export default function Account() {
         invoiceState: companyAddress.state || null,
         invoiceCountry: companyAddress.country || null,
       });
+      if (companyLogoFile) {
+        const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+        const formData = new FormData();
+        formData.append("file", companyLogoFile);
+        const resp = await fetch(`${baseUrl}/api/org/company-logo`, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        if (!resp.ok) {
+          const payload = await resp.json().catch(() => null);
+          const message =
+            payload?.error?.message || payload?.message || "Company info saved, but logo upload failed.";
+          throw new Error(message);
+        }
+      }
     },
     onSuccess: () => {
+      setCompanyLogoFile(null);
+      setCompanyLogoStatus(companyLogoFile ? "Company information and logo saved." : "Company information saved.");
       queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
-      setProfileMessage("Company information saved.");
+      setProfileMessage(companyLogoFile ? "Company information and logo saved." : "Company information saved.");
+      toast({ title: companyLogoFile ? "Company information and logo saved" : "Company information saved" });
     },
-    onError: (e: Error) => setProfileMessage(e.message || "Could not save company information."),
+    onError: (e: Error) => {
+      const msg = e.message || "Could not save company information.";
+      setCompanyLogoStatus(msg);
+      setProfileMessage(msg);
+      toast({ title: "Could not save company information", description: msg, variant: "destructive" });
+    },
   });
 
   const uploadCompanyLogoMutation = useMutation({
