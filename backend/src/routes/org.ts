@@ -387,17 +387,17 @@ app.get("/org/invoice-info", async (c) => {
 });
 
 const InvoiceInfoSchema = z.object({
-  invoiceName:    z.string().max(200).optional(),
-  invoiceStreet:  z.string().max(200).optional(),
-  invoiceNumber:  z.string().max(30).optional(),
-  invoiceZip:     z.string().max(20).optional(),
-  invoiceCity:    z.string().max(100).optional(),
-  invoiceState:   z.string().max(100).optional(),
-  invoiceCountry: z.string().max(100).optional(),
-  invoiceVat:     z.string().max(60).optional(),
-  invoiceEmail:   z.string().email().max(200).optional().or(z.literal("")),
-  invoicePhone:   z.string().max(60).optional(),
-  invoiceContact: z.string().max(200).optional(),
+  invoiceName: z.union([z.string().max(200), z.null()]).optional(),
+  invoiceStreet: z.union([z.string().max(200), z.null()]).optional(),
+  invoiceNumber: z.union([z.string().max(30), z.null()]).optional(),
+  invoiceZip: z.union([z.string().max(20), z.null()]).optional(),
+  invoiceCity: z.union([z.string().max(100), z.null()]).optional(),
+  invoiceState: z.union([z.string().max(100), z.null()]).optional(),
+  invoiceCountry: z.union([z.string().max(100), z.null()]).optional(),
+  invoiceVat: z.union([z.string().max(60), z.null()]).optional(),
+  invoiceEmail: z.union([z.string().email().max(200), z.literal(""), z.null()]).optional(),
+  invoicePhone: z.union([z.string().max(60), z.null()]).optional(),
+  invoiceContact: z.union([z.string().max(200), z.null()]).optional(),
 });
 
 // PATCH /api/org/invoice-info
