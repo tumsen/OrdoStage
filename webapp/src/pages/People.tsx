@@ -66,6 +66,7 @@ type DocumentPermissionState = { teamIds: string[]; personIds: string[] };
 // ── Form schema ───────────────────────────────────────────────────────────────
 
 const PRESET_ROLES = ["Tour Manager", "Actor", "Tech"] as const;
+const SOFTWARE_OWNER_EMAIL = "tumsen@gmail.com";
 
 const PersonFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -457,6 +458,7 @@ function PersonFormDialog({
         session?.user?.email?.toLowerCase() === person.email?.trim().toLowerCase()
     );
   const isSelfPerson = Boolean(person?.id && mePerson?.id && person.id === mePerson.id);
+  const isSoftwareOwner = (session?.user?.email || "").toLowerCase() === SOFTWARE_OWNER_EMAIL;
 
   const { data: personDocuments } = useQuery<PersonDocument[]>({
     queryKey: ["people", person?.id, "documents"],
@@ -1201,7 +1203,7 @@ function PersonFormDialog({
                       }}
                       doc={doc}
                       canEdit={canEditPersonDocs}
-                      canManagePermissions={canWriteOrg || isSelfPerson}
+                      canManagePermissions={isSoftwareOwner || isSelfPerson}
                       isSaving={
                         updateDocMutation.isPending && updateDocMutation.variables?.id === doc.id
                       }

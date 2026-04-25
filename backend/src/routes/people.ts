@@ -15,6 +15,7 @@ import { canAction } from "../requestRole";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
 
 const TEAM_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#84cc16", "#06b6d4"];
+const SOFTWARE_OWNER_EMAIL = "tumsen@gmail.com";
 
 /** `YYYY-MM-DD` (local calendar day) or any date string `Date` can parse. */
 function parsePersonDocumentExpiresAtInput(raw: unknown): Date | null {
@@ -1102,9 +1103,9 @@ peopleRouter.get("/people/documents/:docId/permissions", async (c) => {
   if (!doc) {
     return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
   }
-  const canWritePeople = canAction(c, "write.people");
+  const isSoftwareOwner = (user.email || "").toLowerCase() === SOFTWARE_OWNER_EMAIL;
   const canEditSelf = canEditOwnProfile(user, doc.person.email);
-  if (!canWritePeople && !canEditSelf) {
+  if (!isSoftwareOwner && !canEditSelf) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
   const perms = await loadDocPermissions([doc.id]);
@@ -1131,9 +1132,9 @@ peopleRouter.get("/people/documents/:docId/permissions/options", async (c) => {
   if (!doc) {
     return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
   }
-  const canWritePeople = canAction(c, "write.people");
+  const isSoftwareOwner = (user.email || "").toLowerCase() === SOFTWARE_OWNER_EMAIL;
   const canEditSelf = canEditOwnProfile(user, doc.person.email);
-  if (!canWritePeople && !canEditSelf) {
+  if (!isSoftwareOwner && !canEditSelf) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
   const teams = await prisma.department.findMany({
@@ -1183,9 +1184,9 @@ peopleRouter.patch(
     if (!doc) {
       return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
     }
-    const canWritePeople = canAction(c, "write.people");
+    const isSoftwareOwner = (user.email || "").toLowerCase() === SOFTWARE_OWNER_EMAIL;
     const canEditSelf = canEditOwnProfile(user, doc.person.email);
-    if (!canWritePeople && !canEditSelf) {
+    if (!isSoftwareOwner && !canEditSelf) {
       return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
     }
     const teamIds = [...new Set(body.teamIds.filter(Boolean))];
