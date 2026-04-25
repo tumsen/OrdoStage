@@ -27,12 +27,6 @@ const CURRENCY_COUNTRY_LABELS: Record<string, string> = {
   HRK: "Croatia",
 };
 
-function formatMajorFromCents(centsText: string): string {
-  const cents = Number(centsText);
-  if (!Number.isFinite(cents)) return "-";
-  return (cents / 100).toFixed(2);
-}
-
 function calculateBaseComparison(rows: Record<string, CurrencyRow>, rates: Record<string, number>): Record<string, number | null> {
   const base = Number(rows[BASE_CURRENCY]?.userDailyRateCents ?? "0");
   const calculated: Record<string, number | null> = {};
@@ -174,16 +168,20 @@ export default function Pricing() {
               <Button variant="outline" onClick={() => fetchUsdRates()} disabled={fxLoading}>
                 {fxLoading ? "Loading rates..." : "Refresh USD rates"}
               </Button>
+              {fxRefreshedAt ? (
+                <span className="text-[11px] text-white/45">Checked: {new Date(fxRefreshedAt).toLocaleString()}</span>
+              ) : null}
+              {fxUpdatedAt ? <span className="text-[11px] text-white/45">Provider: {fxUpdatedAt}</span> : null}
             </div>
           </div>
 
           {fxError ? <p className="text-xs text-red-300">Rate lookup failed: {fxError}</p> : null}
 
           <div className="space-y-2 overflow-x-auto">
-            <div className="grid min-w-[900px] grid-cols-12 gap-2 text-xs text-white/45 px-1 whitespace-nowrap">
+            <div className="grid min-w-[760px] grid-cols-12 gap-2 text-xs text-white/45 px-1 whitespace-nowrap">
               <p className="col-span-4">Currency / Country</p>
-              <p className="col-span-3">Current price</p>
-              <p className="col-span-3">Price from next month</p>
+              <p className="col-span-2">Current</p>
+              <p className="col-span-2">Next month</p>
               <p className="col-span-2">Base calculation</p>
             </div>
             {(data?.supportedCurrencies ?? []).map((currency) => {
@@ -200,14 +198,14 @@ export default function Pricing() {
               const rateLabel =
                 currency === BASE_CURRENCY ? "1.000000" : fxRates[currency] != null ? fxRates[currency].toFixed(6) : "-";
               return (
-                <div key={currency} className="grid min-w-[900px] grid-cols-12 gap-2 items-center whitespace-nowrap">
+                <div key={currency} className="grid min-w-[760px] grid-cols-12 gap-2 items-center whitespace-nowrap">
                   <div className="col-span-4">
                     <p className="text-xs text-white font-medium">
                       {currency} - {CURRENCY_COUNTRY_LABELS[currency] ?? "Other"}
                     </p>
                   </div>
                   <Input
-                    className="col-span-3 h-8 text-xs"
+                    className="col-span-2 h-7 text-xs px-2"
                     value={row.userDailyRateCents}
                     onChange={(e) =>
                       setCurrencyRows((prev) => ({
@@ -217,7 +215,7 @@ export default function Pricing() {
                     }
                   />
                   <Input
-                    className="col-span-3 h-8 text-xs"
+                    className="col-span-2 h-7 text-xs px-2"
                     value={row.nextMonthUserDailyRateCents}
                     onChange={(e) =>
                       setCurrencyRows((prev) => ({
@@ -227,17 +225,13 @@ export default function Pricing() {
                     }
                   />
                   <Input
-                    className="col-span-2 h-8 text-xs"
-                    value={calculatedValue ? `${calculatedValue} (${formatMajorFromCents(calculatedValue)}) @ ${rateLabel}` : ""}
+                    className="col-span-2 h-7 text-xs px-2"
+                    value={calculatedValue ? rateLabel : "-"}
                     readOnly
                   />
                 </div>
               );
             })}
-          </div>
-          <div className="text-[11px] text-white/45 flex flex-wrap gap-x-4 gap-y-1">
-            {fxRefreshedAt ? <span>Refreshed: {new Date(fxRefreshedAt).toLocaleString()}</span> : null}
-            {fxUpdatedAt ? <span>Provider update: {fxUpdatedAt}</span> : null}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
