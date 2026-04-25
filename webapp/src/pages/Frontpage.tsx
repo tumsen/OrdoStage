@@ -106,13 +106,59 @@ function FeatureBlock({
   return (
     <section
       id="features"
-      className="w-full max-w-3xl scroll-mt-6 space-y-4 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm sm:p-7"
+      className="w-full max-w-5xl scroll-mt-6 space-y-8 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm sm:p-7"
     >
-      <h2 className="text-lg font-semibold text-white md:text-xl text-center sm:text-left">{sectionHeading}</h2>
-      <p className="text-sm leading-relaxed text-white/88 md:text-base">{sectionBody}</p>
-      <p className="text-sm font-medium leading-relaxed text-ordo-yellow/90 md:text-base text-center sm:text-left">
-        {closing}
-      </p>
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-white md:text-2xl text-center sm:text-left">{sectionHeading}</h2>
+        <p className="text-sm leading-relaxed text-white/88 md:text-base">{sectionBody}</p>
+        <p className="text-sm font-medium leading-relaxed text-ordo-yellow/90 md:text-base text-center sm:text-left">
+          {closing}
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <article className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h3 className="text-sm font-semibold text-white">Run every production from one system</h3>
+          <p className="mt-2 text-sm leading-relaxed text-white/75">
+            Events, people, venues, tours, tech docs, and calendar sharing stay connected so your team always works from current information.
+          </p>
+        </article>
+        <article className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h3 className="text-sm font-semibold text-white">Reduce admin pressure immediately</h3>
+          <p className="mt-2 text-sm leading-relaxed text-white/75">
+            Replace scattered spreadsheets and back-and-forth emails with one workflow built for technical, production, and operations teams.
+          </p>
+        </article>
+        <article className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h3 className="text-sm font-semibold text-white">Scale from one venue to full tour</h3>
+          <p className="mt-2 text-sm leading-relaxed text-white/75">
+            Use the same structure whether you run one house or multiple productions across regions with changing crews and schedules.
+          </p>
+        </article>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-ordo-yellow/35 bg-gradient-to-br from-ordo-magenta/[0.12] to-ordo-violet/[0.10] p-5">
+          <h3 className="text-base font-semibold text-white">What teams get with OrdoStage</h3>
+          <ul className="mt-3 list-disc pl-5 space-y-1.5 text-sm text-white/85 marker:text-ordo-yellow">
+            <li>Shared production timeline across departments</li>
+            <li>Live venue and rider data with fewer errors</li>
+            <li>People and permissions that match real workflows</li>
+            <li>Faster coordination for rehearsals, shows, and tours</li>
+          </ul>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+          <h3 className="text-base font-semibold text-white">Why organizations switch</h3>
+          <p className="mt-2 text-sm leading-relaxed text-white/80">
+            OrdoStage gives operations, technical teams, and management the same live picture of what is happening now and what is next. Less confusion. Better execution. Higher reliability on show-critical days.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">Fewer planning mistakes</span>
+            <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">Faster handovers</span>
+            <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">Better team alignment</span>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
