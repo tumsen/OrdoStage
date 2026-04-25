@@ -4,12 +4,15 @@
 
 export type PersonDocExpiryInfo =
   | { kind: "none" }
+  | { kind: "forever" }
   | { kind: "expired"; daysPast: number }
   | { kind: "ok"; daysLeft: number };
 
 export function getPersonDocumentExpiryInfo(
-  expiresAtIso: string | null | undefined
+  expiresAtIso: string | null | undefined,
+  doesNotExpire?: boolean
 ): PersonDocExpiryInfo {
+  if (doesNotExpire) return { kind: "forever" };
   if (expiresAtIso == null || expiresAtIso === "") return { kind: "none" };
   const exp = new Date(expiresAtIso);
   if (Number.isNaN(exp.getTime())) return { kind: "none" };

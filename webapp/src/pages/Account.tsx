@@ -19,7 +19,7 @@ import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
 import { useI18n } from "@/lib/i18n";
 import type { Person, PersonDocument } from "../../../backend/src/types";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import { PersonDocumentListRow } from "@/components/PersonDocumentListRow";
+import { PersonDocumentListRow, type PersonDocumentSavePatch } from "@/components/PersonDocumentListRow";
 
 const CONFIRM_PHRASE = "DELETE";
 
@@ -40,15 +40,17 @@ async function uploadPersonDocument(
   file: File,
   name: string,
   type: string,
-  expiresAtYmd?: string
+  options?: { expiresAtYmd?: string; doesNotExpire?: boolean }
 ): Promise<void> {
   const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
   const formData = new FormData();
   formData.append("file", file);
   formData.append("name", name.trim() || file.name);
   formData.append("type", type.trim() || "other");
-  if (expiresAtYmd?.trim()) {
-    formData.append("expiresAt", expiresAtYmd.trim());
+  if (options?.doesNotExpire) {
+    formData.append("doesNotExpire", "true");
+  } else if (options?.expiresAtYmd?.trim()) {
+    formData.append("expiresAt", options.expiresAtYmd.trim());
   }
   const resp = await fetch(`${baseUrl}/api/people/${personId}/documents`, {
     method: "POST",
@@ -73,6 +75,7 @@ export default function Account() {
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
   const [docExpires, setDocExpires] = useState("");
+  const [docDoesNotExpire, setDocDoesNotExpire] = useState(false);
   const [docType, setDocType] = useState("other");
 
   const { data: mePerson } = useQuery<Person | null>({
@@ -121,7 +124,11 @@ export default function Account() {
         emergencyContactPhone: profileDraft.emergencyContactPhone.trim() || undefined,
       });
       if (photoFile) await uploadPersonPhoto(mePerson.id, photoFile);
-      if (docFile) await uploadPersonDocument(mePerson.id, docFile, docName, docType, docExpires);
+      if (docFile)
+        await uploadPersonDocument(mePerson.id, docFile, docName, docType, {
+          expiresAtYmd: docExpires,
+          doesNotExpire: docDoesNotExpire,
+        });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["people", "me"] });
@@ -131,6 +138,7 @@ export default function Account() {
       setDocFile(null);
       setDocName("");
       setDocExpires("");
+      setDocDoesNotExpire(false);
       setDocType("other");
       setProfileMessage("Profile saved.");
     },
@@ -152,19 +160,21 @@ export default function Account() {
     mutationFn: (docId: string) => api.delete(`/api/people/documents/${docId}`),
     onSuccess: () => {
       if (mePerson?.id) queryClient.invalidateQueries({ queryKey: ["people", mePerson.id, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["people"] });
     },
   });
 
   const updateDocMutation = useMutation({
-    mutationFn: ({
-      id,
-      body,
-    }: {
-      id: string;
-      body: { name: string; expiresAt: string | null };
-    }) => api.patch<PersonDocument>(`/api/people/documents/${id}`, { name: body.name, expiresAt: body.expiresAt }),
-    onSuccess: () => {
+    mutationFn: ({ id, body }: { id: string; body: PersonDocumentSavePatch }) =>
+      api.patch<PersonDocument>(`/api/people/documents/${id}`, body),
+    onSuccess: (data, { id }) => {
+      if (mePerson?.id && data) {
+        queryClient.setQueryData<PersonDocument[]>(["people", mePerson.id, "documents"], (old) =>
+          !old ? old : old.map((d) => (d.id === id ? { ...d, ...data } : d))
+        );
+      }
       if (mePerson?.id) queryClient.invalidateQueries({ queryKey: ["people", mePerson.id, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["people"] });
     },
   });
 
@@ -319,8 +329,8 @@ export default function Account() {
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="flex flex-col gap-4 w-full min-w-0">
+              <div className="space-y-2 w-full max-w-md">
                 <Label className="text-white/70 text-xs uppercase tracking-wide">Profile image</Label>
                 {mePerson.hasPhoto ? (
                   <img
@@ -352,7 +362,7 @@ export default function Account() {
                 ) : null}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 w-full min-w-0">
                 <Label className="text-white/70 text-xs uppercase tracking-wide">Documents</Label>
                 <Input
                   placeholder="Document name"
@@ -360,14 +370,29 @@ export default function Account() {
                   onChange={(e) => setDocName(e.target.value)}
                   className="bg-white/5 border-white/10 text-white"
                 />
-                <div className="space-y-1">
-                  <Label className="text-white/50 text-[10px]">Expiration (optional)</Label>
-                  <input
-                    type="date"
-                    value={docExpires}
-                    onChange={(e) => setDocExpires(e.target.value)}
-                    className="w-full max-w-[220px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-sm"
-                  />
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm text-white/55 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={docDoesNotExpire}
+                      onChange={(e) => {
+                        setDocDoesNotExpire(e.target.checked);
+                        if (e.target.checked) setDocExpires("");
+                      }}
+                      className="rounded border-white/30 accent-violet-600"
+                    />
+                    <span>Does not expire</span>
+                  </label>
+                  <div className="space-y-1">
+                    <Label className="text-white/50 text-[10px]">Expiration (optional)</Label>
+                    <input
+                      type="date"
+                      value={docExpires}
+                      disabled={docDoesNotExpire}
+                      onChange={(e) => setDocExpires(e.target.value)}
+                      className="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-sm disabled:opacity-40"
+                    />
+                  </div>
                 </div>
                 <Input
                   placeholder="Document type (passport, certificate, etc)"

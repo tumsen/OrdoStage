@@ -145,6 +145,14 @@ export const PersonSchema = z.object({
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** Present on list: most urgent dated doc, or a “forever” doc if only those exist. */
+  documentExpiryHint: z
+    .union([
+      z.object({ name: z.string(), forever: z.literal(true) }),
+      z.object({ name: z.string(), daysLeft: z.number(), expired: z.boolean() }),
+    ])
+    .nullable()
+    .optional(),
 });
 
 export const PersonDocumentSchema = z.object({
@@ -154,8 +162,9 @@ export const PersonDocumentSchema = z.object({
   type: z.string(),
   filename: z.string(),
   mimeType: z.string(),
-  /** ISO datetime, or null if no expiration (optional for older clients). */
+  /** ISO datetime, or null if no specific date. */
   expiresAt: z.string().datetime().nullable().optional(),
+  doesNotExpire: z.boolean().default(false),
   createdAt: z.string(),
 });
 
@@ -163,6 +172,7 @@ export const UpdatePersonDocumentSchema = z.object({
   name: z.string().min(1).optional(),
   /** YYYY-MM-DD, ISO 8601 string, or null to clear. */
   expiresAt: z.union([z.string().min(1), z.null()]).optional(),
+  doesNotExpire: z.boolean().optional(),
 });
 
 /** Each row picks an existing team (teamId) or creates one by name (newTeamName). */

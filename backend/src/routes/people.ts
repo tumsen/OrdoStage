@@ -222,23 +222,95 @@ function canEditOwnProfile(user: { email: string }, personEmail: string | null):
   return personEmail.toLowerCase() === user.email.toLowerCase();
 }
 
+/** Calendar days from today to the document’s local expiry day (negative = expired). */
+function calendarDayDiffFromToday(expiresAt: Date): number {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const d = new Date(expiresAt.getFullYear(), expiresAt.getMonth(), expiresAt.getDate());
+  return Math.round((d.getTime() - new Date(startOfToday.getFullYear(), startOfToday.getMonth(), startOfToday.getDate()).getTime()) / 86400000);
+}
+
+type ListDocRow = { name: string; expiresAt: Date | null; doesNotExpire: boolean };
+
+type DocumentExpiryHint =
+  | { name: string; forever: true }
+  | { name: string; daysLeft: number; expired: boolean };
+
+/** Picks a single hint: dated docs first (expired → soonest), else a “forever” doc. */
+function documentExpiryHintForList(rows: ListDocRow[]): DocumentExpiryHint | null {
+  if (rows.length === 0) return null;
+  const dated = rows.filter((r) => r.expiresAt && !r.doesNotExpire);
+  if (dated.length > 0) {
+    const scored = dated.map((r) => {
+      const daysLeft = calendarDayDiffFromToday(r.expiresAt!);
+      return { name: r.name, expiresAt: r.expiresAt!, daysLeft, expired: daysLeft < 0 };
+    });
+    const expired = scored.filter((r) => r.expired);
+    if (expired.length > 0) {
+      const worst = expired.reduce((a, b) => (a.expiresAt < b.expiresAt ? a : b));
+      return { name: worst.name, daysLeft: worst.daysLeft, expired: true };
+    }
+    const soon = scored.reduce((a, b) => (a.daysLeft < b.daysLeft ? a : b));
+    return { name: soon.name, daysLeft: soon.daysLeft, expired: false };
+  }
+  const forever = rows.find((r) => r.doesNotExpire);
+  if (forever) return { name: forever.name, forever: true };
+  return null;
+}
+
+function documentExpiryHintByPersonId(orgId: string): Promise<Map<string, DocumentExpiryHint | null>> {
+  return prisma.personDocument
+    .findMany({
+      where: {
+        person: { organizationId: orgId },
+        OR: [{ doesNotExpire: true }, { expiresAt: { not: null } }],
+      },
+      select: { personId: true, name: true, expiresAt: true, doesNotExpire: true },
+    })
+    .then((docs) => {
+      const by = new Map<string, ListDocRow[]>();
+      for (const d of docs) {
+        const list = by.get(d.personId) ?? [];
+        list.push({
+          name: d.name,
+          expiresAt: d.expiresAt,
+          doesNotExpire: d.doesNotExpire,
+        });
+        by.set(d.personId, list);
+      }
+      const m = new Map<string, DocumentExpiryHint | null>();
+      for (const [personId, list] of by) {
+        m.set(personId, documentExpiryHintForList(list));
+      }
+      return m;
+    });
+}
+
 // GET /api/people
 peopleRouter.get("/people", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  const people = await prisma.person.findMany({
-    where: { organizationId: user.organizationId },
-    orderBy: { name: "asc" },
-    include: {
-      teamMemberships: {
-        include: { department: true },
+  const [people, hintMap] = await Promise.all([
+    prisma.person.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { name: "asc" },
+      include: {
+        teamMemberships: {
+          include: { department: true },
+        },
+        permissionGroup: { select: { id: true, name: true, slug: true } },
       },
-      permissionGroup: { select: { id: true, name: true, slug: true } },
-    },
+    }),
+    documentExpiryHintByPersonId(user.organizationId),
+  ]);
+  return c.json({
+    data: people.map((p) => ({
+      ...serializePerson(p),
+      documentExpiryHint: hintMap.get(p.id) ?? null,
+    })),
   });
-  return c.json({ data: people.map(serializePerson) });
 });
 
 // GET /api/people/me — current user's linked person profile in active organization
@@ -595,6 +667,7 @@ peopleRouter.get("/people/:id/documents", async (c) => {
       filename: true,
       mimeType: true,
       expiresAt: true,
+      doesNotExpire: true,
       createdAt: true,
     },
     orderBy: { createdAt: "desc" },
@@ -602,6 +675,7 @@ peopleRouter.get("/people/:id/documents", async (c) => {
   return c.json({
     data: docs.map((d) => ({
       ...d,
+      doesNotExpire: d.doesNotExpire,
       createdAt: d.createdAt.toISOString(),
       expiresAt: d.expiresAt ? d.expiresAt.toISOString() : null,
     })),
@@ -727,13 +801,15 @@ peopleRouter.post("/people/:id/documents", async (c) => {
   const name = formData["name"];
   const type = formData["type"];
   const expiresField = formData["expiresAt"];
+  const dneField = formData["doesNotExpire"];
   if (!file || typeof file === "string") {
     return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
   }
   const rawName = typeof name === "string" && name.trim() ? name.trim() : file.name;
   const rawType = typeof type === "string" && type.trim() ? type.trim() : "other";
+  const doesNotExpire = dneField === "true" || dneField === "on" || dneField === "1";
   let expiresAt: Date | null = null;
-  if (typeof expiresField === "string" && expiresField.trim()) {
+  if (!doesNotExpire && typeof expiresField === "string" && expiresField.trim()) {
     const d = parsePersonDocumentExpiresAtInput(expiresField);
     if (!d) {
       return c.json({ error: { message: "Invalid expiration date", code: "BAD_REQUEST" } }, 400);
@@ -749,7 +825,8 @@ peopleRouter.post("/people/:id/documents", async (c) => {
       filename: file.name,
       data: bytes,
       mimeType: file.type || "application/octet-stream",
-      expiresAt,
+      doesNotExpire,
+      expiresAt: doesNotExpire ? null : expiresAt,
     },
     select: {
       id: true,
@@ -758,6 +835,7 @@ peopleRouter.post("/people/:id/documents", async (c) => {
       type: true,
       filename: true,
       mimeType: true,
+      doesNotExpire: true,
       expiresAt: true,
       createdAt: true,
     },
@@ -766,6 +844,7 @@ peopleRouter.post("/people/:id/documents", async (c) => {
     {
       data: {
         ...document,
+        doesNotExpire: document.doesNotExpire,
         createdAt: document.createdAt.toISOString(),
         expiresAt: document.expiresAt ? document.expiresAt.toISOString() : null,
       },
@@ -794,20 +873,42 @@ peopleRouter.patch("/people/documents/:docId", zValidator("json", UpdatePersonDo
   if (!canWritePeople && !canEditSelf) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
-  if (body.expiresAt !== undefined && body.expiresAt !== null) {
-    const d = parsePersonDocumentExpiresAtInput(body.expiresAt);
-    if (!d) {
-      return c.json({ error: { message: "Invalid expiration date", code: "BAD_REQUEST" } }, 400);
+  if (body.doesNotExpire !== true) {
+    if (body.expiresAt !== undefined && body.expiresAt !== null) {
+      const d = parsePersonDocumentExpiresAtInput(body.expiresAt);
+      if (!d) {
+        return c.json({ error: { message: "Invalid expiration date", code: "BAD_REQUEST" } }, 400);
+      }
     }
+  }
+  const data: { name?: string; expiresAt?: Date | null; doesNotExpire?: boolean } = {};
+  if (body.name !== undefined) data.name = body.name;
+  if (body.doesNotExpire === true) {
+    data.doesNotExpire = true;
+    data.expiresAt = null;
+  } else {
+    if (body.doesNotExpire === false) {
+      data.doesNotExpire = false;
+    }
+    if (body.expiresAt !== undefined) {
+      if (body.expiresAt === null) {
+        data.expiresAt = null;
+      } else {
+        const parsed = parsePersonDocumentExpiresAtInput(body.expiresAt);
+        if (!parsed) {
+          return c.json({ error: { message: "Invalid expiration date", code: "BAD_REQUEST" } }, 400);
+        }
+        data.expiresAt = parsed;
+        data.doesNotExpire = false;
+      }
+    }
+  }
+  if (Object.keys(data).length === 0) {
+    return c.json({ error: { message: "No fields to update", code: "BAD_REQUEST" } }, 400);
   }
   const updated = await prisma.personDocument.update({
     where: { id: doc.id },
-    data: {
-      ...(body.name !== undefined && { name: body.name }),
-      ...(body.expiresAt !== undefined && {
-        expiresAt: body.expiresAt === null ? null : parsePersonDocumentExpiresAtInput(body.expiresAt),
-      }),
-    },
+    data,
     select: {
       id: true,
       personId: true,
@@ -815,6 +916,7 @@ peopleRouter.patch("/people/documents/:docId", zValidator("json", UpdatePersonDo
       type: true,
       filename: true,
       mimeType: true,
+      doesNotExpire: true,
       expiresAt: true,
       createdAt: true,
     },
@@ -822,6 +924,7 @@ peopleRouter.patch("/people/documents/:docId", zValidator("json", UpdatePersonDo
   return c.json({
     data: {
       ...updated,
+      doesNotExpire: updated.doesNotExpire,
       createdAt: updated.createdAt.toISOString(),
       expiresAt: updated.expiresAt ? updated.expiresAt.toISOString() : null,
     },

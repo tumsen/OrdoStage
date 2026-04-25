@@ -15,6 +15,7 @@ import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
 import type { Person, PersonDocument } from "../../../backend/src/types";
 import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,7 +46,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSession } from "@/lib/auth-client";
-import { PersonDocumentListRow } from "@/components/PersonDocumentListRow";
+import { PersonDocumentListRow, type PersonDocumentSavePatch } from "@/components/PersonDocumentListRow";
 
 interface Team {
   id: string;
@@ -245,15 +246,17 @@ async function uploadPersonDocument(
   file: File,
   name: string,
   type: string,
-  expiresAtYmd?: string
+  options?: { expiresAtYmd?: string; doesNotExpire?: boolean }
 ): Promise<void> {
   const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
   const formData = new FormData();
   formData.append("file", file);
   formData.append("name", name.trim() || file.name);
   formData.append("type", type.trim() || "other");
-  if (expiresAtYmd?.trim()) {
-    formData.append("expiresAt", expiresAtYmd.trim());
+  if (options?.doesNotExpire) {
+    formData.append("doesNotExpire", "true");
+  } else if (options?.expiresAtYmd?.trim()) {
+    formData.append("expiresAt", options.expiresAtYmd.trim());
   }
   const resp = await fetch(`${baseUrl}/api/people/${personId}/documents`, {
     method: "POST",
@@ -360,6 +363,7 @@ function PersonFormDialog({
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
   const [docExpires, setDocExpires] = useState("");
+  const [docDoesNotExpire, setDocDoesNotExpire] = useState(false);
   const [docType, setDocType] = useState<(typeof PERSON_DOCUMENT_TYPE_OPTIONS)[number]>("other");
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -427,7 +431,7 @@ function PersonFormDialog({
           docFile,
           docName || docFile.name,
           docType,
-          docExpires
+          { expiresAtYmd: docExpires, doesNotExpire: docDoesNotExpire }
         );
       }
       queryClient.invalidateQueries({ queryKey: ["people"] });
@@ -438,6 +442,7 @@ function PersonFormDialog({
       setDocFile(null);
       setDocName("");
       setDocExpires("");
+      setDocDoesNotExpire(false);
       setDocType("other");
       setUploadError(null);
       onOpenChange(false);
@@ -464,17 +469,19 @@ function PersonFormDialog({
         docFile,
         docName || docFile.name,
         docType,
-        docExpires
+        { expiresAtYmd: docExpires, doesNotExpire: docDoesNotExpire }
       );
     },
     onSuccess: () => {
       setDocFile(null);
       setDocName("");
       setDocExpires("");
+      setDocDoesNotExpire(false);
       setDocType("other");
       if (person?.id) {
         queryClient.invalidateQueries({ queryKey: ["people", person.id, "documents"] });
       }
+      queryClient.invalidateQueries({ queryKey: ["people"] });
     },
     onError: (e: Error) => setUploadError(e.message || "Could not upload document."),
   });
@@ -485,26 +492,23 @@ function PersonFormDialog({
       if (person?.id) {
         queryClient.invalidateQueries({ queryKey: ["people", person.id, "documents"] });
       }
+      queryClient.invalidateQueries({ queryKey: ["people"] });
     },
   });
 
   const updateDocMutation = useMutation({
-    mutationFn: async ({
-      id,
-      body,
-    }: {
-      id: string;
-      body: { name: string; expiresAt: string | null };
-    }) => {
-      return api.patch<PersonDocument>(`/api/people/documents/${id}`, {
-        name: body.name,
-        expiresAt: body.expiresAt,
-      });
-    },
-    onSuccess: () => {
+    mutationFn: async ({ id, body }: { id: string; body: PersonDocumentSavePatch }) =>
+      api.patch<PersonDocument>(`/api/people/documents/${id}`, body),
+    onSuccess: (data, { id }) => {
+      if (person?.id && data) {
+        queryClient.setQueryData<PersonDocument[]>(["people", person.id, "documents"], (old) =>
+          !old ? old : old.map((d) => (d.id === id ? { ...d, ...data } : d))
+        );
+      }
       if (person?.id) {
         queryClient.invalidateQueries({ queryKey: ["people", person.id, "documents"] });
       }
+      queryClient.invalidateQueries({ queryKey: ["people"] });
     },
   });
 
@@ -806,8 +810,8 @@ function PersonFormDialog({
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3">
+          <div className="flex flex-col gap-4 w-full min-w-0">
+            <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3 w-full max-w-md">
               <Label className="text-white/50 text-xs uppercase tracking-wide">Profile image</Label>
               <p className="text-[11px] text-white/35">
                 Upload a profile image (jpg/png/webp). For new people, the image is uploaded right after you click Add Person.
@@ -839,7 +843,7 @@ function PersonFormDialog({
               ) : null}
             </div>
 
-            <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3 w-full min-w-0">
               <Label className="text-white/50 text-xs uppercase tracking-wide">Documents</Label>
               <p className="text-[11px] text-white/35">
                 Add passport, driver license, certificates, contracts, or other files.
@@ -863,14 +867,28 @@ function PersonFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="sm:col-span-3 space-y-1">
-                  <Label className="text-white/40 text-[10px]">Expiration (optional)</Label>
-                  <input
-                    type="date"
-                    value={docExpires}
-                    onChange={(e) => setDocExpires(e.target.value)}
-                    className="w-full sm:max-w-[200px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs"
-                  />
+                <div className="sm:col-span-3 space-y-2">
+                  <label className="flex items-center gap-2 text-[11px] text-white/55 cursor-pointer">
+                    <Checkbox
+                      checked={docDoesNotExpire}
+                      onCheckedChange={(v) => {
+                        setDocDoesNotExpire(v === true);
+                        if (v === true) setDocExpires("");
+                      }}
+                      className="border-white/30 data-[state=checked]:bg-violet-600"
+                    />
+                    <span>Does not expire</span>
+                  </label>
+                  <div className="space-y-1">
+                    <Label className="text-white/40 text-[10px]">Expiration (optional)</Label>
+                    <input
+                      type="date"
+                      value={docExpires}
+                      disabled={docDoesNotExpire}
+                      onChange={(e) => setDocExpires(e.target.value)}
+                      className="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs disabled:opacity-40"
+                    />
+                  </div>
                 </div>
                 <Input
                   type="file"
@@ -1026,6 +1044,42 @@ function PersonCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-white/90">{person.name}</span>
+          {person.documentExpiryHint
+            ? (() => {
+                const hint = person.documentExpiryHint;
+                if ("forever" in hint && hint.forever) {
+                  return (
+                    <Badge
+                      className="max-w-full border border-violet-500/50 bg-violet-800/40 text-violet-100 font-normal tabular-nums"
+                      title="Document marked as not expiring"
+                    >
+                      <span className="inline-block max-w-[10rem] truncate align-bottom">{hint.name}</span>
+                      <span className="whitespace-nowrap"> · ∞</span>
+                    </Badge>
+                  );
+                }
+                const dated = hint as { name: string; daysLeft: number; expired: boolean };
+                return (
+                  <Badge
+                    className={
+                      dated.expired
+                        ? "max-w-full border border-red-500/50 bg-red-800/50 text-red-100 font-normal"
+                        : "max-w-full border border-emerald-500/50 bg-emerald-600/30 text-emerald-100 font-normal"
+                    }
+                    title="Most urgent document with an expiration"
+                  >
+                    <span className="inline-block max-w-[10rem] truncate align-bottom">{dated.name}</span>
+                    <span className="whitespace-nowrap">
+                      {dated.expired
+                        ? " · Expired"
+                        : dated.daysLeft === 0
+                          ? " · Last day"
+                          : ` · ${dated.daysLeft}d left`}
+                    </span>
+                  </Badge>
+                );
+              })()
+            : null}
           <AffiliationBadge affiliation={person.affiliation ?? "internal"} />
           <RoleBadge role={person.role} />
           {!isActive ? (
