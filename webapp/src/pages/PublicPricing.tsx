@@ -149,7 +149,7 @@ export default function PublicPricing() {
           </p>
           <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-yellow">
             <li>Invoice generated on the 1st for the previous month</li>
-            <li>Payment due within 7 days</li>
+            <li>Payment is due within 7 days (automatic payment can be enabled)</li>
             <li>No credit card is required to start</li>
             <li>If you do not want to continue, simply stop paying</li>
             <li>If a negative balance remains unpaid for 30 days, the account may be permanently deleted</li>

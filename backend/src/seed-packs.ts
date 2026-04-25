@@ -65,7 +65,7 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
       "Billing is postpaid and based on real monthly usage.",
       "Every active user contributes billable usage days.",
       "Invoices are issued on the first day of each month for the previous month's usage.",
-      "Payment is due within 7 days unless your contract says otherwise.",
+      "Payment is due within 7 days (automatic payment can be enabled), unless your contract says otherwise.",
       "If an invoice is overdue, the organization becomes view-only until payment is completed.",
       "No credit card is required to start. If you stop paying, accounts with an unpaid negative balance for 30 days may be permanently deleted, including organization data.",
     ].join("\n\n"),
