@@ -217,8 +217,6 @@ export default function Pricing() {
                   : calculatedRows[currency] != null
                     ? String(calculatedRows[currency])
                     : "";
-              const rateLabel =
-                currency === form.baseCurrencyCode ? "1.000000" : fxRates[currency] != null ? fxRates[currency].toFixed(6) : "-";
               return (
                 <div
                   key={currency}
@@ -262,7 +260,7 @@ export default function Pricing() {
                   />
                   <Input
                     className="col-span-2 h-7 text-xs px-2"
-                    value={calculatedValue ? `${formatMajorFromCents(calculatedValue)} @ ${rateLabel}` : "-"}
+                    value={calculatedValue ? `${formatMajorFromCents(calculatedValue)}` : "-"}
                     readOnly
                   />
                 </div>
