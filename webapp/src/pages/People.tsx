@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
@@ -46,7 +46,11 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSession } from "@/lib/auth-client";
-import { PersonDocumentListRow, type PersonDocumentSavePatch } from "@/components/PersonDocumentListRow";
+import {
+  PersonDocumentListRow,
+  type PersonDocumentListRowHandle,
+  type PersonDocumentSavePatch,
+} from "@/components/PersonDocumentListRow";
 
 interface Team {
   id: string;
@@ -285,12 +289,16 @@ function PersonFormDialog({
   onOpenChange,
   person,
   onSuccess,
+  onPersonUpdated,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   person?: Person;
   onSuccess?: () => void;
+  /** Called after a successful **edit** save (dialog stays open). */
+  onPersonUpdated?: (p: Person) => void;
 }) {
+  const documentRowHandleMap = useRef(new Map<string, PersonDocumentListRowHandle>());
   const queryClient = useQueryClient();
   const { canWrite: canWriteOrg } = usePermissions();
   const { data: session } = useSession();
@@ -445,8 +453,13 @@ function PersonFormDialog({
       setDocDoesNotExpire(false);
       setDocType("other");
       setUploadError(null);
-      onOpenChange(false);
-      form.reset();
+      if (person) {
+        onPersonUpdated?.(result as Person);
+        toast({ title: "Changes saved" });
+      } else {
+        onOpenChange(false);
+        form.reset();
+      }
       onSuccess?.();
     },
     onError: (e: Error) => {
@@ -518,8 +531,18 @@ function PersonFormDialog({
     },
   });
 
-  function handleSubmit(values: PersonFormValues) {
+  async function handleSubmit(values: PersonFormValues) {
     setUploadError(null);
+    if (documentRowHandleMap.current.size > 0) {
+      const handles = [...documentRowHandleMap.current.values()];
+      try {
+        await Promise.all(handles.map((h) => h.saveIfDirty()));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Could not update document(s)";
+        toast({ title: msg, variant: "destructive" });
+        return;
+      }
+    }
     mutation.mutate(values);
   }
 
@@ -922,6 +945,10 @@ function PersonFormDialog({
                   {personDocuments.map((doc) => (
                     <PersonDocumentListRow
                       key={doc.id}
+                      ref={(h) => {
+                        if (h) documentRowHandleMap.current.set(doc.id, h);
+                        else documentRowHandleMap.current.delete(doc.id);
+                      }}
                       doc={doc}
                       canEdit={canEditPersonDocs}
                       isSaving={
@@ -945,6 +972,7 @@ function PersonFormDialog({
 
         <DialogFooter>
           <Button
+            type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             className="border-white/10 text-white/60 hover:text-white bg-transparent"
@@ -952,6 +980,7 @@ function PersonFormDialog({
             Cancel
           </Button>
           <Button
+            type="button"
             disabled={mutation.isPending}
             onClick={form.handleSubmit(handleSubmit)}
             className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
@@ -1380,6 +1409,7 @@ export default function People() {
           open={!!editPerson}
           onOpenChange={(v) => { if (!v) setEditPerson(null); }}
           person={editPerson}
+          onPersonUpdated={setEditPerson}
         />
       ) : null}
 

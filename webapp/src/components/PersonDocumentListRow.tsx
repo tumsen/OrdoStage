@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useImperativeHandle, forwardRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,14 +25,34 @@ type Props = {
   onDelete: (id: string) => void;
 };
 
-export function PersonDocumentListRow({
+export type PersonDocumentListRowHandle = {
+  /** Persists the row when there are unsaved changes (e.g. before the parent form saves). */
+  saveIfDirty: () => Promise<void>;
+};
+
+function buildSaveBody(
+  name: string,
+  doesNotExpire: boolean,
+  expires: string
+): PersonDocumentSavePatch {
+  return {
+    name: name.trim(),
+    doesNotExpire,
+    expiresAt: doesNotExpire ? null : expires.trim() || null,
+  };
+}
+
+export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Props>(function PersonDocumentListRow(
+  {
   doc,
   canEdit,
   isSaving,
   isDeleting,
   onSave,
   onDelete,
-}: Props) {
+}: Props,
+  ref
+) {
   const [name, setName] = useState(doc.name);
   const [expires, setExpires] = useState(() => formatDateForDateInput(doc.expiresAt ?? null));
   const [doesNotExpire, setDoesNotExpire] = useState(Boolean(doc.doesNotExpire));
@@ -53,6 +73,19 @@ export function PersonDocumentListRow({
   const docExp = docDne ? null : docDate;
   const dirty =
     name.trim() !== doc.name || doesNotExpire !== docDne || localExp !== docExp;
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      async saveIfDirty() {
+        if (!canEdit) return;
+        if (!name.trim() || isSaving) return;
+        if (!dirty) return;
+        await onSave(doc.id, buildSaveBody(name, doesNotExpire, expires));
+      },
+    }),
+    [canEdit, dirty, name, doesNotExpire, expires, isSaving, doc.id, onSave]
+  );
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-2 py-2 text-xs border-b border-white/5 last:border-0 w-full min-w-0">
@@ -136,12 +169,7 @@ export function PersonDocumentListRow({
               e.stopPropagation();
               const n = name.trim();
               if (!n || isSaving) return;
-              // Full snapshot (not a diff) so the server + cache always get a consistent state.
-              await onSave(doc.id, {
-                name: n,
-                doesNotExpire,
-                expiresAt: doesNotExpire ? null : (expires.trim() || null),
-              });
+              await onSave(doc.id, buildSaveBody(n, doesNotExpire, expires));
             }}
           >
             {isSaving ? "Saving…" : "Save"}
@@ -169,4 +197,4 @@ export function PersonDocumentListRow({
       </div>
     </div>
   );
-}
+});

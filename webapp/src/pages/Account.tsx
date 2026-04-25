@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
@@ -20,7 +20,11 @@ import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
 import { useI18n } from "@/lib/i18n";
 import type { Person, PersonDocument } from "../../../backend/src/types";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import { PersonDocumentListRow, type PersonDocumentSavePatch } from "@/components/PersonDocumentListRow";
+import {
+  PersonDocumentListRow,
+  type PersonDocumentListRowHandle,
+  type PersonDocumentSavePatch,
+} from "@/components/PersonDocumentListRow";
 
 const CONFIRM_PHRASE = "DELETE";
 
@@ -79,6 +83,8 @@ export default function Account() {
   const [docDoesNotExpire, setDocDoesNotExpire] = useState(false);
   const [docType, setDocType] = useState("other");
 
+  const documentRowHandleMap = useRef(new Map<string, PersonDocumentListRowHandle>());
+
   const { data: mePerson } = useQuery<Person | null>({
     queryKey: ["people", "me"],
     queryFn: () => api.get<Person | null>("/api/people/me"),
@@ -118,6 +124,10 @@ export default function Account() {
   const saveProfileMutation = useMutation({
     mutationFn: async () => {
       if (!mePerson) return;
+      const docHandles = [...documentRowHandleMap.current.values()];
+      if (docHandles.length) {
+        await Promise.all(docHandles.map((h) => h.saveIfDirty()));
+      }
       await api.put(`/api/people/${mePerson.id}`, {
         name: profileDraft.name.trim(),
         phone: profileDraft.phone.trim() || undefined,
@@ -415,6 +425,10 @@ export default function Account() {
                     {myDocs.map((doc) => (
                       <PersonDocumentListRow
                         key={doc.id}
+                        ref={(h) => {
+                          if (h) documentRowHandleMap.current.set(doc.id, h);
+                          else documentRowHandleMap.current.delete(doc.id);
+                        }}
                         doc={doc}
                         canEdit
                         isSaving={updateDocMutation.isPending && updateDocMutation.variables?.id === doc.id}
