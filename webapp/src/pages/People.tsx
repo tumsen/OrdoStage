@@ -12,7 +12,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
+import { BillingSummary, type OrgBillingPayload } from "@/components/BillingSummary";
 import type { Person, PersonDocument } from "../../../backend/src/types";
 import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
 import { Button } from "@/components/ui/button";
@@ -1251,9 +1251,6 @@ function PersonCard({
   canEditPerson,
   canDeletePerson,
   canSeeDocumentSummaries,
-  deactivateCreditCost,
-  creditsBalance,
-  unlimitedCredits,
 }: {
   person: Person;
   onEdit: () => void;
@@ -1261,9 +1258,6 @@ function PersonCard({
   canEditPerson: boolean;
   canDeletePerson: boolean;
   canSeeDocumentSummaries: boolean;
-  deactivateCreditCost: number;
-  creditsBalance: number;
-  unlimitedCredits: boolean;
 }) {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
@@ -1294,14 +1288,6 @@ function PersonCard({
     if (!canWrite) return;
     if (checked) {
       activeMutation.mutate(true);
-      return;
-    }
-    if (!unlimitedCredits && creditsBalance < deactivateCreditCost) {
-      toast({
-        title: "Not enough credits",
-        description: `Deactivating costs ${deactivateCreditCost} credits. Top up under Account.`,
-        variant: "destructive",
-      });
       return;
     }
     setDeactivateOpen(true);
@@ -1450,14 +1436,6 @@ function PersonCard({
               <p>
                 Inactive contacts stay in your directory but are marked inactive. Reactivating is free.
               </p>
-              {!unlimitedCredits ? (
-                <p className="text-amber-200/90">
-                  This action uses <strong>{deactivateCreditCost}</strong> credits from your organisation balance
-                  (currently {creditsBalance}).
-                </p>
-              ) : (
-                <p className="text-white/45">Your organisation has unlimited credits.</p>
-              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1470,7 +1448,7 @@ function PersonCard({
               disabled={activeMutation.isPending}
               onClick={() => activeMutation.mutate(false)}
             >
-              {activeMutation.isPending ? "Working…" : `Deactivate (${deactivateCreditCost} credits)`}
+              {activeMutation.isPending ? "Working…" : "Deactivate"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1495,15 +1473,10 @@ export default function People() {
     queryFn: () => api.get<Person[]>("/api/people"),
   });
 
-  const { data: orgCredits, isLoading: orgLoading } = useQuery({
+  const { data: orgInfo, isLoading: orgLoading } = useQuery<OrgBillingPayload>({
     queryKey: ["org"],
-    queryFn: () =>
-      api.get<OrgCreditsPayload & { deactivatePersonCredits?: number }>("/api/org"),
+    queryFn: () => api.get<OrgBillingPayload>("/api/org"),
   });
-
-  const deactivateCost = orgCredits?.deactivatePersonCredits ?? 20;
-  const creditBal = orgCredits?.credits ?? 0;
-  const orgUnlimited = Boolean(orgCredits?.unlimitedCredits);
 
   const sortedPeople = useMemo(
     () => sortPeopleList(people ?? [], sortMode),
@@ -1520,7 +1493,7 @@ export default function People() {
 
   return (
     <div className="p-6 space-y-6">
-      <CreditsSummary org={orgCredits} isLoading={orgLoading} variant="compact" className="max-w-3xl" />
+      <BillingSummary org={orgInfo} isLoading={orgLoading} variant="compact" className="max-w-3xl" />
 
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -1598,9 +1571,6 @@ export default function People() {
                 canEditPerson={canEditPerson}
                 canDeletePerson={canDeletePerson}
                 canSeeDocumentSummaries={canWrite}
-                deactivateCreditCost={deactivateCost}
-                creditsBalance={creditBal}
-                unlimitedCredits={orgUnlimited}
               />
                 );
               })()

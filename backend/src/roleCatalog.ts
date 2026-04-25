@@ -27,9 +27,9 @@ export const ACTION_DEFS: {
   { id: "write.calendars", label: "Manage share links & calendars", group: "content" },
   { id: "write.departments", label: "Manage teams & who is on each team", group: "content" },
   { id: "team.invite", label: "Invite users & manage org members", group: "team" },
-  { id: "billing.view", label: "View billing & credits", group: "billing" },
-  { id: "billing.manage", label: "Purchase credits & billing settings", group: "billing" },
-  { id: "org.policies", label: "Org policies (e.g. deactivate credit cost)", group: "organization" },
+  { id: "billing.view", label: "View billing", group: "billing" },
+  { id: "billing.manage", label: "Manage billing settings", group: "billing" },
+  { id: "org.policies", label: "Org policies", group: "organization" },
   { id: "org.update", label: "Rename and general organization settings", group: "organization" },
   { id: "org.delete", label: "Delete the entire organization", group: "organization" },
   { id: "roles.manage", label: "Create & edit permission groups (except system groups)", group: "organization" },
@@ -45,7 +45,7 @@ function allExceptViews(exclude: string[]): string[] {
 
 const ALL_ACTIONS_SET = ALL_ACTION_IDS;
 
-/** Default sets when no DB row exists (legacy). */
+/** Default sets when no DB row exists (backward compatibility). */
 export const LEGACY_PRESETS: Record<
   string,
   { views: string[]; actions: string[] }

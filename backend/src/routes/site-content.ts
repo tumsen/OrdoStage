@@ -25,7 +25,7 @@ function isLegacyLegalPlaceholder(key: string, dbValue: string): boolean {
     );
   }
   if (key === "refund_content") {
-    return v.startsWith("## Refund Policy") || v.includes("Credit-pack purchases are generally non-refundable once credits are delivered.");
+    return v.startsWith("## Refund Policy");
   }
   return false;
 }

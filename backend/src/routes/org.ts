@@ -2,18 +2,11 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
-import { deductCredits } from "../credits";
-import { getSignupCreditsForNewOrg } from "../signupCredits";
-import { env } from "../env";
 import { canAction } from "../requestRole";
 import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
-import { maybeEnqueueAutoTopUp } from "../autoTopup";
 import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 import { DistanceUnitSchema, LanguageSchema, TimeFormatSchema } from "../types";
-
-const OrgPoliciesSchema = z.object({
-  deactivatePersonCredits: z.number().int().min(0).max(1_000_000),
-});
+import { enforceOverdueAccess, getBillingConfig, recordDailyUsageSnapshot } from "../postpaidBilling";
 
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -197,24 +190,11 @@ app.post("/org/switch", async (c) => {
   return c.json({ data: { ok: true, organizationId, orgRole: mem.orgRole } });
 });
 
-// GET /api/org — get current org info + credit status
+// GET /api/org — get current org info + billing status
 app.get("/org", async (c) => {
   const user = c.get("user");
   if (!user) return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   if (!user.organizationId) return c.json({ error: { message: "No organization", code: "NO_ORG" } }, 404);
-
-  const unlimitedEmails = [
-    "tumsen@gmail.com",
-    ...env.UNLIMITED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
-  ];
-  if (unlimitedEmails.includes(user.email.toLowerCase())) {
-    await prisma.organization.update({
-      where: { id: user.organizationId },
-      data: { unlimitedCredits: true, creditBalance: 999999999 },
-    });
-  }
-
-  const credits = await deductCredits(user.organizationId);
 
   const activeUserCount = await prisma.organizationMembership.count({
     where: {
@@ -223,9 +203,14 @@ app.get("/org", async (c) => {
     },
   });
 
-  const origin =
-    c.req.header("origin") || env.FRONTEND_URL || env.BACKEND_URL || "http://localhost:5173";
-  await maybeEnqueueAutoTopUp(user.organizationId, origin);
+  await recordDailyUsageSnapshot(prisma);
+  const viewOnly = await enforceOverdueAccess(prisma, user.organizationId);
+  const billingConfig = await getBillingConfig(prisma);
+  const openInvoice = await prisma.billingInvoice.findFirst({
+    where: { organizationId: user.organizationId, status: { in: ["issued", "overdue"] } },
+    orderBy: { issuedAt: "desc" },
+    include: { lines: true },
+  });
 
   const org = await prisma.organization.findUnique({
     where: { id: user.organizationId },
@@ -236,57 +221,23 @@ app.get("/org", async (c) => {
     return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
   }
 
-  const unlimited = Boolean(org.unlimitedCredits);
-  const estimatedDaysRemaining = unlimited
-    ? null
-    : activeUserCount > 0
-      ? Math.floor(credits.balance / activeUserCount)
-      : credits.balance;
-
   return c.json({
     data: {
       ...org,
-      ...credits,
-      credits: credits.balance,
       userCount: activeUserCount,
-      dailyCreditsUsed: activeUserCount,
-      estimatedDaysRemaining,
-      pendingAutoTopUpUrl: org.pendingAutoTopUpUrl ?? null,
-      autoTopUpEnabled: org.autoTopUpEnabled ?? false,
-      autoTopUpPackId: org.autoTopUpPackId ?? null,
-      autoTopUpThreshold: org.autoTopUpThreshold ?? 30,
+      isViewOnlyDueToBilling: viewOnly,
+      billingStatus: org.billingStatus,
+      paymentDueDays: billingConfig.paymentDueDays,
+      openInvoice,
     },
   });
 });
 
 const BillingSettingsSchema = z.object({
-  autoTopUpEnabled: z.boolean().optional(),
-  autoTopUpPackId: z.string().min(1).nullable().optional(),
-  autoTopUpThreshold: z.number().int().min(0).max(1_000_000).optional(),
-});
-
-// PATCH /api/org/policies
-app.patch("/org/policies", async (c) => {
-  const user = c.get("user");
-  if (!user?.organizationId) {
-    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  }
-
-  if (!canAction(c, "org.policies")) {
-    return c.json(
-      { error: { message: "You do not have permission to change organization policies", code: "FORBIDDEN" } },
-      403
-    );
-  }
-
-  const body = OrgPoliciesSchema.parse(await c.req.json().catch(() => ({})));
-
-  await prisma.organization.update({
-    where: { id: user.organizationId },
-    data: { deactivatePersonCredits: body.deactivatePersonCredits },
-  });
-
-  return c.json({ data: { ok: true } });
+  customUserDailyRateCents: z.number().int().min(1).nullable().optional(),
+  customDiscountPercent: z.number().int().min(0).max(100).nullable().optional(),
+  customFlatRateCents: z.number().int().min(1).nullable().optional(),
+  customFlatRateMaxUsers: z.number().int().min(1).nullable().optional(),
 });
 
 // PATCH /api/org/billing-settings
@@ -304,15 +255,7 @@ app.patch("/org/billing-settings", async (c) => {
   }
 
   const body = BillingSettingsSchema.parse(await c.req.json().catch(() => ({})));
-
-  const data: {
-    autoTopUpEnabled?: boolean;
-    autoTopUpPackId?: string | null;
-    autoTopUpThreshold?: number;
-  } = {};
-  if (body.autoTopUpEnabled !== undefined) data.autoTopUpEnabled = body.autoTopUpEnabled;
-  if (body.autoTopUpPackId !== undefined) data.autoTopUpPackId = body.autoTopUpPackId;
-  if (body.autoTopUpThreshold !== undefined) data.autoTopUpThreshold = body.autoTopUpThreshold;
+  const data = body;
 
   if (Object.keys(data).length === 0) {
     return c.json({ error: { message: "No changes", code: "BAD_REQUEST" } }, 400);
@@ -589,20 +532,9 @@ app.post("/org", async (c) => {
   const body = await c.req.json();
   const { name } = z.object({ name: z.string().min(1).max(200) }).parse(body);
 
-  const unlimitedEmails = [
-    "tumsen@gmail.com",
-    ...env.UNLIMITED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
-  ];
-  const isUnlimited = unlimitedEmails.includes(user.email.toLowerCase());
-
-  const signupCredits = await getSignupCreditsForNewOrg();
-
   const org = await prisma.organization.create({
     data: {
       name: name.trim(),
-      ...(isUnlimited
-        ? { unlimitedCredits: true, creditBalance: 999999999 }
-        : { creditBalance: signupCredits }),
     },
   });
 

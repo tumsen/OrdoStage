@@ -103,7 +103,7 @@ documentsRouter.post("/events/:eventId/documents", async (c) => {
   );
 });
 
-// GET /api/documents/:id/download — serve file (public GET, no credit block)
+// GET /api/documents/:id/download — serve file
 documentsRouter.get("/documents/:id/download", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)

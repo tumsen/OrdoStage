@@ -4,16 +4,17 @@ import { Link } from "react-router-dom";
 import { api, isApiError } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Users, DollarSign, CreditCard, AlertTriangle } from "lucide-react";
+import { Building2, Users, DollarSign, Receipt, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-interface RecentPurchase {
+interface RecentInvoice {
   id: string;
   organizationId: string;
-  days: number;
-  amountCents: number;
-  createdAt: string;
+  totalCents: number;
+  issuedAt: string;
+  dueAt: string;
+  status: string;
   organization: { name: string };
 }
 
@@ -22,15 +23,15 @@ interface AdminStats {
   totalUsers: number;
   totalPeople: number;
   totalRevenueCents: number;
-  recentPurchases: RecentPurchase[];
+  recentInvoices: RecentInvoice[];
+  openInvoices: number;
 }
 
 interface OrgSummary {
   id: string;
   name: string;
-  creditBalance: number;
-  unlimitedCredits?: boolean;
-  freeTrialUsed: boolean;
+  billingStatus: string;
+  billingDueAt?: string | null;
   createdAt: string;
   _count: { users: number; events: number };
 }
@@ -85,14 +86,7 @@ export default function Dashboard() {
     queryFn: () => api.get<OrgSummary[]>("/api/admin/orgs"),
   });
 
-  const lowCreditOrgs = orgs?.filter((o) => !o.unlimitedCredits && o.creditBalance < 30) ?? [];
-
-  const finiteOrgs = (orgs ?? []).filter((o) => !o.unlimitedCredits);
-  const hasUnlimitedOrg = (orgs ?? []).some((o) => Boolean(o.unlimitedCredits));
-  const avgCreditBalance =
-    finiteOrgs.length > 0
-      ? Math.round(finiteOrgs.reduce((sum, o) => sum + o.creditBalance, 0) / finiteOrgs.length)
-      : 0;
+  const overdueOrgs = orgs?.filter((o) => o.billingStatus === "overdue_view_only") ?? [];
 
   const testEmailMutation = useMutation({
     mutationFn: (to: string) => api.post<{ ok: boolean }>("/api/admin/email/test", { to }),
@@ -143,42 +137,44 @@ export default function Dashboard() {
           accent
         />
         <StatCard
-          title="Avg Credit Balance"
-          value={hasUnlimitedOrg ? "∞ days" : `${avgCreditBalance} days`}
-          icon={CreditCard}
+          title="Open Invoices"
+          value={stats?.openInvoices ?? 0}
+          icon={Receipt}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Purchases */}
+        {/* Recent invoices */}
         <Card className="bg-gray-900 border border-white/10">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-white/70 uppercase tracking-wider">
-              Recent Purchases
+              Recent Invoices
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {!stats?.recentPurchases?.length ? (
-              <div className="px-6 py-8 text-center text-white/30 text-sm">No purchases yet</div>
+            {!stats?.recentInvoices?.length ? (
+              <div className="px-6 py-8 text-center text-white/30 text-sm">No invoices yet</div>
             ) : (
               <div className="divide-y divide-white/5">
-                {stats.recentPurchases.slice(0, 10).map((purchase) => (
-                  <div key={purchase.id} className="px-6 py-3 flex items-center justify-between gap-3">
+                {stats.recentInvoices.slice(0, 10).map((invoice) => (
+                  <div key={invoice.id} className="px-6 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <Link
-                        to={`/admin/orgs/${purchase.organizationId}`}
+                        to={`/admin/orgs/${invoice.organizationId}`}
                         className="text-sm text-white/80 hover:text-rose-300 truncate block transition-colors"
                       >
-                        {purchase.organization.name}
+                        {invoice.organization.name}
                       </Link>
-                      <div className="text-xs text-white/30 mt-0.5">{formatDate(purchase.createdAt)}</div>
+                      <div className="text-xs text-white/30 mt-0.5">
+                        Issued {formatDate(invoice.issuedAt)} · Due {formatDate(invoice.dueAt)}
+                      </div>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      <Badge className="bg-green-950/60 text-green-400 border-green-800/40 text-xs">
-                        +{purchase.days}d
+                      <Badge className="bg-white/10 text-white/70 border-white/20 text-xs">
+                        {invoice.status}
                       </Badge>
                       <span className="text-white/60 text-sm font-medium">
-                        €{(purchase.amountCents / 100).toFixed(2)}
+                        €{(invoice.totalCents / 100).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -188,15 +184,15 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Low Credit Alert */}
+        {/* Overdue alert */}
         <Card className="bg-gray-900 border border-white/10">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-white/70 uppercase tracking-wider flex items-center gap-2">
               <AlertTriangle size={14} className="text-amber-400" />
-              Low Credit Alerts
-              {lowCreditOrgs.length > 0 ? (
+              Overdue Billing Alerts
+              {overdueOrgs.length > 0 ? (
                 <Badge className="bg-amber-950/60 text-amber-400 border-amber-800/40 ml-1">
-                  {lowCreditOrgs.length}
+                  {overdueOrgs.length}
                 </Badge>
               ) : null}
             </CardTitle>
@@ -208,23 +204,15 @@ export default function Dashboard() {
                   <div key={i} className="h-12 bg-white/5 rounded animate-pulse" />
                 ))}
               </div>
-            ) : lowCreditOrgs.length === 0 ? (
-              <div className="px-6 py-8 text-center text-white/30 text-sm">All organizations have sufficient credits</div>
+            ) : overdueOrgs.length === 0 ? (
+              <div className="px-6 py-8 text-center text-white/30 text-sm">No organizations are overdue</div>
             ) : (
               <div className="divide-y divide-white/5">
-                {lowCreditOrgs.map((org) => (
+                {overdueOrgs.map((org) => (
                   <div key={org.id} className="px-6 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm text-white/80 truncate">{org.name}</div>
-                      <div
-                        className={`text-xs mt-0.5 ${
-                          org.creditBalance <= 0
-                            ? "text-red-400"
-                            : "text-amber-400"
-                        }`}
-                      >
-                        {org.creditBalance <= 0 ? "No credits" : `${org.creditBalance} days left`}
-                      </div>
+                      <div className="text-xs mt-0.5 text-red-400">View-only until invoice is paid</div>
                     </div>
                     <Button
                       asChild

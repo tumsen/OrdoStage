@@ -5,13 +5,6 @@ import {
   DEFAULT_TERMS_CONTENT,
 } from "./legal-defaults";
 
-const DEFAULT_PACKS = [
-  { packId: "pack_100", days: 100, amountCents: 900, label: "100 days" },
-  { packId: "pack_500", days: 500, amountCents: 3900, label: "500 days" },
-  { packId: "pack_1000", days: 1000, amountCents: 6900, label: "1000 days" },
-  { packId: "pack_5000", days: 5000, amountCents: 29900, label: "5000 days" },
-];
-
 const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   { key: "landing_title", value: "OrdoStage" },
   {
@@ -46,10 +39,6 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   { key: "terms_content", value: DEFAULT_TERMS_CONTENT },
   { key: "privacy_content", value: DEFAULT_PRIVACY_CONTENT },
   { key: "refund_content", value: DEFAULT_REFUND_CONTENT },
-  /** Default credits charged to deactivate a person (orgs inherit via DB default; owners can override). */
-  { key: "person_deactivate_credit_default", value: "20" },
-  /** Credits for new organisations (also shown on marketing pages). */
-  { key: "signup_credits", value: "30" },
   { key: "company_brand", value: "Ordo Stage" },
   { key: "company_entity", value: "Schwifty" },
   { key: "company_address", value: "Strandgade 1, 5700 Svendborg, Denmark" },
@@ -57,7 +46,7 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   { key: "company_email", value: "mail@ordostage.com" },
   {
     key: "pricing_page_title",
-    value: "Simple pricing that grows with your team",
+    value: "Postpaid pricing that scales with usage",
   },
   /** Global (English row is source of truth; merged for all languages). 1 = on, 0 = off. */
   { key: "public_maintenance_mode", value: "0" },
@@ -73,19 +62,18 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   {
     key: "pricing_intro",
     value: [
-      "No subscriptions, no surprises. Just credits — buy a pack and use them as you need.",
-      "When you create an account, you get {{signup_credits}} credits free to test the system.",
-      "You can also enable automatic top-up under Billing in your organisation: choose a credit pack and a balance threshold. When credits fall to that level, we open a checkout so you can refill before work stops — a simple way to keep credits on the account without watching the balance every day.",
-      "Every active user costs 1 credit per day. Add as many people as your project needs, and only pay for who's actually active.",
-      "Need to pause someone? Deactivating a user costs {{deactivate_credits}} credits. Their info stays safe, and bringing them back is completely free.",
-      "Want to remove someone entirely? Deleting a user is free — though keep in mind it permanently removes them and all their data.",
+      "Billing is postpaid and based on real monthly usage.",
+      "Every active user contributes billable usage days.",
+      "Invoices are issued on the first day of each month for the previous month's usage.",
+      "Payment is due within 7 days unless your contract says otherwise.",
+      "If an invoice is overdue, the organization becomes view-only until payment is completed.",
     ].join("\n\n"),
   },
   {
     key: "pricing_notes",
     value: [
-      "You'll need at least one active user to keep your account editable.",
-      "If your balance dips to −30 credits, your account switches to view-only mode. Top it up within 30 days and everything goes back to normal — wait longer and the account may be permanently deleted.",
+      "Owner admins can set default per-user rates, discounts, and optional flat-rate deals.",
+      "Organization-level custom pricing can override global defaults.",
     ].join("\n"),
   },
 ];
@@ -96,14 +84,6 @@ export function getDefaultSiteContentMap(): Record<string, string> {
 }
 
 export async function seedPacks() {
-  for (const pack of DEFAULT_PACKS) {
-    await prisma.pricePack.upsert({
-      where: { packId: pack.packId },
-      update: {},
-      create: pack,
-    });
-  }
-
   for (const item of DEFAULT_SITE_CONTENT) {
     await prisma.siteContent.upsert({
       where: { key_locale: { key: item.key, locale: "en" } },

@@ -1,6 +1,6 @@
 type OrgRoleInput = string | null | undefined;
 
-/** Roles that may create/update org data. Includes `member` (legacy Prisma default before team roles). */
+/** Roles that may create/update org data. Includes `member` for backward compatibility. */
 export function canWrite(orgRole: OrgRoleInput): boolean {
   if (orgRole == null) return false;
   return ["owner", "manager", "member"].includes(orgRole);

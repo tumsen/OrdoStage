@@ -23,7 +23,7 @@ export async function sendInvoiceEmail(data: InvoiceData, pdfBytes: Uint8Array):
     <div style="font-family:sans-serif;color:#1a1a2e;max-width:520px">
       <h2 style="color:#9e1e8e;margin-bottom:4px">Thank you for your purchase!</h2>
       <p style="color:#555">Hi ${data.buyerName},</p>
-      <p>Your payment for <strong>${data.packLabel}</strong> (${data.days} credit days) has been confirmed.</p>
+      <p>Your payment for <strong>${data.packLabel}</strong> (${data.days} usage days) has been confirmed.</p>
       <p><strong>Invoice number:</strong> ${data.invoiceNumber}<br/>
          <strong>Amount:</strong> €${(data.amountCents / 100).toFixed(2)}<br/>
          <strong>Date:</strong> ${data.date.toLocaleDateString("en-GB", { dateStyle: "long" })}</p>

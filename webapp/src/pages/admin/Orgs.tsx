@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, isApiError } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,13 +20,11 @@ import { confirmDeleteOrganizationByName } from "@/lib/deleteConfirm";
 interface OrgSummary {
   id: string;
   name: string;
-  creditBalance: number;
-  unlimitedCredits?: boolean;
-  discountPercent: number;
-  freeTrialUsed: boolean;
+  billingStatus: string;
+  customDiscountPercent: number | null;
+  customFlatRateCents: number | null;
+  customFlatRateMaxUsers: number | null;
   createdAt: string;
-  totalPurchasedDays: number;
-  totalPurchasedCents: number;
   _count: { users: number; events: number; people: number; memberships?: number };
 }
 
@@ -39,31 +36,17 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function CreditBadge({ balance, unlimited }: { balance: number; unlimited?: boolean }) {
-  if (unlimited) {
-    return (
-      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
-        ∞
-      </span>
-    );
-  }
-  if (balance <= 0) {
+function BillingBadge({ status }: { status: string }) {
+  if (status === "overdue_view_only") {
     return (
       <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-950/60 text-red-400 border border-red-800/40">
-        {balance}d
-      </span>
-    );
-  }
-  if (balance <= 30) {
-    return (
-      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-950/60 text-amber-400 border border-amber-800/40">
-        {balance}d
+        overdue
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-950/60 text-green-400 border border-green-800/40">
-      {balance}d
+    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
+      {status}
     </span>
   );
 }
@@ -174,10 +157,9 @@ export default function Orgs() {
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Users</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">People</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Events</TableHead>
-              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Credits</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Billing</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Discount</TableHead>
-              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Purchased</TableHead>
-              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Free Trial</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Flat rate</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Created</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider text-right">Actions</TableHead>
             </TableRow>
@@ -209,20 +191,15 @@ export default function Orgs() {
                   <TableCell className="text-white/50">{org._count.people}</TableCell>
                   <TableCell className="text-white/50">{org._count.events}</TableCell>
                   <TableCell>
-                    <CreditBadge balance={org.creditBalance} unlimited={org.unlimitedCredits} />
+                    <BillingBadge status={org.billingStatus} />
                   </TableCell>
                   <TableCell className="text-white/50">
-                    {org.discountPercent > 0 ? `${org.discountPercent}%` : "—"}
+                    {org.customDiscountPercent != null ? `${org.customDiscountPercent}%` : "—"}
                   </TableCell>
                   <TableCell className="text-white/50 text-sm">
-                    {org.totalPurchasedDays}d / €{(org.totalPurchasedCents / 100).toFixed(0)}
-                  </TableCell>
-                  <TableCell>
-                    {org.freeTrialUsed ? (
-                      <Badge className="bg-white/5 text-white/40 border-white/10 text-xs">Used</Badge>
-                    ) : (
-                      <Badge className="bg-blue-950/60 text-blue-400 border-blue-800/40 text-xs">Available</Badge>
-                    )}
+                    {org.customFlatRateCents != null
+                      ? `€${(org.customFlatRateCents / 100).toFixed(2)}${org.customFlatRateMaxUsers ? ` / max ${org.customFlatRateMaxUsers} users` : ""}`
+                      : "—"}
                   </TableCell>
                   <TableCell className="text-white/40 text-sm">{formatDate(org.createdAt)}</TableCell>
                   <TableCell className="text-right">

@@ -382,7 +382,7 @@ function compareDocumentSummaries(a: PersonDocumentListSummary, b: PersonDocumen
   return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 }
 
-/** List rows the legacy single-badge hint can use (same as old OR: DNE or has expires). */
+/** List rows that the single-badge hint can use (DNE or has expiry). */
 function listDocRowsForExpiryHintFilter(rows: ListDocRow[]) {
   return rows.filter((r) => r.doesNotExpire || (r.expiresAt != null && !r.doesNotExpire));
 }
@@ -605,7 +605,7 @@ peopleRouter.get("/people/:id", async (c) => {
   return c.json({ data: serializePerson(person) });
 });
 
-// PATCH /api/people/:id/active — deactivate costs credits (owner setting); activate is free
+// PATCH /api/people/:id/active
 peopleRouter.patch("/people/:id/active", zValidator("json", PersonActiveSchema), async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
@@ -633,51 +633,10 @@ peopleRouter.patch("/people/:id/active", zValidator("json", PersonActiveSchema),
     return c.json({ data: serializePerson(full!) });
   }
 
-  if (!active) {
-    const org = await prisma.organization.findUnique({ where: { id: user.organizationId } });
-    if (!org) return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
-
-    const cost = org.deactivatePersonCredits ?? 20;
-    if (!org.unlimitedCredits && org.creditBalance < cost) {
-      return c.json(
-        {
-          error: {
-            message: `Not enough credits to deactivate (${cost} required).`,
-            code: "INSUFFICIENT_CREDITS",
-            creditsRequired: cost,
-            balance: org.creditBalance,
-          },
-        },
-        402
-      );
-    }
-
-    await prisma.$transaction(async (tx) => {
-      if (!org.unlimitedCredits) {
-        await tx.organization.update({
-          where: { id: org.id },
-          data: { creditBalance: org.creditBalance - cost },
-        });
-        await tx.creditLog.create({
-          data: {
-            organizationId: org.id,
-            delta: -cost,
-            reason: "person_deactivate",
-            note: `${existing.name} (${existing.id})`,
-          },
-        });
-      }
-      await tx.person.update({
-        where: { id },
-        data: { isActive: false },
-      });
-    });
-  } else {
-    await prisma.person.update({
-      where: { id },
-      data: { isActive: true },
-    });
-  }
+  await prisma.person.update({
+    where: { id },
+    data: { isActive: active },
+  });
 
   const updated = await prisma.person.findUnique({
     where: { id },

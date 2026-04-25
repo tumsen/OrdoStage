@@ -76,31 +76,23 @@ model Organization {
   defaultLanguage  String             @default("en")
   defaultTimeFormat String            @default("24h")
   defaultDistanceUnit String          @default("km")
-  creditBalance    Int                @default(0)
-  lastDeductedAt   DateTime           @default(now())
   users            User[]
   memberships      OrganizationMembership[]
   venues           Venue[]
   events           Event[]
   people           Person[]
   calendars        Calendar[]
-  creditPurchases  CreditPurchase[]
-  creditLogs       CreditLog[]
   internalBookings InternalBooking[]
   departments      Department[]
   tours            Tour[]
-  freeTrialUsed    Boolean            @default(false)
-  unlimitedCredits Boolean            @default(false)
-  discountPercent  Int                @default(0)
-  discountNote     String?
-  autoTopUpEnabled         Boolean   @default(false)
-  autoTopUpPackId          String?
-  autoTopUpThreshold       Int       @default(30)
-  autoTopUpLastAttemptAt   DateTime?
-  pendingAutoTopUpUrl      String?
-  pendingAutoTopUpCreatedAt DateTime?
-  /** Credits charged when setting a person inactive (owner-configurable; default 20). */
-  deactivatePersonCredits Int              @default(20)
+  /** New postpaid billing mode/status. */
+  billingStatus    String             @default("active")
+  billingDueAt     DateTime?
+  billingViewOnlySince DateTime?
+  customUserDailyRateCents Int?
+  customDiscountPercent   Int?
+  customFlatRateCents     Int?
+  customFlatRateMaxUsers  Int?
   /** Company / invoice information (optional — used on generated PDF invoices). */
   invoiceName      String?
   invoiceStreet    String?
@@ -120,6 +112,70 @@ model Organization {
   updatedAt        DateTime           @updatedAt
   invitations      OrganizationInvitation[]
   roleDefinitions  RoleDefinition[]
+  invoices         BillingInvoice[]
+  usageSnapshots   BillingUsageSnapshot[]
+}
+
+model BillingConfig {
+  /** Singleton config row with id = "default". */
+  id                    String   @id
+  defaultUserDailyRateCents Int  @default(1500)
+  defaultDiscountPercent Int    @default(0)
+  defaultFlatRateCents   Int?
+  defaultFlatRateMaxUsers Int?
+  paymentDueDays         Int     @default(7)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model BillingUsageSnapshot {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  snapshotDate   DateTime
+  activeUsers    Int
+  userDailyRateCents Int
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, snapshotDate])
+  @@index([snapshotDate])
+}
+
+model BillingInvoice {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  periodStart    DateTime
+  periodEnd      DateTime
+  issuedAt       DateTime     @default(now())
+  dueAt          DateTime
+  status         String       @default("issued") // issued | paid | overdue | cancelled
+  subtotalCents  Int
+  discountPercent Int         @default(0)
+  discountCents  Int          @default(0)
+  totalCents     Int
+  currency       String       @default("EUR")
+  paddleInvoiceId String?
+  paidAt         DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  lines          BillingInvoiceLine[]
+
+  @@index([organizationId, status])
+  @@index([issuedAt])
+}
+
+model BillingInvoiceLine {
+  id             String         @id @default(cuid())
+  invoiceId      String
+  invoice        BillingInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  userId         String?
+  userName       String?
+  userEmail      String?
+  daysConsumed   Int
+  rateCents      Int
+  subtotalCents  Int
+  createdAt      DateTime @default(now())
 }
 
 /** User membership in an organization (role is per org). `User.organizationId` is the active workspace. */
@@ -173,25 +229,6 @@ model OrganizationInvitation {
   acceptedAt     DateTime?
 
   @@index([organizationId, email])
-}
-
-model CreditPurchase {
-  id              String        @id @default(cuid())
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  days            Int
-  amountCents     Int
-  paddleTransactionId String?   @unique
-  /** Sequential invoice number (e.g. INV-0001). */
-  invoiceNumber   String?       @unique
-  /** Snapshots taken at purchase time so the record survives org deletion. */
-  orgNameSnapshot        String?
-  invoiceNameSnapshot    String?
-  invoiceAddressSnapshot String?
-  invoiceVatSnapshot     String?
-  invoiceEmailSnapshot   String?
-  packLabelSnapshot      String?
-  createdAt       DateTime     @default(now())
 }
 
 // App models - all scoped to an organization
@@ -356,28 +393,6 @@ model Calendar {
   filter         String?
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-}
-
-// Tracks all credit changes for audit trail
-model CreditLog {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  delta          Int
-  reason         String
-  note           String?
-  adminUserId    String?
-  createdAt      DateTime     @default(now())
-}
-
-// Configurable day pack prices
-model PricePack {
-  id          String  @id @default(cuid())
-  packId      String  @unique
-  days        Int
-  amountCents Int
-  label       String
-  active      Boolean @default(true)
 }
 
 model SiteContent {

@@ -621,9 +621,9 @@ export default function Account() {
 
       <div id="billing" className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
         <div>
-          <p className="text-sm font-medium text-white">Billing & credits</p>
+          <p className="text-sm font-medium text-white">Billing</p>
           <p className="text-xs text-white/50 mt-1">
-            Manage top-up packs, low-credit automation, and organization billing options.
+            Manage monthly invoicing, organization billing options, and payment status.
           </p>
         </div>
         <Billing embedded />

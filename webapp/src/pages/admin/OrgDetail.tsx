@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
@@ -8,15 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, CreditCard } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface OrgUser {
@@ -27,34 +20,38 @@ interface OrgUser {
   createdAt: string;
 }
 
-interface CreditLog {
+interface InvoiceLine {
   id: string;
-  delta: number;
-  reason: string;
-  note: string | null;
-  adminUserId: string | null;
-  createdAt: string;
+  userName: string | null;
+  userEmail: string | null;
+  daysConsumed: number;
+  rateCents: number;
+  subtotalCents: number;
 }
-
-interface CreditPurchase {
+interface Invoice {
   id: string;
-  days: number;
-  amountCents: number;
-  createdAt: string;
+  issuedAt: string;
+  dueAt: string;
+  status: string;
+  subtotalCents: number;
+  discountPercent: number;
+  discountCents: number;
+  totalCents: number;
+  lines: InvoiceLine[];
 }
 
 interface OrgDetail {
   id: string;
   name: string;
-  creditBalance: number;
-  unlimitedCredits: boolean;
-  discountPercent: number;
-  discountNote: string | null;
-  freeTrialUsed: boolean;
+  billingStatus: string;
+  billingDueAt: string | null;
+  customUserDailyRateCents: number | null;
+  customDiscountPercent: number | null;
+  customFlatRateCents: number | null;
+  customFlatRateMaxUsers: number | null;
   createdAt: string;
   users: OrgUser[];
-  creditLogs: CreditLog[];
-  creditPurchases: CreditPurchase[];
+  invoices: Invoice[];
   _count: { events: number; venues: number; people: number };
 }
 
@@ -76,35 +73,17 @@ function formatDateTime(dateStr: string): string {
   });
 }
 
-function ReasonBadge({ reason }: { reason: string }) {
+function BillingStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    purchase: "bg-green-950/60 text-green-400 border-green-800/40",
-    admin_grant: "bg-blue-950/60 text-blue-400 border-blue-800/40",
-    free_trial: "bg-purple-950/60 text-purple-400 border-purple-800/40",
-    daily_deduction: "bg-white/5 text-white/40 border-white/10",
-    admin_remove: "bg-red-950/60 text-red-400 border-red-800/40",
+    active: "bg-emerald-950/60 text-emerald-400 border-emerald-800/40",
+    overdue_view_only: "bg-red-950/60 text-red-400 border-red-800/40",
+    issued: "bg-amber-950/60 text-amber-300 border-amber-800/40",
+    overdue: "bg-red-950/60 text-red-400 border-red-800/40",
+    paid: "bg-emerald-950/60 text-emerald-400 border-emerald-800/40",
   };
-  const labels: Record<string, string> = {
-    purchase: "Purchase",
-    admin_grant: "Admin Grant",
-    free_trial: "Free Trial",
-    daily_deduction: "Daily",
-    admin_remove: "Admin Remove",
-  };
-  const style = styles[reason] ?? "bg-white/5 text-white/40 border-white/10";
-  const label = labels[reason] ?? reason;
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${style}`}>
-      {label}
-    </span>
-  );
-}
-
-function DeltaDisplay({ delta }: { delta: number }) {
-  const isPositive = delta > 0;
-  return (
-    <span className={`text-sm font-semibold ${isPositive ? "text-green-400" : "text-red-400"}`}>
-      {isPositive ? "+" : ""}{delta}d
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${styles[status] ?? "bg-white/5 text-white/50 border-white/10"}`}>
+      {status}
     </span>
   );
 }
@@ -119,274 +98,103 @@ function StatItem({ icon: Icon, label, value }: { icon: React.ElementType; label
   );
 }
 
-function CreditsTab({ org }: { org: OrgDetail }) {
+function BillingTab({ org }: { org: OrgDetail }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    customUserDailyRateCents: "",
+    customDiscountPercent: "",
+    customFlatRateCents: "",
+    customFlatRateMaxUsers: "",
+  });
 
-  const [creditDelta, setCreditDelta] = useState<string>("");
-  const [creditNote, setCreditNote] = useState("");
-  const [trialDays, setTrialDays] = useState<string>("30");
-  const [trialNote, setTrialNote] = useState("");
-  const [discountPercent, setDiscountPercent] = useState<string>(String(org.discountPercent ?? 0));
-  const [discountNote, setDiscountNote] = useState<string>(org.discountNote ?? "");
+  useEffect(() => {
+    setForm({
+      customUserDailyRateCents: org.customUserDailyRateCents == null ? "" : String(org.customUserDailyRateCents),
+      customDiscountPercent: org.customDiscountPercent == null ? "" : String(org.customDiscountPercent),
+      customFlatRateCents: org.customFlatRateCents == null ? "" : String(org.customFlatRateCents),
+      customFlatRateMaxUsers: org.customFlatRateMaxUsers == null ? "" : String(org.customFlatRateMaxUsers),
+    });
+  }, [org.customUserDailyRateCents, org.customDiscountPercent, org.customFlatRateCents, org.customFlatRateMaxUsers]);
 
-  const creditMutation = useMutation({
-    mutationFn: (data: { delta: number; note?: string }) =>
-      api.post(`/api/admin/orgs/${org.id}/credits`, data),
+  const pricingMutation = useMutation({
+    mutationFn: () =>
+      api.put(`/api/admin/orgs/${org.id}/billing-pricing`, {
+        customUserDailyRateCents: form.customUserDailyRateCents.trim() ? Number(form.customUserDailyRateCents) : null,
+        customDiscountPercent: form.customDiscountPercent.trim() ? Number(form.customDiscountPercent) : null,
+        customFlatRateCents: form.customFlatRateCents.trim() ? Number(form.customFlatRateCents) : null,
+        customFlatRateMaxUsers: form.customFlatRateMaxUsers.trim() ? Number(form.customFlatRateMaxUsers) : null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
-      setCreditDelta("");
-      setCreditNote("");
-      toast({ title: "Credits updated", description: "The credit balance has been updated." });
+      toast({ title: "Saved", description: "Organization billing pricing updated." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to update credits.", variant: "destructive" });
+    onError: (err) => {
+      toast({
+        title: "Error",
+        description: isApiError(err) ? err.message : "Failed to save pricing.",
+        variant: "destructive",
+      });
     },
   });
 
-  const trialMutation = useMutation({
-    mutationFn: (data: { days: number; note?: string }) =>
-      api.post(`/api/admin/orgs/${org.id}/free-trial`, data),
+  const markPaidMutation = useMutation({
+    mutationFn: (invoiceId: string) =>
+      api.post(`/api/admin/billing/invoices/${invoiceId}/mark-paid`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
-      setTrialDays("30");
-      setTrialNote("");
-      toast({ title: "Free trial granted", description: "The free trial has been activated." });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to grant free trial.", variant: "destructive" });
+      toast({ title: "Invoice marked as paid" });
     },
   });
-
-  const discountMutation = useMutation({
-    mutationFn: (data: { discountPercent: number; discountNote?: string }) =>
-      api.put(`/api/admin/orgs/${org.id}/pricing`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
-      toast({ title: "Pricing updated", description: "Customer discount has been updated." });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to update discount.", variant: "destructive" });
-    },
-  });
-
-  const unlimitedMutation = useMutation({
-    mutationFn: (data: { unlimited: boolean }) =>
-      api.post(`/api/admin/orgs/${org.id}/unlimited`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "orgs"] });
-      toast({ title: "Unlimited setting updated" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to update unlimited setting.", variant: "destructive" });
-    },
-  });
-
-  const handleCreditSubmit = () => {
-    const delta = parseInt(creditDelta, 10);
-    if (isNaN(delta)) return;
-    creditMutation.mutate({ delta, note: creditNote || undefined });
-  };
-
-  const handleTrialSubmit = () => {
-    const days = parseInt(trialDays, 10);
-    if (isNaN(days) || days < 1 || days > 365) return;
-    trialMutation.mutate({ days, note: trialNote || undefined });
-  };
-
-  const deltaValue = parseInt(creditDelta, 10);
-  const trialDaysValue = parseInt(trialDays, 10);
-  const discountPercentValue = parseInt(discountPercent, 10);
 
   return (
     <div className="space-y-6">
-      {/* Current Balance */}
       <div className="flex items-center gap-4 p-5 rounded-lg bg-gray-900/60 border border-white/10">
-        <div className="w-12 h-12 rounded-xl bg-rose-950/60 border border-rose-800/30 flex items-center justify-center flex-shrink-0">
-          <CreditCard size={20} className="text-rose-400" />
+        <div className="w-12 h-12 rounded-xl bg-blue-950/60 border border-blue-800/30 flex items-center justify-center flex-shrink-0">
+          <Receipt size={20} className="text-blue-300" />
         </div>
         <div>
-          <div className="text-white/40 text-xs uppercase tracking-wider mb-0.5">Current Balance</div>
-          {org.unlimitedCredits ? (
-            <div className="text-3xl font-bold text-emerald-400">
-              ∞ <span className="text-sm font-normal text-white/40">credits</span>
-            </div>
-          ) : (
-            <div className={`text-3xl font-bold ${org.creditBalance <= 0 ? "text-red-400" : org.creditBalance <= 30 ? "text-amber-400" : "text-white"}`}>
-              {org.creditBalance} <span className="text-sm font-normal text-white/40">days</span>
-            </div>
-          )}
+          <div className="text-white/40 text-xs uppercase tracking-wider mb-0.5">Organization Billing Status</div>
+          <BillingStatusBadge status={org.billingStatus} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Add/Remove Credits */}
         <Card className="bg-gray-900 border border-white/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-white/70">Add / Remove Credits</CardTitle>
-          </CardHeader>
           <CardContent className="space-y-3">
-            <div>
-              <label className="text-xs text-white/40 mb-1 block">Days (negative to remove)</label>
-              <Input
-                type="number"
-                placeholder="e.g. 30 or -10"
-                value={creditDelta}
-                onChange={(e) => setCreditDelta(e.target.value)}
-                className="bg-gray-800 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-rose-500/30"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-white/40 mb-1 block">Note (optional)</label>
-              <Input
-                placeholder="Reason for adjustment..."
-                value={creditNote}
-                onChange={(e) => setCreditNote(e.target.value)}
-                className="bg-gray-800 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-rose-500/30"
-              />
-            </div>
-            <Button
-              onClick={handleCreditSubmit}
-              disabled={creditMutation.isPending || isNaN(deltaValue)}
-              className="w-full bg-rose-700 hover:bg-rose-600 text-white"
-            >
-              {creditMutation.isPending ? "Saving..." : "Apply Credits"}
+            <p className="text-sm text-white/70">Custom organization pricing</p>
+            <Input placeholder="Daily user rate (cents)" value={form.customUserDailyRateCents} onChange={(e) => setForm((p) => ({ ...p, customUserDailyRateCents: e.target.value }))} />
+            <Input placeholder="Discount % (optional)" value={form.customDiscountPercent} onChange={(e) => setForm((p) => ({ ...p, customDiscountPercent: e.target.value }))} />
+            <Input placeholder="Flat rate cents (optional)" value={form.customFlatRateCents} onChange={(e) => setForm((p) => ({ ...p, customFlatRateCents: e.target.value }))} />
+            <Input placeholder="Flat rate max users (optional)" value={form.customFlatRateMaxUsers} onChange={(e) => setForm((p) => ({ ...p, customFlatRateMaxUsers: e.target.value }))} />
+            <Button onClick={() => pricingMutation.mutate()} disabled={pricingMutation.isPending} className="w-full bg-rose-700 hover:bg-rose-600">
+              {pricingMutation.isPending ? "Saving..." : "Save custom billing pricing"}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Unlimited credits */}
         <Card className="bg-gray-900 border border-white/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-white/70">Unlimited Credits</CardTitle>
-          </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-xs text-white/40">
-              Toggle unlimited credit mode for this organization. When enabled, credit deductions and balance limits are bypassed.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => unlimitedMutation.mutate({ unlimited: true })}
-                disabled={unlimitedMutation.isPending || org.unlimitedCredits}
-                className="bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40"
-              >
-                {org.unlimitedCredits ? "Unlimited enabled" : "Enable unlimited"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => unlimitedMutation.mutate({ unlimited: false })}
-                disabled={unlimitedMutation.isPending || !org.unlimitedCredits}
-                className="border-white/15 text-white/80 hover:bg-white/5 disabled:opacity-40"
-              >
-                Disable unlimited
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Free Trial */}
-        <Card className={`bg-gray-900 border ${org.freeTrialUsed ? "border-white/5 opacity-60" : "border-white/10"}`}>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-white/70 flex items-center gap-2">
-              Give Free Trial
-              {org.freeTrialUsed ? (
-                <Badge className="bg-white/5 text-white/40 border-white/10 text-xs">Already used</Badge>
-              ) : null}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <label className="text-xs text-white/40 mb-1 block">Days (1–365)</label>
-              <Input
-                type="number"
-                min={1}
-                max={365}
-                placeholder="e.g. 30"
-                value={trialDays}
-                onChange={(e) => setTrialDays(e.target.value)}
-                disabled={org.freeTrialUsed}
-                className="bg-gray-800 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-rose-500/30 disabled:opacity-40"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-white/40 mb-1 block">Note (optional)</label>
-              <Input
-                placeholder="e.g. Welcome trial"
-                value={trialNote}
-                onChange={(e) => setTrialNote(e.target.value)}
-                disabled={org.freeTrialUsed}
-                className="bg-gray-800 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-rose-500/30 disabled:opacity-40"
-              />
-            </div>
-            <Button
-              onClick={handleTrialSubmit}
-              disabled={
-                trialMutation.isPending ||
-                org.freeTrialUsed ||
-                isNaN(trialDaysValue) ||
-                trialDaysValue < 1 ||
-                trialDaysValue > 365
-              }
-              className="w-full bg-purple-700 hover:bg-purple-600 text-white disabled:opacity-40"
-            >
-              {org.freeTrialUsed
-                ? "Already Used"
-                : trialMutation.isPending
-                ? "Granting..."
-                : "Grant Free Trial"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Customer discount */}
-        <Card className="bg-gray-900 border border-white/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-white/70">Customer Discount</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <label className="text-xs text-white/40 mb-1 block">Discount % (0-100)</label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                placeholder="0"
-                value={discountPercent}
-                onChange={(e) => setDiscountPercent(e.target.value)}
-                className="bg-gray-800 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-rose-500/30"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-white/40 mb-1 block">Note (optional)</label>
-              <Input
-                placeholder="e.g. Partner theater agreement"
-                value={discountNote}
-                onChange={(e) => setDiscountNote(e.target.value)}
-                className="bg-gray-800 border-white/10 text-white placeholder:text-white/20 focus-visible:ring-rose-500/30"
-              />
-            </div>
-            <Button
-              onClick={() =>
-                discountMutation.mutate({
-                  discountPercent: discountPercentValue,
-                  discountNote: discountNote || undefined,
-                })
-              }
-              disabled={
-                discountMutation.isPending ||
-                isNaN(discountPercentValue) ||
-                discountPercentValue < 0 ||
-                discountPercentValue > 100
-              }
-              className="w-full bg-rose-700 hover:bg-rose-600 text-white"
-            >
-              {discountMutation.isPending ? "Saving..." : "Save Discount"}
-            </Button>
+            <p className="text-sm text-white/70">Latest invoices</p>
+            {org.invoices.length === 0 ? (
+              <p className="text-sm text-white/40">No invoices generated yet.</p>
+            ) : (
+              org.invoices.slice(0, 5).map((inv) => (
+                <div key={inv.id} className="rounded border border-white/10 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <BillingStatusBadge status={inv.status} />
+                    <p className="text-xs text-white/50">Due {formatDate(inv.dueAt)}</p>
+                  </div>
+                  <p className="text-sm text-white">Total €{(inv.totalCents / 100).toFixed(2)}</p>
+                  <p className="text-xs text-white/50">Lines: {inv.lines.length}</p>
+                  {inv.status !== "paid" ? (
+                    <Button size="sm" variant="outline" onClick={() => markPaidMutation.mutate(inv.id)} disabled={markPaidMutation.isPending}>
+                      Mark as paid
+                    </Button>
+                  ) : null}
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
@@ -567,36 +375,34 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
   );
 }
 
-function HistoryTab({ logs }: { logs: CreditLog[] }) {
+function HistoryTab({ invoices }: { invoices: Invoice[] }) {
   return (
     <div className="rounded-lg border border-white/10 overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="border-white/10 hover:bg-transparent">
             <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Date</TableHead>
-            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Reason</TableHead>
-            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Delta</TableHead>
-            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Note</TableHead>
+            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Status</TableHead>
+            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Due</TableHead>
+            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Total</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {logs.length === 0 ? (
+          {invoices.length === 0 ? (
             <TableRow className="border-white/5">
               <TableCell colSpan={4} className="text-center text-white/30 py-10">
-                No credit history yet
+                No invoice history yet
               </TableCell>
             </TableRow>
           ) : (
-            logs.map((log) => (
-              <TableRow key={log.id} className="border-white/5 hover:bg-white/[0.02]">
-                <TableCell className="text-white/40 text-sm">{formatDateTime(log.createdAt)}</TableCell>
+            invoices.map((inv) => (
+              <TableRow key={inv.id} className="border-white/5 hover:bg-white/[0.02]">
+                <TableCell className="text-white/40 text-sm">{formatDateTime(inv.issuedAt)}</TableCell>
                 <TableCell>
-                  <ReasonBadge reason={log.reason} />
+                  <BillingStatusBadge status={inv.status} />
                 </TableCell>
-                <TableCell>
-                  <DeltaDisplay delta={log.delta} />
-                </TableCell>
-                <TableCell className="text-white/40 text-sm">{log.note ?? "—"}</TableCell>
+                <TableCell className="text-white/40 text-sm">{formatDate(inv.dueAt)}</TableCell>
+                <TableCell className="text-white/40 text-sm">€{(inv.totalCents / 100).toFixed(2)}</TableCell>
               </TableRow>
             ))
           )}
@@ -668,41 +474,35 @@ export default function OrgDetail() {
         <StatItem icon={MapPin} label="Venues" value={org._count.venues} />
         <StatItem icon={UserRound} label="People" value={org._count.people} />
         <div className="flex flex-col items-center gap-1 px-4 py-3">
-          <CreditCard size={16} className="text-white/30" />
+          <Receipt size={16} className="text-white/30" />
           <div
             className={`text-lg font-bold ${
-              org.unlimitedCredits
-                ? "text-emerald-400"
-                : org.creditBalance <= 0
-                ? "text-red-400"
-                : org.creditBalance <= 30
-                ? "text-amber-400"
-                : "text-white"
+              org.billingStatus === "overdue_view_only" ? "text-red-400" : "text-emerald-400"
             }`}
           >
-            {org.unlimitedCredits ? "∞" : org.creditBalance}
+            {org.billingStatus}
           </div>
-          <div className="text-xs text-white/40">Credits</div>
+          <div className="text-xs text-white/40">Billing</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="credits">
+      <Tabs defaultValue="billing">
         <TabsList className="bg-gray-900 border border-white/10">
-          <TabsTrigger value="credits" className="data-[state=active]:bg-rose-900/40 data-[state=active]:text-rose-200 text-white/40">
-            Credits
+          <TabsTrigger value="billing" className="data-[state=active]:bg-rose-900/40 data-[state=active]:text-rose-200 text-white/40">
+            Billing
           </TabsTrigger>
           <TabsTrigger value="users" className="data-[state=active]:bg-rose-900/40 data-[state=active]:text-rose-200 text-white/40">
             Users ({org.users.length})
           </TabsTrigger>
           <TabsTrigger value="history" className="data-[state=active]:bg-rose-900/40 data-[state=active]:text-rose-200 text-white/40">
-            History ({org.creditLogs.length})
+            History ({org.invoices.length})
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="credits" className="mt-4">
+        <TabsContent value="billing" className="mt-4">
           <div className="space-y-4">
-            <CreditsTab org={org} />
+            <BillingTab org={org} />
             <SupportAccessTab org={org} />
           </div>
         </TabsContent>
@@ -712,7 +512,7 @@ export default function OrgDetail() {
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
-          <HistoryTab logs={org.creditLogs} />
+          <HistoryTab invoices={org.invoices} />
         </TabsContent>
       </Tabs>
 

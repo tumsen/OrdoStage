@@ -194,7 +194,7 @@ function LiveFrontpage({ siteContent }: { siteContent: SiteContent | undefined }
       <main className="relative z-[1] mx-auto flex min-h-full max-w-3xl flex-col items-center justify-start gap-8 px-4 pb-12 pt-6 text-center sm:px-6 md:pt-8">
         <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} titleClass="md:text-4xl" />
         <p className="w-full max-w-2xl text-sm leading-relaxed text-white/70">
-          Use the sidebar to jump to <strong>Features</strong>, or open <strong>Pricing</strong> for credit packs.{" "}
+          Use the sidebar to jump to <strong>Features</strong>, or open <strong>Pricing</strong> for billing details.{" "}
           <strong>Terms</strong> and <strong>Privacy</strong> are there too.
         </p>
         <FeatureBlock

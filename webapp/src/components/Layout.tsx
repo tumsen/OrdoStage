@@ -10,10 +10,8 @@ import {
   Menu,
   LogOut,
   AlertTriangle,
-  XCircle,
   Route,
   ShieldCheck,
-  Sparkles,
   UserCircle,
   KeyRound,
 } from "lucide-react";
@@ -34,13 +32,10 @@ import { useI18n } from "@/lib/i18n";
 interface OrgData {
   id: string;
   name: string;
-  credits: number;
   userCount: number;
-  warning: boolean;
-  blocked: boolean;
-  unlimitedCredits?: boolean;
-  estimatedDaysRemaining?: number | null;
-  pendingAutoTopUpUrl?: string | null;
+  billingStatus?: string;
+  isViewOnlyDueToBilling?: boolean;
+  openInvoice?: { dueAt?: string | null } | null;
 }
 
 const navItems: { to: string; labelKey: string; icon: LucideIcon; view: string }[] = [
@@ -185,68 +180,32 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
   );
 }
 
-function CreditBanner() {
+function BillingBanner() {
   const { data: org } = useQuery<OrgData>({
     queryKey: ["org"],
     queryFn: () => api.get<OrgData>("/api/org"),
     staleTime: 60_000,
   });
-  const { t } = useI18n();
-
   if (!org) return null;
-
-  if (org.unlimitedCredits) return null;
-
-  const credits = org.credits ?? 0;
-  const userCount = org.userCount ?? 1;
-  const daysLeft =
-    org.estimatedDaysRemaining != null
-      ? org.estimatedDaysRemaining
-      : userCount > 0
-        ? Math.floor(credits / userCount)
-        : credits;
-
-  if (org.pendingAutoTopUpUrl) {
-    return (
-      <div className="flex-shrink-0 bg-ordo-blue/15 border-b border-ordo-blue/35 px-4 py-2 flex items-center gap-2 text-sm">
-        <Sparkles size={14} className="text-ordo-blue flex-shrink-0" />
-        <span className="text-blue-100/95">
-          {t("credits.autoTopupReady")}
-        </span>
-        <a
-          href={org.pendingAutoTopUpUrl}
-          className="ml-auto text-white/95 underline underline-offset-2 hover:text-ordo-yellow whitespace-nowrap"
-        >
-          {t("credits.payNow")}
-        </a>
-      </div>
-    );
-  }
-
-  if (org.blocked || credits <= 0) {
+  if (org.isViewOnlyDueToBilling || org.billingStatus === "overdue_view_only") {
     return (
       <div className="flex-shrink-0 bg-red-950/80 border-b border-red-800/50 px-4 py-2 flex items-center gap-2 text-sm">
-        <XCircle size={14} className="text-red-400 flex-shrink-0" />
-        <span className="text-red-300">{t("credits.noCreditsReadOnly")}</span>
+        <AlertTriangle size={14} className="text-red-400 flex-shrink-0" />
+        <span className="text-red-300">Billing overdue. Organization is view-only until invoice is paid.</span>
         <Link to="/account#billing" className="ml-auto text-red-200 underline underline-offset-2 hover:text-white whitespace-nowrap">
-          {t("credits.buyCredits")}
+          Open billing
         </Link>
       </div>
     );
   }
-
-  if (org.warning && daysLeft <= 30) {
+  if (org.openInvoice?.dueAt) {
+    const due = new Date(org.openInvoice.dueAt).toLocaleDateString();
     return (
       <div className="flex-shrink-0 bg-ordo-orange/15 border-b border-ordo-yellow/35 px-4 py-2 flex items-center gap-2 text-sm">
         <AlertTriangle size={14} className="text-ordo-yellow flex-shrink-0" />
-        <span className="text-ordo-yellow/95">
-          {t("credits.lowCredits", {
-            days: daysLeft,
-            daysLabel: daysLeft === 1 ? t("credits.day") : t("credits.days"),
-          })}
-        </span>
+        <span className="text-ordo-yellow/95">Open invoice due on {due}.</span>
         <Link to="/account#billing" className="ml-auto text-ordo-yellow underline underline-offset-2 hover:text-white whitespace-nowrap">
-          {t("credits.buyCredits")}
+          Open billing
         </Link>
       </div>
     );
@@ -304,8 +263,8 @@ export function Layout({ children }: LayoutProps) {
           </header>
         ) : null}
 
-        {/* Credit warning banner */}
-        <CreditBanner />
+        {/* Billing warning banner */}
+        <BillingBanner />
 
         {/* Page content */}
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15">

@@ -6,8 +6,13 @@ import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { z } from "zod";
 import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 import { ensureSystemRoles } from "../effectiveRole";
-import { getSignupCreditsForNewOrg } from "../signupCredits";
 import { env } from "../env";
+import {
+  generateMonthlyInvoices,
+  getBillingConfig,
+  markInvoicePaid,
+  recordDailyUsageSnapshot,
+} from "../postpaidBilling";
 
 const app = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -20,17 +25,18 @@ app.use("/admin/*", adminMiddleware);
 // ── Stats ──────────────────────────────────────────────────────────────────
 
 app.get("/admin/stats", async (c) => {
-  const [totalOrgs, totalUsers, totalRevenue, totalPeople, recentPurchases] =
+  const [totalOrgs, totalUsers, totalRevenue, totalPeople, recentInvoices, openInvoices] =
     await Promise.all([
       prisma.organization.count(),
       prisma.user.count({ where: { organizationId: { not: null } } }),
-      prisma.creditPurchase.aggregate({ _sum: { amountCents: true } }),
+      prisma.billingInvoice.aggregate({ _sum: { totalCents: true }, where: { status: "paid" } }),
       prisma.person.count(),
-      prisma.creditPurchase.findMany({
-        orderBy: { createdAt: "desc" },
+      prisma.billingInvoice.findMany({
+        orderBy: { issuedAt: "desc" },
         take: 10,
-        include: { organization: { select: { name: true } } },
+        include: { organization: { select: { name: true } }, lines: true },
       }),
+      prisma.billingInvoice.count({ where: { status: { in: ["issued", "overdue"] } } }),
     ]);
 
   return c.json({
@@ -38,10 +44,53 @@ app.get("/admin/stats", async (c) => {
       totalOrgs,
       totalUsers,
       totalPeople,
-      totalRevenueCents: totalRevenue._sum.amountCents || 0,
-      recentPurchases,
+      totalRevenueCents: totalRevenue._sum.totalCents || 0,
+      recentInvoices,
+      openInvoices,
     },
   });
+});
+
+app.get("/admin/billing/settings", async (c) => {
+  const cfg = await getBillingConfig(prisma);
+  return c.json({ data: cfg });
+});
+
+app.patch("/admin/billing/settings", async (c) => {
+  const body = await c.req.json();
+  const parsed = z
+    .object({
+      defaultUserDailyRateCents: z.number().int().min(1).max(1_000_000).optional(),
+      defaultDiscountPercent: z.number().int().min(0).max(100).optional(),
+      defaultFlatRateCents: z.number().int().min(1).nullable().optional(),
+      defaultFlatRateMaxUsers: z.number().int().min(1).nullable().optional(),
+      paymentDueDays: z.number().int().min(1).max(30).optional(),
+    })
+    .parse(body);
+
+  const cfg = await prisma.billingConfig.upsert({
+    where: { id: "default" },
+    create: { id: "default", ...parsed },
+    update: parsed,
+  });
+  return c.json({ data: cfg });
+});
+
+app.post("/admin/billing/snapshot", async (c) => {
+  const created = await recordDailyUsageSnapshot(prisma);
+  return c.json({ data: { organizationsProcessed: created } });
+});
+
+app.post("/admin/billing/generate-invoices", async (c) => {
+  const generated = await generateMonthlyInvoices(prisma, new Date());
+  return c.json({ data: { generated } });
+});
+
+app.post("/admin/billing/invoices/:id/mark-paid", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const paddleInvoiceId = z.object({ paddleInvoiceId: z.string().optional() }).parse(body).paddleInvoiceId;
+  await markInvoicePaid(prisma, c.req.param("id"), paddleInvoiceId);
+  return c.json({ data: { ok: true } });
 });
 
 app.post("/admin/email/test", async (c) => {
@@ -84,9 +133,6 @@ app.get("/admin/orgs", async (c) => {
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { users: true, memberships: true, events: true, people: true } },
-      creditPurchases: {
-        select: { days: true, amountCents: true },
-      },
       users: {
         select: {
           id: true,
@@ -98,13 +144,7 @@ app.get("/admin/orgs", async (c) => {
       },
     },
   });
-  return c.json({
-    data: orgs.map((org) => ({
-      ...org,
-      totalPurchasedDays: org.creditPurchases.reduce((sum, purchase) => sum + purchase.days, 0),
-      totalPurchasedCents: org.creditPurchases.reduce((sum, purchase) => sum + purchase.amountCents, 0),
-    })),
-  });
+  return c.json({ data: orgs });
 });
 
 app.post("/admin/orgs", async (c) => {
@@ -116,11 +156,9 @@ app.post("/admin/orgs", async (c) => {
     })
     .parse(body);
 
-  const signupCredits = await getSignupCreditsForNewOrg();
   const created = await prisma.organization.create({
     data: {
       name: name.trim(),
-      creditBalance: signupCredits,
     },
     select: { id: true, name: true, createdAt: true },
   });
@@ -194,8 +232,7 @@ app.get("/admin/orgs/:id", async (c) => {
         },
         orderBy: { user: { name: "asc" } },
       },
-      creditLogs: { orderBy: { createdAt: "desc" }, take: 50 },
-      creditPurchases: { orderBy: { createdAt: "desc" }, take: 20 },
+      invoices: { orderBy: { issuedAt: "desc" }, take: 20, include: { lines: true } },
       _count: { select: { events: true, venues: true, people: true } },
     },
   });
@@ -307,246 +344,25 @@ app.delete("/admin/orgs/:id", async (c) => {
   return new Response(null, { status: 204 });
 });
 
-// ── Credit management ──────────────────────────────────────────────────────
-
-app.put("/admin/orgs/:id/pricing", async (c) => {
+app.put("/admin/orgs/:id/billing-pricing", async (c) => {
   const body = await c.req.json();
-  const { discountPercent, discountNote } = z
+  const parsed = z
     .object({
-      discountPercent: z.number().int().min(0).max(100),
-      discountNote: z.string().optional(),
+      customUserDailyRateCents: z.number().int().min(1).nullable().optional(),
+      customDiscountPercent: z.number().int().min(0).max(100).nullable().optional(),
+      customFlatRateCents: z.number().int().min(1).nullable().optional(),
+      customFlatRateMaxUsers: z.number().int().min(1).nullable().optional(),
     })
     .parse(body);
 
-  const org = await prisma.organization.findUnique({
-    where: { id: c.req.param("id") },
-  });
-  if (!org)
-    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  const org = await prisma.organization.findUnique({ where: { id: c.req.param("id") } });
+  if (!org) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
 
   const updated = await prisma.organization.update({
     where: { id: org.id },
-    data: {
-      discountPercent,
-      discountNote: discountNote || null,
-    },
+    data: parsed,
   });
-
   return c.json({ data: updated });
-});
-
-// Add or remove credits manually
-app.post("/admin/orgs/:id/credits", async (c) => {
-  const user = c.get("user")!;
-  const body = await c.req.json();
-  const { delta, note } = z
-    .object({
-      delta: z.number().int(), // positive = add, negative = remove
-      note: z.string().optional(),
-    })
-    .parse(body);
-
-  const org = await prisma.organization.findUnique({
-    where: { id: c.req.param("id") },
-  });
-  if (!org)
-    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
-
-  const [updatedOrg] = await prisma.$transaction([
-    prisma.organization.update({
-      where: { id: org.id },
-      data: { creditBalance: { increment: delta } },
-    }),
-    prisma.creditLog.create({
-      data: {
-        organizationId: org.id,
-        delta,
-        reason: delta > 0 ? "admin_grant" : "admin_remove",
-        note: note || `Manual adjustment by admin`,
-        adminUserId: user.id,
-      },
-    }),
-  ]);
-
-  return c.json({ data: updatedOrg });
-});
-
-// Give free trial
-app.post("/admin/orgs/:id/free-trial", async (c) => {
-  const user = c.get("user")!;
-  const body = await c.req.json();
-  const { days, note } = z
-    .object({
-      days: z.number().int().min(1).max(365),
-      note: z.string().optional(),
-    })
-    .parse(body);
-
-  const org = await prisma.organization.findUnique({
-    where: { id: c.req.param("id") },
-  });
-  if (!org)
-    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
-
-  const [updatedOrg] = await prisma.$transaction([
-    prisma.organization.update({
-      where: { id: org.id },
-      data: {
-        creditBalance: { increment: days },
-        freeTrialUsed: true,
-      },
-    }),
-    prisma.creditLog.create({
-      data: {
-        organizationId: org.id,
-        delta: days,
-        reason: "free_trial",
-        note: note || `Free trial: ${days} days`,
-        adminUserId: user.id,
-      },
-    }),
-  ]);
-
-  return c.json({ data: updatedOrg });
-});
-
-// Set unlimited credits on an org
-app.post("/admin/orgs/:id/unlimited", async (c) => {
-  const body = await c.req.json();
-  const { unlimited } = z
-    .object({ unlimited: z.boolean() })
-    .parse(body);
-
-  const org = await prisma.organization.findUnique({
-    where: { id: c.req.param("id") },
-  });
-  if (!org)
-    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
-
-  const updatedOrg = await prisma.organization.update({
-    where: { id: org.id },
-    data: unlimited
-      ? { unlimitedCredits: true }
-      : {
-          unlimitedCredits: false,
-          // Unlimited mode uses a sentinel balance; reset to zero when disabling.
-          creditBalance: org.creditBalance === 999999999 ? 0 : org.creditBalance,
-        },
-  });
-
-  return c.json({ data: updatedOrg });
-});
-
-// ── Price packs ────────────────────────────────────────────────────────────
-
-app.get("/admin/packs", async (c) => {
-  const packs = await prisma.pricePack.findMany({ orderBy: { days: "asc" } });
-  return c.json({ data: packs });
-});
-
-app.post("/admin/packs", async (c) => {
-  const body = await c.req.json();
-  const { packId, days, amountCents, label, active } = z
-    .object({
-      packId: z
-        .string()
-        .regex(/^[a-zA-Z0-9_-]+$/)
-        .optional(),
-      days: z.number().int().min(1),
-      amountCents: z.number().int().min(1),
-      label: z.string().min(1),
-      active: z.boolean().optional(),
-    })
-    .parse(body);
-
-  const normalizedPackId = (packId && packId.trim().length > 0)
-    ? packId.trim()
-    : `pack_${days}_${Date.now()}`;
-
-  const existing = await prisma.pricePack.findUnique({
-    where: { packId: normalizedPackId },
-  });
-  if (existing) {
-    return c.json(
-      { error: { message: "Pack ID already exists", code: "CONFLICT" } },
-      409
-    );
-  }
-
-  const created = await prisma.pricePack.create({
-    data: {
-      packId: normalizedPackId,
-      days,
-      amountCents,
-      label,
-      active: active ?? true,
-    },
-  });
-
-  return c.json({ data: created }, 201);
-});
-
-app.put("/admin/packs/:packId", async (c) => {
-  const body = await c.req.json();
-  const { amountCents, label, active } = z
-    .object({
-      amountCents: z.number().int().min(1).optional(),
-      label: z.string().optional(),
-      active: z.boolean().optional(),
-    })
-    .parse(body);
-
-  const segment = c.req.param("packId").trim();
-  const existing = await prisma.pricePack.findFirst({
-    where: { OR: [{ id: segment }, { packId: segment }] },
-  });
-  if (!existing) {
-    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
-  }
-
-  const pack = await prisma.pricePack.update({
-    where: { id: existing.id },
-    data: {
-      ...(amountCents !== undefined && { amountCents }),
-      ...(label && { label }),
-      ...(active !== undefined && { active }),
-    },
-  });
-  return c.json({ data: pack });
-});
-
-app.delete("/admin/packs/:packId", async (c) => {
-  const segment = c.req.param("packId").trim();
-  const existing = await prisma.pricePack.findFirst({
-    where: { OR: [{ id: segment }, { packId: segment }] },
-  });
-
-  // Use the provided slug for cleanup if we can't find the record (stale UI); otherwise, use canonical packId.
-  const packIdForCleanup = existing?.packId ?? segment;
-
-  try {
-    await prisma.$transaction([
-      prisma.organization.updateMany({
-        where: { autoTopUpPackId: packIdForCleanup },
-        data: {
-          autoTopUpPackId: null,
-          autoTopUpEnabled: false,
-          pendingAutoTopUpUrl: null,
-          pendingAutoTopUpCreatedAt: null,
-        },
-      }),
-      // Delete by either primary key or packId slug to be robust against UI routing edge cases.
-      prisma.pricePack.deleteMany({
-        where: { OR: [{ id: segment }, { packId: segment }] },
-      }),
-    ]);
-  } catch (err) {
-    console.error("[admin] delete pack failed:", segment, err);
-    const message = err instanceof Error ? err.message : "Failed to delete pack";
-    return c.json({ error: { message, code: "DELETE_FAILED" } }, 500);
-  }
-
-  return c.json({ data: { ok: true } });
 });
 
 function mapAdminUserListRow(u: {

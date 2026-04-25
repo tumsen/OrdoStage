@@ -28,16 +28,13 @@ const en = {
     current: "current",
     organizationFallback: "Organization",
   },
-  credits: {
-    noCreditsReadOnly: "No credits remaining. Your account is in read-only mode.",
-    buyCredits: "Buy Credits ->",
-    lowCredits:
-      "Low credits: {{days}} {{daysLabel}} remaining. Top up to avoid read-only mode.",
+  billingAlerts: {
+    overdueReadOnly: "Billing overdue. Your account is in read-only mode.",
+    openBilling: "Open billing ->",
+    dueSoon:
+      "Invoice due soon: {{days}} {{daysLabel}} remaining to avoid read-only mode.",
     day: "day",
     days: "days",
-    autoTopupReady:
-      "Credits are low - a checkout is ready for your automatic top-up. Complete payment to add credits.",
-    payNow: "Pay now ->",
   },
   account: {
     title: "Account",
@@ -110,8 +107,6 @@ const en = {
       save: "Save website content",
       saved: "Saved",
       saveError: "Failed to save website content.",
-      creditsEnOnly:
-        "Free signup credits are stored in English and apply to all organizations. Set “Content language” to English to edit this value.",
       publicHomeMode: "Public home (global)",
       publicHomeModeHint:
         "Applies in every language. The public shell always has a left menu (Features, Pricing, Terms, Privacy). Turn off both modes for the shorter “live” home; turn on maintenance for a minimal notice, or early-bird for the long welcome page.",
@@ -192,8 +187,6 @@ const da: DeepPartial<typeof en> = {
       editLocaleHint:
         "Redigér offentlig websidetekst for hvert sprog. Tomme felter falder tilbage til engelsk.",
       contentLanguage: "Indholdssprog",
-      creditsEnOnly:
-        "Gratis tilmeldingskreditter gemmes på engelsk for hele produktet. Vælg engelsk under “Indholdssprog” for at redigere værdien.",
       publicHomeMode: "Offentlig forside (globalt)",
       publicHomeModeHint:
         "Gælder alle sprog. For Paddle: slå begge fra, så besøgende får fuld navigation inkl. Priser.",
@@ -268,8 +261,6 @@ const de: DeepPartial<typeof en> = {
       editLocaleHint:
         "Oeffentliche Webseitentexte pro Sprache bearbeiten. Leere Felder nutzen Englisch als Fallback.",
       contentLanguage: "Inhaltssprache",
-      creditsEnOnly:
-        "Kostenlose Anmelde-Credits werden einmalig auf Englisch gespeichert. Stellen Sie “Inhaltssprache” auf Englisch, um den Wert zu bearbeiten.",
       publicHomeMode: "Oeffentliche Startseite (global)",
       publicHomeModeHint:
         "Fuer alle Sprachen. Fuer Paddle beide ausschalten, damit Navigation und Preise sichtbar sind.",

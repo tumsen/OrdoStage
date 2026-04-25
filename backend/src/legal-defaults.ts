@@ -21,12 +21,12 @@ We are not liable for any loss, corruption, or accidental deletion of your data,
 4. Service availability and closure
 We reserve the right to modify, suspend, or permanently close Ordo Stage at any time, with or without notice. In the event of a planned closure, we will make reasonable efforts to notify users in advance, but we are not obligated to do so.
 We are not responsible for any losses — financial or otherwise — resulting from the suspension or discontinuation of the service.
-5. Credits and payments
-Credits are non-refundable once purchased. If the service is closed, we will make reasonable efforts to refund unused credit packs, but this is not guaranteed.
-Account balances that reach −30 credits will result in the account becoming view-only. Accounts not topped up within 30 days of reaching this threshold will be permanently deleted, including all associated data.
+5. Billing and payments
+Ordo Stage uses postpaid invoicing based on monthly usage. Invoices are due within the payment period stated on the invoice (default 7 days).
+If an invoice remains unpaid after the due date, the organization may be switched to view-only mode until payment is received.
 6. Limitation of liability
 To the fullest extent permitted by law, Ordo Stage and its operators shall not be liable for any indirect, incidental, special, or consequential damages, including but not limited to loss of data, loss of revenue, or loss of business, arising from your use of or inability to use the service.
-Our total liability to you for any claim shall not exceed the amount you paid for credits in the 30 days prior to the claim.
+Our total liability to you for any claim shall not exceed the amount you paid to Ordo Stage in the 30 days prior to the claim.
 7. Changes to these terms
 We may update these terms from time to time. Continued use of the service after changes are posted means you accept the updated terms.
 8. Governing law
@@ -46,12 +46,12 @@ mail@ordostage.com
 We collect only what's necessary to run the service:
 	•	Account information — name, email address, and any details provided when creating an account or adding users.
 	•	Usage data — how the service is used, for troubleshooting and improving the product.
-	•	Billing information — records of credit purchases. We do not store full payment card details.
+	•	Billing information — invoices, payment status, and billing contacts. We do not store full payment card details.
 3. Why we collect it
 We use your data to:
 	•	Provide and maintain the Ordo Stage service
 	•	Manage your account and users
-	•	Send important service-related communications (e.g. low credit warnings, account deletion notices)
+	•	Send important service-related communications (e.g. invoice reminders, account notices)
 	•	Comply with legal obligations
 
 Our legal basis for processing is contract performance (Art. 6(1)(b) GDPR) — we need your data to deliver the service you've signed up for. For legal compliance, our basis is legal obligation (Art. 6(1)(c)).
@@ -59,7 +59,7 @@ Our legal basis for processing is contract performance (Art. 6(1)(b) GDPR) — w
 We do not sell, rent, or share your personal data with third parties outside our company. Your data stays within Ordo Stage and is only accessed by our team for the purposes described in this policy.
 We may disclose data if required to do so by law or a valid legal process.
 5. How long we keep your data
-We keep your data for as long as your account is active. When an account is deleted — whether by you or due to a negative credit balance — all associated personal data is permanently deleted from our systems within 30 days.
+We keep your data for as long as your account is active. When an account is deleted, all associated personal data is permanently deleted from our systems within 30 days.
 Billing records may be retained for up to 5 years to comply with Danish accounting legislation.
 6. Where your data is stored
 Your data is stored on servers located within the European Economic Area (EEA). If this changes, we will update this policy and ensure appropriate safeguards are in place.
@@ -89,10 +89,10 @@ We may update this policy from time to time. We will notify you of significant c
 export const DEFAULT_REFUND_CONTENT = `Refund policy (summary)
 Last updated: April 2026
 
-Credit packs are generally non-refundable once purchased and credits have been delivered.
+Monthly invoices cover delivered usage and are generally not reversible after payment has settled.
 
-If Ordo Stage is permanently closed, we will make reasonable efforts to refund unused credit packs where possible, but this is not guaranteed.
+If Ordo Stage is permanently closed, any handling of open or prepaid contractual amounts will follow applicable law and your written agreement.
 
-For mistaken purchases or if technical issues prevented delivery, contact mail@ordostage.com and we will review your case.
+For billing mistakes or technical charging errors, contact mail@ordostage.com and we will review your case.
 
-This summary reflects section 5 (Credits and payments) of our Terms of Service; in case of conflict, the Terms of Service prevail.`;
+This summary reflects section 5 (Billing and payments) of our Terms of Service; in case of conflict, the Terms of Service prevail.`;

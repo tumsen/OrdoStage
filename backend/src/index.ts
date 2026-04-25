@@ -9,7 +9,6 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import "./env";
 import { auth } from "./auth";
-import { deductCredits } from "./credits";
 import venuesRouter from "./routes/venues";
 import peopleRouter from "./routes/people";
 import eventsRouter from "./routes/events";
@@ -29,10 +28,9 @@ import accountRouter from "./routes/account";
 import roleDefinitionsRouter from "./routes/roleDefinitions";
 import type { EffectiveRole } from "./effectiveRole";
 import { resolveEffectiveRole } from "./effectiveRole";
-import { seedPacks } from "./seed-packs";
 import { prisma } from "./prisma";
+import { enforceOverdueAccess } from "./postpaidBilling";
 
-seedPacks().catch(console.error);
 const SUPPORT_EMAILS = new Set(["tumsen@gmail.com"]);
 
 const app = new Hono<{
@@ -141,13 +139,13 @@ app.use("/api/*", async (c, next) => {
 // Auth handler
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
-// Public routes (no auth required — mount before credit check middleware)
+// Public routes (no auth required — mount before billing middleware)
 app.route("/api/public", publicRouter);
 
-// Billing routes (webhook must be before credit check middleware)
+// Billing routes (webhook must be before billing middleware)
 app.route("/api", billingRouter);
 
-// Credit check middleware for all API routes (except auth and webhook)
+// Billing access middleware for all API routes (except auth/webhook/public)
 app.use("/api/*", async (c, next) => {
   const path = c.req.path;
 
@@ -157,7 +155,7 @@ app.use("/api/*", async (c, next) => {
     return;
   }
 
-  // Owner-admin routes enforce access in adminMiddleware; never block writes due to org credits.
+  // Owner-admin routes enforce access in adminMiddleware; never block writes due to org billing state.
   if (path.startsWith("/api/admin")) {
     await next();
     return;
@@ -176,22 +174,18 @@ app.use("/api/*", async (c, next) => {
     return;
   }
 
-  const { balance, warning, blocked } = await deductCredits(user.organizationId);
+  const blocked = await enforceOverdueAccess(prisma, user.organizationId);
 
-  // Set info headers
-  c.header("X-Credits-Remaining", String(balance));
-  c.header("X-Credits-Warning", String(warning));
-
-  // Block writes when out of credits
+  // Block writes when billing is overdue
   const method = c.req.method;
-  // Document metadata / uploads: allow even when out of credits (files already stored; editing names/dates is free)
-  const exemptCreditBlock =
+  // Document metadata / uploads: allow even in view-only billing mode.
+  const exemptBillingBlock =
     (path.match(/^\/api\/people\/[^/]+\/active$/) && method === "PATCH") ||
     (path.match(/^\/api\/people\/[^/]+\/resend-app-access-email$/) && method === "POST") ||
     (path === "/api/me/account" && method === "DELETE") ||
     (path.match(/^\/api\/people\/documents\/.+/) && ["PATCH", "DELETE"].includes(method)) ||
     (path.match(/^\/api\/people\/[^/]+\/documents$/) && method === "POST");
-  if (exemptCreditBlock) {
+  if (exemptBillingBlock) {
     await next();
     return;
   }
@@ -200,8 +194,8 @@ app.use("/api/*", async (c, next) => {
     return c.json(
       {
         error: {
-          message: "No credits remaining. Please top up to continue.",
-          code: "NO_CREDITS",
+          message: "Billing overdue. Organization is view-only until due invoice is paid.",
+          code: "BILLING_OVERDUE",
         },
       },
       402

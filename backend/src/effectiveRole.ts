@@ -43,7 +43,7 @@ function effectiveFromRow(
   return { views: v, actions: a, canWrite, canManageTeam };
 }
 
-/** Ensure org has system permission groups (owner, admin) and demote legacy manager/member. */
+/** Ensure org has system permission groups (owner, admin) and demote old manager/member roles. */
 export async function ensureSystemRoles(prisma: PrismaClient, organizationId: string): Promise<void> {
   const seeds = systemRoleSeeds();
   for (const s of seeds) {

@@ -173,7 +173,7 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Uint8Array>
   y -= 24;
 
   // Row
-  const desc = `OrdoStage credits — ${data.packLabel} (${data.days} days)`;
+  const desc = `OrdoStage usage billing — ${data.packLabel} (${data.days} days)`;
   page.drawText(desc, { x: L + 8, y, size: 10, font: regular, color: black });
   page.drawText(String(data.days), { x: R - 115, y, size: 10, font: regular, color: black });
   page.drawText(`€${cents(data.amountCents)}`, { x: R - 78, y, size: 10, font: regular, color: black });
