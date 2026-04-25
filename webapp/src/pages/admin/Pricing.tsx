@@ -197,6 +197,8 @@ export default function Pricing() {
                   : calculatedRows[currency] != null
                     ? String(calculatedRows[currency])
                     : "";
+              const rateLabel =
+                currency === BASE_CURRENCY ? "1.000000" : fxRates[currency] != null ? fxRates[currency].toFixed(6) : "-";
               return (
                 <div key={currency} className="grid min-w-[900px] grid-cols-12 gap-2 items-center whitespace-nowrap">
                   <div className="col-span-4">
@@ -226,7 +228,7 @@ export default function Pricing() {
                   />
                   <Input
                     className="col-span-2 h-8 text-xs"
-                    value={calculatedValue ? `${calculatedValue} (${formatMajorFromCents(calculatedValue)})` : ""}
+                    value={calculatedValue ? `${calculatedValue} (${formatMajorFromCents(calculatedValue)}) @ ${rateLabel}` : ""}
                     readOnly
                   />
                 </div>
