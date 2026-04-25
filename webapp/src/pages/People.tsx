@@ -50,6 +50,12 @@ import {
   type PersonDocumentListRowHandle,
   type PersonDocumentSavePatch,
 } from "@/components/PersonDocumentListRow";
+import {
+  DocumentPermissionsForm,
+  normalizeDocumentPermissions,
+  type DocumentPermissionState,
+  type DocumentPermissionOptions,
+} from "@/components/DocumentPermissionsForm";
 
 interface Team {
   id: string;
@@ -57,11 +63,6 @@ interface Team {
   color: string;
   createdAt: string;
 }
-
-type DocumentPermissionMember = { id: string; name: string };
-type DocumentPermissionTeam = { id: string; name: string; color: string; members: DocumentPermissionMember[] };
-type DocumentPermissionOptions = { ownerPersonId: string; teams: DocumentPermissionTeam[] };
-type DocumentPermissionState = { teamIds: string[]; personIds: string[] };
 
 // ── Form schema ───────────────────────────────────────────────────────────────
 
@@ -482,11 +483,13 @@ function PersonFormDialog({
 
   useEffect(() => {
     if (!permissionState || !permissionsDoc) return;
-    setPermissionDraft({
-      teamIds: permissionState.teamIds ?? [],
-      personIds: permissionState.personIds ?? [],
-    });
-  }, [permissionState, permissionsDoc?.id]);
+    setPermissionDraft(
+      normalizeDocumentPermissions(
+        { teamIds: permissionState.teamIds ?? [], personIds: permissionState.personIds ?? [] },
+        permissionOptions?.teams
+      )
+    );
+  }, [permissionState, permissionsDoc?.id, permissionOptions?.teams]);
 
   useEffect(() => {
     if (!open || person || !teams?.length) return;
@@ -1006,63 +1009,12 @@ function PersonFormDialog({
               <DialogHeader>
                 <DialogTitle>Document permissions</DialogTitle>
               </DialogHeader>
-              <p className="text-xs text-white/45">
-                Choose exactly who can view/download this document. Default is no one selected.
-              </p>
-          {(() => {
-            const ownerPersonId = permissionOptions?.ownerPersonId ?? "";
-            return (
-              <div className="space-y-3">
-                {(permissionOptions?.teams ?? []).map((team) => {
-                  const teamChecked = permissionDraft.teamIds.includes(team.id);
-                  return (
-                    <div key={team.id} className="rounded border border-white/10 bg-white/[0.02] p-2 space-y-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          checked={teamChecked}
-                          onCheckedChange={(v) => {
-                            const on = v === true;
-                            setPermissionDraft((prev) => ({
-                              ...prev,
-                              teamIds: on
-                                ? [...new Set([...prev.teamIds, team.id])]
-                                : prev.teamIds.filter((id) => id !== team.id),
-                            }));
-                          }}
-                        />
-                        <span
-                          className="inline-block h-2.5 w-2.5 rounded-full border border-white/20"
-                          style={{ backgroundColor: team.color }}
-                        />
-                        <span className="text-sm text-white/85">{team.name}</span>
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pl-6">
-                        {team.members
-                          .filter((m) => m.id !== ownerPersonId)
-                          .map((m) => (
-                            <label key={m.id} className="flex items-center gap-2 text-xs text-white/75 cursor-pointer">
-                              <Checkbox
-                                checked={permissionDraft.personIds.includes(m.id)}
-                                onCheckedChange={(v) => {
-                                  const on = v === true;
-                                  setPermissionDraft((prev) => ({
-                                    ...prev,
-                                    personIds: on
-                                      ? [...new Set([...prev.personIds, m.id])]
-                                      : prev.personIds.filter((id) => id !== m.id),
-                                  }));
-                                }}
-                              />
-                              <span>{m.name}</span>
-                            </label>
-                          ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
+              <p className="text-xs text-white/45">Default is no one in addition to the document owner. Use teams and people below.</p>
+              <DocumentPermissionsForm
+                options={permissionOptions}
+                draft={permissionDraft}
+                onChange={setPermissionDraft}
+              />
               <DialogFooter>
                 <Button
                   type="button"
