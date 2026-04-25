@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
 type CurrencyRow = {
-  userDailyRateCents: string;
-  nextMonthUserDailyRateCents: string;
+  userDailyRateCents: string; // major units input (e.g. "5" means 5.00)
+  nextMonthUserDailyRateCents: string; // major units input
 };
 const CURRENCY_COUNTRY_LABELS: Record<string, string> = {
   USD: "United States",
@@ -27,25 +27,33 @@ const CURRENCY_COUNTRY_LABELS: Record<string, string> = {
   HRK: "Croatia",
 };
 
-function formatMajorFromCents(centsText: string): string {
-  const cents = Number(centsText);
-  if (!Number.isFinite(cents)) return "-";
-  return (cents / 100).toFixed(2);
+function formatEditableMajorFromCents(cents: number | null | undefined): string {
+  if (cents == null || !Number.isFinite(cents)) return "";
+  const major = cents / 100;
+  const fixed = major.toFixed(2);
+  return fixed.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+}
+
+function majorToCents(value: string): number {
+  const normalized = value.trim().replace(",", ".");
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(1, Math.round(parsed * 100));
 }
 
 function calculateBaseComparison(
   rows: Record<string, CurrencyRow>,
   rates: Record<string, number>,
   baseCurrency: string
-): Record<string, number | null> {
-  const base = Number(rows[baseCurrency]?.userDailyRateCents ?? "0");
-  const calculated: Record<string, number | null> = {};
-  if (!Number.isFinite(base) || base <= 0) return calculated;
+): Record<string, number> {
+  const baseMajor = Number((rows[baseCurrency]?.userDailyRateCents ?? "0").replace(",", "."));
+  const calculated: Record<string, number> = {};
+  if (!Number.isFinite(baseMajor) || baseMajor <= 0) return calculated;
   for (const currency of Object.keys(rows)) {
     if (currency === baseCurrency) continue;
     const fx = rates[currency];
     if (!fx || !Number.isFinite(fx)) continue;
-    calculated[currency] = Math.max(Math.round(base * fx), 1);
+    calculated[currency] = Math.max(baseMajor * fx, 0);
   }
   return calculated;
 }
@@ -85,8 +93,8 @@ export default function Pricing() {
     for (const currency of data.supportedCurrencies) {
       const found = data.currencyPrices.find((p) => p.currencyCode === currency);
       rowMap[currency] = {
-        userDailyRateCents: String(found?.userDailyRateCents ?? ""),
-        nextMonthUserDailyRateCents: found?.nextMonthUserDailyRateCents != null ? String(found.nextMonthUserDailyRateCents) : "",
+        userDailyRateCents: formatEditableMajorFromCents(found?.userDailyRateCents),
+        nextMonthUserDailyRateCents: formatEditableMajorFromCents(found?.nextMonthUserDailyRateCents),
       };
     }
     setCurrencyRows(rowMap);
@@ -139,9 +147,9 @@ export default function Pricing() {
           .filter(([, row]) => row.userDailyRateCents.trim().length > 0)
           .map(([currencyCode, row]) => ({
             currencyCode,
-            userDailyRateCents: Number(row.userDailyRateCents),
+            userDailyRateCents: majorToCents(row.userDailyRateCents),
             nextMonthUserDailyRateCents:
-              row.nextMonthUserDailyRateCents.trim().length > 0 ? Number(row.nextMonthUserDailyRateCents) : null,
+              row.nextMonthUserDailyRateCents.trim().length > 0 ? majorToCents(row.nextMonthUserDailyRateCents) : null,
           })),
       }),
     onSuccess: () => {
@@ -215,7 +223,7 @@ export default function Pricing() {
                 currency === form.baseCurrencyCode
                   ? row.userDailyRateCents || ""
                   : calculatedRows[currency] != null
-                    ? String(calculatedRows[currency])
+                    ? String(calculatedRows[currency].toFixed(2))
                     : "";
               return (
                 <div
@@ -260,7 +268,7 @@ export default function Pricing() {
                   />
                   <Input
                     className="col-span-2 h-7 text-xs px-2"
-                    value={calculatedValue ? `${formatMajorFromCents(calculatedValue)}` : "-"}
+                    value={calculatedValue || "-"}
                     readOnly
                   />
                 </div>
