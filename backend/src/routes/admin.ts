@@ -88,7 +88,13 @@ app.get("/admin/billing/settings", async (c) => {
   return c.json({
     data: {
       ...cfg,
-      currencyPrices: currencyPrices.map((p) => ({ currencyCode: p.currencyCode, userDailyRateCents: p.userDailyRateCents })),
+      currencyPrices: currencyPrices.map((p) => ({
+        currencyCode: p.currencyCode,
+        userDailyRateCents: p.userDailyRateCents,
+        followBaseCurrency: p.followBaseCurrency,
+        roundingMode: p.roundingMode,
+        roundingUnit: p.roundingUnit,
+      })),
       supportedCurrencies: [...SUPPORTED_BILLING_CURRENCIES],
     },
   });
@@ -103,6 +109,9 @@ app.patch("/admin/billing/settings", async (c) => {
           z.object({
             currencyCode: z.string().length(3),
             userDailyRateCents: z.number().int().min(1).max(10_000_000),
+            followBaseCurrency: z.boolean().optional(),
+            roundingMode: z.enum(["nearest", "up", "down"]).optional(),
+            roundingUnit: z.enum(["whole", "0", "00"]).optional(),
           })
         )
         .optional(),
@@ -120,8 +129,19 @@ app.patch("/admin/billing/settings", async (c) => {
       parsed.currencyPrices.map((row) =>
         prisma.billingCurrencyPrice.upsert({
           where: { currencyCode: row.currencyCode.toUpperCase() },
-          create: { currencyCode: row.currencyCode.toUpperCase(), userDailyRateCents: row.userDailyRateCents },
-          update: { userDailyRateCents: row.userDailyRateCents },
+          create: {
+            currencyCode: row.currencyCode.toUpperCase(),
+            userDailyRateCents: row.userDailyRateCents,
+            followBaseCurrency: row.followBaseCurrency ?? false,
+            roundingMode: row.roundingMode ?? "nearest",
+            roundingUnit: row.roundingUnit ?? "00",
+          },
+          update: {
+            userDailyRateCents: row.userDailyRateCents,
+            ...(row.followBaseCurrency !== undefined ? { followBaseCurrency: row.followBaseCurrency } : {}),
+            ...(row.roundingMode !== undefined ? { roundingMode: row.roundingMode } : {}),
+            ...(row.roundingUnit !== undefined ? { roundingUnit: row.roundingUnit } : {}),
+          },
         })
       )
     );
@@ -130,7 +150,13 @@ app.patch("/admin/billing/settings", async (c) => {
   return c.json({
     data: {
       ...cfg,
-      currencyPrices: prices.map((p) => ({ currencyCode: p.currencyCode, userDailyRateCents: p.userDailyRateCents })),
+      currencyPrices: prices.map((p) => ({
+        currencyCode: p.currencyCode,
+        userDailyRateCents: p.userDailyRateCents,
+        followBaseCurrency: p.followBaseCurrency,
+        roundingMode: p.roundingMode,
+        roundingUnit: p.roundingUnit,
+      })),
       supportedCurrencies: [...SUPPORTED_BILLING_CURRENCIES],
     },
   });

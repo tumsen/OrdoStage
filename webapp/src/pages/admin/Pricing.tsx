@@ -5,6 +5,50 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type RoundingMode = "nearest" | "up" | "down";
+type RoundingUnit = "whole" | "0" | "00";
+
+type CurrencyRow = {
+  userDailyRateCents: string;
+  followBaseCurrency: boolean;
+  roundingMode: RoundingMode;
+  roundingUnit: RoundingUnit;
+};
+
+const BASE_CURRENCY = "USD";
+const CURRENCY_COUNTRY_LABELS: Record<string, string> = {
+  USD: "United States",
+  EUR: "Eurozone",
+  DKK: "Denmark",
+  SEK: "Sweden",
+  NOK: "Norway",
+  GBP: "United Kingdom",
+  CHF: "Switzerland",
+  PLN: "Poland",
+  CZK: "Czech Republic",
+  HUF: "Hungary",
+  RON: "Romania",
+  BGN: "Bulgaria",
+  HRK: "Croatia",
+};
+
+function roundingStepCents(unit: RoundingUnit): number {
+  if (unit === "whole") return 100;
+  if (unit === "0") return 10;
+  return 1;
+}
+
+function applyRounding(cents: number, mode: RoundingMode, unit: RoundingUnit): number {
+  const step = roundingStepCents(unit);
+  if (step <= 1) return Math.max(Math.round(cents), 1);
+  const scaled = cents / step;
+  if (mode === "up") return Math.max(Math.ceil(scaled) * step, 1);
+  if (mode === "down") return Math.max(Math.floor(scaled) * step, 1);
+  return Math.max(Math.round(scaled) * step, 1);
+}
 
 export default function Pricing() {
   const { toast } = useToast();
@@ -12,7 +56,7 @@ export default function Pricing() {
   const [form, setForm] = useState({
     paymentDueDays: "7",
   });
-  const [currencyPrices, setCurrencyPrices] = useState<Record<string, string>>({});
+  const [currencyRows, setCurrencyRows] = useState<Record<string, CurrencyRow>>({});
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
   const [fxLoading, setFxLoading] = useState(false);
   const [fxError, setFxError] = useState<string | null>(null);
@@ -20,7 +64,13 @@ export default function Pricing() {
 
   const { data, isPending } = useQuery<{
     paymentDueDays: number;
-    currencyPrices: Array<{ currencyCode: string; userDailyRateCents: number }>;
+    currencyPrices: Array<{
+      currencyCode: string;
+      userDailyRateCents: number;
+      followBaseCurrency?: boolean;
+      roundingMode?: RoundingMode;
+      roundingUnit?: RoundingUnit;
+    }>;
     supportedCurrencies: string[];
   }>({
     queryKey: ["admin", "billing-settings"],
@@ -29,12 +79,17 @@ export default function Pricing() {
 
   useEffect(() => {
     if (!data) return;
-    const priceMap: Record<string, string> = {};
+    const rowMap: Record<string, CurrencyRow> = {};
     for (const currency of data.supportedCurrencies) {
       const found = data.currencyPrices.find((p) => p.currencyCode === currency);
-      priceMap[currency] = String(found?.userDailyRateCents ?? "");
+      rowMap[currency] = {
+        userDailyRateCents: String(found?.userDailyRateCents ?? ""),
+        followBaseCurrency: Boolean(found?.followBaseCurrency),
+        roundingMode: found?.roundingMode ?? "nearest",
+        roundingUnit: found?.roundingUnit ?? "00",
+      };
     }
-    setCurrencyPrices(priceMap);
+    setCurrencyRows(rowMap);
     setForm({
       paymentDueDays: String(data.paymentDueDays),
     });
@@ -62,15 +117,43 @@ export default function Pricing() {
     fetchUsdRates().catch(() => {});
   }, [fetchUsdRates]);
 
+  useEffect(() => {
+    const base = Number(currencyRows[BASE_CURRENCY]?.userDailyRateCents ?? "0");
+    if (!Number.isFinite(base) || base <= 0) return;
+    if (Object.keys(currencyRows).length === 0) return;
+    setCurrencyRows((prev) => {
+      let changed = false;
+      const next: Record<string, CurrencyRow> = { ...prev };
+      for (const currency of Object.keys(next)) {
+        if (currency === BASE_CURRENCY) continue;
+        const row = next[currency];
+        if (!row.followBaseCurrency) continue;
+        const fx = fxRates[currency];
+        if (!fx || !Number.isFinite(fx)) continue;
+        const raw = base * fx;
+        const rounded = applyRounding(raw, row.roundingMode, row.roundingUnit);
+        const roundedText = String(rounded);
+        if (row.userDailyRateCents !== roundedText) {
+          next[currency] = { ...row, userDailyRateCents: roundedText };
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [currencyRows, fxRates]);
+
   const saveMutation = useMutation({
     mutationFn: () =>
       api.patch("/api/admin/billing/settings", {
         paymentDueDays: Number(form.paymentDueDays),
-        currencyPrices: Object.entries(currencyPrices)
-          .filter(([, v]) => v.trim().length > 0)
-          .map(([currencyCode, value]) => ({
+        currencyPrices: Object.entries(currencyRows)
+          .filter(([, row]) => row.userDailyRateCents.trim().length > 0)
+          .map(([currencyCode, row]) => ({
             currencyCode,
-            userDailyRateCents: Number(value),
+            userDailyRateCents: Number(row.userDailyRateCents),
+            followBaseCurrency: row.followBaseCurrency,
+            roundingMode: row.roundingMode,
+            roundingUnit: row.roundingUnit,
           })),
       }),
     onSuccess: () => {
@@ -106,7 +189,7 @@ export default function Pricing() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <p className="text-xs text-white/60">
-              Standard currency: <span className="text-white font-medium">USD</span>. One row per currency.
+              Standard currency: <span className="text-white font-medium">{BASE_CURRENCY}</span>. One row per currency.
             </p>
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => fetchUsdRates()} disabled={fxLoading}>
@@ -120,25 +203,90 @@ export default function Pricing() {
 
           <div className="space-y-2">
             <div className="grid grid-cols-12 gap-3 text-xs text-white/45 px-1">
-              <p className="col-span-2">Currency</p>
-              <p className="col-span-4">Daily user rate (minor units)</p>
+              <p className="col-span-2">Currency / Country</p>
+              <p className="col-span-2">Follow base</p>
+              <p className="col-span-2">Rounding rule</p>
+              <p className="col-span-2">Round to</p>
               <p className="col-span-3">FX rate (1 USD {"->"} currency)</p>
-              <p className="col-span-3">Converted from USD rate</p>
+              <p className="col-span-1">Rate</p>
             </div>
             {(data?.supportedCurrencies ?? []).map((currency) => {
-              const usdRateCents = Number(currencyPrices.USD || "0");
-              const fxRate = currency === "USD" ? 1 : fxRates[currency];
-              const converted = Number.isFinite(usdRateCents) && fxRate ? Math.round(usdRateCents * fxRate) : null;
+              const row = currencyRows[currency] ?? {
+                userDailyRateCents: "",
+                followBaseCurrency: false,
+                roundingMode: "nearest" as RoundingMode,
+                roundingUnit: "00" as RoundingUnit,
+              };
+              const fxRate = currency === BASE_CURRENCY ? 1 : fxRates[currency];
               return (
                 <div key={currency} className="grid grid-cols-12 gap-3 items-center">
-                  <p className="col-span-2 text-sm text-white font-medium">{currency}</p>
-                  <Input
-                    className="col-span-4"
-                    value={currencyPrices[currency] ?? ""}
-                    onChange={(e) => setCurrencyPrices((prev) => ({ ...prev, [currency]: e.target.value }))}
-                  />
+                  <div className="col-span-2">
+                    <p className="text-sm text-white font-medium">
+                      {currency} - {CURRENCY_COUNTRY_LABELS[currency] ?? "Other"}
+                    </p>
+                  </div>
+                  <div className="col-span-2 flex items-center">
+                    <Checkbox
+                      checked={currency === BASE_CURRENCY ? false : row.followBaseCurrency}
+                      disabled={currency === BASE_CURRENCY}
+                      onCheckedChange={(checked) =>
+                        setCurrencyRows((prev) => ({
+                          ...prev,
+                          [currency]: { ...row, followBaseCurrency: Boolean(checked) },
+                        }))
+                      }
+                    />
+                  </div>
+                  <Select
+                    value={row.roundingMode}
+                    onValueChange={(value: RoundingMode) =>
+                      setCurrencyRows((prev) => ({
+                        ...prev,
+                        [currency]: { ...row, roundingMode: value },
+                      }))
+                    }
+                    disabled={currency === BASE_CURRENCY || !row.followBaseCurrency}
+                  >
+                    <SelectTrigger className="col-span-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nearest">Nearest</SelectItem>
+                      <SelectItem value="up">Up</SelectItem>
+                      <SelectItem value="down">Down</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={row.roundingUnit}
+                    onValueChange={(value: RoundingUnit) =>
+                      setCurrencyRows((prev) => ({
+                        ...prev,
+                        [currency]: { ...row, roundingUnit: value },
+                      }))
+                    }
+                    disabled={currency === BASE_CURRENCY || !row.followBaseCurrency}
+                  >
+                    <SelectTrigger className="col-span-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="whole">Nearest whole</SelectItem>
+                      <SelectItem value="0">Nearest .0</SelectItem>
+                      <SelectItem value="00">Nearest .00</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Input className="col-span-3" value={fxRate ? fxRate.toFixed(6) : ""} readOnly />
-                  <Input className="col-span-3" value={converted != null ? String(converted) : ""} readOnly />
+                  <Input
+                    className="col-span-1"
+                    value={row.userDailyRateCents}
+                    onChange={(e) =>
+                      setCurrencyRows((prev) => ({
+                        ...prev,
+                        [currency]: { ...row, userDailyRateCents: e.target.value },
+                      }))
+                    }
+                    disabled={currency !== BASE_CURRENCY && row.followBaseCurrency}
+                  />
                 </div>
               );
             })}

@@ -127,6 +127,9 @@ model BillingConfig {
 model BillingCurrencyPrice {
   currencyCode       String   @id
   userDailyRateCents Int
+  followBaseCurrency Boolean  @default(false)
+  roundingMode       String   @default("nearest")
+  roundingUnit       String   @default("00")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
