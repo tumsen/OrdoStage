@@ -27,6 +27,12 @@ const CURRENCY_COUNTRY_LABELS: Record<string, string> = {
   HRK: "Croatia",
 };
 
+function formatMajorFromCents(centsText: string): string {
+  const cents = Number(centsText);
+  if (!Number.isFinite(cents)) return "-";
+  return (cents / 100).toFixed(2);
+}
+
 function calculateBaseComparison(rows: Record<string, CurrencyRow>, rates: Record<string, number>): Record<string, number | null> {
   const base = Number(rows[BASE_CURRENCY]?.userDailyRateCents ?? "0");
   const calculated: Record<string, number | null> = {};
@@ -226,7 +232,7 @@ export default function Pricing() {
                   />
                   <Input
                     className="col-span-2 h-7 text-xs px-2"
-                    value={calculatedValue ? rateLabel : "-"}
+                    value={calculatedValue ? `${calculatedValue} (${formatMajorFromCents(calculatedValue)}) @ ${rateLabel}` : "-"}
                     readOnly
                   />
                 </div>
