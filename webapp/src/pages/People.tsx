@@ -1201,7 +1201,7 @@ function PersonFormDialog({
                       }}
                       doc={doc}
                       canEdit={canEditPersonDocs}
-                      canManagePermissions={isSelfPerson}
+                      canManagePermissions={canWriteOrg || isSelfPerson}
                       isSaving={
                         updateDocMutation.isPending && updateDocMutation.variables?.id === doc.id
                       }

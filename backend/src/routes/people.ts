@@ -1102,8 +1102,10 @@ peopleRouter.get("/people/documents/:docId/permissions", async (c) => {
   if (!doc) {
     return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
   }
-  if (!canEditOwnProfile(user, doc.person.email)) {
-    return c.json({ error: { message: "Only the document owner can edit visibility", code: "FORBIDDEN" } }, 403);
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, doc.person.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
   const perms = await loadDocPermissions([doc.id]);
   const entry = perms.get(doc.id) ?? { teamIds: [], personIds: [] };
@@ -1129,8 +1131,10 @@ peopleRouter.get("/people/documents/:docId/permissions/options", async (c) => {
   if (!doc) {
     return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
   }
-  if (!canEditOwnProfile(user, doc.person.email)) {
-    return c.json({ error: { message: "Only the document owner can edit visibility", code: "FORBIDDEN" } }, 403);
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, doc.person.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
   const teams = await prisma.department.findMany({
     where: { organizationId: user.organizationId },
@@ -1179,8 +1183,10 @@ peopleRouter.patch(
     if (!doc) {
       return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
     }
-    if (!canEditOwnProfile(user, doc.person.email)) {
-      return c.json({ error: { message: "Only the document owner can edit visibility", code: "FORBIDDEN" } }, 403);
+    const canWritePeople = canAction(c, "write.people");
+    const canEditSelf = canEditOwnProfile(user, doc.person.email);
+    if (!canWritePeople && !canEditSelf) {
+      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
     }
     const teamIds = [...new Set(body.teamIds.filter(Boolean))];
     const personIds = [...new Set(body.personIds.filter(Boolean))].filter((id) => id !== doc.person.id);
