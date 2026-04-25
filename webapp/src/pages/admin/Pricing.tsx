@@ -220,7 +220,12 @@ export default function Pricing() {
               const rateLabel =
                 currency === form.baseCurrencyCode ? "1.000000" : fxRates[currency] != null ? fxRates[currency].toFixed(6) : "-";
               return (
-                <div key={currency} className="grid min-w-[760px] grid-cols-12 gap-2 items-center whitespace-nowrap">
+                <div
+                  key={currency}
+                  className={`grid min-w-[760px] grid-cols-12 gap-2 items-center whitespace-nowrap rounded px-1 py-1 ${
+                    currency === form.baseCurrencyCode ? "bg-emerald-950/30 border border-emerald-700/40" : ""
+                  }`}
+                >
                   <div className="col-span-4">
                     <div className="flex items-center gap-2">
                       <Checkbox
