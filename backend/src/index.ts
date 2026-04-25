@@ -184,9 +184,12 @@ app.use("/api/*", async (c, next) => {
 
   // Block writes when out of credits
   const method = c.req.method;
+  // Document metadata / uploads: allow even when out of credits (files already stored; editing names/dates is free)
   const exemptCreditBlock =
     (path.match(/^\/api\/people\/[^/]+\/active$/) && method === "PATCH") ||
-    (path === "/api/me/account" && method === "DELETE");
+    (path === "/api/me/account" && method === "DELETE") ||
+    (path.match(/^\/api\/people\/documents\/.+/) && ["PATCH", "DELETE"].includes(method)) ||
+    (path.match(/^\/api\/people\/[^/]+\/documents$/) && method === "POST");
   if (exemptCreditBlock) {
     await next();
     return;

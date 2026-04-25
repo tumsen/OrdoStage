@@ -873,23 +873,23 @@ peopleRouter.patch("/people/documents/:docId", zValidator("json", UpdatePersonDo
   if (!canWritePeople && !canEditSelf) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
-  if (body.doesNotExpire !== true) {
-    if (body.expiresAt !== undefined && body.expiresAt !== null) {
-      const d = parsePersonDocumentExpiresAtInput(body.expiresAt);
-      if (!d) {
-        return c.json({ error: { message: "Invalid expiration date", code: "BAD_REQUEST" } }, 400);
-      }
-    }
-  }
   const data: { name?: string; expiresAt?: Date | null; doesNotExpire?: boolean } = {};
   if (body.name !== undefined) data.name = body.name;
   if (body.doesNotExpire === true) {
     data.doesNotExpire = true;
     data.expiresAt = null;
-  } else {
-    if (body.doesNotExpire === false) {
-      data.doesNotExpire = false;
+  } else if (body.doesNotExpire === false) {
+    data.doesNotExpire = false;
+    if (body.expiresAt) {
+      const p = parsePersonDocumentExpiresAtInput(body.expiresAt);
+      if (!p) {
+        return c.json({ error: { message: "Invalid expiration date", code: "BAD_REQUEST" } }, 400);
+      }
+      data.expiresAt = p;
+    } else {
+      data.expiresAt = null;
     }
+  } else {
     if (body.expiresAt !== undefined) {
       if (body.expiresAt === null) {
         data.expiresAt = null;

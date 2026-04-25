@@ -10,9 +10,10 @@ import { confirmDeleteAction } from "@/lib/deleteConfirm";
 const backendBase = () => import.meta.env.VITE_BACKEND_URL || "";
 
 export type PersonDocumentSavePatch = {
-  name?: string;
-  expiresAt?: string | null;
-  doesNotExpire?: boolean;
+  name: string;
+  doesNotExpire: boolean;
+  /** YYYY-MM-DD or `null` when no date (ignored when `doesNotExpire` is true). */
+  expiresAt: string | null;
 };
 
 type Props = {
@@ -20,7 +21,7 @@ type Props = {
   canEdit: boolean;
   isSaving: boolean;
   isDeleting: boolean;
-  onSave: (id: string, body: PersonDocumentSavePatch) => Promise<void>;
+  onSave: (id: string, body: PersonDocumentSavePatch) => Promise<unknown>;
   onDelete: (id: string) => void;
 };
 
@@ -44,12 +45,14 @@ export function PersonDocumentListRow({
     setDoesNotExpire(Boolean(doc.doesNotExpire));
   }, [doc.id]);
 
-  const expiry = getPersonDocumentExpiryInfo(doc.expiresAt, doc.doesNotExpire);
+  const docDne = doc.doesNotExpire === true;
+  const docDate = formatDateForDateInput(doc.expiresAt ?? null) || null;
+
+  const expiry = getPersonDocumentExpiryInfo(doc.expiresAt, docDne);
+  const localExp = doesNotExpire ? null : (expires.trim() || null);
+  const docExp = docDne ? null : docDate;
   const dirty =
-    name.trim() !== doc.name ||
-    doesNotExpire !== Boolean(doc.doesNotExpire) ||
-    (!doesNotExpire &&
-      (expires || null) !== (formatDateForDateInput(doc.expiresAt ?? null) || null));
+    name.trim() !== doc.name || doesNotExpire !== docDne || localExp !== docExp;
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-2 py-2 text-xs border-b border-white/5 last:border-0 w-full min-w-0">
@@ -128,19 +131,17 @@ export function PersonDocumentListRow({
             size="sm"
             className="h-7 text-[11px] bg-white/10 hover:bg-white/15"
             disabled={!dirty || !name.trim() || isSaving}
-            onClick={async () => {
-              const patch: PersonDocumentSavePatch = {};
-              if (name.trim() !== doc.name) patch.name = name.trim();
-              if (doesNotExpire !== Boolean(doc.doesNotExpire)) patch.doesNotExpire = doesNotExpire;
-              if (doesNotExpire) {
-                if (doc.expiresAt) patch.expiresAt = null;
-              } else {
-                const nextExp = expires.trim() || null;
-                const curExp = formatDateForDateInput(doc.expiresAt ?? null) || null;
-                if (nextExp !== curExp) patch.expiresAt = nextExp;
-              }
-              if (Object.keys(patch).length === 0) return;
-              await onSave(doc.id, patch);
+            onClick={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const n = name.trim();
+              if (!n || isSaving) return;
+              // Full snapshot (not a diff) so the server + cache always get a consistent state.
+              await onSave(doc.id, {
+                name: n,
+                doesNotExpire,
+                expiresAt: doesNotExpire ? null : (expires.trim() || null),
+              });
             }}
           >
             {isSaving ? "Saving…" : "Save"}

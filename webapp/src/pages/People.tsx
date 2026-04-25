@@ -510,6 +510,12 @@ function PersonFormDialog({
       }
       queryClient.invalidateQueries({ queryKey: ["people"] });
     },
+    onError: (e: Error) => {
+      toast({
+        title: e.message || "Could not update document",
+        variant: "destructive",
+      });
+    },
   });
 
   function handleSubmit(values: PersonFormValues) {

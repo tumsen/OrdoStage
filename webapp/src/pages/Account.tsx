@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
-import { api, isApiError } from "@/lib/api";
+import { api, isApiError, ApiError } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -175,6 +176,10 @@ export default function Account() {
       }
       if (mePerson?.id) queryClient.invalidateQueries({ queryKey: ["people", mePerson.id, "documents"] });
       queryClient.invalidateQueries({ queryKey: ["people"] });
+    },
+    onError: (e: Error) => {
+      const msg = e instanceof ApiError ? e.message : "Could not update document";
+      toast({ title: msg, variant: "destructive" });
     },
   });
 
