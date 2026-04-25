@@ -86,29 +86,15 @@ const PersonFormSchema = z.object({
     .array(
       z.object({
         teamId: z.string().optional(),
-        newTeamName: z.string().optional(),
         role: z.string().optional(),
       })
     )
     .min(1, "Pick at least one team")
     .superRefine((rows, ctx) => {
-      let ok = false;
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        if (!r) continue;
-        const hasId = Boolean(r.teamId?.trim());
-        const hasNew = Boolean(r.newTeamName?.trim());
-        if (hasId && hasNew) {
-          ctx.addIssue({
-            code: "custom",
-            message: "Use either an existing team or a new name per row",
-            path: ["teamAssignments", i],
-          });
-          continue;
-        }
-        if (hasId || hasNew) ok = true;
+      const hasTeam = rows.some((r) => Boolean(r?.teamId?.trim()));
+      if (!hasTeam) {
+        ctx.addIssue({ code: "custom", message: "Select at least one team", path: ["teamAssignments"] });
       }
-      if (!ok) ctx.addIssue({ code: "custom", message: "Select or add at least one team", path: ["teamAssignments"] });
     }),
 })
   .superRefine((data, ctx) => {
@@ -427,7 +413,6 @@ function PersonFormDialog({
           teamAssignments:
             person.teamMemberships?.map((membership) => ({
               teamId: membership.teamId,
-              newTeamName: "",
               role: membership.role ?? "",
             })) ?? [],
         }
@@ -452,7 +437,6 @@ function PersonFormDialog({
         },
   });
 
-  const [newTeamDraft, setNewTeamDraft] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
@@ -478,7 +462,7 @@ function PersonFormDialog({
     if (!open || person || !teams?.length) return;
     const cur = form.getValues("teamAssignments");
     if (cur.length === 0) {
-      form.setValue("teamAssignments", [{ teamId: teams[0].id, newTeamName: "", role: "" }]);
+      form.setValue("teamAssignments", [{ teamId: teams[0].id, role: "" }]);
     }
   }, [open, person, teams, form]);
 
@@ -506,7 +490,6 @@ function PersonFormDialog({
           : {}),
         teamAssignments: values.teamAssignments.map((assignment) => ({
           teamId: assignment.teamId?.trim() || undefined,
-          newTeamName: assignment.newTeamName?.trim() || undefined,
           role: assignment.role?.trim() || undefined,
         })),
       };
@@ -836,36 +819,9 @@ function PersonFormDialog({
           <div className="space-y-2">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Teams *</Label>
             <p className="text-[11px] text-white/35">
-              Pick existing teams or add a new name — we create the team if it does not exist. Optional{" "}
+              Choose from teams that already exist. Create new teams on the Team page. Optional{" "}
               <strong className="text-white/45">role in team</strong> below can differ from the default role above.
             </p>
-            <div className="flex gap-2 flex-wrap">
-              <Input
-                value={newTeamDraft}
-                onChange={(e) => setNewTeamDraft(e.target.value)}
-                placeholder="New team name…"
-                className="flex-1 min-w-[140px] bg-white/5 border-white/10 text-white placeholder:text-white/25 h-9 text-sm"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-white/15 text-white/80 shrink-0"
-                onClick={() => {
-                  const name = newTeamDraft.trim();
-                  if (!name) return;
-                  const current = form.getValues("teamAssignments");
-                  form.setValue(
-                    "teamAssignments",
-                    [...current, { newTeamName: name, teamId: "", role: "" }],
-                    { shouldValidate: true }
-                  );
-                  setNewTeamDraft("");
-                }}
-              >
-                Add team
-              </Button>
-            </div>
             {teams && teams.length > 0 ? (
               <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
                 {teams.map((team) => {
@@ -882,7 +838,7 @@ function PersonFormDialog({
                             form.setValue(
                               "teamAssignments",
                               checked
-                                ? [...current, { teamId: team.id, newTeamName: "", role: "" }]
+                                ? [...current, { teamId: team.id, role: "" }]
                                 : current.filter((entry) => entry.teamId !== team.id),
                               { shouldValidate: true }
                             );
@@ -917,7 +873,7 @@ function PersonFormDialog({
               </div>
             ) : (
               <p className="text-xs text-amber-300/70">
-                No teams yet — use &quot;Add team&quot; with a name above, or create teams on the Team page.
+                No teams yet — create teams on the Team page, then add this person to them here.
               </p>
             )}
             {form.formState.errors.teamAssignments ? (
