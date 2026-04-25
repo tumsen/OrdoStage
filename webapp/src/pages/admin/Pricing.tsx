@@ -50,29 +50,22 @@ function applyRounding(cents: number, mode: RoundingMode, unit: RoundingUnit): n
   return Math.max(Math.round(scaled) * step, 1);
 }
 
-function recomputeLinkedRows(
+function calculateLinkedRows(
   rows: Record<string, CurrencyRow>,
   rates: Record<string, number>
-): { next: Record<string, CurrencyRow>; changed: boolean; changedCount: number } {
+): Record<string, number | null> {
   const base = Number(rows[BASE_CURRENCY]?.userDailyRateCents ?? "0");
-  if (!Number.isFinite(base) || base <= 0) return { next: rows, changed: false, changedCount: 0 };
-  let changed = false;
-  let changedCount = 0;
-  const next: Record<string, CurrencyRow> = { ...rows };
-  for (const currency of Object.keys(next)) {
+  const calculated: Record<string, number | null> = {};
+  if (!Number.isFinite(base) || base <= 0) return calculated;
+  for (const currency of Object.keys(rows)) {
     if (currency === BASE_CURRENCY) continue;
-    const row = next[currency];
+    const row = rows[currency];
     if (!row.followBaseCurrency) continue;
     const fx = rates[currency];
     if (!fx || !Number.isFinite(fx)) continue;
-    const roundedText = String(applyRounding(base * fx, row.roundingMode, row.roundingUnit));
-    if (row.userDailyRateCents !== roundedText) {
-      next[currency] = { ...row, userDailyRateCents: roundedText };
-      changed = true;
-      changedCount += 1;
-    }
+    calculated[currency] = applyRounding(base * fx, row.roundingMode, row.roundingUnit);
   }
-  return { next, changed, changedCount };
+  return calculated;
 }
 
 export default function Pricing() {
@@ -144,21 +137,23 @@ export default function Pricing() {
     fetchUsdRates().catch(() => {});
   }, [fetchUsdRates]);
 
-  useEffect(() => {
-    if (Object.keys(currencyRows).length === 0) return;
-    setCurrencyRows((prev) => {
-      const { next, changed } = recomputeLinkedRows(prev, fxRates);
-      return changed ? next : prev;
-    });
-  }, [currencyRows, fxRates]);
+  const calculatedRows = calculateLinkedRows(currencyRows, fxRates);
 
   const applyUsdRecalculationNow = () => {
     let changedCount = 0;
     setCurrencyRows((prev) => {
-      const result = recomputeLinkedRows(prev, fxRates);
-      changedCount = result.changedCount;
-      const { next, changed } = result;
-      return changed ? next : prev;
+      const calculated = calculateLinkedRows(prev, fxRates);
+      const next: Record<string, CurrencyRow> = { ...prev };
+      for (const currency of Object.keys(calculated)) {
+        const value = calculated[currency];
+        if (value == null) continue;
+        const nextText = String(value);
+        if (next[currency] && next[currency].userDailyRateCents !== nextText) {
+          next[currency] = { ...next[currency], userDailyRateCents: nextText };
+          changedCount += 1;
+        }
+      }
+      return changedCount > 0 ? next : prev;
     });
     if (changedCount > 0) {
       toast({ title: "Recalculated", description: `Updated ${changedCount} linked currency rows.` });
@@ -235,11 +230,12 @@ export default function Pricing() {
           <div className="space-y-2">
             <div className="grid grid-cols-12 gap-3 text-xs text-white/45 px-1">
               <p className="col-span-2">Currency / Country</p>
+              <p className="col-span-1">Current price</p>
               <p className="col-span-2">Follow base</p>
               <p className="col-span-2">Rounding rule</p>
               <p className="col-span-2">Round to</p>
               <p className="col-span-3">FX rate (1 USD {"->"} currency)</p>
-              <p className="col-span-1">Rate</p>
+              <p className="col-span-2">Calculated price</p>
             </div>
             {(data?.supportedCurrencies ?? []).map((currency) => {
               const row = currencyRows[currency] ?? {
@@ -249,6 +245,12 @@ export default function Pricing() {
                 roundingUnit: "00" as RoundingUnit,
               };
               const fxRate = currency === BASE_CURRENCY ? 1 : fxRates[currency];
+              const calculatedValue =
+                currency === BASE_CURRENCY
+                  ? row.userDailyRateCents || ""
+                  : calculatedRows[currency] != null
+                    ? String(calculatedRows[currency])
+                    : "";
               return (
                 <div key={currency} className="grid grid-cols-12 gap-3 items-center">
                   <div className="col-span-2">
@@ -256,6 +258,16 @@ export default function Pricing() {
                       {currency} - {CURRENCY_COUNTRY_LABELS[currency] ?? "Other"}
                     </p>
                   </div>
+                  <Input
+                    className="col-span-1"
+                    value={row.userDailyRateCents}
+                    onChange={(e) =>
+                      setCurrencyRows((prev) => ({
+                        ...prev,
+                        [currency]: { ...row, userDailyRateCents: e.target.value },
+                      }))
+                    }
+                  />
                   <div className="col-span-2 flex items-center">
                     <Checkbox
                       checked={currency === BASE_CURRENCY ? false : row.followBaseCurrency}
@@ -307,17 +319,7 @@ export default function Pricing() {
                     </SelectContent>
                   </Select>
                   <Input className="col-span-3" value={fxRate ? fxRate.toFixed(6) : ""} readOnly />
-                  <Input
-                    className="col-span-1"
-                    value={row.userDailyRateCents}
-                    onChange={(e) =>
-                      setCurrencyRows((prev) => ({
-                        ...prev,
-                        [currency]: { ...row, userDailyRateCents: e.target.value },
-                      }))
-                    }
-                    disabled={currency !== BASE_CURRENCY && row.followBaseCurrency}
-                  />
+                  <Input className="col-span-2" value={calculatedValue} readOnly />
                 </div>
               );
             })}
