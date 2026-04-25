@@ -145,6 +145,7 @@ export default function Account() {
   const [companyAddress, setCompanyAddress] = useState<Address>(EMPTY_ADDRESS);
   const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null);
   const [companyLogoPreviewUrl, setCompanyLogoPreviewUrl] = useState<string | null>(null);
+  const [companyLogoStatus, setCompanyLogoStatus] = useState<string>("");
 
   const { data: companyInfo } = useQuery<{
     name: string;
@@ -201,7 +202,7 @@ export default function Account() {
 
   const uploadCompanyLogoMutation = useMutation({
     mutationFn: async () => {
-      if (!companyLogoFile) return;
+      if (!companyLogoFile) throw new Error("Please choose a logo file first.");
       const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
       const formData = new FormData();
       formData.append("file", companyLogoFile);
@@ -210,23 +211,41 @@ export default function Account() {
         credentials: "include",
         body: formData,
       });
-      if (!resp.ok) throw new Error("Could not upload company logo.");
+      if (!resp.ok) {
+        const payload = await resp.json().catch(() => null);
+        const message = payload?.error?.message || payload?.message || "Could not upload company logo.";
+        throw new Error(message);
+      }
     },
     onSuccess: () => {
       setCompanyLogoFile(null);
+      setCompanyLogoStatus("Company logo updated.");
       queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
       setProfileMessage("Company logo updated.");
+      toast({ title: "Company logo updated" });
     },
-    onError: (e: Error) => setProfileMessage(e.message || "Could not upload company logo."),
+    onError: (e: Error) => {
+      const msg = e.message || "Could not upload company logo.";
+      setCompanyLogoStatus(msg);
+      setProfileMessage(msg);
+      toast({ title: "Could not upload company logo", description: msg, variant: "destructive" });
+    },
   });
 
   const removeCompanyLogoMutation = useMutation({
     mutationFn: () => api.delete("/api/org/company-logo"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
+      setCompanyLogoStatus("Company logo removed.");
       setProfileMessage("Company logo removed.");
+      toast({ title: "Company logo removed" });
     },
-    onError: (e: Error) => setProfileMessage(e.message || "Could not remove company logo."),
+    onError: (e: Error) => {
+      const msg = e.message || "Could not remove company logo.";
+      setCompanyLogoStatus(msg);
+      setProfileMessage(msg);
+      toast({ title: "Could not remove company logo", description: msg, variant: "destructive" });
+    },
   });
 
   const saveProfileMutation = useMutation({
@@ -525,7 +544,10 @@ export default function Account() {
                 <Input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setCompanyLogoFile(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    setCompanyLogoStatus("");
+                    setCompanyLogoFile(e.target.files?.[0] ?? null);
+                  }}
                   className="max-w-md bg-white/5 border-white/10 text-white file:text-white"
                 />
                 <Button
@@ -560,6 +582,7 @@ export default function Account() {
                 </div>
               ) : null}
             </div>
+            {companyLogoStatus ? <p className="text-xs text-white/70">{companyLogoStatus}</p> : null}
           </div>
           <Button
             type="button"
