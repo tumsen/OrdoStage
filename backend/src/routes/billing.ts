@@ -128,7 +128,7 @@ app.post("/billing/webhook", async (c) => {
 
     if (organizationId && days > 0 && amountCents > 0) {
       const existing = await prisma.creditPurchase.findUnique({
-        where: { stripeSessionId: transactionId },
+        where: { paddleTransactionId: transactionId },
       });
       if (!existing) {
         // Fetch org info for snapshot + invoice
@@ -167,7 +167,7 @@ app.post("/billing/webhook", async (c) => {
               organizationId,
               days,
               amountCents,
-              stripeSessionId: transactionId,
+              paddleTransactionId: transactionId,
               invoiceNumber,
               orgNameSnapshot: org?.name ?? null,
               invoiceNameSnapshot: org?.invoiceName ?? null,
