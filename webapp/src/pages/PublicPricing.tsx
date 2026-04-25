@@ -4,6 +4,39 @@ import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
+const REGION_TO_CURRENCY: Record<string, string> = {
+  DK: "DKK",
+  SE: "SEK",
+  NO: "NOK",
+  GB: "GBP",
+  CH: "CHF",
+  PL: "PLN",
+  CZ: "CZK",
+  HU: "HUF",
+  RO: "RON",
+  BG: "BGN",
+  HR: "HRK",
+  US: "USD",
+};
+
+function detectUserCurrency(supported: string[], fallback: string): string {
+  if (typeof navigator !== "undefined") {
+    const locale = navigator.language || "";
+    const region = locale.split("-")[1]?.toUpperCase();
+    if (region && REGION_TO_CURRENCY[region] && supported.includes(REGION_TO_CURRENCY[region])) {
+      return REGION_TO_CURRENCY[region];
+    }
+    const currencyFromLocale =
+      locale.includes("en-US") ? "USD" : locale.includes("da-") ? "DKK" : locale.includes("sv-") ? "SEK" : locale.includes("nb-") || locale.includes("nn-") ? "NOK" : locale.includes("en-GB") ? "GBP" : "EUR";
+    if (supported.includes(currencyFromLocale)) return currencyFromLocale;
+  }
+  return supported.includes(fallback) ? fallback : supported[0] || "USD";
+}
+
+function formatMajorFromCents(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
 function SectionDivider() {
   return (
     <div className="my-14 md:my-16 flex items-center gap-4" aria-hidden>
@@ -24,6 +57,21 @@ export default function PublicPricing() {
   const pricingTitle =
     siteMeta?.pricing_page_title?.trim() || "Postpaid pricing that scales with usage";
 
+  const { data: publicPricing } = useQuery<{
+    baseCurrencyCode: string;
+    prices: Array<{ currencyCode: string; userDailyRateCents: number }>;
+  }>({
+    queryKey: ["public-pricing-rates"],
+    queryFn: () => api.get("/api/public/pricing"),
+  });
+
+  const supportedCurrencies = (publicPricing?.prices ?? []).map((p) => p.currencyCode);
+  const userCurrency = detectUserCurrency(supportedCurrencies, publicPricing?.baseCurrencyCode || "USD");
+  const selectedPriceCents =
+    publicPricing?.prices.find((p) => p.currencyCode === userCurrency)?.userDailyRateCents ??
+    publicPricing?.prices.find((p) => p.currencyCode === publicPricing?.baseCurrencyCode)?.userDailyRateCents ??
+    0;
+
   return (
     <div className="text-white">
       <article className="w-full px-6 py-14 md:py-20 space-y-10 md:space-y-12">
@@ -39,6 +87,15 @@ export default function PublicPricing() {
           <p className="rounded-xl border border-ordo-yellow/35 bg-gradient-to-br from-ordo-magenta/[0.12] to-ordo-violet/[0.08] px-4 py-4 text-[15px] leading-relaxed text-white/90 md:text-base">
             Invoices are issued on the first day of each month for previous-month usage, with a 7-day payment window.
           </p>
+          <div className="rounded-xl border border-white/15 bg-white/[0.04] px-4 py-4">
+            <p className="text-sm text-white/65">Daily user price for your region</p>
+            <p className="text-2xl font-bold text-white mt-1">
+              {userCurrency} {formatMajorFromCents(selectedPriceCents)}
+            </p>
+            <p className="text-xs text-white/50 mt-1">
+              Currency auto-selected from your locale/country. Base currency: {publicPricing?.baseCurrencyCode || "USD"}.
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
               asChild

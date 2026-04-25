@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { prisma } from "../prisma";
+import { ensureCurrencyPriceMonthRollover, SUPPORTED_BILLING_CURRENCIES } from "../postpaidBilling";
 
 const DEFAULT_RIDER_VISIBILITY = {
   venue: true,
@@ -51,6 +52,30 @@ function serializePublicPerson(person: any) {
 }
 
 const publicRouter = new Hono();
+
+// GET /api/public/pricing — public pricing table
+publicRouter.get("/pricing", async (c) => {
+  await ensureCurrencyPriceMonthRollover(prisma);
+  const [cfgRows, priceRows] = await Promise.all([
+    prisma.$queryRaw<Array<{ baseCurrencyCode: string | null }>>`
+      SELECT "baseCurrencyCode" FROM "BillingConfig" WHERE "id" = 'default' LIMIT 1
+    `,
+    prisma.billingCurrencyPrice.findMany(),
+  ]);
+
+  const byCurrency = new Map(priceRows.map((r) => [r.currencyCode.toUpperCase(), r.userDailyRateCents]));
+  const prices = SUPPORTED_BILLING_CURRENCIES.map((currencyCode) => ({
+    currencyCode,
+    userDailyRateCents: byCurrency.get(currencyCode) ?? 0,
+  }));
+
+  return c.json({
+    data: {
+      baseCurrencyCode: cfgRows[0]?.baseCurrencyCode?.toUpperCase() || "USD",
+      prices,
+    },
+  });
+});
 
 // GET /api/public/invite/:token — invitation preview (no auth)
 publicRouter.get("/invite/:token", async (c) => {
