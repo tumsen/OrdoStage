@@ -260,7 +260,7 @@ app.patch("/org/billing-settings", async (c) => {
     ...(body.customFlatRateCents !== undefined ? { customFlatRateCents: body.customFlatRateCents } : {}),
     ...(body.customFlatRateMaxUsers !== undefined ? { customFlatRateMaxUsers: body.customFlatRateMaxUsers } : {}),
     ...(body.billingCurrencyCode !== undefined
-      ? { billingCurrencyCode: (body.billingCurrencyCode || "EUR").toUpperCase() }
+      ? { billingCurrencyCode: (body.billingCurrencyCode || "USD").toUpperCase() }
       : {}),
   };
 

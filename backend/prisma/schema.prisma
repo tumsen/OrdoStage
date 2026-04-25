@@ -92,7 +92,7 @@ model Organization {
   customDiscountPercent   Int?
   customFlatRateCents     Int?
   customFlatRateMaxUsers  Int?
-  billingCurrencyCode     String             @default("EUR")
+  billingCurrencyCode     String             @default("USD")
   /** Company / invoice information (optional — used on generated PDF invoices). */
   invoiceName      String?
   invoiceStreet    String?

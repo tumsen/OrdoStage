@@ -54,11 +54,11 @@ app.get("/admin/stats", async (c) => {
     ]);
   const now = new Date();
   const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
-  const fallbackRate = currencyPrices.EUR ?? 1500;
+  const fallbackRate = currencyPrices.USD ?? 1500;
   const expectedIncomeByCurrencyCents: Record<string, number> = {};
   for (const currency of SUPPORTED_BILLING_CURRENCIES) expectedIncomeByCurrencyCents[currency] = 0;
   for (const org of orgs) {
-    const currency = (org.billingCurrencyCode || "EUR").toUpperCase();
+    const currency = (org.billingCurrencyCode || "USD").toUpperCase();
     const estimate = estimateMonthlyOrgAmountCents({
       activeUsers: org.memberships.length,
       daysInMonth,
@@ -206,9 +206,9 @@ app.get("/admin/orgs", async (c) => {
   }), getCurrencyPriceMap(prisma)]);
   const now = new Date();
   const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
-  const fallbackRate = currencyPrices.EUR ?? 1500;
+  const fallbackRate = currencyPrices.USD ?? 1500;
   const data = orgs.map((org) => {
-    const currency = (org.billingCurrencyCode || "EUR").toUpperCase();
+    const currency = (org.billingCurrencyCode || "USD").toUpperCase();
     const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
       activeUsers: org._count.memberships,
       daysInMonth,
@@ -322,10 +322,10 @@ app.get("/admin/orgs/:id", async (c) => {
     createdAt: m.user.createdAt,
   }));
 
-  const currency = (org.billingCurrencyCode || "EUR").toUpperCase();
+  const currency = (org.billingCurrencyCode || "USD").toUpperCase();
   const now = new Date();
   const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
-  const fallbackRate = currencyPrices.EUR ?? 1500;
+  const fallbackRate = currencyPrices.USD ?? 1500;
   const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
     activeUsers: org.memberships.length,
     daysInMonth,
@@ -453,7 +453,7 @@ app.put("/admin/orgs/:id/billing-pricing", async (c) => {
       ...(parsed.customFlatRateCents !== undefined ? { customFlatRateCents: parsed.customFlatRateCents } : {}),
       ...(parsed.customFlatRateMaxUsers !== undefined ? { customFlatRateMaxUsers: parsed.customFlatRateMaxUsers } : {}),
       ...(parsed.billingCurrencyCode !== undefined
-        ? { billingCurrencyCode: (parsed.billingCurrencyCode || "EUR").toUpperCase() }
+        ? { billingCurrencyCode: (parsed.billingCurrencyCode || "USD").toUpperCase() }
         : {}),
     },
   });

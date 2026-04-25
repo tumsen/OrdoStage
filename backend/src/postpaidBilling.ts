@@ -5,8 +5,8 @@ export type BillingConfigResolved = {
 };
 
 export const SUPPORTED_BILLING_CURRENCIES = [
-  "EUR",
   "USD",
+  "EUR",
   "DKK",
   "SEK",
   "NOK",
@@ -79,7 +79,7 @@ export function estimateMonthlyOrgAmountCents(input: {
 
 export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new Date()): Promise<number> {
   const currencyPrices = await getCurrencyPriceMap(prisma);
-  const fallbackRate = currencyPrices.EUR ?? 1500;
+  const fallbackRate = currencyPrices.USD ?? 1500;
   const snapshotDate = startOfUtcDay(today);
   const orgs = await prisma.organization.findMany({
     select: {
@@ -102,13 +102,13 @@ export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new
         organizationId: org.id,
         snapshotDate,
         activeUsers,
-        userDailyRateCents: currencyPrices[(org.billingCurrencyCode || "EUR").toUpperCase()] ?? fallbackRate,
-        currencyCode: (org.billingCurrencyCode || "EUR").toUpperCase(),
+        userDailyRateCents: currencyPrices[(org.billingCurrencyCode || "USD").toUpperCase()] ?? fallbackRate,
+        currencyCode: (org.billingCurrencyCode || "USD").toUpperCase(),
       },
       update: {
         activeUsers,
-        userDailyRateCents: currencyPrices[(org.billingCurrencyCode || "EUR").toUpperCase()] ?? fallbackRate,
-        currencyCode: (org.billingCurrencyCode || "EUR").toUpperCase(),
+        userDailyRateCents: currencyPrices[(org.billingCurrencyCode || "USD").toUpperCase()] ?? fallbackRate,
+        currencyCode: (org.billingCurrencyCode || "USD").toUpperCase(),
       },
     });
     created += 1;
@@ -182,7 +182,7 @@ export async function markInvoicePaid(
 export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new Date()): Promise<number> {
   const cfg = await getBillingConfig(prisma);
   const currencyPrices = await getCurrencyPriceMap(prisma);
-  const fallbackRate = currencyPrices.EUR ?? 1500;
+  const fallbackRate = currencyPrices.USD ?? 1500;
   const currentMonthStart = startOfUtcMonth(runAt);
   const targetMonthEnd = currentMonthStart;
   const targetMonthStart = startOfUtcMonth(new Date(Date.UTC(runAt.getUTCFullYear(), runAt.getUTCMonth() - 1, 1)));
@@ -214,7 +214,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
       orderBy: { snapshotDate: "asc" },
     });
     if (snapshots.length === 0) continue;
-    const currency = (org.billingCurrencyCode || "EUR").toUpperCase();
+    const currency = (org.billingCurrencyCode || "USD").toUpperCase();
 
     const daysByUser: Map<string, { name: string; email: string; days: number; rate: number }> = new Map();
     const memberRows = await prisma.organizationMembership.findMany({
