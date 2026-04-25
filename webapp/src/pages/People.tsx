@@ -82,20 +82,12 @@ const PersonFormSchema = z.object({
   notes: z.string().optional(),
   /** App access: RoleDefinition id from GET /api/org/role-definitions. Required if email is set. */
   permissionGroupId: z.string().optional(),
-  teamAssignments: z
-    .array(
-      z.object({
-        teamId: z.string().optional(),
-        role: z.string().optional(),
-      })
-    )
-    .min(1, "Pick at least one team")
-    .superRefine((rows, ctx) => {
-      const hasTeam = rows.some((r) => Boolean(r?.teamId?.trim()));
-      if (!hasTeam) {
-        ctx.addIssue({ code: "custom", message: "Select at least one team", path: ["teamAssignments"] });
-      }
-    }),
+  teamAssignments: z.array(
+    z.object({
+      teamId: z.string().optional(),
+      role: z.string().optional(),
+    })
+  ),
 })
   .superRefine((data, ctx) => {
     if (data.email?.trim() && !data.permissionGroupId?.trim()) {
@@ -467,6 +459,9 @@ function PersonFormDialog({
   }, [open, person, teams, form]);
 
   const rolePreset = form.watch("rolePreset");
+  const watchedAssignments = form.watch("teamAssignments");
+  const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
+  const availableTeamsToAdd = (teams ?? []).filter((t) => !selectedTeamIds.has(t.id));
 
   const mutation = useMutation({
     mutationFn: (values: PersonFormValues) => {
@@ -488,10 +483,14 @@ function PersonFormDialog({
         ...(values.permissionGroupId?.trim()
           ? { permissionGroupId: values.permissionGroupId.trim() }
           : {}),
-        teamAssignments: values.teamAssignments.map((assignment) => ({
-          teamId: assignment.teamId?.trim() || undefined,
-          role: assignment.role?.trim() || undefined,
-        })),
+        ...(canWriteOrg
+          ? {
+              teamAssignments: values.teamAssignments.map((assignment) => ({
+                teamId: assignment.teamId?.trim() || undefined,
+                role: assignment.role?.trim() || undefined,
+              })),
+            }
+          : {}),
       };
       return person
         ? api.put(`/api/people/${person.id}`, payload)
@@ -602,6 +601,14 @@ function PersonFormDialog({
 
   async function handleSubmit(values: PersonFormValues) {
     setUploadError(null);
+    if (canWriteOrg) {
+      const selectedTeamCount = values.teamAssignments.filter((r) => Boolean(r.teamId?.trim())).length;
+      if (selectedTeamCount === 0) {
+        form.setError("teamAssignments", { type: "custom", message: "Select at least one team" });
+        return;
+      }
+      form.clearErrors("teamAssignments");
+    }
     if (documentRowHandleMap.current.size > 0) {
       const handles = [...documentRowHandleMap.current.values()];
       try {
@@ -818,62 +825,100 @@ function PersonFormDialog({
 
           <div className="space-y-2">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Teams *</Label>
-            <p className="text-[11px] text-white/35">
-              Choose from teams that already exist. Create new teams on the Team page. Optional{" "}
-              <strong className="text-white/45">role in team</strong> below can differ from the default role above.
-            </p>
-            {teams && teams.length > 0 ? (
-              <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
-                {teams.map((team) => {
-                  const assignments = form.watch("teamAssignments");
-                  const selected = assignments.some((assignment) => assignment.teamId === team.id);
-                  const assignment = assignments.find((entry) => entry.teamId === team.id);
-                  return (
-                    <div key={team.id} className="rounded border border-white/5 px-2 py-2">
-                      <label className="flex items-center gap-2 text-xs text-white/80 hover:text-white cursor-pointer">
-                        <Checkbox
-                          checked={selected}
-                          onCheckedChange={(checked) => {
-                            const current = form.getValues("teamAssignments");
-                            form.setValue(
-                              "teamAssignments",
-                              checked
-                                ? [...current, { teamId: team.id, role: "" }]
-                                : current.filter((entry) => entry.teamId !== team.id),
-                              { shouldValidate: true }
-                            );
-                          }}
-                        />
-                        <span
-                          className="inline-block h-2.5 w-2.5 rounded-full border border-white/20"
-                          style={{ backgroundColor: team.color }}
-                        />
-                        <span>{team.name}</span>
-                      </label>
-                      {selected ? (
-                        <Input
-                          value={assignment?.role ?? ""}
-                          onChange={(e) => {
-                            const current = form.getValues("teamAssignments");
-                            form.setValue(
-                              "teamAssignments",
-                              current.map((entry) =>
-                                entry.teamId === team.id ? { ...entry, role: e.target.value } : entry
-                              ),
-                              { shouldValidate: true }
-                            );
-                          }}
-                          placeholder="Role in this team (optional)"
-                          className="mt-2 h-8 bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
-                        />
-                      ) : null}
+            {canWriteOrg ? (
+              <>
+                <p className="text-[11px] text-white/35">
+                  Add existing teams from the dropdown. Only teams the person is not already part of are listed.
+                </p>
+                {teams && teams.length > 0 ? (
+                  <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
+                    <Select
+                      value=""
+                      onValueChange={(teamId) => {
+                        if (!teamId) return;
+                        const current = form.getValues("teamAssignments");
+                        if (current.some((entry) => entry.teamId === teamId)) return;
+                        form.setValue("teamAssignments", [...current, { teamId, role: "" }], {
+                          shouldValidate: true,
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white">
+                        <SelectValue placeholder="Add team…" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-[min(45vh,260px)]">
+                        {availableTeamsToAdd.length === 0 ? (
+                          <div className="px-2 py-1.5 text-xs text-white/45">All teams already assigned</div>
+                        ) : (
+                          availableTeamsToAdd.map((team) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+
+                    <div className="space-y-2">
+                      {watchedAssignments.map((assignment) => {
+                        const team = (teams ?? []).find((t) => t.id === assignment.teamId);
+                        if (!team) return null;
+                        return (
+                          <div key={team.id} className="rounded border border-white/5 px-2 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 text-xs text-white/85">
+                                <span
+                                  className="inline-block h-2.5 w-2.5 rounded-full border border-white/20"
+                                  style={{ backgroundColor: team.color }}
+                                />
+                                <span>{team.name}</span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-[11px] text-red-300 hover:text-red-200 hover:bg-red-950/30"
+                                onClick={() => {
+                                  const current = form.getValues("teamAssignments");
+                                  form.setValue(
+                                    "teamAssignments",
+                                    current.filter((entry) => entry.teamId !== team.id),
+                                    { shouldValidate: true }
+                                  );
+                                }}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                            <Input
+                              value={assignment.role ?? ""}
+                              onChange={(e) => {
+                                const current = form.getValues("teamAssignments");
+                                form.setValue(
+                                  "teamAssignments",
+                                  current.map((entry) =>
+                                    entry.teamId === team.id ? { ...entry, role: e.target.value } : entry
+                                  ),
+                                  { shouldValidate: true }
+                                );
+                              }}
+                              placeholder="Role in this team (optional)"
+                              className="mt-2 h-8 bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-300/70">
+                    No teams yet — create teams on the Team page, then add this person to them here.
+                  </p>
+                )}
+              </>
             ) : (
-              <p className="text-xs text-amber-300/70">
-                No teams yet — create teams on the Team page, then add this person to them here.
+              <p className="text-[11px] text-white/40">
+                Team membership can only be changed by People admins.
               </p>
             )}
             {form.formState.errors.teamAssignments ? (
@@ -1041,6 +1086,7 @@ function PersonCard({
   onDelete,
   canEditPerson,
   canDeletePerson,
+  canSeeDocumentSummaries,
   deactivateCreditCost,
   creditsBalance,
   unlimitedCredits,
@@ -1050,6 +1096,7 @@ function PersonCard({
   onDelete: () => void;
   canEditPerson: boolean;
   canDeletePerson: boolean;
+  canSeeDocumentSummaries: boolean;
   deactivateCreditCost: number;
   creditsBalance: number;
   unlimitedCredits: boolean;
@@ -1203,7 +1250,7 @@ function PersonCard({
             Notes: {person.notes}
           </div>
         ) : null}
-        <PersonListDocumentChips items={person.documentSummaries} />
+        {canSeeDocumentSummaries ? <PersonListDocumentChips items={person.documentSummaries} /> : null}
       </div>
 
       {/* Active + actions */}
@@ -1386,6 +1433,7 @@ export default function People() {
                 onDelete={() => setDeleteId(person.id)}
                 canEditPerson={canEditPerson}
                 canDeletePerson={canDeletePerson}
+                canSeeDocumentSummaries={canWrite}
                 deactivateCreditCost={deactivateCost}
                 creditsBalance={creditBal}
                 unlimitedCredits={orgUnlimited}

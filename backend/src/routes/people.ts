@@ -704,10 +704,15 @@ peopleRouter.get("/people/:id/documents", async (c) => {
   const { id } = c.req.param();
   const person = await prisma.person.findUnique({
     where: { id, organizationId: user.organizationId },
-    select: { id: true },
+    select: { id: true, email: true },
   });
   if (!person) {
     return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+  }
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, person.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
   const docs = await prisma.personDocument.findMany({
     where: { personId: person.id },
@@ -992,9 +997,15 @@ peopleRouter.get("/people/documents/:docId/download", async (c) => {
   const { docId } = c.req.param();
   const doc = await prisma.personDocument.findFirst({
     where: { id: docId, person: { organizationId: user.organizationId } },
+    select: { data: true, mimeType: true, filename: true, person: { select: { email: true } } },
   });
   if (!doc) {
     return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, doc.person.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
   return new Response(doc.data, {
     headers: {
