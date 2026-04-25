@@ -73,8 +73,8 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   {
     key: "pricing_notes",
     value: [
-      "Owner admins can set default per-user rates, discounts, and optional flat-rate deals.",
-      "Organization-level custom pricing can override global defaults.",
+      "Pricing is usage-based and billed monthly in arrears.",
+      "For custom commercial terms, contact us directly.",
     ].join("\n"),
   },
 ];

@@ -145,7 +145,7 @@ export default function PublicPricing() {
           <h2 className="text-xl md:text-2xl font-semibold text-white">How postpaid billing works</h2>
           <p className="text-white/75 leading-relaxed">
             Every active user contributes usage days. We total those usage days for the month and bill
-            according to your plan and any agreed discount or flat-rate terms.
+            based on your actual usage.
           </p>
           <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-yellow">
             <li>Invoice generated on the 1st for the previous month</li>
