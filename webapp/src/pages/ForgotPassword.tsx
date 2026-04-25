@@ -50,7 +50,8 @@ export default function ForgotPassword() {
         <div className="bg-gray-900 border border-white/10 rounded-xl p-6">
           <h2 className="text-xl font-semibold text-white mb-1">Forgot password?</h2>
           <p className="text-gray-400 text-sm mb-6">
-            Enter your email and we'll send you a reset link.
+            Enter your email and we&apos;ll send a link to set or reset your password. New team members can use the same link
+            if they need another try.
           </p>
           {success ? (
             <div className="space-y-4">

@@ -504,6 +504,24 @@ function PersonFormDialog({
   const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
   const sortedTeams = [...(teams ?? [])].sort((a, b) => a.name.localeCompare(b.name));
 
+  const canResendAppAccess =
+    canWriteOrg && Boolean(person?.id && form.watch("email")?.trim() && form.watch("permissionGroupId")?.trim());
+
+  const resendAppAccessMutation = useMutation({
+    mutationFn: () => {
+      if (!person?.id) throw new Error("No person");
+      return api.post<{ accountSetupEmail: { status: "sent"; createdUser?: boolean } }>(
+        `/api/people/${person.id}/resend-app-access-email`
+      );
+    },
+    onSuccess: () => {
+      toast({ title: "Login email sent", description: "They can set a password using the link we sent." });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Could not resend email", description: e.message, variant: "destructive" });
+    },
+  });
+
   const mutation = useMutation({
     mutationFn: (values: PersonFormValues) => {
       const payload = {
@@ -538,6 +556,16 @@ function PersonFormDialog({
         : api.post<Person>("/api/people", payload);
     },
     onSuccess: async (result) => {
+      const saved = result as Person & { accountSetupEmail?: { status: string; error?: string } };
+      if (saved.accountSetupEmail?.status === "sent") {
+        toast({ title: "Login email sent", description: "They can set a password from the link in their inbox (valid about one hour)." });
+      } else if (saved.accountSetupEmail?.status === "failed") {
+        toast({
+          title: "Account saved, but the login email failed to send",
+          description: saved.accountSetupEmail.error ?? "Try resend or check that email and Resend are configured.",
+          variant: "destructive",
+        });
+      }
       const personId = person?.id ?? (result as Person).id;
       if (personId && photoFile) {
         await uploadPersonPhoto(personId, photoFile);
@@ -789,8 +817,10 @@ function PersonFormDialog({
               Permission group{form.watch("email")?.trim() ? " *" : ""}
             </Label>
             <p className="text-[10px] text-white/30 leading-snug">
-              If this person has an email, you must select a group so their login works. Groups and what they can do are edited
-              only under{" "}
+              If this person has an email, you must select a group so their login works. We send a
+              <strong className="text-white/50"> one-time link to set a password</strong> when you add them, or you can resend
+              it when editing. Sign-in also has <strong className="text-white/50">Forgot password</strong> for any time. Groups
+              and what they can do are edited only under{" "}
               <Link to="/roles" className="text-rose-300/90 hover:underline">
                 Permission groups
               </Link>
@@ -1176,23 +1206,36 @@ function PersonFormDialog({
           ) : null}
         </div>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="border-white/10 text-white/60 hover:text-white bg-transparent"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            disabled={mutation.isPending}
-            onClick={form.handleSubmit(handleSubmit)}
-            className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-          >
-            {mutation.isPending ? "Saving..." : person ? "Save Changes" : "Add Person"}
-          </Button>
+        <DialogFooter className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
+          {canResendAppAccess ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="border-white/10 text-white/80 hover:text-white bg-transparent mr-auto"
+              disabled={resendAppAccessMutation.isPending || mutation.isPending}
+              onClick={() => resendAppAccessMutation.mutate()}
+            >
+              {resendAppAccessMutation.isPending ? "Sending…" : "Resend login email"}
+            </Button>
+          ) : null}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="border-white/10 text-white/60 hover:text-white bg-transparent"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={mutation.isPending}
+              onClick={form.handleSubmit(handleSubmit)}
+              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+            >
+              {mutation.isPending ? "Saving..." : person ? "Save Changes" : "Add Person"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

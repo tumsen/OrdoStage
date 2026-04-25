@@ -13,6 +13,11 @@ import {
 } from "../types";
 import { canAction } from "../requestRole";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
+import {
+  accountSetupEmailForResponse,
+  type AccountSetupResult,
+  provisionPersonAppAccountAndEmail,
+} from "../peopleAccountInvite";
 
 const TEAM_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#84cc16", "#06b6d4"];
 const SOFTWARE_OWNER_EMAIL = "tumsen@gmail.com";
@@ -552,8 +557,30 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       permissionGroup: { select: { id: true, name: true, slug: true } },
     },
   });
+  let account: AccountSetupResult = { status: "skipped" };
+  if (body.email?.trim() && body.permissionGroupId) {
+    try {
+      account = await provisionPersonAppAccountAndEmail({
+        organizationId: user.organizationId,
+        personName: person.name,
+        email: person.email,
+        permissionGroupId: person.permissionGroupId,
+      });
+    } catch (e) {
+      console.error("[person app account] POST /api/people", e);
+      account = { status: "failed", error: e instanceof Error ? e.message : "Account setup failed" };
+    }
+  }
   await syncUserOrgRoleFromPerson(user.organizationId, person.email, person.permissionGroupId);
-  return c.json({ data: serializePerson(person) }, 201);
+  return c.json(
+    {
+      data: {
+        ...serializePerson(person),
+        accountSetupEmail: accountSetupEmailForResponse(account),
+      },
+    },
+    201
+  );
 });
 
 // GET /api/people/:id
@@ -678,6 +705,8 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
   if (!existing) {
     return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
   }
+  const hadEmail = Boolean(existing.email?.trim());
+  const hadGroup = Boolean(existing.permissionGroupId);
   const canWritePeople = canAction(c, "write.people");
   const canEditSelf = canEditOwnProfile(user, existing.email);
   if (!canWritePeople && !canEditSelf) {
@@ -774,8 +803,71 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       permissionGroup: { select: { id: true, name: true, slug: true } },
     },
   });
+  let account: AccountSetupResult = { status: "skipped" };
+  if (canWritePeople) {
+    const nowEmail = person.email?.trim();
+    const nowGroup = person.permissionGroupId;
+    if (nowEmail && nowGroup && (!hadEmail || !hadGroup)) {
+      try {
+        account = await provisionPersonAppAccountAndEmail({
+          organizationId: user.organizationId,
+          personName: person.name,
+          email: person.email,
+          permissionGroupId: person.permissionGroupId,
+        });
+      } catch (e) {
+        console.error("[person app account] PUT /api/people/:id", e);
+        account = { status: "failed", error: e instanceof Error ? e.message : "Account setup failed" };
+      }
+    }
+  }
   await syncUserOrgRoleFromPerson(user.organizationId, person.email, person.permissionGroupId);
-  return c.json({ data: serializePerson(person) });
+  return c.json({
+    data: { ...serializePerson(person), accountSetupEmail: accountSetupEmailForResponse(account) },
+  });
+});
+
+// POST /api/people/:id/resend-app-access-email — app login setup / password link (managers)
+peopleRouter.post("/people/:id/resend-app-access-email", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "write.people")) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  const { id } = c.req.param();
+  const person = await prisma.person.findFirst({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!person) {
+    return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+  }
+  if (!person.email?.trim() || !person.permissionGroupId) {
+    return c.json(
+      { error: { message: "Add an email and permission group before resending a login link.", code: "BAD_REQUEST" } },
+      400
+    );
+  }
+  let r: AccountSetupResult;
+  try {
+    r = await provisionPersonAppAccountAndEmail({
+      organizationId: user.organizationId,
+      personName: person.name,
+      email: person.email,
+      permissionGroupId: person.permissionGroupId,
+    });
+  } catch (e) {
+    console.error("[person app account] resend", e);
+    r = { status: "failed", error: e instanceof Error ? e.message : "Account setup failed" };
+  }
+  if (r.status === "failed") {
+    return c.json({ error: { message: r.error, code: "EMAIL_FAILED" } }, 502);
+  }
+  if (r.status === "skipped") {
+    return c.json({ error: { message: "Could not send login email.", code: "BAD_REQUEST" } }, 400);
+  }
+  return c.json({ data: { accountSetupEmail: accountSetupEmailForResponse(r) } });
 });
 
 // GET /api/people/:id/documents

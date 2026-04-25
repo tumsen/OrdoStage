@@ -145,6 +145,14 @@ export const PersonSchema = z.object({
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** Set on create/update when app-access provisioning runs (not stored in DB). */
+  accountSetupEmail: z
+    .object({
+      status: z.enum(["sent", "failed", "skipped"]),
+      error: z.string().optional(),
+      createdUser: z.boolean().optional(),
+    })
+    .optional(),
   /** Present on list: most urgent dated doc, or a “forever” doc if only those exist. */
   documentExpiryHint: z
     .union([

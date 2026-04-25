@@ -63,8 +63,8 @@ export const auth = betterAuth({
         await resend.emails.send({
           from: env.FROM_EMAIL || "OrdoStage <noreply@ordostage.com>",
           to: user.email,
-          subject: "Reset your password",
-          html: `<p>Click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 1 hour.</p>`,
+          subject: "Set or reset your OrdoStage password",
+          html: `<p>Use the link below to <strong>choose a password</strong> for your account (or reset it if you forgot it).</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>On the sign-in page, use <strong>Forgot password</strong> any time to get a new link. This link expires in 1 hour.</p>`,
         });
       } else {
         console.log(`[DEV] Password reset link for ${user.email}: ${resetUrl}`);

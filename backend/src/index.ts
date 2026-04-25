@@ -187,6 +187,7 @@ app.use("/api/*", async (c, next) => {
   // Document metadata / uploads: allow even when out of credits (files already stored; editing names/dates is free)
   const exemptCreditBlock =
     (path.match(/^\/api\/people\/[^/]+\/active$/) && method === "PATCH") ||
+    (path.match(/^\/api\/people\/[^/]+\/resend-app-access-email$/) && method === "POST") ||
     (path === "/api/me/account" && method === "DELETE") ||
     (path.match(/^\/api\/people\/documents\/.+/) && ["PATCH", "DELETE"].includes(method)) ||
     (path.match(/^\/api\/people\/[^/]+\/documents$/) && method === "POST");
