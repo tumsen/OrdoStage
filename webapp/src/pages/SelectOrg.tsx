@@ -54,7 +54,7 @@ export default function SelectOrg() {
 
   return (
     <Layout>
-      <div className="max-w-lg mx-auto px-6 py-12">
+      <div className="w-full px-6 py-12">
         <h1 className="text-2xl font-semibold text-white">Choose organization</h1>
         <p className="text-white/45 text-sm mt-2">
           You belong to more than one organization. Pick which workspace to open.

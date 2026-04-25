@@ -113,7 +113,7 @@ export default function Users() {
   const COL_COUNT = 7;
 
   return (
-    <div className="p-6 space-y-4 max-w-7xl mx-auto">
+    <div className="p-6 space-y-4">
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3 max-w-xl">
         <h3 className="text-sm font-semibold text-white">Grant platform admin</h3>
         <p className="text-xs text-white/45">

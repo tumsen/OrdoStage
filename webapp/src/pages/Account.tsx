@@ -379,7 +379,7 @@ export default function Account() {
   }
 
   return (
-    <div className="p-6 space-y-8 max-w-2xl mx-auto">
+    <div className="p-6 space-y-8">
       <div>
         <h2 className="text-xl font-semibold text-white">{t("account.title")}</h2>
         <p className="text-sm text-white/45 mt-1">{t("account.subtitle")}</p>

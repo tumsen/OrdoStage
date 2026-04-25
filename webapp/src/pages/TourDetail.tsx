@@ -2635,7 +2635,7 @@ export default function TourDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-5xl mx-auto space-y-4">
+      <div className="p-6 space-y-4">
         <Skeleton className="h-8 w-48 bg-white/5" />
         <Skeleton className="h-40 w-full rounded-xl bg-white/5" />
         <Skeleton className="h-64 w-full rounded-xl bg-white/5" />

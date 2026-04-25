@@ -107,7 +107,7 @@ export default function Dashboard() {
 
   if (statsPending) {
     return (
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-6 space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} className="h-24 bg-gray-900 border border-white/10 rounded-lg animate-pulse" />
@@ -118,7 +118,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6">
       {/* Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard

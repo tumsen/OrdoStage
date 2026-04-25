@@ -267,7 +267,7 @@ export default function Schedule() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 space-y-4">
       {/* Top bar */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <ScheduleFilters

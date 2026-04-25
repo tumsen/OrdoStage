@@ -41,7 +41,7 @@ export default function PublicPricing() {
 
   return (
     <div className="text-white">
-      <article className="max-w-4xl mx-auto px-6 py-14 md:py-20 space-y-10 md:space-y-12">
+      <article className="w-full px-6 py-14 md:py-20 space-y-10 md:space-y-12">
 
         {/* Hero */}
         <header className="space-y-6">

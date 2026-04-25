@@ -115,7 +115,7 @@ export default function Calendars() {
   });
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-6 space-y-6">
       {/* Explainer */}
       <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-xl p-5 flex gap-4">
         <div className="w-9 h-9 rounded-lg bg-indigo-500/15 flex items-center justify-center flex-shrink-0">

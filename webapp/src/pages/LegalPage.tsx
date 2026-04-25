@@ -25,7 +25,7 @@ export default function LegalPage() {
 
   return (
     <div className="text-white">
-      <div className="max-w-3xl mx-auto px-6 py-10 md:py-14">
+      <div className="w-full px-6 py-10 md:py-14">
         <h1 className="sr-only">{config.title}</h1>
         <article className="rounded-lg border border-white/10 bg-white/[0.02] p-6">
           <pre className="whitespace-pre-wrap text-sm leading-7 text-white/80 font-sans">{text}</pre>

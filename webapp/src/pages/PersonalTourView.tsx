@@ -271,7 +271,7 @@ export default function PersonalTourView() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4">
+        <div className="w-full px-4 py-4">
           <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">{data.tour.name}</div>
           <h1 className="text-lg font-bold text-gray-900 mt-0.5">{data.person.name}</h1>
           {data.person.role ? <p className="text-xs text-gray-400">{data.person.role}</p> : null}
@@ -279,7 +279,7 @@ export default function PersonalTourView() {
       </div>
 
       {/* Intro */}
-      <div className="max-w-2xl mx-auto px-4 py-5">
+      <div className="w-full px-4 py-5">
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-5">
           <p className="text-xs text-indigo-600 leading-relaxed">
             This is your personal tour view. Check the hotel box for each day you need accommodation, and add any notes. Everything saves automatically.

@@ -173,7 +173,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
   });
 
   return (
-    <div className={embedded ? "space-y-8" : "p-6 md:p-8 space-y-8 max-w-5xl mx-auto"}>
+    <div className={embedded ? "space-y-8" : "p-6 md:p-8 space-y-8"}>
       {toast ? (
         <div
           className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${

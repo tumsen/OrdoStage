@@ -48,7 +48,7 @@ export default function PublicTourSchedule() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-3xl mx-auto px-6 py-8">
+        <div className="w-full px-6 py-8">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{tour.name}</h1>
@@ -102,7 +102,7 @@ export default function PublicTourSchedule() {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-6 py-8 space-y-8">
+      <div className="w-full px-6 py-8 space-y-8">
         {/* Cast & Crew */}
         {tour.people.length > 0 ? (
           <section>
