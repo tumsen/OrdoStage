@@ -189,7 +189,8 @@ export async function enforceOverdueAccess(prisma: PrismaClient, organizationId:
 export async function markInvoicePaid(
   prisma: PrismaClient,
   invoiceId: string,
-  paddleInvoiceId?: string | null
+  paddleInvoiceId?: string | null,
+  paddleTransactionId?: string | null
 ): Promise<void> {
   const paidAt = new Date();
   const invoice = await prisma.billingInvoice.update({
@@ -198,6 +199,7 @@ export async function markInvoicePaid(
       status: "paid",
       paidAt,
       paddleInvoiceId: paddleInvoiceId ?? undefined,
+      paddleTransactionId: paddleTransactionId ?? undefined,
     },
     select: { organizationId: true },
   });
@@ -207,6 +209,31 @@ export async function markInvoicePaid(
       billingStatus: "active",
       billingDueAt: null,
       billingViewOnlySince: null,
+    },
+  });
+}
+
+export async function markInvoiceOverdue(
+  prisma: PrismaClient,
+  invoiceId: string,
+  paddleInvoiceId?: string | null,
+  paddleTransactionId?: string | null
+): Promise<void> {
+  const invoice = await prisma.billingInvoice.update({
+    where: { id: invoiceId },
+    data: {
+      status: "overdue",
+      paddleInvoiceId: paddleInvoiceId ?? undefined,
+      paddleTransactionId: paddleTransactionId ?? undefined,
+    },
+    select: { organizationId: true, dueAt: true },
+  });
+  await prisma.organization.update({
+    where: { id: invoice.organizationId },
+    data: {
+      billingStatus: "overdue_view_only",
+      billingDueAt: invoice.dueAt,
+      billingViewOnlySince: new Date(),
     },
   });
 }

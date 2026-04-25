@@ -93,6 +93,7 @@ model Organization {
   customFlatRateCents     Int?
   customFlatRateMaxUsers  Int?
   billingCurrencyCode     String             @default("USD")
+  paddleCustomerId        String?
   /** Company / invoice information (optional — used on generated PDF invoices). */
   invoiceName      String?
   invoiceStreet    String?
@@ -166,6 +167,8 @@ model BillingInvoice {
   totalCents     Int
   currency       String       @default("EUR")
   paddleInvoiceId String?
+  paddleTransactionId String?
+  paddleInvoiceUrl String?
   paidAt         DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

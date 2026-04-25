@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../env";
 import { auth } from "../auth";
-import { markInvoicePaid } from "../postpaidBilling";
+import { markInvoiceOverdue, markInvoicePaid } from "../postpaidBilling";
 import { prisma } from "../prisma";
 
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
@@ -63,24 +63,51 @@ app.post("/billing/webhook", async (c) => {
     event_type?: string;
     data?: {
       id?: string;
+      transaction_id?: string;
+      invoice_id?: string;
       custom_data?: { invoiceId?: string };
+      checkout?: { url?: string | null } | null;
+      invoice?: { id?: string | null } | null;
     };
   };
+  const eventType = event?.event_type || "";
+  const data = event?.data;
+  if (data) {
+    const customInvoiceId = data.custom_data?.invoiceId?.trim();
+    const paddleTransactionId = data.transaction_id || data.id || undefined;
+    const paddleInvoiceId = data.invoice_id || data.invoice?.id || undefined;
 
-  if (event?.event_type === "transaction.completed" && event.data?.id) {
-    const customInvoiceId = event.data.custom_data?.invoiceId?.trim();
-    if (customInvoiceId) {
-      const exists = await prisma.billingInvoice.findUnique({ where: { id: customInvoiceId } });
-      if (exists) {
-        await markInvoicePaid(prisma, customInvoiceId, event.data.id);
-      }
-    } else {
-      const byPaddleId = await prisma.billingInvoice.findFirst({
-        where: { paddleInvoiceId: event.data.id },
-        select: { id: true },
+    const invoice =
+      (customInvoiceId
+        ? await prisma.billingInvoice.findUnique({ where: { id: customInvoiceId } })
+        : null) ??
+      (paddleTransactionId
+        ? await prisma.billingInvoice.findFirst({ where: { paddleTransactionId }, orderBy: { issuedAt: "desc" } })
+        : null) ??
+      (paddleInvoiceId
+        ? await prisma.billingInvoice.findFirst({ where: { paddleInvoiceId }, orderBy: { issuedAt: "desc" } })
+        : null);
+
+    if (invoice) {
+      await prisma.billingInvoice.update({
+        where: { id: invoice.id },
+        data: {
+          paddleTransactionId: paddleTransactionId ?? undefined,
+          paddleInvoiceId: paddleInvoiceId ?? undefined,
+          ...(data.checkout?.url ? { paddleInvoiceUrl: data.checkout.url } : {}),
+        },
       });
-      if (byPaddleId) {
-        await markInvoicePaid(prisma, byPaddleId.id, event.data.id);
+
+      if (eventType === "transaction.completed" || eventType === "payment.succeeded") {
+        await markInvoicePaid(prisma, invoice.id, paddleInvoiceId, paddleTransactionId);
+      }
+
+      if (
+        eventType === "transaction.payment_failed" ||
+        eventType === "transaction.past_due" ||
+        eventType === "payment.failed"
+      ) {
+        await markInvoiceOverdue(prisma, invoice.id, paddleInvoiceId, paddleTransactionId);
       }
     }
   }

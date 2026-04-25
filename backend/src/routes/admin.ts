@@ -17,6 +17,7 @@ import {
   recordDailyUsageSnapshot,
   SUPPORTED_BILLING_CURRENCIES,
 } from "../postpaidBilling";
+import { createPaddleCustomer, createPaddleTransactionForInvoice } from "../paddleClient";
 
 const app = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -243,6 +244,79 @@ app.post("/admin/billing/invoices/:id/mark-paid", async (c) => {
   const paddleInvoiceId = z.object({ paddleInvoiceId: z.string().optional() }).parse(body).paddleInvoiceId;
   await markInvoicePaid(prisma, c.req.param("id"), paddleInvoiceId);
   return c.json({ data: { ok: true } });
+});
+
+app.post("/admin/billing/invoices/:id/paddle-sync", async (c) => {
+  const invoiceId = c.req.param("id");
+  const invoice = await prisma.billingInvoice.findUnique({
+    where: { id: invoiceId },
+    include: {
+      organization: {
+        select: {
+          id: true,
+          name: true,
+          paddleCustomerId: true,
+          invoiceEmail: true,
+        },
+      },
+    },
+  });
+  if (!invoice) {
+    return c.json({ error: { message: "Invoice not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  try {
+    let paddleCustomerId = invoice.organization.paddleCustomerId;
+    if (!paddleCustomerId) {
+      const customer = await createPaddleCustomer({
+        organizationId: invoice.organization.id,
+        name: invoice.organization.name,
+        email: invoice.organization.invoiceEmail,
+      });
+      paddleCustomerId = customer.id;
+      await prisma.organization.update({
+        where: { id: invoice.organization.id },
+        data: { paddleCustomerId },
+      });
+    }
+
+    const periodLabel = `${invoice.periodStart.toISOString().slice(0, 10)} to ${invoice.periodEnd.toISOString().slice(0, 10)}`;
+    const transaction = await createPaddleTransactionForInvoice({
+      customerId: paddleCustomerId,
+      invoiceId: invoice.id,
+      organizationName: invoice.organization.name,
+      periodLabel,
+      amountCents: invoice.totalCents,
+      currencyCode: invoice.currency,
+    });
+
+    const updated = await prisma.billingInvoice.update({
+      where: { id: invoice.id },
+      data: {
+        paddleTransactionId: transaction.id,
+        paddleInvoiceId: transaction.invoice?.id ?? invoice.paddleInvoiceId,
+        paddleInvoiceUrl: transaction.checkout?.url ?? invoice.paddleInvoiceUrl,
+      },
+      select: {
+        id: true,
+        paddleTransactionId: true,
+        paddleInvoiceId: true,
+        paddleInvoiceUrl: true,
+      },
+    });
+
+    return c.json({ data: updated });
+  } catch (error) {
+    return c.json(
+      {
+        error: {
+          message: error instanceof Error ? error.message : "Failed to sync invoice with Paddle.",
+          code: "PADDLE_SYNC_FAILED",
+        },
+      },
+      502
+    );
+  }
 });
 
 app.post("/admin/email/test", async (c) => {
