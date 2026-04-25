@@ -149,8 +149,8 @@ app.patch("/admin/billing/settings", async (c) => {
         .array(
           z.object({
             currencyCode: z.string().length(3),
-            userDailyRateCents: z.number().int().min(1).max(10_000_000),
-            nextMonthUserDailyRateCents: z.number().int().min(1).max(10_000_000).nullable().optional(),
+            userDailyRateCents: z.number().finite().min(1).max(10_000_000),
+            nextMonthUserDailyRateCents: z.number().finite().min(1).max(10_000_000).nullable().optional(),
           })
         )
         .optional(),
@@ -171,13 +171,17 @@ app.patch("/admin/billing/settings", async (c) => {
           where: { currencyCode: row.currencyCode.toUpperCase() },
           create: {
             currencyCode: row.currencyCode.toUpperCase(),
-            userDailyRateCents: row.userDailyRateCents,
-            nextMonthUserDailyRateCents: row.nextMonthUserDailyRateCents ?? null,
+            userDailyRateCents: Math.max(1, Math.round(row.userDailyRateCents)),
+            nextMonthUserDailyRateCents:
+              row.nextMonthUserDailyRateCents != null ? Math.max(1, Math.round(row.nextMonthUserDailyRateCents)) : null,
           },
           update: {
-            userDailyRateCents: row.userDailyRateCents,
+            userDailyRateCents: Math.max(1, Math.round(row.userDailyRateCents)),
             ...(row.nextMonthUserDailyRateCents !== undefined
-              ? { nextMonthUserDailyRateCents: row.nextMonthUserDailyRateCents }
+              ? {
+                  nextMonthUserDailyRateCents:
+                    row.nextMonthUserDailyRateCents != null ? Math.max(1, Math.round(row.nextMonthUserDailyRateCents)) : null,
+                }
               : {}),
           },
         })
