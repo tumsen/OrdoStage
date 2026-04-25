@@ -1299,7 +1299,7 @@ function PersonCard({
     if (!unlimitedCredits && creditsBalance < deactivateCreditCost) {
       toast({
         title: "Not enough credits",
-        description: `Deactivating costs ${deactivateCreditCost} credits. Top up under Billing.`,
+        description: `Deactivating costs ${deactivateCreditCost} credits. Top up under Account.`,
         variant: "destructive",
       });
       return;

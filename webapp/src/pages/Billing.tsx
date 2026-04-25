@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
-import { AddressFields, type Address, EMPTY_ADDRESS } from "@/components/AddressFields";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -49,7 +48,7 @@ interface BillingPack {
   active: boolean;
 }
 
-export default function Billing() {
+export default function Billing({ embedded = false }: { embedded?: boolean } = {}) {
   const queryClient = useQueryClient();
   const { isOwner } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,15 +57,6 @@ export default function Billing() {
   const [orgNameDraft, setOrgNameDraft] = useState("");
   const [deleteWord, setDeleteWord] = useState("");
   const [showDeleteOrg, setShowDeleteOrg] = useState(false);
-  const [inv, setInv] = useState({
-    invoiceName: "",
-    invoiceVat: "",
-    invoiceEmail: "",
-    invoicePhone: "",
-    invoiceContact: "",
-  });
-  const [invAddress, setInvAddress] = useState<Address>(EMPTY_ADDRESS);
-  const [invSaving, setInvSaving] = useState(false);
   const { t } = useI18n();
 
   const { data: org, isLoading } = useQuery<OrgBillingData>({
@@ -157,46 +147,6 @@ export default function Billing() {
     if (org?.name) setOrgNameDraft(org.name);
   }, [org?.name]);
 
-  interface InvoiceInfo {
-    name: string;
-    invoiceName: string | null;
-    invoiceStreet: string | null;
-    invoiceNumber: string | null;
-    invoiceZip: string | null;
-    invoiceCity: string | null;
-    invoiceState: string | null;
-    invoiceCountry: string | null;
-    invoiceVat: string | null;
-    invoiceEmail: string | null;
-    invoicePhone: string | null;
-    invoiceContact: string | null;
-  }
-
-  const { data: invoiceInfo } = useQuery<InvoiceInfo>({
-    queryKey: ["org-invoice-info"],
-    queryFn: () => api.get<InvoiceInfo>("/api/org/invoice-info"),
-    enabled: isOwner,
-  });
-
-  useEffect(() => {
-    if (!invoiceInfo) return;
-    setInv({
-      invoiceName: invoiceInfo.invoiceName ?? "",
-      invoiceVat: invoiceInfo.invoiceVat ?? "",
-      invoiceEmail: invoiceInfo.invoiceEmail ?? "",
-      invoicePhone: invoiceInfo.invoicePhone ?? "",
-      invoiceContact: invoiceInfo.invoiceContact ?? "",
-    });
-    setInvAddress({
-      street:  invoiceInfo.invoiceStreet  ?? "",
-      number:  invoiceInfo.invoiceNumber  ?? "",
-      zip:     invoiceInfo.invoiceZip     ?? "",
-      city:    invoiceInfo.invoiceCity    ?? "",
-      state:   invoiceInfo.invoiceState   ?? "",
-      country: invoiceInfo.invoiceCountry ?? "",
-    });
-  }, [invoiceInfo]);
-
   const renameOrgMutation = useMutation({
     mutationFn: (name: string) => api.patch<{ ok: boolean }>("/api/org", { name }),
     onSuccess: () => {
@@ -223,7 +173,7 @@ export default function Billing() {
   });
 
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-5xl mx-auto">
+    <div className={embedded ? "space-y-8" : "p-6 md:p-8 space-y-8 max-w-5xl mx-auto"}>
       {toast ? (
         <div
           className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${
@@ -237,12 +187,14 @@ export default function Billing() {
         </div>
       ) : null}
 
-      <div>
-        <h2 className="text-2xl font-bold text-white">Billing &amp; Credits</h2>
-        <p className="text-gray-400 mt-1 text-sm">
-          Each active team member uses 1 credit per day. Credits are shared across your organisation.
-        </p>
-      </div>
+      {!embedded ? (
+        <div>
+          <h2 className="text-2xl font-bold text-white">Billing &amp; Credits</h2>
+          <p className="text-gray-400 mt-1 text-sm">
+            Each active team member uses 1 credit per day. Credits are shared across your organisation.
+          </p>
+        </div>
+      ) : null}
 
       <CreditsSummary org={org} isLoading={isLoading} variant="card" />
 
@@ -346,101 +298,6 @@ export default function Billing() {
                   <SelectItem value="mi">{t("common.miles")}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {isOwner ? (
-        <Card className="bg-gray-900 border-white/10">
-          <CardHeader>
-            <CardTitle className="text-white text-base">Company &amp; invoice information</CardTitle>
-            <p className="text-gray-400 text-sm font-normal">
-              Used on PDF invoices automatically sent when you buy credits. Leave blank to use your organization name only.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-white/70">Legal entity / company name</Label>
-                <Input
-                  className="bg-gray-800 border-white/10 text-white"
-                  placeholder="Acme Theatre ApS"
-                  value={inv.invoiceName}
-                  onChange={(e) => setInv((s) => ({ ...s, invoiceName: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-white/70">VAT number</Label>
-                <Input
-                  className="bg-gray-800 border-white/10 text-white"
-                  placeholder="DK12345678"
-                  value={inv.invoiceVat}
-                  onChange={(e) => setInv((s) => ({ ...s, invoiceVat: e.target.value }))}
-                />
-              </div>
-              <div className="sm:col-span-2 space-y-1.5">
-                <Label className="text-white/70">Address</Label>
-                <AddressFields value={invAddress} onChange={setInvAddress} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-white/70">Billing email</Label>
-                <Input
-                  type="email"
-                  className="bg-gray-800 border-white/10 text-white"
-                  placeholder="invoices@yourcompany.com"
-                  value={inv.invoiceEmail}
-                  onChange={(e) => setInv((s) => ({ ...s, invoiceEmail: e.target.value }))}
-                />
-                <p className="text-[11px] text-white/35">PDF invoices are sent to this address after each purchase.</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-white/70">Phone</Label>
-                <Input
-                  className="bg-gray-800 border-white/10 text-white"
-                  placeholder="+45 12 34 56 78"
-                  value={inv.invoicePhone}
-                  onChange={(e) => setInv((s) => ({ ...s, invoicePhone: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-white/70">Contact person</Label>
-                <Input
-                  className="bg-gray-800 border-white/10 text-white"
-                  placeholder="Jane Doe"
-                  value={inv.invoiceContact}
-                  onChange={(e) => setInv((s) => ({ ...s, invoiceContact: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="pt-1">
-              <button
-                type="button"
-                disabled={invSaving}
-                className="px-4 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white text-sm font-medium disabled:opacity-50 transition-colors"
-                onClick={async () => {
-                  setInvSaving(true);
-                  try {
-                    await api.patch("/api/org/invoice-info", {
-                      ...inv,
-                      invoiceStreet:  invAddress.street  || null,
-                      invoiceNumber:  invAddress.number  || null,
-                      invoiceZip:     invAddress.zip     || null,
-                      invoiceCity:    invAddress.city    || null,
-                      invoiceState:   invAddress.state   || null,
-                      invoiceCountry: invAddress.country || null,
-                    });
-                    queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
-                    setToast({ type: "success", message: "Invoice information saved." });
-                  } catch {
-                    setToast({ type: "error", message: "Could not save invoice information." });
-                  } finally {
-                    setInvSaving(false);
-                  }
-                }}
-              >
-                {invSaving ? "Saving…" : "Save invoice info"}
-              </button>
             </div>
           </CardContent>
         </Card>

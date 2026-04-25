@@ -23,6 +23,7 @@ import type { Person, PersonDocument } from "../../../backend/src/types";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/AddressFields";
 import { usePermissions } from "@/hooks/usePermissions";
+import Billing from "@/pages/Billing";
 import {
   PersonDocumentListRow,
   type PersonDocumentListRowHandle,
@@ -547,6 +548,16 @@ export default function Account() {
           </Button>
         </div>
       ) : null}
+
+      <div id="billing" className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+        <div>
+          <p className="text-sm font-medium text-white">Billing & credits</p>
+          <p className="text-xs text-white/50 mt-1">
+            Manage top-up packs, low-credit automation, and organization billing options.
+          </p>
+        </div>
+        <Billing embedded />
+      </div>
 
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
         <div>

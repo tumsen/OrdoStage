@@ -24,7 +24,6 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import SetupOrg from "./pages/SetupOrg";
 import SelectOrg from "./pages/SelectOrg";
-import Billing from "./pages/Billing";
 import Account from "./pages/Account";
 import Roles from "./pages/Roles";
 import Tours from "./pages/Tours";
@@ -259,9 +258,7 @@ const App = () => (
             path="/billing"
             element={
               <ProtectedRoute>
-                <Layout>
-                  <Billing />
-                </Layout>
+                <Navigate to="/account#billing" replace />
               </ProtectedRoute>
             }
           />

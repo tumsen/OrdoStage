@@ -8,7 +8,6 @@ import {
   UsersRound,
   Share2,
   Menu,
-  CreditCard,
   LogOut,
   AlertTriangle,
   XCircle,
@@ -53,7 +52,6 @@ const navItems: { to: string; labelKey: string; icon: LucideIcon; view: string }
   { to: "/people", labelKey: "nav.people", icon: Users, view: "people" },
   { to: "/team", labelKey: "nav.team", icon: UsersRound, view: "team" },
   { to: "/calendars", labelKey: "nav.calendars", icon: Share2, view: "calendars" },
-  { to: "/billing", labelKey: "nav.billing", icon: CreditCard, view: "billing" },
   { to: "/roles", labelKey: "nav.roles", icon: KeyRound, view: "roles" },
   { to: "/account", labelKey: "nav.account", icon: UserCircle, view: "account" },
 ];
@@ -230,7 +228,7 @@ function CreditBanner() {
       <div className="flex-shrink-0 bg-red-950/80 border-b border-red-800/50 px-4 py-2 flex items-center gap-2 text-sm">
         <XCircle size={14} className="text-red-400 flex-shrink-0" />
         <span className="text-red-300">{t("credits.noCreditsReadOnly")}</span>
-        <Link to="/billing" className="ml-auto text-red-200 underline underline-offset-2 hover:text-white whitespace-nowrap">
+        <Link to="/account#billing" className="ml-auto text-red-200 underline underline-offset-2 hover:text-white whitespace-nowrap">
           {t("credits.buyCredits")}
         </Link>
       </div>
@@ -247,7 +245,7 @@ function CreditBanner() {
             daysLabel: daysLeft === 1 ? t("credits.day") : t("credits.days"),
           })}
         </span>
-        <Link to="/billing" className="ml-auto text-ordo-yellow underline underline-offset-2 hover:text-white whitespace-nowrap">
+        <Link to="/account#billing" className="ml-auto text-ordo-yellow underline underline-offset-2 hover:text-white whitespace-nowrap">
           {t("credits.buyCredits")}
         </Link>
       </div>
