@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import {
@@ -7,6 +8,7 @@ import {
   UpdatePersonSchema,
   PersonActiveSchema,
   UpdatePersonDocumentSchema,
+  UpdatePersonDocumentVisibilitySchema,
   type TeamAssignmentInput,
 } from "../types";
 import { canAction } from "../requestRole";
@@ -220,6 +222,86 @@ function serializePerson(person: {
 function canEditOwnProfile(user: { email: string }, personEmail: string | null): boolean {
   if (!personEmail) return false;
   return personEmail.toLowerCase() === user.email.toLowerCase();
+}
+
+async function getViewerPersonContext(orgId: string, email: string) {
+  const viewer = await prisma.person.findFirst({
+    where: { organizationId: orgId, email },
+    select: { id: true, teamMemberships: { select: { departmentId: true } } },
+  });
+  if (!viewer && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
+    const ci = await prisma.person.findFirst({
+      where: { organizationId: orgId, email: { equals: email, mode: "insensitive" } },
+      select: { id: true, teamMemberships: { select: { departmentId: true } } },
+    });
+    return ci
+      ? { personId: ci.id, teamIds: ci.teamMemberships.map((m) => m.departmentId) }
+      : null;
+  }
+  return viewer
+    ? { personId: viewer.id, teamIds: viewer.teamMemberships.map((m) => m.departmentId) }
+    : null;
+}
+
+function canViewerAccessDocumentByPermission(
+  viewer: { personId: string; teamIds: string[] } | null,
+  allowedPersonIds: string[],
+  allowedTeamIds: string[]
+) {
+  if (!viewer) return false;
+  if (allowedPersonIds.includes(viewer.personId)) return true;
+  if (viewer.teamIds.some((teamId) => allowedTeamIds.includes(teamId))) return true;
+  return false;
+}
+
+type DocPermissionMap = Map<string, { teamIds: string[]; personIds: string[] }>;
+
+async function loadDocPermissions(docIds: string[]): Promise<DocPermissionMap> {
+  const uniqueIds = [...new Set(docIds.filter(Boolean))];
+  const map: DocPermissionMap = new Map();
+  if (uniqueIds.length === 0) return map;
+  const values = Prisma.join(uniqueIds.map((id) => Prisma.sql`${id}`));
+  const teamRows = await prisma.$queryRaw<Array<{ documentId: string; teamId: string }>>(Prisma.sql`
+    SELECT "documentId", "teamId"
+    FROM "PersonDocumentAllowedTeam"
+    WHERE "documentId" IN (${values})
+  `);
+  const personRows = await prisma.$queryRaw<Array<{ documentId: string; allowedPersonId: string }>>(Prisma.sql`
+    SELECT "documentId", "allowedPersonId"
+    FROM "PersonDocumentAllowedPerson"
+    WHERE "documentId" IN (${values})
+  `);
+  for (const id of uniqueIds) map.set(id, { teamIds: [], personIds: [] });
+  for (const r of teamRows) {
+    const cur = map.get(r.documentId);
+    if (!cur) continue;
+    cur.teamIds.push(r.teamId);
+  }
+  for (const r of personRows) {
+    const cur = map.get(r.documentId);
+    if (!cur) continue;
+    cur.personIds.push(r.allowedPersonId);
+  }
+  return map;
+}
+
+async function replaceDocPermissions(documentId: string, teamIds: string[], personIds: string[]) {
+  await prisma.$executeRaw(Prisma.sql`DELETE FROM "PersonDocumentAllowedTeam" WHERE "documentId" = ${documentId}`);
+  await prisma.$executeRaw(Prisma.sql`DELETE FROM "PersonDocumentAllowedPerson" WHERE "documentId" = ${documentId}`);
+  if (teamIds.length > 0) {
+    const rows = Prisma.join(teamIds.map((teamId) => Prisma.sql`(${documentId}, ${teamId}, NOW())`));
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "PersonDocumentAllowedTeam" ("documentId", "teamId", "createdAt")
+      VALUES ${rows}
+    `);
+  }
+  if (personIds.length > 0) {
+    const rows = Prisma.join(personIds.map((allowedPersonId) => Prisma.sql`(${documentId}, ${allowedPersonId}, NOW())`));
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "PersonDocumentAllowedPerson" ("documentId", "allowedPersonId", "createdAt")
+      VALUES ${rows}
+    `);
+  }
 }
 
 /** Calendar days from today to the document’s local expiry day (negative = expired). */
@@ -711,8 +793,9 @@ peopleRouter.get("/people/:id/documents", async (c) => {
   }
   const canWritePeople = canAction(c, "write.people");
   const canEditSelf = canEditOwnProfile(user, person.email);
+  let viewerContext: { personId: string; teamIds: string[] } | null = null;
   if (!canWritePeople && !canEditSelf) {
-    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+    viewerContext = await getViewerPersonContext(user.organizationId, user.email);
   }
   const docs = await prisma.personDocument.findMany({
     where: { personId: person.id },
@@ -729,10 +812,19 @@ peopleRouter.get("/people/:id/documents", async (c) => {
     },
     orderBy: { createdAt: "desc" },
   });
+  const permissionMap = await loadDocPermissions(docs.map((d) => d.id));
+  const visibleDocs = canWritePeople || canEditSelf
+    ? docs
+    : docs.filter((d) => {
+        const perms = permissionMap.get(d.id) ?? { teamIds: [], personIds: [] };
+        return canViewerAccessDocumentByPermission(viewerContext, perms.personIds, perms.teamIds);
+      });
   return c.json({
-    data: docs.map((d) => ({
+    data: visibleDocs.map((d) => ({
       ...d,
       doesNotExpire: d.doesNotExpire,
+      allowedTeamIds: (permissionMap.get(d.id)?.teamIds ?? []),
+      allowedPersonIds: (permissionMap.get(d.id)?.personIds ?? []),
       createdAt: d.createdAt.toISOString(),
       expiresAt: d.expiresAt ? d.expiresAt.toISOString() : null,
     })),
@@ -902,6 +994,8 @@ peopleRouter.post("/people/:id/documents", async (c) => {
       data: {
         ...document,
         doesNotExpire: document.doesNotExpire,
+        allowedTeamIds: [],
+        allowedPersonIds: [],
         createdAt: document.createdAt.toISOString(),
         expiresAt: document.expiresAt ? document.expiresAt.toISOString() : null,
       },
@@ -978,15 +1072,143 @@ peopleRouter.patch("/people/documents/:docId", zValidator("json", UpdatePersonDo
       createdAt: true,
     },
   });
+  const perms = await loadDocPermissions([updated.id]);
   return c.json({
     data: {
       ...updated,
       doesNotExpire: updated.doesNotExpire,
+      allowedTeamIds: perms.get(updated.id)?.teamIds ?? [],
+      allowedPersonIds: perms.get(updated.id)?.personIds ?? [],
       createdAt: updated.createdAt.toISOString(),
       expiresAt: updated.expiresAt ? updated.expiresAt.toISOString() : null,
     },
   });
 });
+
+// GET /api/people/documents/:docId/permissions — only owner can configure
+peopleRouter.get("/people/documents/:docId/permissions", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { docId } = c.req.param();
+  const doc = await prisma.personDocument.findFirst({
+    where: { id: docId, person: { organizationId: user.organizationId } },
+    select: {
+      id: true,
+      person: { select: { id: true, email: true } },
+    },
+  });
+  if (!doc) {
+    return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+  if (!canEditOwnProfile(user, doc.person.email)) {
+    return c.json({ error: { message: "Only the document owner can edit visibility", code: "FORBIDDEN" } }, 403);
+  }
+  const perms = await loadDocPermissions([doc.id]);
+  const entry = perms.get(doc.id) ?? { teamIds: [], personIds: [] };
+  return c.json({
+    data: {
+      teamIds: entry.teamIds,
+      personIds: entry.personIds,
+    },
+  });
+});
+
+// GET /api/people/documents/:docId/permissions/options — teams + team members for owner popup
+peopleRouter.get("/people/documents/:docId/permissions/options", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { docId } = c.req.param();
+  const doc = await prisma.personDocument.findFirst({
+    where: { id: docId, person: { organizationId: user.organizationId } },
+    select: { id: true, person: { select: { id: true, email: true } } },
+  });
+  if (!doc) {
+    return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+  if (!canEditOwnProfile(user, doc.person.email)) {
+    return c.json({ error: { message: "Only the document owner can edit visibility", code: "FORBIDDEN" } }, 403);
+  }
+  const teams = await prisma.department.findMany({
+    where: { organizationId: user.organizationId },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      color: true,
+      teamMembers: {
+        where: { person: { isActive: true } },
+        select: {
+          person: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+  return c.json({
+    data: {
+      ownerPersonId: doc.person.id,
+      teams: teams.map((t) => ({
+        id: t.id,
+        name: t.name,
+        color: t.color,
+        members: t.teamMembers.map((m) => ({ id: m.person.id, name: m.person.name })),
+      })),
+    },
+  });
+});
+
+// PATCH /api/people/documents/:docId/permissions — only owner can edit visibility
+peopleRouter.patch(
+  "/people/documents/:docId/permissions",
+  zValidator("json", UpdatePersonDocumentVisibilitySchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId) {
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    }
+    const { docId } = c.req.param();
+    const body = c.req.valid("json");
+    const doc = await prisma.personDocument.findFirst({
+      where: { id: docId, person: { organizationId: user.organizationId } },
+      select: { id: true, person: { select: { id: true, email: true } } },
+    });
+    if (!doc) {
+      return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+    }
+    if (!canEditOwnProfile(user, doc.person.email)) {
+      return c.json({ error: { message: "Only the document owner can edit visibility", code: "FORBIDDEN" } }, 403);
+    }
+    const teamIds = [...new Set(body.teamIds.filter(Boolean))];
+    const personIds = [...new Set(body.personIds.filter(Boolean))].filter((id) => id !== doc.person.id);
+
+    if (teamIds.length > 0) {
+      const teams = await prisma.department.findMany({
+        where: { id: { in: teamIds }, organizationId: user.organizationId },
+        select: { id: true },
+      });
+      if (teams.length !== teamIds.length) {
+        return c.json({ error: { message: "One or more teams were not found", code: "NOT_FOUND" } }, 404);
+      }
+    }
+    if (personIds.length > 0) {
+      const people = await prisma.person.findMany({
+        where: { id: { in: personIds }, organizationId: user.organizationId },
+        select: { id: true },
+      });
+      if (people.length !== personIds.length) {
+        return c.json({ error: { message: "One or more people were not found", code: "NOT_FOUND" } }, 404);
+      }
+    }
+
+    await replaceDocPermissions(doc.id, teamIds, personIds);
+
+    return c.json({ data: { teamIds, personIds } });
+  }
+);
 
 // GET /api/people/documents/:docId/download
 peopleRouter.get("/people/documents/:docId/download", async (c) => {
@@ -997,7 +1219,13 @@ peopleRouter.get("/people/documents/:docId/download", async (c) => {
   const { docId } = c.req.param();
   const doc = await prisma.personDocument.findFirst({
     where: { id: docId, person: { organizationId: user.organizationId } },
-    select: { data: true, mimeType: true, filename: true, person: { select: { email: true } } },
+    select: {
+      id: true,
+      data: true,
+      mimeType: true,
+      filename: true,
+      person: { select: { email: true } },
+    },
   });
   if (!doc) {
     return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
@@ -1005,7 +1233,17 @@ peopleRouter.get("/people/documents/:docId/download", async (c) => {
   const canWritePeople = canAction(c, "write.people");
   const canEditSelf = canEditOwnProfile(user, doc.person.email);
   if (!canWritePeople && !canEditSelf) {
-    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+    const perms = await loadDocPermissions([doc.id]);
+    const entry = perms.get(doc.id) ?? { teamIds: [], personIds: [] };
+    const viewerContext = await getViewerPersonContext(user.organizationId, user.email);
+    const allowed = canViewerAccessDocumentByPermission(
+      viewerContext,
+      entry.personIds,
+      entry.teamIds
+    );
+    if (!allowed) {
+      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+    }
   }
   return new Response(doc.data, {
     headers: {

@@ -14,6 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { signOut } from "@/lib/auth-client";
 import { usePreferences } from "@/hooks/usePreferences";
 import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
@@ -27,6 +29,11 @@ import {
 } from "@/components/PersonDocumentListRow";
 
 const CONFIRM_PHRASE = "DELETE";
+
+type DocumentPermissionMember = { id: string; name: string };
+type DocumentPermissionTeam = { id: string; name: string; color: string; members: DocumentPermissionMember[] };
+type DocumentPermissionOptions = { ownerPersonId: string; teams: DocumentPermissionTeam[] };
+type DocumentPermissionState = { teamIds: string[]; personIds: string[] };
 
 async function uploadPersonPhoto(personId: string, file: File): Promise<void> {
   const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
@@ -82,6 +89,8 @@ export default function Account() {
   const [docExpires, setDocExpires] = useState("");
   const [docDoesNotExpire, setDocDoesNotExpire] = useState(false);
   const [docType, setDocType] = useState("other");
+  const [permissionsDoc, setPermissionsDoc] = useState<PersonDocument | null>(null);
+  const [permissionDraft, setPermissionDraft] = useState<DocumentPermissionState>({ teamIds: [], personIds: [] });
 
   const documentRowHandleMap = useRef(new Map<string, PersonDocumentListRowHandle>());
 
@@ -94,6 +103,20 @@ export default function Account() {
     queryKey: ["people", mePerson?.id, "documents"],
     queryFn: () => api.get<PersonDocument[]>(`/api/people/${mePerson!.id}/documents`),
     enabled: Boolean(mePerson?.id),
+  });
+
+  const { data: permissionOptions } = useQuery<DocumentPermissionOptions>({
+    queryKey: ["people", "documents", permissionsDoc?.id, "permission-options"],
+    queryFn: () =>
+      api.get<DocumentPermissionOptions>(`/api/people/documents/${permissionsDoc!.id}/permissions/options`),
+    enabled: Boolean(permissionsDoc?.id),
+  });
+
+  const { data: permissionState } = useQuery<DocumentPermissionState>({
+    queryKey: ["people", "documents", permissionsDoc?.id, "permissions"],
+    queryFn: () =>
+      api.get<DocumentPermissionState>(`/api/people/documents/${permissionsDoc!.id}/permissions`),
+    enabled: Boolean(permissionsDoc?.id),
   });
 
   const [profileDraft, setProfileDraft] = useState<{
@@ -193,6 +216,20 @@ export default function Account() {
     },
   });
 
+  const updateDocPermissionsMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: DocumentPermissionState }) =>
+      api.patch<DocumentPermissionState>(`/api/people/documents/${id}/permissions`, body),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["people", "documents", id, "permissions"] });
+      toast({ title: "Document permissions updated" });
+      setPermissionsDoc(null);
+    },
+    onError: (e: Error) => {
+      const msg = e instanceof ApiError ? e.message : "Could not update document permissions";
+      toast({ title: msg, variant: "destructive" });
+    },
+  });
+
   useEffect(() => {
     if (!mePerson) return;
     setProfileDraft({
@@ -202,6 +239,14 @@ export default function Account() {
       emergencyContactPhone: mePerson.emergencyContactPhone ?? "",
     });
   }, [mePerson?.id]);
+
+  useEffect(() => {
+    if (!permissionState || !permissionsDoc) return;
+    setPermissionDraft({
+      teamIds: permissionState.teamIds ?? [],
+      personIds: permissionState.personIds ?? [],
+    });
+  }, [permissionState, permissionsDoc?.id]);
 
   async function onDeleteAccount() {
     setError("");
@@ -430,11 +475,13 @@ export default function Account() {
                         }}
                         doc={doc}
                         canEdit
+                        canManagePermissions
                         isSaving={updateDocMutation.isPending && updateDocMutation.variables?.id === doc.id}
                         isDeleting={deleteDocMutation.isPending && deleteDocMutation.variables === doc.id}
                         onSave={async (id, body) => {
                           await updateDocMutation.mutateAsync({ id, body });
                         }}
+                        onEditPermissions={(d) => setPermissionsDoc(d)}
                         onDelete={(id) => deleteDocMutation.mutate(id)}
                       />
                     ))}
@@ -455,6 +502,95 @@ export default function Account() {
           </>
         )}
       </div>
+
+      <Dialog open={Boolean(permissionsDoc)} onOpenChange={(o) => { if (!o) setPermissionsDoc(null); }}>
+        <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Document permissions</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-white/45">
+            Choose exactly who can view/download this document. Default is no one selected.
+          </p>
+          {(() => {
+            const ownerPersonId = permissionOptions?.ownerPersonId ?? "";
+            return (
+          <div className="space-y-3">
+            {(permissionOptions?.teams ?? []).map((team) => {
+              const teamChecked = permissionDraft.teamIds.includes(team.id);
+              return (
+                <div key={team.id} className="rounded border border-white/10 bg-white/[0.02] p-2 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={teamChecked}
+                      onCheckedChange={(v) => {
+                        const on = v === true;
+                        setPermissionDraft((prev) => ({
+                          ...prev,
+                          teamIds: on
+                            ? [...new Set([...prev.teamIds, team.id])]
+                            : prev.teamIds.filter((id) => id !== team.id),
+                        }));
+                      }}
+                    />
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full border border-white/20"
+                      style={{ backgroundColor: team.color }}
+                    />
+                    <span className="text-sm text-white/85">{team.name}</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pl-6">
+                    {team.members
+                      .filter((m) => m.id !== ownerPersonId)
+                      .map((m) => (
+                        <label key={m.id} className="flex items-center gap-2 text-xs text-white/75 cursor-pointer">
+                          <Checkbox
+                            checked={permissionDraft.personIds.includes(m.id)}
+                            onCheckedChange={(v) => {
+                              const on = v === true;
+                              setPermissionDraft((prev) => ({
+                                ...prev,
+                                personIds: on
+                                  ? [...new Set([...prev.personIds, m.id])]
+                                  : prev.personIds.filter((id) => id !== m.id),
+                              }));
+                            }}
+                          />
+                          <span>{m.name}</span>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-white/10 text-white/70 bg-transparent"
+              onClick={() => setPermissionsDoc(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-indigo-700 hover:bg-indigo-600 text-white"
+              disabled={!permissionsDoc || updateDocPermissionsMutation.isPending}
+              onClick={() => {
+                if (!permissionsDoc) return;
+                updateDocPermissionsMutation.mutate({
+                  id: permissionsDoc.id,
+                  body: { teamIds: permissionDraft.teamIds, personIds: permissionDraft.personIds },
+                });
+              }}
+            >
+              {updateDocPermissionsMutation.isPending ? "Saving..." : "Save permissions"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="rounded-xl border border-red-500/25 bg-red-950/20 p-5 space-y-4">
         <div className="flex gap-3">

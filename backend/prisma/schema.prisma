@@ -239,6 +239,7 @@ model Person {
   departmentId     String?
   department       Department?             @relation(fields: [departmentId], references: [id])
   documents        PersonDocument[]
+  documentPermissions PersonDocumentAllowedPerson[]
   teamMemberships  PersonTeam[]
   assignments      EventPerson[]
   internalBookings InternalBookingPerson[]
@@ -268,7 +269,33 @@ model PersonDocument {
   expiresAt  DateTime?
   /** Explicit “never expires” (badge shows ∞); implies no expiresAt. */
   doesNotExpire Boolean @default(false)
+  allowedTeams PersonDocumentAllowedTeam[]
+  allowedPeople PersonDocumentAllowedPerson[]
   createdAt  DateTime @default(now())
+}
+
+model PersonDocumentAllowedTeam {
+  id         String         @id @default(cuid())
+  documentId String
+  teamId     String
+  document   PersonDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  team       Department     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdAt  DateTime       @default(now())
+
+  @@unique([documentId, teamId])
+  @@index([teamId])
+}
+
+model PersonDocumentAllowedPerson {
+  id             String         @id @default(cuid())
+  documentId     String
+  allowedPersonId String
+  document       PersonDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  allowedPerson  Person         @relation(fields: [allowedPersonId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+
+  @@unique([documentId, allowedPersonId])
+  @@index([allowedPersonId])
 }
 
 model Event {
@@ -396,6 +423,7 @@ model Department {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   people         Person[]
   teamMembers    PersonTeam[]
+  documentPermissions PersonDocumentAllowedTeam[]
   tourAssignments TourTeam[]
   createdAt      DateTime     @default(now())
 }

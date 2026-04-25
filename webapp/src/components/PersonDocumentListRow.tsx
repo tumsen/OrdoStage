@@ -19,10 +19,12 @@ export type PersonDocumentSavePatch = {
 type Props = {
   doc: PersonDocument;
   canEdit: boolean;
+  canManagePermissions?: boolean;
   isSaving: boolean;
   isDeleting: boolean;
   onSave: (id: string, body: PersonDocumentSavePatch) => Promise<unknown>;
   onDelete: (id: string) => void;
+  onEditPermissions?: (doc: PersonDocument) => void;
 };
 
 export type PersonDocumentListRowHandle = {
@@ -46,10 +48,12 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
   {
   doc,
   canEdit,
+  canManagePermissions = false,
   isSaving,
   isDeleting,
   onSave,
   onDelete,
+  onEditPermissions,
 }: Props,
   ref
 ) {
@@ -175,6 +179,17 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
         >
           Download
         </a>
+        {canManagePermissions && onEditPermissions ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 text-[11px] border-white/20 text-white/75"
+            onClick={() => onEditPermissions(doc)}
+          >
+            Permissions
+          </Button>
+        ) : null}
         {canEdit && (
           <button
             type="button"

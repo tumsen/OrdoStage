@@ -175,6 +175,9 @@ export const PersonDocumentSchema = z.object({
   /** ISO datetime, or null if no specific date. */
   expiresAt: z.string().datetime().nullable().optional(),
   doesNotExpire: z.boolean().default(false),
+  /** People/teams explicitly allowed to view/download this document. Empty = owner/admin only. */
+  allowedTeamIds: z.array(z.string()).optional(),
+  allowedPersonIds: z.array(z.string()).optional(),
   createdAt: z.string(),
 });
 
@@ -183,6 +186,11 @@ export const UpdatePersonDocumentSchema = z.object({
   /** YYYY-MM-DD, ISO 8601 string, or null to clear. */
   expiresAt: z.union([z.string().min(1), z.null()]).optional(),
   doesNotExpire: z.boolean().optional(),
+});
+
+export const UpdatePersonDocumentVisibilitySchema = z.object({
+  teamIds: z.array(z.string()).default([]),
+  personIds: z.array(z.string()).default([]),
 });
 
 /** Each row picks an existing team (teamId) or creates one by name (newTeamName). */

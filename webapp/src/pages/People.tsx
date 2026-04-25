@@ -58,6 +58,11 @@ interface Team {
   createdAt: string;
 }
 
+type DocumentPermissionMember = { id: string; name: string };
+type DocumentPermissionTeam = { id: string; name: string; color: string; members: DocumentPermissionMember[] };
+type DocumentPermissionOptions = { ownerPersonId: string; teams: DocumentPermissionTeam[] };
+type DocumentPermissionState = { teamIds: string[]; personIds: string[] };
+
 // ── Form schema ───────────────────────────────────────────────────────────────
 
 const PRESET_ROLES = ["Tour Manager", "Actor", "Tech"] as const;
@@ -437,6 +442,8 @@ function PersonFormDialog({
   const [docType, setDocType] = useState<(typeof PERSON_DOCUMENT_TYPE_OPTIONS)[number]>("other");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [teamPickerOpen, setTeamPickerOpen] = useState(false);
+  const [permissionsDoc, setPermissionsDoc] = useState<PersonDocument | null>(null);
+  const [permissionDraft, setPermissionDraft] = useState<DocumentPermissionState>({ teamIds: [], personIds: [] });
 
   const canEditPersonDocs =
     canWriteOrg ||
@@ -444,12 +451,40 @@ function PersonFormDialog({
       person?.email?.trim() &&
         session?.user?.email?.toLowerCase() === person.email?.trim().toLowerCase()
     );
+  const isSelfPerson =
+    Boolean(
+      person?.email?.trim() &&
+      session?.user?.email &&
+      session.user.email.toLowerCase() === person.email.trim().toLowerCase()
+    );
 
   const { data: personDocuments } = useQuery<PersonDocument[]>({
     queryKey: ["people", person?.id, "documents"],
     queryFn: () => api.get<PersonDocument[]>(`/api/people/${person!.id}/documents`),
     enabled: Boolean(person?.id),
   });
+
+  const { data: permissionOptions } = useQuery<DocumentPermissionOptions>({
+    queryKey: ["people", "documents", permissionsDoc?.id, "permission-options"],
+    queryFn: () =>
+      api.get<DocumentPermissionOptions>(`/api/people/documents/${permissionsDoc!.id}/permissions/options`),
+    enabled: Boolean(permissionsDoc?.id),
+  });
+
+  const { data: permissionState } = useQuery<DocumentPermissionState>({
+    queryKey: ["people", "documents", permissionsDoc?.id, "permissions"],
+    queryFn: () =>
+      api.get<DocumentPermissionState>(`/api/people/documents/${permissionsDoc!.id}/permissions`),
+    enabled: Boolean(permissionsDoc?.id),
+  });
+
+  useEffect(() => {
+    if (!permissionState || !permissionsDoc) return;
+    setPermissionDraft({
+      teamIds: permissionState.teamIds ?? [],
+      personIds: permissionState.personIds ?? [],
+    });
+  }, [permissionState, permissionsDoc?.id]);
 
   useEffect(() => {
     if (!open || person || !teams?.length) return;
@@ -597,6 +632,19 @@ function PersonFormDialog({
         title: e.message || "Could not update document",
         variant: "destructive",
       });
+    },
+  });
+
+  const updateDocPermissionsMutation = useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: DocumentPermissionState }) =>
+      api.patch<DocumentPermissionState>(`/api/people/documents/${id}/permissions`, body),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["people", "documents", id, "permissions"] });
+      toast({ title: "Document permissions updated" });
+      setPermissionsDoc(null);
+    },
+    onError: (e: Error) => {
+      toast({ title: e.message || "Could not update document permissions", variant: "destructive" });
     },
   });
 
@@ -951,6 +999,98 @@ function PersonFormDialog({
             </DialogContent>
           </Dialog>
 
+          <Dialog open={Boolean(permissionsDoc)} onOpenChange={(o) => { if (!o) setPermissionsDoc(null); }}>
+            <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-2xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Document permissions</DialogTitle>
+              </DialogHeader>
+              <p className="text-xs text-white/45">
+                Choose exactly who can view/download this document. Default is no one selected.
+              </p>
+          {(() => {
+            const ownerPersonId = permissionOptions?.ownerPersonId ?? "";
+            return (
+              <div className="space-y-3">
+                {(permissionOptions?.teams ?? []).map((team) => {
+                  const teamChecked = permissionDraft.teamIds.includes(team.id);
+                  return (
+                    <div key={team.id} className="rounded border border-white/10 bg-white/[0.02] p-2 space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={teamChecked}
+                          onCheckedChange={(v) => {
+                            const on = v === true;
+                            setPermissionDraft((prev) => ({
+                              ...prev,
+                              teamIds: on
+                                ? [...new Set([...prev.teamIds, team.id])]
+                                : prev.teamIds.filter((id) => id !== team.id),
+                            }));
+                          }}
+                        />
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full border border-white/20"
+                          style={{ backgroundColor: team.color }}
+                        />
+                        <span className="text-sm text-white/85">{team.name}</span>
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pl-6">
+                        {team.members
+                          .filter((m) => m.id !== ownerPersonId)
+                          .map((m) => (
+                            <label key={m.id} className="flex items-center gap-2 text-xs text-white/75 cursor-pointer">
+                              <Checkbox
+                                checked={permissionDraft.personIds.includes(m.id)}
+                                onCheckedChange={(v) => {
+                                  const on = v === true;
+                                  setPermissionDraft((prev) => ({
+                                    ...prev,
+                                    personIds: on
+                                      ? [...new Set([...prev.personIds, m.id])]
+                                      : prev.personIds.filter((id) => id !== m.id),
+                                  }));
+                                }}
+                              />
+                              <span>{m.name}</span>
+                            </label>
+                          ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-white/10 text-white/70 bg-transparent"
+                  onClick={() => setPermissionsDoc(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-indigo-700 hover:bg-indigo-600 text-white"
+                  disabled={!permissionsDoc || updateDocPermissionsMutation.isPending}
+                  onClick={() => {
+                    if (!permissionsDoc) return;
+                    updateDocPermissionsMutation.mutate({
+                      id: permissionsDoc.id,
+                      body: {
+                        teamIds: permissionDraft.teamIds,
+                        personIds: permissionDraft.personIds,
+                      },
+                    });
+                  }}
+                >
+                  {updateDocPermissionsMutation.isPending ? "Saving…" : "Save permissions"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           <div className="flex flex-col gap-4 w-full min-w-0">
             <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3 w-full max-w-md">
               <Label className="text-white/50 text-xs uppercase tracking-wide">Profile image</Label>
@@ -1061,6 +1201,7 @@ function PersonFormDialog({
                       }}
                       doc={doc}
                       canEdit={canEditPersonDocs}
+                      canManagePermissions={isSelfPerson}
                       isSaving={
                         updateDocMutation.isPending && updateDocMutation.variables?.id === doc.id
                       }
@@ -1068,6 +1209,7 @@ function PersonFormDialog({
                       onSave={async (id, body) => {
                         await updateDocMutation.mutateAsync({ id, body });
                       }}
+                      onEditPermissions={(d) => setPermissionsDoc(d)}
                       onDelete={(id) => deleteDocMutation.mutate(id)}
                     />
                   ))}
