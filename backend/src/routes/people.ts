@@ -230,11 +230,16 @@ function calendarDayDiffFromToday(expiresAt: Date): number {
   return Math.round((d.getTime() - new Date(startOfToday.getFullYear(), startOfToday.getMonth(), startOfToday.getDate()).getTime()) / 86400000);
 }
 
-type ListDocRow = { name: string; expiresAt: Date | null; doesNotExpire: boolean };
+type ListDocRow = { name: string; type: string; expiresAt: Date | null; doesNotExpire: boolean };
 
 type DocumentExpiryHint =
   | { name: string; forever: true }
   | { name: string; daysLeft: number; expired: boolean };
+
+type PersonDocumentListSummary =
+  | { name: string; type?: string; forever: true }
+  | { name: string; type?: string; noExpiry: true }
+  | { name: string; type?: string; daysLeft: number; expired: boolean };
 
 /** Picks a single hint: dated docs first (expired → soonest), else a “forever” doc. */
 function documentExpiryHintForList(rows: ListDocRow[]): DocumentExpiryHint | null {
@@ -258,14 +263,50 @@ function documentExpiryHintForList(rows: ListDocRow[]): DocumentExpiryHint | nul
   return null;
 }
 
-function documentExpiryHintByPersonId(orgId: string): Promise<Map<string, DocumentExpiryHint | null>> {
+function personDocumentSummaryFromRow(r: ListDocRow): PersonDocumentListSummary {
+  const typeField = (r.type || "other").trim() || "other";
+  if (r.doesNotExpire) {
+    return { name: r.name, type: typeField, forever: true };
+  }
+  if (r.expiresAt) {
+    const daysLeft = calendarDayDiffFromToday(r.expiresAt);
+    return { name: r.name, type: typeField, daysLeft, expired: daysLeft < 0 };
+  }
+  return { name: r.name, type: typeField, noExpiry: true };
+}
+
+function rankDocumentSummary(s: PersonDocumentListSummary) {
+  if ("expired" in s && s.expired) return 0;
+  if ("daysLeft" in s && "expired" in s && !s.expired) return 1;
+  if ("noExpiry" in s && s.noExpiry) return 2;
+  if ("forever" in s && s.forever) return 3;
+  return 4;
+}
+
+function compareDocumentSummaries(a: PersonDocumentListSummary, b: PersonDocumentListSummary) {
+  const ra = rankDocumentSummary(a);
+  const rb = rankDocumentSummary(b);
+  if (ra !== rb) return ra - rb;
+  if ("daysLeft" in a && "expired" in a && "daysLeft" in b && "expired" in b) {
+    if (a.expired && b.expired) return a.daysLeft - b.daysLeft;
+    if (!a.expired && !b.expired) return a.daysLeft - b.daysLeft;
+  }
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+/** List rows the legacy single-badge hint can use (same as old OR: DNE or has expires). */
+function listDocRowsForExpiryHintFilter(rows: ListDocRow[]) {
+  return rows.filter((r) => r.doesNotExpire || (r.expiresAt != null && !r.doesNotExpire));
+}
+
+function personDocumentListMetaByOrgId(orgId: string): Promise<{
+  hintMap: Map<string, DocumentExpiryHint | null>;
+  summariesMap: Map<string, PersonDocumentListSummary[]>;
+}> {
   return prisma.personDocument
     .findMany({
-      where: {
-        person: { organizationId: orgId },
-        OR: [{ doesNotExpire: true }, { expiresAt: { not: null } }],
-      },
-      select: { personId: true, name: true, expiresAt: true, doesNotExpire: true },
+      where: { person: { organizationId: orgId } },
+      select: { personId: true, name: true, type: true, expiresAt: true, doesNotExpire: true },
     })
     .then((docs) => {
       const by = new Map<string, ListDocRow[]>();
@@ -273,16 +314,26 @@ function documentExpiryHintByPersonId(orgId: string): Promise<Map<string, Docume
         const list = by.get(d.personId) ?? [];
         list.push({
           name: d.name,
+          type: d.type || "other",
           expiresAt: d.expiresAt,
           doesNotExpire: d.doesNotExpire,
         });
         by.set(d.personId, list);
       }
-      const m = new Map<string, DocumentExpiryHint | null>();
+      const hintMap = new Map<string, DocumentExpiryHint | null>();
+      const summariesMap = new Map<string, PersonDocumentListSummary[]>();
       for (const [personId, list] of by) {
-        m.set(personId, documentExpiryHintForList(list));
+        const forHint = listDocRowsForExpiryHintFilter(list);
+        hintMap.set(
+          personId,
+          forHint.length > 0 ? documentExpiryHintForList(forHint) : null,
+        );
+        const sorted = list
+          .map((r) => personDocumentSummaryFromRow(r))
+          .sort(compareDocumentSummaries);
+        summariesMap.set(personId, sorted);
       }
-      return m;
+      return { hintMap, summariesMap };
     });
 }
 
@@ -292,7 +343,7 @@ peopleRouter.get("/people", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
-  const [people, hintMap] = await Promise.all([
+  const [people, { hintMap, summariesMap }] = await Promise.all([
     prisma.person.findMany({
       where: { organizationId: user.organizationId },
       orderBy: { name: "asc" },
@@ -303,12 +354,13 @@ peopleRouter.get("/people", async (c) => {
         permissionGroup: { select: { id: true, name: true, slug: true } },
       },
     }),
-    documentExpiryHintByPersonId(user.organizationId),
+    personDocumentListMetaByOrgId(user.organizationId),
   ]);
   return c.json({
     data: people.map((p) => ({
       ...serializePerson(p),
       documentExpiryHint: hintMap.get(p.id) ?? null,
+      documentSummaries: summariesMap.get(p.id) ?? [],
     })),
   });
 });

@@ -15,7 +15,6 @@ import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { CreditsSummary, type OrgCreditsPayload } from "@/components/CreditsSummary";
 import type { Person, PersonDocument } from "../../../backend/src/types";
 import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -203,6 +202,93 @@ function AffiliationBadge({ affiliation }: { affiliation: Person["affiliation"] 
     >
       {internal ? "Internal" : "External"}
     </span>
+  );
+}
+
+function formatDocumentTypeForList(t: string | undefined) {
+  if (!t) return "";
+  return t.replace(/_/g, " ");
+}
+
+/** Compact document cards for the people list (smaller than role / affiliation). */
+function PersonListDocumentChips({ items }: { items: Person["documentSummaries"] }) {
+  if (!items?.length) return null;
+  return (
+    <div className="mt-2 pt-2 border-t border-white/[0.06] w-full min-w-0">
+      <p className="text-[9px] uppercase tracking-wide text-white/30 mb-1">Documents</p>
+      <div className="flex flex-wrap gap-1">
+        {items.map((d, i) => {
+          const typeLabel = formatDocumentTypeForList("type" in d ? d.type : undefined);
+          const typeSeg = typeLabel ? `${typeLabel} · ` : "";
+          if ("forever" in d && d.forever) {
+            return (
+              <div
+                key={`${d.name}-${i}`}
+                className="inline-flex flex-col max-w-full rounded border border-violet-500/40 bg-violet-950/35 px-1.5 py-0.5"
+                title={`${d.name} — does not expire`}
+              >
+                <span className="text-[9px] font-medium text-violet-100/95 leading-tight truncate">
+                  {d.name}
+                </span>
+                <span className="text-[8px] text-white/45 leading-tight">
+                  {typeSeg}∞
+                </span>
+              </div>
+            );
+          }
+          if ("noExpiry" in d && d.noExpiry) {
+            return (
+              <div
+                key={`${d.name}-${i}`}
+                className="inline-flex flex-col max-w-full rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5"
+                title={`${d.name} — no date set`}
+              >
+                <span className="text-[9px] font-medium text-white/75 leading-tight truncate">
+                  {d.name}
+                </span>
+                <span className="text-[8px] text-white/35 leading-tight">
+                  {typeSeg}No date
+                </span>
+              </div>
+            );
+          }
+          if ("expired" in d && d.expired) {
+            return (
+              <div
+                key={`${d.name}-${i}`}
+                className="inline-flex flex-col max-w-full rounded border border-red-500/45 bg-red-950/30 px-1.5 py-0.5"
+                title={`${d.name} — expired (${d.daysLeft < 0 ? `${-d.daysLeft}d ago` : "last day"})`}
+              >
+                <span className="text-[9px] font-medium text-red-100/90 leading-tight truncate">
+                  {d.name}
+                </span>
+                <span className="text-[8px] text-red-200/50 leading-tight">
+                  {typeSeg}Expired
+                </span>
+              </div>
+            );
+          }
+          if ("daysLeft" in d) {
+            return (
+              <div
+                key={`${d.name}-${i}`}
+                className="inline-flex flex-col max-w-full rounded border border-emerald-500/40 bg-emerald-950/25 px-1.5 py-0.5"
+                title={`${d.name} — ${d.daysLeft === 0 ? "last day" : `${d.daysLeft}d left`}`}
+              >
+                <span className="text-[9px] font-medium text-emerald-100/90 leading-tight truncate">
+                  {d.name}
+                </span>
+                <span className="text-[8px] text-emerald-200/50 leading-tight">
+                  {typeSeg}
+                  {d.daysLeft === 0 ? "Last day" : `${d.daysLeft}d left`}
+                </span>
+              </div>
+            );
+          }
+          return null;
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1079,42 +1165,6 @@ function PersonCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-white/90">{person.name}</span>
-          {person.documentExpiryHint
-            ? (() => {
-                const hint = person.documentExpiryHint;
-                if ("forever" in hint && hint.forever) {
-                  return (
-                    <Badge
-                      className="max-w-full border border-violet-500/50 bg-violet-800/40 text-violet-100 font-normal tabular-nums"
-                      title="Document marked as not expiring"
-                    >
-                      <span className="inline-block max-w-[10rem] truncate align-bottom">{hint.name}</span>
-                      <span className="whitespace-nowrap"> · ∞</span>
-                    </Badge>
-                  );
-                }
-                const dated = hint as { name: string; daysLeft: number; expired: boolean };
-                return (
-                  <Badge
-                    className={
-                      dated.expired
-                        ? "max-w-full border border-red-500/50 bg-red-800/50 text-red-100 font-normal"
-                        : "max-w-full border border-emerald-500/50 bg-emerald-600/30 text-emerald-100 font-normal"
-                    }
-                    title="Most urgent document with an expiration"
-                  >
-                    <span className="inline-block max-w-[10rem] truncate align-bottom">{dated.name}</span>
-                    <span className="whitespace-nowrap">
-                      {dated.expired
-                        ? " · Expired"
-                        : dated.daysLeft === 0
-                          ? " · Last day"
-                          : ` · ${dated.daysLeft}d left`}
-                    </span>
-                  </Badge>
-                );
-              })()
-            : null}
           <AffiliationBadge affiliation={person.affiliation ?? "internal"} />
           <RoleBadge role={person.role} />
           {!isActive ? (
@@ -1199,6 +1249,7 @@ function PersonCard({
             Notes: {person.notes}
           </div>
         ) : null}
+        <PersonListDocumentChips items={person.documentSummaries} />
       </div>
 
       {/* Active + actions */}

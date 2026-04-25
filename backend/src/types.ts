@@ -153,6 +153,16 @@ export const PersonSchema = z.object({
     ])
     .nullable()
     .optional(),
+  /** All documents (GET /api/people list) for list cards. */
+  documentSummaries: z
+    .array(
+      z.union([
+        z.object({ name: z.string(), type: z.string().optional(), forever: z.literal(true) }),
+        z.object({ name: z.string(), type: z.string().optional(), noExpiry: z.literal(true) }),
+        z.object({ name: z.string(), type: z.string().optional(), daysLeft: z.number(), expired: z.boolean() }),
+      ]),
+    )
+    .optional(),
 });
 
 export const PersonDocumentSchema = z.object({
