@@ -89,10 +89,10 @@ model Organization {
   billingStatus    String             @default("active")
   billingDueAt     DateTime?
   billingViewOnlySince DateTime?
-  customUserDailyRateCents Int?
   customDiscountPercent   Int?
   customFlatRateCents     Int?
   customFlatRateMaxUsers  Int?
+  billingCurrencyCode     String             @default("EUR")
   /** Company / invoice information (optional — used on generated PDF invoices). */
   invoiceName      String?
   invoiceStreet    String?
@@ -119,13 +119,16 @@ model Organization {
 model BillingConfig {
   /** Singleton config row with id = "default". */
   id                    String   @id
-  defaultUserDailyRateCents Int  @default(1500)
-  defaultDiscountPercent Int    @default(0)
-  defaultFlatRateCents   Int?
-  defaultFlatRateMaxUsers Int?
   paymentDueDays         Int     @default(7)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
+}
+
+model BillingCurrencyPrice {
+  currencyCode       String   @id
+  userDailyRateCents Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model BillingUsageSnapshot {
@@ -135,6 +138,7 @@ model BillingUsageSnapshot {
   snapshotDate   DateTime
   activeUsers    Int
   userDailyRateCents Int
+  currencyCode    String       @default("EUR")
   createdAt      DateTime @default(now())
 
   @@unique([organizationId, snapshotDate])

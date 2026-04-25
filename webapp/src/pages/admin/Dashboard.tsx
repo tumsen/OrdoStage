@@ -25,6 +25,7 @@ interface AdminStats {
   totalRevenueCents: number;
   recentInvoices: RecentInvoice[];
   openInvoices: number;
+  expectedIncomeByCurrencyCents: Record<string, number>;
 }
 
 interface OrgSummary {
@@ -137,11 +138,32 @@ export default function Dashboard() {
           accent
         />
         <StatCard
-          title="Open Invoices"
-          value={stats?.openInvoices ?? 0}
+          title="Expected Income"
+          value={Object.entries(stats?.expectedIncomeByCurrencyCents ?? {})
+            .filter(([, cents]) => cents > 0)
+            .slice(0, 1)
+            .map(([currency, cents]) => `${currency} ${(cents / 100).toFixed(0)}`)[0] ?? "—"}
           icon={Receipt}
         />
       </div>
+
+      <Card className="bg-gray-900 border border-white/10">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-white/70 uppercase tracking-wider">
+            Expected Monthly Income by Currency
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {Object.entries(stats?.expectedIncomeByCurrencyCents ?? {})
+            .filter(([, cents]) => cents > 0)
+            .map(([currency, cents]) => (
+              <div key={currency} className="rounded border border-white/10 p-3">
+                <p className="text-xs text-white/40">{currency}</p>
+                <p className="text-sm text-white font-semibold">{(cents / 100).toFixed(2)}</p>
+              </div>
+            ))}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent invoices */}

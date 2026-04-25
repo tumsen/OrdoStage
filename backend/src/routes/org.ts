@@ -234,10 +234,10 @@ app.get("/org", async (c) => {
 });
 
 const BillingSettingsSchema = z.object({
-  customUserDailyRateCents: z.number().int().min(1).nullable().optional(),
   customDiscountPercent: z.number().int().min(0).max(100).nullable().optional(),
   customFlatRateCents: z.number().int().min(1).nullable().optional(),
   customFlatRateMaxUsers: z.number().int().min(1).nullable().optional(),
+  billingCurrencyCode: z.string().length(3).nullable().optional(),
 });
 
 // PATCH /api/org/billing-settings
@@ -255,7 +255,14 @@ app.patch("/org/billing-settings", async (c) => {
   }
 
   const body = BillingSettingsSchema.parse(await c.req.json().catch(() => ({})));
-  const data = body;
+  const data = {
+    ...(body.customDiscountPercent !== undefined ? { customDiscountPercent: body.customDiscountPercent } : {}),
+    ...(body.customFlatRateCents !== undefined ? { customFlatRateCents: body.customFlatRateCents } : {}),
+    ...(body.customFlatRateMaxUsers !== undefined ? { customFlatRateMaxUsers: body.customFlatRateMaxUsers } : {}),
+    ...(body.billingCurrencyCode !== undefined
+      ? { billingCurrencyCode: (body.billingCurrencyCode || "EUR").toUpperCase() }
+      : {}),
+  };
 
   if (Object.keys(data).length === 0) {
     return c.json({ error: { message: "No changes", code: "BAD_REQUEST" } }, 400);

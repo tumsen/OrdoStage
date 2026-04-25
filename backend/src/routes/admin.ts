@@ -8,10 +8,13 @@ import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 import { ensureSystemRoles } from "../effectiveRole";
 import { env } from "../env";
 import {
+  estimateMonthlyOrgAmountCents,
   generateMonthlyInvoices,
+  getCurrencyPriceMap,
   getBillingConfig,
   markInvoicePaid,
   recordDailyUsageSnapshot,
+  SUPPORTED_BILLING_CURRENCIES,
 } from "../postpaidBilling";
 
 const app = new Hono<{
@@ -25,7 +28,7 @@ app.use("/admin/*", adminMiddleware);
 // ── Stats ──────────────────────────────────────────────────────────────────
 
 app.get("/admin/stats", async (c) => {
-  const [totalOrgs, totalUsers, totalRevenue, totalPeople, recentInvoices, openInvoices] =
+  const [totalOrgs, totalUsers, totalRevenue, totalPeople, recentInvoices, openInvoices, orgs, currencyPrices] =
     await Promise.all([
       prisma.organization.count(),
       prisma.user.count({ where: { organizationId: { not: null } } }),
@@ -37,7 +40,35 @@ app.get("/admin/stats", async (c) => {
         include: { organization: { select: { name: true } }, lines: true },
       }),
       prisma.billingInvoice.count({ where: { status: { in: ["issued", "overdue"] } } }),
+      prisma.organization.findMany({
+        select: {
+          id: true,
+          billingCurrencyCode: true,
+          customDiscountPercent: true,
+          customFlatRateCents: true,
+          customFlatRateMaxUsers: true,
+          memberships: { where: { user: { isActive: true } }, select: { id: true } },
+        },
+      }),
+      getCurrencyPriceMap(prisma),
     ]);
+  const now = new Date();
+  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+  const fallbackRate = currencyPrices.EUR ?? 1500;
+  const expectedIncomeByCurrencyCents: Record<string, number> = {};
+  for (const currency of SUPPORTED_BILLING_CURRENCIES) expectedIncomeByCurrencyCents[currency] = 0;
+  for (const org of orgs) {
+    const currency = (org.billingCurrencyCode || "EUR").toUpperCase();
+    const estimate = estimateMonthlyOrgAmountCents({
+      activeUsers: org.memberships.length,
+      daysInMonth,
+      userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
+      customDiscountPercent: org.customDiscountPercent,
+      customFlatRateCents: org.customFlatRateCents,
+      customFlatRateMaxUsers: org.customFlatRateMaxUsers,
+    });
+    expectedIncomeByCurrencyCents[currency] = (expectedIncomeByCurrencyCents[currency] ?? 0) + estimate;
+  }
 
   return c.json({
     data: {
@@ -47,33 +78,62 @@ app.get("/admin/stats", async (c) => {
       totalRevenueCents: totalRevenue._sum.totalCents || 0,
       recentInvoices,
       openInvoices,
+      expectedIncomeByCurrencyCents,
     },
   });
 });
 
 app.get("/admin/billing/settings", async (c) => {
-  const cfg = await getBillingConfig(prisma);
-  return c.json({ data: cfg });
+  const [cfg, currencyPrices] = await Promise.all([getBillingConfig(prisma), prisma.billingCurrencyPrice.findMany()]);
+  return c.json({
+    data: {
+      ...cfg,
+      currencyPrices: currencyPrices.map((p) => ({ currencyCode: p.currencyCode, userDailyRateCents: p.userDailyRateCents })),
+      supportedCurrencies: [...SUPPORTED_BILLING_CURRENCIES],
+    },
+  });
 });
 
 app.patch("/admin/billing/settings", async (c) => {
   const body = await c.req.json();
   const parsed = z
     .object({
-      defaultUserDailyRateCents: z.number().int().min(1).max(1_000_000).optional(),
-      defaultDiscountPercent: z.number().int().min(0).max(100).optional(),
-      defaultFlatRateCents: z.number().int().min(1).nullable().optional(),
-      defaultFlatRateMaxUsers: z.number().int().min(1).nullable().optional(),
+      currencyPrices: z
+        .array(
+          z.object({
+            currencyCode: z.string().length(3),
+            userDailyRateCents: z.number().int().min(1).max(10_000_000),
+          })
+        )
+        .optional(),
       paymentDueDays: z.number().int().min(1).max(30).optional(),
     })
     .parse(body);
 
   const cfg = await prisma.billingConfig.upsert({
     where: { id: "default" },
-    create: { id: "default", ...parsed },
-    update: parsed,
+    create: { id: "default", paymentDueDays: parsed.paymentDueDays ?? 7 },
+    update: { ...(parsed.paymentDueDays !== undefined ? { paymentDueDays: parsed.paymentDueDays } : {}) },
   });
-  return c.json({ data: cfg });
+  if (parsed.currencyPrices?.length) {
+    await prisma.$transaction(
+      parsed.currencyPrices.map((row) =>
+        prisma.billingCurrencyPrice.upsert({
+          where: { currencyCode: row.currencyCode.toUpperCase() },
+          create: { currencyCode: row.currencyCode.toUpperCase(), userDailyRateCents: row.userDailyRateCents },
+          update: { userDailyRateCents: row.userDailyRateCents },
+        })
+      )
+    );
+  }
+  const prices = await prisma.billingCurrencyPrice.findMany();
+  return c.json({
+    data: {
+      ...cfg,
+      currencyPrices: prices.map((p) => ({ currencyCode: p.currencyCode, userDailyRateCents: p.userDailyRateCents })),
+      supportedCurrencies: [...SUPPORTED_BILLING_CURRENCIES],
+    },
+  });
 });
 
 app.post("/admin/billing/snapshot", async (c) => {
@@ -129,7 +189,7 @@ app.post("/admin/email/test", async (c) => {
 // ── Organizations ──────────────────────────────────────────────────────────
 
 app.get("/admin/orgs", async (c) => {
-  const orgs = await prisma.organization.findMany({
+  const [orgs, currencyPrices] = await Promise.all([prisma.organization.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { users: true, memberships: true, events: true, people: true } },
@@ -143,8 +203,23 @@ app.get("/admin/orgs", async (c) => {
         },
       },
     },
+  }), getCurrencyPriceMap(prisma)]);
+  const now = new Date();
+  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+  const fallbackRate = currencyPrices.EUR ?? 1500;
+  const data = orgs.map((org) => {
+    const currency = (org.billingCurrencyCode || "EUR").toUpperCase();
+    const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
+      activeUsers: org._count.memberships,
+      daysInMonth,
+      userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
+      customDiscountPercent: org.customDiscountPercent,
+      customFlatRateCents: org.customFlatRateCents,
+      customFlatRateMaxUsers: org.customFlatRateMaxUsers,
+    });
+    return { ...org, estimatedMonthlyCents, estimatedCurrencyCode: currency };
   });
-  return c.json({ data: orgs });
+  return c.json({ data });
 });
 
 app.post("/admin/orgs", async (c) => {
@@ -216,7 +291,7 @@ app.post("/admin/orgs", async (c) => {
 });
 
 app.get("/admin/orgs/:id", async (c) => {
-  const org = await prisma.organization.findUnique({
+  const [org, currencyPrices] = await Promise.all([prisma.organization.findUnique({
     where: { id: c.req.param("id") },
     include: {
       memberships: {
@@ -235,7 +310,7 @@ app.get("/admin/orgs/:id", async (c) => {
       invoices: { orderBy: { issuedAt: "desc" }, take: 20, include: { lines: true } },
       _count: { select: { events: true, venues: true, people: true } },
     },
-  });
+  }), getCurrencyPriceMap(prisma)]);
   if (!org)
     return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
 
@@ -247,8 +322,20 @@ app.get("/admin/orgs/:id", async (c) => {
     createdAt: m.user.createdAt,
   }));
 
+  const currency = (org.billingCurrencyCode || "EUR").toUpperCase();
+  const now = new Date();
+  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+  const fallbackRate = currencyPrices.EUR ?? 1500;
+  const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
+    activeUsers: org.memberships.length,
+    daysInMonth,
+    userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
+    customDiscountPercent: org.customDiscountPercent,
+    customFlatRateCents: org.customFlatRateCents,
+    customFlatRateMaxUsers: org.customFlatRateMaxUsers,
+  });
   const { memberships: _m, ...rest } = org;
-  return c.json({ data: { ...rest, users } });
+  return c.json({ data: { ...rest, users, estimatedMonthlyCents, estimatedCurrencyCode: currency } });
 });
 
 app.post("/admin/orgs/:id/grant-org-admin", async (c) => {
@@ -352,6 +439,7 @@ app.put("/admin/orgs/:id/billing-pricing", async (c) => {
       customDiscountPercent: z.number().int().min(0).max(100).nullable().optional(),
       customFlatRateCents: z.number().int().min(1).nullable().optional(),
       customFlatRateMaxUsers: z.number().int().min(1).nullable().optional(),
+      billingCurrencyCode: z.string().length(3).nullable().optional(),
     })
     .parse(body);
 
@@ -360,7 +448,14 @@ app.put("/admin/orgs/:id/billing-pricing", async (c) => {
 
   const updated = await prisma.organization.update({
     where: { id: org.id },
-    data: parsed,
+    data: {
+      ...(parsed.customDiscountPercent !== undefined ? { customDiscountPercent: parsed.customDiscountPercent } : {}),
+      ...(parsed.customFlatRateCents !== undefined ? { customFlatRateCents: parsed.customFlatRateCents } : {}),
+      ...(parsed.customFlatRateMaxUsers !== undefined ? { customFlatRateMaxUsers: parsed.customFlatRateMaxUsers } : {}),
+      ...(parsed.billingCurrencyCode !== undefined
+        ? { billingCurrencyCode: (parsed.billingCurrencyCode || "EUR").toUpperCase() }
+        : {}),
+    },
   });
   return c.json({ data: updated });
 });

@@ -24,6 +24,8 @@ interface OrgSummary {
   customDiscountPercent: number | null;
   customFlatRateCents: number | null;
   customFlatRateMaxUsers: number | null;
+  estimatedMonthlyCents: number;
+  estimatedCurrencyCode: string;
   createdAt: string;
   _count: { users: number; events: number; people: number; memberships?: number };
 }
@@ -160,6 +162,7 @@ export default function Orgs() {
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Billing</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Discount</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Flat rate</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Est. monthly</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Created</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider text-right">Actions</TableHead>
             </TableRow>
@@ -168,7 +171,7 @@ export default function Orgs() {
             {isPending ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i} className="border-white/5">
-                  {Array.from({ length: 10 }).map((_, j) => (
+                  {Array.from({ length: 11 }).map((_, j) => (
                     <TableCell key={j}>
                       <div className="h-4 bg-white/5 rounded animate-pulse" />
                     </TableCell>
@@ -177,7 +180,7 @@ export default function Orgs() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow className="border-white/5">
-                <TableCell colSpan={10} className="text-center text-white/30 py-12">
+                <TableCell colSpan={11} className="text-center text-white/30 py-12">
                   {search ? "No organizations match your search" : "No organizations yet"}
                 </TableCell>
               </TableRow>
@@ -200,6 +203,9 @@ export default function Orgs() {
                     {org.customFlatRateCents != null
                       ? `€${(org.customFlatRateCents / 100).toFixed(2)}${org.customFlatRateMaxUsers ? ` / max ${org.customFlatRateMaxUsers} users` : ""}`
                       : "—"}
+                  </TableCell>
+                  <TableCell className="text-white/50 text-sm">
+                    {org.estimatedCurrencyCode} {(org.estimatedMonthlyCents / 100).toFixed(2)}
                   </TableCell>
                   <TableCell className="text-white/40 text-sm">{formatDate(org.createdAt)}</TableCell>
                   <TableCell className="text-right">

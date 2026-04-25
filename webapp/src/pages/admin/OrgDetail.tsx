@@ -45,10 +45,12 @@ interface OrgDetail {
   name: string;
   billingStatus: string;
   billingDueAt: string | null;
-  customUserDailyRateCents: number | null;
   customDiscountPercent: number | null;
   customFlatRateCents: number | null;
   customFlatRateMaxUsers: number | null;
+  billingCurrencyCode: string;
+  estimatedMonthlyCents: number;
+  estimatedCurrencyCode: string;
   createdAt: string;
   users: OrgUser[];
   invoices: Invoice[];
@@ -102,28 +104,28 @@ function BillingTab({ org }: { org: OrgDetail }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
-    customUserDailyRateCents: "",
     customDiscountPercent: "",
     customFlatRateCents: "",
     customFlatRateMaxUsers: "",
+    billingCurrencyCode: "EUR",
   });
 
   useEffect(() => {
     setForm({
-      customUserDailyRateCents: org.customUserDailyRateCents == null ? "" : String(org.customUserDailyRateCents),
       customDiscountPercent: org.customDiscountPercent == null ? "" : String(org.customDiscountPercent),
       customFlatRateCents: org.customFlatRateCents == null ? "" : String(org.customFlatRateCents),
       customFlatRateMaxUsers: org.customFlatRateMaxUsers == null ? "" : String(org.customFlatRateMaxUsers),
+      billingCurrencyCode: org.billingCurrencyCode || "EUR",
     });
-  }, [org.customUserDailyRateCents, org.customDiscountPercent, org.customFlatRateCents, org.customFlatRateMaxUsers]);
+  }, [org.customDiscountPercent, org.customFlatRateCents, org.customFlatRateMaxUsers, org.billingCurrencyCode]);
 
   const pricingMutation = useMutation({
     mutationFn: () =>
       api.put(`/api/admin/orgs/${org.id}/billing-pricing`, {
-        customUserDailyRateCents: form.customUserDailyRateCents.trim() ? Number(form.customUserDailyRateCents) : null,
         customDiscountPercent: form.customDiscountPercent.trim() ? Number(form.customDiscountPercent) : null,
         customFlatRateCents: form.customFlatRateCents.trim() ? Number(form.customFlatRateCents) : null,
         customFlatRateMaxUsers: form.customFlatRateMaxUsers.trim() ? Number(form.customFlatRateMaxUsers) : null,
+        billingCurrencyCode: form.billingCurrencyCode,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
@@ -163,10 +165,13 @@ function BillingTab({ org }: { org: OrgDetail }) {
         <Card className="bg-gray-900 border border-white/10">
           <CardContent className="space-y-3">
             <p className="text-sm text-white/70">Custom organization pricing</p>
-            <Input placeholder="Daily user rate (cents)" value={form.customUserDailyRateCents} onChange={(e) => setForm((p) => ({ ...p, customUserDailyRateCents: e.target.value }))} />
+            <Input placeholder="Billing currency (e.g. EUR, USD, DKK)" value={form.billingCurrencyCode} onChange={(e) => setForm((p) => ({ ...p, billingCurrencyCode: e.target.value.toUpperCase() }))} />
             <Input placeholder="Discount % (optional)" value={form.customDiscountPercent} onChange={(e) => setForm((p) => ({ ...p, customDiscountPercent: e.target.value }))} />
             <Input placeholder="Flat rate cents (optional)" value={form.customFlatRateCents} onChange={(e) => setForm((p) => ({ ...p, customFlatRateCents: e.target.value }))} />
             <Input placeholder="Flat rate max users (optional)" value={form.customFlatRateMaxUsers} onChange={(e) => setForm((p) => ({ ...p, customFlatRateMaxUsers: e.target.value }))} />
+            <p className="text-xs text-white/45">
+              Estimated monthly price (current users): {org.estimatedCurrencyCode} {(org.estimatedMonthlyCents / 100).toFixed(2)}
+            </p>
             <Button onClick={() => pricingMutation.mutate()} disabled={pricingMutation.isPending} className="w-full bg-rose-700 hover:bg-rose-600">
               {pricingMutation.isPending ? "Saving..." : "Save custom billing pricing"}
             </Button>

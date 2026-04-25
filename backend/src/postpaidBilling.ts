@@ -1,12 +1,28 @@
 import { PrismaClient } from "@prisma/client";
 
 export type BillingConfigResolved = {
-  defaultUserDailyRateCents: number;
-  defaultDiscountPercent: number;
-  defaultFlatRateCents: number | null;
-  defaultFlatRateMaxUsers: number | null;
   paymentDueDays: number;
 };
+
+export const SUPPORTED_BILLING_CURRENCIES = [
+  "EUR",
+  "USD",
+  "DKK",
+  "SEK",
+  "NOK",
+  "GBP",
+  "CHF",
+  "PLN",
+  "CZK",
+  "HUF",
+  "RON",
+  "BGN",
+  "HRK",
+] as const;
+
+export type SupportedBillingCurrency = (typeof SUPPORTED_BILLING_CURRENCIES)[number];
+
+export type CurrencyPriceMap = Record<string, number>;
 
 function startOfUtcDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -29,13 +45,46 @@ export async function getBillingConfig(prisma: PrismaClient): Promise<BillingCon
   return cfg;
 }
 
+export async function getCurrencyPriceMap(prisma: PrismaClient): Promise<CurrencyPriceMap> {
+  const rows = await prisma.billingCurrencyPrice.findMany();
+  const map: CurrencyPriceMap = {};
+  for (const currency of SUPPORTED_BILLING_CURRENCIES) {
+    map[currency] = 1500;
+  }
+  for (const row of rows) {
+    map[row.currencyCode.toUpperCase()] = row.userDailyRateCents;
+  }
+  return map;
+}
+
+export function estimateMonthlyOrgAmountCents(input: {
+  activeUsers: number;
+  daysInMonth: number;
+  userDailyRateCents: number;
+  customDiscountPercent: number | null;
+  customFlatRateCents: number | null;
+  customFlatRateMaxUsers: number | null;
+}): number {
+  const subtotal = input.activeUsers * input.daysInMonth * input.userDailyRateCents;
+  const discountPercent = Math.min(Math.max(input.customDiscountPercent ?? 0, 0), 100);
+  const flatRateApplicable =
+    input.customFlatRateCents != null &&
+    input.customFlatRateMaxUsers != null &&
+    input.customFlatRateMaxUsers > 0 &&
+    input.activeUsers <= input.customFlatRateMaxUsers;
+  if (flatRateApplicable) return input.customFlatRateCents!;
+  const discountCents = Math.round((subtotal * discountPercent) / 100);
+  return Math.max(subtotal - discountCents, 0);
+}
+
 export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new Date()): Promise<number> {
-  const cfg = await getBillingConfig(prisma);
+  const currencyPrices = await getCurrencyPriceMap(prisma);
+  const fallbackRate = currencyPrices.EUR ?? 1500;
   const snapshotDate = startOfUtcDay(today);
   const orgs = await prisma.organization.findMany({
     select: {
       id: true,
-      customUserDailyRateCents: true,
+      billingCurrencyCode: true,
     },
   });
 
@@ -53,11 +102,13 @@ export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new
         organizationId: org.id,
         snapshotDate,
         activeUsers,
-        userDailyRateCents: org.customUserDailyRateCents ?? cfg.defaultUserDailyRateCents,
+        userDailyRateCents: currencyPrices[(org.billingCurrencyCode || "EUR").toUpperCase()] ?? fallbackRate,
+        currencyCode: (org.billingCurrencyCode || "EUR").toUpperCase(),
       },
       update: {
         activeUsers,
-        userDailyRateCents: org.customUserDailyRateCents ?? cfg.defaultUserDailyRateCents,
+        userDailyRateCents: currencyPrices[(org.billingCurrencyCode || "EUR").toUpperCase()] ?? fallbackRate,
+        currencyCode: (org.billingCurrencyCode || "EUR").toUpperCase(),
       },
     });
     created += 1;
@@ -130,6 +181,8 @@ export async function markInvoicePaid(
 
 export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new Date()): Promise<number> {
   const cfg = await getBillingConfig(prisma);
+  const currencyPrices = await getCurrencyPriceMap(prisma);
+  const fallbackRate = currencyPrices.EUR ?? 1500;
   const currentMonthStart = startOfUtcMonth(runAt);
   const targetMonthEnd = currentMonthStart;
   const targetMonthStart = startOfUtcMonth(new Date(Date.UTC(runAt.getUTCFullYear(), runAt.getUTCMonth() - 1, 1)));
@@ -138,6 +191,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
   const orgs = await prisma.organization.findMany({
     select: {
       id: true,
+      billingCurrencyCode: true,
       customDiscountPercent: true,
       customFlatRateCents: true,
       customFlatRateMaxUsers: true,
@@ -160,6 +214,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
       orderBy: { snapshotDate: "asc" },
     });
     if (snapshots.length === 0) continue;
+    const currency = (org.billingCurrencyCode || "EUR").toUpperCase();
 
     const daysByUser: Map<string, { name: string; email: string; days: number; rate: number }> = new Map();
     const memberRows = await prisma.organizationMembership.findMany({
@@ -171,10 +226,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
     });
 
     const totalUserDays = snapshots.reduce((sum, s) => sum + s.activeUsers, 0);
-    const avgRateCents =
-      snapshots.length > 0
-        ? Math.round(snapshots.reduce((sum, s) => sum + s.userDailyRateCents, 0) / snapshots.length)
-        : cfg.defaultUserDailyRateCents;
+    const avgRateCents = currencyPrices[currency] ?? fallbackRate;
     const subtotalCents = totalUserDays * avgRateCents;
 
     // Approximate user-level days equally across active users (future snapshots can be improved per user).
@@ -193,11 +245,11 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
       });
     }
 
-    const discountPercent = Math.min(Math.max(org.customDiscountPercent ?? cfg.defaultDiscountPercent, 0), 100);
+    const discountPercent = Math.min(Math.max(org.customDiscountPercent ?? 0, 0), 100);
     const discountCents = Math.round((subtotalCents * discountPercent) / 100);
 
-    const flatRateCents = org.customFlatRateCents ?? cfg.defaultFlatRateCents;
-    const flatRateMaxUsers = org.customFlatRateMaxUsers ?? cfg.defaultFlatRateMaxUsers;
+    const flatRateCents = org.customFlatRateCents;
+    const flatRateMaxUsers = org.customFlatRateMaxUsers;
     const flatRateApplicable =
       flatRateCents != null &&
       flatRateMaxUsers != null &&
@@ -218,7 +270,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
           discountPercent: flatRateApplicable ? 0 : discountPercent,
           discountCents: flatRateApplicable ? 0 : discountCents,
           totalCents,
-          currency: "EUR",
+          currency,
         },
       });
 

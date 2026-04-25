@@ -10,19 +10,14 @@ export default function Pricing() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
-    defaultUserDailyRateCents: "1500",
-    defaultDiscountPercent: "0",
-    defaultFlatRateCents: "",
-    defaultFlatRateMaxUsers: "",
     paymentDueDays: "7",
   });
+  const [currencyPrices, setCurrencyPrices] = useState<Record<string, string>>({});
 
   const { data, isPending } = useQuery<{
-    defaultUserDailyRateCents: number;
-    defaultDiscountPercent: number;
-    defaultFlatRateCents: number | null;
-    defaultFlatRateMaxUsers: number | null;
     paymentDueDays: number;
+    currencyPrices: Array<{ currencyCode: string; userDailyRateCents: number }>;
+    supportedCurrencies: string[];
   }>({
     queryKey: ["admin", "billing-settings"],
     queryFn: () => api.get("/api/admin/billing/settings"),
@@ -30,11 +25,13 @@ export default function Pricing() {
 
   useEffect(() => {
     if (!data) return;
+    const priceMap: Record<string, string> = {};
+    for (const currency of data.supportedCurrencies) {
+      const found = data.currencyPrices.find((p) => p.currencyCode === currency);
+      priceMap[currency] = String(found?.userDailyRateCents ?? "");
+    }
+    setCurrencyPrices(priceMap);
     setForm({
-      defaultUserDailyRateCents: String(data.defaultUserDailyRateCents),
-      defaultDiscountPercent: String(data.defaultDiscountPercent),
-      defaultFlatRateCents: data.defaultFlatRateCents == null ? "" : String(data.defaultFlatRateCents),
-      defaultFlatRateMaxUsers: data.defaultFlatRateMaxUsers == null ? "" : String(data.defaultFlatRateMaxUsers),
       paymentDueDays: String(data.paymentDueDays),
     });
   }, [data]);
@@ -42,11 +39,13 @@ export default function Pricing() {
   const saveMutation = useMutation({
     mutationFn: () =>
       api.patch("/api/admin/billing/settings", {
-        defaultUserDailyRateCents: Number(form.defaultUserDailyRateCents),
-        defaultDiscountPercent: Number(form.defaultDiscountPercent),
-        defaultFlatRateCents: form.defaultFlatRateCents.trim() ? Number(form.defaultFlatRateCents) : null,
-        defaultFlatRateMaxUsers: form.defaultFlatRateMaxUsers.trim() ? Number(form.defaultFlatRateMaxUsers) : null,
         paymentDueDays: Number(form.paymentDueDays),
+        currencyPrices: Object.entries(currencyPrices)
+          .filter(([, v]) => v.trim().length > 0)
+          .map(([currencyCode, value]) => ({
+            currencyCode,
+            userDailyRateCents: Number(value),
+          })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "billing-settings"] });
@@ -76,25 +75,18 @@ export default function Pricing() {
     <div className="p-6 space-y-4">
       <Card className="bg-gray-900 border border-white/10">
         <CardHeader>
-          <CardTitle className="text-white">Postpaid billing defaults</CardTitle>
+          <CardTitle className="text-white">Global currency pricing</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-xs text-white/50">Daily user rate (cents)</p>
-            <Input value={form.defaultUserDailyRateCents} onChange={(e) => setForm((p) => ({ ...p, defaultUserDailyRateCents: e.target.value }))} />
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-white/50">Default discount (%)</p>
-            <Input value={form.defaultDiscountPercent} onChange={(e) => setForm((p) => ({ ...p, defaultDiscountPercent: e.target.value }))} />
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-white/50">Default flat rate (cents, optional)</p>
-            <Input value={form.defaultFlatRateCents} onChange={(e) => setForm((p) => ({ ...p, defaultFlatRateCents: e.target.value }))} />
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-white/50">Flat rate max users (optional)</p>
-            <Input value={form.defaultFlatRateMaxUsers} onChange={(e) => setForm((p) => ({ ...p, defaultFlatRateMaxUsers: e.target.value }))} />
-          </div>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {(data?.supportedCurrencies ?? []).map((currency) => (
+            <div key={currency} className="space-y-1">
+              <p className="text-xs text-white/50">Daily user rate ({currency}, minor units)</p>
+              <Input
+                value={currencyPrices[currency] ?? ""}
+                onChange={(e) => setCurrencyPrices((prev) => ({ ...prev, [currency]: e.target.value }))}
+              />
+            </div>
+          ))}
           <div className="space-y-1">
             <p className="text-xs text-white/50">Invoice due days</p>
             <Input value={form.paymentDueDays} onChange={(e) => setForm((p) => ({ ...p, paymentDueDays: e.target.value }))} />
