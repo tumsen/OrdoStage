@@ -12,6 +12,7 @@ import {
   generateMonthlyInvoices,
   getCurrencyPriceMap,
   getBillingConfig,
+  ensureCurrencyPriceMonthRollover,
   markInvoicePaid,
   recordDailyUsageSnapshot,
   SUPPORTED_BILLING_CURRENCIES,
@@ -84,6 +85,7 @@ app.get("/admin/stats", async (c) => {
 });
 
 app.get("/admin/billing/settings", async (c) => {
+  await ensureCurrencyPriceMonthRollover(prisma);
   const [cfg, currencyPrices] = await Promise.all([getBillingConfig(prisma), prisma.billingCurrencyPrice.findMany()]);
   return c.json({
     data: {
@@ -91,9 +93,7 @@ app.get("/admin/billing/settings", async (c) => {
       currencyPrices: currencyPrices.map((p) => ({
         currencyCode: p.currencyCode,
         userDailyRateCents: p.userDailyRateCents,
-        followBaseCurrency: p.followBaseCurrency,
-        roundingMode: p.roundingMode,
-        roundingUnit: p.roundingUnit,
+        nextMonthUserDailyRateCents: p.nextMonthUserDailyRateCents,
       })),
       supportedCurrencies: [...SUPPORTED_BILLING_CURRENCIES],
     },
@@ -150,9 +150,7 @@ app.patch("/admin/billing/settings", async (c) => {
           z.object({
             currencyCode: z.string().length(3),
             userDailyRateCents: z.number().int().min(1).max(10_000_000),
-            followBaseCurrency: z.boolean().optional(),
-            roundingMode: z.enum(["nearest", "up", "down"]).optional(),
-            roundingUnit: z.enum(["whole", "0", "00"]).optional(),
+            nextMonthUserDailyRateCents: z.number().int().min(1).max(10_000_000).nullable().optional(),
           })
         )
         .optional(),
@@ -160,6 +158,7 @@ app.patch("/admin/billing/settings", async (c) => {
     })
     .parse(body);
 
+  await ensureCurrencyPriceMonthRollover(prisma);
   const cfg = await prisma.billingConfig.upsert({
     where: { id: "default" },
     create: { id: "default", paymentDueDays: parsed.paymentDueDays ?? 7 },
@@ -173,15 +172,13 @@ app.patch("/admin/billing/settings", async (c) => {
           create: {
             currencyCode: row.currencyCode.toUpperCase(),
             userDailyRateCents: row.userDailyRateCents,
-            followBaseCurrency: row.followBaseCurrency ?? false,
-            roundingMode: row.roundingMode ?? "nearest",
-            roundingUnit: row.roundingUnit ?? "00",
+            nextMonthUserDailyRateCents: row.nextMonthUserDailyRateCents ?? null,
           },
           update: {
             userDailyRateCents: row.userDailyRateCents,
-            ...(row.followBaseCurrency !== undefined ? { followBaseCurrency: row.followBaseCurrency } : {}),
-            ...(row.roundingMode !== undefined ? { roundingMode: row.roundingMode } : {}),
-            ...(row.roundingUnit !== undefined ? { roundingUnit: row.roundingUnit } : {}),
+            ...(row.nextMonthUserDailyRateCents !== undefined
+              ? { nextMonthUserDailyRateCents: row.nextMonthUserDailyRateCents }
+              : {}),
           },
         })
       )
@@ -194,9 +191,7 @@ app.patch("/admin/billing/settings", async (c) => {
       currencyPrices: prices.map((p) => ({
         currencyCode: p.currencyCode,
         userDailyRateCents: p.userDailyRateCents,
-        followBaseCurrency: p.followBaseCurrency,
-        roundingMode: p.roundingMode,
-        roundingUnit: p.roundingUnit,
+        nextMonthUserDailyRateCents: p.nextMonthUserDailyRateCents,
       })),
       supportedCurrencies: [...SUPPORTED_BILLING_CURRENCIES],
     },

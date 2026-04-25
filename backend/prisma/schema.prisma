@@ -120,6 +120,7 @@ model BillingConfig {
   /** Singleton config row with id = "default". */
   id                    String   @id
   paymentDueDays         Int     @default(7)
+  priceRolloverMonthKey  String?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }
@@ -127,6 +128,7 @@ model BillingConfig {
 model BillingCurrencyPrice {
   currencyCode       String   @id
   userDailyRateCents Int
+  nextMonthUserDailyRateCents Int?
   followBaseCurrency Boolean  @default(false)
   roundingMode       String   @default("nearest")
   roundingUnit       String   @default("00")

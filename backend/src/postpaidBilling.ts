@@ -24,6 +24,12 @@ export type SupportedBillingCurrency = (typeof SUPPORTED_BILLING_CURRENCIES)[num
 
 export type CurrencyPriceMap = Record<string, number>;
 
+function currentUtcMonthKey(now: Date): string {
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
 function startOfUtcDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
@@ -45,7 +51,33 @@ export async function getBillingConfig(prisma: PrismaClient): Promise<BillingCon
   return cfg;
 }
 
+export async function ensureCurrencyPriceMonthRollover(prisma: PrismaClient, now = new Date()): Promise<void> {
+  const monthKey = currentUtcMonthKey(now);
+  const cfg = await prisma.billingConfig.upsert({
+    where: { id: "default" },
+    create: { id: "default", priceRolloverMonthKey: monthKey },
+    update: {},
+    select: { id: true, priceRolloverMonthKey: true },
+  });
+  if (cfg.priceRolloverMonthKey === monthKey) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      UPDATE "BillingCurrencyPrice"
+      SET
+        "userDailyRateCents" = COALESCE("nextMonthUserDailyRateCents", "userDailyRateCents"),
+        "nextMonthUserDailyRateCents" = NULL
+      WHERE "nextMonthUserDailyRateCents" IS NOT NULL
+    `;
+    await tx.billingConfig.update({
+      where: { id: "default" },
+      data: { priceRolloverMonthKey: monthKey },
+    });
+  });
+}
+
 export async function getCurrencyPriceMap(prisma: PrismaClient): Promise<CurrencyPriceMap> {
+  await ensureCurrencyPriceMonthRollover(prisma);
   const rows = await prisma.billingCurrencyPrice.findMany();
   const map: CurrencyPriceMap = {};
   for (const currency of SUPPORTED_BILLING_CURRENCIES) {
