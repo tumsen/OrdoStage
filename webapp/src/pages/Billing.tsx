@@ -2,12 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Receipt } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface OrgBillingData {
   id: string;
   name: string;
   billingStatus: string;
+  billingCurrencyCode?: string;
   paymentDueDays: number;
+  estimatedMonthlyCents?: number;
+  estimatedCurrencyCode?: string;
   openInvoice?: {
     id: string;
     issuedAt: string;
@@ -26,6 +30,8 @@ interface OrgBillingData {
 }
 
 export default function Billing({ embedded = false }: { embedded?: boolean } = {}) {
+  const { canAction } = usePermissions();
+  const canManageBilling = canAction("billing.manage");
   const { data: org, isLoading } = useQuery<OrgBillingData>({
     queryKey: ["org"],
     queryFn: () => api.get<OrgBillingData>("/api/org"),
@@ -62,6 +68,21 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
           )}
         </CardContent>
       </Card>
+      {canManageBilling && org?.estimatedMonthlyCents != null ? (
+        <Card className="bg-gray-900 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white">Expected monthly price</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-white">
+              Based on current active users and this month&apos;s pricing:
+              <span className="ml-1 text-white/80">
+                {org.estimatedCurrencyCode || org.billingCurrencyCode || "USD"} {(org.estimatedMonthlyCents / 100).toFixed(2)}
+              </span>
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

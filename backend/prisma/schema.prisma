@@ -264,6 +264,7 @@ model Venue {
   organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   events           Event[]
   internalBookings InternalBooking[]
+  eventShows       EventShow[]
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 }
@@ -299,6 +300,8 @@ model Person {
   tourAssignments  TourPerson[]
   showAssignments  TourShowPerson[]
   tourNotes        TourPersonNote[]
+  responsibleShows EventShow[]              @relation("EventShowResponsible")
+  showStaffing     EventShowStaffing[]      @relation("EventShowStaffingPerson")
   /** App access for users linked by email uses this permission group (RoleDefinition). */
   permissionGroupId String?
   permissionGroup   RoleDefinition?        @relation(fields: [permissionGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -374,6 +377,7 @@ model Event {
   customFields   String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  shows          EventShow[]
 }
 
 model EventPerson {
@@ -385,6 +389,57 @@ model EventPerson {
   person   Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, personId])
+}
+
+model EventShow {
+  id                   String       @id @default(cuid())
+  eventId              String
+  event                Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  showDate             DateTime
+  showTime             String
+  durationMinutes      Int
+  venueId              String
+  venue                Venue        @relation(fields: [venueId], references: [id])
+  technicalNotes       String?
+  fohNotes             String?
+  ticketNotes          String?
+  hospitalityNotes     String?
+  teamResponsibleId    String?
+  teamResponsible      Person?      @relation("EventShowResponsible", fields: [teamResponsibleId], references: [id], onDelete: SetNull)
+  getInTime            String?
+  getInDurationMinutes Int?
+  getOutTime           String?
+  getOutDurationMinutes Int?
+  rehearsalTime        String?
+  rehearsalDurationMinutes Int?
+  soundcheckTime       String?
+  soundcheckDurationMinutes Int?
+  breakTime            String?
+  breakDurationMinutes Int?
+  notes                String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  staffing             EventShowStaffing[]
+
+  @@index([eventId, showDate])
+  @@index([venueId, showDate])
+}
+
+model EventShowStaffing {
+  id                     String    @id @default(cuid())
+  showId                 String
+  show                   EventShow @relation(fields: [showId], references: [id], onDelete: Cascade)
+  personId               String
+  person                 Person    @relation("EventShowStaffingPerson", fields: [personId], references: [id], onDelete: Cascade)
+  role                   String?
+  meetingTime            String?
+  meetingDurationMinutes Int?
+  notes                  String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@unique([showId, personId])
+  @@index([personId])
 }
 
 model Document {

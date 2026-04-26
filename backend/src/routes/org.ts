@@ -6,7 +6,13 @@ import { canAction } from "../requestRole";
 import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
 import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 import { DistanceUnitSchema, LanguageSchema, TimeFormatSchema } from "../types";
-import { enforceOverdueAccess, getBillingConfig, recordDailyUsageSnapshot } from "../postpaidBilling";
+import {
+  enforceOverdueAccess,
+  estimateMonthlyOrgAmountCents,
+  getBillingConfig,
+  getCurrencyPriceMap,
+  recordDailyUsageSnapshot,
+} from "../postpaidBilling";
 
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -205,26 +211,43 @@ app.get("/org", async (c) => {
 
   await recordDailyUsageSnapshot(prisma);
   const viewOnly = await enforceOverdueAccess(prisma, user.organizationId);
-  const billingConfig = await getBillingConfig(prisma);
-  const openInvoice = await prisma.billingInvoice.findFirst({
-    where: { organizationId: user.organizationId, status: { in: ["issued", "overdue"] } },
-    orderBy: { issuedAt: "desc" },
-    include: { lines: true },
-  });
-
-  const org = await prisma.organization.findUnique({
-    where: { id: user.organizationId },
-    include: { _count: { select: { users: true, memberships: true } } },
-  });
+  const [billingConfig, openInvoice, org, currencyPrices] = await Promise.all([
+    getBillingConfig(prisma),
+    prisma.billingInvoice.findFirst({
+      where: { organizationId: user.organizationId, status: { in: ["issued", "overdue"] } },
+      orderBy: { issuedAt: "desc" },
+      include: { lines: true },
+    }),
+    prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      include: { _count: { select: { users: true, memberships: true } } },
+    }),
+    getCurrencyPriceMap(prisma),
+  ]);
 
   if (!org) {
     return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
   }
 
+  const currency = (org.billingCurrencyCode || "USD").toUpperCase();
+  const now = new Date();
+  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+  const fallbackRate = currencyPrices.USD ?? 1500;
+  const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
+    activeUsers: activeUserCount,
+    daysInMonth,
+    userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
+    customDiscountPercent: org.customDiscountPercent,
+    customFlatRateCents: org.customFlatRateCents,
+    customFlatRateMaxUsers: org.customFlatRateMaxUsers,
+  });
+
   return c.json({
     data: {
       ...org,
       userCount: activeUserCount,
+      estimatedMonthlyCents,
+      estimatedCurrencyCode: currency,
       isViewOnlyDueToBilling: viewOnly,
       billingStatus: org.billingStatus,
       paymentDueDays: billingConfig.paymentDueDays,

@@ -28,13 +28,6 @@ export async function completePostAuthenticationNavigation(
     navigate("/dashboard");
     return;
   }
-
-  const session = await authClient.getSession();
-  const cur = (session?.data?.user as { organizationId?: string } | undefined)?.organizationId;
-  if (cur && rows.some((r) => r.organizationId === cur)) {
-    navigate("/dashboard");
-    return;
-  }
-
+  // Multi-organization users always choose workspace after login.
   navigate("/select-org");
 }

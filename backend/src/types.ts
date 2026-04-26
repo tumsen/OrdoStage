@@ -326,6 +326,82 @@ export const EventSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const EventShowStaffingSchema = z.object({
+  id: z.string(),
+  showId: z.string(),
+  personId: z.string(),
+  role: z.string().nullable(),
+  meetingTime: z.string().nullable(),
+  meetingDurationMinutes: z.number().nullable(),
+  notes: z.string().nullable(),
+  person: PersonSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const EventShowSchema = z.object({
+  id: z.string(),
+  eventId: z.string(),
+  showDate: z.string(),
+  showTime: z.string(),
+  durationMinutes: z.number(),
+  venueId: z.string(),
+  venue: VenueSchema,
+  technicalNotes: z.string().nullable(),
+  fohNotes: z.string().nullable(),
+  ticketNotes: z.string().nullable(),
+  hospitalityNotes: z.string().nullable(),
+  teamResponsibleId: z.string().nullable(),
+  teamResponsible: PersonSchema.nullable().optional(),
+  getInTime: z.string().nullable(),
+  getInDurationMinutes: z.number().nullable(),
+  getOutTime: z.string().nullable(),
+  getOutDurationMinutes: z.number().nullable(),
+  rehearsalTime: z.string().nullable(),
+  rehearsalDurationMinutes: z.number().nullable(),
+  soundcheckTime: z.string().nullable(),
+  soundcheckDurationMinutes: z.number().nullable(),
+  breakTime: z.string().nullable(),
+  breakDurationMinutes: z.number().nullable(),
+  notes: z.string().nullable(),
+  staffing: z.array(EventShowStaffingSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const CreateEventShowSchema = z.object({
+  showDate: z.string().min(1),
+  showTime: z.string().min(1),
+  durationMinutes: z.number().int().min(1),
+  venueId: z.string().min(1),
+  technicalNotes: z.string().optional(),
+  fohNotes: z.string().optional(),
+  ticketNotes: z.string().optional(),
+  hospitalityNotes: z.string().optional(),
+  teamResponsibleId: z.string().optional(),
+  getInTime: z.string().optional(),
+  getInDurationMinutes: z.number().int().min(1).optional(),
+  getOutTime: z.string().optional(),
+  getOutDurationMinutes: z.number().int().min(1).optional(),
+  rehearsalTime: z.string().optional(),
+  rehearsalDurationMinutes: z.number().int().min(1).optional(),
+  soundcheckTime: z.string().optional(),
+  soundcheckDurationMinutes: z.number().int().min(1).optional(),
+  breakTime: z.string().optional(),
+  breakDurationMinutes: z.number().int().min(1).optional(),
+  notes: z.string().optional(),
+});
+
+export const UpdateEventShowSchema = CreateEventShowSchema.partial();
+
+export const UpsertEventShowStaffingSchema = z.object({
+  personId: z.string().min(1),
+  role: z.string().optional(),
+  meetingTime: z.string().optional(),
+  meetingDurationMinutes: z.number().int().min(1).optional(),
+  notes: z.string().optional(),
+});
+
 export const CreateEventSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
@@ -388,6 +464,7 @@ export const EventDetailSchema = EventSchema.extend({
   venue: VenueSchema.nullable(),
   people: z.array(EventPersonSchema),
   documents: z.array(DocumentSchema),
+  shows: z.array(EventShowSchema),
 });
 
 // InternalBooking
@@ -478,6 +555,8 @@ export type PersonDocument = z.infer<typeof PersonDocumentSchema>;
 export type PersonTeamMembership = z.infer<typeof PersonTeamMembershipSchema>;
 export type CreatePerson = z.infer<typeof CreatePersonSchema>;
 export type Event = z.infer<typeof EventSchema>;
+export type EventShow = z.infer<typeof EventShowSchema>;
+export type EventShowStaffing = z.infer<typeof EventShowStaffingSchema>;
 export type CreateEvent = z.infer<typeof CreateEventSchema>;
 export type EventDetail = z.infer<typeof EventDetailSchema>;
 export type EventPerson = z.infer<typeof EventPersonSchema>;

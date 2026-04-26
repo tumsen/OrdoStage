@@ -4,6 +4,7 @@ import { auth } from "./auth";
 import { prisma } from "./prisma";
 import { env } from "./env";
 import { isPostgresDatabaseUrl } from "./databaseUrl";
+import { Resend } from "resend";
 
 async function findUserByEmailLoose(email: string) {
   const trimmed = email.trim();
@@ -24,6 +25,28 @@ export type AccountSetupResult =
 
 const REDIRECT_PATH = "/reset-password";
 
+async function sendExistingUserAddedOrgEmail(input: { to: string; organizationName: string; roleName: string }) {
+  const subject = `You've been added to ${input.organizationName} in OrdoStage`;
+  const html = `
+    <p>Hello,</p>
+    <p>You have been added as a user in <strong>${input.organizationName}</strong> with the role <strong>${input.roleName}</strong>.</p>
+    <p>You use the <strong>same login email and password</strong> for all organizations in OrdoStage.</p>
+    <p>Just sign in as usual and choose the organization from your workspace list.</p>
+  `;
+
+  if (env.RESEND_API_KEY) {
+    const resend = new Resend(env.RESEND_API_KEY);
+    await resend.emails.send({
+      from: env.FROM_EMAIL || "OrdoStage <noreply@ordostage.com>",
+      to: input.to,
+      subject,
+      html,
+    });
+    return;
+  }
+  console.log(`[DEV] Multi-org invite email to ${input.to}: ${subject}`);
+}
+
 /**
  * Provisions a `User` + `OrganizationMembership` (when the person has app access via email
  * and permission group) and sends a password set/reset link. Idempotent: existing users
@@ -43,7 +66,7 @@ export async function provisionPersonAppAccountAndEmail(opts: {
 
   const group = await prisma.roleDefinition.findFirst({
     where: { id: groupId, organizationId: opts.organizationId },
-    select: { slug: true },
+    select: { slug: true, name: true },
   });
   if (!group) {
     return { status: "failed", error: "Invalid permission group" };
@@ -90,6 +113,11 @@ export async function provisionPersonAppAccountAndEmail(opts: {
     return { status: "failed", error: "Could not create or look up a user for this email" };
   }
 
+  const existingOtherMembershipCount = await prisma.organizationMembership.count({
+    where: { userId: u.id, organizationId: { not: opts.organizationId } },
+  });
+  const isExistingMultiOrgInvite = !createdUser && existingOtherMembershipCount > 0;
+
   if (!u.organizationId || u.organizationId === opts.organizationId) {
     await prisma.user.update({
       where: { id: u.id },
@@ -108,12 +136,26 @@ export async function provisionPersonAppAccountAndEmail(opts: {
   });
 
   try {
-    await auth.api.requestPasswordReset({ body: { email: u.email, redirectTo } } as { body: { email: string; redirectTo: string } });
+    if (isExistingMultiOrgInvite) {
+      const org = await prisma.organization.findUnique({
+        where: { id: opts.organizationId },
+        select: { name: true },
+      });
+      await sendExistingUserAddedOrgEmail({
+        to: u.email,
+        organizationName: org?.name || "your organization",
+        roleName: group.name || group.slug,
+      });
+    } else {
+      await auth.api.requestPasswordReset({
+        body: { email: u.email, redirectTo },
+      } as { body: { email: string; redirectTo: string } });
+    }
   } catch (e: unknown) {
     if (isAPIError(e)) {
-      return { status: "failed", error: e.message || "Failed to send setup email" };
+      return { status: "failed", error: e.message || "Failed to send app access email" };
     }
-    return { status: "failed", error: e instanceof Error ? e.message : "Failed to send setup email" };
+    return { status: "failed", error: e instanceof Error ? e.message : "Failed to send app access email" };
   }
 
   return { status: "sent", createdUser };

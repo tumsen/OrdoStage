@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Edit2, Trash2, Plus, X, Download, Upload } from "lucide-react";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import type { EventDetail, Person, EventPerson, Document } from "@/lib/types";
+import type { EventDetail, Person, EventPerson, Document, EventShow } from "@/lib/types";
 import type { Department } from "../../../backend/src/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
@@ -968,6 +968,207 @@ function DocumentsTab({ event }: { event: EventDetail }) {
   );
 }
 
+function ShowsTab({ event }: { event: EventDetail }) {
+  const queryClient = useQueryClient();
+  const { data: venues } = useQuery({
+    queryKey: ["venues"],
+    queryFn: () => api.get<{ id: string; name: string }[]>("/api/venues"),
+  });
+  const { data: people } = useQuery({
+    queryKey: ["people"],
+    queryFn: () => api.get<Person[]>("/api/people"),
+  });
+  const [creating, setCreating] = useState(false);
+  const [newShow, setNewShow] = useState({
+    showDate: "",
+    showTime: "",
+    durationMinutes: "120",
+    venueId: "",
+  });
+  const [staffDraft, setStaffDraft] = useState<Record<string, { personId: string; role: string; meetingTime: string; meetingDurationMinutes: string }>>({});
+
+  const createShow = useMutation({
+    mutationFn: () =>
+      api.post(`/api/events/${event.id}/shows`, {
+        showDate: newShow.showDate,
+        showTime: newShow.showTime,
+        durationMinutes: Number(newShow.durationMinutes),
+        venueId: newShow.venueId,
+      }),
+    onSuccess: () => {
+      setCreating(false);
+      setNewShow({ showDate: "", showTime: "", durationMinutes: "120", venueId: "" });
+      queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+    },
+  });
+
+  const updateShow = useMutation({
+    mutationFn: ({ showId, body }: { showId: string; body: Record<string, unknown> }) =>
+      api.put(`/api/events/${event.id}/shows/${showId}`, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
+  });
+
+  const deleteShow = useMutation({
+    mutationFn: (showId: string) => api.delete(`/api/events/${event.id}/shows/${showId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
+  });
+
+  const upsertStaff = useMutation({
+    mutationFn: ({ showId, body }: { showId: string; body: Record<string, unknown> }) =>
+      api.post(`/api/events/${event.id}/shows/${showId}/staffing`, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
+  });
+
+  const removeStaff = useMutation({
+    mutationFn: ({ showId, personId }: { showId: string; personId: string }) =>
+      api.delete(`/api/events/${event.id}/shows/${showId}/staffing/${personId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-white/45">{event.shows.length} show{event.shows.length === 1 ? "" : "s"}</p>
+        <Button size="sm" className="bg-white/5 border border-white/10 hover:bg-white/10 text-white" onClick={() => setCreating((v) => !v)}>
+          <Plus size={13} className="mr-1" /> Add show
+        </Button>
+      </div>
+      {creating ? (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 grid gap-3 md:grid-cols-4">
+          <Input type="date" value={newShow.showDate} onChange={(e) => setNewShow((s) => ({ ...s, showDate: e.target.value }))} className="bg-white/5 border-white/10 text-white [color-scheme:dark]" />
+          <Input type="time" value={newShow.showTime} onChange={(e) => setNewShow((s) => ({ ...s, showTime: e.target.value }))} className="bg-white/5 border-white/10 text-white [color-scheme:dark]" />
+          <Input type="number" min={1} placeholder="Duration (min)" value={newShow.durationMinutes} onChange={(e) => setNewShow((s) => ({ ...s, durationMinutes: e.target.value }))} className="bg-white/5 border-white/10 text-white" />
+          <Select value={newShow.venueId} onValueChange={(v) => setNewShow((s) => ({ ...s, venueId: v }))}>
+            <SelectTrigger className="bg-white/5 border-white/10 text-white"><SelectValue placeholder="Venue" /></SelectTrigger>
+            <SelectContent className="bg-[#16161f] border-white/10 text-white">
+              {(venues ?? []).map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <div className="md:col-span-4 flex gap-2">
+            <Button
+              size="sm"
+              className="bg-red-900 hover:bg-red-800 text-white"
+              disabled={!newShow.showDate || !newShow.showTime || !newShow.durationMinutes || !newShow.venueId || createShow.isPending}
+              onClick={() => createShow.mutate()}
+            >
+              {createShow.isPending ? "Adding..." : "Create show"}
+            </Button>
+            <Button size="sm" variant="outline" className="border-white/10 text-white/70 bg-transparent" onClick={() => setCreating(false)}>Cancel</Button>
+          </div>
+        </div>
+      ) : null}
+
+      {event.shows.length === 0 ? (
+        <div className="text-center text-white/35 text-sm py-10">No shows yet. Add the first show to start planning technical, FOH, and team staffing.</div>
+      ) : (
+        <div className="space-y-3">
+          {event.shows.map((show: EventShow) => {
+            const draft = staffDraft[show.id] || { personId: "", role: "", meetingTime: "", meetingDurationMinutes: "60" };
+            return (
+              <div key={show.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-white">
+                      {new Date(show.showDate).toLocaleDateString()} {show.showTime} - {show.venue?.name}
+                    </p>
+                    <p className="text-xs text-white/45">Duration: {show.durationMinutes} min</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-white/30 hover:text-red-400"
+                    onClick={() => {
+                      if (!confirmDeleteAction("show")) return;
+                      deleteShow.mutate(show.id);
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </Button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Textarea
+                    value={show.technicalNotes || ""}
+                    placeholder="Technical tab notes"
+                    onChange={(e) => updateShow.mutate({ showId: show.id, body: { technicalNotes: e.target.value } })}
+                    className="bg-white/5 border-white/10 text-white min-h-[90px]"
+                  />
+                  <Textarea
+                    value={show.fohNotes || ""}
+                    placeholder="FOH tab notes (tickets, bar, hospitality)"
+                    onChange={(e) => updateShow.mutate({ showId: show.id, body: { fohNotes: e.target.value } })}
+                    className="bg-white/5 border-white/10 text-white min-h-[90px]"
+                  />
+                </div>
+
+                <div className="grid gap-2 md:grid-cols-6">
+                  <Input value={show.getInTime || ""} placeholder="Get-in time" onChange={(e) => updateShow.mutate({ showId: show.id, body: { getInTime: e.target.value } })} className="bg-white/5 border-white/10 text-white" />
+                  <Input value={String(show.getInDurationMinutes ?? "")} placeholder="Get-in dur" onChange={(e) => updateShow.mutate({ showId: show.id, body: { getInDurationMinutes: e.target.value ? Number(e.target.value) : null } })} className="bg-white/5 border-white/10 text-white" />
+                  <Input value={show.rehearsalTime || ""} placeholder="Rehearsal time" onChange={(e) => updateShow.mutate({ showId: show.id, body: { rehearsalTime: e.target.value } })} className="bg-white/5 border-white/10 text-white" />
+                  <Input value={show.soundcheckTime || ""} placeholder="Soundcheck time" onChange={(e) => updateShow.mutate({ showId: show.id, body: { soundcheckTime: e.target.value } })} className="bg-white/5 border-white/10 text-white" />
+                  <Input value={show.breakTime || ""} placeholder="Break time" onChange={(e) => updateShow.mutate({ showId: show.id, body: { breakTime: e.target.value } })} className="bg-white/5 border-white/10 text-white" />
+                  <Input value={show.getOutTime || ""} placeholder="Get-out time" onChange={(e) => updateShow.mutate({ showId: show.id, body: { getOutTime: e.target.value } })} className="bg-white/5 border-white/10 text-white" />
+                </div>
+
+                <div className="rounded border border-white/10 p-3 space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-white/45">Team staffing</p>
+                  {show.staffing.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between text-sm bg-white/[0.03] border border-white/10 rounded px-3 py-2">
+                      <span className="text-white/85">
+                        {s.person.name} - {s.role || "Role not set"} {s.meetingTime ? `- ${s.meetingTime}` : ""}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-white/35 hover:text-red-400"
+                        onClick={() => removeStaff.mutate({ showId: show.id, personId: s.personId })}
+                      >
+                        <X size={12} />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="grid gap-2 md:grid-cols-4">
+                    <Select value={draft.personId} onValueChange={(v) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, personId: v } }))}>
+                      <SelectTrigger className="bg-white/5 border-white/10 text-white"><SelectValue placeholder="Person" /></SelectTrigger>
+                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                        {(people ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input value={draft.role} onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, role: e.target.value } }))} placeholder="Role" className="bg-white/5 border-white/10 text-white" />
+                    <Input value={draft.meetingTime} onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, meetingTime: e.target.value } }))} placeholder="Meeting time (HH:mm)" className="bg-white/5 border-white/10 text-white" />
+                    <div className="flex gap-2">
+                      <Input value={draft.meetingDurationMinutes} onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, meetingDurationMinutes: e.target.value } }))} placeholder="Duration" className="bg-white/5 border-white/10 text-white" />
+                      <Button
+                        size="sm"
+                        className="bg-red-900 hover:bg-red-800 text-white"
+                        disabled={!draft.personId || upsertStaff.isPending}
+                        onClick={() =>
+                          upsertStaff.mutate({
+                            showId: show.id,
+                            body: {
+                              personId: draft.personId,
+                              role: draft.role || undefined,
+                              meetingTime: draft.meetingTime || undefined,
+                              meetingDurationMinutes: draft.meetingDurationMinutes ? Number(draft.meetingDurationMinutes) : undefined,
+                            },
+                          })
+                        }
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-white/45">Staffing meeting time and duration are added to each person&apos;s work schedule.</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function EventDetailPage() {
@@ -1022,6 +1223,12 @@ export default function EventDetailPage() {
                 Details
               </TabsTrigger>
               <TabsTrigger
+                value="shows"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                Shows ({event.shows.length})
+              </TabsTrigger>
+              <TabsTrigger
                 value="people"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
@@ -1042,6 +1249,9 @@ export default function EventDetailPage() {
             </TabsContent>
             <TabsContent value="people" className="mt-0">
               <PeopleTab event={event} />
+            </TabsContent>
+            <TabsContent value="shows" className="mt-0">
+              <ShowsTab event={event} />
             </TabsContent>
             <TabsContent value="documents" className="mt-0">
               <DocumentsTab event={event} />

@@ -5,6 +5,7 @@ export type {
   Person,
   CreatePerson,
   Event,
+  EventShow,
   CreateEvent,
   EventDetail,
   EventPerson,
