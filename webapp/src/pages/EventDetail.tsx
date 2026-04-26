@@ -64,10 +64,83 @@ const EventEditSchema = z.object({
   stageSize: z.string().optional(),
   getInTime: z.string().optional(),
   setupTime: z.string().optional(),
+  bookingContracts: z.string().optional(),
+  technicalRider: z.string().optional(),
+  techCount: z.string().optional(),
+  handsNeeded: z.string().optional(),
+  getInDate: z.string().optional(),
+  ticketingInfo: z.string().optional(),
+  hospitalityInfo: z.string().optional(),
+  fohNotes: z.string().optional(),
 });
 
 type EventEditValues = z.infer<typeof EventEditSchema>;
 type CustomField = { key: string; value: string; departments: string[] };
+type GeneralEventFields = {
+  bookingContracts: string;
+  technicalRider: string;
+  techCount: string;
+  handsNeeded: string;
+  getInDate: string;
+  ticketingInfo: string;
+  hospitalityInfo: string;
+  fohNotes: string;
+};
+
+function splitGeneralEventFields(fields: CustomField[]): {
+  general: GeneralEventFields;
+  rest: CustomField[];
+} {
+  const general: GeneralEventFields = {
+    bookingContracts: "",
+    technicalRider: "",
+    techCount: "",
+    handsNeeded: "",
+    getInDate: "",
+    ticketingInfo: "",
+    hospitalityInfo: "",
+    fohNotes: "",
+  };
+  const rest: CustomField[] = [];
+  for (const field of fields) {
+    const key = field.key?.trim();
+    const value = field.value ?? "";
+    if (key === "Contracts") {
+      general.bookingContracts = value;
+      continue;
+    }
+    if (key === "Technical rider") {
+      general.technicalRider = value;
+      continue;
+    }
+    if (key === "Tech count") {
+      general.techCount = value;
+      continue;
+    }
+    if (key === "Hands needed") {
+      general.handsNeeded = value;
+      continue;
+    }
+    if (key === "Get-in date") {
+      general.getInDate = value;
+      continue;
+    }
+    if (key === "Ticketing") {
+      general.ticketingInfo = value;
+      continue;
+    }
+    if (key === "Hospitality") {
+      general.hospitalityInfo = value;
+      continue;
+    }
+    if (key === "FOH notes") {
+      general.fohNotes = value;
+      continue;
+    }
+    rest.push(field);
+  }
+  return { general, rest };
+}
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -141,8 +214,8 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
       return [];
     }
   })();
-
-  const [customFields, setCustomFields] = useState<CustomField[]>(parsedCustomFields);
+  const splitFields = splitGeneralEventFields(parsedCustomFields);
+  const [customFields, setCustomFields] = useState<CustomField[]>(splitFields.rest);
 
   const { data: venues } = useQuery({
     queryKey: ["venues"],
@@ -172,6 +245,14 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
       stageSize: event.stageSize ?? "",
       getInTime: event.getInTime ?? "",
       setupTime: event.setupTime ?? "",
+      bookingContracts: splitFields.general.bookingContracts,
+      technicalRider: splitFields.general.technicalRider,
+      techCount: splitFields.general.techCount,
+      handsNeeded: splitFields.general.handsNeeded,
+      getInDate: splitFields.general.getInDate,
+      ticketingInfo: splitFields.general.ticketingInfo,
+      hospitalityInfo: splitFields.general.hospitalityInfo,
+      fohNotes: splitFields.general.fohNotes,
     },
   });
 
@@ -206,7 +287,21 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
     if (values.getInTime) payload.getInTime = values.getInTime;
     if (values.setupTime) payload.setupTime = values.setupTime;
     if (values.actorCount) payload.actorCount = Number(values.actorCount);
-    payload.customFields = customFields.length > 0 ? JSON.stringify(customFields) : undefined;
+    const normalizedCustomFields = customFields.filter((f) => f.key.trim() || f.value.trim());
+    const generalFields = [
+      { key: "Contracts", value: values.bookingContracts?.trim() || "" },
+      { key: "Technical rider", value: values.technicalRider?.trim() || "" },
+      { key: "Tech count", value: values.techCount?.trim() || "" },
+      { key: "Hands needed", value: values.handsNeeded?.trim() || "" },
+      { key: "Get-in date", value: values.getInDate?.trim() || "" },
+      { key: "Ticketing", value: values.ticketingInfo?.trim() || "" },
+      { key: "Hospitality", value: values.hospitalityInfo?.trim() || "" },
+      { key: "FOH notes", value: values.fohNotes?.trim() || "" },
+    ]
+      .filter((row) => row.value)
+      .map((row) => ({ ...row, departments: [] as string[] }));
+    const mergedCustomFields = [...normalizedCustomFields, ...generalFields];
+    payload.customFields = mergedCustomFields.length > 0 ? JSON.stringify(mergedCustomFields) : undefined;
 
     updateMutation.mutate(payload);
   }
@@ -441,6 +536,109 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
               />
             </div>
 
+            <SectionHeader>Booking / Technical / FOH (General)</SectionHeader>
+
+            <FormField
+              control={form.control}
+              name="bookingContracts"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contracts</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="technicalRider"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical Rider</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="techCount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Tech Count</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="handsNeeded"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Hands Needed</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="getInDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in Date</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="ticketingInfo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Ticketing</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="hospitalityInfo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Hospitality</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fohNotes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">FOH Notes</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
             {/* ── Additional Info ── */}
             <SectionHeader>Additional Info</SectionHeader>
 
@@ -588,13 +786,13 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
         </div>
       ) : null}
 
-      {parsedCustomFields.length > 0 ? (
+      {splitFields.rest.length > 0 ? (
         <div>
           <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
             Additional Info
           </div>
           <div className="space-y-2">
-            {parsedCustomFields.map((cf, idx) => {
+            {splitFields.rest.map((cf, idx) => {
               const fieldDepts = depts.filter((d) => cf.departments.includes(d.id));
               return (
                 <div
@@ -615,6 +813,31 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
                 </div>
               );
             })}
+          </div>
+        </div>
+      ) : null}
+
+      {(splitFields.general.bookingContracts ||
+        splitFields.general.technicalRider ||
+        splitFields.general.techCount ||
+        splitFields.general.handsNeeded ||
+        splitFields.general.getInDate ||
+        splitFields.general.ticketingInfo ||
+        splitFields.general.hospitalityInfo ||
+        splitFields.general.fohNotes) ? (
+        <div>
+          <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
+            Booking / Technical / FOH (General)
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {splitFields.general.bookingContracts ? <InfoRow label="Contracts" value={splitFields.general.bookingContracts} /> : null}
+            {splitFields.general.technicalRider ? <InfoRow label="Technical rider" value={splitFields.general.technicalRider} /> : null}
+            {splitFields.general.techCount ? <InfoRow label="Tech count" value={splitFields.general.techCount} /> : null}
+            {splitFields.general.handsNeeded ? <InfoRow label="Hands needed" value={splitFields.general.handsNeeded} /> : null}
+            {splitFields.general.getInDate ? <InfoRow label="Get-in date" value={splitFields.general.getInDate} /> : null}
+            {splitFields.general.ticketingInfo ? <InfoRow label="Ticketing" value={splitFields.general.ticketingInfo} /> : null}
+            {splitFields.general.hospitalityInfo ? <InfoRow label="Hospitality" value={splitFields.general.hospitalityInfo} /> : null}
+            {splitFields.general.fohNotes ? <InfoRow label="FOH notes" value={splitFields.general.fohNotes} /> : null}
           </div>
         </div>
       ) : null}
