@@ -17,6 +17,12 @@ function canManagePermissionGroups(
   return canAction(c, "roles.manage");
 }
 
+function sanitizeActionsForRoleSlug(slug: string, actions: string[]): string[] {
+  // org.delete is owner-only; never allow persisting it on non-owner groups.
+  if (slug !== "owner") return actions.filter((a) => a !== "org.delete");
+  return actions;
+}
+
 const CreateSchema = z.object({
   slug: z
     .string()
@@ -113,7 +119,10 @@ roleDefRouter.post("/org/role-definitions", zValidator("json", CreateSchema), as
   }
 
   const views = body.views.filter((id) => ALL_VIEW_IDS.includes(id));
-  const actions = body.actions.filter((id) => ALL_ACTION_IDS.includes(id));
+  const actions = sanitizeActionsForRoleSlug(
+    body.slug,
+    body.actions.filter((id) => ALL_ACTION_IDS.includes(id))
+  );
 
   const maxOrder = await prisma.roleDefinition.aggregate({
     where: { organizationId: sessionUser.organizationId },
@@ -187,10 +196,10 @@ roleDefRouter.patch("/org/role-definitions/:id", zValidator("json", PatchSchema)
   if (body.description !== undefined) data.description = body.description;
   if (body.views !== undefined) data.views = body.views.filter((x) => ALL_VIEW_IDS.includes(x));
   if (body.actions !== undefined) {
-    let act = body.actions.filter((x) => ALL_ACTION_IDS.includes(x));
-    if (existing.slug === "admin") {
-      act = act.filter((a) => a !== "org.delete");
-    }
+    const act = sanitizeActionsForRoleSlug(
+      existing.slug,
+      body.actions.filter((x) => ALL_ACTION_IDS.includes(x))
+    );
     data.actions = act;
   }
   if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder;

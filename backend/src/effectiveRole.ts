@@ -64,9 +64,11 @@ export async function ensureSystemRoles(prisma: PrismaClient, organizationId: st
         },
       });
     } else {
+      const nextActions =
+        s.slug === "owner" ? existing.actions : existing.actions.filter((a) => a !== "org.delete");
       await prisma.roleDefinition.update({
         where: { id: existing.id },
-        data: { isSystem: true },
+        data: { isSystem: true, actions: nextActions },
       });
     }
   }

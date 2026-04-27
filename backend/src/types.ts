@@ -210,36 +210,6 @@ export const TeamAssignmentInputSchema = z.object({
 
 export type TeamAssignmentInput = z.infer<typeof TeamAssignmentInputSchema>;
 
-/** Shared row rules for create vs update; Zod v4 forbids `.partial()` on objects with refinements, so update uses this explicitly. */
-function refineTeamAssignmentInputRows(
-  rows: TeamAssignmentInput[],
-  ctx: z.core.$RefinementCtx<TeamAssignmentInput[] | undefined>,
-) {
-  let anyValid = false;
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
-    if (!r) continue;
-    const hasId = Boolean(r.teamId?.trim());
-    const hasNew = Boolean(r.newTeamName?.trim());
-    if (hasId && hasNew) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Use either an existing team or a new team name per row",
-        path: ["teamAssignments", i],
-      });
-      continue;
-    }
-    if (hasId || hasNew) anyValid = true;
-  }
-  if (!anyValid) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Select or add at least one team",
-      path: ["teamAssignments"],
-    });
-  }
-}
-
 export const CreatePersonSchema = z
   .object({
     name: z.string().min(1),
@@ -256,18 +226,32 @@ export const CreatePersonSchema = z
     emergencyContactName: z.string().optional(),
     emergencyContactPhone: z.string().optional(),
     notes: z.string().optional(),
-    /** Required when `email` is set — defines app access (permission group / RoleDefinition). */
-    permissionGroupId: z.string().min(1).optional(),
+    /** Required for every person (exactly one permission group). */
+    permissionGroupId: z.string().min(1),
     teamAssignments: z
       .array(TeamAssignmentInputSchema)
-      .min(1, "At least one team is required")
-      .superRefine(refineTeamAssignmentInputRows),
+      .default([])
+      .superRefine((rows, ctx) => {
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r) continue;
+          const hasId = Boolean(r.teamId?.trim());
+          const hasNew = Boolean(r.newTeamName?.trim());
+          if (hasId && hasNew) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Use either an existing team or a new team name per row",
+              path: ["teamAssignments", i],
+            });
+          }
+        }
+      }),
   })
   .superRefine((data, ctx) => {
-    if (data.email?.trim() && !data.permissionGroupId?.trim()) {
+    if (!data.permissionGroupId?.trim()) {
       ctx.addIssue({
         code: "custom",
-        message: "Select a permission group when the person has an email (required for app access).",
+        message: "Permission group is required.",
         path: ["permissionGroupId"],
       });
     }
@@ -301,7 +285,20 @@ export const UpdatePersonSchema = z
       .optional()
       .superRefine((rows, ctx) => {
         if (rows === undefined) return;
-        refineTeamAssignmentInputRows(rows, ctx);
+        // Update allows none/multiple teams.
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r) continue;
+          const hasId = Boolean(r.teamId?.trim());
+          const hasNew = Boolean(r.newTeamName?.trim());
+          if (hasId && hasNew) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Use either an existing team or a new team name per row",
+              path: ["teamAssignments", i],
+            });
+          }
+        }
       }),
   });
 

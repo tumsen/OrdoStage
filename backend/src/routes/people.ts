@@ -38,35 +38,50 @@ function parsePersonDocumentExpiresAtInput(raw: unknown): Date | null {
 
 const peopleRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
-/** Validates RoleDefinition for this org; owner group only for the org owner user’s email. */
-async function assertValidPermissionGroup(
+async function resolvePermissionGroupSlug(
   organizationId: string,
-  groupId: string | null | undefined,
-  personEmail: string | null | undefined
-): Promise<void> {
-  if (!groupId) {
-    if (personEmail?.trim()) {
-      throw new Error("Permission group is required when the person has an email.");
-    }
-    return;
-  }
+  groupId: string | null | undefined
+): Promise<string | null> {
+  if (!groupId) return null;
   const g = await prisma.roleDefinition.findFirst({
     where: { id: groupId, organizationId },
+    select: { slug: true },
   });
-  if (!g) {
-    throw new Error("Invalid permission group.");
+  if (!g) throw new Error("Invalid permission group.");
+  return g.slug;
+}
+
+async function enforcePermissionGroupTransitionRules(input: {
+  organizationId: string;
+  actorUserId: string;
+  actorEmail: string | null | undefined;
+  actorOrgRole: string | null | undefined;
+  currentSlug?: string | null;
+  nextSlug: string;
+  targetPersonEmail: string | null | undefined;
+}): Promise<void> {
+  const actorEmailNorm = (input.actorEmail || "").trim().toLowerCase();
+  const targetEmailNorm = (input.targetPersonEmail || "").trim().toLowerCase();
+  const isSaasOwnerAdmin = actorEmailNorm === SOFTWARE_OWNER_EMAIL;
+  const actorIsOwner = input.actorOrgRole === "owner";
+
+  if (input.nextSlug === "admin" && !actorIsOwner && !isSaasOwnerAdmin) {
+    throw new Error("Only owners can grant Admin permissions.");
   }
-  if (g.slug === "owner") {
-    const e = personEmail?.trim();
-    if (!e) {
-      throw new Error("The Owner group can only be assigned when the person has the owner’s email.");
+  if (input.nextSlug === "owner" && !actorIsOwner && !isSaasOwnerAdmin) {
+    throw new Error("Only owners can grant Owner permissions.");
+  }
+
+  // Only owner themselves can leave owner group, and only if another owner remains.
+  if (input.currentSlug === "owner" && input.nextSlug !== "owner") {
+    if (!targetEmailNorm || actorEmailNorm !== targetEmailNorm) {
+      throw new Error("Only the owner themselves can leave the Owner group.");
     }
-    const owner = await prisma.user.findFirst({
-      where: { organizationId, orgRole: "owner" },
-      select: { email: true },
+    const ownerCount = await prisma.organizationMembership.count({
+      where: { organizationId: input.organizationId, orgRole: "owner" },
     });
-    if (!owner || owner.email.toLowerCase() !== e.toLowerCase()) {
-      throw new Error("The Owner group can only be assigned to the organization owner.");
+    if (ownerCount <= 1) {
+      throw new Error("You must grant owner permissions to another person before leaving the Owner group.");
     }
   }
 }
@@ -503,25 +518,38 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
   }
 
   const body = c.req.valid("json");
+  const actor = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { orgRole: true, email: true },
+  });
+  const actorOrgRole = actor?.orgRole ?? user.orgRole ?? null;
+
   try {
-    await assertValidPermissionGroup(user.organizationId, body.permissionGroupId, body.email);
+    const nextGroupSlug = (await resolvePermissionGroupSlug(user.organizationId, body.permissionGroupId))!;
+    await enforcePermissionGroupTransitionRules({
+      organizationId: user.organizationId,
+      actorUserId: user.id,
+      actorEmail: actor?.email ?? user.email,
+      actorOrgRole,
+      currentSlug: null,
+      nextSlug: nextGroupSlug,
+      targetPersonEmail: body.email,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Invalid permission group";
     return c.json({ error: { message, code: "BAD_REQUEST" } }, 400);
   }
 
   const resolved = await resolveAssignmentTeamIds(user.organizationId, body.teamAssignments);
-  if (resolved.length === 0) {
-    return c.json({ error: { message: "Could not resolve any team assignments", code: "BAD_REQUEST" } }, 400);
-  }
-
   const teamIds = resolved.map((r) => r.teamId);
-  const teamsFound = await prisma.department.findMany({
-    where: { id: { in: teamIds }, organizationId: user.organizationId },
-    select: { id: true },
-  });
-  if (teamsFound.length !== teamIds.length) {
-    return c.json({ error: { message: "One or more teams were not found", code: "NOT_FOUND" } }, 404);
+  if (teamIds.length > 0) {
+    const teamsFound = await prisma.department.findMany({
+      where: { id: { in: teamIds }, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (teamsFound.length !== teamIds.length) {
+      return c.json({ error: { message: "One or more teams were not found", code: "NOT_FOUND" } }, 404);
+    }
   }
 
   const person = await prisma.person.create({
@@ -540,7 +568,7 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       emergencyContactName: body.emergencyContactName ?? null,
       emergencyContactPhone: body.emergencyContactPhone ?? null,
       ...(body.notes !== undefined && { notes: body.notes ?? null }),
-      ...(body.permissionGroupId && { permissionGroupId: body.permissionGroupId }),
+      permissionGroupId: body.permissionGroupId,
       departmentId: teamIds[0] ?? null,
       organizationId: user.organizationId,
       teamMemberships: {
@@ -656,6 +684,7 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
   const existing = await prisma.person.findUnique({
     where: { id, organizationId: user.organizationId },
     include: {
+      permissionGroup: { select: { slug: true } },
       teamMemberships: {
         include: { department: true },
       },
@@ -691,15 +720,33 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
   }
   const nextEmail =
     body.email !== undefined ? (body.email?.trim() ? body.email : null) : existing.email;
-  if (body.permissionGroupId !== undefined || body.email !== undefined) {
-    const nextGroupId =
-      body.permissionGroupId !== undefined ? body.permissionGroupId : existing.permissionGroupId;
-    try {
-      await assertValidPermissionGroup(user.organizationId, nextGroupId, nextEmail);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Invalid permission group";
-      return c.json({ error: { message, code: "BAD_REQUEST" } }, 400);
+  let nextGroupId = existing.permissionGroupId;
+  if (body.permissionGroupId !== undefined) {
+    if (!body.permissionGroupId) {
+      return c.json({ error: { message: "Permission group is required.", code: "BAD_REQUEST" } }, 400);
     }
+    nextGroupId = body.permissionGroupId;
+  }
+  const actor = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { orgRole: true, email: true },
+  });
+  const actorOrgRole = actor?.orgRole ?? user.orgRole ?? null;
+  try {
+    const nextSlug = await resolvePermissionGroupSlug(user.organizationId, nextGroupId);
+    if (!nextSlug) throw new Error("Permission group is required.");
+    await enforcePermissionGroupTransitionRules({
+      organizationId: user.organizationId,
+      actorUserId: user.id,
+      actorEmail: actor?.email ?? user.email,
+      actorOrgRole,
+      currentSlug: existing.permissionGroup?.slug ?? null,
+      nextSlug,
+      targetPersonEmail: nextEmail,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Invalid permission group";
+    return c.json({ error: { message, code: "BAD_REQUEST" } }, 400);
   }
   let nextAssignments: Array<{ teamId: string; role?: string | undefined }> = existing.teamMemberships.map(
     (membership) => ({
@@ -709,19 +756,15 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
   );
   if (body.teamAssignments !== undefined) {
     const resolved = await resolveAssignmentTeamIds(user.organizationId, body.teamAssignments);
-    if (resolved.length === 0) {
-      return c.json(
-        { error: { message: "A person must belong to at least one team", code: "BAD_REQUEST" } },
-        400
-      );
-    }
     const teamIds = resolved.map((r) => r.teamId);
-    const teamsFound = await prisma.department.findMany({
-      where: { id: { in: teamIds }, organizationId: user.organizationId },
-      select: { id: true },
-    });
-    if (teamsFound.length !== teamIds.length) {
-      return c.json({ error: { message: "One or more teams were not found", code: "NOT_FOUND" } }, 404);
+    if (teamIds.length > 0) {
+      const teamsFound = await prisma.department.findMany({
+        where: { id: { in: teamIds }, organizationId: user.organizationId },
+        select: { id: true },
+      });
+      if (teamsFound.length !== teamIds.length) {
+        return c.json({ error: { message: "One or more teams were not found", code: "NOT_FOUND" } }, 404);
+      }
     }
     nextAssignments = resolved.map((r) => ({ teamId: r.teamId, role: r.role ?? undefined }));
   }
@@ -1348,9 +1391,26 @@ peopleRouter.delete("/people/:id", async (c) => {
   const { id } = c.req.param();
   const existing = await prisma.person.findUnique({
     where: { id, organizationId: user.organizationId },
+    include: { permissionGroup: { select: { slug: true } } },
   });
   if (!existing) {
     return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+  }
+  if (existing.permissionGroup?.slug === "owner") {
+    const ownerCount = await prisma.organizationMembership.count({
+      where: { organizationId: user.organizationId, orgRole: "owner" },
+    });
+    if (ownerCount <= 1) {
+      return c.json(
+        {
+          error: {
+            message: "Cannot delete the last owner. Grant owner permissions to another person first.",
+            code: "BAD_REQUEST",
+          },
+        },
+        400
+      );
+    }
   }
   await prisma.person.delete({ where: { id } });
   return new Response(null, { status: 204 });

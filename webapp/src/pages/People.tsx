@@ -87,24 +87,15 @@ const PersonFormSchema = z.object({
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
   notes: z.string().optional(),
-  /** App access: RoleDefinition id from GET /api/org/role-definitions. Required if email is set. */
-  permissionGroupId: z.string().optional(),
+  /** Required: every person belongs to exactly one permission group. */
+  permissionGroupId: z.string().min(1, "Select a permission group"),
   teamAssignments: z.array(
     z.object({
       teamId: z.string().optional(),
       role: z.string().optional(),
     })
   ),
-})
-  .superRefine((data, ctx) => {
-    if (data.email?.trim() && !data.permissionGroupId?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Select a permission group (required for app access when the person has an email).",
-        path: ["permissionGroupId"],
-      });
-    }
-  });
+});
 
 type PersonFormValues = z.infer<typeof PersonFormSchema>;
 
@@ -155,6 +146,36 @@ function roleToFormValues(role: string | null): { rolePreset: string; roleCustom
   if (!role) return { rolePreset: "", roleCustom: "" };
   if ((PRESET_ROLES as readonly string[]).includes(role)) return { rolePreset: role, roleCustom: "" };
   return { rolePreset: "other", roleCustom: role };
+}
+
+function toFriendlyPeopleSaveError(message: string): string {
+  const m = (message || "").trim();
+  if (!m) return "Could not save person.";
+  if (m.includes("Only owners can grant Admin permissions")) {
+    return "Only organization owners can give someone Admin permissions.";
+  }
+  if (m.includes("Only owners can grant Owner permissions")) {
+    return "Only organization owners can give someone Owner permissions.";
+  }
+  if (m.includes("Only the owner themselves can leave the Owner group")) {
+    return "Only the current owner can remove their own Owner permissions.";
+  }
+  if (m.includes("grant owner permissions to another person before leaving")) {
+    return "You must assign Owner permissions to another person before removing this owner.";
+  }
+  if (m.includes("Permission group is required")) {
+    return "Select a permission group for this person.";
+  }
+  if (m.includes("Invalid permission group")) {
+    return "The selected permission group no longer exists. Please pick another group.";
+  }
+  if (m.includes("One or more teams were not found")) {
+    return "One of the selected teams was not found. Refresh and try again.";
+  }
+  if (m.includes("Cannot delete the last owner")) {
+    return "You cannot remove the last owner. Add another owner first.";
+  }
+  return m;
 }
 
 // ── Role badge ────────────────────────────────────────────────────────────────
@@ -491,14 +512,6 @@ function PersonFormDialog({
     );
   }, [permissionState, permissionsDoc?.id, permissionOptions?.teams]);
 
-  useEffect(() => {
-    if (!open || person || !teams?.length) return;
-    const cur = form.getValues("teamAssignments");
-    if (cur.length === 0) {
-      form.setValue("teamAssignments", [{ teamId: teams[0].id, role: "" }]);
-    }
-  }, [open, person, teams, form]);
-
   const rolePreset = form.watch("rolePreset");
   const watchedAssignments = form.watch("teamAssignments");
   const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
@@ -600,7 +613,9 @@ function PersonFormDialog({
       onSuccess?.();
     },
     onError: (e: Error) => {
-      setUploadError(e.message || "Could not save person.");
+      const friendly = toFriendlyPeopleSaveError(e.message || "");
+      setUploadError(friendly);
+      toast({ title: "Could not save person", description: friendly, variant: "destructive" });
     },
   });
 
@@ -683,14 +698,6 @@ function PersonFormDialog({
 
   async function handleSubmit(values: PersonFormValues) {
     setUploadError(null);
-    if (canWriteOrg) {
-      const selectedTeamCount = values.teamAssignments.filter((r) => Boolean(r.teamId?.trim())).length;
-      if (selectedTeamCount === 0) {
-        form.setError("teamAssignments", { type: "custom", message: "Select at least one team" });
-        return;
-      }
-      form.clearErrors("teamAssignments");
-    }
     if (documentRowHandleMap.current.size > 0) {
       const handles = [...documentRowHandleMap.current.values()];
       try {
@@ -813,11 +820,9 @@ function PersonFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">
-              Permission group{form.watch("email")?.trim() ? " *" : ""}
-            </Label>
+            <Label className="text-white/50 text-xs uppercase tracking-wide">Permission group *</Label>
             <p className="text-[10px] text-white/30 leading-snug">
-              If this person has an email, you must select a group so their login works. We send a
+              Every person must belong to one permission group. If they have an email, we send a
               <strong className="text-white/50"> one-time link to set a password</strong> when you add them, or you can resend
               it when editing. Sign-in also has <strong className="text-white/50">Forgot password</strong> for any time. Groups
               and what they can do are edited only under{" "}
@@ -908,7 +913,7 @@ function PersonFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">Teams *</Label>
+            <Label className="text-white/50 text-xs uppercase tracking-wide">Teams</Label>
             {canWriteOrg ? (
               <>
                 <p className="text-[11px] text-white/35">
