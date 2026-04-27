@@ -375,9 +375,67 @@ model Event {
   actorCount     Int?
   allergies      String?
   customFields   String?
+  ownerTeamId    String?
+  ownerTeam      Department?   @relation("EventOwnerTeam", fields: [ownerTeamId], references: [id], onDelete: SetNull)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   shows          EventShow[]
+  teams          EventTeam[]
+  teamNotes      EventTeamNote[]
+  teamDocuments  EventTeamDocument[]
+
+  @@index([ownerTeamId])
+}
+
+model EventTeam {
+  id          String     @id @default(cuid())
+  eventId     String
+  event       Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  teamId      String
+  team        Department @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  isOwner     Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  notesFrom   EventTeamNote[] @relation("EventTeamNoteFromTeam")
+  notesTo     EventTeamNote[] @relation("EventTeamNoteToTeam")
+  documents   EventTeamDocument[]
+
+  @@unique([eventId, teamId])
+  @@index([teamId])
+}
+
+model EventTeamNote {
+  id              String     @id @default(cuid())
+  eventId         String
+  event           Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  fromTeamId      String
+  fromTeam        EventTeam  @relation("EventTeamNoteFromTeam", fields: [fromTeamId], references: [id], onDelete: Cascade)
+  toTeamId        String
+  toTeam          EventTeam  @relation("EventTeamNoteToTeam", fields: [toTeamId], references: [id], onDelete: Cascade)
+  body            String
+  createdByUserId String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([eventId, createdAt])
+  @@index([fromTeamId])
+  @@index([toTeamId])
+}
+
+model EventTeamDocument {
+  id             String    @id @default(cuid())
+  eventId        String
+  event          Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  teamId         String
+  team           EventTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  name           String
+  type           String    @default("other")
+  filename       String
+  data           Bytes
+  mimeType       String    @default("application/octet-stream")
+  createdByUserId String?
+  createdAt      DateTime  @default(now())
+
+  @@index([eventId, teamId, createdAt])
 }
 
 model EventPerson {
@@ -511,6 +569,8 @@ model Department {
   teamMembers    PersonTeam[]
   documentPermissions PersonDocumentAllowedTeam[]
   tourAssignments TourTeam[]
+  ownerEvents    Event[]      @relation("EventOwnerTeam")
+  eventTeams     EventTeam[]
   createdAt      DateTime     @default(now())
 }
 

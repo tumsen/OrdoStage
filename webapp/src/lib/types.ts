@@ -8,6 +8,8 @@ export type {
   EventShow,
   CreateEvent,
   EventDetail,
+  EventTeam,
+  EventTeamNote,
   EventPerson,
   Document,
   Calendar,

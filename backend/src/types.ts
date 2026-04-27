@@ -319,8 +319,43 @@ export const EventSchema = z.object({
   actorCount: z.number().nullable(),
   allergies: z.string().nullable(),
   customFields: z.string().nullable(),
+  ownerTeamId: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+export const EventTeamSchema = z.object({
+  id: z.string(),
+  eventId: z.string(),
+  teamId: z.string(),
+  isOwner: z.boolean(),
+  createdAt: z.string(),
+  team: z.object({
+    id: z.string(),
+    name: z.string(),
+    color: z.string(),
+  }),
+});
+
+export const EventTeamNoteSchema = z.object({
+  id: z.string(),
+  eventId: z.string(),
+  fromTeamId: z.string(),
+  toTeamId: z.string(),
+  body: z.string(),
+  createdByUserId: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const CreateEventTeamNoteSchema = z.object({
+  fromTeamId: z.string().min(1),
+  toTeamId: z.string().min(1),
+  body: z.string().min(1),
+});
+
+export const UpdateEventTeamNoteSchema = z.object({
+  body: z.string().min(1),
 });
 
 export const EventShowStaffingSchema = z.object({
@@ -414,9 +449,12 @@ export const CreateEventSchema = z.object({
   actorCount: z.number().optional(),
   allergies: z.string().optional(),
   customFields: z.string().optional(),
+  ownerTeamId: z.string().optional(),
+  teamIds: z.array(z.string()).optional(),
 });
 
 export const UpdateEventSchema = CreateEventSchema.partial();
+export const AddEventTeamSchema = z.object({ teamId: z.string().min(1) });
 
 // EventPerson
 export const EventPersonSchema = z.object({
@@ -461,6 +499,8 @@ export const EventDetailSchema = EventSchema.extend({
   venue: VenueSchema.nullable(),
   people: z.array(EventPersonSchema),
   documents: z.array(DocumentSchema),
+  teams: z.array(EventTeamSchema).optional(),
+  teamNotes: z.array(EventTeamNoteSchema).optional(),
   shows: z.array(EventShowSchema),
 });
 
@@ -552,6 +592,8 @@ export type PersonDocument = z.infer<typeof PersonDocumentSchema>;
 export type PersonTeamMembership = z.infer<typeof PersonTeamMembershipSchema>;
 export type CreatePerson = z.infer<typeof CreatePersonSchema>;
 export type Event = z.infer<typeof EventSchema>;
+export type EventTeam = z.infer<typeof EventTeamSchema>;
+export type EventTeamNote = z.infer<typeof EventTeamNoteSchema>;
 export type EventShow = z.infer<typeof EventShowSchema>;
 export type EventShowStaffing = z.infer<typeof EventShowStaffingSchema>;
 export type CreateEvent = z.infer<typeof CreateEventSchema>;

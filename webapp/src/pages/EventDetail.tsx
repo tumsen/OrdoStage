@@ -1,13 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Edit2, Trash2, Plus, X, Download, Upload } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import type { EventDetail, Person, EventPerson, Document, EventShow } from "@/lib/types";
+import type { EventDetail, EventTeam, EventTeamNote, Person, EventPerson, Document, EventShow } from "@/lib/types";
 import type { Department } from "../../../backend/src/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
@@ -49,6 +49,19 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/hooks/use-toast";
+
+type TeamDocument = {
+  id: string;
+  eventId: string;
+  teamId: string;
+  name: string;
+  type: string;
+  filename: string;
+  mimeType: string;
+  createdByUserId: string | null;
+  createdAt: string;
+};
 
 const EventEditSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -1392,6 +1405,413 @@ function ShowsTab({ event }: { event: EventDetail }) {
   );
 }
 
+function TeamsTab({ event }: { event: EventDetail }) {
+  const queryClient = useQueryClient();
+  const backendBase = import.meta.env.VITE_BACKEND_URL || "";
+  const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [addTeamId, setAddTeamId] = useState("");
+  const [noteToTeamId, setNoteToTeamId] = useState("");
+  const [noteBody, setNoteBody] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteBody, setEditingNoteBody] = useState("");
+  const [showAllNotes, setShowAllNotes] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadName, setUploadName] = useState("");
+  const [uploadType, setUploadType] = useState("other");
+
+  function errMsg(e: unknown, fallback: string) {
+    if (isApiError(e)) return e.message;
+    if (e instanceof Error && e.message) return e.message;
+    return fallback;
+  }
+
+  const { data: allDepartments = [] } = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => api.get<Department[]>("/api/departments"),
+  });
+
+  const { data: teams = [] } = useQuery({
+    queryKey: ["event", event.id, "teams"],
+    queryFn: () => api.get<EventTeam[]>(`/api/events/${event.id}/teams`),
+  });
+
+  const { data: notes = [] } = useQuery({
+    queryKey: ["event", event.id, "team-notes"],
+    queryFn: () => api.get<EventTeamNote[]>(`/api/events/${event.id}/team-notes`),
+  });
+
+  const { data: documents = [] } = useQuery({
+    queryKey: ["event", event.id, "team-docs", selectedTeam],
+    queryFn: () => api.get<TeamDocument[]>(`/api/events/${event.id}/teams/${selectedTeam}/documents`),
+    enabled: Boolean(selectedTeam),
+  });
+
+  const addTeamMutation = useMutation({
+    mutationFn: (teamId: string) => api.post(`/api/events/${event.id}/teams`, { teamId }),
+    onSuccess: () => {
+      setAddTeamId("");
+      queryClient.invalidateQueries({ queryKey: ["event", event.id, "teams"] });
+      queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+    },
+    onError: (e) =>
+      toast({ title: "Could not add team", description: errMsg(e, "Save failed"), variant: "destructive" }),
+  });
+
+  const removeTeamMutation = useMutation({
+    mutationFn: (teamId: string) => api.delete(`/api/events/${event.id}/teams/${teamId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event", event.id, "teams"] });
+      queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+    },
+    onError: (e) =>
+      toast({ title: "Could not remove team", description: errMsg(e, "Remove failed"), variant: "destructive" }),
+  });
+
+  const createNoteMutation = useMutation({
+    mutationFn: (payload: { fromTeamId: string; toTeamId: string; body: string }) =>
+      api.post(`/api/events/${event.id}/team-notes`, payload),
+    onSuccess: () => {
+      setNoteBody("");
+      queryClient.invalidateQueries({ queryKey: ["event", event.id, "team-notes"] });
+      queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+    },
+    onError: (e) =>
+      toast({ title: "Could not add note", description: errMsg(e, "Save failed"), variant: "destructive" }),
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: ({ noteId, body }: { noteId: string; body: string }) =>
+      api.patch(`/api/events/${event.id}/team-notes/${noteId}`, { body }),
+    onSuccess: () => {
+      setEditingNoteId(null);
+      setEditingNoteBody("");
+      queryClient.invalidateQueries({ queryKey: ["event", event.id, "team-notes"] });
+      queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+    },
+    onError: (e) =>
+      toast({ title: "Could not update note", description: errMsg(e, "Save failed"), variant: "destructive" }),
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: (noteId: string) => api.delete(`/api/events/${event.id}/team-notes/${noteId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event", event.id, "team-notes"] });
+      queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+    },
+    onError: (e) =>
+      toast({ title: "Could not delete note", description: errMsg(e, "Delete failed"), variant: "destructive" }),
+  });
+
+  const uploadTeamDocMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedTeam || !uploadFile) throw new Error("Select team and file");
+      const form = new FormData();
+      form.append("file", uploadFile);
+      form.append("name", uploadName || uploadFile.name);
+      form.append("type", uploadType || "other");
+      return api.post(`/api/events/${event.id}/teams/${selectedTeam}/documents`, form);
+    },
+    onSuccess: () => {
+      setUploadFile(null);
+      setUploadName("");
+      setUploadType("other");
+      queryClient.invalidateQueries({ queryKey: ["event", event.id, "team-docs", selectedTeam] });
+    },
+    onError: (e) =>
+      toast({ title: "Could not upload document", description: errMsg(e, "Upload failed"), variant: "destructive" }),
+  });
+
+  const deleteTeamDocMutation = useMutation({
+    mutationFn: (docId: string) => api.delete(`/api/events/${event.id}/team-documents/${docId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event", event.id, "team-docs", selectedTeam] });
+    },
+    onError: (e) =>
+      toast({ title: "Could not delete document", description: errMsg(e, "Delete failed"), variant: "destructive" }),
+  });
+
+  const teamNameByEventTeamId = new Map(teams.map((t) => [t.id, t.team.name]));
+
+  const availableTeams = allDepartments.filter((d) => !teams.some((t) => t.team.id === d.id));
+  const selectedTeamRow = teams.find((t) => t.id === selectedTeam) ?? null;
+  const visibleNotes = showAllNotes
+    ? notes
+    : notes.filter((n) => n.fromTeamId === selectedTeam || n.toTeamId === selectedTeam);
+
+  useEffect(() => {
+    if (!selectedTeam && teams.length > 0) {
+      setSelectedTeam(teams[0].id);
+      return;
+    }
+    if (selectedTeam && !teams.some((t) => t.id === selectedTeam)) {
+      setSelectedTeam(teams[0]?.id ?? "");
+    }
+  }, [selectedTeam, teams]);
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
+        <p className="text-xs uppercase tracking-wide text-white/45">Event teams</p>
+        <Tabs value={selectedTeam || undefined} onValueChange={setSelectedTeam}>
+          <TabsList className="bg-transparent h-auto gap-1 p-0 flex-wrap justify-start">
+            {teams.map((t) => (
+              <TabsTrigger
+                key={t.id}
+                value={t.id}
+                className="data-[state=active]:bg-white/15 data-[state=active]:text-white border border-white/15 text-white/65"
+              >
+                {t.team.name} {t.isOwner ? "(owner)" : ""}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
+          <Select value={addTeamId} onValueChange={setAddTeamId}>
+            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+              <SelectValue placeholder="Add team to event..." />
+            </SelectTrigger>
+            <SelectContent className="bg-[#16161f] border-white/10 text-white">
+              {availableTeams.map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            disabled={!addTeamId || addTeamMutation.isPending}
+            className="bg-red-900 hover:bg-red-800 text-white"
+            onClick={() => addTeamMutation.mutate(addTeamId)}
+          >
+            Add team
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!selectedTeam || removeTeamMutation.isPending}
+            className="border-white/10 text-white/70 bg-transparent"
+            onClick={() => {
+              if (!selectedTeam) return;
+              const teamName = teamNameByEventTeamId.get(selectedTeam) || "team";
+              if (!confirmDeleteAction(`team "${teamName}" from event`)) return;
+              removeTeamMutation.mutate(selectedTeam);
+            }}
+          >
+            Remove selected
+          </Button>
+        </div>
+        {selectedTeamRow ? (
+          <p className="text-xs text-white/45">
+            Active team tab: <span className="text-white/75">{selectedTeamRow.team.name}</span>
+          </p>
+        ) : null}
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
+        <p className="text-xs uppercase tracking-wide text-white/45">Directed notes</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-white/45">
+            {showAllNotes ? "Showing all notes" : "Showing notes for selected team"}
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 border-white/10 text-white/70 bg-transparent"
+            onClick={() => setShowAllNotes((v) => !v)}
+          >
+            {showAllNotes ? "Show selected team" : "Show all"}
+          </Button>
+        </div>
+        <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+          <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+              <SelectValue placeholder="From team" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#16161f] border-white/10 text-white">
+              {teams.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.team.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={noteToTeamId} onValueChange={setNoteToTeamId}>
+            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+              <SelectValue placeholder="To team" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#16161f] border-white/10 text-white">
+              {teams
+                .filter((t) => t.id !== selectedTeam)
+                .map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.team.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            disabled={!selectedTeam || !noteToTeamId || !noteBody.trim() || createNoteMutation.isPending}
+            className="bg-red-900 hover:bg-red-800 text-white"
+            onClick={() =>
+              createNoteMutation.mutate({
+                fromTeamId: selectedTeam,
+                toTeamId: noteToTeamId,
+                body: noteBody.trim(),
+              })
+            }
+          >
+            Add note
+          </Button>
+        </div>
+        <Textarea
+          value={noteBody}
+          onChange={(e) => setNoteBody(e.target.value)}
+          placeholder="Write note to another department/team..."
+          className="bg-white/5 border-white/10 text-white min-h-[80px]"
+        />
+        <div className="space-y-2">
+          {visibleNotes.length === 0 ? (
+            <p className="text-sm text-white/35">No team notes yet.</p>
+          ) : (
+            visibleNotes.map((n) => (
+              <div key={n.id} className="flex items-start justify-between gap-3 rounded border border-white/10 bg-white/[0.03] p-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-white/45">
+                    {teamNameByEventTeamId.get(n.fromTeamId) || "Unknown"} {"->"} {teamNameByEventTeamId.get(n.toTeamId) || "Unknown"}
+                  </p>
+                  {editingNoteId === n.id ? (
+                    <div className="space-y-2 mt-1">
+                      <Textarea
+                        value={editingNoteBody}
+                        onChange={(e) => setEditingNoteBody(e.target.value)}
+                        className="bg-white/5 border-white/10 text-white min-h-[70px]"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-red-900 hover:bg-red-800 text-white"
+                          disabled={!editingNoteBody.trim() || updateNoteMutation.isPending}
+                          onClick={() => updateNoteMutation.mutate({ noteId: n.id, body: editingNoteBody.trim() })}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-white/10 text-white/70 bg-transparent"
+                          onClick={() => {
+                            setEditingNoteId(null);
+                            setEditingNoteBody("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-white/85 whitespace-pre-wrap">{n.body}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-white/30 hover:text-white"
+                    onClick={() => {
+                      setEditingNoteId(n.id);
+                      setEditingNoteBody(n.body);
+                    }}
+                  >
+                    <Edit2 size={13} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-white/30 hover:text-red-400"
+                    onClick={() => {
+                      if (!confirmDeleteAction("team note")) return;
+                      deleteNoteMutation.mutate(n.id);
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
+        <p className="text-xs uppercase tracking-wide text-white/45">Team documents</p>
+        <div className="grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto]">
+          <Input
+            type="file"
+            onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+            className="bg-white/5 border-white/10 text-white file:text-white"
+          />
+          <Input
+            value={uploadName}
+            onChange={(e) => setUploadName(e.target.value)}
+            placeholder="Document name"
+            className="bg-white/5 border-white/10 text-white"
+          />
+          <Input
+            value={uploadType}
+            onChange={(e) => setUploadType(e.target.value)}
+            placeholder="Type"
+            className="bg-white/5 border-white/10 text-white"
+          />
+          <Button
+            size="sm"
+            disabled={!selectedTeam || !uploadFile || uploadTeamDocMutation.isPending}
+            className="bg-red-900 hover:bg-red-800 text-white"
+            onClick={() => uploadTeamDocMutation.mutate()}
+          >
+            Upload
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {!selectedTeam ? (
+            <p className="text-sm text-white/35">Select a team to view documents.</p>
+          ) : documents.length === 0 ? (
+            <p className="text-sm text-white/35">No documents for selected team.</p>
+          ) : (
+            documents.map((doc) => (
+              <div key={doc.id} className="flex items-center justify-between rounded border border-white/10 bg-white/[0.03] px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm text-white/85 truncate">{doc.name}</p>
+                  <p className="text-xs text-white/45">{doc.type} · {formatDate(doc.createdAt)}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <a href={`${backendBase}/api/events/${event.id}/team-documents/${doc.id}/download`} target="_blank" rel="noreferrer">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-white/25 hover:text-white">
+                      <Download size={13} />
+                    </Button>
+                  </a>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-white/25 hover:text-red-400"
+                    onClick={() => {
+                      if (!confirmDeleteAction("team document")) return;
+                      deleteTeamDocMutation.mutate(doc.id);
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function EventDetailPage() {
@@ -1452,6 +1872,12 @@ export default function EventDetailPage() {
                 Shows ({event.shows.length})
               </TabsTrigger>
               <TabsTrigger
+                value="teams"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                Teams ({event.teams?.length ?? 0})
+              </TabsTrigger>
+              <TabsTrigger
                 value="people"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
@@ -1475,6 +1901,9 @@ export default function EventDetailPage() {
             </TabsContent>
             <TabsContent value="shows" className="mt-0">
               <ShowsTab event={event} />
+            </TabsContent>
+            <TabsContent value="teams" className="mt-0">
+              <TeamsTab event={event} />
             </TabsContent>
             <TabsContent value="documents" className="mt-0">
               <DocumentsTab event={event} />

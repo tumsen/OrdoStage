@@ -67,8 +67,13 @@ export default function Roles() {
   useEffect(() => {
     if (mode === "edit" && editRow) {
       setDraftName(editRow.name);
-      setDraftViews([...editRow.views]);
-      setDraftActions([...editRow.actions]);
+      if (editRow.slug === "owner" && catalog) {
+        setDraftViews(catalog.views.map((v) => v.id));
+        setDraftActions(catalog.actions.map((a) => a.id));
+      } else {
+        setDraftViews([...editRow.views]);
+        setDraftActions([...editRow.actions]);
+      }
     }
     if (mode === "new" && catalog) {
       setNewName("");
@@ -151,6 +156,7 @@ export default function Roles() {
     }, {}) ?? {};
 
   const dialogOpen = mode !== "closed";
+  const isEditingOwner = mode === "edit" && editRow?.slug === "owner";
 
   const permissionsForm =
     catalog ? (
@@ -159,10 +165,16 @@ export default function Roles() {
           <p className="text-[10px] uppercase tracking-wide text-white/35 mb-2">Can see</p>
           <div className="space-y-2 rounded-md border border-white/10 p-3 bg-white/[0.02]">
             {catalog.views.map((v) => (
-              <label key={v.id} className="flex items-center gap-2 text-sm text-white/75 cursor-pointer">
+              <label
+                key={v.id}
+                className={`flex items-center gap-2 text-sm ${isEditingOwner ? "text-white/40" : "text-white/75 cursor-pointer"}`}
+              >
                 <Checkbox
-                  checked={draftViews.includes(v.id)}
-                  onCheckedChange={(ch) => setDraftViews(toggle(draftViews, v.id, ch === true))}
+                  checked={isEditingOwner ? true : draftViews.includes(v.id)}
+                  disabled={isEditingOwner}
+                  onCheckedChange={(ch) =>
+                    isEditingOwner ? undefined : setDraftViews(toggle(draftViews, v.id, ch === true))
+                  }
                 />
                 <span>{v.label}</span>
               </label>
@@ -175,12 +187,18 @@ export default function Roles() {
               {GROUP_LABEL[group] ?? group}
             </p>
             <div className="space-y-2 rounded-md border border-white/10 p-3 bg-white/[0.02]">
-              {items.map((a) => (
-                <label key={a.id} className="flex items-center gap-2 text-sm text-white/75 cursor-pointer">
+              {items
+                .filter((a) => isEditingOwner || a.id !== "org.delete")
+                .map((a) => (
+                <label
+                  key={a.id}
+                  className={`flex items-center gap-2 text-sm ${isEditingOwner ? "text-white/40" : "text-white/75 cursor-pointer"}`}
+                >
                   <Checkbox
-                    checked={draftActions.includes(a.id)}
+                    checked={isEditingOwner ? true : draftActions.includes(a.id)}
+                    disabled={isEditingOwner}
                     onCheckedChange={(ch) =>
-                      setDraftActions(toggle(draftActions, a.id, ch === true))
+                      isEditingOwner ? undefined : setDraftActions(toggle(draftActions, a.id, ch === true))
                     }
                   />
                   <span>{a.label}</span>
@@ -204,7 +222,7 @@ export default function Roles() {
           </div>
           <p className="text-sm text-white/40 mt-1 max-w-xl">
             Define what each role can <strong className="text-white/55">see</strong> in the sidebar and what they can{" "}
-            <strong className="text-white/55">do</strong> in the app. Built-in roles can be tuned; add custom roles and assign
+            <strong className="text-white/55">do</strong> in the app. Owner always has full permissions and is read-only; add custom roles and assign
             them from the Team page.
           </p>
         </div>
@@ -259,7 +277,9 @@ export default function Roles() {
               {canManageGroups ? (
                 <div className="flex items-center gap-2 shrink-0">
                   {r.slug === "owner" ? (
-                    <span className="text-[10px] text-white/30 max-w-[120px] text-right">System — not editable</span>
+                    <Button variant="outline" size="sm" className="border-white/15" onClick={() => openEdit(r)}>
+                      <Pencil size={13} className="mr-1.5" /> View
+                    </Button>
                   ) : (
                     <Button variant="outline" size="sm" className="border-white/15" onClick={() => openEdit(r)}>
                       <Pencil size={13} className="mr-1.5" /> Edit
@@ -327,9 +347,13 @@ export default function Roles() {
               <Label className="text-white/50 text-xs">Display name</Label>
               <Input
                 value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
+                onChange={(e) => (isEditingOwner ? undefined : setDraftName(e.target.value))}
+                disabled={isEditingOwner}
                 className="bg-white/5 border-white/10 mt-1"
               />
+              {isEditingOwner ? (
+                <p className="text-[11px] text-white/35 mt-1">Owner always has full permissions and cannot be edited.</p>
+              ) : null}
             </div>
           ) : null}
 
@@ -349,7 +373,7 @@ export default function Roles() {
             {canManageGroups ? (
               <Button
                 className="bg-red-900 hover:bg-red-800"
-                disabled={saveMutation.isPending || (mode === "new" && !newName.trim())}
+                disabled={isEditingOwner || saveMutation.isPending || (mode === "new" && !newName.trim())}
                 onClick={() => saveMutation.mutate()}
               >
                 {saveMutation.isPending ? "Saving…" : "Save"}
