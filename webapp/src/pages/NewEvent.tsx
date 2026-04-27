@@ -225,12 +225,48 @@ export default function NewEvent() {
         <ArrowLeft size={14} /> Back to Events
       </Button>
 
-      <div className="bg-white/[0.03] border border-white/10 rounded-xl p-6">
-        <h2 className="text-base font-semibold text-white mb-6">Create New Event</h2>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-            <Tabs defaultValue="booking" className="w-full">
+      <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
+        <Tabs defaultValue="details">
+          <div className="border-b border-white/10 px-6">
+            <TabsList className="bg-transparent h-12 gap-1 p-0">
+              <TabsTrigger
+                value="details"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                Details
+              </TabsTrigger>
+              <TabsTrigger
+                value="shows"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                Shows
+              </TabsTrigger>
+              <TabsTrigger
+                value="teams"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                Teams
+              </TabsTrigger>
+              <TabsTrigger
+                value="people"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                People
+              </TabsTrigger>
+              <TabsTrigger
+                value="documents"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                Documents
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          <div className="p-6">
+            <TabsContent value="details" className="mt-0">
+              <h2 className="text-base font-semibold text-white mb-6">Create New Event</h2>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                  <Tabs defaultValue="booking" className="w-full">
               <TabsList className="grid grid-cols-3 w-full bg-white/[0.02] border border-white/10 p-1 h-auto">
                 <TabsTrigger value="booking" className="data-[state=active]:bg-red-900 data-[state=active]:text-white text-white/60">Booking</TabsTrigger>
                 <TabsTrigger value="technical" className="data-[state=active]:bg-red-900 data-[state=active]:text-white text-white/60">Technical</TabsTrigger>
@@ -342,24 +378,48 @@ export default function NewEvent() {
                   <button type="button" onClick={addCustomField} className="flex items-center gap-2 text-sm text-white/40 hover:text-white/70 transition-colors py-1"><Plus size={13} /> Add Field</button>
                 </div>
               </TabsContent>
-            </Tabs>
+                  </Tabs>
 
-            {createMutation.isError ? (
-              <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
-                {createMutation.error instanceof Error ? createMutation.error.message : "Failed to create event."}
+                  {createMutation.isError ? (
+                    <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+                      {createMutation.error instanceof Error ? createMutation.error.message : "Failed to create event."}
+                    </div>
+                  ) : null}
+
+                  <div className="flex gap-3 pt-2">
+                    <Button type="button" variant="outline" onClick={() => navigate("/events")} className="border-white/10 text-white/60 hover:text-white hover:border-white/20 bg-transparent">
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createMutation.isPending} className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50">
+                      {createMutation.isPending ? "Creating..." : "Create Event"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </TabsContent>
+
+            <TabsContent value="shows" className="mt-0">
+              <div className="py-10 text-center text-white/35 text-sm">
+                Create the event first, then add shows here.
               </div>
-            ) : null}
-
-            <div className="flex gap-3 pt-2">
-              <Button type="button" variant="outline" onClick={() => navigate("/events")} className="border-white/10 text-white/60 hover:text-white hover:border-white/20 bg-transparent">
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending} className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50">
-                {createMutation.isPending ? "Creating..." : "Create Event"}
-              </Button>
-            </div>
-          </form>
-        </Form>
+            </TabsContent>
+            <TabsContent value="teams" className="mt-0">
+              <div className="py-10 text-center text-white/35 text-sm">
+                Create the event first, then manage teams here.
+              </div>
+            </TabsContent>
+            <TabsContent value="people" className="mt-0">
+              <div className="py-10 text-center text-white/35 text-sm">
+                Create the event first, then assign people here.
+              </div>
+            </TabsContent>
+            <TabsContent value="documents" className="mt-0">
+              <div className="py-10 text-center text-white/35 text-sm">
+                Create the event first, then upload documents here.
+              </div>
+            </TabsContent>
+          </div>
+        </Tabs>
       </div>
     </div>
   );
