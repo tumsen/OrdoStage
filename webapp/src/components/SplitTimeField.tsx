@@ -288,7 +288,12 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
         placeholder="00"
         className={SEG}
         value={hh}
-        onFocus={(e) => e.currentTarget.select()}
+        onFocus={(e) => {
+          e.currentTarget.select();
+          if (e.currentTarget.value.length === 2) {
+            setHh("");
+          }
+        }}
         onInput={onHInput}
         onKeyDown={onHKeyDown}
         onBlur={onHBlur}
@@ -308,7 +313,12 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
         placeholder="00"
         className={SEG}
         value={mm}
-        onFocus={(e) => e.currentTarget.select()}
+        onFocus={(e) => {
+          e.currentTarget.select();
+          if (e.currentTarget.value.length === 2) {
+            setMm("");
+          }
+        }}
         onInput={onMInput}
         onKeyDown={onMKeyDown}
         onBlur={onMBlur}
