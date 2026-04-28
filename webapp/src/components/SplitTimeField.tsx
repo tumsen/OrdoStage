@@ -4,7 +4,8 @@ import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } f
 import { usePreferences } from "@/hooks/usePreferences";
 import { durationHhMmToTotalMinutes, totalMinutesToDurationHhMm } from "@/lib/showTiming";
 
-const WRAPPER = "inline-flex items-center gap-0.5 shrink-0 w-[5.75rem] justify-center rounded-md border border-white/10 bg-white/5 py-0.5 px-0.5 [color-scheme:dark]";
+const WRAPPER =
+  "inline-flex items-center gap-0.5 shrink-0 w-[5.75rem] justify-center rounded-md border border-white/10 bg-white/5 py-0.5 px-0.5";
 
 const SEG = cn(
   "h-9 w-7 text-center font-mono text-sm tabular-nums",
@@ -12,26 +13,22 @@ const SEG = cn(
   "rounded px-0.5 focus:outline-none focus:ring-1 focus:ring-red-500/50",
   "placeholder:text-white/20",
 );
-const AMPM_BTN = "h-9 rounded px-1.5 text-[10px] font-medium border border-white/10";
+
+const AMPM_BTN = "h-9 px-1.5 text-[10px] font-medium";
 
 export type SplitTimeFieldHandle = { focusHours: () => void; focusMinutes: () => void };
 
 type Mode = "clock" | "duration";
 
-function onlyDigits2(raw: string): string {
-  return raw.replace(/\D/g, "").slice(0, 2);
+function digitsOnly(s: string) {
+  return s.replace(/\D/g, "").slice(0, 2);
 }
 
-function focusSegment(input: HTMLInputElement | null) {
+function focusAndSelect(input: HTMLInputElement | null) {
   if (!input) return;
   input.focus();
-  // Always start at first digit so two fresh digits can be entered.
   requestAnimationFrame(() => {
-    try {
-      input.setSelectionRange(0, input.value.length);
-    } catch {
-      // noop
-    }
+    try { input.setSelectionRange(0, input.value.length); } catch { /* noop */ }
   });
 }
 
@@ -44,321 +41,269 @@ type SplitHhMmProps = {
   className?: string;
 };
 
-const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function SplitHhMmInner(
-  { value, onChange, mode, "aria-label": ariaLabel, nextFieldRef, className },
-  ref
-) {
-  const uid = useId();
-  const hId = `${uid}-h`;
-  const mId = `${uid}-m`;
-  const hRef = useRef<HTMLInputElement>(null);
-  const mRef = useRef<HTMLInputElement>(null);
-  const lastEmitted = useRef(value);
-  const { effective } = usePreferences();
-  const is12h = mode === "clock" && effective?.timeFormat === "12h";
+const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
+  function SplitHhMmInner({ value, onChange, mode, "aria-label": ariaLabel, nextFieldRef, className }, ref) {
+    const uid = useId();
+    const hRef = useRef<HTMLInputElement>(null);
+    const mRef = useRef<HTMLInputElement>(null);
+    const lastEmitted = useRef(value);
+    const justFocusedH = useRef(false);
+    const justFocusedM = useRef(false);
 
-  const to12h = (hh24: string) => {
-    const h = parseInt(hh24, 10);
-    if (!Number.isFinite(h)) return { hh12: "", meridiem: "AM" as const };
-    const meridiem = h >= 12 ? "PM" as const : "AM" as const;
-    const h12 = h % 12 === 0 ? 12 : h % 12;
-    return { hh12: String(h12).padStart(2, "0"), meridiem };
-  };
-  const to24h = (hh12: string, meridiem: "AM" | "PM") => {
-    const h = parseInt(hh12, 10);
-    if (!Number.isFinite(h) || h < 1 || h > 12) return "";
-    let h24 = h % 12;
-    if (meridiem === "PM") h24 += 12;
-    return String(h24).padStart(2, "0");
-  };
+    const { effective } = usePreferences();
+    const is12h = mode === "clock" && effective?.timeFormat === "12h";
 
-  const fromProp = (v: string) => {
-    if (!v || !v.includes(":")) return { hh: "", mm: "" };
-    const p = v.trim().split(":");
-    if (p.length < 2) return { hh: "", mm: "" };
-    const hhRaw = onlyDigits2(p[0] ?? "");
-    const mmRaw = onlyDigits2(p[1] ?? "");
-    const hh = hhRaw.length === 1 ? hhRaw.padStart(2, "0") : hhRaw;
-    const mm = mmRaw.length === 1 ? mmRaw.padStart(2, "0") : mmRaw;
-    if (is12h && hh.length === 2) {
-      const conv = to12h(hh);
-      return { hh: conv.hh12, mm };
-    }
-    return { hh, mm };
-  };
+    /* ── 12-hour conversions ── */
+    const to12 = (hh24: string) => {
+      const h = parseInt(hh24, 10);
+      if (!Number.isFinite(h)) return { hh12: "", am: true };
+      const am = h < 12;
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      return { hh12: String(h12).padStart(2, "0"), am };
+    };
+    const to24 = (hh12: string, am: boolean) => {
+      const h = parseInt(hh12, 10);
+      if (!Number.isFinite(h) || h < 1 || h > 12) return "";
+      const h24 = am ? (h === 12 ? 0 : h) : (h === 12 ? 12 : h + 12);
+      return String(h24).padStart(2, "0");
+    };
 
-  const [hh, setHh] = useState(() => fromProp(value).hh);
-  const [mm, setMm] = useState(() => fromProp(value).mm);
-  const [meridiem, setMeridiem] = useState<"AM" | "PM">(() => {
-    const parts = value?.split(":");
-    if (is12h && parts?.[0]) return to12h(parts[0]).meridiem;
-    return "AM";
-  });
+    /* ── Parse incoming "HH:MM" value to display strings ── */
+    const parseProp = (v: string) => {
+      if (!v?.includes(":")) return { hh: "", mm: "", am: true };
+      const [rawH = "", rawM = ""] = v.trim().split(":");
+      const h24 = digitsOnly(rawH).padStart(2, "0").slice(0, 2);
+      const mm = digitsOnly(rawM).padStart(2, "0").slice(0, 2);
+      if (is12h) {
+        const { hh12, am } = to12(h24);
+        return { hh: hh12, mm, am };
+      }
+      return { hh: h24, mm, am: parseInt(h24, 10) < 12 };
+    };
 
-  useEffect(() => {
-    if (value === lastEmitted.current) return;
-    const s = fromProp(value);
-    setHh(s.hh);
-    setMm(s.mm);
-    if (is12h && value?.includes(":")) {
-      const p = value.split(":");
-      if (p[0]) setMeridiem(to12h(p[0]).meridiem);
-    }
-    lastEmitted.current = value;
-  }, [value, is12h]);
+    const init = parseProp(value);
+    const [hh, setHh] = useState(init.hh);
+    const [mm, setMm] = useState(init.mm);
+    const [isAM, setIsAM] = useState(init.am);
 
-  const emit = (h: string, m: string, afterMinutesFilled?: boolean) => {
-    const h2 = onlyDigits2(h);
-    const m2 = onlyDigits2(m);
-    if (h2.length === 2 && m2.length === 2) {
+    /* Sync from parent when value changes externally */
+    useEffect(() => {
+      if (value === lastEmitted.current) return;
+      const p = parseProp(value);
+      setHh(p.hh);
+      setMm(p.mm);
+      setIsAM(p.am);
+      lastEmitted.current = value;
+    }, [value, is12h]);
+
+    /* ── Emit committed HH:MM string ── */
+    const commit = (h: string, m: string, jumpAfter = false) => {
+      const h2 = digitsOnly(h);
+      const m2 = digitsOnly(m);
+      if (h2.length !== 2 || m2.length !== 2) return;
+
+      const mmN = parseInt(m2, 10);
+      if (mmN < 0 || mmN > 59) return;
+
+      let out = "";
       if (mode === "clock") {
-        const mmN = parseInt(m2, 10);
-        if (!Number.isFinite(mmN) || mmN < 0 || mmN > 59) return;
-        let t = "";
         if (is12h) {
-          const hh24 = to24h(h2, meridiem);
+          const hh24 = to24(h2, isAM);
           if (!hh24) return;
-          t = `${hh24}:${m2}`;
+          out = `${hh24}:${m2}`;
         } else {
           const hhN = parseInt(h2, 10);
-          if (!Number.isFinite(hhN) || hhN < 0 || hhN > 23) return;
-          t = `${h2}:${m2}`;
+          if (hhN < 0 || hhN > 23) return;
+          out = `${h2}:${m2}`;
         }
-        lastEmitted.current = t;
-        onChange(t);
-        if (afterMinutesFilled) {
-          requestAnimationFrame(() => nextFieldRef?.current?.focusHours());
-        }
-        return;
-      }
-      const total = durationHhMmToTotalMinutes(h2, m2);
-      const t = totalMinutesToDurationHhMm(total);
-      lastEmitted.current = t;
-      onChange(t);
-      if (afterMinutesFilled) {
-        requestAnimationFrame(() => nextFieldRef?.current?.focusHours());
-      }
-      return;
-    }
-    if (h2.length === 0 && m2.length === 0) {
-      lastEmitted.current = "";
-      onChange("");
-    }
-  };
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      focusHours: () => focusSegment(hRef.current),
-      focusMinutes: () => focusSegment(mRef.current),
-    }),
-    []
-  );
-
-  const onHInput = (e: React.FormEvent<HTMLInputElement>) => {
-    const raw = onlyDigits2((e.target as HTMLInputElement).value);
-    setHh(raw);
-    if (raw.length === 2) {
-      const mmNum = onlyDigits2(mm);
-      focusSegment(mRef.current);
-      if (mmNum.length === 2) emit(raw, mmNum, false);
-    } else {
-      if (!raw && !mm) {
-        lastEmitted.current = "";
-        onChange("");
-      }
-    }
-  };
-
-  const onMInput = (e: React.FormEvent<HTMLInputElement>) => {
-    const raw = onlyDigits2((e.target as HTMLInputElement).value);
-    setMm(raw);
-    const h2 = onlyDigits2(hh);
-    if (raw.length === 2) {
-      emit(h2, raw, true);
-    } else {
-      if (!raw && !h2) {
-        lastEmitted.current = "";
-        onChange("");
-      }
-    }
-  };
-
-  const onHBlur = () => {
-    const h2 = onlyDigits2(hh);
-    const m2 = onlyDigits2(mm);
-    if (h2.length === 1) {
-      setHh("");
-      return;
-    }
-    if (h2.length === 2) {
-      if (mode === "clock") {
-        if (is12h) {
-          const hN = parseInt(h2, 10);
-          if (!Number.isFinite(hN) || hN < 1 || hN > 12) {
-            setHh("");
-            return;
-          }
-          setHh(String(hN).padStart(2, "0"));
-        } else {
-          const hN = parseInt(h2, 10);
-          if (!Number.isFinite(hN) || hN < 0 || hN > 23) {
-            setHh("");
-            return;
-          }
-          setHh(String(hN).padStart(2, "0"));
-        }
-        if (m2.length === 2) emit(h2, m2, false);
-      } else if (m2.length === 2) {
-        emit(h2, m2, false);
-      }
-    }
-  };
-
-  const onMBlur = () => {
-    const h2 = onlyDigits2(hh);
-    const m2 = onlyDigits2(mm);
-    if (m2.length === 1) {
-      setMm("");
-      return;
-    }
-    if (h2.length === 2 && m2.length === 2) {
-      if (mode === "clock") {
-        const mmN = parseInt(m2, 10);
-        if (!Number.isFinite(mmN) || mmN < 0 || mmN > 59) {
-          setMm("");
-          return;
-        }
-        setMm(String(mmN).padStart(2, "0"));
-        emit(h2, m2, false);
       } else {
-        emit(h2, m2, false);
+        const total = durationHhMmToTotalMinutes(h2, m2);
+        out = totalMinutesToDurationHhMm(total);
       }
-    }
-  };
 
-  const onHKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowRight" && (e.target as HTMLInputElement).selectionStart === 2) {
+      lastEmitted.current = out;
+      onChange(out);
+      if (jumpAfter) requestAnimationFrame(() => nextFieldRef?.current?.focusHours());
+    };
+
+    useImperativeHandle(ref, () => ({
+      focusHours: () => focusAndSelect(hRef.current),
+      focusMinutes: () => focusAndSelect(mRef.current),
+    }), []);
+
+    /* ── HH handlers ── */
+    const onHChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const inputDigits = e.target.value.replace(/\D/g, "");
+      let next: string;
+
+      if (justFocusedH.current) {
+        // First keystroke after focus: take only the single newly typed digit
+        next = inputDigits.slice(-1);
+        justFocusedH.current = false;
+      } else {
+        next = inputDigits.slice(0, 2);
+      }
+
+      setHh(next);
+
+      if (next.length === 2) {
+        // Validate range before jumping
+        const n = parseInt(next, 10);
+        const valid = is12h ? (n >= 1 && n <= 12) : (n >= 0 && n <= 23);
+        if (!valid) { setHh(""); return; }
+        focusAndSelect(mRef.current);
+        if (mm.length === 2) commit(next, mm, false);
+      }
+    };
+
+    const onHFocus = () => {
+      justFocusedH.current = true;
+    };
+
+    const onHBlur = () => {
+      justFocusedH.current = false;
+      if (hh.length === 1) { setHh(""); return; }
+      if (hh.length === 2 && mm.length === 2) commit(hh, mm, false);
+    };
+
+    const onHKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "ArrowRight") { e.preventDefault(); focusAndSelect(mRef.current); }
+      if (e.key === "Backspace" && !hh) { /* stay in HH */ }
+    };
+
+    /* ── MM handlers ── */
+    const onMChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const inputDigits = e.target.value.replace(/\D/g, "");
+      let next: string;
+
+      if (justFocusedM.current) {
+        next = inputDigits.slice(-1);
+        justFocusedM.current = false;
+      } else {
+        next = inputDigits.slice(0, 2);
+      }
+
+      setMm(next);
+
+      if (next.length === 2) {
+        const n = parseInt(next, 10);
+        if (n < 0 || n > 59) { setMm(""); return; }
+        commit(hh, next, true);
+      }
+    };
+
+    const onMFocus = () => {
+      justFocusedM.current = true;
+    };
+
+    const onMBlur = () => {
+      justFocusedM.current = false;
+      if (mm.length === 1) { setMm(""); return; }
+      if (hh.length === 2 && mm.length === 2) commit(hh, mm, false);
+    };
+
+    const onMKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "ArrowLeft") { e.preventDefault(); focusAndSelect(hRef.current); }
+      if (e.key === "Backspace" && !mm) { e.preventDefault(); focusAndSelect(hRef.current); }
+    };
+
+    /* ── Paste ── */
+    const onPasteH = (e: React.ClipboardEvent<HTMLInputElement>) => {
       e.preventDefault();
-      focusSegment(mRef.current);
-    }
-  };
+      const m = (e.clipboardData.getData("text") || "").match(/(\d{1,2})[:\s]?(\d{2})/);
+      if (!m) return;
+      const ph = digitsOnly(m[1] ?? "");
+      const pm = digitsOnly(m[2] ?? "");
+      setHh(ph); setMm(pm);
+      if (ph.length === 2 && pm.length === 2) commit(ph, pm, false);
+      else focusAndSelect(mRef.current);
+    };
 
-  const onMKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && (e.target as HTMLInputElement).value.length === 0) {
+    const onPasteM = (e: React.ClipboardEvent<HTMLInputElement>) => {
       e.preventDefault();
-      focusSegment(hRef.current);
-    }
-    if (e.key === "ArrowLeft" && (e.target as HTMLInputElement).selectionStart === 0) {
-      e.preventDefault();
-      focusSegment(hRef.current);
-    }
-  };
+      const m = (e.clipboardData.getData("text") || "").match(/(\d{1,2})[:\s]?(\d{2})/);
+      if (!m) return;
+      const ph = digitsOnly(m[1] ?? "");
+      const pm = digitsOnly(m[2] ?? "");
+      setHh(ph); setMm(pm);
+      if (ph.length === 2 && pm.length === 2) commit(ph, pm, true);
+    };
 
-  const onPasteH = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const t = (e.clipboardData.getData("text") || "").match(/(\d{1,2})[:\s]?(\d{2})/);
-    if (t) {
-      setHh(onlyDigits2(t[1] ?? ""));
-      setMm(onlyDigits2(t[2] ?? ""));
-      emit(onlyDigits2(t[1] ?? ""), onlyDigits2(t[2] ?? ""), true);
-      if (onlyDigits2(t[2] ?? "").length < 2) focusSegment(mRef.current);
-    }
-  };
-
-  const onPasteM = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const t = (e.clipboardData.getData("text") || "").match(/(\d{1,2})[:\s]?(\d{2})/);
-    if (t) {
-      setHh(onlyDigits2(t[1] ?? ""));
-      setMm(onlyDigits2(t[2] ?? ""));
-      emit(onlyDigits2(t[1] ?? ""), onlyDigits2(t[2] ?? ""), true);
-    }
-  };
-
-  return (
-    <div className={cn(WRAPPER, className)} role="group" aria-label={ariaLabel ?? "Time"}>
-      <input
-        id={hId}
-        ref={hRef}
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        maxLength={2}
-        placeholder="00"
-        className={SEG}
-        value={hh}
-        onFocus={(e) => {
-          e.currentTarget.select();
-          if (e.currentTarget.value.length === 2) {
-            setHh("");
-          }
-        }}
-        onInput={onHInput}
-        onKeyDown={onHKeyDown}
-        onBlur={onHBlur}
-        onPaste={onPasteH}
-        aria-label={ariaLabel ? `${ariaLabel} hours` : "Hours"}
-      />
-      <span className="text-white/45 text-sm select-none" aria-hidden>
-        :
-      </span>
-      <input
-        id={mId}
-        ref={mRef}
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        maxLength={2}
-        placeholder="00"
-        className={SEG}
-        value={mm}
-        onFocus={(e) => {
-          e.currentTarget.select();
-          if (e.currentTarget.value.length === 2) {
-            setMm("");
-          }
-        }}
-        onInput={onMInput}
-        onKeyDown={onMKeyDown}
-        onBlur={onMBlur}
-        onPaste={onPasteM}
-        aria-label={ariaLabel ? `${ariaLabel} minutes` : "Minutes"}
-      />
-      {is12h ? (
-        <div className="ml-1 inline-flex h-9 items-center rounded border border-white/10 bg-white/5 overflow-hidden">
-          <button
-            type="button"
-            className={cn(AMPM_BTN, meridiem === "AM" ? "bg-white/15 text-white" : "text-white/60")}
-            onClick={() => {
-              setMeridiem("AM");
-              emit(hh, mm, false);
-            }}
-            aria-label={ariaLabel ? `${ariaLabel} AM` : "AM"}
-          >
-            AM
-          </button>
-          <button
-            type="button"
-            className={cn(AMPM_BTN, meridiem === "PM" ? "bg-white/15 text-white" : "text-white/60")}
-            onClick={() => {
-              setMeridiem("PM");
-              emit(hh, mm, false);
-            }}
-            aria-label={ariaLabel ? `${ariaLabel} PM` : "PM"}
-          >
-            PM
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-});
+    return (
+      <div className={cn(WRAPPER, className)} role="group" aria-label={ariaLabel ?? "Time"}>
+        <input
+          id={`${uid}-h`}
+          ref={hRef}
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={2}
+          placeholder="00"
+          className={SEG}
+          value={hh}
+          onFocus={onHFocus}
+          onChange={onHChange}
+          onBlur={onHBlur}
+          onKeyDown={onHKeyDown}
+          onPaste={onPasteH}
+          aria-label={ariaLabel ? `${ariaLabel} hours` : "Hours"}
+        />
+        <span className="text-white/45 text-sm select-none" aria-hidden>:</span>
+        <input
+          id={`${uid}-m`}
+          ref={mRef}
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={2}
+          placeholder="00"
+          className={SEG}
+          value={mm}
+          onFocus={onMFocus}
+          onChange={onMChange}
+          onBlur={onMBlur}
+          onKeyDown={onMKeyDown}
+          onPaste={onPasteM}
+          aria-label={ariaLabel ? `${ariaLabel} minutes` : "Minutes"}
+        />
+        {is12h ? (
+          <div className="ml-0.5 inline-flex h-9 items-center rounded border border-white/10 bg-white/5 overflow-hidden">
+            {(["AM", "PM"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={cn(
+                  AMPM_BTN,
+                  isAM === (m === "AM")
+                    ? "bg-white/15 text-white"
+                    : "text-white/55 hover:text-white/80",
+                )}
+                onClick={() => {
+                  setIsAM(m === "AM");
+                  if (hh.length === 2 && mm.length === 2) {
+                    const hh24 = to24(hh, m === "AM");
+                    if (hh24) {
+                      const out = `${hh24}:${mm}`;
+                      lastEmitted.current = out;
+                      onChange(out);
+                    }
+                  }
+                }}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  },
+);
 
 export const SplitTimeInput = forwardRef<
   SplitTimeFieldHandle,
   Omit<SplitHhMmProps, "mode"> & { "aria-label"?: string; nextFieldRef?: React.RefObject<SplitTimeFieldHandle | null> }
->(function SplitTimeInput({ ...props }, ref) {
+>(function SplitTimeInput(props, ref) {
   return <SplitHhMmInner ref={ref} mode="clock" {...props} />;
 });
 
@@ -371,23 +316,19 @@ export const SplitDurationHhMmInput = forwardRef<
     nextFieldRef?: React.RefObject<SplitTimeFieldHandle | null>;
   }
 >(function SplitDurationHhMmInput({ valueMinutes, onChangeMinutes, "aria-label": a, nextFieldRef, className }, ref) {
-  const t = totalMinutesToDurationHhMm(Number.isFinite(valueMinutes) && !Number.isNaN(valueMinutes) ? valueMinutes : 0);
+  const safe = Number.isFinite(valueMinutes) && !Number.isNaN(valueMinutes) ? valueMinutes : 0;
   return (
     <SplitHhMmInner
       ref={ref}
       className={className}
       mode="duration"
-      value={t}
+      value={totalMinutesToDurationHhMm(safe)}
       aria-label={a ?? "Duration"}
       nextFieldRef={nextFieldRef}
       onChange={(s) => {
-        if (!s) {
-          onChangeMinutes(0);
-          return;
-        }
-        const p = s.split(":");
-        if (p.length < 2) return;
-        onChangeMinutes(durationHhMmToTotalMinutes(onlyDigits2(p[0] ?? ""), onlyDigits2(p[1] ?? "")));
+        if (!s) { onChangeMinutes(0); return; }
+        const [h = "", m = ""] = s.split(":");
+        onChangeMinutes(durationHhMmToTotalMinutes(h.replace(/\D/g, "").slice(0, 2), m.replace(/\D/g, "").slice(0, 2)));
       }}
     />
   );
