@@ -23,8 +23,16 @@ export function DateInputWithWeekday({
   const ref = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="flex items-center gap-2">
-      <div className={cn("text-[11px] text-white/45 whitespace-nowrap", weekdayClassName)}>
+    <div
+      className={cn(
+        "w-full h-9 rounded-md border border-white/10 bg-white/5 text-white",
+        "focus-within:border-white/30",
+        "flex items-center gap-2 px-3",
+        disabled && "opacity-40",
+        className
+      )}
+    >
+      <div className={cn("text-[11px] text-white/55 whitespace-nowrap shrink-0", weekdayClassName)}>
         {formatWeekdayDate(value)}
       </div>
       <input
@@ -37,8 +45,8 @@ export function DateInputWithWeekday({
         onFocus={() => ref.current?.showPicker?.()}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          "w-full h-9 px-3 text-sm bg-white/5 border border-white/10 rounded-md text-white focus:outline-none focus:border-white/30 [color-scheme:dark]",
-          className
+          "ml-auto h-7 min-w-[8.5rem] bg-transparent border-0 rounded-none text-white",
+          "focus:outline-none [color-scheme:dark]"
         )}
       />
     </div>
