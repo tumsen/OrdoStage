@@ -7,6 +7,7 @@ import { z } from "zod";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
+import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import type { Event, Venue } from "@/lib/types";
 import type { Department } from "../../../backend/src/types";
 import { Button } from "@/components/ui/button";
@@ -325,7 +326,7 @@ export default function NewEvent() {
                     <FormItem><FormLabel className="text-white/70 text-sm">Hands needed (get-in)</FormLabel><FormControl><Input {...field} value={field.value ?? ""} type="number" min={0} placeholder="e.g. 4" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="getInDate" render={({ field }) => (
-                    <FormItem><FormLabel className="text-white/70 text-sm">Get-in date</FormLabel><FormControl><Input {...field} value={field.value ?? ""} type="date" className="bg-white/5 border-white/10 text-white focus:border-white/30 [color-scheme:dark]" /></FormControl></FormItem>
+                    <FormItem><FormLabel className="text-white/70 text-sm">Get-in date</FormLabel><FormControl><DateInputWithWeekday value={field.value ?? ""} onChange={field.onChange} className="bg-white/5 border-white/10 text-white focus:border-white/30" /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="getInTime" render={({ field }) => (
                     <FormItem><FormLabel className="text-white/70 text-sm">Get-in time</FormLabel><FormControl><Input {...field} value={field.value ?? ""} placeholder="HH:mm" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 max-w-[8rem]" /></FormControl></FormItem>

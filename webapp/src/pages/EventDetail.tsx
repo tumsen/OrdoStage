@@ -11,6 +11,7 @@ import type { EventDetail, EventTeam, EventTeamNote, Person, EventPerson, Docume
 import type { Department } from "../../../backend/src/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
+import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
 import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
@@ -959,15 +960,14 @@ function ShowTimeEditor({
     <div className="flex flex-wrap items-end gap-3">
       <div>
         <FieldLabel>Date</FieldLabel>
-        <Input
-          type="date"
+        <DateInputWithWeekday
           value={showDate}
-          onChange={(e) => {
-            const v = e.target.value;
+          onChange={(v) => {
             setShowDate(v);
             onUpdate({ showDate: v });
           }}
           className="w-[10.5rem] min-w-[10.5rem] bg-white/5 border-white/10 text-white [color-scheme:dark]"
+          weekdayClassName="text-[10px] text-white/45"
         />
       </div>
       <div>
@@ -1056,12 +1056,14 @@ function ShowTimingInlineEditor({
   date,
   start,
   durationMinutes,
+  onDateChange,
   onChange,
 }: {
   label: string;
   date: string;
   start: string | null;
   durationMinutes: number | null;
+  onDateChange?: (date: string) => void;
   onChange: (patch: { start?: string; durationMinutes?: number | null }) => void;
 }) {
   const [localStart, setLocalStart] = useState(start ?? "");
@@ -1085,11 +1087,11 @@ function ShowTimingInlineEditor({
       <div className="flex flex-nowrap items-end gap-2 overflow-x-auto pb-0.5">
         <div className="shrink-0">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide block mb-1">Date</Label>
-          <Input
-            type="date"
+          <DateInputWithWeekday
             value={date}
-            readOnly
+            onChange={(v) => onDateChange?.(v)}
             className="w-[10.5rem] min-w-[10.5rem] bg-white/5 border-white/10 text-white/70 [color-scheme:dark]"
+            weekdayClassName="text-[10px] text-white/45"
           />
         </div>
         <div className="shrink-0">
@@ -1523,6 +1525,7 @@ function ShowEventCard({
         <ShowTimingInlineEditor
           label="Get-in"
           date={show.showDate.slice(0, 10)}
+          onDateChange={(v) => patch({ showDate: v })}
           start={show.getInTime}
           durationMinutes={show.getInDurationMinutes}
           onChange={(p) =>
@@ -1535,6 +1538,7 @@ function ShowEventCard({
         <ShowTimingInlineEditor
           label="Rehearsal"
           date={show.showDate.slice(0, 10)}
+          onDateChange={(v) => patch({ showDate: v })}
           start={show.rehearsalTime}
           durationMinutes={show.rehearsalDurationMinutes}
           onChange={(p) =>
@@ -1547,6 +1551,7 @@ function ShowEventCard({
         <ShowTimingInlineEditor
           label="Soundcheck"
           date={show.showDate.slice(0, 10)}
+          onDateChange={(v) => patch({ showDate: v })}
           start={show.soundcheckTime}
           durationMinutes={show.soundcheckDurationMinutes}
           onChange={(p) =>
@@ -1559,6 +1564,7 @@ function ShowEventCard({
         <ShowTimingInlineEditor
           label="Break"
           date={show.showDate.slice(0, 10)}
+          onDateChange={(v) => patch({ showDate: v })}
           start={show.breakTime}
           durationMinutes={show.breakDurationMinutes}
           onChange={(p) =>
@@ -1571,6 +1577,7 @@ function ShowEventCard({
         <ShowTimingInlineEditor
           label="Get-out"
           date={show.showDate.slice(0, 10)}
+          onDateChange={(v) => patch({ showDate: v })}
           start={show.getOutTime}
           durationMinutes={show.getOutDurationMinutes}
           onChange={(p) =>
@@ -1629,6 +1636,7 @@ function ShowEventCard({
             <ShowTimingInlineEditor
               label="Meeting"
               date={show.showDate.slice(0, 10)}
+              onDateChange={(v) => patch({ showDate: v })}
               start={draft.meetingTime || null}
               durationMinutes={draft.meetingDurationMinutes ? Number(draft.meetingDurationMinutes) : null}
               onChange={(p) =>
@@ -1751,11 +1759,11 @@ function ShowsTab({ event }: { event: EventDetail }) {
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <FieldLabel>Date</FieldLabel>
-              <Input
-                type="date"
+              <DateInputWithWeekday
                 value={newShow.showDate}
-                onChange={(e) => setNewShow((s) => mergeNewShowState(s, { showDate: e.target.value }))}
+                onChange={(v) => setNewShow((s) => mergeNewShowState(s, { showDate: v }))}
                 className="w-[10.5rem] min-w-[10.5rem] bg-white/5 border-white/10 text-white [color-scheme:dark]"
+                weekdayClassName="text-[10px] text-white/45"
               />
             </div>
             <div>

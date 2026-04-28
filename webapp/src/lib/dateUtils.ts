@@ -40,3 +40,17 @@ export function isNext30Days(dateStr: string): boolean {
   future.setDate(future.getDate() + 30);
   return d >= now && d <= future;
 }
+
+export function formatWeekdayDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  if (!m) return "—";
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return "—";
+  const dt = new Date(y, mo - 1, d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  const weekday = dt.toLocaleDateString("en-US", { weekday: "long" });
+  return `${weekday} ${String(d).padStart(2, "0")}/${String(mo).padStart(2, "0")}/${String(y)}`;
+}

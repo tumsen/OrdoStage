@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { BillingSummary, type OrgBillingPayload } from "@/components/BillingSummary";
+import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import type { Person, PersonDocument } from "../../../backend/src/types";
 import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
 import { Button } from "@/components/ui/button";
@@ -1149,12 +1150,12 @@ function PersonFormDialog({
                     />
                     <span>Does not expire</span>
                   </label>
-                  <input
-                    type="date"
+                  <DateInputWithWeekday
                     value={docExpires}
                     disabled={docDoesNotExpire}
-                    onChange={(e) => setDocExpires(e.target.value)}
-                    className="h-9 w-[150px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs disabled:opacity-40"
+                    onChange={setDocExpires}
+                    className="h-9 w-[170px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs disabled:opacity-40"
+                    weekdayClassName="text-[10px] text-white/45"
                   />
                   <Input
                     type="file"

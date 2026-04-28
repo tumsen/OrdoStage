@@ -7,6 +7,7 @@ import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Event } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
+import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -77,19 +78,18 @@ export default function Events() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-          <input
-            type="date"
+          <DateInputWithWeekday
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            placeholder="From"
-            className="h-8 px-3 text-sm bg-white/5 border border-white/10 rounded-md text-white/70 focus:outline-none focus:border-white/30"
+            onChange={setDateFrom}
+            className="h-8 w-[10rem] px-3 text-sm text-white/70"
+            weekdayClassName="text-[10px] text-white/40"
           />
           <span className="text-white/30 text-xs">to</span>
-          <input
-            type="date"
+          <DateInputWithWeekday
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="h-8 px-3 text-sm bg-white/5 border border-white/10 rounded-md text-white/70 focus:outline-none focus:border-white/30"
+            onChange={setDateTo}
+            className="h-8 w-[10rem] px-3 text-sm text-white/70"
+            weekdayClassName="text-[10px] text-white/40"
           />
         </div>
         <Button

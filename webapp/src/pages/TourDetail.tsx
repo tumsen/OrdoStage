@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
+import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import type {
   TourDetail,
   TourShow,
@@ -730,12 +731,11 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
               <Label className="text-white/60 text-xs uppercase tracking-wide">
                 Date <span className="text-red-400">*</span>
               </Label>
-              <Input
-                type="date"
+              <DateInputWithWeekday
                 value={form.date}
-                onChange={(e) => setField("date", e.target.value)}
-                className={fieldCls + " [color-scheme:dark]"}
-                required
+                onChange={(v) => setField("date", v)}
+                className={fieldCls}
+                weekdayClassName="text-[11px] text-white/45"
               />
             </div>
             {form.type === "show" ? (

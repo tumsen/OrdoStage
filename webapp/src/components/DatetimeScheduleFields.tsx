@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
-import { Input } from "@/components/ui/input";
+import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Label } from "@/components/ui/label";
 import {
   buildDatetimeLocal,
@@ -92,11 +92,11 @@ export function DatetimeScheduleFields({
     <ScheduleTimeRow className={className}>
       <div className="shrink-0">
         <Label className={scheduleFieldLabelClass}>Date</Label>
-        <Input
-          type="date"
+        <DateInputWithWeekday
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={setDate}
           className={scheduleDateInputClass}
+          weekdayClassName="text-[10px] text-white/45"
         />
       </div>
       <div className="shrink-0">
