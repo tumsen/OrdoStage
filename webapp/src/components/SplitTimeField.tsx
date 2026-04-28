@@ -48,6 +48,9 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
     // saved values so blur can restore if user typed nothing new
     const savedHh = useRef("");
     const savedMm = useRef("");
+    // set to true right before we programmatically move focus, so blur doesn't validate
+    const skipHBlur = useRef(false);
+    const skipMBlur = useRef(false);
 
     const { effective } = usePreferences();
     const is12h = mode === "clock" && effective?.timeFormat === "12h";
@@ -128,18 +131,17 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
         const n = parseInt(next, 10);
         const valid = is12h ? n >= 1 && n <= 12 : n >= 0 && n <= 23;
         if (!valid) { setHh(""); return; }
+        // Flag BEFORE focus() — focus() fires onHBlur synchronously with stale state
+        skipHBlur.current = true;
         focusAndSelect(mRef.current);
         if (mm.length === 2) commit(next, mm, false);
       }
     };
 
     const onHBlur = () => {
-      if (hh === "") {
-        // user focused but typed nothing — restore previous value
-        setHh(savedHh.current);
-        return;
-      }
-      if (hh.length === 1) { setHh(""); return; }      // single digit → invalid, clear
+      if (skipHBlur.current) { skipHBlur.current = false; return; }
+      if (hh === "") { setHh(savedHh.current); return; }
+      if (hh.length === 1) { setHh(""); return; }
       if (hh.length === 2 && mm.length === 2) commit(hh, mm, false);
     };
 
@@ -163,14 +165,23 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
     };
 
     const onMBlur = () => {
+      if (skipMBlur.current) { skipMBlur.current = false; return; }
       if (mm === "") { setMm(savedMm.current); return; }
       if (mm.length === 1) { setMm(""); return; }
       if (hh.length === 2 && mm.length === 2) commit(hh, mm, false);
     };
 
     const onMKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "ArrowLeft")  { e.preventDefault(); focusAndSelect(hRef.current); }
-      if (e.key === "Backspace" && !mm) { e.preventDefault(); focusAndSelect(hRef.current); }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        skipMBlur.current = true;
+        focusAndSelect(hRef.current);
+      }
+      if (e.key === "Backspace" && !mm) {
+        e.preventDefault();
+        skipMBlur.current = true;
+        focusAndSelect(hRef.current);
+      }
     };
 
     /* ── Paste ── */
