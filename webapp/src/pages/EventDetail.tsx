@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,12 +11,8 @@ import type { EventDetail, EventTeam, EventTeamNote, Person, EventPerson, Docume
 import type { Department } from "../../../backend/src/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
-import {
-  DURATION_MINUTES_INPUT_CLASS,
-  TIME_INPUT_CLASS,
-  durationMinutesBetween,
-  endTimeFromStartAndDuration,
-} from "@/lib/showTiming";
+import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
+import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -247,6 +243,7 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
   });
 
   const depts = departments ?? [];
+  const setupTimeFieldRef = useRef<SplitTimeFieldHandle>(null);
 
   const form = useForm<EventEditValues>({
     resolver: zodResolver(EventEditSchema),
@@ -536,11 +533,11 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
                   <FormItem>
                     <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in Time</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <SplitTimeInput
                         value={field.value ?? ""}
-                        type="time"
-                        className={`${TIME_INPUT_CLASS} max-w-[5.75rem]`}
+                        onChange={field.onChange}
+                        nextFieldRef={setupTimeFieldRef}
+                        aria-label="Get-in time"
                       />
                     </FormControl>
                   </FormItem>
@@ -553,11 +550,11 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
                   <FormItem>
                     <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Setup Time</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <SplitTimeInput
+                        ref={setupTimeFieldRef}
                         value={field.value ?? ""}
-                        type="time"
-                        className={`${TIME_INPUT_CLASS} max-w-[5.75rem]`}
+                        onChange={field.onChange}
+                        aria-label="Setup time"
                       />
                     </FormControl>
                   </FormItem>
@@ -963,6 +960,9 @@ function ShowTimeEditor({
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [dur, setDur] = useState("");
+  const refStart = useRef<SplitTimeFieldHandle>(null);
+  const refEnd = useRef<SplitTimeFieldHandle>(null);
+  const refDur = useRef<SplitTimeFieldHandle>(null);
 
   useEffect(() => {
     setShowDate(show.showDate.slice(0, 10));
@@ -988,11 +988,12 @@ function ShowTimeEditor({
       </div>
       <div>
         <FieldLabel>Start</FieldLabel>
-        <Input
-          type="time"
+        <SplitTimeInput
+          ref={refStart}
           value={start}
-          onChange={(e) => {
-            const v = e.target.value;
+          nextFieldRef={refEnd}
+          aria-label="Start"
+          onChange={(v) => {
             setStart(v);
             const d = Number(dur);
             if (!Number.isNaN(d) && d >= 1) {
@@ -1010,16 +1011,16 @@ function ShowTimeEditor({
               onUpdate({ showTime: v });
             }
           }}
-          className={TIME_INPUT_CLASS}
         />
       </div>
       <div>
         <FieldLabel>End</FieldLabel>
-        <Input
-          type="time"
+        <SplitTimeInput
+          ref={refEnd}
           value={end}
-          onChange={(e) => {
-            const v = e.target.value;
+          nextFieldRef={refDur}
+          aria-label="End"
+          onChange={(v) => {
             setEnd(v);
             if (start && v) {
               const dm = durationMinutesBetween(start, v);
@@ -1029,25 +1030,19 @@ function ShowTimeEditor({
               }
             }
           }}
-          className={TIME_INPUT_CLASS}
         />
       </div>
       <div>
-        <FieldLabel>Duration (min)</FieldLabel>
-        <Input
-          type="number"
-          min={1}
-          value={dur}
-          onChange={(e) => {
-            const v = e.target.value;
-            setDur(v);
-            const d = Number(v);
-            if (!Number.isNaN(d) && d >= 1) {
-              if (start) setEnd(endTimeFromStartAndDuration(start, d));
-              onUpdate({ durationMinutes: d });
-            }
+        <FieldLabel>Duration</FieldLabel>
+        <SplitDurationHhMmInput
+          ref={refDur}
+          valueMinutes={Number(dur) || 0}
+          aria-label="Duration"
+          onChangeMinutes={(m) => {
+            setDur(String(m));
+            if (m >= 1 && start) setEnd(endTimeFromStartAndDuration(start, m));
+            if (m >= 1) onUpdate({ durationMinutes: m });
           }}
-          className={DURATION_MINUTES_INPUT_CLASS}
         />
       </div>
       <div className="min-w-0 flex-1 max-w-xs">
@@ -1375,6 +1370,240 @@ function DocumentsTab({ event }: { event: EventDetail }) {
   );
 }
 
+type StaffDraftRow = { personId: string; role: string; meetingTime: string; meetingDurationMinutes: string };
+
+function ShowEventCard({
+  show,
+  venues,
+  people,
+  staffDraft,
+  setStaffDraft,
+  updateShow,
+  deleteShow,
+  removeStaff,
+  upsertStaff,
+}: {
+  show: EventShow;
+  venues: { id: string; name: string }[] | undefined;
+  people: Person[] | undefined;
+  staffDraft: Record<string, StaffDraftRow>;
+  setStaffDraft: Dispatch<SetStateAction<Record<string, StaffDraftRow>>>;
+  updateShow: { mutate: (a: { showId: string; body: Record<string, unknown> }) => void };
+  deleteShow: { mutate: (id: string) => void };
+  removeStaff: { mutate: (a: { showId: string; personId: string }) => void };
+  upsertStaff: { mutate: (a: { showId: string; body: Record<string, unknown> }) => void; isPending: boolean };
+}) {
+  const refGetIn = useRef<SplitTimeFieldHandle>(null);
+  const refGetInDur = useRef<SplitTimeFieldHandle>(null);
+  const refReh = useRef<SplitTimeFieldHandle>(null);
+  const refSound = useRef<SplitTimeFieldHandle>(null);
+  const refBreak = useRef<SplitTimeFieldHandle>(null);
+  const refGetOut = useRef<SplitTimeFieldHandle>(null);
+  const refMeet = useRef<SplitTimeFieldHandle>(null);
+  const refMeetDur = useRef<SplitTimeFieldHandle>(null);
+
+  const patch = (body: Record<string, unknown>) => updateShow.mutate({ showId: show.id, body });
+  const draft = staffDraft[show.id] || { personId: "", role: "", meetingTime: "", meetingDurationMinutes: "60" };
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <ShowTimeEditor show={show} venues={venues} onUpdate={patch} />
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0 text-white/30 hover:text-red-400"
+          onClick={() => {
+            if (!confirmDeleteAction("show")) return;
+            deleteShow.mutate(show.id);
+          }}
+        >
+          <Trash2 size={13} />
+        </Button>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div>
+          <FieldLabel>Technical tab notes</FieldLabel>
+          <Textarea
+            value={show.technicalNotes || ""}
+            placeholder="Lx, rigger, power, load in..."
+            onChange={(e) => patch({ technicalNotes: e.target.value })}
+            className="bg-white/5 border-white/10 text-white min-h-[90px]"
+          />
+        </div>
+        <div>
+          <FieldLabel>FOH tab notes</FieldLabel>
+          <Textarea
+            value={show.fohNotes || ""}
+            placeholder="Tickets, bar, hospitality…"
+            onChange={(e) => patch({ fohNotes: e.target.value })}
+            className="bg-white/5 border-white/10 text-white min-h-[90px]"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <FieldLabel>Get-in time</FieldLabel>
+          <SplitTimeInput
+            ref={refGetIn}
+            nextFieldRef={refGetInDur}
+            value={show.getInTime || ""}
+            onChange={(v) => patch({ getInTime: v })}
+            aria-label="Get-in time"
+          />
+        </div>
+        <div>
+          <FieldLabel>Get-in duration</FieldLabel>
+          <SplitDurationHhMmInput
+            ref={refGetInDur}
+            nextFieldRef={refReh}
+            valueMinutes={show.getInDurationMinutes ?? 0}
+            onChangeMinutes={(m) => patch({ getInDurationMinutes: m > 0 ? m : null })}
+            aria-label="Get-in duration"
+          />
+        </div>
+        <div>
+          <FieldLabel>Rehearsal time</FieldLabel>
+          <SplitTimeInput
+            ref={refReh}
+            nextFieldRef={refSound}
+            value={show.rehearsalTime || ""}
+            onChange={(v) => patch({ rehearsalTime: v })}
+            aria-label="Rehearsal time"
+          />
+        </div>
+        <div>
+          <FieldLabel>Soundcheck time</FieldLabel>
+          <SplitTimeInput
+            ref={refSound}
+            nextFieldRef={refBreak}
+            value={show.soundcheckTime || ""}
+            onChange={(v) => patch({ soundcheckTime: v })}
+            aria-label="Soundcheck time"
+          />
+        </div>
+        <div>
+          <FieldLabel>Break time</FieldLabel>
+          <SplitTimeInput
+            ref={refBreak}
+            nextFieldRef={refGetOut}
+            value={show.breakTime || ""}
+            onChange={(v) => patch({ breakTime: v })}
+            aria-label="Break time"
+          />
+        </div>
+        <div>
+          <FieldLabel>Get-out time</FieldLabel>
+          <SplitTimeInput
+            ref={refGetOut}
+            nextFieldRef={refMeet}
+            value={show.getOutTime || ""}
+            onChange={(v) => patch({ getOutTime: v })}
+            aria-label="Get-out time"
+          />
+        </div>
+      </div>
+
+      <div className="rounded border border-white/10 p-3 space-y-2">
+        <p className="text-xs uppercase tracking-wide text-white/45">Team staffing</p>
+        {show.staffing.map((s) => (
+          <div
+            key={s.id}
+            className="flex items-center justify-between text-sm bg-white/[0.03] border border-white/10 rounded px-3 py-2"
+          >
+            <span className="text-white/85">
+              {s.person.name} - {s.role || "Role not set"} {s.meetingTime ? `- ${s.meetingTime}` : ""}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-white/35 hover:text-red-400"
+              onClick={() => removeStaff.mutate({ showId: show.id, personId: s.personId })}
+            >
+              <X size={12} />
+            </Button>
+          </div>
+        ))}
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <FieldLabel>Person</FieldLabel>
+            <Select
+              value={draft.personId}
+              onValueChange={(v) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, personId: v } }))}
+            >
+              <SelectTrigger className="bg-white/5 border-white/10 text-white w-full min-w-0">
+                <SelectValue placeholder="Person" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                {(people ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <FieldLabel>Role</FieldLabel>
+            <Input
+              value={draft.role}
+              onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, role: e.target.value } }))}
+              className="bg-white/5 border-white/10 text-white w-full"
+            />
+          </div>
+          <div>
+            <FieldLabel>Meeting time</FieldLabel>
+            <SplitTimeInput
+              ref={refMeet}
+              nextFieldRef={refMeetDur}
+              value={draft.meetingTime}
+              onChange={(v) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, meetingTime: v } }))}
+              aria-label="Meeting time"
+            />
+          </div>
+          <div>
+            <FieldLabel>Duration</FieldLabel>
+            <div className="flex gap-2">
+              <SplitDurationHhMmInput
+                ref={refMeetDur}
+                valueMinutes={Number(draft.meetingDurationMinutes) || 0}
+                onChangeMinutes={(m) =>
+                  setStaffDraft((p) => ({
+                    ...p,
+                    [show.id]: { ...draft, meetingDurationMinutes: String(m) },
+                  }))
+                }
+                aria-label="Meeting duration"
+              />
+              <Button
+                size="sm"
+                className="bg-red-900 hover:bg-red-800 text-white shrink-0"
+                disabled={!draft.personId || upsertStaff.isPending}
+                onClick={() =>
+                  upsertStaff.mutate({
+                    showId: show.id,
+                    body: {
+                      personId: draft.personId,
+                      role: draft.role || undefined,
+                      meetingTime: draft.meetingTime || undefined,
+                      meetingDurationMinutes: draft.meetingDurationMinutes
+                        ? Number(draft.meetingDurationMinutes)
+                        : undefined,
+                    },
+                  })
+                }
+              >
+                Add
+              </Button>
+            </div>
+          </div>
+        </div>
+        <p className="text-[11px] text-white/45">Staffing meeting time and duration are added to each person&apos;s work schedule.</p>
+      </div>
+    </div>
+  );
+}
+
 function ShowsTab({ event }: { event: EventDetail }) {
   const queryClient = useQueryClient();
   const { data: venues } = useQuery({
@@ -1394,6 +1623,9 @@ function ShowsTab({ event }: { event: EventDetail }) {
     venueId: "",
   });
   const [staffDraft, setStaffDraft] = useState<Record<string, { personId: string; role: string; meetingTime: string; meetingDurationMinutes: string }>>({});
+  const newStartRef = useRef<SplitTimeFieldHandle>(null);
+  const newEndRef = useRef<SplitTimeFieldHandle>(null);
+  const newDurRef = useRef<SplitTimeFieldHandle>(null);
 
   const createShow = useMutation({
     mutationFn: () =>
@@ -1455,30 +1687,33 @@ function ShowsTab({ event }: { event: EventDetail }) {
             </div>
             <div>
               <FieldLabel>Start</FieldLabel>
-              <Input
-                type="time"
+              <SplitTimeInput
+                ref={newStartRef}
                 value={newShow.showTime}
-                onChange={(e) => setNewShow((s) => mergeNewShowState(s, { showTime: e.target.value }))}
-                className={TIME_INPUT_CLASS}
+                nextFieldRef={newEndRef}
+                aria-label="Start"
+                onChange={(v) => setNewShow((s) => mergeNewShowState(s, { showTime: v }))}
               />
             </div>
             <div>
               <FieldLabel>End</FieldLabel>
-              <Input
-                type="time"
+              <SplitTimeInput
+                ref={newEndRef}
                 value={newShow.endTime}
-                onChange={(e) => setNewShow((s) => mergeNewShowState(s, { endTime: e.target.value }))}
-                className={TIME_INPUT_CLASS}
+                nextFieldRef={newDurRef}
+                aria-label="End"
+                onChange={(v) => setNewShow((s) => mergeNewShowState(s, { endTime: v }))}
               />
             </div>
             <div>
-              <FieldLabel>Duration (min)</FieldLabel>
-              <Input
-                type="number"
-                min={1}
-                value={newShow.durationMinutes}
-                onChange={(e) => setNewShow((s) => mergeNewShowState(s, { durationMinutes: e.target.value }))}
-                className={DURATION_MINUTES_INPUT_CLASS}
+              <FieldLabel>Duration</FieldLabel>
+              <SplitDurationHhMmInput
+                ref={newDurRef}
+                valueMinutes={Number(newShow.durationMinutes) || 0}
+                aria-label="Duration"
+                onChangeMinutes={(m) => {
+                  setNewShow((s) => mergeNewShowState(s, { durationMinutes: String(m) }));
+                }}
               />
             </div>
             <div className="min-w-0 flex-1 max-w-xs">
@@ -1515,199 +1750,20 @@ function ShowsTab({ event }: { event: EventDetail }) {
         <div className="text-center text-white/35 text-sm py-10">No shows yet. Add the first show to start planning technical, FOH, and team staffing.</div>
       ) : (
         <div className="space-y-3">
-          {event.shows.map((show: EventShow) => {
-            const draft = staffDraft[show.id] || { personId: "", role: "", meetingTime: "", meetingDurationMinutes: "60" };
-            return (
-              <div key={show.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <ShowTimeEditor
-                      show={show}
-                      venues={venues}
-                      onUpdate={(body) => updateShow.mutate({ showId: show.id, body })}
-                    />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-white/30 hover:text-red-400"
-                    onClick={() => {
-                      if (!confirmDeleteAction("show")) return;
-                      deleteShow.mutate(show.id);
-                    }}
-                  >
-                    <Trash2 size={13} />
-                  </Button>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div>
-                    <FieldLabel>Technical tab notes</FieldLabel>
-                    <Textarea
-                      value={show.technicalNotes || ""}
-                      placeholder="Lx, rigger, power, load in..."
-                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { technicalNotes: e.target.value } })}
-                      className="bg-white/5 border-white/10 text-white min-h-[90px]"
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel>FOH tab notes</FieldLabel>
-                    <Textarea
-                      value={show.fohNotes || ""}
-                      placeholder="Tickets, bar, hospitality…"
-                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { fohNotes: e.target.value } })}
-                      className="bg-white/5 border-white/10 text-white min-h-[90px]"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <div>
-                    <FieldLabel>Get-in time</FieldLabel>
-                    <Input
-                      type="time"
-                      value={show.getInTime || ""}
-                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { getInTime: e.target.value } })}
-                      className={TIME_INPUT_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel>Get-in (min)</FieldLabel>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={String(show.getInDurationMinutes ?? "")}
-                      onChange={(e) =>
-                        updateShow.mutate({
-                          showId: show.id,
-                          body: { getInDurationMinutes: e.target.value ? Number(e.target.value) : null },
-                        })
-                      }
-                      className={DURATION_MINUTES_INPUT_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel>Rehearsal time</FieldLabel>
-                    <Input
-                      type="time"
-                      value={show.rehearsalTime || ""}
-                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { rehearsalTime: e.target.value } })}
-                      className={TIME_INPUT_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel>Soundcheck time</FieldLabel>
-                    <Input
-                      type="time"
-                      value={show.soundcheckTime || ""}
-                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { soundcheckTime: e.target.value } })}
-                      className={TIME_INPUT_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel>Break time</FieldLabel>
-                    <Input
-                      type="time"
-                      value={show.breakTime || ""}
-                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { breakTime: e.target.value } })}
-                      className={TIME_INPUT_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel>Get-out time</FieldLabel>
-                    <Input
-                      type="time"
-                      value={show.getOutTime || ""}
-                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { getOutTime: e.target.value } })}
-                      className={TIME_INPUT_CLASS}
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded border border-white/10 p-3 space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-white/45">Team staffing</p>
-                  {show.staffing.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between text-sm bg-white/[0.03] border border-white/10 rounded px-3 py-2">
-                      <span className="text-white/85">
-                        {s.person.name} - {s.role || "Role not set"} {s.meetingTime ? `- ${s.meetingTime}` : ""}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-white/35 hover:text-red-400"
-                        onClick={() => removeStaff.mutate({ showId: show.id, personId: s.personId })}
-                      >
-                        <X size={12} />
-                      </Button>
-                    </div>
-                  ))}
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <FieldLabel>Person</FieldLabel>
-                      <Select value={draft.personId} onValueChange={(v) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, personId: v } }))}>
-                        <SelectTrigger className="bg-white/5 border-white/10 text-white w-full min-w-0">
-                          <SelectValue placeholder="Person" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                          {(people ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <FieldLabel>Role</FieldLabel>
-                      <Input
-                        value={draft.role}
-                        onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, role: e.target.value } }))}
-                        className="bg-white/5 border-white/10 text-white w-full"
-                      />
-                    </div>
-                    <div>
-                      <FieldLabel>Meeting time</FieldLabel>
-                      <Input
-                        type="time"
-                        value={draft.meetingTime}
-                        onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, meetingTime: e.target.value } }))}
-                        className={TIME_INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <FieldLabel>Duration (min)</FieldLabel>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          min={1}
-                          value={draft.meetingDurationMinutes}
-                          onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, meetingDurationMinutes: e.target.value } }))}
-                          className={DURATION_MINUTES_INPUT_CLASS}
-                        />
-                        <Button
-                          size="sm"
-                          className="bg-red-900 hover:bg-red-800 text-white shrink-0"
-                          disabled={!draft.personId || upsertStaff.isPending}
-                          onClick={() =>
-                            upsertStaff.mutate({
-                              showId: show.id,
-                              body: {
-                                personId: draft.personId,
-                                role: draft.role || undefined,
-                                meetingTime: draft.meetingTime || undefined,
-                                meetingDurationMinutes: draft.meetingDurationMinutes
-                                  ? Number(draft.meetingDurationMinutes)
-                                  : undefined,
-                              },
-                            })
-                          }
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-white/45">Staffing meeting time and duration are added to each person&apos;s work schedule.</p>
-                </div>
-              </div>
-            );
-          })}
+          {event.shows.map((show: EventShow) => (
+            <ShowEventCard
+              key={show.id}
+              show={show}
+              venues={venues}
+              people={people}
+              staffDraft={staffDraft}
+              setStaffDraft={setStaffDraft}
+              updateShow={updateShow}
+              deleteShow={deleteShow}
+              removeStaff={removeStaff}
+              upsertStaff={upsertStaff}
+            />
+          ))}
         </div>
       )}
     </div>
