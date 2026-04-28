@@ -266,5 +266,3 @@ export const SplitDurationHhMmInput = forwardRef<
   );
 });
 
-// re-export helper so callers don't need separate import
-function dig2(s: string) { return s.replace(/\D/g, "").slice(0, 2); }
