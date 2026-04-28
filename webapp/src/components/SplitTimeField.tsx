@@ -80,9 +80,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
     const m2 = onlyDigits2(m);
     if (h2.length === 2 && m2.length === 2) {
       if (mode === "clock") {
-        const hhN = Math.min(23, Math.max(0, parseInt(h2, 10) || 0));
-        const mmN = Math.min(59, Math.max(0, parseInt(m2, 10) || 0));
-        const t = `${String(hhN).padStart(2, "0")}:${String(mmN).padStart(2, "0")}`;
+        const t = `${h2}:${m2}`;
         lastEmitted.current = t;
         onChange(t);
         if (afterMinutesFilled) {
@@ -152,14 +150,8 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
     }
     if (h2.length === 2) {
       if (mode === "clock") {
-        const hhN = Math.min(23, Math.max(0, parseInt(h2, 10) || 0));
-        setHh(String(hhN).padStart(2, "0"));
-        if (m2.length === 2) {
-          const mmN = Math.min(59, Math.max(0, parseInt(m2, 10) || 0));
-          const mmP = String(mmN).padStart(2, "0");
-          setMm(mmP);
-          emit(String(hhN).padStart(2, "0"), mmP, false);
-        }
+        setHh(h2);
+        if (m2.length === 2) emit(h2, m2, false);
       } else if (m2.length === 2) {
         emit(h2, m2, false);
       }
@@ -175,11 +167,8 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
     }
     if (h2.length === 2 && m2.length === 2) {
       if (mode === "clock") {
-        const mmN = Math.min(59, Math.max(0, parseInt(m2, 10) || 0));
-        const mmP = String(mmN).padStart(2, "0");
-        setMm(mmP);
-        const hhN = Math.min(23, Math.max(0, parseInt(h2, 10) || 0));
-        emit(String(hhN).padStart(2, "0"), mmP, false);
+        setMm(m2);
+        emit(h2, m2, false);
       } else {
         emit(h2, m2, false);
       }
