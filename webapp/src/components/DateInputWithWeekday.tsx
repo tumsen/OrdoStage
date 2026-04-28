@@ -25,7 +25,7 @@ export function DateInputWithWeekday({
   return (
     <div
       className={cn(
-        "w-full h-9 rounded-md border border-white/10 bg-white/5 text-white",
+        "w-full h-10 rounded-md border border-white/10 bg-white/5 text-white",
         "focus-within:border-white/30",
         "flex items-center gap-2 px-3",
         disabled && "opacity-40",
@@ -45,7 +45,7 @@ export function DateInputWithWeekday({
         onFocus={() => ref.current?.showPicker?.()}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          "ml-auto h-7 min-w-[8.5rem] bg-transparent border-0 rounded-none text-white",
+          "ml-auto h-9 min-w-[8.5rem] bg-transparent border-0 rounded-none text-white",
           "focus:outline-none [color-scheme:dark]"
         )}
       />
