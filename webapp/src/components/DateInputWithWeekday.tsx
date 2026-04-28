@@ -1,6 +1,6 @@
 import { useRef } from "react";
 
-import { formatWeekdayDate } from "@/lib/dateUtils";
+import { formatWeekdayOnly } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 
 type DateInputWithWeekdayProps = {
@@ -33,7 +33,7 @@ export function DateInputWithWeekday({
       )}
     >
       <div className={cn("text-[11px] text-white/55 whitespace-nowrap shrink-0", weekdayClassName)}>
-        {formatWeekdayDate(value)}
+        {formatWeekdayOnly(value)}
       </div>
       <input
         ref={ref}
