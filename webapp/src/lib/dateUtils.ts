@@ -2,25 +2,26 @@ export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  const hasTime = /T\d{2}:\d{2}/.test(dateStr);
+  if (!hasTime) return `${weekday} ${day}/${month}/${year}`;
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${weekday} ${day}/${month}/${year} ${hh}:${mm}`;
 }
 
 export function formatDateShort(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${weekday} ${day}/${month}/${year}`;
 }
 
 export function isUpcoming(dateStr: string): boolean {
