@@ -37,10 +37,11 @@ type SplitHhMmProps = {
   "aria-label"?: string;
   nextFieldRef?: React.RefObject<SplitTimeFieldHandle | null>;
   className?: string;
+  disabled?: boolean;
 };
 
 const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
-  function SplitHhMmInner({ value, onChange, mode, "aria-label": ariaLabel, nextFieldRef, className }, ref) {
+  function SplitHhMmInner({ value, onChange, mode, "aria-label": ariaLabel, nextFieldRef, className, disabled }, ref) {
     const uid = useId();
     const hRef = useRef<HTMLInputElement>(null);
     const mRef = useRef<HTMLInputElement>(null);
@@ -230,12 +231,18 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
     };
 
     return (
-      <div className={cn(WRAPPER, className)} role="group" aria-label={ariaLabel ?? "Time"}>
+      <div
+        className={cn(WRAPPER, disabled && "opacity-50", className)}
+        role="group"
+        aria-label={ariaLabel ?? "Time"}
+        aria-disabled={disabled ? "true" : "false"}
+      >
         <input
           id={`${uid}-h`} ref={hRef}
           type="text" inputMode="numeric" autoComplete="off"
           maxLength={2} placeholder="00" className={SEG}
           value={hh}
+          disabled={disabled}
           onFocus={onHFocus} onChange={onHChange} onBlur={onHBlur}
           onKeyDown={onHKeyDown} onPaste={onPasteH}
           aria-label={ariaLabel ? `${ariaLabel} hours` : "Hours"}
@@ -246,6 +253,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
           type="text" inputMode="numeric" autoComplete="off"
           maxLength={2} placeholder="00" className={SEG}
           value={mm}
+          disabled={disabled}
           onFocus={onMFocus} onChange={onMChange} onBlur={onMBlur}
           onKeyDown={onMKeyDown} onPaste={onPasteM}
           aria-label={ariaLabel ? `${ariaLabel} minutes` : "Minutes"}
@@ -255,6 +263,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
             {(["AM", "PM"] as const).map((m) => (
               <button key={m} type="button"
                 className={cn(AMPM_BTN, isAM === (m === "AM") ? "bg-white/15 text-white" : "text-white/55 hover:text-white/80")}
+                disabled={disabled}
                 onClick={() => {
                   const newAM = m === "AM";
                   setIsAM(newAM);

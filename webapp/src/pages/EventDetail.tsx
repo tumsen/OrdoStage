@@ -955,6 +955,7 @@ function ShowTimeEditor({
     setDur(String(show.durationMinutes));
     setEnd(endTimeFromStartAndDuration(show.showTime, show.durationMinutes));
   }, [show.id, show.showDate, show.showTime, show.durationMinutes, show.updatedAt]);
+  const hasStartTime = /^\d{2}:\d{2}$/.test(start);
 
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -1004,6 +1005,7 @@ function ShowTimeEditor({
           value={end}
           nextFieldRef={refDur}
           aria-label="End"
+          disabled={!hasStartTime}
           onChange={(v) => {
             setEnd(v);
             if (start && v) {
@@ -1022,6 +1024,7 @@ function ShowTimeEditor({
           ref={refDur}
           valueMinutes={Number(dur) || 0}
           aria-label="Duration"
+          disabled={!hasStartTime}
           onChangeMinutes={(m) => {
             setDur(String(m));
             if (m >= 1 && start) setEnd(endTimeFromStartAndDuration(start, m));
@@ -1080,6 +1083,7 @@ function ShowTimingInlineEditor({
     setLocalDuration(String(dur));
     setLocalEnd(st && dur > 0 ? endTimeFromStartAndDuration(st, dur) : "");
   }, [start, durationMinutes, date]);
+  const hasStartTime = /^\d{2}:\d{2}$/.test(localStart);
 
   return (
     <div className="space-y-1.5">
@@ -1118,6 +1122,7 @@ function ShowTimingInlineEditor({
             value={localEnd}
             nextFieldRef={refDur}
             aria-label={`${label} end`}
+            disabled={!hasStartTime}
             onChange={(v) => {
               setLocalEnd(v);
               if (localStart && v) {
@@ -1136,6 +1141,7 @@ function ShowTimingInlineEditor({
             ref={refDur}
             valueMinutes={Number(localDuration) || 0}
             aria-label={`${label} duration`}
+            disabled={!hasStartTime}
             onChangeMinutes={(m) => {
               setLocalDuration(String(m));
               onChange({ durationMinutes: m > 0 ? m : null });
@@ -1783,6 +1789,7 @@ function ShowsTab({ event }: { event: EventDetail }) {
                 value={newShow.endTime}
                 nextFieldRef={newDurRef}
                 aria-label="End"
+                disabled={!/^\d{2}:\d{2}$/.test(newShow.showTime)}
                 onChange={(v) => setNewShow((s) => mergeNewShowState(s, { endTime: v }))}
               />
             </div>
@@ -1792,6 +1799,7 @@ function ShowsTab({ event }: { event: EventDetail }) {
                 ref={newDurRef}
                 valueMinutes={Number(newShow.durationMinutes) || 0}
                 aria-label="Duration"
+                disabled={!/^\d{2}:\d{2}$/.test(newShow.showTime)}
                 onChangeMinutes={(m) => {
                   setNewShow((s) => mergeNewShowState(s, { durationMinutes: String(m) }));
                 }}

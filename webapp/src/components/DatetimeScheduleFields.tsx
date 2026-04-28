@@ -36,6 +36,7 @@ export function DatetimeScheduleFields({
   const date = sd.date;
   const startT = sd.time;
   const endT = ed.time;
+  const hasStartTime = /^\d{2}:\d{2}$/.test(startT);
 
   const durationMin = useMemo(() => {
     if (!startValue || !endValue) return 0;
@@ -66,6 +67,7 @@ export function DatetimeScheduleFields({
   };
 
   const onEndT = (v: string) => {
+    if (!hasStartTime) return;
     const d0 = ed.date || sd.date;
     if (!d0) return;
     let end = new Date(buildDatetimeLocal(d0, v));
@@ -78,6 +80,7 @@ export function DatetimeScheduleFields({
   };
 
   const onDur = (m: number) => {
+    if (!hasStartTime) return;
     if (!startValue) return;
     const s = new Date(startValue);
     if (!Number.isFinite(s.getTime())) return;
@@ -117,6 +120,7 @@ export function DatetimeScheduleFields({
           onChange={onEndT}
           nextFieldRef={refDur}
           aria-label="End"
+          disabled={!hasStartTime}
         />
       </div>
       <div className="shrink-0">
@@ -126,6 +130,7 @@ export function DatetimeScheduleFields({
           valueMinutes={durationMin}
           onChangeMinutes={onDur}
           aria-label="Duration"
+          disabled={!hasStartTime}
         />
       </div>
     </ScheduleTimeRow>
