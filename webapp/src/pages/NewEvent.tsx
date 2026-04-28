@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import { api } from "@/lib/api";
-import { TIME_INPUT_CLASS } from "@/lib/showTiming";
+import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
 import type { Event, Venue } from "@/lib/types";
 import type { Department } from "../../../backend/src/types";
 import { Button } from "@/components/ui/button";
@@ -281,13 +281,15 @@ export default function NewEvent() {
                 <FormField control={form.control} name="description" render={({ field }) => (
                   <FormItem><FormLabel className="text-white/70 text-sm">Description</FormLabel><FormControl><Textarea {...field} value={field.value ?? ""} placeholder="General event description..." className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-none" rows={3} /></FormControl></FormItem>
                 )} />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <FormField control={form.control} name="startDate" render={({ field }) => (
-                    <FormItem><FormLabel className="text-white/70 text-sm">Start Date & Time *</FormLabel><FormControl><Input {...field} type="datetime-local" className="bg-white/5 border-white/10 text-white focus:border-white/30 [color-scheme:dark]" /></FormControl><FormMessage className="text-red-400 text-xs" /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="endDate" render={({ field }) => (
-                    <FormItem><FormLabel className="text-white/70 text-sm">End Date & Time</FormLabel><FormControl><Input {...field} value={field.value ?? ""} type="datetime-local" className="bg-white/5 border-white/10 text-white focus:border-white/30 [color-scheme:dark]" /></FormControl></FormItem>
-                  )} />
+                <div className="space-y-2">
+                  <FormLabel className="text-white/70 text-sm">Schedule *</FormLabel>
+                  <DatetimeScheduleFields
+                    startValue={form.watch("startDate")}
+                    endValue={form.watch("endDate") ?? ""}
+                    onStartChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
+                    onEndChange={(v) => form.setValue("endDate", v, { shouldDirty: true })}
+                  />
+                  <FormMessage className="text-red-400 text-xs">{form.formState.errors.startDate?.message}</FormMessage>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <FormField control={form.control} name="status" render={({ field }) => (
@@ -326,12 +328,12 @@ export default function NewEvent() {
                     <FormItem><FormLabel className="text-white/70 text-sm">Get-in date</FormLabel><FormControl><Input {...field} value={field.value ?? ""} type="date" className="bg-white/5 border-white/10 text-white focus:border-white/30 [color-scheme:dark]" /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="getInTime" render={({ field }) => (
-                    <FormItem><FormLabel className="text-white/70 text-sm">Get-in time</FormLabel><FormControl><Input {...field} value={field.value ?? ""} type="time" className={`${TIME_INPUT_CLASS} max-w-[5.75rem]`} /></FormControl></FormItem>
+                    <FormItem><FormLabel className="text-white/70 text-sm">Get-in time</FormLabel><FormControl><Input {...field} value={field.value ?? ""} placeholder="HH:mm" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 max-w-[8rem]" /></FormControl></FormItem>
                   )} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <FormField control={form.control} name="setupTime" render={({ field }) => (
-                    <FormItem><FormLabel className="text-white/70 text-sm">Setup time</FormLabel><FormControl><Input {...field} value={field.value ?? ""} type="time" className={`${TIME_INPUT_CLASS} max-w-[5.75rem]`} /></FormControl></FormItem>
+                    <FormItem><FormLabel className="text-white/70 text-sm">Setup time</FormLabel><FormControl><Input {...field} value={field.value ?? ""} placeholder="HH:mm" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 max-w-[8rem]" /></FormControl></FormItem>
                   )} />
                   <FormField control={form.control} name="stageSize" render={({ field }) => (
                     <FormItem><FormLabel className="text-white/70 text-sm">Stage size</FormLabel><FormControl><Input {...field} value={field.value ?? ""} placeholder="e.g. 12m × 8m" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" /></FormControl></FormItem>

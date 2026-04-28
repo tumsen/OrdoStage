@@ -21,6 +21,7 @@ import {
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { toast } from "@/hooks/use-toast";
+import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
 import type { CalendarItem } from "./scheduleUtils";
 import type {
   EventDetail,
@@ -188,16 +189,15 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
         <Input className={`${inp} mt-1`} value={title} onChange={(e) => setTitle(e.target.value)} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className={lbl}>Start</Label>
-          <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-            className="w-full mt-1 h-9 px-3 text-sm bg-white/5 border border-white/10 rounded-md text-white focus:outline-none focus:border-white/30" />
-        </div>
-        <div>
-          <Label className={lbl}>End</Label>
-          <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-            className="w-full mt-1 h-9 px-3 text-sm bg-white/5 border border-white/10 rounded-md text-white focus:outline-none focus:border-white/30" />
+      <div>
+        <Label className={lbl}>Schedule</Label>
+        <div className="mt-1">
+          <DatetimeScheduleFields
+            startValue={startDate}
+            endValue={endDate}
+            onStartChange={setStartDate}
+            onEndChange={setEndDate}
+          />
         </div>
       </div>
 
@@ -388,16 +388,15 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
         <Input className={`${inp} mt-1`} value={title} onChange={(e) => setTitle(e.target.value)} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className={lbl}>Start</Label>
-          <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-            className="w-full mt-1 h-9 px-3 text-sm bg-white/5 border border-white/10 rounded-md text-white focus:outline-none focus:border-white/30" />
-        </div>
-        <div>
-          <Label className={lbl}>End</Label>
-          <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-            className="w-full mt-1 h-9 px-3 text-sm bg-white/5 border border-white/10 rounded-md text-white focus:outline-none focus:border-white/30" />
+      <div>
+        <Label className={lbl}>Schedule</Label>
+        <div className="mt-1">
+          <DatetimeScheduleFields
+            startValue={startDate}
+            endValue={endDate}
+            onStartChange={setStartDate}
+            onEndChange={setEndDate}
+          />
         </div>
       </div>
 

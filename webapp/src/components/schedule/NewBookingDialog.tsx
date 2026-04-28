@@ -29,6 +29,7 @@ import {
 import { api } from "@/lib/api";
 import type { CreateInternalBooking, Venue, Person } from "../../../../backend/src/types";
 import { toast } from "@/hooks/use-toast";
+import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
 
 interface NewBookingDialogProps {
   open: boolean;
@@ -153,42 +154,15 @@ export function NewBookingDialog({ open, onClose, venues, people, initialSlot }:
             />
 
             {/* Date range */}
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className={labelClass}>Start *</FormLabel>
-                    <FormControl>
-                      <input
-                        type="datetime-local"
-                        {...field}
-                        className="w-full h-9 px-3 text-sm bg-white/5 border border-white/10 rounded-md text-white focus:outline-none focus:border-white/30"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            <div className="space-y-2">
+              <FormLabel className={labelClass}>Schedule *</FormLabel>
+              <DatetimeScheduleFields
+                startValue={form.watch("startDate")}
+                endValue={form.watch("endDate") ?? ""}
+                onStartChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
+                onEndChange={(v) => form.setValue("endDate", v, { shouldDirty: true })}
               />
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className={labelClass}>End</FormLabel>
-                    <FormControl>
-                      <input
-                        type="datetime-local"
-                        {...field}
-                        value={field.value ?? ""}
-                        className="w-full h-9 px-3 text-sm bg-white/5 border border-white/10 rounded-md text-white focus:outline-none focus:border-white/30"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormMessage>{form.formState.errors.startDate?.message}</FormMessage>
             </div>
 
             {/* Description */}

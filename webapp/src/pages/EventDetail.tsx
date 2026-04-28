@@ -12,6 +12,7 @@ import type { Department } from "../../../backend/src/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
+import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
 import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -382,32 +383,15 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Start</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="datetime-local" className="bg-white/5 border-white/10 text-white focus:border-white/30 [color-scheme:dark]" />
-                    </FormControl>
-                    <FormMessage className="text-red-400 text-xs" />
-                  </FormItem>
-                )}
+            <div className="space-y-2">
+              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Schedule</FormLabel>
+              <DatetimeScheduleFields
+                startValue={form.watch("startDate")}
+                endValue={form.watch("endDate") ?? ""}
+                onStartChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
+                onEndChange={(v) => form.setValue("endDate", v, { shouldDirty: true })}
               />
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">End</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value ?? ""} type="datetime-local" className="bg-white/5 border-white/10 text-white focus:border-white/30 [color-scheme:dark]" />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+              <FormMessage className="text-red-400 text-xs">{form.formState.errors.startDate?.message}</FormMessage>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -1067,6 +1051,105 @@ function ShowTimeEditor({
   );
 }
 
+function ShowTimingInlineEditor({
+  label,
+  date,
+  start,
+  durationMinutes,
+  onChange,
+}: {
+  label: string;
+  date: string;
+  start: string | null;
+  durationMinutes: number | null;
+  onChange: (patch: { start?: string; durationMinutes?: number | null }) => void;
+}) {
+  const [localStart, setLocalStart] = useState(start ?? "");
+  const [localDuration, setLocalDuration] = useState(String(durationMinutes ?? 0));
+  const [localEnd, setLocalEnd] = useState("");
+  const refStart = useRef<SplitTimeFieldHandle>(null);
+  const refEnd = useRef<SplitTimeFieldHandle>(null);
+  const refDur = useRef<SplitTimeFieldHandle>(null);
+
+  useEffect(() => {
+    const st = start ?? "";
+    const dur = durationMinutes ?? 0;
+    setLocalStart(st);
+    setLocalDuration(String(dur));
+    setLocalEnd(st && dur > 0 ? endTimeFromStartAndDuration(st, dur) : "");
+  }, [start, durationMinutes, date]);
+
+  return (
+    <div className="space-y-1.5">
+      <FieldLabel>{label}</FieldLabel>
+      <div className="flex flex-nowrap items-end gap-2 overflow-x-auto pb-0.5">
+        <div className="shrink-0">
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide block mb-1">Date</Label>
+          <Input
+            type="date"
+            value={date}
+            readOnly
+            className="w-[10.5rem] min-w-[10.5rem] bg-white/5 border-white/10 text-white/70 [color-scheme:dark]"
+          />
+        </div>
+        <div className="shrink-0">
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide block mb-1">Start</Label>
+          <SplitTimeInput
+            ref={refStart}
+            value={localStart}
+            nextFieldRef={refEnd}
+            aria-label={`${label} start`}
+            onChange={(v) => {
+              setLocalStart(v);
+              onChange({ start: v });
+              const d = Number(localDuration);
+              if (v && Number.isFinite(d) && d > 0) {
+                setLocalEnd(endTimeFromStartAndDuration(v, d));
+              }
+            }}
+          />
+        </div>
+        <div className="shrink-0">
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide block mb-1">End</Label>
+          <SplitTimeInput
+            ref={refEnd}
+            value={localEnd}
+            nextFieldRef={refDur}
+            aria-label={`${label} end`}
+            onChange={(v) => {
+              setLocalEnd(v);
+              if (localStart && v) {
+                const dm = durationMinutesBetween(localStart, v);
+                if (dm) {
+                  setLocalDuration(String(dm));
+                  onChange({ durationMinutes: dm });
+                }
+              }
+            }}
+          />
+        </div>
+        <div className="shrink-0">
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide block mb-1">Duration</Label>
+          <SplitDurationHhMmInput
+            ref={refDur}
+            valueMinutes={Number(localDuration) || 0}
+            aria-label={`${label} duration`}
+            onChangeMinutes={(m) => {
+              setLocalDuration(String(m));
+              onChange({ durationMinutes: m > 0 ? m : null });
+              if (localStart && m > 0) {
+                setLocalEnd(endTimeFromStartAndDuration(localStart, m));
+              } else if (!m) {
+                setLocalEnd("");
+              }
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── People Tab ───────────────────────────────────────────────────────────────
 
 function PeopleTab({ event }: { event: EventDetail }) {
@@ -1393,15 +1476,6 @@ function ShowEventCard({
   removeStaff: { mutate: (a: { showId: string; personId: string }) => void };
   upsertStaff: { mutate: (a: { showId: string; body: Record<string, unknown> }) => void; isPending: boolean };
 }) {
-  const refGetIn = useRef<SplitTimeFieldHandle>(null);
-  const refGetInDur = useRef<SplitTimeFieldHandle>(null);
-  const refReh = useRef<SplitTimeFieldHandle>(null);
-  const refSound = useRef<SplitTimeFieldHandle>(null);
-  const refBreak = useRef<SplitTimeFieldHandle>(null);
-  const refGetOut = useRef<SplitTimeFieldHandle>(null);
-  const refMeet = useRef<SplitTimeFieldHandle>(null);
-  const refMeetDur = useRef<SplitTimeFieldHandle>(null);
-
   const patch = (body: Record<string, unknown>) => updateShow.mutate({ showId: show.id, body });
   const draft = staffDraft[show.id] || { personId: "", role: "", meetingTime: "", meetingDurationMinutes: "60" };
 
@@ -1445,67 +1519,67 @@ function ShowEventCard({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div>
-          <FieldLabel>Get-in time</FieldLabel>
-          <SplitTimeInput
-            ref={refGetIn}
-            nextFieldRef={refGetInDur}
-            value={show.getInTime || ""}
-            onChange={(v) => patch({ getInTime: v })}
-            aria-label="Get-in time"
-          />
-        </div>
-        <div>
-          <FieldLabel>Get-in duration</FieldLabel>
-          <SplitDurationHhMmInput
-            ref={refGetInDur}
-            nextFieldRef={refReh}
-            valueMinutes={show.getInDurationMinutes ?? 0}
-            onChangeMinutes={(m) => patch({ getInDurationMinutes: m > 0 ? m : null })}
-            aria-label="Get-in duration"
-          />
-        </div>
-        <div>
-          <FieldLabel>Rehearsal time</FieldLabel>
-          <SplitTimeInput
-            ref={refReh}
-            nextFieldRef={refSound}
-            value={show.rehearsalTime || ""}
-            onChange={(v) => patch({ rehearsalTime: v })}
-            aria-label="Rehearsal time"
-          />
-        </div>
-        <div>
-          <FieldLabel>Soundcheck time</FieldLabel>
-          <SplitTimeInput
-            ref={refSound}
-            nextFieldRef={refBreak}
-            value={show.soundcheckTime || ""}
-            onChange={(v) => patch({ soundcheckTime: v })}
-            aria-label="Soundcheck time"
-          />
-        </div>
-        <div>
-          <FieldLabel>Break time</FieldLabel>
-          <SplitTimeInput
-            ref={refBreak}
-            nextFieldRef={refGetOut}
-            value={show.breakTime || ""}
-            onChange={(v) => patch({ breakTime: v })}
-            aria-label="Break time"
-          />
-        </div>
-        <div>
-          <FieldLabel>Get-out time</FieldLabel>
-          <SplitTimeInput
-            ref={refGetOut}
-            nextFieldRef={refMeet}
-            value={show.getOutTime || ""}
-            onChange={(v) => patch({ getOutTime: v })}
-            aria-label="Get-out time"
-          />
-        </div>
+      <div className="space-y-3">
+        <ShowTimingInlineEditor
+          label="Get-in"
+          date={show.showDate.slice(0, 10)}
+          start={show.getInTime}
+          durationMinutes={show.getInDurationMinutes}
+          onChange={(p) =>
+            patch({
+              ...(p.start !== undefined ? { getInTime: p.start } : {}),
+              ...(p.durationMinutes !== undefined ? { getInDurationMinutes: p.durationMinutes } : {}),
+            })
+          }
+        />
+        <ShowTimingInlineEditor
+          label="Rehearsal"
+          date={show.showDate.slice(0, 10)}
+          start={show.rehearsalTime}
+          durationMinutes={show.rehearsalDurationMinutes}
+          onChange={(p) =>
+            patch({
+              ...(p.start !== undefined ? { rehearsalTime: p.start } : {}),
+              ...(p.durationMinutes !== undefined ? { rehearsalDurationMinutes: p.durationMinutes } : {}),
+            })
+          }
+        />
+        <ShowTimingInlineEditor
+          label="Soundcheck"
+          date={show.showDate.slice(0, 10)}
+          start={show.soundcheckTime}
+          durationMinutes={show.soundcheckDurationMinutes}
+          onChange={(p) =>
+            patch({
+              ...(p.start !== undefined ? { soundcheckTime: p.start } : {}),
+              ...(p.durationMinutes !== undefined ? { soundcheckDurationMinutes: p.durationMinutes } : {}),
+            })
+          }
+        />
+        <ShowTimingInlineEditor
+          label="Break"
+          date={show.showDate.slice(0, 10)}
+          start={show.breakTime}
+          durationMinutes={show.breakDurationMinutes}
+          onChange={(p) =>
+            patch({
+              ...(p.start !== undefined ? { breakTime: p.start } : {}),
+              ...(p.durationMinutes !== undefined ? { breakDurationMinutes: p.durationMinutes } : {}),
+            })
+          }
+        />
+        <ShowTimingInlineEditor
+          label="Get-out"
+          date={show.showDate.slice(0, 10)}
+          start={show.getOutTime}
+          durationMinutes={show.getOutDurationMinutes}
+          onChange={(p) =>
+            patch({
+              ...(p.start !== undefined ? { getOutTime: p.start } : {}),
+              ...(p.durationMinutes !== undefined ? { getOutDurationMinutes: p.durationMinutes } : {}),
+            })
+          }
+        />
       </div>
 
       <div className="rounded border border-white/10 p-3 space-y-2">
@@ -1551,30 +1625,29 @@ function ShowEventCard({
               className="bg-white/5 border-white/10 text-white w-full"
             />
           </div>
-          <div>
-            <FieldLabel>Meeting time</FieldLabel>
-            <SplitTimeInput
-              ref={refMeet}
-              nextFieldRef={refMeetDur}
-              value={draft.meetingTime}
-              onChange={(v) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, meetingTime: v } }))}
-              aria-label="Meeting time"
+          <div className="sm:col-span-2 lg:col-span-2">
+            <ShowTimingInlineEditor
+              label="Meeting"
+              date={show.showDate.slice(0, 10)}
+              start={draft.meetingTime || null}
+              durationMinutes={draft.meetingDurationMinutes ? Number(draft.meetingDurationMinutes) : null}
+              onChange={(p) =>
+                setStaffDraft((prev) => {
+                  const row = prev[show.id] || { personId: "", role: "", meetingTime: "", meetingDurationMinutes: "60" };
+                  return {
+                    ...prev,
+                    [show.id]: {
+                      ...row,
+                      ...(p.start !== undefined ? { meetingTime: p.start ?? "" } : {}),
+                      ...(p.durationMinutes !== undefined
+                        ? { meetingDurationMinutes: p.durationMinutes ? String(p.durationMinutes) : "0" }
+                        : {}),
+                    },
+                  };
+                })
+              }
             />
-          </div>
-          <div>
-            <FieldLabel>Duration</FieldLabel>
-            <div className="flex gap-2">
-              <SplitDurationHhMmInput
-                ref={refMeetDur}
-                valueMinutes={Number(draft.meetingDurationMinutes) || 0}
-                onChangeMinutes={(m) =>
-                  setStaffDraft((p) => ({
-                    ...p,
-                    [show.id]: { ...draft, meetingDurationMinutes: String(m) },
-                  }))
-                }
-                aria-label="Meeting duration"
-              />
+            <div className="pt-2">
               <Button
                 size="sm"
                 className="bg-red-900 hover:bg-red-800 text-white shrink-0"
