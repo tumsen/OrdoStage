@@ -142,11 +142,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
   const onHBlur = () => {
     const h2 = onlyDigits2(hh);
     const m2 = onlyDigits2(mm);
-    if (h2.length === 1) {
-      const p = h2.padStart(2, "0");
-      setHh(p);
-      if (m2.length === 2) emit(p, m2, false);
-    } else if (h2.length === 2) {
+    if (h2.length === 2) {
       if (mode === "clock") {
         const hhN = Math.min(23, Math.max(0, parseInt(h2, 10) || 0));
         setHh(String(hhN).padStart(2, "0"));
@@ -165,11 +161,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
   const onMBlur = () => {
     const h2 = onlyDigits2(hh);
     const m2 = onlyDigits2(mm);
-    if (m2.length === 1) {
-      const p = m2.padStart(2, "0");
-      setMm(p);
-      if (h2.length === 2) emit(h2, p, false);
-    } else if (h2.length === 2 && m2.length === 2) {
+    if (h2.length === 2 && m2.length === 2) {
       if (mode === "clock") {
         const mmN = Math.min(59, Math.max(0, parseInt(m2, 10) || 0));
         const mmP = String(mmN).padStart(2, "0");
