@@ -20,6 +20,19 @@ function onlyDigits2(raw: string): string {
   return raw.replace(/\D/g, "").slice(0, 2);
 }
 
+function focusSegment(input: HTMLInputElement | null) {
+  if (!input) return;
+  input.focus();
+  // Always start at first digit so two fresh digits can be entered.
+  requestAnimationFrame(() => {
+    try {
+      input.setSelectionRange(0, input.value.length);
+    } catch {
+      // noop
+    }
+  });
+}
+
 type SplitHhMmProps = {
   value: string;
   onChange: (next: string) => void;
@@ -91,8 +104,8 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
   useImperativeHandle(
     ref,
     () => ({
-      focusHours: () => hRef.current?.focus(),
-      focusMinutes: () => mRef.current?.focus(),
+      focusHours: () => focusSegment(hRef.current),
+      focusMinutes: () => focusSegment(mRef.current),
     }),
     []
   );
@@ -102,8 +115,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
     setHh(raw);
     if (raw.length === 2) {
       const mmNum = onlyDigits2(mm);
-      mRef.current?.focus();
-      mRef.current?.select();
+      focusSegment(mRef.current);
       if (mmNum.length === 2) emit(raw, mmNum, false);
     } else {
       if (!raw && !mm) {
@@ -173,18 +185,18 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
   const onHKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowRight" && (e.target as HTMLInputElement).selectionStart === 2) {
       e.preventDefault();
-      mRef.current?.focus();
+      focusSegment(mRef.current);
     }
   };
 
   const onMKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace" && (e.target as HTMLInputElement).value.length === 0) {
       e.preventDefault();
-      hRef.current?.focus();
+      focusSegment(hRef.current);
     }
     if (e.key === "ArrowLeft" && (e.target as HTMLInputElement).selectionStart === 0) {
       e.preventDefault();
-      hRef.current?.focus();
+      focusSegment(hRef.current);
     }
   };
 
@@ -195,7 +207,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
       setHh(onlyDigits2(t[1] ?? ""));
       setMm(onlyDigits2(t[2] ?? ""));
       emit(onlyDigits2(t[1] ?? ""), onlyDigits2(t[2] ?? ""), true);
-      if (onlyDigits2(t[2] ?? "").length < 2) mRef.current?.focus();
+      if (onlyDigits2(t[2] ?? "").length < 2) focusSegment(mRef.current);
     }
   };
 
@@ -221,6 +233,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
         placeholder="00"
         className={SEG}
         value={hh}
+        onFocus={(e) => e.currentTarget.select()}
         onInput={onHInput}
         onKeyDown={onHKeyDown}
         onBlur={onHBlur}
@@ -240,6 +253,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
         placeholder="00"
         className={SEG}
         value={mm}
+        onFocus={(e) => e.currentTarget.select()}
         onInput={onMInput}
         onKeyDown={onMKeyDown}
         onBlur={onMBlur}
