@@ -57,7 +57,11 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
     if (!v || !v.includes(":")) return { hh: "", mm: "" };
     const p = v.trim().split(":");
     if (p.length < 2) return { hh: "", mm: "" };
-    return { hh: onlyDigits2(p[0] ?? ""), mm: onlyDigits2(p[1] ?? "") };
+    const hhRaw = onlyDigits2(p[0] ?? "");
+    const mmRaw = onlyDigits2(p[1] ?? "");
+    const hh = hhRaw.length === 1 ? hhRaw.padStart(2, "0") : hhRaw;
+    const mm = mmRaw.length === 1 ? mmRaw.padStart(2, "0") : mmRaw;
+    return { hh, mm };
   };
 
   const [hh, setHh] = useState(() => fromProp(value).hh);
@@ -142,6 +146,10 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
   const onHBlur = () => {
     const h2 = onlyDigits2(hh);
     const m2 = onlyDigits2(mm);
+    if (h2.length === 1) {
+      setHh("");
+      return;
+    }
     if (h2.length === 2) {
       if (mode === "clock") {
         const hhN = Math.min(23, Math.max(0, parseInt(h2, 10) || 0));
@@ -161,6 +169,10 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
   const onMBlur = () => {
     const h2 = onlyDigits2(hh);
     const m2 = onlyDigits2(mm);
+    if (m2.length === 1) {
+      setMm("");
+      return;
+    }
     if (h2.length === 2 && m2.length === 2) {
       if (mode === "clock") {
         const mmN = Math.min(59, Math.max(0, parseInt(m2, 10) || 0));

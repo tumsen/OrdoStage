@@ -23,8 +23,10 @@ export function DateInputWithWeekday({
   const ref = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="space-y-1">
-      <div className={cn("text-[11px] text-white/45", weekdayClassName)}>{formatWeekdayDate(value)}</div>
+    <div className="flex items-center gap-2">
+      <div className={cn("text-[11px] text-white/45 whitespace-nowrap", weekdayClassName)}>
+        {formatWeekdayDate(value)}
+      </div>
       <input
         ref={ref}
         type="date"
