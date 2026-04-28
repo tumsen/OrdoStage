@@ -29,7 +29,7 @@ export function durationMinutesBetween(start: string, end: string): number | nul
   if (a === null || b === null) return null;
   let d = b - a;
   if (d < 0) d += 24 * 60;
-  if (d === 0) return null;
+  if (d === 0) return 24 * 60;
   return d;
 }
 

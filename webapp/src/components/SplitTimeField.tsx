@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } from "react";
 
+import { usePreferences } from "@/hooks/usePreferences";
 import { durationHhMmToTotalMinutes, totalMinutesToDurationHhMm } from "@/lib/showTiming";
 
 const WRAPPER = "inline-flex items-center gap-0.5 shrink-0 w-[5.75rem] justify-center rounded-md border border-white/10 bg-white/5 py-0.5 px-0.5 [color-scheme:dark]";
@@ -11,6 +12,7 @@ const SEG = cn(
   "rounded px-0.5 focus:outline-none focus:ring-1 focus:ring-red-500/50",
   "placeholder:text-white/20",
 );
+const AMPM_BTN = "h-9 rounded px-1.5 text-[10px] font-medium border border-white/10";
 
 export type SplitTimeFieldHandle = { focusHours: () => void; focusMinutes: () => void };
 
@@ -52,6 +54,23 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
   const hRef = useRef<HTMLInputElement>(null);
   const mRef = useRef<HTMLInputElement>(null);
   const lastEmitted = useRef(value);
+  const { effective } = usePreferences();
+  const is12h = mode === "clock" && effective?.timeFormat === "12h";
+
+  const to12h = (hh24: string) => {
+    const h = parseInt(hh24, 10);
+    if (!Number.isFinite(h)) return { hh12: "", meridiem: "AM" as const };
+    const meridiem = h >= 12 ? "PM" as const : "AM" as const;
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return { hh12: String(h12).padStart(2, "0"), meridiem };
+  };
+  const to24h = (hh12: string, meridiem: "AM" | "PM") => {
+    const h = parseInt(hh12, 10);
+    if (!Number.isFinite(h) || h < 1 || h > 12) return "";
+    let h24 = h % 12;
+    if (meridiem === "PM") h24 += 12;
+    return String(h24).padStart(2, "0");
+  };
 
   const fromProp = (v: string) => {
     if (!v || !v.includes(":")) return { hh: "", mm: "" };
@@ -61,26 +80,50 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
     const mmRaw = onlyDigits2(p[1] ?? "");
     const hh = hhRaw.length === 1 ? hhRaw.padStart(2, "0") : hhRaw;
     const mm = mmRaw.length === 1 ? mmRaw.padStart(2, "0") : mmRaw;
+    if (is12h && hh.length === 2) {
+      const conv = to12h(hh);
+      return { hh: conv.hh12, mm };
+    }
     return { hh, mm };
   };
 
   const [hh, setHh] = useState(() => fromProp(value).hh);
   const [mm, setMm] = useState(() => fromProp(value).mm);
+  const [meridiem, setMeridiem] = useState<"AM" | "PM">(() => {
+    const parts = value?.split(":");
+    if (is12h && parts?.[0]) return to12h(parts[0]).meridiem;
+    return "AM";
+  });
 
   useEffect(() => {
     if (value === lastEmitted.current) return;
     const s = fromProp(value);
     setHh(s.hh);
     setMm(s.mm);
+    if (is12h && value?.includes(":")) {
+      const p = value.split(":");
+      if (p[0]) setMeridiem(to12h(p[0]).meridiem);
+    }
     lastEmitted.current = value;
-  }, [value]);
+  }, [value, is12h]);
 
   const emit = (h: string, m: string, afterMinutesFilled?: boolean) => {
     const h2 = onlyDigits2(h);
     const m2 = onlyDigits2(m);
     if (h2.length === 2 && m2.length === 2) {
       if (mode === "clock") {
-        const t = `${h2}:${m2}`;
+        const mmN = parseInt(m2, 10);
+        if (!Number.isFinite(mmN) || mmN < 0 || mmN > 59) return;
+        let t = "";
+        if (is12h) {
+          const hh24 = to24h(h2, meridiem);
+          if (!hh24) return;
+          t = `${hh24}:${m2}`;
+        } else {
+          const hhN = parseInt(h2, 10);
+          if (!Number.isFinite(hhN) || hhN < 0 || hhN > 23) return;
+          t = `${h2}:${m2}`;
+        }
         lastEmitted.current = t;
         onChange(t);
         if (afterMinutesFilled) {
@@ -150,7 +193,21 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
     }
     if (h2.length === 2) {
       if (mode === "clock") {
-        setHh(h2);
+        if (is12h) {
+          const hN = parseInt(h2, 10);
+          if (!Number.isFinite(hN) || hN < 1 || hN > 12) {
+            setHh("");
+            return;
+          }
+          setHh(String(hN).padStart(2, "0"));
+        } else {
+          const hN = parseInt(h2, 10);
+          if (!Number.isFinite(hN) || hN < 0 || hN > 23) {
+            setHh("");
+            return;
+          }
+          setHh(String(hN).padStart(2, "0"));
+        }
         if (m2.length === 2) emit(h2, m2, false);
       } else if (m2.length === 2) {
         emit(h2, m2, false);
@@ -167,7 +224,12 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
     }
     if (h2.length === 2 && m2.length === 2) {
       if (mode === "clock") {
-        setMm(m2);
+        const mmN = parseInt(m2, 10);
+        if (!Number.isFinite(mmN) || mmN < 0 || mmN > 59) {
+          setMm("");
+          return;
+        }
+        setMm(String(mmN).padStart(2, "0"));
         emit(h2, m2, false);
       } else {
         emit(h2, m2, false);
@@ -253,6 +315,32 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(function
         onPaste={onPasteM}
         aria-label={ariaLabel ? `${ariaLabel} minutes` : "Minutes"}
       />
+      {is12h ? (
+        <div className="ml-1 inline-flex h-9 items-center rounded border border-white/10 bg-white/5 overflow-hidden">
+          <button
+            type="button"
+            className={cn(AMPM_BTN, meridiem === "AM" ? "bg-white/15 text-white" : "text-white/60")}
+            onClick={() => {
+              setMeridiem("AM");
+              emit(hh, mm, false);
+            }}
+            aria-label={ariaLabel ? `${ariaLabel} AM` : "AM"}
+          >
+            AM
+          </button>
+          <button
+            type="button"
+            className={cn(AMPM_BTN, meridiem === "PM" ? "bg-white/15 text-white" : "text-white/60")}
+            onClick={() => {
+              setMeridiem("PM");
+              emit(hh, mm, false);
+            }}
+            aria-label={ariaLabel ? `${ariaLabel} PM` : "PM"}
+          >
+            PM
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 });
