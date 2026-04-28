@@ -146,11 +146,13 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
     };
 
     const onHKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "ArrowRight") { e.preventDefault(); focusAndSelect(mRef.current); }
+      if (e.key === "ArrowRight" && hh.length === 2) { e.preventDefault(); focusAndSelect(mRef.current); }
       if (e.key === "Enter") {
         e.preventDefault();
-        skipHBlur.current = true;
-        focusAndSelect(mRef.current);
+        if (hh.length === 2) {
+          skipHBlur.current = true;
+          focusAndSelect(mRef.current);
+        }
       }
     };
 
