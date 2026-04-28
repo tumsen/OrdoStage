@@ -147,6 +147,13 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
 
     const onHKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "ArrowRight") { e.preventDefault(); focusAndSelect(mRef.current); }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const zero = is12h ? "12" : "00";
+        setHh(zero);
+        skipHBlur.current = true;
+        focusAndSelect(mRef.current);
+      }
     };
 
     /* ── MM ── */
@@ -181,6 +188,15 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
         e.preventDefault();
         skipMBlur.current = true;
         focusAndSelect(hRef.current);
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const newMm = "00";
+        setMm(newMm);
+        // use current hh (or "00" if empty) to commit
+        const h = hh.length === 2 ? hh : (is12h ? "12" : "00");
+        if (hh.length !== 2) setHh(h);
+        commit(h, newMm, true);
       }
     };
 
