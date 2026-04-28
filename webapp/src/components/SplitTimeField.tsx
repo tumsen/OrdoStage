@@ -149,8 +149,12 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
       if (e.key === "ArrowRight") { e.preventDefault(); focusAndSelect(mRef.current); }
       if (e.key === "Enter") {
         e.preventDefault();
-        const zero = is12h ? "12" : "00";
-        setHh(zero);
+        if (is12h) {
+          setHh("08");
+          setIsAM(false); // 8 PM
+        } else {
+          setHh("20");
+        }
         skipHBlur.current = true;
         focusAndSelect(mRef.current);
       }
@@ -194,8 +198,11 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
         const newMm = "00";
         setMm(newMm);
         // use current hh (or "00" if empty) to commit
-        const h = hh.length === 2 ? hh : (is12h ? "12" : "00");
-        if (hh.length !== 2) setHh(h);
+        let h = hh.length === 2 ? hh : (is12h ? "08" : "20");
+        if (hh.length !== 2) {
+          setHh(h);
+          if (is12h) setIsAM(false); // default 8 PM
+        }
         commit(h, newMm, true);
       }
     };
