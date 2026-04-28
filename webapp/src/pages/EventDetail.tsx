@@ -11,6 +11,12 @@ import type { EventDetail, EventTeam, EventTeamNote, Person, EventPerson, Docume
 import type { Department } from "../../../backend/src/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
+import {
+  DURATION_MINUTES_INPUT_CLASS,
+  TIME_INPUT_CLASS,
+  durationMinutesBetween,
+  endTimeFromStartAndDuration,
+} from "@/lib/showTiming";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -530,7 +536,12 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
                   <FormItem>
                     <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in Time</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value ?? ""} placeholder="e.g. 14:00" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
+                      <Input
+                        {...field}
+                        value={field.value ?? ""}
+                        type="time"
+                        className={`${TIME_INPUT_CLASS} max-w-[5.75rem]`}
+                      />
                     </FormControl>
                   </FormItem>
                 )}
@@ -542,7 +553,12 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
                   <FormItem>
                     <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Setup Time</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value ?? ""} placeholder="e.g. 09:00" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
+                      <Input
+                        {...field}
+                        value={field.value ?? ""}
+                        type="time"
+                        className={`${TIME_INPUT_CLASS} max-w-[5.75rem]`}
+                      />
                     </FormControl>
                   </FormItem>
                 )}
@@ -901,6 +917,161 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <Label className="text-white/60 text-xs uppercase tracking-wide block mb-1.5">{children}</Label>;
+}
+
+type NewShowFormState = {
+  showDate: string;
+  showTime: string;
+  endTime: string;
+  durationMinutes: string;
+  venueId: string;
+};
+
+function mergeNewShowState(prev: NewShowFormState, patch: Partial<NewShowFormState>): NewShowFormState {
+  const next: NewShowFormState = { ...prev, ...patch };
+  const durN = Number(next.durationMinutes);
+  const durOk = !Number.isNaN(durN) && durN >= 1;
+
+  if (patch.durationMinutes !== undefined && durOk && next.showTime) {
+    next.endTime = endTimeFromStartAndDuration(next.showTime, durN);
+  } else if (patch.endTime !== undefined && next.showTime && next.endTime) {
+    const dm = durationMinutesBetween(next.showTime, next.endTime);
+    if (dm) next.durationMinutes = String(dm);
+  } else if (patch.showTime !== undefined) {
+    if (durOk && next.showTime) {
+      next.endTime = endTimeFromStartAndDuration(next.showTime, durN);
+    } else if (next.showTime && next.endTime) {
+      const dm = durationMinutesBetween(next.showTime, next.endTime);
+      if (dm) next.durationMinutes = String(dm);
+    }
+  }
+  return next;
+}
+
+function ShowTimeEditor({
+  show,
+  venues,
+  onUpdate,
+}: {
+  show: EventShow;
+  venues: { id: string; name: string }[] | undefined;
+  onUpdate: (body: Record<string, unknown>) => void;
+}) {
+  const [showDate, setShowDate] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [dur, setDur] = useState("");
+
+  useEffect(() => {
+    setShowDate(show.showDate.slice(0, 10));
+    setStart(show.showTime);
+    setDur(String(show.durationMinutes));
+    setEnd(endTimeFromStartAndDuration(show.showTime, show.durationMinutes));
+  }, [show.id, show.showDate, show.showTime, show.durationMinutes, show.updatedAt]);
+
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <div>
+        <FieldLabel>Date</FieldLabel>
+        <Input
+          type="date"
+          value={showDate}
+          onChange={(e) => {
+            const v = e.target.value;
+            setShowDate(v);
+            onUpdate({ showDate: v });
+          }}
+          className="w-[10.5rem] min-w-[10.5rem] bg-white/5 border-white/10 text-white [color-scheme:dark]"
+        />
+      </div>
+      <div>
+        <FieldLabel>Start</FieldLabel>
+        <Input
+          type="time"
+          value={start}
+          onChange={(e) => {
+            const v = e.target.value;
+            setStart(v);
+            const d = Number(dur);
+            if (!Number.isNaN(d) && d >= 1) {
+              setEnd(endTimeFromStartAndDuration(v, d));
+              onUpdate({ showTime: v });
+            } else if (v && end) {
+              const dm = durationMinutesBetween(v, end);
+              if (dm) {
+                setDur(String(dm));
+                onUpdate({ showTime: v, durationMinutes: dm });
+              } else {
+                onUpdate({ showTime: v });
+              }
+            } else {
+              onUpdate({ showTime: v });
+            }
+          }}
+          className={TIME_INPUT_CLASS}
+        />
+      </div>
+      <div>
+        <FieldLabel>End</FieldLabel>
+        <Input
+          type="time"
+          value={end}
+          onChange={(e) => {
+            const v = e.target.value;
+            setEnd(v);
+            if (start && v) {
+              const dm = durationMinutesBetween(start, v);
+              if (dm) {
+                setDur(String(dm));
+                onUpdate({ durationMinutes: dm });
+              }
+            }
+          }}
+          className={TIME_INPUT_CLASS}
+        />
+      </div>
+      <div>
+        <FieldLabel>Duration (min)</FieldLabel>
+        <Input
+          type="number"
+          min={1}
+          value={dur}
+          onChange={(e) => {
+            const v = e.target.value;
+            setDur(v);
+            const d = Number(v);
+            if (!Number.isNaN(d) && d >= 1) {
+              if (start) setEnd(endTimeFromStartAndDuration(start, d));
+              onUpdate({ durationMinutes: d });
+            }
+          }}
+          className={DURATION_MINUTES_INPUT_CLASS}
+        />
+      </div>
+      <div className="min-w-0 flex-1 max-w-xs">
+        <FieldLabel>Venue</FieldLabel>
+        <Select
+          value={show.venueId}
+          onValueChange={(v) => onUpdate({ venueId: v })}
+        >
+          <SelectTrigger className="bg-white/5 border-white/10 text-white w-full min-w-0">
+            <SelectValue placeholder="Venue" />
+          </SelectTrigger>
+          <SelectContent className="bg-[#16161f] border-white/10 text-white">
+            {(venues ?? []).map((v) => (
+              <SelectItem key={v.id} value={v.id}>
+                {v.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
 // ── People Tab ───────────────────────────────────────────────────────────────
 
 function PeopleTab({ event }: { event: EventDetail }) {
@@ -1215,9 +1386,10 @@ function ShowsTab({ event }: { event: EventDetail }) {
     queryFn: () => api.get<Person[]>("/api/people"),
   });
   const [creating, setCreating] = useState(false);
-  const [newShow, setNewShow] = useState({
+  const [newShow, setNewShow] = useState<NewShowFormState>({
     showDate: "",
     showTime: "",
+    endTime: "",
     durationMinutes: "120",
     venueId: "",
   });
@@ -1233,7 +1405,7 @@ function ShowsTab({ event }: { event: EventDetail }) {
       }),
     onSuccess: () => {
       setCreating(false);
-      setNewShow({ showDate: "", showTime: "", durationMinutes: "120", venueId: "" });
+      setNewShow({ showDate: "", showTime: "", endTime: "", durationMinutes: "120", venueId: "" });
       queryClient.invalidateQueries({ queryKey: ["event", event.id] });
     },
   });
@@ -1270,17 +1442,62 @@ function ShowsTab({ event }: { event: EventDetail }) {
         </Button>
       </div>
       {creating ? (
-        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 grid gap-3 md:grid-cols-4">
-          <Input type="date" value={newShow.showDate} onChange={(e) => setNewShow((s) => ({ ...s, showDate: e.target.value }))} className="bg-white/5 border-white/10 text-white [color-scheme:dark]" />
-          <Input type="time" value={newShow.showTime} onChange={(e) => setNewShow((s) => ({ ...s, showTime: e.target.value }))} className="bg-white/5 border-white/10 text-white [color-scheme:dark]" />
-          <Input type="number" min={1} placeholder="Duration (min)" value={newShow.durationMinutes} onChange={(e) => setNewShow((s) => ({ ...s, durationMinutes: e.target.value }))} className="bg-white/5 border-white/10 text-white" />
-          <Select value={newShow.venueId} onValueChange={(v) => setNewShow((s) => ({ ...s, venueId: v }))}>
-            <SelectTrigger className="bg-white/5 border-white/10 text-white"><SelectValue placeholder="Venue" /></SelectTrigger>
-            <SelectContent className="bg-[#16161f] border-white/10 text-white">
-              {(venues ?? []).map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <div className="md:col-span-4 flex gap-2">
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <FieldLabel>Date</FieldLabel>
+              <Input
+                type="date"
+                value={newShow.showDate}
+                onChange={(e) => setNewShow((s) => mergeNewShowState(s, { showDate: e.target.value }))}
+                className="w-[10.5rem] min-w-[10.5rem] bg-white/5 border-white/10 text-white [color-scheme:dark]"
+              />
+            </div>
+            <div>
+              <FieldLabel>Start</FieldLabel>
+              <Input
+                type="time"
+                value={newShow.showTime}
+                onChange={(e) => setNewShow((s) => mergeNewShowState(s, { showTime: e.target.value }))}
+                className={TIME_INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <FieldLabel>End</FieldLabel>
+              <Input
+                type="time"
+                value={newShow.endTime}
+                onChange={(e) => setNewShow((s) => mergeNewShowState(s, { endTime: e.target.value }))}
+                className={TIME_INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <FieldLabel>Duration (min)</FieldLabel>
+              <Input
+                type="number"
+                min={1}
+                value={newShow.durationMinutes}
+                onChange={(e) => setNewShow((s) => mergeNewShowState(s, { durationMinutes: e.target.value }))}
+                className={DURATION_MINUTES_INPUT_CLASS}
+              />
+            </div>
+            <div className="min-w-0 flex-1 max-w-xs">
+              <FieldLabel>Venue</FieldLabel>
+              <Select value={newShow.venueId} onValueChange={(v) => setNewShow((s) => mergeNewShowState(s, { venueId: v }))}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white w-full min-w-0">
+                  <SelectValue placeholder="Venue" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                  {(venues ?? []).map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
             <Button
               size="sm"
               className="bg-red-900 hover:bg-red-800 text-white"
@@ -1302,17 +1519,18 @@ function ShowsTab({ event }: { event: EventDetail }) {
             const draft = staffDraft[show.id] || { personId: "", role: "", meetingTime: "", meetingDurationMinutes: "60" };
             return (
               <div key={show.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-white">
-                      {new Date(show.showDate).toLocaleDateString()} {show.showTime} - {show.venue?.name}
-                    </p>
-                    <p className="text-xs text-white/45">Duration: {show.durationMinutes} min</p>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <ShowTimeEditor
+                      show={show}
+                      venues={venues}
+                      onUpdate={(body) => updateShow.mutate({ showId: show.id, body })}
+                    />
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-white/30 hover:text-red-400"
+                    className="h-7 w-7 shrink-0 text-white/30 hover:text-red-400"
                     onClick={() => {
                       if (!confirmDeleteAction("show")) return;
                       deleteShow.mutate(show.id);
@@ -1323,27 +1541,87 @@ function ShowsTab({ event }: { event: EventDetail }) {
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
-                  <Textarea
-                    value={show.technicalNotes || ""}
-                    placeholder="Technical tab notes"
-                    onChange={(e) => updateShow.mutate({ showId: show.id, body: { technicalNotes: e.target.value } })}
-                    className="bg-white/5 border-white/10 text-white min-h-[90px]"
-                  />
-                  <Textarea
-                    value={show.fohNotes || ""}
-                    placeholder="FOH tab notes (tickets, bar, hospitality)"
-                    onChange={(e) => updateShow.mutate({ showId: show.id, body: { fohNotes: e.target.value } })}
-                    className="bg-white/5 border-white/10 text-white min-h-[90px]"
-                  />
+                  <div>
+                    <FieldLabel>Technical tab notes</FieldLabel>
+                    <Textarea
+                      value={show.technicalNotes || ""}
+                      placeholder="Lx, rigger, power, load in..."
+                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { technicalNotes: e.target.value } })}
+                      className="bg-white/5 border-white/10 text-white min-h-[90px]"
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>FOH tab notes</FieldLabel>
+                    <Textarea
+                      value={show.fohNotes || ""}
+                      placeholder="Tickets, bar, hospitality…"
+                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { fohNotes: e.target.value } })}
+                      className="bg-white/5 border-white/10 text-white min-h-[90px]"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid gap-2 md:grid-cols-6">
-                  <Input value={show.getInTime || ""} placeholder="Get-in time" onChange={(e) => updateShow.mutate({ showId: show.id, body: { getInTime: e.target.value } })} className="bg-white/5 border-white/10 text-white" />
-                  <Input value={String(show.getInDurationMinutes ?? "")} placeholder="Get-in dur" onChange={(e) => updateShow.mutate({ showId: show.id, body: { getInDurationMinutes: e.target.value ? Number(e.target.value) : null } })} className="bg-white/5 border-white/10 text-white" />
-                  <Input value={show.rehearsalTime || ""} placeholder="Rehearsal time" onChange={(e) => updateShow.mutate({ showId: show.id, body: { rehearsalTime: e.target.value } })} className="bg-white/5 border-white/10 text-white" />
-                  <Input value={show.soundcheckTime || ""} placeholder="Soundcheck time" onChange={(e) => updateShow.mutate({ showId: show.id, body: { soundcheckTime: e.target.value } })} className="bg-white/5 border-white/10 text-white" />
-                  <Input value={show.breakTime || ""} placeholder="Break time" onChange={(e) => updateShow.mutate({ showId: show.id, body: { breakTime: e.target.value } })} className="bg-white/5 border-white/10 text-white" />
-                  <Input value={show.getOutTime || ""} placeholder="Get-out time" onChange={(e) => updateShow.mutate({ showId: show.id, body: { getOutTime: e.target.value } })} className="bg-white/5 border-white/10 text-white" />
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <FieldLabel>Get-in time</FieldLabel>
+                    <Input
+                      type="time"
+                      value={show.getInTime || ""}
+                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { getInTime: e.target.value } })}
+                      className={TIME_INPUT_CLASS}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Get-in (min)</FieldLabel>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={String(show.getInDurationMinutes ?? "")}
+                      onChange={(e) =>
+                        updateShow.mutate({
+                          showId: show.id,
+                          body: { getInDurationMinutes: e.target.value ? Number(e.target.value) : null },
+                        })
+                      }
+                      className={DURATION_MINUTES_INPUT_CLASS}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Rehearsal time</FieldLabel>
+                    <Input
+                      type="time"
+                      value={show.rehearsalTime || ""}
+                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { rehearsalTime: e.target.value } })}
+                      className={TIME_INPUT_CLASS}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Soundcheck time</FieldLabel>
+                    <Input
+                      type="time"
+                      value={show.soundcheckTime || ""}
+                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { soundcheckTime: e.target.value } })}
+                      className={TIME_INPUT_CLASS}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Break time</FieldLabel>
+                    <Input
+                      type="time"
+                      value={show.breakTime || ""}
+                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { breakTime: e.target.value } })}
+                      className={TIME_INPUT_CLASS}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Get-out time</FieldLabel>
+                    <Input
+                      type="time"
+                      value={show.getOutTime || ""}
+                      onChange={(e) => updateShow.mutate({ showId: show.id, body: { getOutTime: e.target.value } })}
+                      className={TIME_INPUT_CLASS}
+                    />
+                  </div>
                 </div>
 
                 <div className="rounded border border-white/10 p-3 space-y-2">
@@ -1363,35 +1641,66 @@ function ShowsTab({ event }: { event: EventDetail }) {
                       </Button>
                     </div>
                   ))}
-                  <div className="grid gap-2 md:grid-cols-4">
-                    <Select value={draft.personId} onValueChange={(v) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, personId: v } }))}>
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white"><SelectValue placeholder="Person" /></SelectTrigger>
-                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                        {(people ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Input value={draft.role} onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, role: e.target.value } }))} placeholder="Role" className="bg-white/5 border-white/10 text-white" />
-                    <Input value={draft.meetingTime} onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, meetingTime: e.target.value } }))} placeholder="Meeting time (HH:mm)" className="bg-white/5 border-white/10 text-white" />
-                    <div className="flex gap-2">
-                      <Input value={draft.meetingDurationMinutes} onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, meetingDurationMinutes: e.target.value } }))} placeholder="Duration" className="bg-white/5 border-white/10 text-white" />
-                      <Button
-                        size="sm"
-                        className="bg-red-900 hover:bg-red-800 text-white"
-                        disabled={!draft.personId || upsertStaff.isPending}
-                        onClick={() =>
-                          upsertStaff.mutate({
-                            showId: show.id,
-                            body: {
-                              personId: draft.personId,
-                              role: draft.role || undefined,
-                              meetingTime: draft.meetingTime || undefined,
-                              meetingDurationMinutes: draft.meetingDurationMinutes ? Number(draft.meetingDurationMinutes) : undefined,
-                            },
-                          })
-                        }
-                      >
-                        Add
-                      </Button>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <FieldLabel>Person</FieldLabel>
+                      <Select value={draft.personId} onValueChange={(v) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, personId: v } }))}>
+                        <SelectTrigger className="bg-white/5 border-white/10 text-white w-full min-w-0">
+                          <SelectValue placeholder="Person" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                          {(people ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <FieldLabel>Role</FieldLabel>
+                      <Input
+                        value={draft.role}
+                        onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, role: e.target.value } }))}
+                        className="bg-white/5 border-white/10 text-white w-full"
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Meeting time</FieldLabel>
+                      <Input
+                        type="time"
+                        value={draft.meetingTime}
+                        onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, meetingTime: e.target.value } }))}
+                        className={TIME_INPUT_CLASS}
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Duration (min)</FieldLabel>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={draft.meetingDurationMinutes}
+                          onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, meetingDurationMinutes: e.target.value } }))}
+                          className={DURATION_MINUTES_INPUT_CLASS}
+                        />
+                        <Button
+                          size="sm"
+                          className="bg-red-900 hover:bg-red-800 text-white shrink-0"
+                          disabled={!draft.personId || upsertStaff.isPending}
+                          onClick={() =>
+                            upsertStaff.mutate({
+                              showId: show.id,
+                              body: {
+                                personId: draft.personId,
+                                role: draft.role || undefined,
+                                meetingTime: draft.meetingTime || undefined,
+                                meetingDurationMinutes: draft.meetingDurationMinutes
+                                  ? Number(draft.meetingDurationMinutes)
+                                  : undefined,
+                              },
+                            })
+                          }
+                        >
+                          Add
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   <p className="text-[11px] text-white/45">Staffing meeting time and duration are added to each person&apos;s work schedule.</p>
