@@ -51,6 +51,8 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
     // set to true right before we programmatically move focus, so blur doesn't validate
     const skipHBlur = useRef(false);
     const skipMBlur = useRef(false);
+    // set when HH auto-jumps to MM so onMFocus keeps the existing value
+    const jumpingToMM = useRef(false);
 
     const { effective } = usePreferences();
     const is12h = mode === "clock" && effective?.timeFormat === "12h";
@@ -133,6 +135,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
         if (!valid) { setHh(""); return; }
         // Flag BEFORE focus() — focus() fires onHBlur synchronously with stale state
         skipHBlur.current = true;
+        jumpingToMM.current = true;
         focusAndSelect(mRef.current);
         if (mm.length === 2) commit(next, mm, false);
       }
@@ -151,6 +154,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
         e.preventDefault();
         if (hh.length === 2) {
           skipHBlur.current = true;
+          jumpingToMM.current = true;
           focusAndSelect(mRef.current);
         }
       }
@@ -158,6 +162,12 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
 
     /* ── MM ── */
     const onMFocus = () => {
+      if (jumpingToMM.current) {
+        // Auto-jumped from HH — keep existing MM value visible, just select it
+        jumpingToMM.current = false;
+        savedMm.current = mm;
+        return;
+      }
       savedMm.current = mm;
       setMm("");
     };
