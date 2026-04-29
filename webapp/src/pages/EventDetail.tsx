@@ -1487,6 +1487,25 @@ function ShowEventCard({
   const patch = (body: Record<string, unknown>) => updateShow.mutate({ showId: show.id, body });
   const draft = staffDraft[show.id] || { personId: "", role: "", meetingTime: "", meetingDurationMinutes: "60" };
 
+  /** Local note text: controlled value must not track the query on every keystroke or saves race and drop characters. */
+  const [technicalNotes, setTechnicalNotes] = useState(() => show.technicalNotes ?? "");
+  const [fohNotes, setFohNotes] = useState(() => show.fohNotes ?? "");
+  const techDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fohDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setTechnicalNotes(show.technicalNotes ?? "");
+    setFohNotes(show.fohNotes ?? "");
+  }, [show.id]);
+
+  useEffect(
+    () => () => {
+      if (techDebounce.current) clearTimeout(techDebounce.current);
+      if (fohDebounce.current) clearTimeout(fohDebounce.current);
+    },
+    []
+  );
+
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
@@ -1510,18 +1529,48 @@ function ShowEventCard({
         <div>
           <FieldLabel>Technical tab notes</FieldLabel>
           <Textarea
-            value={show.technicalNotes || ""}
+            value={technicalNotes}
             placeholder="Lx, rigger, power, load in..."
-            onChange={(e) => patch({ technicalNotes: e.target.value })}
+            onChange={(e) => {
+              const v = e.target.value;
+              setTechnicalNotes(v);
+              if (techDebounce.current) clearTimeout(techDebounce.current);
+              techDebounce.current = setTimeout(() => {
+                patch({ technicalNotes: v });
+                techDebounce.current = null;
+              }, 400);
+            }}
+            onBlur={(e) => {
+              if (techDebounce.current) {
+                clearTimeout(techDebounce.current);
+                techDebounce.current = null;
+                patch({ technicalNotes: e.currentTarget.value });
+              }
+            }}
             className="bg-white/5 border-white/10 text-white min-h-[90px]"
           />
         </div>
         <div>
           <FieldLabel>FOH tab notes</FieldLabel>
           <Textarea
-            value={show.fohNotes || ""}
+            value={fohNotes}
             placeholder="Tickets, bar, hospitality…"
-            onChange={(e) => patch({ fohNotes: e.target.value })}
+            onChange={(e) => {
+              const v = e.target.value;
+              setFohNotes(v);
+              if (fohDebounce.current) clearTimeout(fohDebounce.current);
+              fohDebounce.current = setTimeout(() => {
+                patch({ fohNotes: v });
+                fohDebounce.current = null;
+              }, 400);
+            }}
+            onBlur={(e) => {
+              if (fohDebounce.current) {
+                clearTimeout(fohDebounce.current);
+                fohDebounce.current = null;
+                patch({ fohNotes: e.currentTarget.value });
+              }
+            }}
             className="bg-white/5 border-white/10 text-white min-h-[90px]"
           />
         </div>
