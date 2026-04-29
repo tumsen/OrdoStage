@@ -1,15 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useParams, useNavigate, useMatch } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Edit2, Trash2, Plus, X, Download, Upload } from "lucide-react";
 import { api, isApiError } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import type { EventDetail, EventTeam, EventTeamNote, Person, EventPerson, Document, EventShow } from "@/lib/types";
+import type { Event, EventDetail, EventTeam, EventTeamNote, Person, EventPerson, Document, EventShow } from "@/lib/types";
 import type { Department } from "../../../backend/src/types";
-import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
@@ -94,6 +93,33 @@ const EventEditSchema = z.object({
 });
 
 type EventEditValues = z.infer<typeof EventEditSchema>;
+
+function emptyEventFormValues(): EventEditValues {
+  return {
+    title: "",
+    description: "",
+    startDate: "",
+    endDate: "",
+    status: "draft",
+    venueId: "",
+    tags: "",
+    contactPerson: "",
+    actorCount: "",
+    allergies: "",
+    stageSize: "",
+    getInTime: "",
+    setupTime: "",
+    bookingContracts: "",
+    technicalRider: "",
+    techCount: "",
+    handsNeeded: "",
+    getInDate: "",
+    ticketingInfo: "",
+    hospitalityInfo: "",
+    fohNotes: "",
+  };
+}
+
 type CustomField = { key: string; value: string; departments: string[] };
 type GeneralEventFields = {
   bookingContracts: string;
@@ -105,6 +131,32 @@ type GeneralEventFields = {
   hospitalityInfo: string;
   fohNotes: string;
 };
+
+function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditValues {
+  return {
+    title: e.title,
+    description: e.description ?? "",
+    startDate: e.startDate ? e.startDate.slice(0, 16) : "",
+    endDate: e.endDate ? e.endDate.slice(0, 16) : "",
+    status: e.status,
+    venueId: e.venueId ?? "",
+    tags: e.tags ?? "",
+    contactPerson: e.contactPerson ?? "",
+    actorCount: e.actorCount != null ? String(e.actorCount) : "",
+    allergies: e.allergies ?? "",
+    stageSize: e.stageSize ?? "",
+    getInTime: e.getInTime ?? "",
+    setupTime: e.setupTime ?? "",
+    bookingContracts: g.bookingContracts,
+    technicalRider: g.technicalRider,
+    techCount: g.techCount,
+    handsNeeded: g.handsNeeded,
+    getInDate: g.getInDate,
+    ticketingInfo: g.ticketingInfo,
+    hospitalityInfo: g.hospitalityInfo,
+    fohNotes: g.fohNotes,
+  };
+}
 
 function splitGeneralEventFields(fields: CustomField[]): {
   general: GeneralEventFields;
@@ -204,29 +256,25 @@ function DeptBadge({
   );
 }
 
-function DeptTag({ dept }: { dept: Department }) {
-  return (
-    <span
-      className="px-2 py-0.5 rounded text-xs font-medium border"
-      style={{
-        backgroundColor: dept.color + "22",
-        borderColor: dept.color + "44",
-        color: dept.color,
-      }}
-    >
-      {dept.name}
-    </span>
-  );
-}
-
 // ── Details Tab ──────────────────────────────────────────────────────────────
 
-function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () => void }) {
+function DetailsTab({
+  event,
+  isNew,
+  onCreated,
+  onDeleted,
+}: {
+  event: EventDetail | null;
+  isNew: boolean;
+  onCreated: (id: string) => void;
+  onDeleted: () => void;
+}) {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
+  const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const parsedCustomFields: CustomField[] = (() => {
+    if (!event) return [];
     try {
       return event.customFields ? (JSON.parse(event.customFields) as CustomField[]) : [];
     } catch {
@@ -249,48 +297,89 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
   const depts = departments ?? [];
   const setupTimeFieldRef = useRef<SplitTimeFieldHandle>(null);
 
+  const formValues = useMemo((): EventEditValues => {
+    if (isNew || !event) return emptyEventFormValues();
+    const s = splitGeneralEventFields(
+      (() => {
+        try {
+          if (!event.customFields) return [] as CustomField[];
+          return JSON.parse(event.customFields) as CustomField[];
+        } catch {
+          return [] as CustomField[];
+        }
+      })()
+    );
+    return formValuesFromEvent(event, s.general);
+  }, [isNew, event]);
+
   const form = useForm<EventEditValues>({
     resolver: zodResolver(EventEditSchema),
-    values: {
-      title: event.title,
-      description: event.description ?? "",
-      startDate: event.startDate ? event.startDate.slice(0, 16) : "",
-      endDate: event.endDate ? event.endDate.slice(0, 16) : "",
-      status: event.status,
-      venueId: event.venueId ?? "",
-      tags: event.tags ?? "",
-      contactPerson: event.contactPerson ?? "",
-      actorCount: event.actorCount != null ? String(event.actorCount) : "",
-      allergies: event.allergies ?? "",
-      stageSize: event.stageSize ?? "",
-      getInTime: event.getInTime ?? "",
-      setupTime: event.setupTime ?? "",
-      bookingContracts: splitFields.general.bookingContracts,
-      technicalRider: splitFields.general.technicalRider,
-      techCount: splitFields.general.techCount,
-      handsNeeded: splitFields.general.handsNeeded,
-      getInDate: splitFields.general.getInDate,
-      ticketingInfo: splitFields.general.ticketingInfo,
-      hospitalityInfo: splitFields.general.hospitalityInfo,
-      fohNotes: splitFields.general.fohNotes,
+    values: formValues,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) => api.post<Event>("/api/events", data),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      onCreated(created.id);
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) =>
-      api.put(`/api/events/${event.id}`, data),
+    mutationFn: (data: Record<string, unknown>) => {
+      if (!event) throw new Error("Event missing");
+      return api.put(`/api/events/${event.id}`, data);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["event", event.id] });
-      setEditing(false);
+      if (event) queryClient.invalidateQueries({ queryKey: ["event", event.id] });
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.delete(`/api/events/${event.id}`),
+    mutationFn: () => {
+      if (!event) throw new Error("Event missing");
+      return api.delete(`/api/events/${event.id}`);
+    },
     onSuccess: onDeleted,
   });
 
   function onSubmit(values: EventEditValues) {
+    const normalizedCustomFields = customFields.filter((f) => f.key.trim() || f.value.trim());
+    const generalFields = [
+      { key: "Contracts", value: values.bookingContracts?.trim() || "" },
+      { key: "Technical rider", value: values.technicalRider?.trim() || "" },
+      { key: "Tech count", value: values.techCount?.trim() || "" },
+      { key: "Hands needed", value: values.handsNeeded?.trim() || "" },
+      { key: "Get-in date", value: values.getInDate?.trim() || "" },
+      { key: "Ticketing", value: values.ticketingInfo?.trim() || "" },
+      { key: "Hospitality", value: values.hospitalityInfo?.trim() || "" },
+      { key: "FOH notes", value: values.fohNotes?.trim() || "" },
+    ]
+      .filter((row) => row.value)
+      .map((row) => ({ ...row, departments: [] as string[] }));
+    const mergedCustomFields = [...normalizedCustomFields, ...generalFields];
+
+    if (isNew) {
+      const payload: Record<string, unknown> = {
+        title: values.title,
+        status: values.status,
+      };
+      if (values.startDate?.trim()) payload.startDate = values.startDate;
+      if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
+      if (values.endDate) payload.endDate = values.endDate;
+      if (values.description) payload.description = values.description;
+      if (values.tags) payload.tags = values.tags;
+      if (values.contactPerson) payload.contactPerson = values.contactPerson;
+      if (values.allergies) payload.allergies = values.allergies;
+      if (values.stageSize) payload.stageSize = values.stageSize;
+      if (values.getInTime) payload.getInTime = values.getInTime;
+      if (values.setupTime) payload.setupTime = values.setupTime;
+      if (values.actorCount) payload.actorCount = Number(values.actorCount);
+      if (mergedCustomFields.length > 0) payload.customFields = JSON.stringify(mergedCustomFields);
+      createMutation.mutate(payload);
+      return;
+    }
+
     const payload: Record<string, unknown> = {
       title: values.title,
       status: values.status,
@@ -308,22 +397,7 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
     if (values.getInTime) payload.getInTime = values.getInTime;
     if (values.setupTime) payload.setupTime = values.setupTime;
     if (values.actorCount) payload.actorCount = Number(values.actorCount);
-    const normalizedCustomFields = customFields.filter((f) => f.key.trim() || f.value.trim());
-    const generalFields = [
-      { key: "Contracts", value: values.bookingContracts?.trim() || "" },
-      { key: "Technical rider", value: values.technicalRider?.trim() || "" },
-      { key: "Tech count", value: values.techCount?.trim() || "" },
-      { key: "Hands needed", value: values.handsNeeded?.trim() || "" },
-      { key: "Get-in date", value: values.getInDate?.trim() || "" },
-      { key: "Ticketing", value: values.ticketingInfo?.trim() || "" },
-      { key: "Hospitality", value: values.hospitalityInfo?.trim() || "" },
-      { key: "FOH notes", value: values.fohNotes?.trim() || "" },
-    ]
-      .filter((row) => row.value)
-      .map((row) => ({ ...row, departments: [] as string[] }));
-    const mergedCustomFields = [...normalizedCustomFields, ...generalFields];
     payload.customFields = mergedCustomFields.length > 0 ? JSON.stringify(mergedCustomFields) : undefined;
-
     updateMutation.mutate(payload);
   }
 
@@ -356,12 +430,22 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
     );
   }
 
-  if (editing) {
-    return (
-      <div className="space-y-5">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-            {/* ── Core fields ── */}
+  const saving = createMutation.isPending || updateMutation.isPending;
+  const saveError = isNew ? createMutation.isError : updateMutation.isError;
+  const saveErrorMsg = isNew
+    ? createMutation.error instanceof Error
+      ? createMutation.error.message
+      : "Failed to create event."
+    : updateMutation.error instanceof Error
+      ? updateMutation.error.message
+      : "Failed to save changes.";
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-semibold text-white">{isNew ? "New event" : "Details"}</h2>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          {/* ── Core fields ── */}
             <FormField
               control={form.control}
               name="title"
@@ -711,196 +795,61 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
               </button>
             </div>
 
-            {updateMutation.isError && (
+            {saveError ? (
               <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
-                {updateMutation.error instanceof Error
-                  ? updateMutation.error.message
-                  : "Failed to save changes."}
+                {saveErrorMsg}
               </div>
-            )}
+            ) : null}
 
-            <div className="flex gap-3">
-              <Button type="submit" disabled={updateMutation.isPending} className="bg-red-900 hover:bg-red-800 text-white border-red-700/50">
-                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit" disabled={saving} className="bg-red-900 hover:bg-red-800 text-white border-red-700/50">
+                {isNew ? (saving ? "Creating…" : "Create event") : saving ? "Saving…" : "Save"}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setEditing(false)} className="border-white/10 text-white/60 hover:text-white bg-transparent">
-                Cancel
-              </Button>
+              {isNew ? (
+                <Button type="button" variant="outline" onClick={() => navigate("/events")} className="border-white/10 text-white/60 hover:text-white bg-transparent">
+                  Cancel
+                </Button>
+              ) : null}
             </div>
           </form>
         </Form>
-      </div>
-    );
-  }
 
-  // ── View mode ────────────────────────────────────────────────────────────
-
-  const hasProductionInfo =
-    event.contactPerson || event.actorCount != null || event.allergies;
-  const hasTechnical = event.stageSize || event.getInTime || event.setupTime;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="text-xl font-semibold text-white">{event.title}</h2>
-          {event.description ? (
-            <p className="text-white/50 text-sm leading-relaxed">{event.description}</p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <StatusBadge status={event.status} />
-          <Button variant="ghost" size="icon" onClick={() => setEditing(true)} className="h-8 w-8 text-white/40 hover:text-white">
-            <Edit2 size={14} />
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <InfoRow label="Event window" value={formatDate(event.startDate)} />
-        <InfoRow label="End" value={formatDate(event.endDate)} />
-        <InfoRow label="Venue" value={event.venue?.name ?? "—"} />
-        <InfoRow label="Tags" value={event.tags ?? "—"} />
-      </div>
-
-      {hasProductionInfo ? (
-        <div>
-          <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
-            Production Info
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {event.contactPerson ? (
-              <InfoRow label="Contact Person" value={event.contactPerson} />
-            ) : null}
-            {event.actorCount != null ? (
-              <InfoRow label="Actor Count" value={String(event.actorCount)} />
-            ) : null}
-            {event.allergies ? (
-              <div className="sm:col-span-2">
-                <InfoRow label="Allergies / Dietary" value={event.allergies} />
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {hasTechnical ? (
-        <div>
-          <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
-            Technical
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {event.stageSize ? (
-              <InfoRow label="Stage Size" value={event.stageSize} />
-            ) : null}
-            {event.getInTime ? (
-              <InfoRow label="Get-in Time" value={event.getInTime} />
-            ) : null}
-            {event.setupTime ? (
-              <InfoRow label="Setup Time" value={event.setupTime} />
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {splitFields.rest.length > 0 ? (
-        <div>
-          <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
-            Additional Info
-          </div>
-          <div className="space-y-2">
-            {splitFields.rest.map((cf, idx) => {
-              const fieldDepts = depts.filter((d) => cf.departments.includes(d.id));
-              return (
-                <div
-                  key={idx}
-                  className="bg-white/[0.02] border border-white/[0.07] rounded-lg px-4 py-3 flex items-start justify-between gap-4"
-                >
-                  <div className="min-w-0">
-                    <div className="text-xs text-white/35 uppercase tracking-wide mb-0.5">{cf.key}</div>
-                    <div className="text-sm text-white/80">{cf.value}</div>
-                  </div>
-                  {fieldDepts.length > 0 ? (
-                    <div className="flex flex-wrap gap-1 flex-shrink-0">
-                      {fieldDepts.map((d) => (
-                        <DeptTag key={d.id} dept={d} />
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {(splitFields.general.bookingContracts ||
-        splitFields.general.technicalRider ||
-        splitFields.general.techCount ||
-        splitFields.general.handsNeeded ||
-        splitFields.general.getInDate ||
-        splitFields.general.ticketingInfo ||
-        splitFields.general.hospitalityInfo ||
-        splitFields.general.fohNotes) ? (
-        <div>
-          <div className="text-xs text-white/40 uppercase tracking-widest mb-3 pb-2 border-b border-white/[0.06]">
-            Booking / Technical / FOH (General)
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {splitFields.general.bookingContracts ? <InfoRow label="Contracts" value={splitFields.general.bookingContracts} /> : null}
-            {splitFields.general.technicalRider ? <InfoRow label="Technical rider" value={splitFields.general.technicalRider} /> : null}
-            {splitFields.general.techCount ? <InfoRow label="Tech count" value={splitFields.general.techCount} /> : null}
-            {splitFields.general.handsNeeded ? <InfoRow label="Hands needed" value={splitFields.general.handsNeeded} /> : null}
-            {splitFields.general.getInDate ? <InfoRow label="Get-in date" value={splitFields.general.getInDate} /> : null}
-            {splitFields.general.ticketingInfo ? <InfoRow label="Ticketing" value={splitFields.general.ticketingInfo} /> : null}
-            {splitFields.general.hospitalityInfo ? <InfoRow label="Hospitality" value={splitFields.general.hospitalityInfo} /> : null}
-            {splitFields.general.fohNotes ? <InfoRow label="FOH notes" value={splitFields.general.fohNotes} /> : null}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="pt-2 border-t border-white/10">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setConfirmDelete(true)}
-          className="text-red-400/70 hover:text-red-400 hover:bg-red-500/10 gap-2"
-        >
-          <Trash2 size={13} /> Delete Event
-        </Button>
-      </div>
-
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this event?</AlertDialogTitle>
-            <AlertDialogDescription className="text-white/50">
-              This will permanently delete the event and all associated documents.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => {
-                if (!confirmDeleteAction(`event "${event.title}"`)) return;
-                deleteMutation.mutate();
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-white/[0.02] border border-white/8 rounded-lg px-4 py-3">
-      <div className="text-xs text-white/35 uppercase tracking-wide mb-1">{label}</div>
-      <div className="text-sm text-white/80">{value}</div>
+        {!isNew && event ? (
+          <>
+            <div className="pt-2 border-t border-white/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmDelete(true)}
+                className="text-red-400/70 hover:text-red-400 hover:bg-red-500/10 gap-2"
+              >
+                <Trash2 size={13} /> Delete event
+              </Button>
+            </div>
+            <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+              <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this event?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-white/50">
+                    This will permanently delete the event and all associated documents.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+                    onClick={() => {
+                      if (!confirmDeleteAction(`event "${event.title}"`)) return;
+                      deleteMutation.mutate();
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        ) : null}
     </div>
   );
 }
@@ -2039,32 +1988,37 @@ function TeamsTab({ event }: { event: EventDetail }) {
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const isNew = useMatch({ path: "/events/new", end: true }) !== null;
 
   const { data: event, isLoading, error } = useQuery({
     queryKey: ["event", id],
     queryFn: () => api.get<EventDetail>(`/api/events/${id}`),
-    enabled: !!id,
+    enabled: !isNew && !!id,
   });
 
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-8 w-48 bg-white/5" />
-        <Skeleton className="h-64 w-full rounded-xl bg-white/5" />
-      </div>
-    );
+  if (!isNew) {
+    if (isLoading) {
+      return (
+        <div className="p-6 space-y-4">
+          <Skeleton className="h-8 w-48 bg-white/5" />
+          <Skeleton className="h-64 w-full rounded-xl bg-white/5" />
+        </div>
+      );
+    }
+
+    if (error || !event) {
+      return (
+        <div className="p-6 text-center text-red-400">
+          Failed to load event.{" "}
+          <button onClick={() => navigate("/events")} className="underline text-white/50 hover:text-white">
+            Go back
+          </button>
+        </div>
+      );
+    }
   }
 
-  if (error || !event) {
-    return (
-      <div className="p-6 text-center text-red-400">
-        Failed to load event.{" "}
-        <button onClick={() => navigate("/events")} className="underline text-white/50 hover:text-white">
-          Go back
-        </button>
-      </div>
-    );
-  }
+  const ev = isNew ? null : (event as EventDetail);
 
   return (
     <div className="p-6 space-y-6">
@@ -2091,44 +2045,66 @@ export default function EventDetailPage() {
                 value="shows"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
-                Shows ({event.shows.length})
+                Shows ({ev?.shows.length ?? 0})
               </TabsTrigger>
               <TabsTrigger
                 value="teams"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
-                Teams ({event.teams?.length ?? 0})
+                Teams ({ev?.teams?.length ?? 0})
               </TabsTrigger>
               <TabsTrigger
                 value="people"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
-                People ({event.people.length})
+                People ({ev?.people.length ?? 0})
               </TabsTrigger>
               <TabsTrigger
                 value="documents"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
-                Documents ({event.documents.length})
+                Documents ({ev?.documents.length ?? 0})
               </TabsTrigger>
             </TabsList>
           </div>
 
           <div className="p-6">
             <TabsContent value="details" className="mt-0">
-              <DetailsTab event={event} onDeleted={() => navigate("/events")} />
+              <DetailsTab
+                key={isNew ? "new" : ev!.id}
+                event={isNew ? null : ev!}
+                isNew={isNew}
+                onCreated={(newId) => navigate(`/events/${newId}`)}
+                onDeleted={() => navigate("/events")}
+              />
             </TabsContent>
             <TabsContent value="people" className="mt-0">
-              <PeopleTab event={event} />
+              {isNew ? (
+                <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then assign people here.</div>
+              ) : (
+                <PeopleTab event={ev!} />
+              )}
             </TabsContent>
             <TabsContent value="shows" className="mt-0">
-              <ShowsTab event={event} />
+              {isNew ? (
+                <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then add shows here.</div>
+              ) : (
+                <ShowsTab event={ev!} />
+              )}
             </TabsContent>
             <TabsContent value="teams" className="mt-0">
-              <TeamsTab event={event} />
+              {isNew ? (
+                <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then manage teams here.</div>
+              ) : (
+                <TeamsTab event={ev!} />
+              )}
             </TabsContent>
             <TabsContent value="documents" className="mt-0">
-              <DocumentsTab event={event} />
+              {isNew ? (
+                <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then upload documents here.</div>
+              ) : (
+                <DocumentsTab event={ev!} />
+              )}
             </TabsContent>
           </div>
         </Tabs>

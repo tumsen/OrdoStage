@@ -12,7 +12,6 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { GuestRoute } from "@/components/GuestRoute";
 import Index from "./pages/Index";
 import Events from "./pages/Events";
-import NewEvent from "./pages/NewEvent";
 import EventDetail from "./pages/EventDetail";
 import Venues from "./pages/Venues";
 import People from "./pages/People";
@@ -159,7 +158,7 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Layout>
-                  <NewEvent />
+                  <EventDetail />
                 </Layout>
               </ProtectedRoute>
             }
