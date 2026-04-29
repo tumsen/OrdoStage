@@ -2150,13 +2150,13 @@ export default function EventDetailPage() {
                 value="people"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
-                People ({ev?.people.length ?? 0})
+                People ({ev?.people?.length ?? 0})
               </TabsTrigger>
               <TabsTrigger
                 value="documents"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
-                Documents ({ev?.documents.length ?? 0})
+                Documents ({ev?.documents?.length ?? 0})
               </TabsTrigger>
             </TabsList>
           </div>
