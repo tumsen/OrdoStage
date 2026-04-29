@@ -21,11 +21,10 @@ import type {
 import {
   decodeToFormFields,
   formDimsToStageSize,
-  requiredStageTotalsMeters,
+  requiredStageTotalsMetersFromStrings,
   venueRecordToMeters,
   venueSmallerThanStageWarnings,
 } from "@/lib/stageSize";
-import { scheduleFieldLabelClass } from "@/components/ScheduleTimeRow";
 import { cn } from "@/lib/utils";
 import type { Department } from "../../../backend/src/types";
 import { formatDate } from "@/lib/dateUtils";
@@ -94,12 +93,9 @@ const EventEditSchema = z.object({
   contactPerson: z.string().optional(),
   actorCount: z.string().optional(),
   allergies: z.string().optional(),
-  stageWidthM: z.string().optional(),
-  stageWidthCm: z.string().optional(),
-  stageDepthM: z.string().optional(),
-  stageDepthCm: z.string().optional(),
-  stageHeightM: z.string().optional(),
-  stageHeightCm: z.string().optional(),
+  stageWidth: z.string().optional(),
+  stageDepth: z.string().optional(),
+  stageHeight: z.string().optional(),
   getInTime: z.string().optional(),
   setupTime: z.string().optional(),
   bookingContracts: z.string().optional(),
@@ -339,25 +335,22 @@ function DetailsTab({
   });
 
   const vId = form.watch("venueId");
-  const sWM = form.watch("stageWidthM");
-  const sWcm = form.watch("stageWidthCm");
-  const sDM = form.watch("stageDepthM");
-  const sDcm = form.watch("stageDepthCm");
-  const sHM = form.watch("stageHeightM");
-  const sHcm = form.watch("stageHeightCm");
+  const sW = form.watch("stageWidth");
+  const sD = form.watch("stageDepth");
+  const sH = form.watch("stageHeight");
 
   const venueSizeWarnings = useMemo(() => {
     if (!venues?.length) return null;
     if (!vId || vId === "__none__") return null;
     const v = venues.find((x) => x.id === vId);
     if (!v) return null;
-    const tot = requiredStageTotalsMeters(
-      { m: sWM, cm: sWcm },
-      { m: sDM, cm: sDcm },
-      { m: sHM, cm: sHcm }
-    );
+    const tot = requiredStageTotalsMetersFromStrings({
+      stageWidth: sW,
+      stageDepth: sD,
+      stageHeight: sH,
+    });
     return venueSmallerThanStageWarnings(tot, venueRecordToMeters(v));
-  }, [venues, vId, sWM, sWcm, sDM, sDcm, sHM, sHcm]);
+  }, [venues, vId, sW, sD, sH]);
 
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => api.post<Event>("/api/events", data),
@@ -630,60 +623,43 @@ function DetailsTab({
 
             <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
               <p className="text-[9px] text-white/35 mb-1.5 leading-snug">
-                <span className="text-white/50">W × D × H</span> — m + cm; max 999,99 m per side. Amber note if the default venue is smaller.
+                <span className="text-white/50">W × D × H</span> — one number per side in metres (e.g.{" "}
+                <span className="text-white/55">999,99</span>). Amber note if the default venue is smaller.
               </p>
-              <div className="flex flex-nowrap items-end gap-1.5 sm:gap-2 min-w-0 overflow-x-auto pb-0.5 -mx-0.5 px-0.5">
+              <div className="flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 overflow-x-auto pb-0.5">
                 {(
                   [
-                    { short: "W", full: "Width", m: "stageWidthM" as const, cm: "stageWidthCm" as const },
-                    { short: "D", full: "Depth", m: "stageDepthM" as const, cm: "stageDepthCm" as const },
-                    { short: "H", full: "Height", m: "stageHeightM" as const, cm: "stageHeightCm" as const },
+                    { short: "W", full: "Width", name: "stageWidth" as const },
+                    { short: "D", full: "Depth", name: "stageDepth" as const },
+                    { short: "H", full: "Height", name: "stageHeight" as const },
                   ] as const
                 ).map((row, i) => (
-                  <div key={row.m} className="flex shrink-0 items-end gap-1.5">
+                  <div key={row.name} className="flex shrink-0 items-end gap-1.5">
                     {i > 0 ? <div className="w-px h-7 bg-white/10 self-end mb-0.5 shrink-0" aria-hidden /> : null}
-                    <div className="flex items-end gap-1 shrink-0" title={`${row.full} (m, cm)`}>
+                    <div className="flex items-end gap-1.5 shrink-0" title={`${row.full} (m)`}>
                       <span className="text-[10px] text-white/50 pb-2 w-4 text-center font-medium leading-none">
                         {row.short}
                       </span>
                       <FormField
                         control={form.control}
-                        name={row.m}
+                        name={row.name}
                         render={({ field }) => (
-                          <FormItem className="space-y-0.5 w-[5.25rem] min-w-[5.25rem] shrink-0">
-                            <FormLabel className={scheduleFieldLabelClass}>m</FormLabel>
+                          <FormItem className="space-y-0">
                             <FormControl>
                               <Input
                                 {...field}
                                 value={field.value ?? ""}
                                 inputMode="decimal"
-                                maxLength={6}
+                                maxLength={7}
                                 placeholder="0"
-                                className="h-8 w-full min-w-0 bg-white/5 border-white/10 text-white"
+                                autoComplete="off"
+                                className="h-8 w-[5.75rem] min-w-[5.75rem] bg-white/5 border-white/10 text-white tabular-nums"
                               />
                             </FormControl>
                           </FormItem>
                         )}
                       />
-                      <FormField
-                        control={form.control}
-                        name={row.cm}
-                        render={({ field }) => (
-                          <FormItem className="space-y-0.5 w-10 min-w-10">
-                            <FormLabel className={scheduleFieldLabelClass}>cm</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                value={field.value ?? ""}
-                                inputMode="numeric"
-                                maxLength={2}
-                                placeholder="0"
-                                className="h-8 w-full min-w-0 bg-white/5 border-white/10 text-white"
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
+                      <span className="text-[10px] text-white/40 pb-2 shrink-0">m</span>
                     </div>
                   </div>
                 ))}

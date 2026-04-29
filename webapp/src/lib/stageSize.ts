@@ -1,55 +1,39 @@
-/** Stored in Event.stageSize as JSON. v=2: meters + centimeters per dimension. */
+/**
+ * Event.stageSize JSON.
+ * v=3: one value per axis in metres (W × D × H), max 999.99.
+ * v=2 (legacy): m + cm per axis — still decoded for display.
+ */
 
-export const STAGE_SIZE_V = 2 as const;
+export const STAGE_SIZE_V = 3 as const;
 
-export type StageDimMetersCm = { m: string; cm: string };
 export type StageDimensionsForm = {
-  stageWidthM: string;
-  stageWidthCm: string;
-  stageDepthM: string;
-  stageDepthCm: string;
-  stageHeightM: string;
-  stageHeightCm: string;
+  stageWidth: string;
+  stageDepth: string;
+  stageHeight: string;
 };
 
-const EMPTY: StageDimMetersCm = { m: "", cm: "" };
-
-function numM(s: string): number {
-  const t = String(s ?? "")
+function parseMetresInput(raw: string): number {
+  const t = String(raw ?? "")
     .trim()
     .replace(/\s/g, "")
     .replace(",", ".");
   if (!t) return 0;
   const n = parseFloat(t);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function numCm(s: string): number {
-  const t = String(s ?? "").trim();
-  if (!t) return 0;
-  const n = parseInt(t, 10);
   if (!Number.isFinite(n)) return 0;
-  return Math.min(99, Math.max(0, n));
+  return Math.min(999.99, Math.max(0, n));
 }
 
-/** Total meters for one W/D/H from m + cm fields (cm is 0–99). */
-export function dimToTotalMetersMcm(pair: StageDimMetersCm): number {
-  const m = numM(pair.m);
-  const cm = numCm(pair.cm);
-  return m + cm / 100;
-}
-
-function clampMInput(raw: string): string {
-  const t = String(raw).trim().replace(",", ".");
-  if (!t) return "";
-  const n = parseFloat(t);
-  if (!Number.isFinite(n)) return raw;
-  return String(Math.min(999.99, Math.max(0, n)));
+/** Format stored number for the input (comma decimal, trim zeros). */
+export function formatMetresForInput(m: number): string {
+  if (!Number.isFinite(m) || m <= 0) return "";
+  const rounded = Math.round(m * 100) / 100;
+  const s = rounded.toFixed(2).replace(/\.?0+$/, "").replace(".", ",");
+  return s;
 }
 
 /**
  * Parse venue dimension strings (freeform, one field per edge in DB).
- * Returns total meters or null if unknown.
+ * Returns total metres or null if unknown.
  */
 export function parseVenueEdgeToMeters(raw: string | null | undefined): number | null {
   if (raw == null) return null;
@@ -76,102 +60,85 @@ export function parseVenueEdgeToMeters(raw: string | null | undefined): number |
   return null;
 }
 
-export function decodeStageSize(
-  stageSize: string | null | undefined
-): {
-  w: StageDimMetersCm;
-  d: StageDimMetersCm;
-  h: StageDimMetersCm;
+type LegacyMcm = { m?: number; cm?: number } | [number, number];
+
+function legacyAxisToMeters(x: LegacyMcm | undefined): number {
+  if (x == null) return 0;
+  if (Array.isArray(x)) {
+    const m = x[0] ?? 0;
+    const cm = x[1] ?? 0;
+    return (Number.isFinite(m) ? m : 0) + (Number.isFinite(cm) ? cm / 100 : 0);
+  }
+  const m = x.m ?? 0;
+  const cm = x.cm ?? 0;
+  return m + cm / 100;
+}
+
+export function decodeStageSizeJson(stageSize: string | null | undefined): {
+  w: number;
+  d: number;
+  h: number;
 } {
-  if (!stageSize?.trim()) {
-    return { w: { ...EMPTY }, d: { ...EMPTY }, h: { ...EMPTY } };
-  }
+  if (!stageSize?.trim()) return { w: 0, d: 0, h: 0 };
   const s = stageSize.trim();
-  if (s.startsWith("{")) {
-    try {
-      const j = JSON.parse(s) as {
-        v?: number;
-        w?: { m?: number; cm?: number } | [number, number];
-        d?: { m?: number; cm?: number } | [number, number];
-        h?: { m?: number; cm?: number } | [number, number];
-      };
-      const pick = (x: typeof j.w, label: "w" | "d" | "h"): StageDimMetersCm => {
-        if (Array.isArray(x) && x.length >= 1) {
-          return {
-            m: x[0] != null ? String(x[0]) : "",
-            cm: x[1] != null ? String(x[1]) : "",
-          };
-        }
-        if (x && typeof x === "object" && "m" in x) {
-          return {
-            m: x.m != null ? String(x.m) : "",
-            cm: x.cm != null ? String(x.cm) : "",
-          };
-        }
-        return { ...EMPTY };
-      };
-      if (j.v === 2 && j.w && j.d && j.h) {
-        return { w: pick(j.w, "w"), d: pick(j.d, "d"), h: pick(j.h, "h") };
-      }
-    } catch {
-      /* fall through */
+  if (!s.startsWith("{")) return { w: 0, d: 0, h: 0 };
+  try {
+    const j = JSON.parse(s) as {
+      v?: number;
+      w?: number | LegacyMcm;
+      d?: number | LegacyMcm;
+      h?: number | LegacyMcm;
+    };
+    if (j.v === STAGE_SIZE_V && typeof j.w === "number" && typeof j.d === "number" && typeof j.h === "number") {
+      return { w: j.w, d: j.d, h: j.h };
     }
+    if (j.v === 2 && j.w != null && j.d != null && j.h != null) {
+      return {
+        w: legacyAxisToMeters(j.w as LegacyMcm),
+        d: legacyAxisToMeters(j.d as LegacyMcm),
+        h: legacyAxisToMeters(j.h as LegacyMcm),
+      };
+    }
+  } catch {
+    /* ignore */
   }
-  return { w: { ...EMPTY }, d: { ...EMPTY }, h: { ...EMPTY } };
+  return { w: 0, d: 0, h: 0 };
 }
 
 export function encodeStageSize(
-  w: StageDimMetersCm,
-  d: StageDimMetersCm,
-  h: StageDimMetersCm
+  width: string,
+  depth: string,
+  height: string
 ): string | undefined {
-  const wm = clampMInput(w.m);
-  const wcm = String(numCm(w.cm) || 0);
-  const dm = clampMInput(d.m);
-  const dcm = String(numCm(d.cm) || 0);
-  const hm = clampMInput(h.m);
-  const hcm = String(numCm(h.cm) || 0);
-  const allEmpty = !wm && wcm === "0" && !dm && dcm === "0" && !hm && hcm === "0";
-  if (allEmpty) return undefined;
-  return JSON.stringify({
-    v: STAGE_SIZE_V,
-    w: { m: wm ? parseFloat(wm) : 0, cm: parseInt(wcm, 10) || 0 },
-    d: { m: dm ? parseFloat(dm) : 0, cm: parseInt(dcm, 10) || 0 },
-    h: { m: hm ? parseFloat(hm) : 0, cm: parseInt(hcm, 10) || 0 },
-  });
+  const w = parseMetresInput(width);
+  const d = parseMetresInput(depth);
+  const h = parseMetresInput(height);
+  if (w <= 0 && d <= 0 && h <= 0) return undefined;
+  return JSON.stringify({ v: STAGE_SIZE_V, w, d, h });
 }
 
 export function formDimsToStageSize(values: StageDimensionsForm): string | undefined {
-  return encodeStageSize(
-    { m: values.stageWidthM, cm: values.stageWidthCm },
-    { m: values.stageDepthM, cm: values.stageDepthCm },
-    { m: values.stageHeightM, cm: values.stageHeightCm }
-  );
+  return encodeStageSize(values.stageWidth, values.stageDepth, values.stageHeight);
 }
 
-export function decodeToFormFields(
-  stageSize: string | null | undefined
-): StageDimensionsForm {
-  const { w, d, h } = decodeStageSize(stageSize);
+export function decodeToFormFields(stageSize: string | null | undefined): StageDimensionsForm {
+  const { w, d, h } = decodeStageSizeJson(stageSize);
   return {
-    stageWidthM: w.m,
-    stageWidthCm: w.cm,
-    stageDepthM: d.m,
-    stageDepthCm: d.cm,
-    stageHeightM: h.m,
-    stageHeightCm: h.cm,
+    stageWidth: w > 0 ? formatMetresForInput(w) : "",
+    stageDepth: d > 0 ? formatMetresForInput(d) : "",
+    stageHeight: h > 0 ? formatMetresForInput(h) : "",
   };
 }
 
-export function requiredStageTotalsMeters(
-  w: StageDimMetersCm,
-  d: StageDimMetersCm,
-  h: StageDimMetersCm
-): { w: number; d: number; h: number } {
+export function requiredStageTotalsMetersFromStrings(a: {
+  stageWidth: string;
+  stageDepth: string;
+  stageHeight: string;
+}): { w: number; d: number; h: number } {
   return {
-    w: dimToTotalMetersMcm(w),
-    d: dimToTotalMetersMcm(d),
-    h: dimToTotalMetersMcm(h),
+    w: parseMetresInput(a.stageWidth),
+    d: parseMetresInput(a.stageDepth),
+    h: parseMetresInput(a.stageHeight),
   };
 }
 
@@ -187,7 +154,7 @@ export function venueRecordToMeters(venue: {
   };
 }
 
-/** When any required stage edge (m+cm) exceeds the venue, return messages. */
+/** When any required stage edge exceeds the venue, return messages. */
 export function venueSmallerThanStageWarnings(
   req: { w: number; d: number; h: number },
   venue: { width: number | null; depth: number | null; height: number | null }
