@@ -146,11 +146,16 @@ type GeneralEventFields = {
   fohNotes: string;
 };
 
+function normalizeEventStatus(s: string | undefined): "draft" | "confirmed" | "cancelled" {
+  if (s === "confirmed" || s === "cancelled" || s === "draft") return s;
+  return "draft";
+}
+
 function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditValues {
   return {
     title: e.title,
     description: e.description ?? "",
-    status: e.status,
+    status: normalizeEventStatus(e.status),
     venueId: e.venueId ?? "",
     tags: e.tags ?? "",
     contactPerson: e.contactPerson ?? "",
@@ -515,7 +520,10 @@ function DetailsTab({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={normalizeEventStatus(field.value)}
+                    >
                       <FormControl>
                         <SelectTrigger className="bg-white/5 border-white/10 text-white">
                           <SelectValue />
@@ -533,24 +541,36 @@ function DetailsTab({
               <FormField
                 control={form.control}
                 name="venueId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Venue</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <FormControl>
-                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                          <SelectValue placeholder="No venue" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                        <SelectItem value="__none__">No venue</SelectItem>
-                        {(venues ?? []).map((v) => (
-                          <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const vid = field.value ?? "";
+                  const venueIds = new Set((venues ?? []).map((x) => x.id));
+                  const orphan =
+                    Boolean(vid && vid !== "__none__" && !venueIds.has(vid));
+                  const selectValue = orphan ? vid : vid || "__none__";
+                  return (
+                    <FormItem>
+                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Venue</FormLabel>
+                      <Select onValueChange={field.onChange} value={selectValue}>
+                        <FormControl>
+                          <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                            <SelectValue placeholder="No venue" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                          <SelectItem value="__none__">No venue</SelectItem>
+                          {orphan ? (
+                            <SelectItem value={vid}>Unavailable venue (re-select or clear)</SelectItem>
+                          ) : null}
+                          {(venues ?? []).map((v) => (
+                            <SelectItem key={v.id} value={v.id}>
+                              {v.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  );
+                }}
               />
             </div>
             {venueSizeWarnings && venueSizeWarnings.length > 0 ? (

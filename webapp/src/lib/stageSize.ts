@@ -89,8 +89,13 @@ export function decodeStageSizeJson(stageSize: string | null | undefined): {
       d?: number | LegacyMcm;
       h?: number | LegacyMcm;
     };
-    if (j.v === STAGE_SIZE_V && typeof j.w === "number" && typeof j.d === "number" && typeof j.h === "number") {
-      return { w: j.w, d: j.d, h: j.h };
+    if (j.v === STAGE_SIZE_V && j.w != null && j.d != null && j.h != null) {
+      const num = (x: unknown) => {
+        if (typeof x === "number" && Number.isFinite(x)) return x;
+        const n = parseFloat(String(x).replace(",", "."));
+        return Number.isFinite(n) ? n : 0;
+      };
+      return { w: num(j.w), d: num(j.d), h: num(j.h) };
     }
     if (j.v === 2 && j.w != null && j.d != null && j.h != null) {
       return {

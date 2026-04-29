@@ -8,6 +8,8 @@ interface Props {
 
 interface State {
   hasError: boolean;
+  /** Dev-only: last caught error message */
+  errorMessage?: string;
 }
 
 /**
@@ -16,8 +18,8 @@ interface State {
 export class AppErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false };
 
-  static getDerivedStateFromError(): State {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, errorMessage: error?.message ?? String(error) };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -26,6 +28,8 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const devMsg =
+        import.meta.env.DEV && this.state.errorMessage ? this.state.errorMessage : null;
       return (
         <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center p-8 text-center">
           <div className="max-w-md space-y-4">
@@ -33,6 +37,11 @@ export class AppErrorBoundary extends Component<Props, State> {
             <p className="text-sm text-white/50 leading-relaxed">
               This page hit an unexpected error. Reload the page or go back to your dashboard.
             </p>
+            {devMsg ? (
+              <p className="text-left text-xs font-mono text-red-300/90 break-words whitespace-pre-wrap rounded border border-red-500/20 bg-red-500/10 p-3">
+                {devMsg}
+              </p>
+            ) : null}
             <div className="flex flex-wrap gap-3 justify-center pt-2">
               <Button
                 type="button"

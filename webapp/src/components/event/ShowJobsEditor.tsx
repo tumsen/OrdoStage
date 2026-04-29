@@ -17,9 +17,12 @@ import {
 } from "@/lib/showTiming";
 import type { EventShow, EventShowJob, Person } from "@/lib/types";
 
-function jobWindow(j: EventShowJob): { startValue: string; endValue: string } {
-  const d = j.jobDate.slice(0, 10);
-  const start = buildDatetimeLocal(d, j.startTime);
+function jobWindow(j: EventShowJob, show: EventShow): { startValue: string; endValue: string } {
+  const fallback = show.showDate.slice(0, 10);
+  const rawDate = j.jobDate ?? "";
+  const d =
+    typeof rawDate === "string" && rawDate.length >= 10 ? rawDate.slice(0, 10) : fallback;
+  const start = buildDatetimeLocal(d, j.startTime || "00:00");
   const t0 = new Date(start).getTime();
   const end = toDatetimeLocalString(new Date(t0 + j.durationMinutes * 60_000));
   return { startValue: start, endValue: end };
@@ -132,7 +135,7 @@ export function ShowJobsEditor({
       ) : null}
 
       {jobs.map((j) => {
-        const w = jobWindow(j);
+        const w = jobWindow(j, show);
         return (
           <div key={j.id} className={jobRowClass}>
             <div className="shrink-0 w-28 min-w-28 sm:w-36 sm:min-w-36">
@@ -216,7 +219,7 @@ export function ShowJobsEditor({
                   const durationMinutes = Math.max(1, Math.round((b.getTime() - a.getTime()) / 60_000));
                   createJob.mutate({
                     title: j.title,
-                    jobDate: j.jobDate.slice(0, 10),
+                    jobDate: (j.jobDate ? String(j.jobDate) : show.showDate).slice(0, 10),
                     startTime: j.startTime,
                     durationMinutes,
                     venueId: j.venueId,
