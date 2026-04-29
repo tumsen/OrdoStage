@@ -7,12 +7,29 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Edit2, Trash2, Plus, X, Download, Upload } from "lucide-react";
 import { api, isApiError } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import type { Event, EventDetail, EventTeam, EventTeamNote, Person, EventPerson, Document, EventShow } from "@/lib/types";
+import type {
+  Event,
+  EventDetail,
+  EventTeam,
+  EventTeamNote,
+  Person,
+  EventPerson,
+  Document,
+  EventShow,
+  Venue,
+} from "@/lib/types";
+import {
+  decodeToFormFields,
+  formDimsToStageSize,
+  requiredStageTotalsMeters,
+  venueRecordToMeters,
+  venueSmallerThanStageWarnings,
+} from "@/lib/stageSize";
+import { cn } from "@/lib/utils";
 import type { Department } from "../../../backend/src/types";
 import { formatDate } from "@/lib/dateUtils";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
-import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
 import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
 import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
 import { Button } from "@/components/ui/button";
@@ -70,16 +87,18 @@ type TeamDocument = {
 const EventEditSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  /** Optional: events without shows may have no event-level dates. */
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
   status: z.enum(["draft", "confirmed", "cancelled"]),
   venueId: z.string().optional(),
   tags: z.string().optional(),
   contactPerson: z.string().optional(),
   actorCount: z.string().optional(),
   allergies: z.string().optional(),
-  stageSize: z.string().optional(),
+  stageWidthM: z.string().optional(),
+  stageWidthCm: z.string().optional(),
+  stageDepthM: z.string().optional(),
+  stageDepthCm: z.string().optional(),
+  stageHeightM: z.string().optional(),
+  stageHeightCm: z.string().optional(),
   getInTime: z.string().optional(),
   setupTime: z.string().optional(),
   bookingContracts: z.string().optional(),
@@ -98,15 +117,13 @@ function emptyEventFormValues(): EventEditValues {
   return {
     title: "",
     description: "",
-    startDate: "",
-    endDate: "",
     status: "draft",
     venueId: "",
     tags: "",
     contactPerson: "",
     actorCount: "",
     allergies: "",
-    stageSize: "",
+    ...decodeToFormFields(null),
     getInTime: "",
     setupTime: "",
     bookingContracts: "",
@@ -136,15 +153,13 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
   return {
     title: e.title,
     description: e.description ?? "",
-    startDate: e.startDate ? e.startDate.slice(0, 16) : "",
-    endDate: e.endDate ? e.endDate.slice(0, 16) : "",
     status: e.status,
     venueId: e.venueId ?? "",
     tags: e.tags ?? "",
     contactPerson: e.contactPerson ?? "",
     actorCount: e.actorCount != null ? String(e.actorCount) : "",
     allergies: e.allergies ?? "",
-    stageSize: e.stageSize ?? "",
+    ...decodeToFormFields(e.stageSize),
     getInTime: e.getInTime ?? "",
     setupTime: e.setupTime ?? "",
     bookingContracts: g.bookingContracts,
@@ -215,9 +230,14 @@ function splitGeneralEventFields(fields: CustomField[]): {
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
-function SectionHeader({ children }: { children: React.ReactNode }) {
+function SectionHeader({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className="text-xs text-white/40 uppercase tracking-widest mb-3 mt-6 pb-2 border-b border-white/[0.06]">
+    <div
+      className={cn(
+        "text-[10px] text-white/40 uppercase tracking-widest mb-2 mt-4 pb-1.5 border-b border-white/[0.06]",
+        className
+      )}
+    >
       {children}
     </div>
   );
@@ -286,7 +306,7 @@ function DetailsTab({
 
   const { data: venues } = useQuery({
     queryKey: ["venues"],
-    queryFn: () => api.get<{ id: string; name: string }[]>("/api/venues"),
+    queryFn: () => api.get<Venue[]>("/api/venues"),
   });
 
   const { data: departments } = useQuery({
@@ -316,6 +336,27 @@ function DetailsTab({
     resolver: zodResolver(EventEditSchema),
     values: formValues,
   });
+
+  const vId = form.watch("venueId");
+  const sWM = form.watch("stageWidthM");
+  const sWcm = form.watch("stageWidthCm");
+  const sDM = form.watch("stageDepthM");
+  const sDcm = form.watch("stageDepthCm");
+  const sHM = form.watch("stageHeightM");
+  const sHcm = form.watch("stageHeightCm");
+
+  const venueSizeWarnings = useMemo(() => {
+    if (!venues?.length) return null;
+    if (!vId || vId === "__none__") return null;
+    const v = venues.find((x) => x.id === vId);
+    if (!v) return null;
+    const tot = requiredStageTotalsMeters(
+      { m: sWM, cm: sWcm },
+      { m: sDM, cm: sDcm },
+      { m: sHM, cm: sHcm }
+    );
+    return venueSmallerThanStageWarnings(tot, venueRecordToMeters(v));
+  }, [venues, vId, sWM, sWcm, sDM, sDcm, sHM, sHcm]);
 
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => api.post<Event>("/api/events", data),
@@ -359,19 +400,19 @@ function DetailsTab({
       .map((row) => ({ ...row, departments: [] as string[] }));
     const mergedCustomFields = [...normalizedCustomFields, ...generalFields];
 
+    const stageEnc = formDimsToStageSize(values);
+
     if (isNew) {
       const payload: Record<string, unknown> = {
         title: values.title,
         status: values.status,
       };
-      if (values.startDate?.trim()) payload.startDate = values.startDate;
       if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
-      if (values.endDate) payload.endDate = values.endDate;
       if (values.description) payload.description = values.description;
       if (values.tags) payload.tags = values.tags;
       if (values.contactPerson) payload.contactPerson = values.contactPerson;
       if (values.allergies) payload.allergies = values.allergies;
-      if (values.stageSize) payload.stageSize = values.stageSize;
+      if (stageEnc) payload.stageSize = stageEnc;
       if (values.getInTime) payload.getInTime = values.getInTime;
       if (values.setupTime) payload.setupTime = values.setupTime;
       if (values.actorCount) payload.actorCount = Number(values.actorCount);
@@ -384,16 +425,15 @@ function DetailsTab({
       title: values.title,
       status: values.status,
     };
-    if (values.startDate?.trim()) payload.startDate = values.startDate;
-    else payload.startDate = null;
+    payload.startDate = null;
+    payload.endDate = null;
     if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
     else payload.venueId = undefined;
-    if (values.endDate) payload.endDate = values.endDate;
     if (values.description) payload.description = values.description;
     if (values.tags) payload.tags = values.tags;
     if (values.contactPerson) payload.contactPerson = values.contactPerson;
     if (values.allergies) payload.allergies = values.allergies;
-    if (values.stageSize) payload.stageSize = values.stageSize;
+    payload.stageSize = stageEnc ?? null;
     if (values.getInTime) payload.getInTime = values.getInTime;
     if (values.setupTime) payload.setupTime = values.setupTime;
     if (values.actorCount) payload.actorCount = Number(values.actorCount);
@@ -441,10 +481,10 @@ function DetailsTab({
       : "Failed to save changes.";
 
   return (
-    <div className="space-y-5">
-      <h2 className="text-lg font-semibold text-white">{isNew ? "New event" : "Details"}</h2>
+    <div className="space-y-4">
+      <h2 className="text-base font-semibold text-white">{isNew ? "New event" : "Details"}</h2>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
           {/* ── Core fields ── */}
             <FormField
               control={form.control}
@@ -466,25 +506,15 @@ function DetailsTab({
                 <FormItem>
                   <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Description</FormLabel>
                   <FormControl>
-                    <Textarea {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30 resize-none" rows={3} />
+                    <Textarea {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30 resize-none" rows={2} />
                   </FormControl>
                 </FormItem>
               )}
             />
-            <p className="text-sm text-white/40">
-              Show date, time, and venue are set per show in the <strong className="text-white/60">Shows</strong> tab. You can
-              optionally set a rough event window here for the list and calendar.
+            <p className="text-xs text-white/40">
+              Schedule and duration are per show (below). Default venue is for reference; each show can use a different venue.
             </p>
-            <div className="space-y-2">
-              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Event window (optional)</FormLabel>
-              <DatetimeScheduleFields
-                startValue={form.watch("startDate") || ""}
-                endValue={form.watch("endDate") ?? ""}
-                onStartChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
-                onEndChange={(v) => form.setValue("endDate", v, { shouldDirty: true })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField
                 control={form.control}
                 name="status"
@@ -529,6 +559,16 @@ function DetailsTab({
                 )}
               />
             </div>
+            {venueSizeWarnings && venueSizeWarnings.length > 0 ? (
+              <div
+                role="status"
+                className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100/95 space-y-0.5"
+              >
+                {venueSizeWarnings.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            ) : null}
             <FormField
               control={form.control}
               name="tags"
@@ -587,20 +627,61 @@ function DetailsTab({
             {/* ── Technical ── */}
             <SectionHeader>Technical</SectionHeader>
 
-            <FormField
-              control={form.control}
-              name="stageSize"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Stage Size</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value ?? ""} placeholder="e.g. 12m × 8m" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2">
+              <p className="text-[10px] text-white/50 uppercase tracking-wide">Required space (W × D × H)</p>
+              <p className="text-[9px] text-white/32">Per axis: metres (max 999,99) and centimetres (0–99). Compared to the selected venue’s W / D / H when set.</p>
+              {(
+                [
+                  { label: "Width", m: "stageWidthM" as const, cm: "stageWidthCm" as const },
+                  { label: "Depth", m: "stageDepthM" as const, cm: "stageDepthCm" as const },
+                  { label: "Height", m: "stageHeightM" as const, cm: "stageHeightCm" as const },
+                ] as const
+              ).map((row) => (
+                <div key={row.m} className="flex flex-wrap items-end gap-2">
+                  <span className="text-[10px] text-white/45 w-12 shrink-0 pb-2">{row.label}</span>
+                  <FormField
+                    control={form.control}
+                    name={row.m}
+                    render={({ field }) => (
+                      <FormItem className="space-y-0.5">
+                        <FormLabel className="text-[9px] text-white/40 uppercase tracking-wide">m</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            value={field.value ?? ""}
+                            inputMode="decimal"
+                            maxLength={6}
+                            placeholder="0"
+                            className="h-8 w-[5.5rem] min-w-0 max-w-[6.5rem] bg-white/5 border-white/10 text-white"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={row.cm}
+                    render={({ field }) => (
+                      <FormItem className="space-y-0.5">
+                        <FormLabel className="text-[9px] text-white/40 uppercase tracking-wide">cm</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            value={field.value ?? ""}
+                            inputMode="numeric"
+                            maxLength={2}
+                            placeholder="0"
+                            className="h-8 w-11 min-w-0 bg-white/5 border-white/10 text-white"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              ))}
+            </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField
                 control={form.control}
                 name="getInTime"
@@ -813,6 +894,13 @@ function DetailsTab({
             </div>
           </form>
         </Form>
+
+        {!isNew && event ? (
+          <div className="pt-3 border-t border-white/10 space-y-2">
+            <SectionHeader className="!mt-0 !mb-1">Shows</SectionHeader>
+            <ShowsTab event={event} embedded />
+          </div>
+        ) : null}
 
         {!isNew && event ? (
           <>
@@ -1423,11 +1511,11 @@ function ShowEventCard({
   );
 }
 
-function ShowsTab({ event }: { event: EventDetail }) {
+function ShowsTab({ event, embedded }: { event: EventDetail; embedded?: boolean }) {
   const queryClient = useQueryClient();
   const { data: venues } = useQuery({
     queryKey: ["venues"],
-    queryFn: () => api.get<{ id: string; name: string }[]>("/api/venues"),
+    queryFn: () => api.get<Venue[]>("/api/venues"),
   });
   const { data: people } = useQuery({
     queryKey: ["people"],
@@ -1473,10 +1561,16 @@ function ShowsTab({ event }: { event: EventDetail }) {
 
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-white/45">{event.shows.length} show{event.shows.length === 1 ? "" : "s"}</p>
-        <Button size="sm" className="bg-white/5 border border-white/10 hover:bg-white/10 text-white" onClick={() => setCreating((v) => !v)}>
+    <div className={embedded ? "space-y-3" : "space-y-4"}>
+      <div className={`flex items-center justify-between gap-2 ${embedded ? "min-h-0" : ""}`}>
+        {embedded ? (
+          <p className="text-[10px] text-white/40">
+            {event.shows.length} show{event.shows.length === 1 ? "" : "s"} — date, time, and venue per show
+          </p>
+        ) : (
+          <p className="text-xs text-white/45">{event.shows.length} show{event.shows.length === 1 ? "" : "s"}</p>
+        )}
+        <Button size="sm" className="bg-white/5 border border-white/10 hover:bg-white/10 text-white shrink-0" onClick={() => setCreating((v) => !v)}>
           <Plus size={13} className="mr-1" /> Add show
         </Button>
       </div>
@@ -2042,12 +2136,6 @@ export default function EventDetailPage() {
                 Details
               </TabsTrigger>
               <TabsTrigger
-                value="shows"
-                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
-              >
-                Shows ({ev?.shows.length ?? 0})
-              </TabsTrigger>
-              <TabsTrigger
                 value="teams"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
@@ -2083,13 +2171,6 @@ export default function EventDetailPage() {
                 <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then assign people here.</div>
               ) : (
                 <PeopleTab event={ev!} />
-              )}
-            </TabsContent>
-            <TabsContent value="shows" className="mt-0">
-              {isNew ? (
-                <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then add shows here.</div>
-              ) : (
-                <ShowsTab event={ev!} />
               )}
             </TabsContent>
             <TabsContent value="teams" className="mt-0">
