@@ -14,6 +14,7 @@ import { formatDate } from "@/lib/dateUtils";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
+import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
 import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,7 +71,8 @@ type TeamDocument = {
 const EventEditSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  startDate: z.string().min(1, "Start date is required"),
+  /** Optional: events without shows may have no event-level dates. */
+  startDate: z.string().optional(),
   endDate: z.string().optional(),
   status: z.enum(["draft", "confirmed", "cancelled"]),
   venueId: z.string().optional(),
@@ -291,9 +293,10 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
   function onSubmit(values: EventEditValues) {
     const payload: Record<string, unknown> = {
       title: values.title,
-      startDate: values.startDate,
       status: values.status,
     };
+    if (values.startDate?.trim()) payload.startDate = values.startDate;
+    else payload.startDate = null;
     if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
     else payload.venueId = undefined;
     if (values.endDate) payload.endDate = values.endDate;
@@ -384,15 +387,18 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
                 </FormItem>
               )}
             />
+            <p className="text-sm text-white/40">
+              Show date, time, and venue are set per show in the <strong className="text-white/60">Shows</strong> tab. You can
+              optionally set a rough event window here for the list and calendar.
+            </p>
             <div className="space-y-2">
-              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Schedule</FormLabel>
+              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Event window (optional)</FormLabel>
               <DatetimeScheduleFields
-                startValue={form.watch("startDate")}
+                startValue={form.watch("startDate") || ""}
                 endValue={form.watch("endDate") ?? ""}
                 onStartChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
                 onEndChange={(v) => form.setValue("endDate", v, { shouldDirty: true })}
               />
-              <FormMessage className="text-red-400 text-xs">{form.formState.errors.startDate?.message}</FormMessage>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -751,7 +757,7 @@ function DetailsTab({ event, onDeleted }: { event: EventDetail; onDeleted: () =>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <InfoRow label="Start" value={formatDate(event.startDate)} />
+        <InfoRow label="Event window" value={formatDate(event.startDate)} />
         <InfoRow label="End" value={formatDate(event.endDate)} />
         <InfoRow label="Venue" value={event.venue?.name ?? "—"} />
         <InfoRow label="Tags" value={event.tags ?? "—"} />
@@ -1049,110 +1055,6 @@ function ShowTimeEditor({
             ))}
           </SelectContent>
         </Select>
-      </div>
-    </div>
-  );
-}
-
-function ShowTimingInlineEditor({
-  label,
-  date,
-  start,
-  durationMinutes,
-  onDateChange,
-  onChange,
-}: {
-  label: string;
-  date: string;
-  start: string | null;
-  durationMinutes: number | null;
-  onDateChange?: (date: string) => void;
-  onChange: (patch: { start?: string; durationMinutes?: number | null }) => void;
-}) {
-  const [localStart, setLocalStart] = useState(start ?? "");
-  const [localDuration, setLocalDuration] = useState(String(durationMinutes ?? 0));
-  const [localEnd, setLocalEnd] = useState("");
-  const refStart = useRef<SplitTimeFieldHandle>(null);
-  const refEnd = useRef<SplitTimeFieldHandle>(null);
-  const refDur = useRef<SplitTimeFieldHandle>(null);
-
-  useEffect(() => {
-    const st = start ?? "";
-    const dur = durationMinutes ?? 0;
-    setLocalStart(st);
-    setLocalDuration(String(dur));
-    setLocalEnd(st && dur > 0 ? endTimeFromStartAndDuration(st, dur) : "");
-  }, [start, durationMinutes, date]);
-  const hasStartTime = /^\d{2}:\d{2}$/.test(localStart);
-
-  return (
-    <div className="space-y-1.5">
-      <FieldLabel>{label}</FieldLabel>
-      <div className="flex flex-nowrap items-end gap-2 overflow-x-auto pb-0.5">
-        <div className="shrink-0">
-          <Label className="text-white/45 text-[10px] uppercase tracking-wide block mb-1">Date</Label>
-          <DateInputWithWeekday
-            value={date}
-            onChange={(v) => onDateChange?.(v)}
-            className="w-[10.5rem] min-w-[10.5rem] bg-white/5 border-white/10 text-white/70 [color-scheme:dark]"
-            weekdayClassName="text-[10px] text-white/45"
-          />
-        </div>
-        <div className="shrink-0">
-          <Label className="text-white/45 text-[10px] uppercase tracking-wide block mb-1">Start</Label>
-          <SplitTimeInput
-            ref={refStart}
-            value={localStart}
-            nextFieldRef={refEnd}
-            aria-label={`${label} start`}
-            onChange={(v) => {
-              setLocalStart(v);
-              onChange({ start: v });
-              const d = Number(localDuration);
-              if (v && Number.isFinite(d) && d > 0) {
-                setLocalEnd(endTimeFromStartAndDuration(v, d));
-              }
-            }}
-          />
-        </div>
-        <div className="shrink-0">
-          <Label className="text-white/45 text-[10px] uppercase tracking-wide block mb-1">End</Label>
-          <SplitTimeInput
-            ref={refEnd}
-            value={localEnd}
-            nextFieldRef={refDur}
-            aria-label={`${label} end`}
-            disabled={!hasStartTime}
-            onChange={(v) => {
-              setLocalEnd(v);
-              if (localStart && v) {
-                const dm = durationMinutesBetween(localStart, v);
-                if (dm) {
-                  setLocalDuration(String(dm));
-                  onChange({ durationMinutes: dm });
-                }
-              }
-            }}
-          />
-        </div>
-        <div className="shrink-0">
-          <Label className="text-white/45 text-[10px] uppercase tracking-wide block mb-1">Duration</Label>
-          <SplitDurationHhMmInput
-            ref={refDur}
-            valueMinutes={Number(localDuration) || 0}
-            aria-label={`${label} duration`}
-            disabled={!hasStartTime}
-            onChangeMinutes={(m) => {
-              setLocalDuration(String(m));
-              onChange({ durationMinutes: m > 0 ? m : null });
-              if (localStart && m > 0) {
-                setLocalEnd(endTimeFromStartAndDuration(localStart, m));
-              } else if (!m) {
-                setLocalEnd("");
-              }
-            }}
-          />
-        </div>
       </div>
     </div>
   );
@@ -1461,31 +1363,22 @@ function DocumentsTab({ event }: { event: EventDetail }) {
   );
 }
 
-type StaffDraftRow = { personId: string; role: string; meetingTime: string; meetingDurationMinutes: string };
-
 function ShowEventCard({
+  eventId,
   show,
   venues,
   people,
-  staffDraft,
-  setStaffDraft,
   updateShow,
   deleteShow,
-  removeStaff,
-  upsertStaff,
 }: {
+  eventId: string;
   show: EventShow;
   venues: { id: string; name: string }[] | undefined;
   people: Person[] | undefined;
-  staffDraft: Record<string, StaffDraftRow>;
-  setStaffDraft: Dispatch<SetStateAction<Record<string, StaffDraftRow>>>;
   updateShow: { mutate: (a: { showId: string; body: Record<string, unknown> }) => void };
   deleteShow: { mutate: (id: string) => void };
-  removeStaff: { mutate: (a: { showId: string; personId: string }) => void };
-  upsertStaff: { mutate: (a: { showId: string; body: Record<string, unknown> }) => void; isPending: boolean };
 }) {
   const patch = (body: Record<string, unknown>) => updateShow.mutate({ showId: show.id, body });
-  const draft = staffDraft[show.id] || { personId: "", role: "", meetingTime: "", meetingDurationMinutes: "60" };
 
   /** Local note text: controlled value must not track the query on every keystroke or saves race and drop characters. */
   const [technicalNotes, setTechnicalNotes] = useState(() => show.technicalNotes ?? "");
@@ -1576,166 +1469,7 @@ function ShowEventCard({
         </div>
       </div>
 
-      <div className="space-y-3">
-        <ShowTimingInlineEditor
-          label="Get-in"
-          date={show.showDate.slice(0, 10)}
-          onDateChange={(v) => patch({ showDate: v })}
-          start={show.getInTime}
-          durationMinutes={show.getInDurationMinutes}
-          onChange={(p) =>
-            patch({
-              ...(p.start !== undefined ? { getInTime: p.start } : {}),
-              ...(p.durationMinutes !== undefined ? { getInDurationMinutes: p.durationMinutes } : {}),
-            })
-          }
-        />
-        <ShowTimingInlineEditor
-          label="Rehearsal"
-          date={show.showDate.slice(0, 10)}
-          onDateChange={(v) => patch({ showDate: v })}
-          start={show.rehearsalTime}
-          durationMinutes={show.rehearsalDurationMinutes}
-          onChange={(p) =>
-            patch({
-              ...(p.start !== undefined ? { rehearsalTime: p.start } : {}),
-              ...(p.durationMinutes !== undefined ? { rehearsalDurationMinutes: p.durationMinutes } : {}),
-            })
-          }
-        />
-        <ShowTimingInlineEditor
-          label="Soundcheck"
-          date={show.showDate.slice(0, 10)}
-          onDateChange={(v) => patch({ showDate: v })}
-          start={show.soundcheckTime}
-          durationMinutes={show.soundcheckDurationMinutes}
-          onChange={(p) =>
-            patch({
-              ...(p.start !== undefined ? { soundcheckTime: p.start } : {}),
-              ...(p.durationMinutes !== undefined ? { soundcheckDurationMinutes: p.durationMinutes } : {}),
-            })
-          }
-        />
-        <ShowTimingInlineEditor
-          label="Break"
-          date={show.showDate.slice(0, 10)}
-          onDateChange={(v) => patch({ showDate: v })}
-          start={show.breakTime}
-          durationMinutes={show.breakDurationMinutes}
-          onChange={(p) =>
-            patch({
-              ...(p.start !== undefined ? { breakTime: p.start } : {}),
-              ...(p.durationMinutes !== undefined ? { breakDurationMinutes: p.durationMinutes } : {}),
-            })
-          }
-        />
-        <ShowTimingInlineEditor
-          label="Get-out"
-          date={show.showDate.slice(0, 10)}
-          onDateChange={(v) => patch({ showDate: v })}
-          start={show.getOutTime}
-          durationMinutes={show.getOutDurationMinutes}
-          onChange={(p) =>
-            patch({
-              ...(p.start !== undefined ? { getOutTime: p.start } : {}),
-              ...(p.durationMinutes !== undefined ? { getOutDurationMinutes: p.durationMinutes } : {}),
-            })
-          }
-        />
-      </div>
-
-      <div className="rounded border border-white/10 p-3 space-y-2">
-        <p className="text-xs uppercase tracking-wide text-white/45">Team staffing</p>
-        {show.staffing.map((s) => (
-          <div
-            key={s.id}
-            className="flex items-center justify-between text-sm bg-white/[0.03] border border-white/10 rounded px-3 py-2"
-          >
-            <span className="text-white/85">
-              {s.person.name} - {s.role || "Role not set"} {s.meetingTime ? `- ${s.meetingTime}` : ""}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-white/35 hover:text-red-400"
-              onClick={() => removeStaff.mutate({ showId: show.id, personId: s.personId })}
-            >
-              <X size={12} />
-            </Button>
-          </div>
-        ))}
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <FieldLabel>Person</FieldLabel>
-            <Select
-              value={draft.personId}
-              onValueChange={(v) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, personId: v } }))}
-            >
-              <SelectTrigger className="bg-white/5 border-white/10 text-white w-full min-w-0">
-                <SelectValue placeholder="Person" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                {(people ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <FieldLabel>Role</FieldLabel>
-            <Input
-              value={draft.role}
-              onChange={(e) => setStaffDraft((p) => ({ ...p, [show.id]: { ...draft, role: e.target.value } }))}
-              className="bg-white/5 border-white/10 text-white w-full"
-            />
-          </div>
-          <div className="sm:col-span-2 lg:col-span-2">
-            <ShowTimingInlineEditor
-              label="Meeting"
-              date={show.showDate.slice(0, 10)}
-              onDateChange={(v) => patch({ showDate: v })}
-              start={draft.meetingTime || null}
-              durationMinutes={draft.meetingDurationMinutes ? Number(draft.meetingDurationMinutes) : null}
-              onChange={(p) =>
-                setStaffDraft((prev) => {
-                  const row = prev[show.id] || { personId: "", role: "", meetingTime: "", meetingDurationMinutes: "60" };
-                  return {
-                    ...prev,
-                    [show.id]: {
-                      ...row,
-                      ...(p.start !== undefined ? { meetingTime: p.start ?? "" } : {}),
-                      ...(p.durationMinutes !== undefined
-                        ? { meetingDurationMinutes: p.durationMinutes ? String(p.durationMinutes) : "0" }
-                        : {}),
-                    },
-                  };
-                })
-              }
-            />
-            <div className="pt-2">
-              <Button
-                size="sm"
-                className="bg-red-900 hover:bg-red-800 text-white shrink-0"
-                disabled={!draft.personId || upsertStaff.isPending}
-                onClick={() =>
-                  upsertStaff.mutate({
-                    showId: show.id,
-                    body: {
-                      personId: draft.personId,
-                      role: draft.role || undefined,
-                      meetingTime: draft.meetingTime || undefined,
-                      meetingDurationMinutes: draft.meetingDurationMinutes
-                        ? Number(draft.meetingDurationMinutes)
-                        : undefined,
-                    },
-                  })
-                }
-              >
-                Add
-              </Button>
-            </div>
-          </div>
-        </div>
-        <p className="text-[11px] text-white/45">Staffing meeting time and duration are added to each person&apos;s work schedule.</p>
-      </div>
+      <ShowJobsEditor eventId={eventId} show={show} venues={venues} people={people} />
     </div>
   );
 }
@@ -1758,7 +1492,6 @@ function ShowsTab({ event }: { event: EventDetail }) {
     durationMinutes: "120",
     venueId: "",
   });
-  const [staffDraft, setStaffDraft] = useState<Record<string, { personId: string; role: string; meetingTime: string; meetingDurationMinutes: string }>>({});
   const newStartRef = useRef<SplitTimeFieldHandle>(null);
   const newEndRef = useRef<SplitTimeFieldHandle>(null);
   const newDurRef = useRef<SplitTimeFieldHandle>(null);
@@ -1789,17 +1522,6 @@ function ShowsTab({ event }: { event: EventDetail }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
   });
 
-  const upsertStaff = useMutation({
-    mutationFn: ({ showId, body }: { showId: string; body: Record<string, unknown> }) =>
-      api.post(`/api/events/${event.id}/shows/${showId}/staffing`, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
-  });
-
-  const removeStaff = useMutation({
-    mutationFn: ({ showId, personId }: { showId: string; personId: string }) =>
-      api.delete(`/api/events/${event.id}/shows/${showId}/staffing/${personId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
-  });
 
   return (
     <div className="space-y-4">
@@ -1891,15 +1613,12 @@ function ShowsTab({ event }: { event: EventDetail }) {
           {event.shows.map((show: EventShow) => (
             <ShowEventCard
               key={show.id}
+              eventId={event.id}
               show={show}
               venues={venues}
               people={people}
-              staffDraft={staffDraft}
-              setStaffDraft={setStaffDraft}
               updateShow={updateShow}
               deleteShow={deleteShow}
-              removeStaff={removeStaff}
-              upsertStaff={upsertStaff}
             />
           ))}
         </div>

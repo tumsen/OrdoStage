@@ -121,7 +121,7 @@ scheduleRouter.get("/schedule", async (c) => {
 
   const serializedEvents = events.map((event) => ({
     ...event,
-    startDate: serializeDate(event.startDate),
+    startDate: event.startDate ? serializeDate(event.startDate) : null,
     endDate: event.endDate ? serializeDate(event.endDate) : null,
     createdAt: serializeDate(event.createdAt),
     updatedAt: serializeDate(event.updatedAt),

@@ -307,7 +307,8 @@ export const EventSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string().nullable(),
-  startDate: z.string(),
+  /** Null when the event has no schedule window (e.g. no shows yet). */
+  startDate: z.string().nullable(),
   endDate: z.string().nullable(),
   status: z.enum(["draft", "confirmed", "cancelled"]),
   venueId: z.string().nullable(),
@@ -371,6 +372,34 @@ export const EventShowStaffingSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const EventShowJobSchema = z.object({
+  id: z.string(),
+  showId: z.string(),
+  title: z.string(),
+  jobDate: z.string(),
+  startTime: z.string(),
+  durationMinutes: z.number(),
+  venueId: z.string(),
+  venue: VenueSchema,
+  personId: z.string().nullable(),
+  person: PersonSchema.nullable().optional(),
+  sortOrder: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const CreateEventShowJobSchema = z.object({
+  title: z.string().min(1),
+  jobDate: z.string().min(1),
+  startTime: z.string().min(1),
+  durationMinutes: z.number().int().min(1),
+  venueId: z.string().min(1),
+  personId: z.string().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const UpdateEventShowJobSchema = CreateEventShowJobSchema.partial();
+
 export const EventShowSchema = z.object({
   id: z.string(),
   eventId: z.string(),
@@ -397,6 +426,7 @@ export const EventShowSchema = z.object({
   breakDurationMinutes: z.number().nullable(),
   notes: z.string().nullable(),
   staffing: z.array(EventShowStaffingSchema),
+  jobs: z.array(EventShowJobSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -411,20 +441,26 @@ export const CreateEventShowSchema = z.object({
   ticketNotes: z.string().optional(),
   hospitalityNotes: z.string().optional(),
   teamResponsibleId: z.string().optional(),
-  getInTime: z.string().optional(),
-  getInDurationMinutes: z.number().int().min(1).optional(),
-  getOutTime: z.string().optional(),
-  getOutDurationMinutes: z.number().int().min(1).optional(),
-  rehearsalTime: z.string().optional(),
-  rehearsalDurationMinutes: z.number().int().min(1).optional(),
-  soundcheckTime: z.string().optional(),
-  soundcheckDurationMinutes: z.number().int().min(1).optional(),
-  breakTime: z.string().optional(),
-  breakDurationMinutes: z.number().int().min(1).optional(),
   notes: z.string().optional(),
 });
 
-export const UpdateEventShowSchema = CreateEventShowSchema.partial();
+/** Legacy per-show timing slots (DB columns). Optional on update only; not used by the current UI. */
+const EventShowLegacySlotFields = z
+  .object({
+    getInTime: z.string().nullable().optional(),
+    getInDurationMinutes: z.number().int().min(1).nullable().optional(),
+    getOutTime: z.string().nullable().optional(),
+    getOutDurationMinutes: z.number().int().min(1).nullable().optional(),
+    rehearsalTime: z.string().nullable().optional(),
+    rehearsalDurationMinutes: z.number().int().min(1).nullable().optional(),
+    soundcheckTime: z.string().nullable().optional(),
+    soundcheckDurationMinutes: z.number().int().min(1).nullable().optional(),
+    breakTime: z.string().nullable().optional(),
+    breakDurationMinutes: z.number().int().min(1).nullable().optional(),
+  })
+  .partial();
+
+export const UpdateEventShowSchema = CreateEventShowSchema.partial().merge(EventShowLegacySlotFields);
 
 export const UpsertEventShowStaffingSchema = z.object({
   personId: z.string().min(1),
@@ -437,8 +473,9 @@ export const UpsertEventShowStaffingSchema = z.object({
 export const CreateEventSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
-  startDate: z.string(),
-  endDate: z.string().optional(),
+  /** Omit or null when the event has no date yet (e.g. before any show exists). */
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
   status: z.enum(["draft", "confirmed", "cancelled"]).default("draft"),
   venueId: z.string().optional(),
   tags: z.string().optional(),
@@ -595,6 +632,7 @@ export type Event = z.infer<typeof EventSchema>;
 export type EventTeam = z.infer<typeof EventTeamSchema>;
 export type EventTeamNote = z.infer<typeof EventTeamNoteSchema>;
 export type EventShow = z.infer<typeof EventShowSchema>;
+export type EventShowJob = z.infer<typeof EventShowJobSchema>;
 export type EventShowStaffing = z.infer<typeof EventShowStaffingSchema>;
 export type CreateEvent = z.infer<typeof CreateEventSchema>;
 export type EventDetail = z.infer<typeof EventDetailSchema>;

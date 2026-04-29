@@ -53,8 +53,9 @@ export default function Events() {
 
   const filtered = (events ?? []).filter((e) => {
     if (statusFilter !== "all" && e.status !== statusFilter) return false;
-    if (dateFrom && new Date(e.startDate) < new Date(dateFrom)) return false;
-    if (dateTo && new Date(e.startDate) > new Date(dateTo + "T23:59:59")) return false;
+    if (dateFrom && e.startDate && new Date(e.startDate) < new Date(dateFrom)) return false;
+    if (dateTo && e.startDate && new Date(e.startDate) > new Date(dateTo + "T23:59:59")) return false;
+    if ((dateFrom || dateTo) && !e.startDate) return false;
     return true;
   });
 

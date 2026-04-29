@@ -265,6 +265,7 @@ model Venue {
   events           Event[]
   internalBookings InternalBooking[]
   eventShows       EventShow[]
+  eventShowJobs    EventShowJob[]
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 }
@@ -302,6 +303,7 @@ model Person {
   tourNotes        TourPersonNote[]
   responsibleShows EventShow[]              @relation("EventShowResponsible")
   showStaffing     EventShowStaffing[]      @relation("EventShowStaffingPerson")
+  showJobs         EventShowJob[]
   /** App access for users linked by email uses this permission group (RoleDefinition). */
   permissionGroupId String?
   permissionGroup   RoleDefinition?        @relation(fields: [permissionGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -358,7 +360,8 @@ model Event {
   id             String        @id @default(cuid())
   title          String
   description    String?
-  startDate      DateTime
+  /** Set when the event has a known window; events with no shows may leave this null. */
+  startDate      DateTime?
   endDate        DateTime?
   status         String        @default("draft")
   venueId        String?
@@ -478,9 +481,31 @@ model EventShow {
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
   staffing             EventShowStaffing[]
+  jobs                 EventShowJob[]
 
   @@index([eventId, showDate])
   @@index([venueId, showDate])
+}
+
+/** Per-show work item: title, when/where, optional assignee. Replaces fixed slots (get-in, rehearsal, …) in the UI. */
+model EventShowJob {
+  id              String    @id @default(cuid())
+  showId          String
+  show            EventShow @relation(fields: [showId], references: [id], onDelete: Cascade)
+  title           String
+  jobDate         DateTime
+  startTime       String
+  durationMinutes Int
+  venueId         String
+  venue           Venue     @relation(fields: [venueId], references: [id])
+  personId        String?
+  person          Person?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([showId, sortOrder])
+  @@index([venueId])
 }
 
 model EventShowStaffing {

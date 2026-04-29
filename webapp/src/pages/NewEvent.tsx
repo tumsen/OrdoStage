@@ -34,7 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 const EventFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  startDate: z.string().min(1, "Start date is required"),
+  startDate: z.string().optional(),
   endDate: z.string().optional(),
   status: z.enum(["draft", "confirmed", "cancelled"]).default("draft"),
   venueId: z.string().optional(),
@@ -152,9 +152,9 @@ export default function NewEvent() {
   function onSubmit(values: EventFormValues) {
     const payload: Record<string, unknown> = {
       title: values.title,
-      startDate: values.startDate,
       status: values.status,
     };
+    if (values.startDate?.trim()) payload.startDate = values.startDate;
 
     if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
     if (values.endDate) payload.endDate = values.endDate;
@@ -282,15 +282,18 @@ export default function NewEvent() {
                 <FormField control={form.control} name="description" render={({ field }) => (
                   <FormItem><FormLabel className="text-white/70 text-sm">Description</FormLabel><FormControl><Textarea {...field} value={field.value ?? ""} placeholder="General event description..." className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-none" rows={3} /></FormControl></FormItem>
                 )} />
+                <p className="text-sm text-white/40">
+                  You add date, time, and venue for each <strong className="text-white/60">show</strong> on the Next tab. Optionally set a
+                  general event window here.
+                </p>
                 <div className="space-y-2">
-                  <FormLabel className="text-white/70 text-sm">Schedule *</FormLabel>
+                  <FormLabel className="text-white/70 text-sm">Event window (optional)</FormLabel>
                   <DatetimeScheduleFields
-                    startValue={form.watch("startDate")}
+                    startValue={form.watch("startDate") || ""}
                     endValue={form.watch("endDate") ?? ""}
                     onStartChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
                     onEndChange={(v) => form.setValue("endDate", v, { shouldDirty: true })}
                   />
-                  <FormMessage className="text-red-400 text-xs">{form.formState.errors.startDate?.message}</FormMessage>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <FormField control={form.control} name="status" render={({ field }) => (

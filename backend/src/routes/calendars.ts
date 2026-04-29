@@ -25,7 +25,7 @@ function buildICS(
     id: string;
     title: string;
     description: string | null;
-    startDate: Date;
+    startDate: Date | null;
     endDate: Date | null;
     status: string;
     tags: string | null;
@@ -42,6 +42,7 @@ function buildICS(
   };
 
   const vevents = events
+    .filter((e): e is typeof e & { startDate: Date } => e.startDate != null)
     .map((event) => {
       const dtstart = formatICSDate(event.startDate);
       const dtend = event.endDate

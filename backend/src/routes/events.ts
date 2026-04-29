@@ -5,8 +5,10 @@ import { auth } from "../auth";
 import {
   CreateEventSchema,
   CreateEventShowSchema,
+  CreateEventShowJobSchema,
   UpdateEventSchema,
   UpdateEventShowSchema,
+  UpdateEventShowJobSchema,
   AssignPersonSchema,
   UpsertEventShowStaffingSchema,
   AddEventTeamSchema,
@@ -136,7 +138,7 @@ function serializeEvent(event: {
   id: string;
   title: string;
   description: string | null;
-  startDate: Date;
+  startDate: Date | null;
   endDate: Date | null;
   status: string;
   venueId: string | null;
@@ -157,7 +159,7 @@ function serializeEvent(event: {
     id: event.id,
     title: event.title,
     description: event.description,
-    startDate: event.startDate.toISOString(),
+    startDate: event.startDate ? event.startDate.toISOString() : null,
     endDate: event.endDate ? event.endDate.toISOString() : null,
     status: event.status,
     venueId: event.venueId,
@@ -340,6 +342,10 @@ const eventInclude: any = {
     include: {
       venue: true,
       teamResponsible: true,
+      jobs: {
+        include: { venue: true, person: true },
+        orderBy: { sortOrder: "asc" as const },
+      },
       staffing: {
         include: {
           person: true,
@@ -398,6 +404,21 @@ function serializeFullEvent(event: any) {
       breakTime: show.breakTime,
       breakDurationMinutes: show.breakDurationMinutes,
       notes: show.notes,
+      jobs: (show.jobs ?? []).map((job: any) => ({
+        id: job.id,
+        showId: job.showId,
+        title: job.title,
+        jobDate: job.jobDate.toISOString(),
+        startTime: job.startTime,
+        durationMinutes: job.durationMinutes,
+        venueId: job.venueId,
+        venue: serializeVenue(job.venue)!,
+        personId: job.personId,
+        person: job.person ? serializePerson(job.person) : null,
+        sortOrder: job.sortOrder,
+        createdAt: job.createdAt.toISOString(),
+        updatedAt: job.updatedAt.toISOString(),
+      })),
       staffing: show.staffing.map((s: any) => ({
         id: s.id,
         showId: s.showId,
@@ -479,7 +500,7 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
     data: {
       title: body.title,
       description: body.description ?? null,
-      startDate: new Date(body.startDate),
+      startDate: body.startDate ? new Date(body.startDate) : null,
       endDate: body.endDate ? new Date(body.endDate) : null,
       status: body.status ?? "draft",
       venueId: body.venueId ?? null,
@@ -594,7 +615,9 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
     data: {
       ...(body.title !== undefined && { title: body.title }),
       ...(body.description !== undefined && { description: body.description }),
-      ...(body.startDate !== undefined && { startDate: new Date(body.startDate) }),
+      ...(body.startDate !== undefined && {
+        startDate: body.startDate === null || body.startDate === "" ? null : new Date(body.startDate),
+      }),
       ...(body.endDate !== undefined && { endDate: body.endDate ? new Date(body.endDate) : null }),
       ...(body.status !== undefined && { status: body.status }),
       ...(body.venueId !== undefined && { venueId: body.venueId }),
@@ -1206,19 +1229,19 @@ eventsRouter.post("/events/:id/shows", zValidator("json", CreateEventShowSchema)
       ticketNotes: body.ticketNotes ?? null,
       hospitalityNotes: body.hospitalityNotes ?? null,
       teamResponsibleId: body.teamResponsibleId ?? null,
-      getInTime: body.getInTime ?? null,
-      getInDurationMinutes: body.getInDurationMinutes ?? null,
-      getOutTime: body.getOutTime ?? null,
-      getOutDurationMinutes: body.getOutDurationMinutes ?? null,
-      rehearsalTime: body.rehearsalTime ?? null,
-      rehearsalDurationMinutes: body.rehearsalDurationMinutes ?? null,
-      soundcheckTime: body.soundcheckTime ?? null,
-      soundcheckDurationMinutes: body.soundcheckDurationMinutes ?? null,
-      breakTime: body.breakTime ?? null,
-      breakDurationMinutes: body.breakDurationMinutes ?? null,
       notes: body.notes ?? null,
     },
   });
+  const ev = await prismaAny.event.findUnique({
+    where: { id: eventId },
+    select: { startDate: true },
+  });
+  if (ev && ev.startDate == null) {
+    await prismaAny.event.update({
+      where: { id: eventId },
+      data: { startDate: new Date(body.showDate) },
+    });
+  }
   return c.json({ data: { id: show.id } }, 201);
 });
 
@@ -1403,6 +1426,118 @@ eventsRouter.delete("/events/:id/shows/:showId/staffing/:personId", async (c) =>
   if (!row) return c.json({ error: { message: "Staffing not found", code: "NOT_FOUND" } }, 404);
   await removeStaffingFromSchedule(row.id, user.organizationId);
   await prismaAny.eventShowStaffing.delete({ where: { id: row.id } });
+  return new Response(null, { status: 204 });
+});
+
+// POST /api/events/:id/shows/:showId/jobs
+eventsRouter.post(
+  "/events/:id/shows/:showId/jobs",
+  zValidator("json", CreateEventShowJobSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId)
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    if (!canAction(c, "write.events")) {
+      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+    }
+    const { id: eventId, showId } = c.req.param();
+    const body = c.req.valid("json");
+    const show = await prismaAny.eventShow.findFirst({
+      where: { id: showId, eventId, event: { organizationId: user.organizationId } },
+    });
+    if (!show) return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
+    const venue = await prisma.venue.findUnique({
+      where: { id: body.venueId, organizationId: user.organizationId },
+    });
+    if (!venue) return c.json({ error: { message: "Venue not found", code: "NOT_FOUND" } }, 404);
+    if (body.personId) {
+      const p = await prisma.person.findUnique({
+        where: { id: body.personId, organizationId: user.organizationId },
+        select: { id: true },
+      });
+      if (!p) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+    }
+    const max = await prismaAny.eventShowJob.aggregate({
+      where: { showId },
+      _max: { sortOrder: true },
+    });
+    const sortOrder = body.sortOrder ?? (max._max.sortOrder == null ? 0 : max._max.sortOrder + 1);
+    const job = await prismaAny.eventShowJob.create({
+      data: {
+        showId,
+        title: body.title,
+        jobDate: new Date(body.jobDate),
+        startTime: body.startTime,
+        durationMinutes: body.durationMinutes,
+        venueId: body.venueId,
+        personId: body.personId ?? null,
+        sortOrder,
+      },
+    });
+    return c.json({ data: { id: job.id } }, 201);
+  }
+);
+
+// PUT /api/events/:id/shows/:showId/jobs/:jobId
+eventsRouter.put(
+  "/events/:id/shows/:showId/jobs/:jobId",
+  zValidator("json", UpdateEventShowJobSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId)
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    if (!canAction(c, "write.events")) {
+      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+    }
+    const { id: eventId, showId, jobId } = c.req.param();
+    const body = c.req.valid("json");
+    const job = await prismaAny.eventShowJob.findFirst({
+      where: { id: jobId, showId, show: { id: showId, eventId, event: { organizationId: user.organizationId } } },
+    });
+    if (!job) return c.json({ error: { message: "Job not found", code: "NOT_FOUND" } }, 404);
+    if (body.venueId) {
+      const venue = await prisma.venue.findUnique({
+        where: { id: body.venueId, organizationId: user.organizationId },
+      });
+      if (!venue) return c.json({ error: { message: "Venue not found", code: "NOT_FOUND" } }, 404);
+    }
+    if (body.personId) {
+      const p = await prisma.person.findUnique({
+        where: { id: body.personId, organizationId: user.organizationId },
+        select: { id: true },
+      });
+      if (!p) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+    }
+    await prismaAny.eventShowJob.update({
+      where: { id: jobId },
+      data: {
+        ...(body.title !== undefined && { title: body.title }),
+        ...(body.jobDate !== undefined && { jobDate: new Date(body.jobDate) }),
+        ...(body.startTime !== undefined && { startTime: body.startTime }),
+        ...(body.durationMinutes !== undefined && { durationMinutes: body.durationMinutes }),
+        ...(body.venueId !== undefined && { venueId: body.venueId }),
+        ...(body.personId !== undefined && { personId: body.personId ?? null }),
+        ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
+      },
+    });
+    return c.json({ data: { ok: true } });
+  }
+);
+
+// DELETE /api/events/:id/shows/:showId/jobs/:jobId
+eventsRouter.delete("/events/:id/shows/:showId/jobs/:jobId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  if (!canAction(c, "write.events")) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  const { id: eventId, showId, jobId } = c.req.param();
+  const job = await prismaAny.eventShowJob.findFirst({
+    where: { id: jobId, showId, show: { id: showId, eventId, event: { organizationId: user.organizationId } } },
+  });
+  if (!job) return c.json({ error: { message: "Job not found", code: "NOT_FOUND" } }, 404);
+  await prismaAny.eventShowJob.delete({ where: { id: jobId } });
   return new Response(null, { status: 204 });
 });
 
