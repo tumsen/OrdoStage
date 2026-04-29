@@ -45,7 +45,8 @@ function MonthCalendar({ events, tourDetails }: { events: Event[]; tourDetails: 
 
   // Build a map: "YYYY-MM-DD" → CalEntry[]
   const entriesByDate = new Map<string, CalEntry[]>();
-  function addEntry(dateStr: string, entry: CalEntry) {
+  function addEntry(dateStr: string | null | undefined, entry: CalEntry) {
+    if (dateStr == null || dateStr === "") return;
     const key = dateStr.slice(0, 10);
     if (!entriesByDate.has(key)) entriesByDate.set(key, []);
     entriesByDate.get(key)!.push(entry);
@@ -55,7 +56,7 @@ function MonthCalendar({ events, tourDetails }: { events: Event[]; tourDetails: 
     addEntry(e.startDate, { label: e.title, color: "event", href: `/events/${e.id}` });
   }
   for (const tour of tourDetails) {
-    for (const show of tour.shows) {
+    for (const show of tour.shows ?? []) {
       addEntry(show.date, {
         label: show.type === "travel"
           ? `Travel${show.fromLocation && show.toLocation ? `: ${show.fromLocation}→${show.toLocation}` : ""}`
@@ -212,8 +213,8 @@ export default function Dashboard() {
   const tourCount = tours?.length ?? 0;
 
   const upcomingEvents = (events ?? [])
-    .filter((e) => isNext30Days(e.startDate))
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+    .filter((e) => e.startDate && isNext30Days(e.startDate))
+    .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime())
     .slice(0, 6);
 
   // Upcoming tour shows (next 60 days across all tours)
@@ -221,10 +222,11 @@ export default function Dashboard() {
   const in60 = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
   const upcomingShows = tourDetails
     .flatMap((tour) =>
-      tour.shows
+      (tour.shows ?? [])
         .filter((s) => {
+          if (!s.date) return false;
           const d = new Date(s.date);
-          return d >= now && d <= in60;
+          return !Number.isNaN(d.getTime()) && d >= now && d <= in60;
         })
         .map((s) => ({ show: s, tour }))
     )

@@ -13,19 +13,36 @@ export interface CalendarItem {
   raw: EventDetail | InternalBookingDetail;
 }
 
+/** Date anchor for the schedule grid: event window, or earliest show date when window is unset. */
+export function eventCalendarStart(e: EventDetail): string | null {
+  if (e.startDate) return e.startDate;
+  if (!e.shows?.length) return null;
+  const sorted = [...e.shows]
+    .map((s) => s.showDate)
+    .filter(Boolean)
+    .sort();
+  return sorted[0] ?? null;
+}
+
 export function toCalendarItems(
   events: EventDetail[],
   bookings: InternalBookingDetail[]
 ): CalendarItem[] {
-  const eventItems: CalendarItem[] = events.map((e) => ({
-    id: e.id,
-    title: e.title,
-    kind: "event",
-    status: e.status,
-    startDate: e.startDate,
-    endDate: e.endDate,
-    raw: e,
-  }));
+  const eventItems: CalendarItem[] = events
+    .map((e) => {
+      const startDate = eventCalendarStart(e);
+      if (!startDate) return null;
+      return {
+        id: e.id,
+        title: e.title,
+        kind: "event" as const,
+        status: e.status,
+        startDate,
+        endDate: e.endDate,
+        raw: e,
+      };
+    })
+    .filter((item): item is CalendarItem => item !== null);
 
   const bookingItems: CalendarItem[] = bookings.map((b) => ({
     id: b.id,
@@ -70,6 +87,7 @@ export function getMonthDays(year: number, month: number): (Date | null)[] {
 export function itemsForDay(items: CalendarItem[], date: Date): CalendarItem[] {
   const dateStr = toDateStr(date);
   return items.filter((item) => {
+    if (!item.startDate) return false;
     const start = item.startDate.slice(0, 10);
     const end = item.endDate ? item.endDate.slice(0, 10) : start;
     return dateStr >= start && dateStr <= end;
@@ -124,11 +142,12 @@ export function itemColor(item: CalendarItem): string {
 
 /** ISO string includes a time component (not date-only). */
 export function hasTimedStart(item: CalendarItem): boolean {
+  if (!item.startDate) return false;
   return /\dT\d/.test(item.startDate);
 }
 
 export function getItemTimeRange(item: CalendarItem): { start: Date; end: Date; hasExplicitTime: boolean } {
-  const start = new Date(item.startDate);
+  const start = new Date(item.startDate || 0);
   const end = item.endDate ? new Date(item.endDate) : new Date(start.getTime() + 60 * 60 * 1000);
   const hasExplicitTime = hasTimedStart(item);
   return { start, end, hasExplicitTime };

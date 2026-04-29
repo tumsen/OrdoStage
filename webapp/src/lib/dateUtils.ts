@@ -34,8 +34,10 @@ export function isThisMonth(dateStr: string): boolean {
   return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
 }
 
-export function isNext30Days(dateStr: string): boolean {
+export function isNext30Days(dateStr: string | null | undefined): boolean {
+  if (!dateStr) return false;
   const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return false;
   const now = new Date();
   const future = new Date();
   future.setDate(future.getDate() + 30);
