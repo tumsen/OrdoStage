@@ -25,6 +25,7 @@ import {
   venueRecordToMeters,
   venueSmallerThanStageWarnings,
 } from "@/lib/stageSize";
+import { scheduleFieldLabelClass } from "@/components/ScheduleTimeRow";
 import { cn } from "@/lib/utils";
 import type { Department } from "../../../backend/src/types";
 import { formatDate } from "@/lib/dateUtils";
@@ -627,58 +628,66 @@ function DetailsTab({
             {/* ── Technical ── */}
             <SectionHeader>Technical</SectionHeader>
 
-            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2">
-              <p className="text-[10px] text-white/50 uppercase tracking-wide">Required space (W × D × H)</p>
-              <p className="text-[9px] text-white/32">Per axis: metres (max 999,99) and centimetres (0–99). Compared to the selected venue’s W / D / H when set.</p>
-              {(
-                [
-                  { label: "Width", m: "stageWidthM" as const, cm: "stageWidthCm" as const },
-                  { label: "Depth", m: "stageDepthM" as const, cm: "stageDepthCm" as const },
-                  { label: "Height", m: "stageHeightM" as const, cm: "stageHeightCm" as const },
-                ] as const
-              ).map((row) => (
-                <div key={row.m} className="flex flex-wrap items-end gap-2">
-                  <span className="text-[10px] text-white/45 w-12 shrink-0 pb-2">{row.label}</span>
-                  <FormField
-                    control={form.control}
-                    name={row.m}
-                    render={({ field }) => (
-                      <FormItem className="space-y-0.5">
-                        <FormLabel className="text-[9px] text-white/40 uppercase tracking-wide">m</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            value={field.value ?? ""}
-                            inputMode="decimal"
-                            maxLength={6}
-                            placeholder="0"
-                            className="h-8 w-[5.5rem] min-w-0 max-w-[6.5rem] bg-white/5 border-white/10 text-white"
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={row.cm}
-                    render={({ field }) => (
-                      <FormItem className="space-y-0.5">
-                        <FormLabel className="text-[9px] text-white/40 uppercase tracking-wide">cm</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            value={field.value ?? ""}
-                            inputMode="numeric"
-                            maxLength={2}
-                            placeholder="0"
-                            className="h-8 w-11 min-w-0 bg-white/5 border-white/10 text-white"
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              ))}
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+              <p className="text-[9px] text-white/35 mb-1.5 leading-snug">
+                <span className="text-white/50">W × D × H</span> — m + cm; max 999,99 m per side. Amber note if the default venue is smaller.
+              </p>
+              <div className="flex flex-nowrap items-end gap-1.5 sm:gap-2 min-w-0 overflow-x-auto pb-0.5 -mx-0.5 px-0.5">
+                {(
+                  [
+                    { short: "W", full: "Width", m: "stageWidthM" as const, cm: "stageWidthCm" as const },
+                    { short: "D", full: "Depth", m: "stageDepthM" as const, cm: "stageDepthCm" as const },
+                    { short: "H", full: "Height", m: "stageHeightM" as const, cm: "stageHeightCm" as const },
+                  ] as const
+                ).map((row, i) => (
+                  <div key={row.m} className="flex shrink-0 items-end gap-1.5">
+                    {i > 0 ? <div className="w-px h-7 bg-white/10 self-end mb-0.5 shrink-0" aria-hidden /> : null}
+                    <div className="flex items-end gap-1 shrink-0" title={`${row.full} (m, cm)`}>
+                      <span className="text-[10px] text-white/50 pb-2 w-4 text-center font-medium leading-none">
+                        {row.short}
+                      </span>
+                      <FormField
+                        control={form.control}
+                        name={row.m}
+                        render={({ field }) => (
+                          <FormItem className="space-y-0.5 w-[5.25rem] min-w-[5.25rem] shrink-0">
+                            <FormLabel className={scheduleFieldLabelClass}>m</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value ?? ""}
+                                inputMode="decimal"
+                                maxLength={6}
+                                placeholder="0"
+                                className="h-8 w-full min-w-0 bg-white/5 border-white/10 text-white"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={row.cm}
+                        render={({ field }) => (
+                          <FormItem className="space-y-0.5 w-10 min-w-10">
+                            <FormLabel className={scheduleFieldLabelClass}>cm</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value ?? ""}
+                                inputMode="numeric"
+                                maxLength={2}
+                                placeholder="0"
+                                className="h-8 w-full min-w-0 bg-white/5 border-white/10 text-white"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
