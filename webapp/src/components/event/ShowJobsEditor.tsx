@@ -110,10 +110,12 @@ export function ShowJobsEditor({
   };
 
   const jobRowClass =
-    "flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 overflow-x-auto pb-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-2";
+    "w-full flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 overflow-x-auto pb-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-2";
 
   const selectTriggerClass =
-    "bg-white/5 border-white/10 text-white h-9 w-[7.5rem] min-w-[7.5rem] sm:w-36 sm:min-w-[9rem]";
+    "bg-white/5 border-white/10 text-white h-10 w-[7.5rem] min-w-[7.5rem] sm:w-36 sm:min-w-[9rem]";
+  const personSelectTriggerClass =
+    "bg-white/5 border-white/10 text-white h-10 w-[10.5rem] min-w-[10.5rem] sm:w-56 sm:min-w-[14rem]";
 
   return (
     <div className="space-y-2">
@@ -146,7 +148,7 @@ export function ShowJobsEditor({
                   const v = e.target.value.trim();
                   if (v && v !== j.title) updateJob.mutate({ jobId: j.id, body: { title: v } });
                 }}
-                className="bg-white/5 border-white/10 text-white h-9 w-full"
+                className="bg-white/5 border-white/10 text-white h-10 w-full"
               />
             </div>
             <div className="shrink-0 min-w-0 max-w-full">
@@ -192,7 +194,7 @@ export function ShowJobsEditor({
                   updateJob.mutate({ jobId: j.id, body: { personId: v === "__none__" ? null : v } })
                 }
               >
-                <SelectTrigger className={selectTriggerClass}>
+                <SelectTrigger className={personSelectTriggerClass}>
                   <SelectValue placeholder="Unassigned" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#16161f] border-white/10 text-white">
@@ -253,7 +255,7 @@ export function ShowJobsEditor({
             <Input
               value={draft.title}
               onChange={(e) => setDraft((d) => (d ? { ...d, title: e.target.value } : d))}
-              className="bg-white/5 border-white/10 text-white h-9 w-full"
+              className="bg-white/5 border-white/10 text-white h-10 w-full"
             />
           </div>
           <div className="shrink-0 min-w-0 max-w-full">
@@ -290,7 +292,7 @@ export function ShowJobsEditor({
                 setDraft((d) => (d ? { ...d, personId: personId === "__none__" ? "" : personId } : d))
               }
             >
-              <SelectTrigger className={selectTriggerClass}>
+              <SelectTrigger className={personSelectTriggerClass}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#16161f] border-white/10 text-white">
@@ -307,13 +309,13 @@ export function ShowJobsEditor({
             <Button
               type="button"
               size="sm"
-              className="h-9 bg-red-900 hover:bg-red-800"
+              className="h-10 bg-red-900 hover:bg-red-800"
               onClick={saveDraft}
               disabled={createJob.isPending}
             >
               Save
             </Button>
-            <Button type="button" size="sm" variant="ghost" className="h-9" onClick={() => setDraft(null)}>
+            <Button type="button" size="sm" variant="ghost" className="h-10" onClick={() => setDraft(null)}>
               Cancel
             </Button>
           </div>

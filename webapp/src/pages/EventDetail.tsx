@@ -1015,7 +1015,7 @@ function ShowTimeEditor({
             setShowDate(v);
             onUpdate({ showDate: v });
           }}
-          className="w-[10.5rem] min-w-[10.5rem] bg-white/5 border-white/10 text-white [color-scheme:dark]"
+          className="w-[13rem] min-w-[13rem] bg-white/5 border-white/10 text-white [color-scheme:dark]"
           weekdayClassName="text-[10px] text-white/45"
         />
       </div>
@@ -1567,7 +1567,7 @@ function ShowsTab({ event, embedded }: { event: EventDetail; embedded?: boolean 
 
   return (
     <div className={embedded ? "space-y-3" : "space-y-4"}>
-      <div className={`flex items-center justify-between gap-2 ${embedded ? "min-h-0" : ""}`}>
+      <div className={`space-y-2 ${embedded ? "min-h-0" : ""}`}>
         {embedded ? (
           <p className="text-[10px] text-white/40">
             {event.shows.length} show{event.shows.length === 1 ? "" : "s"} — date, time, and venue per show
@@ -1575,19 +1575,19 @@ function ShowsTab({ event, embedded }: { event: EventDetail; embedded?: boolean 
         ) : (
           <p className="text-xs text-white/45">{event.shows.length} show{event.shows.length === 1 ? "" : "s"}</p>
         )}
-        <Button size="sm" className="bg-white/5 border border-white/10 hover:bg-white/10 text-white shrink-0" onClick={() => setCreating((v) => !v)}>
+        <Button size="sm" className="bg-white/5 border border-white/10 hover:bg-white/10 text-white" onClick={() => setCreating((v) => !v)}>
           <Plus size={13} className="mr-1" /> Add show
         </Button>
       </div>
       {creating ? (
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-nowrap items-end gap-3 min-w-0 overflow-x-auto pb-0.5">
             <div>
               <FieldLabel>Date</FieldLabel>
               <DateInputWithWeekday
                 value={newShow.showDate}
                 onChange={(v) => setNewShow((s) => mergeNewShowState(s, { showDate: v }))}
-                className="w-[10.5rem] min-w-[10.5rem] bg-white/5 border-white/10 text-white [color-scheme:dark]"
+                className="w-[13rem] min-w-[13rem] bg-white/5 border-white/10 text-white [color-scheme:dark]"
                 weekdayClassName="text-[10px] text-white/45"
               />
             </div>
