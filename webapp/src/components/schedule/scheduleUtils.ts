@@ -5,8 +5,7 @@ export type BookingType = "rehearsal" | "maintenance" | "private" | "other";
 export interface CalendarItem {
   id: string;
   title: string;
-  metaLine?: string;
-  kind: "event" | "booking" | "job";
+  kind: "event" | "booking";
   type?: BookingType;
   status?: string;
   startDate: string;
@@ -58,7 +57,7 @@ export function toCalendarItems(
       });
 
     if (shows.length > 0) {
-      const showItems = shows.map((show) => {
+      return shows.map((show) => {
         const day = show.showDate.slice(0, 10);
         const hasTime = /^\d{2}:\d{2}$/.test(show.showTime);
         const ranges: Array<{ start: string; end: string | null }> = [];
@@ -92,21 +91,9 @@ export function toCalendarItems(
           endDate = maxEnd;
         }
 
-        const jobs = (show.jobs ?? [])
-          .slice()
-          .sort((a, b) => a.startTime.localeCompare(b.startTime));
-        const jobsLabel =
-          jobs.length > 0
-            ? jobs
-                .slice(0, 2)
-                .map((j) => `${j.title}${j.person?.name ? ` (${j.person.name})` : ""}`)
-                .join(" · ") + (jobs.length > 2 ? ` +${jobs.length - 2}` : "")
-            : undefined;
-
         return {
           id: `${e.id}:show:${show.id}`,
           title: e.title,
-          metaLine: jobsLabel,
           kind: "event" as const,
           status: e.status,
           startDate,
@@ -114,27 +101,6 @@ export function toCalendarItems(
           raw: e,
         } satisfies CalendarItem;
       });
-
-      const jobItems: CalendarItem[] = shows.flatMap((show) =>
-        (show.jobs ?? [])
-          .filter((job) => Boolean(job.personId))
-          .map((job) => {
-            const day = job.jobDate.slice(0, 10);
-            const startDate = toLocalDatetime(day, job.startTime);
-            const endDate = addMinutesLocal(startDate, job.durationMinutes);
-            return {
-              id: `${e.id}:show:${show.id}:job:${job.id}`,
-              title: `${job.title} - ${job.person?.name ?? "Unassigned"}`,
-              kind: "job" as const,
-              status: e.status,
-              startDate,
-              endDate,
-              raw: e,
-            };
-          })
-      );
-
-      return [...showItems, ...jobItems];
     }
 
     const startDate = eventCalendarStart(e);
@@ -237,7 +203,6 @@ export function formatTime(dateStr: string): string {
 
 export const ITEM_COLORS: Record<string, string> = {
   event: "bg-indigo-600/80 text-indigo-100 border border-indigo-500/40",
-  job: "bg-fuchsia-700/80 text-fuchsia-100 border border-fuchsia-500/40",
   rehearsal: "bg-amber-600/80 text-amber-100 border border-amber-500/40",
   maintenance: "bg-slate-600/80 text-slate-100 border border-slate-500/40",
   private: "bg-purple-600/80 text-purple-100 border border-purple-500/40",
@@ -246,7 +211,6 @@ export const ITEM_COLORS: Record<string, string> = {
 
 export function itemColor(item: CalendarItem): string {
   if (item.kind === "event") return ITEM_COLORS.event;
-  if (item.kind === "job") return ITEM_COLORS.job;
   return ITEM_COLORS[item.type ?? "other"] ?? ITEM_COLORS.other;
 }
 

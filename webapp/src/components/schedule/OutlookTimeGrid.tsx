@@ -160,7 +160,7 @@ export function OutlookTimeGrid({
               return (
                 <div key={day.toISOString()} className="border-l border-white/10 bg-white/[0.01] p-0.5 min-h-[28px] flex flex-col gap-0.5">
                   {allDay.map((item) => {
-                    const eventVenueName = item.kind === "event" || item.kind === "job" ? (item.raw as EventDetail).venue?.name : undefined;
+                    const eventVenueName = item.kind === "event" ? (item.raw as EventDetail).venue?.name : undefined;
                     return (
                       <div key={item.id} className="group/all relative flex items-center">
                         <button
@@ -267,7 +267,7 @@ export function OutlookTimeGrid({
                   const { top, height, clippedStart, clippedEnd } = layout;
 
                   const venueName =
-                    item.kind === "event" || item.kind === "job"
+                    item.kind === "event"
                       ? (item.raw as EventDetail).venue?.name
                       : (item.raw as InternalBookingDetail).venue?.name;
                   const creatorName =
@@ -327,15 +327,10 @@ export function OutlookTimeGrid({
                             {/* Title line */}
                             <div className="truncate font-semibold text-[11px] leading-tight shrink-0">
                               {item.title}
-                              {venueName && (item.kind === "event" || item.kind === "job") ? (
+                              {venueName && item.kind === "event" ? (
                                 <span className="font-normal opacity-75"> @ {venueName}</span>
                               ) : null}
                             </div>
-                            {item.metaLine ? (
-                              <div className="truncate text-[10px] leading-tight mt-0.5 opacity-80 shrink-0">
-                                {item.metaLine}
-                              </div>
-                            ) : null}
                             {/* Time + status line */}
                             <div className="flex items-center gap-1 text-[10px] leading-tight mt-0.5 opacity-90 flex-1 min-h-0 overflow-hidden">
                               <span className="truncate shrink-0">

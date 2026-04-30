@@ -2,7 +2,6 @@ import { ITEM_COLORS } from "./scheduleUtils";
 
 const LEGEND_ITEMS = [
   { label: "Event", colorKey: "event" },
-  { label: "Job", colorKey: "job" },
   { label: "Rehearsal", colorKey: "rehearsal" },
   { label: "Maintenance", colorKey: "maintenance" },
   { label: "Private", colorKey: "private" },
