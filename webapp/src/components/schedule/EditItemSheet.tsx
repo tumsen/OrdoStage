@@ -60,14 +60,17 @@ function EventScheduleSummary({
           ...shows.filter((s) => s.id !== selectedShowId),
         ]
       : shows;
+  const visibleShows = selectedShowId ? orderedShows.slice(0, 1) : orderedShows;
 
   return (
     <div className="space-y-4 mt-4 pb-6">
       <p className="text-xs text-white/45">
-        {shows.length} show{shows.length === 1 ? "" : "s"} in this event.
+        {selectedShowId
+          ? "Selected show"
+          : `${shows.length} show${shows.length === 1 ? "" : "s"} in this event.`}
       </p>
       <div className="space-y-3">
-        {orderedShows.map((show) => {
+        {visibleShows.map((show) => {
           const jobAssignments = (show.jobs ?? []).filter((j) => j.person);
           return (
             <div key={show.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2">
