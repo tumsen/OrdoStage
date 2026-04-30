@@ -73,6 +73,9 @@ export function CalendarCell({ date, items, isToday, onItemClick }: CalendarCell
                   <span className="font-normal opacity-70"> @ {venueName}</span>
                 ) : null}
               </span>
+              {item.metaLine ? (
+                <span className="block truncate text-[9px] opacity-80">{item.metaLine}</span>
+              ) : null}
               {hasTimedStart(item) ? (
                 <span className="flex items-center gap-1 text-[9px] opacity-80 truncate tabular-nums">
                   <span>

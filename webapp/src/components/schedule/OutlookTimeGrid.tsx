@@ -331,6 +331,11 @@ export function OutlookTimeGrid({
                                 <span className="font-normal opacity-75"> @ {venueName}</span>
                               ) : null}
                             </div>
+                            {item.metaLine ? (
+                              <div className="truncate text-[10px] leading-tight mt-0.5 opacity-80 shrink-0">
+                                {item.metaLine}
+                              </div>
+                            ) : null}
                             {/* Time + status line */}
                             <div className="flex items-center gap-1 text-[10px] leading-tight mt-0.5 opacity-90 flex-1 min-h-0 overflow-hidden">
                               <span className="truncate shrink-0">

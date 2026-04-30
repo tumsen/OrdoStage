@@ -5,6 +5,7 @@ export type BookingType = "rehearsal" | "maintenance" | "private" | "other";
 export interface CalendarItem {
   id: string;
   title: string;
+  metaLine?: string;
   kind: "event" | "booking" | "job";
   type?: BookingType;
   status?: string;
@@ -91,9 +92,21 @@ export function toCalendarItems(
           endDate = maxEnd;
         }
 
+        const jobs = (show.jobs ?? [])
+          .slice()
+          .sort((a, b) => a.startTime.localeCompare(b.startTime));
+        const jobsLabel =
+          jobs.length > 0
+            ? jobs
+                .slice(0, 2)
+                .map((j) => `${j.title}${j.person?.name ? ` (${j.person.name})` : ""}`)
+                .join(" · ") + (jobs.length > 2 ? ` +${jobs.length - 2}` : "")
+            : undefined;
+
         return {
           id: `${e.id}:show:${show.id}`,
           title: e.title,
+          metaLine: jobsLabel,
           kind: "event" as const,
           status: e.status,
           startDate,
