@@ -666,11 +666,14 @@ function DetailsTab({
                   control={form.control}
                   name="smokeFx"
                   render={({ field }) => (
-                    <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
-                      <FormControl>
-                        <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
-                      </FormControl>
-                      <FormLabel className="text-white/70 text-xs">Smoke</FormLabel>
+                    <FormItem>
+                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Smoke</FormLabel>
+                      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+                        <FormControl>
+                          <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
+                        </FormControl>
+                        <span className="text-white/70 text-xs">Enabled</span>
+                      </div>
                     </FormItem>
                   )}
                 />
@@ -678,11 +681,14 @@ function DetailsTab({
                   control={form.control}
                   name="hazeFx"
                   render={({ field }) => (
-                    <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
-                      <FormControl>
-                        <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
-                      </FormControl>
-                      <FormLabel className="text-white/70 text-xs">Haze</FormLabel>
+                    <FormItem>
+                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Haze</FormLabel>
+                      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+                        <FormControl>
+                          <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
+                        </FormControl>
+                        <span className="text-white/70 text-xs">Enabled</span>
+                      </div>
                     </FormItem>
                   )}
                 />
@@ -690,11 +696,14 @@ function DetailsTab({
                   control={form.control}
                   name="strobeFx"
                   render={({ field }) => (
-                    <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
-                      <FormControl>
-                        <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
-                      </FormControl>
-                      <FormLabel className="text-white/70 text-xs">Strobe</FormLabel>
+                    <FormItem>
+                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Strobe</FormLabel>
+                      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+                        <FormControl>
+                          <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
+                        </FormControl>
+                        <span className="text-white/70 text-xs">Enabled</span>
+                      </div>
                     </FormItem>
                   )}
                 />
