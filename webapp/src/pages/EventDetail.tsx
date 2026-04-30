@@ -1541,15 +1541,44 @@ function ShowsTab({ event }: { event: EventDetail }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
   });
 
+  const sortedShows = useMemo(
+    () =>
+      [...event.shows].sort((a, b) => {
+        const d = a.showDate.localeCompare(b.showDate);
+        if (d !== 0) return d;
+        return a.showTime.localeCompare(b.showTime);
+      }),
+    [event.shows]
+  );
+
+  const previousShow = sortedShows.length > 0 ? sortedShows[sortedShows.length - 1] : null;
+
+  const copyPreviousShow = useMutation({
+    mutationFn: () => {
+      if (!previousShow) throw new Error("No previous show available");
+      const base = new Date(previousShow.showDate);
+      const shifted = new Date(base.getTime());
+      shifted.setUTCDate(shifted.getUTCDate() + 1);
+      const nextDate = shifted.toISOString().slice(0, 10);
+      return api.post(`/api/events/${event.id}/shows`, {
+        showDate: nextDate,
+        showTime: previousShow.showTime,
+        durationMinutes: previousShow.durationMinutes,
+        venueId: previousShow.venueId,
+        technicalNotes: previousShow.technicalNotes ?? undefined,
+        fohNotes: previousShow.fohNotes ?? undefined,
+        ticketNotes: previousShow.ticketNotes ?? undefined,
+        hospitalityNotes: previousShow.hospitalityNotes ?? undefined,
+        teamResponsibleId: previousShow.teamResponsibleId ?? undefined,
+        notes: previousShow.notes ?? undefined,
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
+  });
+
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <p className="text-xs text-white/45">{event.shows.length} show{event.shows.length === 1 ? "" : "s"}</p>
-        <Button size="sm" className="bg-white/5 border border-white/10 hover:bg-white/10 text-white" onClick={() => setCreating((v) => !v)}>
-          <Plus size={13} className="mr-1" /> Add show
-        </Button>
-      </div>
       {creating ? (
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
           <div className="flex flex-nowrap items-end gap-3 min-w-0 overflow-x-auto pb-0.5">
@@ -1625,11 +1654,11 @@ function ShowsTab({ event }: { event: EventDetail }) {
         </div>
       ) : null}
 
-      {event.shows.length === 0 ? (
+      {sortedShows.length === 0 ? (
         <div className="text-center text-white/35 text-sm py-10">No shows yet. Add the first show to start planning technical, FOH, and team staffing.</div>
       ) : (
         <div className="space-y-3">
-          {event.shows.map((show: EventShow) => (
+          {sortedShows.map((show: EventShow) => (
             <ShowEventCard
               key={show.id}
               show={show}
@@ -1640,6 +1669,23 @@ function ShowsTab({ event }: { event: EventDetail }) {
           ))}
         </div>
       )}
+      <div className="space-y-2 pt-1">
+        <p className="text-xs text-white/45">{sortedShows.length} show{sortedShows.length === 1 ? "" : "s"}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" className="bg-white/5 border border-white/10 hover:bg-white/10 text-white" onClick={() => setCreating((v) => !v)}>
+            <Plus size={13} className="mr-1" /> Add show
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-white/10 text-white/80 bg-transparent"
+            onClick={() => copyPreviousShow.mutate()}
+            disabled={!previousShow || copyPreviousShow.isPending}
+          >
+            {copyPreviousShow.isPending ? "Copying..." : "Copy previous +1 day"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
