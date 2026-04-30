@@ -47,6 +47,19 @@ function EventScheduleSummary({
   selectedShowId: string | null;
   onOpenEvent: () => void;
 }) {
+  function formatShowTimeRange(show: EventDetail["shows"][number]): string {
+    const day = new Date(show.showDate);
+    const [hh, mm] = show.showTime.split(":").map((v) => Number(v));
+    if (!Number.isFinite(day.getTime()) || !Number.isFinite(hh) || !Number.isFinite(mm)) {
+      return `${show.showTime} (${show.durationMinutes} min)`;
+    }
+    const start = new Date(day);
+    start.setHours(hh, mm, 0, 0);
+    const end = new Date(start.getTime() + show.durationMinutes * 60_000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(start.getHours())}:${pad(start.getMinutes())} - ${pad(end.getHours())}:${pad(end.getMinutes())} (${show.durationMinutes} min)`;
+  }
+
   function formatJobTimeRange(job: EventDetail["shows"][number]["jobs"][number]): string {
     const day = new Date(job.jobDate);
     if (!Number.isFinite(day.getTime())) return `${job.startTime}`;
@@ -101,9 +114,7 @@ function EventScheduleSummary({
                     year: "numeric",
                   })}
                 </div>
-                <div className="text-xs text-white/50">
-                  {show.showTime} ({show.durationMinutes} min)
-                </div>
+                <div className="text-xs text-white/50">{formatShowTimeRange(show)}</div>
               </div>
               {show.venue?.name ? (
                 <p className="text-xs text-white/45">Venue: {show.venue.name}</p>
