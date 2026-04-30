@@ -98,13 +98,9 @@ const EventEditSchema = z.object({
   stageHeight: z.string().optional(),
   getInTime: z.string().optional(),
   setupTime: z.string().optional(),
-  bookingContracts: z.string().optional(),
-  technicalRider: z.string().optional(),
-  techCount: z.string().optional(),
-  handsNeeded: z.string().optional(),
-  getInDate: z.string().optional(),
-  ticketingInfo: z.string().optional(),
-  hospitalityInfo: z.string().optional(),
+  smokeFx: z.boolean().optional(),
+  hazeFx: z.boolean().optional(),
+  strobeFx: z.boolean().optional(),
   fohNotes: z.string().optional(),
 });
 
@@ -123,27 +119,21 @@ function emptyEventFormValues(): EventEditValues {
     ...decodeToFormFields(null),
     getInTime: "",
     setupTime: "",
-    bookingContracts: "",
-    technicalRider: "",
-    techCount: "",
-    handsNeeded: "",
-    getInDate: "",
-    ticketingInfo: "",
-    hospitalityInfo: "",
+    smokeFx: false,
+    hazeFx: false,
+    strobeFx: false,
     fohNotes: "",
   };
 }
 
 type CustomField = { key: string; value: string; departments: string[] };
+type ContactRow = { role: string; name: string; phone: string; email: string };
 type GeneralEventFields = {
-  bookingContracts: string;
-  technicalRider: string;
-  techCount: string;
-  handsNeeded: string;
-  getInDate: string;
-  ticketingInfo: string;
-  hospitalityInfo: string;
+  smokeFx: boolean;
+  hazeFx: boolean;
+  strobeFx: boolean;
   fohNotes: string;
+  contacts: ContactRow[];
 };
 
 function normalizeEventStatus(s: string | undefined): "draft" | "confirmed" | "cancelled" {
@@ -164,13 +154,9 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
     ...decodeToFormFields(e.stageSize),
     getInTime: e.getInTime ?? "",
     setupTime: e.setupTime ?? "",
-    bookingContracts: g.bookingContracts,
-    technicalRider: g.technicalRider,
-    techCount: g.techCount,
-    handsNeeded: g.handsNeeded,
-    getInDate: g.getInDate,
-    ticketingInfo: g.ticketingInfo,
-    hospitalityInfo: g.hospitalityInfo,
+    smokeFx: g.smokeFx,
+    hazeFx: g.hazeFx,
+    strobeFx: g.strobeFx,
     fohNotes: g.fohNotes,
   };
 }
@@ -180,50 +166,47 @@ function splitGeneralEventFields(fields: CustomField[]): {
   rest: CustomField[];
 } {
   const general: GeneralEventFields = {
-    bookingContracts: "",
-    technicalRider: "",
-    techCount: "",
-    handsNeeded: "",
-    getInDate: "",
-    ticketingInfo: "",
-    hospitalityInfo: "",
+    smokeFx: false,
+    hazeFx: false,
+    strobeFx: false,
     fohNotes: "",
+    contacts: [],
   };
   const rest: CustomField[] = [];
   for (const field of fields) {
     const key = field.key?.trim();
     const value = field.value ?? "";
-    if (key === "Contracts") {
-      general.bookingContracts = value;
-      continue;
-    }
-    if (key === "Technical rider") {
-      general.technicalRider = value;
-      continue;
-    }
-    if (key === "Tech count") {
-      general.techCount = value;
-      continue;
-    }
-    if (key === "Hands needed") {
-      general.handsNeeded = value;
-      continue;
-    }
-    if (key === "Get-in date") {
-      general.getInDate = value;
-      continue;
-    }
-    if (key === "Ticketing") {
-      general.ticketingInfo = value;
-      continue;
-    }
-    if (key === "Hospitality") {
-      general.hospitalityInfo = value;
-      continue;
-    }
     if (key === "FOH notes") {
       general.fohNotes = value;
       continue;
+    }
+    if (key === "Use smoke fx") {
+      general.smokeFx = value === "true";
+      continue;
+    }
+    if (key === "Use haze fx") {
+      general.hazeFx = value === "true";
+      continue;
+    }
+    if (key === "Use strobe fx") {
+      general.strobeFx = value === "true";
+      continue;
+    }
+    if (key === "Contacts") {
+      try {
+        const parsed = JSON.parse(value) as ContactRow[];
+        if (Array.isArray(parsed)) {
+          general.contacts = parsed.map((row) => ({
+            role: String(row.role ?? ""),
+            name: String(row.name ?? ""),
+            phone: String(row.phone ?? ""),
+            email: String(row.email ?? ""),
+          }));
+          continue;
+        }
+      } catch {
+        // keep legacy values in rest
+      }
     }
     rest.push(field);
   }
@@ -242,39 +225,6 @@ function SectionHeader({ children, className }: { children: React.ReactNode; cla
     >
       {children}
     </div>
-  );
-}
-
-function DeptBadge({
-  dept,
-  selected,
-  onToggle,
-}: {
-  dept: Department;
-  selected: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="px-2 py-0.5 rounded text-xs font-medium border transition-all"
-      style={
-        selected
-          ? {
-              backgroundColor: dept.color + "33",
-              borderColor: dept.color + "66",
-              color: dept.color,
-            }
-          : {
-              backgroundColor: "transparent",
-              borderColor: "rgba(255,255,255,0.1)",
-              color: "rgba(255,255,255,0.35)",
-            }
-      }
-    >
-      {dept.name}
-    </button>
   );
 }
 
@@ -304,19 +254,14 @@ function DetailsTab({
     }
   })();
   const splitFields = splitGeneralEventFields(parsedCustomFields);
-  const [customFields, setCustomFields] = useState<CustomField[]>(splitFields.rest);
+  const [customFields] = useState<CustomField[]>(splitFields.rest);
+  const [contacts, setContacts] = useState<ContactRow[]>(splitFields.general.contacts);
 
   const { data: venues } = useQuery({
     queryKey: ["venues"],
     queryFn: () => api.get<Venue[]>("/api/venues"),
   });
 
-  const { data: departments } = useQuery({
-    queryKey: ["departments"],
-    queryFn: () => api.get<Department[]>("/api/departments"),
-  });
-
-  const depts = departments ?? [];
   const setupTimeFieldRef = useRef<SplitTimeFieldHandle>(null);
 
   const formValues = useMemo((): EventEditValues => {
@@ -339,6 +284,10 @@ function DetailsTab({
     values: formValues,
   });
 
+  useEffect(() => {
+    setContacts(splitFields.general.contacts);
+  }, [event?.id]);
+
   const vId = form.watch("venueId");
   const sW = form.watch("stageWidth");
   const sD = form.watch("stageDepth");
@@ -350,9 +299,9 @@ function DetailsTab({
     const v = venues.find((x) => x.id === vId);
     if (!v) return null;
     const tot = requiredStageTotalsMetersFromStrings({
-      stageWidth: sW,
-      stageDepth: sD,
-      stageHeight: sH,
+      stageWidth: sW ?? "",
+      stageDepth: sD ?? "",
+      stageHeight: sH ?? "",
     });
     return venueSmallerThanStageWarnings(tot, venueRecordToMeters(v));
   }, [venues, vId, sW, sD, sH]);
@@ -385,21 +334,39 @@ function DetailsTab({
 
   function onSubmit(values: EventEditValues) {
     const normalizedCustomFields = customFields.filter((f) => f.key.trim() || f.value.trim());
+    const validContacts = contacts
+      .map((row) => ({
+        role: row.role.trim(),
+        name: row.name.trim(),
+        phone: row.phone.trim(),
+        email: row.email.trim(),
+      }))
+      .filter((row) => row.role || row.name || row.phone || row.email);
+    const audienceFxNote =
+      values.smokeFx || values.hazeFx || values.strobeFx
+        ? "Audience announcement required: This performance uses smoke/haze/strobe effects."
+        : "";
+    const baseFoh = (values.fohNotes ?? "").trim();
+    const mergedFohNotes =
+      audienceFxNote && !baseFoh.includes(audienceFxNote)
+        ? [baseFoh, audienceFxNote].filter(Boolean).join("\n")
+        : baseFoh;
     const generalFields = [
-      { key: "Contracts", value: values.bookingContracts?.trim() || "" },
-      { key: "Technical rider", value: values.technicalRider?.trim() || "" },
-      { key: "Tech count", value: values.techCount?.trim() || "" },
-      { key: "Hands needed", value: values.handsNeeded?.trim() || "" },
-      { key: "Get-in date", value: values.getInDate?.trim() || "" },
-      { key: "Ticketing", value: values.ticketingInfo?.trim() || "" },
-      { key: "Hospitality", value: values.hospitalityInfo?.trim() || "" },
-      { key: "FOH notes", value: values.fohNotes?.trim() || "" },
+      { key: "Use smoke fx", value: values.smokeFx ? "true" : "false" },
+      { key: "Use haze fx", value: values.hazeFx ? "true" : "false" },
+      { key: "Use strobe fx", value: values.strobeFx ? "true" : "false" },
+      { key: "FOH notes", value: mergedFohNotes },
+      { key: "Contacts", value: validContacts.length > 0 ? JSON.stringify(validContacts) : "" },
     ]
       .filter((row) => row.value)
       .map((row) => ({ ...row, departments: [] as string[] }));
     const mergedCustomFields = [...normalizedCustomFields, ...generalFields];
 
-    const stageEnc = formDimsToStageSize(values);
+    const stageEnc = formDimsToStageSize({
+      stageWidth: values.stageWidth ?? "",
+      stageDepth: values.stageDepth ?? "",
+      stageHeight: values.stageHeight ?? "",
+    });
 
     if (isNew) {
       const payload: Record<string, unknown> = {
@@ -440,33 +407,16 @@ function DetailsTab({
     updateMutation.mutate(payload);
   }
 
-  function addCustomField() {
-    setCustomFields((prev) => [...prev, { key: "", value: "", departments: [] }]);
+  function addContact() {
+    setContacts((prev) => [...prev, { role: "", name: "", phone: "", email: "" }]);
   }
 
-  function removeCustomField(idx: number) {
-    setCustomFields((prev) => prev.filter((_, i) => i !== idx));
+  function removeContact(idx: number) {
+    setContacts((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function updateCustomField(idx: number, patch: Partial<CustomField>) {
-    setCustomFields((prev) =>
-      prev.map((f, i) => (i === idx ? { ...f, ...patch } : f))
-    );
-  }
-
-  function toggleDept(fieldIdx: number, deptId: string) {
-    setCustomFields((prev) =>
-      prev.map((f, i) => {
-        if (i !== fieldIdx) return f;
-        const already = f.departments.includes(deptId);
-        return {
-          ...f,
-          departments: already
-            ? f.departments.filter((d) => d !== deptId)
-            : [...f.departments, deptId],
-        };
-      })
-    );
+  function updateContact(idx: number, patch: Partial<ContactRow>) {
+    setContacts((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   }
 
   const saving = createMutation.isPending || updateMutation.isPending;
@@ -715,96 +665,45 @@ function DetailsTab({
               />
             </div>
 
-            <SectionHeader>Booking / Technical / FOH (General)</SectionHeader>
-
-            <FormField
-              control={form.control}
-              name="bookingContracts"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contracts</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-2 gap-4">
+            <SectionHeader>Audience Effects + FOH</SectionHeader>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <FormField
                 control={form.control}
-                name="technicalRider"
+                name="smokeFx"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical Rider</FormLabel>
+                  <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
                     <FormControl>
-                      <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                      <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
                     </FormControl>
+                    <FormLabel className="text-white/70 text-xs">Smoke</FormLabel>
                   </FormItem>
                 )}
               />
               <FormField
                 control={form.control}
-                name="techCount"
+                name="hazeFx"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Tech Count</FormLabel>
+                  <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
                     <FormControl>
-                      <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                      <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
                     </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="handsNeeded"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Hands Needed</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
-                    </FormControl>
+                    <FormLabel className="text-white/70 text-xs">Haze</FormLabel>
                   </FormItem>
                 )}
               />
               <FormField
                 control={form.control}
-                name="getInDate"
+                name="strobeFx"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in Date</FormLabel>
+                  <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
                     <FormControl>
-                      <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
+                      <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
                     </FormControl>
+                    <FormLabel className="text-white/70 text-xs">Strobe</FormLabel>
                   </FormItem>
                 )}
               />
             </div>
-            <FormField
-              control={form.control}
-              name="ticketingInfo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Ticketing</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="hospitalityInfo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Hospitality</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="fohNotes"
@@ -817,61 +716,31 @@ function DetailsTab({
                 </FormItem>
               )}
             />
+            {(form.watch("smokeFx") || form.watch("hazeFx") || form.watch("strobeFx")) ? (
+              <p className="text-xs rounded border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-amber-100/95">
+                FOH audience announcement note will be added automatically when saving.
+              </p>
+            ) : null}
 
-            {/* ── Additional Info ── */}
-            <SectionHeader>Additional Info</SectionHeader>
-
-            <div className="space-y-3">
-              {customFields.map((cf, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white/[0.02] border border-white/[0.07] rounded-lg p-3 space-y-3"
-                >
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={cf.key}
-                      onChange={(e) => updateCustomField(idx, { key: e.target.value })}
-                      placeholder="Label"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 text-sm h-8"
-                    />
-                    <Input
-                      value={cf.value}
-                      onChange={(e) => updateCustomField(idx, { value: e.target.value })}
-                      placeholder="Value"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 text-sm h-8"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeCustomField(idx)}
-                      className="text-white/25 hover:text-red-400 transition-colors flex-shrink-0 p-1"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                  {depts.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="text-xs text-white/30 self-center mr-1">Departments:</span>
-                      {depts.map((dept) => (
-                        <DeptBadge
-                          key={dept.id}
-                          dept={dept}
-                          selected={cf.departments.includes(dept.id)}
-                          onToggle={() => toggleDept(idx, dept.id)}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
+            <SectionHeader>Contacts</SectionHeader>
+            <div className="space-y-2">
+              {contacts.map((row, idx) => (
+                <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr_1fr_1.2fr_auto] gap-2 items-center">
+                  <Input value={row.role} onChange={(e) => updateContact(idx, { role: e.target.value })} placeholder="Role" className="bg-white/5 border-white/10 text-white h-9" />
+                  <Input value={row.name} onChange={(e) => updateContact(idx, { name: e.target.value })} placeholder="Name" className="bg-white/5 border-white/10 text-white h-9" />
+                  <Input value={row.phone} onChange={(e) => updateContact(idx, { phone: e.target.value })} placeholder="Phone" className="bg-white/5 border-white/10 text-white h-9" />
+                  <Input value={row.email} onChange={(e) => updateContact(idx, { email: e.target.value })} placeholder="Email" className="bg-white/5 border-white/10 text-white h-9" />
+                  <Button type="button" variant="ghost" size="icon" onClick={() => removeContact(idx)} className="h-8 w-8 text-white/35 hover:text-red-400">
+                    <X size={14} />
+                  </Button>
                 </div>
               ))}
-
-              <button
-                type="button"
-                onClick={addCustomField}
-                className="flex items-center gap-2 text-sm text-white/40 hover:text-white/70 transition-colors py-1"
-              >
-                <Plus size={13} /> Add Field
-              </button>
+              <Button type="button" size="sm" variant="outline" className="border-white/10 text-white/70 bg-transparent" onClick={addContact}>
+                <Plus size={13} className="mr-1" /> Add contact
+              </Button>
             </div>
+
+            {!isNew && event ? <EventDocumentsSection event={event} /> : null}
 
             {saveError ? (
               <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
@@ -1218,7 +1087,7 @@ function PeopleTab({ event }: { event: EventDetail }) {
 
 // ── Documents Tab ────────────────────────────────────────────────────────────
 
-function DocumentsTab({ event }: { event: EventDetail }) {
+function EventDocumentsSection({ event }: { event: EventDetail }) {
   const queryClient = useQueryClient();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -1255,8 +1124,9 @@ function DocumentsTab({ event }: { event: EventDetail }) {
   const backendBase = import.meta.env.VITE_BACKEND_URL || "";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 rounded-lg border border-white/10 bg-white/[0.02] p-4">
       <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-wide text-white/45">Documents</p>
         <span className="text-xs text-white/40">{event.documents.length} document{event.documents.length !== 1 ? "s" : ""}</span>
         <Button
           size="sm"
@@ -1684,7 +1554,7 @@ function ShowsTab({ event }: { event: EventDetail }) {
     showTime: "",
     endTime: "",
     durationMinutes: "120",
-    venueId: "",
+    venueId: event.venueId ?? "",
   });
   const newStartRef = useRef<SplitTimeFieldHandle>(null);
   const newEndRef = useRef<SplitTimeFieldHandle>(null);
@@ -1700,7 +1570,7 @@ function ShowsTab({ event }: { event: EventDetail }) {
       }),
     onSuccess: () => {
       setCreating(false);
-      setNewShow({ showDate: "", showTime: "", endTime: "", durationMinutes: "120", venueId: "" });
+      setNewShow({ showDate: "", showTime: "", endTime: "", durationMinutes: "120", venueId: event.venueId ?? "" });
       queryClient.invalidateQueries({ queryKey: ["event", event.id] });
     },
   });
@@ -1725,6 +1595,14 @@ function ShowsTab({ event }: { event: EventDetail }) {
       }),
     [event.shows]
   );
+
+  useEffect(() => {
+    setNewShow((prev) =>
+      prev.venueId
+        ? prev
+        : { ...prev, venueId: event.venueId ?? "" }
+    );
+  }, [event.venueId]);
 
   const previousShow = sortedShows.length > 0 ? sortedShows[sortedShows.length - 1] : null;
   const availablePeople = allPeople;
@@ -2383,12 +2261,6 @@ export default function EventDetailPage() {
               >
                 People ({ev?.people?.length ?? 0})
               </TabsTrigger>
-              <TabsTrigger
-                value="documents"
-                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
-              >
-                Documents ({ev?.documents?.length ?? 0})
-              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -2421,13 +2293,6 @@ export default function EventDetailPage() {
                 <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then manage teams here.</div>
               ) : (
                 <TeamsTab event={ev!} />
-              )}
-            </TabsContent>
-            <TabsContent value="documents" className="mt-0">
-              {isNew ? (
-                <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then upload documents here.</div>
-              ) : (
-                <DocumentsTab event={ev!} />
               )}
             </TabsContent>
           </div>
