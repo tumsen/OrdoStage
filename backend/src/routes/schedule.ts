@@ -58,12 +58,15 @@ scheduleRouter.get("/schedule", async (c) => {
 
   const { venueId, personId, from, to } = c.req.query();
 
+  const fromDate = from ? new Date(`${from}T00:00:00.000Z`) : null;
+  const toDateExclusive = to ? new Date(new Date(`${to}T00:00:00.000Z`).getTime() + 86_400_000) : null;
+
   const dateFilter =
-    from || to
+    fromDate || toDateExclusive
       ? {
           startDate: {
-            ...(from ? { gte: new Date(`${from}T00:00:00.000Z`) } : {}),
-            ...(to ? { lt: new Date(new Date(`${to}T00:00:00.000Z`).getTime() + 86_400_000) } : {}),
+            ...(fromDate ? { gte: fromDate } : {}),
+            ...(toDateExclusive ? { lt: toDateExclusive } : {}),
           },
         }
       : {};
@@ -71,8 +74,27 @@ scheduleRouter.get("/schedule", async (c) => {
   // Build event where clause
   const eventWhere: Record<string, unknown> = {
     organizationId: user.organizationId,
-    ...dateFilter,
   };
+  if (fromDate || toDateExclusive) {
+    eventWhere.OR = [
+      {
+        startDate: {
+          ...(fromDate ? { gte: fromDate } : {}),
+          ...(toDateExclusive ? { lt: toDateExclusive } : {}),
+        },
+      },
+      {
+        shows: {
+          some: {
+            showDate: {
+              ...(fromDate ? { gte: fromDate } : {}),
+              ...(toDateExclusive ? { lt: toDateExclusive } : {}),
+            },
+          },
+        },
+      },
+    ];
+  }
   if (venueId) eventWhere.venueId = venueId;
   if (personId) {
     eventWhere.people = { some: { personId } };
@@ -106,6 +128,10 @@ scheduleRouter.get("/schedule", async (c) => {
             createdAt: true,
           },
         },
+        shows: {
+          select: { id: true, showDate: true },
+          orderBy: [{ showDate: "asc" }, { showTime: "asc" }],
+        },
       },
     }),
     prisma.internalBooking.findMany({
@@ -136,6 +162,10 @@ scheduleRouter.get("/schedule", async (c) => {
     documents: event.documents.map((doc) => ({
       ...doc,
       createdAt: serializeDate(doc.createdAt),
+    })),
+    shows: event.shows.map((show) => ({
+      id: show.id,
+      showDate: serializeDate(show.showDate),
     })),
   }));
 
