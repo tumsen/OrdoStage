@@ -96,8 +96,10 @@ const EventEditSchema = z.object({
   stageWidth: z.string().optional(),
   stageDepth: z.string().optional(),
   stageHeight: z.string().optional(),
-  getInTime: z.string().optional(),
-  setupTime: z.string().optional(),
+  getInDate: z.string().optional(),
+  getInStart: z.string().optional(),
+  getInEnd: z.string().optional(),
+  getInDuration: z.string().optional(),
   smokeFx: z.boolean().optional(),
   hazeFx: z.boolean().optional(),
   strobeFx: z.boolean().optional(),
@@ -117,8 +119,10 @@ function emptyEventFormValues(): EventEditValues {
     actorCount: "",
     allergies: "",
     ...decodeToFormFields(null),
-    getInTime: "",
-    setupTime: "",
+    getInDate: "",
+    getInStart: "",
+    getInEnd: "",
+    getInDuration: "",
     smokeFx: false,
     hazeFx: false,
     strobeFx: false,
@@ -134,6 +138,10 @@ type GeneralEventFields = {
   strobeFx: boolean;
   fohNotes: string;
   contacts: ContactRow[];
+  getInDate: string;
+  getInStart: string;
+  getInEnd: string;
+  getInDuration: string;
 };
 
 function normalizeEventStatus(s: string | undefined): "draft" | "confirmed" | "cancelled" {
@@ -152,8 +160,10 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
     actorCount: e.actorCount != null ? String(e.actorCount) : "",
     allergies: e.allergies ?? "",
     ...decodeToFormFields(e.stageSize),
-    getInTime: e.getInTime ?? "",
-    setupTime: e.setupTime ?? "",
+    getInDate: g.getInDate,
+    getInStart: g.getInStart || (e.getInTime ?? ""),
+    getInEnd: g.getInEnd,
+    getInDuration: g.getInDuration,
     smokeFx: g.smokeFx,
     hazeFx: g.hazeFx,
     strobeFx: g.strobeFx,
@@ -171,6 +181,10 @@ function splitGeneralEventFields(fields: CustomField[]): {
     strobeFx: false,
     fohNotes: "",
     contacts: [],
+    getInDate: "",
+    getInStart: "",
+    getInEnd: "",
+    getInDuration: "",
   };
   const rest: CustomField[] = [];
   for (const field of fields) {
@@ -207,6 +221,22 @@ function splitGeneralEventFields(fields: CustomField[]): {
       } catch {
         // keep legacy values in rest
       }
+    }
+    if (key === "Get-in date") {
+      general.getInDate = value;
+      continue;
+    }
+    if (key === "Get-in start") {
+      general.getInStart = value;
+      continue;
+    }
+    if (key === "Get-in end") {
+      general.getInEnd = value;
+      continue;
+    }
+    if (key === "Get-in duration") {
+      general.getInDuration = value;
+      continue;
     }
     rest.push(field);
   }
@@ -262,7 +292,8 @@ function DetailsTab({
     queryFn: () => api.get<Venue[]>("/api/venues"),
   });
 
-  const setupTimeFieldRef = useRef<SplitTimeFieldHandle>(null);
+  const getInEndFieldRef = useRef<SplitTimeFieldHandle>(null);
+  const getInDurFieldRef = useRef<SplitTimeFieldHandle>(null);
 
   const formValues = useMemo((): EventEditValues => {
     if (isNew || !event) return emptyEventFormValues();
@@ -357,6 +388,10 @@ function DetailsTab({
       { key: "Use strobe fx", value: values.strobeFx ? "true" : "false" },
       { key: "FOH notes", value: mergedFohNotes },
       { key: "Contacts", value: validContacts.length > 0 ? JSON.stringify(validContacts) : "" },
+      { key: "Get-in date", value: values.getInDate?.trim() || "" },
+      { key: "Get-in start", value: values.getInStart?.trim() || "" },
+      { key: "Get-in end", value: values.getInEnd?.trim() || "" },
+      { key: "Get-in duration", value: values.getInDuration?.trim() || "" },
     ]
       .filter((row) => row.value)
       .map((row) => ({ ...row, departments: [] as string[] }));
@@ -379,8 +414,8 @@ function DetailsTab({
       if (values.contactPerson) payload.contactPerson = values.contactPerson;
       if (values.allergies) payload.allergies = values.allergies;
       if (stageEnc) payload.stageSize = stageEnc;
-      if (values.getInTime) payload.getInTime = values.getInTime;
-      if (values.setupTime) payload.setupTime = values.setupTime;
+      if (values.getInStart) payload.getInTime = values.getInStart;
+      if (values.getInDuration) payload.setupTime = values.getInDuration;
       if (values.actorCount) payload.actorCount = Number(values.actorCount);
       if (mergedCustomFields.length > 0) payload.customFields = JSON.stringify(mergedCustomFields);
       createMutation.mutate(payload);
@@ -400,8 +435,8 @@ function DetailsTab({
     if (values.contactPerson) payload.contactPerson = values.contactPerson;
     if (values.allergies) payload.allergies = values.allergies;
     payload.stageSize = stageEnc ?? null;
-    if (values.getInTime) payload.getInTime = values.getInTime;
-    if (values.setupTime) payload.setupTime = values.setupTime;
+    if (values.getInStart) payload.getInTime = values.getInStart;
+    if (values.getInDuration) payload.setupTime = values.getInDuration;
     if (values.actorCount) payload.actorCount = Number(values.actorCount);
     payload.customFields = mergedCustomFields.length > 0 ? JSON.stringify(mergedCustomFields) : undefined;
     updateMutation.mutate(payload);
@@ -666,19 +701,19 @@ function DetailsTab({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-[auto_auto_auto_auto] gap-3 items-end">
               <FormField
                 control={form.control}
-                name="getInTime"
+                name="getInDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in Time</FormLabel>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in date</FormLabel>
                     <FormControl>
-                      <SplitTimeInput
+                      <DateInputWithWeekday
                         value={field.value ?? ""}
                         onChange={field.onChange}
-                        nextFieldRef={setupTimeFieldRef}
-                        aria-label="Get-in time"
+                        className="bg-white/5 border-white/10 text-white [color-scheme:dark]"
+                        weekdayClassName="text-sm text-white/45"
                       />
                     </FormControl>
                   </FormItem>
@@ -686,16 +721,76 @@ function DetailsTab({
               />
               <FormField
                 control={form.control}
-                name="setupTime"
+                name="getInStart"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Setup Time</FormLabel>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Start</FormLabel>
                     <FormControl>
                       <SplitTimeInput
-                        ref={setupTimeFieldRef}
                         value={field.value ?? ""}
-                        onChange={field.onChange}
-                        aria-label="Setup time"
+                        nextFieldRef={getInEndFieldRef}
+                        aria-label="Get-in start"
+                        onChange={(v) => {
+                          field.onChange(v);
+                          const d = Number(form.getValues("getInDuration"));
+                          if (!Number.isNaN(d) && d >= 1 && v) {
+                            form.setValue("getInEnd", endTimeFromStartAndDuration(v, d));
+                          } else {
+                            const end = form.getValues("getInEnd");
+                            if (v && end) {
+                              const dm = durationMinutesBetween(v, end);
+                              if (dm) form.setValue("getInDuration", String(dm));
+                            }
+                          }
+                        }}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="getInEnd"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">End</FormLabel>
+                    <FormControl>
+                      <SplitTimeInput
+                        ref={getInEndFieldRef}
+                        value={field.value ?? ""}
+                        nextFieldRef={getInDurFieldRef}
+                        aria-label="Get-in end"
+                        disabled={!/^\d{2}:\d{2}$/.test(form.getValues("getInStart") || "")}
+                        onChange={(v) => {
+                          field.onChange(v);
+                          const start = form.getValues("getInStart");
+                          if (start && v) {
+                            const dm = durationMinutesBetween(start, v);
+                            if (dm) form.setValue("getInDuration", String(dm));
+                          }
+                        }}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="getInDuration"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Duration</FormLabel>
+                    <FormControl>
+                      <SplitDurationHhMmInput
+                        ref={getInDurFieldRef}
+                        valueMinutes={Number(field.value) || 0}
+                        aria-label="Get-in duration"
+                        disabled={!/^\d{2}:\d{2}$/.test(form.getValues("getInStart") || "")}
+                        onChangeMinutes={(m) => {
+                          field.onChange(String(m));
+                          const start = form.getValues("getInStart");
+                          if (m >= 1 && start) form.setValue("getInEnd", endTimeFromStartAndDuration(start, m));
+                        }}
                       />
                     </FormControl>
                   </FormItem>
