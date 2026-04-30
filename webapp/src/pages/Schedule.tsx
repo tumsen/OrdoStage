@@ -84,6 +84,11 @@ function getRange(mode: ScheduleViewMode, anchorDate: Date): { from: string; to:
   if (mode === "day") {
     return { from: toISODate(anchorDate), to: toISODate(anchorDate) };
   }
+  if (mode === "venueocc") {
+    const fromDate = startOfWeek(anchorDate);
+    const toDate = addDays(fromDate, 6);
+    return { from: toISODate(fromDate), to: toISODate(toDate) };
+  }
   const fromDate = new Date(anchorDate);
   const toDate = addDays(fromDate, 6);
   return { from: toISODate(fromDate), to: toISODate(toDate) };
@@ -101,6 +106,14 @@ function rangeLabel(mode: ScheduleViewMode, date: Date, locale: string): string 
   if (mode === "day") {
     return date.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }
+  if (mode === "venueocc") {
+    const fromDate = startOfWeek(date);
+    const toDate = addDays(fromDate, 6);
+    return `Venue occupation (${fromDate.toLocaleDateString(locale, {
+      month: "short",
+      day: "numeric",
+    })} - ${toDate.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })})`;
+  }
   const toDate = addDays(date, 6);
   return `Next 7 days (${date.toLocaleDateString(locale, {
     month: "short",
@@ -117,6 +130,128 @@ function getRangeDays(mode: ScheduleViewMode, anchorDate: Date): Date[] {
     return Array.from({ length: 7 }).map((_, i) => addDays(anchorDate, i));
   }
   return [anchorDate];
+}
+
+type OccupancyEntry = {
+  itemId: string;
+  title: string;
+  kind: "event" | "booking";
+  status?: string;
+  start: Date;
+  end: Date;
+};
+
+function resolveItemVenue(item: CalendarItem): { id: string; name: string } | null {
+  if (item.kind === "booking") {
+    const booking = item.raw as InternalBookingDetail;
+    if (!booking.venueId || !booking.venue?.name) return null;
+    return { id: booking.venueId, name: booking.venue.name };
+  }
+
+  const event = item.raw as EventDetail;
+  const showMatch = /:show:([^:]+)$/.exec(item.id);
+  if (showMatch?.[1]) {
+    const show = (event.shows ?? []).find((s) => s.id === showMatch[1]);
+    if (show?.venueId && show.venue?.name) return { id: show.venueId, name: show.venue.name };
+  }
+
+  if (event.venueId && event.venue?.name) return { id: event.venueId, name: event.venue.name };
+  return null;
+}
+
+function VenueOccupationView({
+  items,
+  venues,
+  locale,
+  venueFilterId,
+}: {
+  items: CalendarItem[];
+  venues: Venue[];
+  locale: string;
+  venueFilterId: string;
+}) {
+  const byVenue = new Map<string, { name: string; entries: OccupancyEntry[] }>();
+
+  for (const item of items) {
+    if (!item.startDate) continue;
+    const venue = resolveItemVenue(item);
+    if (!venue) continue;
+    if (venueFilterId !== "all" && venue.id !== venueFilterId) continue;
+
+    const start = new Date(item.startDate);
+    const end = item.endDate ? new Date(item.endDate) : new Date(start.getTime() + 60 * 60 * 1000);
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) continue;
+
+    const current = byVenue.get(venue.id) ?? { name: venue.name, entries: [] };
+    current.entries.push({
+      itemId: item.id,
+      title: item.title,
+      kind: item.kind,
+      status: item.status,
+      start,
+      end,
+    });
+    byVenue.set(venue.id, current);
+  }
+
+  const selectedVenueOnly =
+    venueFilterId !== "all" ? venues.find((v) => v.id === venueFilterId) ?? null : null;
+
+  const venueRows =
+    selectedVenueOnly
+      ? [{
+          id: selectedVenueOnly.id,
+          name: selectedVenueOnly.name,
+          entries: (byVenue.get(selectedVenueOnly.id)?.entries ?? []).sort(
+            (a, b) => a.start.getTime() - b.start.getTime()
+          ),
+        }]
+      : Array.from(byVenue.entries())
+          .map(([id, value]) => ({
+            id,
+            name: value.name,
+            entries: value.entries.sort((a, b) => a.start.getTime() - b.start.getTime()),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (venueRows.length === 0) {
+    return <div className="text-sm text-white/50">No venue occupation found in this range.</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {venueRows.map((venue) => (
+        <div key={venue.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+          <div className="text-sm font-semibold text-white/90">{venue.name}</div>
+          <div className="text-xs text-white/40 mb-2">{venue.entries.length} occupied slot(s)</div>
+          {venue.entries.length === 0 ? (
+            <div className="text-xs text-white/40 italic">No occupation in selected range.</div>
+          ) : (
+            <div className="space-y-1.5">
+              {venue.entries.map((entry) => (
+                <div key={entry.itemId} className="text-xs text-white/75 rounded border border-white/10 bg-white/[0.02] px-2 py-1.5">
+                  <span className="font-medium text-white/90">
+                    {entry.start.toLocaleDateString(locale, {
+                      weekday: "short",
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}{" "}
+                    {entry.start.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}-
+                    {entry.end.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  <span className="text-white/40"> | </span>
+                  <span>{entry.title}</span>
+                  <span className="text-white/40"> ({entry.kind})</span>
+                  {entry.status ? <span className="text-white/40"> [{entry.status}]</span> : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function YearDiscView({ year, items }: { year: number; items: CalendarItem[] }) {
@@ -257,14 +392,14 @@ export default function Schedule() {
   function moveBackward() {
     if (viewMode === "year" || viewMode === "yeardisc") setAnchorDate((d) => addYears(d, -1));
     else if (viewMode === "month") setAnchorDate((d) => addMonths(d, -1));
-    else if (viewMode === "week" || viewMode === "next7") setAnchorDate((d) => addDays(d, -7));
+    else if (viewMode === "week" || viewMode === "next7" || viewMode === "venueocc") setAnchorDate((d) => addDays(d, -7));
     else setAnchorDate((d) => addDays(d, -1));
   }
 
   function moveForward() {
     if (viewMode === "year" || viewMode === "yeardisc") setAnchorDate((d) => addYears(d, 1));
     else if (viewMode === "month") setAnchorDate((d) => addMonths(d, 1));
-    else if (viewMode === "week" || viewMode === "next7") setAnchorDate((d) => addDays(d, 7));
+    else if (viewMode === "week" || viewMode === "next7" || viewMode === "venueocc") setAnchorDate((d) => addDays(d, 7));
     else setAnchorDate((d) => addDays(d, 1));
   }
 
@@ -387,6 +522,13 @@ export default function Schedule() {
                   }}
                 />
               </div>
+            ) : viewMode === "venueocc" ? (
+              <VenueOccupationView
+                items={visibleItems}
+                venues={venues ?? []}
+                locale={locale}
+                venueFilterId={venueId}
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {getRangeDays(viewMode, anchorDate).map((date) => {
