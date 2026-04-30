@@ -31,6 +31,13 @@ function buildICS(
     tags: string | null;
     venue: { name: string; addressStreet: string | null; addressCity: string | null; addressCountry: string | null; capacity: number | null } | null;
     people: Array<{ person: { name: string; role: string | null }; role: string | null }>;
+    shows?: Array<{
+      id: string;
+      showDate: Date;
+      showTime: string;
+      durationMinutes: number;
+      venue: { name: string; addressStreet: string | null; addressCity: string | null; addressCountry: string | null } | null;
+    }>;
   }>
 ): string {
   const now = formatICSDate(new Date());
@@ -42,22 +49,59 @@ function buildICS(
   };
 
   const vevents = events
-    .filter((e): e is typeof e & { startDate: Date } => e.startDate != null)
-    .map((event) => {
-      const dtstart = formatICSDate(event.startDate);
-      const dtend = event.endDate
-        ? formatICSDate(event.endDate)
-        : formatICSDate(new Date(event.startDate.getTime() + 60 * 60 * 1000));
+    .flatMap((event) => {
+      const showRows = (event.shows ?? []).filter((s) => /^\d{2}:\d{2}$/.test(s.showTime));
+      if (showRows.length > 0) {
+        return showRows.map((show) => {
+          const [hhRaw, mmRaw] = show.showTime.split(":");
+          const hh = Number(hhRaw);
+          const mm = Number(mmRaw);
+          const start = new Date(show.showDate);
+          start.setUTCHours(hh, mm, 0, 0);
+          const end = new Date(start.getTime() + Math.max(1, show.durationMinutes) * 60 * 1000);
+          return {
+            uid: `${event.id}-${show.id}@ordostage`,
+            summary: event.title,
+            start,
+            end,
+            venue: show.venue ?? event.venue ?? null,
+            descriptionBase: event.description,
+            status: event.status,
+            tags: event.tags,
+            people: event.people,
+          };
+        });
+      }
 
-      const icsStatus = statusMap[event.status] ?? "TENTATIVE";
+      if (!event.startDate) return [];
+      const fallbackStart = event.startDate;
+      const fallbackEnd = event.endDate ?? new Date(fallbackStart.getTime() + 60 * 60 * 1000);
+      return [
+        {
+          uid: `${event.id}@ordostage`,
+          summary: event.title,
+          start: fallbackStart,
+          end: fallbackEnd,
+          venue: event.venue,
+          descriptionBase: event.description,
+          status: event.status,
+          tags: event.tags,
+          people: event.people,
+        },
+      ];
+    })
+    .map((row) => {
+      const dtstart = formatICSDate(row.start);
+      const dtend = formatICSDate(row.end);
+
+      const icsStatus = statusMap[row.status] ?? "TENTATIVE";
 
       // Build rich description
       const parts: string[] = [];
-      if (event.description) parts.push(event.description);
-      if (event.venue?.capacity) parts.push(`Capacity: ${event.venue.capacity}`);
-      if (event.tags) parts.push(`Tags: ${event.tags}`);
-      if (event.people.length > 0) {
-        const peopleList = event.people
+      if (row.descriptionBase) parts.push(row.descriptionBase);
+      if (row.tags) parts.push(`Tags: ${row.tags}`);
+      if (row.people.length > 0) {
+        const peopleList = row.people
           .map((ep) => {
             const role = ep.role || ep.person.role;
             return role ? `${ep.person.name} (${role})` : ep.person.name;
@@ -72,21 +116,21 @@ function buildICS(
 
       // Location: venue name + address
       let location: string | null = null;
-      if (event.venue) {
-        const addrParts = [event.venue.addressStreet, event.venue.addressCity, event.venue.addressCountry].filter(Boolean);
+      if (row.venue) {
+        const addrParts = [row.venue.addressStreet, row.venue.addressCity, row.venue.addressCountry].filter(Boolean);
         const loc = addrParts.length > 0
-          ? `${event.venue.name}, ${addrParts.join(", ")}`
-          : event.venue.name;
+          ? `${row.venue.name}, ${addrParts.join(", ")}`
+          : row.venue.name;
         location = `LOCATION:${escapeICSText(loc)}`;
       }
 
       return [
         "BEGIN:VEVENT",
-        `UID:${event.id}@ordostage`,
+        `UID:${row.uid}`,
         `DTSTAMP:${now}`,
         `DTSTART:${dtstart}`,
         `DTEND:${dtend}`,
-        `SUMMARY:${escapeICSText(event.title)}`,
+        `SUMMARY:${escapeICSText(row.summary)}`,
         fullDescription,
         location,
         `STATUS:${icsStatus}`,
@@ -220,6 +264,16 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
     orderBy: { startDate: "asc" },
     include: {
       venue: { select: { name: true, addressStreet: true, addressCity: true, addressCountry: true, capacity: true } },
+      shows: {
+        select: {
+          id: true,
+          showDate: true,
+          showTime: true,
+          durationMinutes: true,
+          venue: { select: { name: true, addressStreet: true, addressCity: true, addressCountry: true } },
+        },
+        orderBy: [{ showDate: "asc" }, { showTime: "asc" }],
+      },
       people: {
         include: {
           person: {
