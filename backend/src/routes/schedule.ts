@@ -116,6 +116,10 @@ scheduleRouter.get("/schedule", async (c) => {
   const bookingWhere: Record<string, unknown> = {
     organizationId: user.organizationId,
     ...dateFilter,
+    NOT: [
+      { title: { startsWith: "[event-show-job:" } },
+      { title: { startsWith: "[event-show-staffing:" } },
+    ],
   };
   if (venueId) bookingWhere.venueId = venueId;
   if (personId) {
