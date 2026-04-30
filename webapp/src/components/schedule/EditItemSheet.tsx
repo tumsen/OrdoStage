@@ -47,6 +47,18 @@ function EventScheduleSummary({
   selectedShowId: string | null;
   onOpenEvent: () => void;
 }) {
+  function formatJobTimeRange(job: EventDetail["shows"][number]["jobs"][number]): string {
+    const day = new Date(job.jobDate);
+    if (!Number.isFinite(day.getTime())) return `${job.startTime}`;
+    const start = new Date(day);
+    const [hh, mm] = job.startTime.split(":").map((v) => Number(v));
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return `${job.startTime}`;
+    start.setHours(hh, mm, 0, 0);
+    const end = new Date(start.getTime() + job.durationMinutes * 60_000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(start.getHours())}:${pad(start.getMinutes())} - ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+  }
+
   const shows = [...(event.shows ?? [])].sort((a, b) => {
     const d = a.showDate.localeCompare(b.showDate);
     if (d !== 0) return d;
@@ -71,7 +83,13 @@ function EventScheduleSummary({
       </p>
       <div className="space-y-3">
         {visibleShows.map((show) => {
-          const jobAssignments = (show.jobs ?? []).filter((j) => j.person);
+          const jobs = (show.jobs ?? [])
+            .slice()
+            .sort((a, b) => {
+              const d = a.jobDate.localeCompare(b.jobDate);
+              if (d !== 0) return d;
+              return a.startTime.localeCompare(b.startTime);
+            });
           return (
             <div key={show.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -90,15 +108,18 @@ function EventScheduleSummary({
               {show.venue?.name ? (
                 <p className="text-xs text-white/45">Venue: {show.venue.name}</p>
               ) : null}
-              {jobAssignments.length === 0 ? (
-                <p className="text-xs text-white/35">No job assignments yet.</p>
+              {jobs.length === 0 ? (
+                <p className="text-xs text-white/35">No jobs on this show yet.</p>
               ) : (
                 <div className="space-y-1">
-                  <p className="text-xs text-white/50">Job assignments</p>
-                  {jobAssignments.map((job) => (
-                    <p key={job.id} className="text-xs text-white/80">
-                      {job.title}: <span className="text-white/95">{job.person?.name}</span>
-                    </p>
+                  <p className="text-xs text-white/50">Jobs</p>
+                  {jobs.map((job) => (
+                    <div key={job.id} className="text-xs text-white/80 flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate">
+                        {job.title} - <span className="text-white/95">{job.person?.name ?? "Unassigned"}</span>
+                      </span>
+                      <span className="shrink-0 text-white/55">{formatJobTimeRange(job)}</span>
+                    </div>
                   ))}
                 </div>
               )}
