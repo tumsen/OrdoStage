@@ -165,6 +165,7 @@ scheduleRouter.get("/schedule", async (c) => {
                 jobDate: true,
                 startTime: true,
                 durationMinutes: true,
+                venueId: true,
                 personId: true,
                 person: {
                   select: {
@@ -212,6 +213,7 @@ scheduleRouter.get("/schedule", async (c) => {
         jobDate: serializeDate(job.jobDate),
         startTime: job.startTime,
         durationMinutes: job.durationMinutes,
+        venueId: job.venueId,
         personId: job.personId,
         person: job.person
           ? {
