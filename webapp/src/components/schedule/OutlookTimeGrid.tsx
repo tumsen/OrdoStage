@@ -160,17 +160,17 @@ export function OutlookTimeGrid({
               return (
                 <div key={day.toISOString()} className="border-l border-white/10 bg-white/[0.01] p-0.5 min-h-[28px] flex flex-col gap-0.5">
                   {allDay.map((item) => {
-                    const venueName = item.kind === "event" ? (item.raw as EventDetail).venue?.name : undefined;
+                    const eventVenueName = item.kind === "event" || item.kind === "job" ? (item.raw as EventDetail).venue?.name : undefined;
                     return (
                       <div key={item.id} className="group/all relative flex items-center">
                         <button
                           data-booking-block
                           onClick={() => onItemClick(item)}
                           className={`flex-1 text-left text-[10px] px-1.5 py-0.5 rounded font-medium truncate ${itemColor(item)}`}
-                          title={[item.title, venueName && `@ ${venueName}`].filter(Boolean).join(" ")}
+                          title={[item.title, eventVenueName && `@ ${eventVenueName}`].filter(Boolean).join(" ")}
                         >
                           {item.title}
-                          {venueName ? <span className="opacity-70"> @ {venueName}</span> : null}
+                          {eventVenueName ? <span className="opacity-70"> @ {eventVenueName}</span> : null}
                           {" "}<StatusLabel status={item.status} />
                         </button>
                         <button
@@ -267,7 +267,7 @@ export function OutlookTimeGrid({
                   const { top, height, clippedStart, clippedEnd } = layout;
 
                   const venueName =
-                    item.kind === "event"
+                    item.kind === "event" || item.kind === "job"
                       ? (item.raw as EventDetail).venue?.name
                       : (item.raw as InternalBookingDetail).venue?.name;
                   const creatorName =
@@ -327,7 +327,7 @@ export function OutlookTimeGrid({
                             {/* Title line */}
                             <div className="truncate font-semibold text-[11px] leading-tight shrink-0">
                               {item.title}
-                              {venueName && item.kind === "event" ? (
+                              {venueName && (item.kind === "event" || item.kind === "job") ? (
                                 <span className="font-normal opacity-75"> @ {venueName}</span>
                               ) : null}
                             </div>

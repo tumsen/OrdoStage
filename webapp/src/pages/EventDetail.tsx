@@ -1424,7 +1424,11 @@ function ShowStaffingSections({
   });
 
   const departments = eventTeams.map((t) => t.team);
-  const staffedDepartmentIds = new Set((show.jobs ?? []).map((j) => j.departmentId).filter(Boolean));
+  const staffedDepartmentIds = new Set(
+    (show.jobs ?? [])
+      .map((j) => j.departmentId)
+      .filter((id): id is string => Boolean(id))
+  );
   for (const s of show.staffing ?? []) {
     if (s.departmentId) staffedDepartmentIds.add(s.departmentId);
   }
@@ -1462,7 +1466,10 @@ function ShowStaffingSections({
             </SelectItem>
             {addableDepartments.map((d) => (
               <SelectItem key={d.id} value={d.id}>
-                {d.name}
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
+                  {d.name}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
@@ -1488,6 +1495,7 @@ function ShowStaffingSections({
                 >
                   <div className="flex items-center gap-2">
                     {isOpen ? <ChevronDown size={14} className="text-white/50" /> : <ChevronRight size={14} className="text-white/50" />}
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: dept.color }} />
                     <span className="text-sm font-medium text-white/85">{dept.name}</span>
                   </div>
                   <span className="text-xs text-white/45">{(show.jobs ?? []).filter((j) => j.departmentId === dept.id).length} jobs</span>
@@ -1986,6 +1994,7 @@ function TeamsTab({ event }: { event: EventDetail }) {
       toast({ title: "Could not delete document", description: errMsg(e, "Delete failed"), variant: "destructive" }),
   });
 
+  const teamByEventTeamId = new Map(teams.map((t) => [t.id, t.team]));
   const teamNameByEventTeamId = new Map(teams.map((t) => [t.id, t.team.name]));
 
   const availableTeams = allDepartments.filter((d) => !teams.some((t) => t.team.id === d.id));
@@ -2016,7 +2025,10 @@ function TeamsTab({ event }: { event: EventDetail }) {
                 value={t.id}
                 className="data-[state=active]:bg-white/15 data-[state=active]:text-white border border-white/15 text-white/65"
               >
-                {t.team.name} {t.isOwner ? "(owner)" : ""}
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: t.team.color }} />
+                  {t.team.name} {t.isOwner ? "(owner)" : ""}
+                </span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -2029,7 +2041,10 @@ function TeamsTab({ event }: { event: EventDetail }) {
             <SelectContent className="bg-[#16161f] border-white/10 text-white">
               {availableTeams.map((d) => (
                 <SelectItem key={d.id} value={d.id}>
-                  {d.name}
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
+                    {d.name}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -2059,7 +2074,11 @@ function TeamsTab({ event }: { event: EventDetail }) {
         </div>
         {selectedTeamRow ? (
           <p className="text-xs text-white/45">
-            Active team tab: <span className="text-white/75">{selectedTeamRow.team.name}</span>
+            Active team tab:{" "}
+            <span className="inline-flex items-center gap-1.5 text-white/75">
+              <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: selectedTeamRow.team.color }} />
+              {selectedTeamRow.team.name}
+            </span>
           </p>
         ) : null}
       </div>
@@ -2087,7 +2106,10 @@ function TeamsTab({ event }: { event: EventDetail }) {
             <SelectContent className="bg-[#16161f] border-white/10 text-white">
               {teams.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
-                  {t.team.name}
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: t.team.color }} />
+                    {t.team.name}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -2101,7 +2123,10 @@ function TeamsTab({ event }: { event: EventDetail }) {
                 .filter((t) => t.id !== selectedTeam)
                 .map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.team.name}
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: t.team.color }} />
+                      {t.team.name}
+                    </span>
                   </SelectItem>
                 ))}
             </SelectContent>
@@ -2135,7 +2160,21 @@ function TeamsTab({ event }: { event: EventDetail }) {
               <div key={n.id} className="flex items-start justify-between gap-3 rounded border border-white/10 bg-white/[0.03] p-3">
                 <div className="min-w-0">
                   <p className="text-xs text-white/45">
-                    {teamNameByEventTeamId.get(n.fromTeamId) || "Unknown"} {"->"} {teamNameByEventTeamId.get(n.toTeamId) || "Unknown"}
+                    <span className="inline-flex items-center gap-1">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: teamByEventTeamId.get(n.fromTeamId)?.color ?? "rgba(255,255,255,0.3)" }}
+                      />
+                      {teamNameByEventTeamId.get(n.fromTeamId) || "Unknown"}
+                    </span>{" "}
+                    {"->"}{" "}
+                    <span className="inline-flex items-center gap-1">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: teamByEventTeamId.get(n.toTeamId)?.color ?? "rgba(255,255,255,0.3)" }}
+                      />
+                      {teamNameByEventTeamId.get(n.toTeamId) || "Unknown"}
+                    </span>
                   </p>
                   {editingNoteId === n.id ? (
                     <div className="space-y-2 mt-1">

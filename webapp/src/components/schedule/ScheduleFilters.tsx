@@ -12,6 +12,7 @@ export type ScheduleViewMode = "year" | "yeardisc" | "month" | "week" | "day" | 
 
 export interface VisibilityFilters {
   event: boolean;
+  job: boolean;
   rehearsal: boolean;
   maintenance: boolean;
   private: boolean;
@@ -96,6 +97,7 @@ export function ScheduleFilters({
         {(
           [
             ["event", "Events"],
+            ["job", "Jobs"],
             ["rehearsal", "Rehearsals"],
             ["maintenance", "Maintenance"],
             ["private", "Private"],

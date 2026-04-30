@@ -186,6 +186,7 @@ export default function Schedule() {
   const [bookingSlot, setBookingSlot] = useState<{ startDate: string; endDate: string } | null>(null);
   const [visibility, setVisibility] = useState<VisibilityFilters>({
     event: true,
+    job: true,
     rehearsal: true,
     maintenance: true,
     private: true,
@@ -214,6 +215,21 @@ export default function Schedule() {
         queryClient.invalidateQueries({ queryKey: ["schedule"] });
         toast({ title: "Event deleted" });
       }).catch(() => toast({ title: "Failed to delete event", variant: "destructive" }));
+    } else if (item.kind === "job") {
+      const m = /^(.*):show:(.*):job:(.*)$/.exec(item.id);
+      if (!m) {
+        toast({ title: "Could not delete job", variant: "destructive" });
+        return;
+      }
+      const eventId = m[1];
+      const showId = m[2];
+      const jobId = m[3];
+      if (!confirmDeleteAction(`job "${item.title}"`)) return;
+      api.delete(`/api/events/${eventId}/shows/${showId}/jobs/${jobId}`).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["schedule"] });
+        queryClient.invalidateQueries({ queryKey: ["event", eventId] });
+        toast({ title: "Job deleted" });
+      }).catch(() => toast({ title: "Failed to delete job", variant: "destructive" }));
     } else {
       if (!confirmDeleteAction(`booking "${item.title}"`)) return;
       deleteBookingMutation.mutate(item.id);
@@ -248,6 +264,7 @@ export default function Schedule() {
 
   const visibleItems = items.filter((item) => {
     if (item.kind === "event") return visibility.event;
+    if (item.kind === "job") return visibility.job;
     if (item.type === "rehearsal") return visibility.rehearsal;
     if (item.type === "maintenance") return visibility.maintenance;
     if (item.type === "private") return visibility.private;
