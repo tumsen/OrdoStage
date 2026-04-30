@@ -207,12 +207,12 @@ export function ShowJobsEditor({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex shrink-0 items-end gap-0.5 pb-px">
+            <div className="flex shrink-0 items-center gap-0.5 self-end pb-[2px]">
               <Button
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 text-white/40 hover:text-white"
+                className="h-10 w-10 text-white/40 hover:text-white"
                 title="Copy job (clear person)"
                 onClick={() => {
                   const { startValue, endValue } = w;
@@ -235,7 +235,7 @@ export function ShowJobsEditor({
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 text-white/40 hover:text-red-400"
+                className="h-10 w-10 text-white/40 hover:text-red-400"
                 onClick={() => {
                   if (!confirm("Delete this job?")) return;
                   deleteJob.mutate(j.id);
@@ -305,7 +305,7 @@ export function ShowJobsEditor({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex shrink-0 items-end gap-1 pb-px">
+          <div className="flex shrink-0 items-center gap-1 self-end pb-[2px]">
             <Button
               type="button"
               size="sm"

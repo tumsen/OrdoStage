@@ -4,8 +4,9 @@ import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } f
 import { usePreferences } from "@/hooks/usePreferences";
 import { durationHhMmToTotalMinutes, totalMinutesToDurationHhMm } from "@/lib/showTiming";
 
+/** Same outer height as shadcn `Input` / `DateInputWithWeekday` (`h-10`). */
 const WRAPPER =
-  "inline-flex items-center gap-0.5 shrink-0 w-[5.75rem] justify-center rounded-md border border-white/10 bg-white/5 py-0.5 px-0.5";
+  "inline-flex h-10 items-center gap-0.5 shrink-0 w-[5.75rem] justify-center rounded-md border border-white/10 bg-white/5 px-0.5";
 
 const SEG = cn(
   "h-9 w-7 text-center font-mono text-sm tabular-nums",
@@ -14,7 +15,7 @@ const SEG = cn(
   "placeholder:text-white/20",
 );
 
-const AMPM_BTN = "h-9 px-1.5 text-[10px] font-medium";
+const AMPM_BTN = "h-full min-h-0 flex-1 px-1.5 text-[10px] font-medium inline-flex items-center justify-center";
 
 export type SplitTimeFieldHandle = { focusHours: () => void; focusMinutes: () => void };
 
@@ -259,7 +260,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
           aria-label={ariaLabel ? `${ariaLabel} minutes` : "Minutes"}
         />
         {is12h && (
-          <div className="ml-0.5 inline-flex h-9 items-center rounded border border-white/10 bg-white/5 overflow-hidden">
+          <div className="ml-0.5 inline-flex h-10 items-stretch self-center rounded border border-white/10 bg-white/5 overflow-hidden">
             {(["AM", "PM"] as const).map((m) => (
               <button key={m} type="button"
                 className={cn(AMPM_BTN, isAM === (m === "AM") ? "bg-white/15 text-white" : "text-white/55 hover:text-white/80")}
