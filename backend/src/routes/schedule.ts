@@ -117,6 +117,23 @@ scheduleRouter.get("/schedule", async (c) => {
             showTime: true,
             durationMinutes: true,
             venueId: true,
+            jobs: {
+              select: {
+                id: true,
+                title: true,
+                jobDate: true,
+                startTime: true,
+                durationMinutes: true,
+                personId: true,
+                person: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+              orderBy: [{ jobDate: "asc" }, { startTime: "asc" }, { sortOrder: "asc" }],
+            },
           },
           orderBy: [{ showDate: "asc" }, { showTime: "asc" }],
         },
@@ -157,6 +174,20 @@ scheduleRouter.get("/schedule", async (c) => {
       showTime: show.showTime,
       durationMinutes: show.durationMinutes,
       venueId: show.venueId,
+      jobs: show.jobs.map((job) => ({
+        id: job.id,
+        title: job.title,
+        jobDate: serializeDate(job.jobDate),
+        startTime: job.startTime,
+        durationMinutes: job.durationMinutes,
+        personId: job.personId,
+        person: job.person
+          ? {
+              id: job.person.id,
+              name: job.person.name,
+            }
+          : null,
+      })),
     })),
   }));
 
