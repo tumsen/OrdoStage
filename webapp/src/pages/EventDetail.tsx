@@ -641,47 +641,39 @@ function DetailsTab({
             {/* ── Technical ── */}
             <SectionHeader>Technical</SectionHeader>
 
-            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
-              <p className="text-[9px] text-white/35 mb-1.5 leading-snug">
-                <span className="text-white/50">W × D × H</span> — one number per side in metres (e.g.{" "}
-                <span className="text-white/55">999,99</span>). Amber note if the default venue is smaller.
-              </p>
-              <div className="flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 overflow-x-auto pb-0.5">
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {(
                   [
-                    { short: "W", full: "Width", name: "stageWidth" as const },
-                    { short: "D", full: "Depth", name: "stageDepth" as const },
-                    { short: "H", full: "Height", name: "stageHeight" as const },
+                    { full: "Width", name: "stageWidth" as const },
+                    { full: "Depth", name: "stageDepth" as const },
+                    { full: "Height", name: "stageHeight" as const },
                   ] as const
-                ).map((row, i) => (
-                  <div key={row.name} className="flex shrink-0 items-end gap-1.5">
-                    {i > 0 ? <div className="w-px h-7 bg-white/10 self-end mb-0.5 shrink-0" aria-hidden /> : null}
-                    <div className="flex items-end gap-1.5 shrink-0" title={`${row.full} (m)`}>
-                      <span className="text-[10px] text-white/50 pb-2 w-4 text-center font-medium leading-none">
-                        {row.short}
-                      </span>
-                      <FormField
-                        control={form.control}
-                        name={row.name}
-                        render={({ field }) => (
-                          <FormItem className="space-y-0">
-                            <FormControl>
-                              <Input
-                                {...field}
-                                value={field.value ?? ""}
-                                inputMode="decimal"
-                                maxLength={7}
-                                placeholder="0"
-                                autoComplete="off"
-                                className="h-8 w-[5.75rem] min-w-[5.75rem] bg-white/5 border-white/10 text-white tabular-nums"
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <span className="text-[10px] text-white/40 pb-2 shrink-0">m</span>
-                    </div>
-                  </div>
+                ).map((row) => (
+                  <FormField
+                    key={row.name}
+                    control={form.control}
+                    name={row.name}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white/60 text-xs uppercase tracking-wide">{row.full}</FormLabel>
+                        <div className="flex items-end gap-1.5">
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value ?? ""}
+                              inputMode="decimal"
+                              maxLength={7}
+                              placeholder="0"
+                              autoComplete="off"
+                              className="h-8 w-full min-w-0 bg-white/5 border-white/10 text-white tabular-nums"
+                            />
+                          </FormControl>
+                          <span className="text-[10px] text-white/40 pb-2 shrink-0">m</span>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
                 ))}
               </div>
             </div>
