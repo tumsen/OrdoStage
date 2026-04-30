@@ -75,26 +75,8 @@ scheduleRouter.get("/schedule", async (c) => {
   const eventWhere: Record<string, unknown> = {
     organizationId: user.organizationId,
   };
-  if (fromDate || toDateExclusive) {
-    eventWhere.OR = [
-      {
-        startDate: {
-          ...(fromDate ? { gte: fromDate } : {}),
-          ...(toDateExclusive ? { lt: toDateExclusive } : {}),
-        },
-      },
-      {
-        shows: {
-          some: {
-            showDate: {
-              ...(fromDate ? { gte: fromDate } : {}),
-              ...(toDateExclusive ? { lt: toDateExclusive } : {}),
-            },
-          },
-        },
-      },
-    ];
-  }
+  // Do not date-filter events at DB level. Event date anchoring now comes from
+  // show dates when startDate is unset, and client-side day filtering handles visibility.
   if (venueId) eventWhere.venueId = venueId;
   if (personId) {
     eventWhere.people = { some: { personId } };
