@@ -111,7 +111,13 @@ scheduleRouter.get("/schedule", async (c) => {
           },
         },
         shows: {
-          select: { id: true, showDate: true },
+          select: {
+            id: true,
+            showDate: true,
+            showTime: true,
+            durationMinutes: true,
+            venueId: true,
+          },
           orderBy: [{ showDate: "asc" }, { showTime: "asc" }],
         },
       },
@@ -148,6 +154,9 @@ scheduleRouter.get("/schedule", async (c) => {
     shows: event.shows.map((show) => ({
       id: show.id,
       showDate: serializeDate(show.showDate),
+      showTime: show.showTime,
+      durationMinutes: show.durationMinutes,
+      venueId: show.venueId,
     })),
   }));
 

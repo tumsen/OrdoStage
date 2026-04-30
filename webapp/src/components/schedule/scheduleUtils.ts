@@ -13,6 +13,18 @@ export interface CalendarItem {
   raw: EventDetail | InternalBookingDetail;
 }
 
+function toLocalDatetime(datePart: string, timePart: string): string {
+  return `${datePart}T${timePart}`;
+}
+
+function addMinutesLocal(startLocal: string, minutes: number): string | null {
+  const d = new Date(startLocal);
+  if (!Number.isFinite(d.getTime())) return null;
+  const end = new Date(d.getTime() + minutes * 60_000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`;
+}
+
 /** Date anchor for the schedule grid: event window, or earliest show date when window is unset. */
 export function eventCalendarStart(e: EventDetail): string | null {
   if (e.startDate) return e.startDate;
@@ -28,11 +40,40 @@ export function toCalendarItems(
   events: EventDetail[],
   bookings: InternalBookingDetail[]
 ): CalendarItem[] {
-  const eventItems: CalendarItem[] = events
-    .map((e) => {
-      const startDate = eventCalendarStart(e);
-      if (!startDate) return null;
-      return {
+  const eventItems = events.flatMap((e) => {
+    const shows = (e.shows ?? [])
+      .filter((s) => Boolean(s.showDate))
+      .sort((a, b) => {
+        const d = a.showDate.localeCompare(b.showDate);
+        if (d !== 0) return d;
+        return a.showTime.localeCompare(b.showTime);
+      });
+
+    if (shows.length > 0) {
+      return shows.map((show) => {
+        const day = show.showDate.slice(0, 10);
+        const hasTime = /^\d{2}:\d{2}$/.test(show.showTime);
+        const startDate = hasTime ? toLocalDatetime(day, show.showTime) : day;
+        const endDate =
+          hasTime && show.durationMinutes > 0
+            ? addMinutesLocal(startDate, show.durationMinutes)
+            : null;
+        return {
+          id: `${e.id}:show:${show.id}`,
+          title: e.title,
+          kind: "event" as const,
+          status: e.status,
+          startDate,
+          endDate,
+          raw: e,
+        } satisfies CalendarItem;
+      });
+    }
+
+    const startDate = eventCalendarStart(e);
+    if (!startDate) return [];
+    return [
+      {
         id: e.id,
         title: e.title,
         kind: "event" as const,
@@ -40,9 +81,9 @@ export function toCalendarItems(
         startDate,
         endDate: e.endDate,
         raw: e,
-      };
-    })
-    .filter((item): item is CalendarItem => item !== null);
+      } satisfies CalendarItem,
+    ];
+  });
 
   const bookingItems: CalendarItem[] = bookings.map((b) => ({
     id: b.id,

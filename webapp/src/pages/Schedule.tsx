@@ -207,8 +207,10 @@ export default function Schedule() {
 
   function handleDeleteItem(item: CalendarItem) {
     if (item.kind === "event") {
+      const rawEvent = item.raw as EventDetail;
+      const eventId = rawEvent.id;
       if (!confirmDeleteAction(`event "${item.title}"`)) return;
-      api.delete(`/api/events/${item.id}`).then(() => {
+      api.delete(`/api/events/${eventId}`).then(() => {
         queryClient.invalidateQueries({ queryKey: ["schedule"] });
         toast({ title: "Event deleted" });
       }).catch(() => toast({ title: "Failed to delete event", variant: "destructive" }));
