@@ -28,6 +28,42 @@ function normalizeTagList(tags: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+type ContactRow = { role?: string; name?: string; phone?: string; email?: string };
+
+function parseEventCustomFields(customFields: string | null | undefined): {
+  contacts: ContactRow[];
+  smokeFx: boolean;
+  hazeFx: boolean;
+  strobeFx: boolean;
+} {
+  if (!customFields) return { contacts: [], smokeFx: false, hazeFx: false, strobeFx: false };
+  try {
+    const fields = JSON.parse(customFields) as Array<{ key?: string; value?: string }>;
+    if (!Array.isArray(fields)) return { contacts: [], smokeFx: false, hazeFx: false, strobeFx: false };
+    let contacts: ContactRow[] = [];
+    let smokeFx = false;
+    let hazeFx = false;
+    let strobeFx = false;
+    for (const field of fields) {
+      const key = (field.key ?? "").trim();
+      const value = (field.value ?? "").trim();
+      if (key === "Contacts" && value) {
+        try {
+          const parsed = JSON.parse(value) as ContactRow[];
+          if (Array.isArray(parsed)) contacts = parsed;
+        } catch {
+          // ignore malformed contacts payload
+        }
+      } else if (key === "Use smoke fx") smokeFx = value === "true";
+      else if (key === "Use haze fx") hazeFx = value === "true";
+      else if (key === "Use strobe fx") strobeFx = value === "true";
+    }
+    return { contacts, smokeFx, hazeFx, strobeFx };
+  } catch {
+    return { contacts: [], smokeFx: false, hazeFx: false, strobeFx: false };
+  }
+}
+
 interface ICSRow {
   uid: string;
   summary: string;
@@ -232,6 +268,21 @@ function buildICS(
         parts.push(`People: ${peopleList}`);
       }
       if (row.customFields) parts.push(`Custom fields: ${row.customFields}`);
+      const meta = parseEventCustomFields(row.customFields);
+      if (meta.contacts.length > 0) {
+        const contactSummary = meta.contacts
+          .map((c) => [c.role, c.name, c.phone, c.email].filter(Boolean).join(" - "))
+          .filter(Boolean)
+          .join("; ");
+        if (contactSummary) parts.push(`Contacts: ${contactSummary}`);
+      }
+      const fx: string[] = [];
+      if (meta.smokeFx) fx.push("Smoke");
+      if (meta.hazeFx) fx.push("Haze");
+      if (meta.strobeFx) fx.push("Strobe");
+      if (fx.length > 0) {
+        parts.push(`Effects: ${fx.join(", ")} (audience announcement required)`);
+      }
       const fullDescription =
         parts.length > 0
           ? `DESCRIPTION:${escapeICSText(parts.join("\\n"))}`

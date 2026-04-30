@@ -38,6 +38,42 @@ interface EditItemSheetProps {
   people: Person[];
 }
 
+type EventContactRow = { role?: string; name?: string; phone?: string; email?: string };
+
+function eventMetaFromCustomFields(customFields: string | null | undefined): {
+  contacts: EventContactRow[];
+  smokeFx: boolean;
+  hazeFx: boolean;
+  strobeFx: boolean;
+} {
+  if (!customFields) return { contacts: [], smokeFx: false, hazeFx: false, strobeFx: false };
+  try {
+    const fields = JSON.parse(customFields) as Array<{ key?: string; value?: string }>;
+    if (!Array.isArray(fields)) return { contacts: [], smokeFx: false, hazeFx: false, strobeFx: false };
+    let contacts: EventContactRow[] = [];
+    let smokeFx = false;
+    let hazeFx = false;
+    let strobeFx = false;
+    for (const f of fields) {
+      const key = (f.key ?? "").trim();
+      const value = (f.value ?? "").trim();
+      if (key === "Contacts" && value) {
+        try {
+          const parsed = JSON.parse(value) as EventContactRow[];
+          if (Array.isArray(parsed)) contacts = parsed;
+        } catch {
+          // ignore invalid legacy value
+        }
+      } else if (key === "Use smoke fx") smokeFx = value === "true";
+      else if (key === "Use haze fx") hazeFx = value === "true";
+      else if (key === "Use strobe fx") strobeFx = value === "true";
+    }
+    return { contacts, smokeFx, hazeFx, strobeFx };
+  } catch {
+    return { contacts: [], smokeFx: false, hazeFx: false, strobeFx: false };
+  }
+}
+
 function EventScheduleSummary({
   event,
   selectedShowId,
@@ -47,6 +83,7 @@ function EventScheduleSummary({
   selectedShowId: string | null;
   onOpenEvent: () => void;
 }) {
+  const eventMeta = eventMetaFromCustomFields(event.customFields);
   function formatShowTimeRange(show: EventDetail["shows"][number]): string {
     const day = new Date(show.showDate);
     const [hh, mm] = show.showTime.split(":").map((v) => Number(v));
@@ -138,6 +175,29 @@ function EventScheduleSummary({
           );
         })}
       </div>
+      {(eventMeta.contacts.length > 0 || eventMeta.smokeFx || eventMeta.hazeFx || eventMeta.strobeFx) ? (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2">
+          <p className="text-xs text-white/50 uppercase tracking-wide">Event contacts & effects</p>
+          {eventMeta.contacts.length > 0 ? (
+            <div className="space-y-1">
+              {eventMeta.contacts.map((c, idx) => (
+                <div key={idx} className="text-xs text-white/80">
+                  <span className="text-white/95">{c.role || "Contact"}</span>
+                  {c.name ? ` - ${c.name}` : ""}
+                  {c.phone ? ` - ${c.phone}` : ""}
+                  {c.email ? ` - ${c.email}` : ""}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {(eventMeta.smokeFx || eventMeta.hazeFx || eventMeta.strobeFx) ? (
+            <p className="text-xs text-amber-200/95">
+              Effects: {eventMeta.smokeFx ? "Smoke " : ""}{eventMeta.hazeFx ? "Haze " : ""}{eventMeta.strobeFx ? "Strobe " : ""}
+              (audience announcement required)
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="pt-2 border-t border-white/10">
         <Button className="bg-indigo-700 hover:bg-indigo-600 text-white border-0" onClick={onOpenEvent}>
           Edit Event
