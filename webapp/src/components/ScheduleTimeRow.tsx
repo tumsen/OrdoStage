@@ -1,3 +1,4 @@
+import { DATE_INPUT_WITH_WEEKDAY_MIN_WIDTH_CLASS } from "@/components/DateInputWithWeekday";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,8 +23,10 @@ export function ScheduleTimeRow({
   );
 }
 
-export const scheduleDateInputClass =
-  "w-[10.5rem] min-w-[10.5rem] shrink-0 bg-white/5 border-white/10 text-white [color-scheme:dark]";
+export const scheduleDateInputClass = cn(
+  "w-[min(100%,24rem)] shrink-0 bg-white/5 border-white/10 text-white [color-scheme:dark]",
+  DATE_INPUT_WITH_WEEKDAY_MIN_WIDTH_CLASS
+);
 
 export const scheduleFieldLabelClass =
   "text-white/60 text-xs uppercase tracking-wide block mb-1.5";
