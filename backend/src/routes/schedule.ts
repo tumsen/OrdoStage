@@ -71,12 +71,42 @@ scheduleRouter.get("/schedule", async (c) => {
         }
       : {};
 
+  const showDateRange =
+    fromDate || toDateExclusive
+      ? {
+          ...(fromDate ? { gte: fromDate } : {}),
+          ...(toDateExclusive ? { lt: toDateExclusive } : {}),
+        }
+      : undefined;
+  const jobDateRange =
+    fromDate || toDateExclusive
+      ? {
+          ...(fromDate ? { gte: fromDate } : {}),
+          ...(toDateExclusive ? { lt: toDateExclusive } : {}),
+        }
+      : undefined;
+
   // Build event where clause
   const eventWhere: Record<string, unknown> = {
     organizationId: user.organizationId,
   };
-  // Do not date-filter events at DB level. Event date anchoring now comes from
-  // show dates when startDate is unset, and client-side day filtering handles visibility.
+  if (fromDate || toDateExclusive) {
+    eventWhere.OR = [
+      {
+        startDate: {
+          ...(fromDate ? { gte: fromDate } : {}),
+          ...(toDateExclusive ? { lt: toDateExclusive } : {}),
+        },
+      },
+      {
+        shows: {
+          some: {
+            showDate: showDateRange,
+          },
+        },
+      },
+    ];
+  }
   if (venueId) eventWhere.venueId = venueId;
   if (personId) {
     eventWhere.people = { some: { personId } };
@@ -111,6 +141,7 @@ scheduleRouter.get("/schedule", async (c) => {
           },
         },
         shows: {
+          ...(showDateRange ? { where: { showDate: showDateRange } } : {}),
           select: {
             id: true,
             showDate: true,
@@ -118,6 +149,7 @@ scheduleRouter.get("/schedule", async (c) => {
             durationMinutes: true,
             venueId: true,
             jobs: {
+              ...(jobDateRange ? { where: { jobDate: jobDateRange } } : {}),
               select: {
                 id: true,
                 title: true,
