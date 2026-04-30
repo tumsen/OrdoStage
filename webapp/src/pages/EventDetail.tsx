@@ -626,6 +626,44 @@ function DetailsTab({
                   />
                 ))}
               </div>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <FormField
+                  control={form.control}
+                  name="smokeFx"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+                      <FormControl>
+                        <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
+                      </FormControl>
+                      <FormLabel className="text-white/70 text-xs">Smoke</FormLabel>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="hazeFx"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+                      <FormControl>
+                        <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
+                      </FormControl>
+                      <FormLabel className="text-white/70 text-xs">Haze</FormLabel>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="strobeFx"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+                      <FormControl>
+                        <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
+                      </FormControl>
+                      <FormLabel className="text-white/70 text-xs">Strobe</FormLabel>
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -665,45 +703,7 @@ function DetailsTab({
               />
             </div>
 
-            <SectionHeader>Audience Effects + FOH</SectionHeader>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <FormField
-                control={form.control}
-                name="smokeFx"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
-                    <FormControl>
-                      <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
-                    </FormControl>
-                    <FormLabel className="text-white/70 text-xs">Smoke</FormLabel>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="hazeFx"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
-                    <FormControl>
-                      <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
-                    </FormControl>
-                    <FormLabel className="text-white/70 text-xs">Haze</FormLabel>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="strobeFx"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
-                    <FormControl>
-                      <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
-                    </FormControl>
-                    <FormLabel className="text-white/70 text-xs">Strobe</FormLabel>
-                  </FormItem>
-                )}
-              />
-            </div>
+            <SectionHeader>FOH</SectionHeader>
             <FormField
               control={form.control}
               name="fohNotes"
