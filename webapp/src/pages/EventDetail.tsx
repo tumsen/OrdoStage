@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, useMatch } from "react-router-dom";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,6 +71,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useSession } from "@/lib/auth-client";
 
 type TeamDocument = {
   id: string;
@@ -893,13 +895,6 @@ function DetailsTab({
         </Form>
 
         {!isNew && event ? (
-          <div className="pt-3 border-t border-white/10 space-y-2">
-            <SectionHeader className="!mt-0 !mb-1">Shows</SectionHeader>
-            <ShowsTab event={event} embedded />
-          </div>
-        ) : null}
-
-        {!isNew && event ? (
           <>
             <div className="pt-2 border-t border-white/10">
               <Button
@@ -1398,17 +1393,13 @@ function DocumentsTab({ event }: { event: EventDetail }) {
 }
 
 function ShowEventCard({
-  eventId,
   show,
   venues,
-  people,
   updateShow,
   deleteShow,
 }: {
-  eventId: string;
   show: EventShow;
   venues: { id: string; name: string }[] | undefined;
-  people: Person[] | undefined;
   updateShow: { mutate: (a: { showId: string; body: Record<string, unknown> }) => void };
   deleteShow: { mutate: (id: string) => void };
 }) {
@@ -1502,21 +1493,15 @@ function ShowEventCard({
           />
         </div>
       </div>
-
-      <ShowJobsEditor eventId={eventId} show={show} venues={venues} people={people} />
     </div>
   );
 }
 
-function ShowsTab({ event, embedded }: { event: EventDetail; embedded?: boolean }) {
+function ShowsTab({ event }: { event: EventDetail }) {
   const queryClient = useQueryClient();
   const { data: venues } = useQuery({
     queryKey: ["venues"],
     queryFn: () => api.get<Venue[]>("/api/venues"),
-  });
-  const { data: people } = useQuery({
-    queryKey: ["people"],
-    queryFn: () => api.get<Person[]>("/api/people"),
   });
   const [creating, setCreating] = useState(false);
   const [newShow, setNewShow] = useState<NewShowFormState>({
@@ -1558,15 +1543,9 @@ function ShowsTab({ event, embedded }: { event: EventDetail; embedded?: boolean 
 
 
   return (
-    <div className={embedded ? "space-y-3" : "space-y-4"}>
-      <div className={`space-y-2 ${embedded ? "min-h-0" : ""}`}>
-        {embedded ? (
-          <p className="text-[10px] text-white/40">
-            {event.shows.length} show{event.shows.length === 1 ? "" : "s"} — date, time, and venue per show
-          </p>
-        ) : (
-          <p className="text-xs text-white/45">{event.shows.length} show{event.shows.length === 1 ? "" : "s"}</p>
-        )}
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <p className="text-xs text-white/45">{event.shows.length} show{event.shows.length === 1 ? "" : "s"}</p>
         <Button size="sm" className="bg-white/5 border border-white/10 hover:bg-white/10 text-white" onClick={() => setCreating((v) => !v)}>
           <Plus size={13} className="mr-1" /> Add show
         </Button>
@@ -1653,10 +1632,8 @@ function ShowsTab({ event, embedded }: { event: EventDetail; embedded?: boolean 
           {event.shows.map((show: EventShow) => (
             <ShowEventCard
               key={show.id}
-              eventId={event.id}
               show={show}
               venues={venues}
-              people={people}
               updateShow={updateShow}
               deleteShow={deleteShow}
             />
@@ -2074,6 +2051,167 @@ function TeamsTab({ event }: { event: EventDetail }) {
   );
 }
 
+function StaffingTab({ event }: { event: EventDetail }) {
+  const queryClient = useQueryClient();
+  const { canWrite } = usePermissions();
+  const { data: session } = useSession();
+  const { data: venues } = useQuery({
+    queryKey: ["venues"],
+    queryFn: () => api.get<Venue[]>("/api/venues"),
+  });
+  const { data: allPeople = [] } = useQuery({
+    queryKey: ["people"],
+    queryFn: () => api.get<Person[]>("/api/people"),
+  });
+
+  const eventTeamDepartments = (event.teams ?? []).map((t) => t.team);
+  const eventPersonIds = new Set(event.people.map((ep) => ep.personId));
+  const availablePeople = allPeople.filter((p) => eventPersonIds.has(p.id));
+  const peopleById = new Map(availablePeople.map((p) => [p.id, p]));
+  const currentUserEmail = (session?.user?.email ?? "").trim().toLowerCase();
+  const actorPerson = availablePeople.find(
+    (p) => (p.email ?? "").trim().toLowerCase() !== "" && (p.email ?? "").trim().toLowerCase() === currentUserEmail
+  );
+
+  const upsertStaffing = useMutation({
+    mutationFn: (args: {
+      showId: string;
+      personId: string;
+      departmentId: string;
+      isLead?: boolean;
+    }) =>
+      api.post(`/api/events/${event.id}/shows/${args.showId}/staffing`, {
+        personId: args.personId,
+        departmentId: args.departmentId,
+        isLead: args.isLead ?? false,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
+  });
+
+  const removeStaffing = useMutation({
+    mutationFn: (args: { showId: string; personId: string }) =>
+      api.delete(`/api/events/${event.id}/shows/${args.showId}/staffing/${args.personId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
+  });
+
+  const staffingByShowAndDept = new Map<string, NonNullable<EventShow["staffing"]>[number][]>();
+  for (const show of event.shows) {
+    for (const row of show.staffing ?? []) {
+      if (!row.departmentId) continue;
+      const key = `${show.id}:${row.departmentId}`;
+      const prev = staffingByShowAndDept.get(key) ?? [];
+      prev.push(row);
+      staffingByShowAndDept.set(key, prev);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+        <p className="text-xs text-white/45">
+          Workflow: set show dates/times on the Shows tab, then assign department leads and jobs here.
+        </p>
+      </div>
+      {event.shows.length === 0 ? (
+        <div className="py-10 text-center text-white/35 text-sm">
+          Add at least one show on the Shows tab before staffing.
+        </div>
+      ) : eventTeamDepartments.length === 0 ? (
+        <div className="py-10 text-center text-white/35 text-sm">
+          Add teams on the Teams tab first. Staffing sections are created from event teams.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {event.shows.map((show) => (
+            <div key={show.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-4">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h3 className="text-sm font-semibold text-white">Show staffing</h3>
+                <span className="text-xs text-white/55">
+                  {formatDate(show.showDate)} {show.showTime ? `• ${show.showTime}` : ""}
+                </span>
+              </div>
+              <div className="space-y-4">
+                {eventTeamDepartments.map((dept) => {
+                  const key = `${show.id}:${dept.id}`;
+                  const rows = staffingByShowAndDept.get(key) ?? [];
+                  const lead = rows.find((r) => r.isLead) ?? null;
+                  const leadValue = lead?.personId ?? "__none__";
+                  const actorIsDeptLead = Boolean(actorPerson && lead?.personId === actorPerson.id);
+                  const canEditDeptAssignments = canWrite || actorIsDeptLead;
+                  return (
+                    <div key={dept.id} className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3">
+                      <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div className="min-w-[14rem]">
+                          <FieldLabel>{dept.name} lead</FieldLabel>
+                          <Select
+                            value={leadValue}
+                            onValueChange={(personId) => {
+                              if (!canEditDeptAssignments) return;
+                              if (personId === "__none__") {
+                                if (lead) removeStaffing.mutate({ showId: show.id, personId: lead.personId });
+                                return;
+                              }
+                              upsertStaffing.mutate({
+                                showId: show.id,
+                                personId,
+                                departmentId: dept.id,
+                                isLead: true,
+                              });
+                            }}
+                            disabled={!canEditDeptAssignments}
+                          >
+                            <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
+                              <SelectValue placeholder="Unassigned lead" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                              <SelectItem value="__none__">Unassigned lead</SelectItem>
+                              {availablePeople.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {!canEditDeptAssignments ? (
+                          <div className="self-start rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-100/90">
+                            Read-only by permission
+                          </div>
+                        ) : null}
+                        {lead ? (
+                          <p className="text-xs text-white/45 pb-2">
+                            Lead: {peopleById.get(lead.personId)?.name ?? "Unknown person"}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-white/35 pb-2">No lead assigned yet.</p>
+                        )}
+                      </div>
+                      <ShowJobsEditor
+                        eventId={event.id}
+                        show={show}
+                        venues={venues}
+                        people={availablePeople}
+                        departmentId={dept.id}
+                        title={`${dept.name} jobs`}
+                        canEdit={canEditDeptAssignments}
+                      />
+                      {!canEditDeptAssignments ? (
+                        <p className="text-xs text-white/35">
+                          Only event owner team or this show's department lead can edit assignments.
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function EventDetailPage() {
@@ -2133,10 +2271,22 @@ export default function EventDetailPage() {
                 Details
               </TabsTrigger>
               <TabsTrigger
+                value="shows"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                Shows ({ev?.shows?.length ?? 0})
+              </TabsTrigger>
+              <TabsTrigger
                 value="teams"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
                 Teams ({ev?.teams?.length ?? 0})
+              </TabsTrigger>
+              <TabsTrigger
+                value="staffing"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                Staffing
               </TabsTrigger>
               <TabsTrigger
                 value="people"
@@ -2163,6 +2313,13 @@ export default function EventDetailPage() {
                 onDeleted={() => navigate("/events")}
               />
             </TabsContent>
+            <TabsContent value="shows" className="mt-0">
+              {isNew ? (
+                <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then add shows here.</div>
+              ) : (
+                <ShowsTab event={ev!} />
+              )}
+            </TabsContent>
             <TabsContent value="people" className="mt-0">
               {isNew ? (
                 <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then assign people here.</div>
@@ -2175,6 +2332,13 @@ export default function EventDetailPage() {
                 <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then manage teams here.</div>
               ) : (
                 <TeamsTab event={ev!} />
+              )}
+            </TabsContent>
+            <TabsContent value="staffing" className="mt-0">
+              {isNew ? (
+                <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab first, then manage staffing.</div>
+              ) : (
+                <StaffingTab event={ev!} />
               )}
             </TabsContent>
             <TabsContent value="documents" className="mt-0">

@@ -39,6 +39,16 @@ async function actorTeamIds(organizationId: string, email: string | undefined): 
   return person?.teamMemberships.map((m) => m.departmentId) ?? [];
 }
 
+async function actorPersonId(organizationId: string, email: string | undefined): Promise<string | null> {
+  const normalized = (email || "").trim();
+  if (!normalized) return null;
+  const person = await prisma.person.findFirst({
+    where: { organizationId, email: { equals: normalized, mode: "insensitive" } },
+    select: { id: true },
+  });
+  return person?.id ?? null;
+}
+
 async function ensureEventOwnerTeam(eventId: string, organizationId: string): Promise<string | null> {
   const event = await prismaAny.event.findUnique({
     where: { id: eventId, organizationId },
@@ -132,6 +142,38 @@ async function canReadEventCollaboration(input: {
   if (eventTeams.length === 0) return false;
   const eventTeamIds = new Set(eventTeams.map((t: { teamId: string }) => t.teamId));
   return actorTeams.some((t) => eventTeamIds.has(t));
+}
+
+async function canManageShowAssignments(input: {
+  organizationId: string;
+  userId: string;
+  userEmail?: string;
+  eventId: string;
+  showId: string;
+  departmentId?: string | null;
+}): Promise<boolean> {
+  const canManageOwnerTeam = await canManageEventAsOwnerTeam({
+    organizationId: input.organizationId,
+    userId: input.userId,
+    userEmail: input.userEmail,
+    eventId: input.eventId,
+  });
+  if (canManageOwnerTeam) return true;
+  if (!input.departmentId) return false;
+
+  const personId = await actorPersonId(input.organizationId, input.userEmail);
+  if (!personId) return false;
+  const leadRow = await prismaAny.eventShowStaffing.findFirst({
+    where: {
+      showId: input.showId,
+      departmentId: input.departmentId,
+      personId,
+      isLead: true,
+      show: { eventId: input.eventId, event: { organizationId: input.organizationId } },
+    },
+    select: { id: true },
+  });
+  return Boolean(leadRow?.id);
 }
 
 function serializeEvent(event: {
@@ -1445,11 +1487,28 @@ eventsRouter.post(
     const user = c.get("user");
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-    if (!canAction(c, "write.events")) {
-      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
-    }
     const { id: eventId, showId } = c.req.param();
     const body = c.req.valid("json");
+    const existingStaffing = await prismaAny.eventShowStaffing.findUnique({
+      where: { showId_personId: { showId, personId: body.personId } },
+      select: { departmentId: true },
+    });
+    const targetDepartmentId =
+      body.departmentId !== undefined ? body.departmentId ?? null : existingStaffing?.departmentId ?? null;
+    const canEditAssignments = await canManageShowAssignments({
+      organizationId: user.organizationId,
+      userId: user.id,
+      userEmail: user.email,
+      eventId,
+      showId,
+      departmentId: targetDepartmentId,
+    });
+    if (!canEditAssignments) {
+      return c.json(
+        { error: { message: "Only owner team or show department lead can edit staffing", code: "FORBIDDEN" } },
+        403
+      );
+    }
     const show = await prismaAny.eventShow.findFirst({
       where: { id: showId, eventId, event: { organizationId: user.organizationId } },
       select: { id: true },
@@ -1524,9 +1583,6 @@ eventsRouter.delete("/events/:id/shows/:showId/staffing/:personId", async (c) =>
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  if (!canAction(c, "write.events")) {
-    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
-  }
   const { id: eventId, showId, personId } = c.req.param();
   const show = await prismaAny.eventShow.findFirst({
     where: { id: showId, eventId, event: { organizationId: user.organizationId } },
@@ -1538,12 +1594,26 @@ eventsRouter.delete("/events/:id/shows/:showId/staffing/:personId", async (c) =>
     select: {
       staffing: {
         where: { personId },
-        select: { id: true },
+        select: { id: true, departmentId: true },
       },
     },
   });
   const row = staffing?.staffing?.[0];
   if (!row) return c.json({ error: { message: "Staffing not found", code: "NOT_FOUND" } }, 404);
+  const canEditAssignments = await canManageShowAssignments({
+    organizationId: user.organizationId,
+    userId: user.id,
+    userEmail: user.email,
+    eventId,
+    showId,
+    departmentId: row.departmentId ?? null,
+  });
+  if (!canEditAssignments) {
+    return c.json(
+      { error: { message: "Only owner team or show department lead can edit staffing", code: "FORBIDDEN" } },
+      403
+    );
+  }
   await removeStaffingFromSchedule(row.id, user.organizationId);
   await prismaAny.eventShowStaffing.delete({ where: { id: row.id } });
   return new Response(null, { status: 204 });
@@ -1557,11 +1627,22 @@ eventsRouter.post(
     const user = c.get("user");
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-    if (!canAction(c, "write.events")) {
-      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
-    }
     const { id: eventId, showId } = c.req.param();
     const body = c.req.valid("json");
+    const canEditAssignments = await canManageShowAssignments({
+      organizationId: user.organizationId,
+      userId: user.id,
+      userEmail: user.email,
+      eventId,
+      showId,
+      departmentId: body.departmentId ?? null,
+    });
+    if (!canEditAssignments) {
+      return c.json(
+        { error: { message: "Only owner team or show department lead can edit jobs", code: "FORBIDDEN" } },
+        403
+      );
+    }
     const show = await prismaAny.eventShow.findFirst({
       where: { id: showId, eventId, event: { organizationId: user.organizationId } },
     });
@@ -1625,15 +1706,27 @@ eventsRouter.put(
     const user = c.get("user");
     if (!user?.organizationId)
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-    if (!canAction(c, "write.events")) {
-      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
-    }
     const { id: eventId, showId, jobId } = c.req.param();
     const body = c.req.valid("json");
     const job = await prismaAny.eventShowJob.findFirst({
       where: { id: jobId, showId, show: { id: showId, eventId, event: { organizationId: user.organizationId } } },
     });
     if (!job) return c.json({ error: { message: "Job not found", code: "NOT_FOUND" } }, 404);
+    const targetDepartmentId = body.departmentId !== undefined ? body.departmentId ?? null : job.departmentId ?? null;
+    const canEditAssignments = await canManageShowAssignments({
+      organizationId: user.organizationId,
+      userId: user.id,
+      userEmail: user.email,
+      eventId,
+      showId,
+      departmentId: targetDepartmentId,
+    });
+    if (!canEditAssignments) {
+      return c.json(
+        { error: { message: "Only owner team or show department lead can edit jobs", code: "FORBIDDEN" } },
+        403
+      );
+    }
     if (body.venueId) {
       const venue = await prisma.venue.findUnique({
         where: { id: body.venueId, organizationId: user.organizationId },
@@ -1687,14 +1780,25 @@ eventsRouter.delete("/events/:id/shows/:showId/jobs/:jobId", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
-  if (!canAction(c, "write.events")) {
-    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
-  }
   const { id: eventId, showId, jobId } = c.req.param();
   const job = await prismaAny.eventShowJob.findFirst({
     where: { id: jobId, showId, show: { id: showId, eventId, event: { organizationId: user.organizationId } } },
   });
   if (!job) return c.json({ error: { message: "Job not found", code: "NOT_FOUND" } }, 404);
+  const canEditAssignments = await canManageShowAssignments({
+    organizationId: user.organizationId,
+    userId: user.id,
+    userEmail: user.email,
+    eventId,
+    showId,
+    departmentId: job.departmentId ?? null,
+  });
+  if (!canEditAssignments) {
+    return c.json(
+      { error: { message: "Only owner team or show department lead can edit jobs", code: "FORBIDDEN" } },
+      403
+    );
+  }
   await removeJobFromSchedule(job.id, user.organizationId);
   await prismaAny.eventShowJob.delete({ where: { id: jobId } });
   return new Response(null, { status: 204 });

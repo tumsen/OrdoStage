@@ -45,14 +45,22 @@ export function ShowJobsEditor({
   show,
   venues,
   people,
+  departmentId,
+  title,
+  canEdit = true,
 }: {
   eventId: string;
   show: EventShow;
   venues: VenueOpt[] | undefined;
   people: Person[] | undefined;
+  departmentId?: string | null;
+  title?: string;
+  canEdit?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const jobs = show.jobs ?? [];
+  const jobs = (show.jobs ?? []).filter((j) =>
+    departmentId === undefined ? true : (j.departmentId ?? null) === departmentId
+  );
   const [draft, setDraft] = useState<{
     title: string;
     startValue: string;
@@ -104,6 +112,7 @@ export function ShowJobsEditor({
       title: draft.title.trim() || "Job",
       ...body,
       venueId: draft.venueId,
+      departmentId: departmentId ?? null,
       personId: draft.personId || null,
     });
     setDraft(null);
@@ -120,14 +129,14 @@ export function ShowJobsEditor({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs uppercase tracking-wide text-white/45">Jobs for this show</p>
+        <p className="text-xs uppercase tracking-wide text-white/45">{title ?? "Jobs for this show"}</p>
         <Button
           type="button"
           size="sm"
           variant="outline"
           className="h-7 border-white/10 text-white/80 bg-transparent"
           onClick={startAdd}
-          disabled={createJob.isPending}
+          disabled={!canEdit || createJob.isPending}
         >
           <Plus size={12} className="mr-1" /> Add job
         </Button>
@@ -145,10 +154,12 @@ export function ShowJobsEditor({
               <Input
                 defaultValue={j.title}
                 onBlur={(e) => {
+                  if (!canEdit) return;
                   const v = e.target.value.trim();
                   if (v && v !== j.title) updateJob.mutate({ jobId: j.id, body: { title: v } });
                 }}
                 className="bg-white/5 border-white/10 text-white h-10 w-full"
+                disabled={!canEdit}
               />
             </div>
             <div className="shrink-0 min-w-0 max-w-full">
@@ -156,6 +167,7 @@ export function ShowJobsEditor({
                 startValue={w.startValue}
                 endValue={w.endValue}
                 onStartChange={(ns) => {
+                  if (!canEdit) return;
                   const ne = toDatetimeLocalString(
                     new Date(new Date(ns).getTime() + j.durationMinutes * 60_000)
                   );
@@ -163,9 +175,11 @@ export function ShowJobsEditor({
                   if (body) updateJob.mutate({ jobId: j.id, body });
                 }}
                 onEndChange={(ne) => {
+                  if (!canEdit) return;
                   const body = rangeToJobBody(w.startValue, ne);
                   if (body) updateJob.mutate({ jobId: j.id, body });
                 }}
+                className={!canEdit ? "pointer-events-none opacity-70" : undefined}
               />
             </div>
             <div className="shrink-0">
@@ -173,6 +187,7 @@ export function ShowJobsEditor({
               <Select
                 value={j.venueId}
                 onValueChange={(venueId) => updateJob.mutate({ jobId: j.id, body: { venueId } })}
+                disabled={!canEdit}
               >
                 <SelectTrigger className={selectTriggerClass}>
                   <SelectValue />
@@ -193,6 +208,7 @@ export function ShowJobsEditor({
                 onValueChange={(v) =>
                   updateJob.mutate({ jobId: j.id, body: { personId: v === "__none__" ? null : v } })
                 }
+                disabled={!canEdit}
               >
                 <SelectTrigger className={personSelectTriggerClass}>
                   <SelectValue placeholder="Unassigned" />
@@ -215,6 +231,7 @@ export function ShowJobsEditor({
                 className="h-10 w-10 text-white/40 hover:text-white"
                 title="Copy job (clear person)"
                 onClick={() => {
+                  if (!canEdit) return;
                   const { startValue, endValue } = w;
                   const a = new Date(startValue);
                   const b = new Date(endValue);
@@ -225,9 +242,11 @@ export function ShowJobsEditor({
                     startTime: j.startTime,
                     durationMinutes,
                     venueId: j.venueId,
+                    departmentId: departmentId ?? j.departmentId ?? null,
                     personId: null,
                   });
                 }}
+                disabled={!canEdit}
               >
                 <Copy size={14} />
               </Button>
@@ -237,9 +256,11 @@ export function ShowJobsEditor({
                 variant="ghost"
                 className="h-10 w-10 text-white/40 hover:text-red-400"
                 onClick={() => {
+                  if (!canEdit) return;
                   if (!confirm("Delete this job?")) return;
                   deleteJob.mutate(j.id);
                 }}
+                disabled={!canEdit}
               >
                 <Trash2 size={14} />
               </Button>
@@ -256,6 +277,7 @@ export function ShowJobsEditor({
               value={draft.title}
               onChange={(e) => setDraft((d) => (d ? { ...d, title: e.target.value } : d))}
               className="bg-white/5 border-white/10 text-white h-10 w-full"
+              disabled={!canEdit}
             />
           </div>
           <div className="shrink-0 min-w-0 max-w-full">
@@ -264,6 +286,7 @@ export function ShowJobsEditor({
               endValue={draft.endValue}
               onStartChange={(v) => setDraft((d) => (d ? { ...d, startValue: v } : d))}
               onEndChange={(v) => setDraft((d) => (d ? { ...d, endValue: v } : d))}
+              className={!canEdit ? "pointer-events-none opacity-70" : undefined}
             />
           </div>
           <div className="shrink-0">
@@ -271,6 +294,7 @@ export function ShowJobsEditor({
             <Select
               value={draft.venueId}
               onValueChange={(venueId) => setDraft((d) => (d ? { ...d, venueId } : d))}
+              disabled={!canEdit}
             >
               <SelectTrigger className={selectTriggerClass}>
                 <SelectValue />
@@ -291,6 +315,7 @@ export function ShowJobsEditor({
               onValueChange={(personId) =>
                 setDraft((d) => (d ? { ...d, personId: personId === "__none__" ? "" : personId } : d))
               }
+              disabled={!canEdit}
             >
               <SelectTrigger className={personSelectTriggerClass}>
                 <SelectValue />
@@ -311,11 +336,11 @@ export function ShowJobsEditor({
               size="sm"
               className="h-10 bg-red-900 hover:bg-red-800"
               onClick={saveDraft}
-              disabled={createJob.isPending}
+              disabled={!canEdit || createJob.isPending}
             >
               Save
             </Button>
-            <Button type="button" size="sm" variant="ghost" className="h-10" onClick={() => setDraft(null)}>
+            <Button type="button" size="sm" variant="ghost" className="h-10" onClick={() => setDraft(null)} disabled={!canEdit}>
               Cancel
             </Button>
           </div>
