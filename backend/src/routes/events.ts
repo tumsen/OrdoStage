@@ -309,8 +309,85 @@ async function syncStaffingToSchedule(staffingId: string): Promise<void> {
   });
 }
 
+async function syncJobToSchedule(jobId: string): Promise<void> {
+  const job = await prismaAny.eventShowJob.findUnique({
+    where: { id: jobId },
+    include: {
+      person: { select: { id: true, organizationId: true, name: true } },
+      show: { include: { event: true } },
+    },
+  });
+  if (!job) return;
+  const marker = `[event-show-job:${job.id}]`;
+  const existing = await prisma.internalBooking.findFirst({
+    where: {
+      organizationId: job.show.event.organizationId,
+      title: { startsWith: marker },
+    },
+    select: { id: true },
+  });
+
+  // No assigned person => remove any mirrored booking.
+  if (!job.personId || !job.person) {
+    if (existing?.id) {
+      await prisma.internalBooking.delete({ where: { id: existing.id } });
+    }
+    return;
+  }
+
+  const startDate = toDateTimeFromDateAndTime(job.jobDate.toISOString(), job.startTime);
+  if (!startDate) return;
+  const endDate = new Date(startDate.getTime() + job.durationMinutes * 60 * 1000);
+  const title = `${marker} ${job.show.event.title} - ${job.title} - ${job.person.name}`;
+
+  const bookingId =
+    existing?.id ??
+    (
+      await prisma.internalBooking.create({
+        data: {
+          organizationId: job.person.organizationId,
+          title,
+          description: null,
+          startDate,
+          endDate,
+          type: "other",
+          venueId: job.venueId || null,
+        },
+        select: { id: true },
+      })
+    ).id;
+
+  await prisma.internalBooking.update({
+    where: { id: bookingId },
+    data: {
+      title,
+      description: null,
+      startDate,
+      endDate,
+      venueId: job.venueId || null,
+    },
+  });
+  await prisma.internalBookingPerson.deleteMany({ where: { bookingId } });
+  await prisma.internalBookingPerson.create({
+    data: { bookingId, personId: job.personId, role: null },
+  });
+}
+
 async function removeStaffingFromSchedule(staffingId: string, organizationId: string): Promise<void> {
   const marker = `[event-show-staffing:${staffingId}]`;
+  const booking = await prisma.internalBooking.findFirst({
+    where: {
+      organizationId,
+      title: { startsWith: marker },
+    },
+    select: { id: true },
+  });
+  if (!booking) return;
+  await prisma.internalBooking.delete({ where: { id: booking.id } });
+}
+
+async function removeJobFromSchedule(jobId: string, organizationId: string): Promise<void> {
+  const marker = `[event-show-job:${jobId}]`;
   const booking = await prisma.internalBooking.findFirst({
     where: {
       organizationId,
@@ -1341,11 +1418,14 @@ eventsRouter.delete("/events/:id/shows/:showId", async (c) => {
   }
   const show = await prismaAny.eventShow.findFirst({
     where: { id: showId, eventId, event: { organizationId: user.organizationId } },
-    include: { staffing: true },
+    include: { staffing: true, jobs: { select: { id: true } } },
   });
   if (!show) return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
   for (const staff of show.staffing) {
     await removeStaffingFromSchedule(staff.id, user.organizationId);
+  }
+  for (const job of show.jobs) {
+    await removeJobFromSchedule(job.id, user.organizationId);
   }
   await prismaAny.eventShow.delete({ where: { id: showId } });
   const remainingShows = await prismaAny.eventShow.count({ where: { eventId } });
@@ -1532,6 +1612,7 @@ eventsRouter.post(
         sortOrder,
       },
     });
+    await syncJobToSchedule(job.id);
     return c.json({ data: { id: job.id } }, 201);
   }
 );
@@ -1596,6 +1677,7 @@ eventsRouter.put(
         ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
       },
     });
+    await syncJobToSchedule(jobId);
     return c.json({ data: { ok: true } });
   }
 );
@@ -1613,6 +1695,7 @@ eventsRouter.delete("/events/:id/shows/:showId/jobs/:jobId", async (c) => {
     where: { id: jobId, showId, show: { id: showId, eventId, event: { organizationId: user.organizationId } } },
   });
   if (!job) return c.json({ error: { message: "Job not found", code: "NOT_FOUND" } }, 404);
+  await removeJobFromSchedule(job.id, user.organizationId);
   await prismaAny.eventShowJob.delete({ where: { id: jobId } });
   return new Response(null, { status: 204 });
 });
