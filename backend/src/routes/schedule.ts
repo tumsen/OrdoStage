@@ -126,20 +126,25 @@ scheduleRouter.get("/schedule", async (c) => {
     prisma.event.findMany({
       where: eventWhere,
       orderBy: { startDate: "asc" },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        startDate: true,
+        endDate: true,
+        status: true,
+        venueId: true,
+        tags: true,
+        contactPerson: true,
+        getInTime: true,
+        setupTime: true,
+        stageSize: true,
+        actorCount: true,
+        allergies: true,
+        customFields: true,
+        createdAt: true,
+        updatedAt: true,
         venue: true,
-        people: { include: { person: true } },
-        documents: {
-          select: {
-            id: true,
-            eventId: true,
-            name: true,
-            type: true,
-            filename: true,
-            mimeType: true,
-            createdAt: true,
-          },
-        },
         shows: {
           ...(showDateRange ? { where: { showDate: showDateRange } } : {}),
           select: {
@@ -189,17 +194,8 @@ scheduleRouter.get("/schedule", async (c) => {
     createdAt: serializeDate(event.createdAt),
     updatedAt: serializeDate(event.updatedAt),
     venue: serializeVenue(event.venue),
-    people: event.people.map((ep) => ({
-      id: ep.id,
-      eventId: ep.eventId,
-      personId: ep.personId,
-      role: ep.role,
-      person: serializePerson(ep.person),
-    })),
-    documents: event.documents.map((doc) => ({
-      ...doc,
-      createdAt: serializeDate(doc.createdAt),
-    })),
+    people: [],
+    documents: [],
     shows: event.shows.map((show) => ({
       id: show.id,
       showDate: serializeDate(show.showDate),
