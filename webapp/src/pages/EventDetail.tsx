@@ -1719,8 +1719,7 @@ function ShowsTab({ event }: { event: EventDetail }) {
   );
 
   const previousShow = sortedShows.length > 0 ? sortedShows[sortedShows.length - 1] : null;
-  const eventPersonIds = new Set(event.people.map((ep) => ep.personId));
-  const availablePeople = allPeople.filter((p) => eventPersonIds.has(p.id));
+  const availablePeople = allPeople;
 
   const copyPreviousShow = useMutation({
     mutationFn: () => {
