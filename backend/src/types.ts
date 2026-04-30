@@ -363,6 +363,8 @@ export const EventShowStaffingSchema = z.object({
   id: z.string(),
   showId: z.string(),
   personId: z.string(),
+  departmentId: z.string().nullable().optional(),
+  isLead: z.boolean().default(false),
   role: z.string().nullable(),
   meetingTime: z.string().nullable(),
   meetingDurationMinutes: z.number().nullable(),
@@ -381,6 +383,7 @@ export const EventShowJobSchema = z.object({
   durationMinutes: z.number(),
   venueId: z.string(),
   venue: VenueSchema,
+  departmentId: z.string().nullable().optional(),
   personId: z.string().nullable(),
   person: PersonSchema.nullable().optional(),
   sortOrder: z.number(),
@@ -394,6 +397,7 @@ export const CreateEventShowJobSchema = z.object({
   startTime: z.string().min(1),
   durationMinutes: z.number().int().min(1),
   venueId: z.string().min(1),
+  departmentId: z.string().nullable().optional(),
   personId: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
@@ -464,6 +468,8 @@ export const UpdateEventShowSchema = CreateEventShowSchema.partial().merge(Event
 
 export const UpsertEventShowStaffingSchema = z.object({
   personId: z.string().min(1),
+  departmentId: z.string().nullable().optional(),
+  isLead: z.boolean().optional(),
   role: z.string().optional(),
   meetingTime: z.string().optional(),
   meetingDurationMinutes: z.number().int().min(1).optional(),

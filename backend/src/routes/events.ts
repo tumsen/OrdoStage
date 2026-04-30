@@ -413,6 +413,7 @@ function serializeFullEvent(event: any) {
         durationMinutes: job.durationMinutes,
         venueId: job.venueId,
         venue: serializeVenue(job.venue)!,
+        departmentId: job.departmentId ?? null,
         personId: job.personId,
         person: job.person ? serializePerson(job.person) : null,
         sortOrder: job.sortOrder,
@@ -423,6 +424,8 @@ function serializeFullEvent(event: any) {
         id: s.id,
         showId: s.showId,
         personId: s.personId,
+        departmentId: s.departmentId ?? null,
+        isLead: Boolean(s.isLead),
         role: s.role,
         meetingTime: s.meetingTime,
         meetingDurationMinutes: s.meetingDurationMinutes,
@@ -1377,24 +1380,61 @@ eventsRouter.post(
       select: { id: true },
     });
     if (!person) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+    if (body.departmentId) {
+      const dept = await prisma.department.findUnique({
+        where: { id: body.departmentId, organizationId: user.organizationId },
+        select: { id: true },
+      });
+      if (!dept) return c.json({ error: { message: "Department not found", code: "NOT_FOUND" } }, 404);
+      const onEvent = await prismaAny.eventTeam.findFirst({
+        where: { eventId, teamId: body.departmentId },
+        select: { id: true },
+      });
+      if (!onEvent) {
+        return c.json(
+          { error: { message: "Department must be added to event teams first", code: "BAD_REQUEST" } },
+          400
+        );
+      }
+    }
+    if (body.isLead && !body.departmentId) {
+      return c.json(
+        { error: { message: "Lead staffing requires a department section", code: "BAD_REQUEST" } },
+        400
+      );
+    }
 
     const staffing = await prismaAny.eventShowStaffing.upsert({
       where: { showId_personId: { showId, personId: body.personId } },
       create: {
         showId,
         personId: body.personId,
+        departmentId: body.departmentId ?? null,
+        isLead: body.isLead ?? false,
         role: body.role ?? null,
         meetingTime: body.meetingTime ?? null,
         meetingDurationMinutes: body.meetingDurationMinutes ?? null,
         notes: body.notes ?? null,
       },
       update: {
+        ...(body.departmentId !== undefined ? { departmentId: body.departmentId ?? null } : {}),
+        ...(body.isLead !== undefined ? { isLead: body.isLead } : {}),
         role: body.role ?? null,
         meetingTime: body.meetingTime ?? null,
         meetingDurationMinutes: body.meetingDurationMinutes ?? null,
         notes: body.notes ?? null,
       },
     });
+    if ((body.isLead ?? false) && body.departmentId) {
+      await prismaAny.eventShowStaffing.updateMany({
+        where: {
+          showId,
+          departmentId: body.departmentId,
+          NOT: { id: staffing.id },
+        },
+        data: { isLead: false },
+      });
+    }
     await syncStaffingToSchedule(staffing.id);
     return c.json({ data: { id: staffing.id } }, 201);
   }
@@ -1457,6 +1497,23 @@ eventsRouter.post(
       });
       if (!p) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
     }
+    if (body.departmentId) {
+      const dept = await prisma.department.findUnique({
+        where: { id: body.departmentId, organizationId: user.organizationId },
+        select: { id: true },
+      });
+      if (!dept) return c.json({ error: { message: "Department not found", code: "NOT_FOUND" } }, 404);
+      const onEvent = await prismaAny.eventTeam.findFirst({
+        where: { eventId, teamId: body.departmentId },
+        select: { id: true },
+      });
+      if (!onEvent) {
+        return c.json(
+          { error: { message: "Department must be added to event teams first", code: "BAD_REQUEST" } },
+          400
+        );
+      }
+    }
     const max = await prismaAny.eventShowJob.aggregate({
       where: { showId },
       _max: { sortOrder: true },
@@ -1470,6 +1527,7 @@ eventsRouter.post(
         startTime: body.startTime,
         durationMinutes: body.durationMinutes,
         venueId: body.venueId,
+        departmentId: body.departmentId ?? null,
         personId: body.personId ?? null,
         sortOrder,
       },
@@ -1508,6 +1566,23 @@ eventsRouter.put(
       });
       if (!p) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
     }
+    if (body.departmentId) {
+      const dept = await prisma.department.findUnique({
+        where: { id: body.departmentId, organizationId: user.organizationId },
+        select: { id: true },
+      });
+      if (!dept) return c.json({ error: { message: "Department not found", code: "NOT_FOUND" } }, 404);
+      const onEvent = await prismaAny.eventTeam.findFirst({
+        where: { eventId, teamId: body.departmentId },
+        select: { id: true },
+      });
+      if (!onEvent) {
+        return c.json(
+          { error: { message: "Department must be added to event teams first", code: "BAD_REQUEST" } },
+          400
+        );
+      }
+    }
     await prismaAny.eventShowJob.update({
       where: { id: jobId },
       data: {
@@ -1516,6 +1591,7 @@ eventsRouter.put(
         ...(body.startTime !== undefined && { startTime: body.startTime }),
         ...(body.durationMinutes !== undefined && { durationMinutes: body.durationMinutes }),
         ...(body.venueId !== undefined && { venueId: body.venueId }),
+        ...(body.departmentId !== undefined && { departmentId: body.departmentId ?? null }),
         ...(body.personId !== undefined && { personId: body.personId ?? null }),
         ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
       },
