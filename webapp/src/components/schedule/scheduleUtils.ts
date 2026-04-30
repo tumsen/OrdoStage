@@ -17,13 +17,6 @@ function toLocalDatetime(datePart: string, timePart: string): string {
   return `${datePart}T${timePart}`;
 }
 
-function toTimedRange(datePart: string, timePart: string, durationMinutes: number): { start: string; end: string | null } | null {
-  if (!/^\d{2}:\d{2}$/.test(timePart) || durationMinutes <= 0) return null;
-  const start = toLocalDatetime(datePart, timePart);
-  const end = addMinutesLocal(start, durationMinutes);
-  return { start, end };
-}
-
 function addMinutesLocal(startLocal: string, minutes: number): string | null {
   const d = new Date(startLocal);
   if (!Number.isFinite(d.getTime())) return null;
@@ -60,36 +53,11 @@ export function toCalendarItems(
       return shows.map((show) => {
         const day = show.showDate.slice(0, 10);
         const hasTime = /^\d{2}:\d{2}$/.test(show.showTime);
-        const ranges: Array<{ start: string; end: string | null }> = [];
-
-        const showRange = toTimedRange(day, show.showTime, show.durationMinutes);
-        if (showRange) ranges.push(showRange);
-
-        const matchingVenueJobRanges = (show.jobs ?? [])
-          .filter((job) => job.venueId === show.venueId)
-          .map((job) => {
-            const jobDay = job.jobDate.slice(0, 10);
-            return toTimedRange(jobDay, job.startTime, job.durationMinutes);
-          })
-          .filter((r): r is { start: string; end: string | null } => Boolean(r));
-        ranges.push(...matchingVenueJobRanges);
-
         let startDate = hasTime ? toLocalDatetime(day, show.showTime) : day;
         let endDate: string | null =
           hasTime && show.durationMinutes > 0
             ? addMinutesLocal(startDate, show.durationMinutes)
             : null;
-
-        if (ranges.length > 0) {
-          const withEnd = ranges.filter((r) => r.end);
-          const minStart = [...ranges].sort((a, b) => a.start.localeCompare(b.start))[0]!.start;
-          const maxEnd =
-            withEnd.length > 0
-              ? withEnd.sort((a, b) => (a.end ?? "").localeCompare(b.end ?? ""))[withEnd.length - 1]!.end ?? null
-              : endDate;
-          startDate = minStart;
-          endDate = maxEnd;
-        }
 
         return {
           id: `${e.id}:show:${show.id}`,
