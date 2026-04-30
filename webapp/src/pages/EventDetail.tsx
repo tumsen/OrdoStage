@@ -1405,6 +1405,7 @@ function ShowStaffingSections({
 }) {
   const queryClient = useQueryClient();
   const [openDeptIds, setOpenDeptIds] = useState<Record<string, boolean>>({});
+  const [addedDeptIds, setAddedDeptIds] = useState<string[]>([]);
 
   const upsertStaffing = useMutation({
     mutationFn: (args: { personId: string; departmentId: string; isLead?: boolean }) =>
@@ -1427,14 +1428,16 @@ function ShowStaffingSections({
   for (const s of show.staffing ?? []) {
     if (s.departmentId) staffedDepartmentIds.add(s.departmentId);
   }
-  const visibleDepartments = departments.filter((d) => staffedDepartmentIds.has(d.id));
-  const addableDepartments = departments.filter((d) => !staffedDepartmentIds.has(d.id));
+  const visibleDepartmentIds = new Set<string>([...Array.from(staffedDepartmentIds), ...addedDeptIds]);
+  const visibleDepartments = departments.filter((d) => visibleDepartmentIds.has(d.id));
+  const addableDepartments = departments.filter((d) => !visibleDepartmentIds.has(d.id));
 
   function setDeptOpen(deptId: string, open: boolean) {
     setOpenDeptIds((prev) => ({ ...prev, [deptId]: open }));
   }
 
   function addDepartmentSection(deptId: string) {
+    setAddedDeptIds((prev) => (prev.includes(deptId) ? prev : [...prev, deptId]));
     setDeptOpen(deptId, true);
   }
 
