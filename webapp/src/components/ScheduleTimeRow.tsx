@@ -1,4 +1,4 @@
-import { DATE_INPUT_WITH_WEEKDAY_FIXED_WIDTH_CLASS } from "@/components/DateInputWithWeekday";
+import { DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS } from "@/components/DateInputWithWeekday";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,7 +25,7 @@ export function ScheduleTimeRow({
 
 export const scheduleDateInputClass = cn(
   "bg-white/5 border-white/10 text-white [color-scheme:dark]",
-  DATE_INPUT_WITH_WEEKDAY_FIXED_WIDTH_CLASS
+  DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS
 );
 
 export const scheduleFieldLabelClass =
