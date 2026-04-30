@@ -657,7 +657,7 @@ function DetailsTab({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white/60 text-xs uppercase tracking-wide">{row.full}</FormLabel>
-                        <div className="flex items-end gap-1.5">
+                        <div className="flex items-center gap-1.5">
                           <FormControl>
                             <Input
                               {...field}
@@ -666,10 +666,10 @@ function DetailsTab({
                               maxLength={7}
                               placeholder="0"
                               autoComplete="off"
-                              className="h-8 w-full min-w-0 bg-white/5 border-white/10 text-white tabular-nums"
+                              className="h-10 w-[5.75rem] min-w-[5.75rem] shrink-0 bg-white/5 border-white/10 text-white tabular-nums"
                             />
                           </FormControl>
-                          <span className="text-[10px] text-white/40 pb-2 shrink-0">m</span>
+                          <span className="text-[10px] text-white/40 shrink-0">m</span>
                         </div>
                       </FormItem>
                     )}
