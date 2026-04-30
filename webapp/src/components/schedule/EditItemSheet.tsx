@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Plus, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   Sheet,
   SheetContent,
@@ -35,6 +36,80 @@ interface EditItemSheetProps {
   onClose: () => void;
   venues: Venue[];
   people: Person[];
+}
+
+function EventScheduleSummary({
+  event,
+  selectedShowId,
+  onOpenEvent,
+}: {
+  event: EventDetail;
+  selectedShowId: string | null;
+  onOpenEvent: () => void;
+}) {
+  const shows = [...(event.shows ?? [])].sort((a, b) => {
+    const d = a.showDate.localeCompare(b.showDate);
+    if (d !== 0) return d;
+    return a.showTime.localeCompare(b.showTime);
+  });
+
+  const orderedShows =
+    selectedShowId && shows.some((s) => s.id === selectedShowId)
+      ? [
+          ...shows.filter((s) => s.id === selectedShowId),
+          ...shows.filter((s) => s.id !== selectedShowId),
+        ]
+      : shows;
+
+  return (
+    <div className="space-y-4 mt-4 pb-6">
+      <p className="text-xs text-white/45">
+        {shows.length} show{shows.length === 1 ? "" : "s"} in this event.
+      </p>
+      <div className="space-y-3">
+        {orderedShows.map((show) => {
+          const jobAssignments = (show.jobs ?? []).filter((j) => j.person);
+          return (
+            <div key={show.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm text-white/85 font-medium">
+                  {new Date(show.showDate).toLocaleDateString("en-GB", {
+                    weekday: "short",
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })}
+                </div>
+                <div className="text-xs text-white/50">
+                  {show.showTime} ({show.durationMinutes} min)
+                </div>
+              </div>
+              {show.venue?.name ? (
+                <p className="text-xs text-white/45">Venue: {show.venue.name}</p>
+              ) : null}
+              {jobAssignments.length === 0 ? (
+                <p className="text-xs text-white/35">No job assignments yet.</p>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-xs text-white/50">Job assignments</p>
+                  {jobAssignments.map((job) => (
+                    <p key={job.id} className="text-xs text-white/80">
+                      {job.title}: <span className="text-white/95">{job.person?.name}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="pt-2 border-t border-white/10">
+        <Button className="bg-indigo-700 hover:bg-indigo-600 text-white border-0" onClick={onOpenEvent}>
+          Edit Event
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 function isEvent(raw: EventDetail | InternalBookingDetail): raw is EventDetail {
@@ -322,6 +397,8 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
   );
 }
 
+void EventForm;
+
 // ─── Booking edit form ────────────────────────────────────────────────────────
 
 interface BookingFormProps {
@@ -500,10 +577,12 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
 // ─── Main sheet ────────────────────────────────────────────────────────────────
 
 export function EditItemSheet({ item, onClose, venues, people }: EditItemSheetProps) {
+  const navigate = useNavigate();
   if (!item) return null;
 
   const raw = item.raw;
   const isEv = isEvent(raw);
+  const selectedShowId = item.id.includes(":show:") ? item.id.split(":show:")[1] ?? null : null;
 
   const BOOKING_TYPE_LABELS: Record<string, string> = {
     rehearsal: "Rehearsal", maintenance: "Maintenance", private: "Private", other: "Other",
@@ -530,12 +609,13 @@ export function EditItemSheet({ item, onClose, venues, people }: EditItemSheetPr
         </SheetHeader>
 
         {isEv ? (
-          <EventForm
+          <EventScheduleSummary
             event={raw as EventDetail}
-            venues={venues}
-            people={people}
-            onSaved={onClose}
-            onClose={onClose}
+            selectedShowId={selectedShowId}
+            onOpenEvent={() => {
+              navigate(`/events/${(raw as EventDetail).id}`);
+              onClose();
+            }}
           />
         ) : (
           <BookingForm
