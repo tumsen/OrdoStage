@@ -744,7 +744,7 @@ export default function Account() {
                       disabled={docDoesNotExpire}
                       onChange={setDocExpires}
                       className="h-9 w-[170px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-sm disabled:opacity-40"
-                      weekdayClassName="text-[10px] text-white/45"
+                      weekdayClassName="text-sm text-white/45"
                     />
                     <Input
                       type="file"

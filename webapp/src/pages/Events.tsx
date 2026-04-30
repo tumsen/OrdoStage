@@ -83,14 +83,14 @@ export default function Events() {
             value={dateFrom}
             onChange={setDateFrom}
             className="h-8 w-[10rem] px-3 text-sm text-white/70"
-            weekdayClassName="text-[10px] text-white/40"
+            weekdayClassName="text-sm text-white/40"
           />
           <span className="text-white/30 text-xs">to</span>
           <DateInputWithWeekday
             value={dateTo}
             onChange={setDateTo}
             className="h-8 w-[10rem] px-3 text-sm text-white/70"
-            weekdayClassName="text-[10px] text-white/40"
+            weekdayClassName="text-sm text-white/40"
           />
         </div>
         <Button

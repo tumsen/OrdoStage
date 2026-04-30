@@ -735,7 +735,7 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
                 value={form.date}
                 onChange={(v) => setField("date", v)}
                 className={fieldCls}
-                weekdayClassName="text-[11px] text-white/45"
+                weekdayClassName="text-sm text-white/45"
               />
             </div>
             {form.type === "show" ? (

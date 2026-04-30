@@ -33,13 +33,14 @@ export function DateInputWithWeekday({
     <div className="pointer-events-none flex min-w-0 items-center gap-2">
       <span
         className={cn(
-          "shrink-0 text-[11px] text-white/55 whitespace-nowrap",
+          "shrink-0 text-sm text-white/55 whitespace-nowrap",
           weekdayClassName
         )}
       >
         {formatWeekdayOnly(value)}
       </span>
-      <span className="shrink-0 text-[11px] tabular-nums tracking-tight text-white/90 whitespace-nowrap">
+      {/* Match SplitTimeField time digits: text-sm font-mono tabular-nums */}
+      <span className="shrink-0 font-mono text-sm tabular-nums tracking-tight text-white/90 whitespace-nowrap">
         {formatDdMmYyyy(value)}
       </span>
     </div>

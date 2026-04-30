@@ -147,7 +147,7 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
               disabled={doesNotExpire}
               onChange={setExpires}
               className="h-7 rounded border border-white/10 bg-white/5 px-1.5 py-0 text-white text-[11px] disabled:opacity-40 disabled:cursor-not-allowed"
-              weekdayClassName="text-[10px] text-white/45"
+              weekdayClassName="text-sm text-white/45"
             />
           </>
         ) : doc.doesNotExpire ? (

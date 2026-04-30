@@ -1016,7 +1016,7 @@ function ShowTimeEditor({
             onUpdate({ showDate: v });
           }}
           className="bg-white/5 border-white/10 text-white [color-scheme:dark]"
-          weekdayClassName="text-[10px] text-white/45"
+          weekdayClassName="text-sm text-white/45"
         />
       </div>
       <div>
@@ -1588,7 +1588,7 @@ function ShowsTab({ event, embedded }: { event: EventDetail; embedded?: boolean 
                 value={newShow.showDate}
                 onChange={(v) => setNewShow((s) => mergeNewShowState(s, { showDate: v }))}
                 className="bg-white/5 border-white/10 text-white [color-scheme:dark]"
-                weekdayClassName="text-[10px] text-white/45"
+                weekdayClassName="text-sm text-white/45"
               />
             </div>
             <div>

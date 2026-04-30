@@ -99,7 +99,7 @@ export function DatetimeScheduleFields({
           value={date}
           onChange={setDate}
           className={scheduleDateInputClass}
-          weekdayClassName="text-[10px] text-white/45"
+          weekdayClassName="text-sm text-white/45"
         />
       </div>
       <div className="shrink-0">
