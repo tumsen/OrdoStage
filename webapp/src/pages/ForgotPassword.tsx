@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { authClient } from "@/lib/auth-client";
+import { api, isApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,15 +26,14 @@ export default function ForgotPassword() {
 
   const onSubmit = async (values: FormValues) => {
     setError("");
-    const result = await authClient.requestPasswordReset({
-      email: values.email,
-      redirectTo: "/reset-password",
-    });
-    if (result.error) {
-      setError(result.error.message || "Failed to send reset link");
-      return;
+    try {
+      await api.post<{ status: boolean; message: string }>("/api/account/request-password-reset", {
+        email: values.email,
+      });
+      setSuccess(true);
+    } catch (e: unknown) {
+      setError(isApiError(e) ? e.message : "Failed to send reset link");
     }
-    setSuccess(true);
   };
 
   return (

@@ -3,24 +3,23 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { emailOTP } from "better-auth/plugins";
 import { prisma } from "./prisma";
 import { env } from "./env";
+import { sendHtmlEmail } from "./resendMail";
+import { sendPasswordResetEmailWithKnownToken } from "./passwordResetFlow";
 
 async function sendOTPEmail(email: string, otp: string) {
-  if (env.RESEND_API_KEY) {
-    // Production: use Resend
-    const { Resend } = await import("resend");
-    const resend = new Resend(env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: env.FROM_EMAIL || "OrdoStage <noreply@ordostage.com>",
+  if (!env.RESEND_API_KEY?.trim()) {
+    console.warn("[auth] RESEND_API_KEY is not set — OTP email not sent.", email, otp);
+    return;
+  }
+  try {
+    await sendHtmlEmail({
       to: email,
       subject: "Your login code",
       html: `<p>Your login code is: <strong>${otp}</strong></p><p>This code expires in 10 minutes.</p>`,
     });
-  } else {
-    console.warn(
-      "[auth] RESEND_API_KEY is not set — OTP emails are not sent. Login code for development:",
-      email,
-      otp
-    );
+  } catch (e) {
+    console.error("[auth] OTP email failed:", e);
+    throw e;
   }
 }
 
@@ -42,24 +41,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     async sendResetPassword({ user, token }: { user: { email: string }; token: string }) {
-      const frontendUrl = env.FRONTEND_URL || env.BACKEND_URL;
-      const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
-      if (env.RESEND_API_KEY) {
-        const { Resend } = await import("resend");
-        const resend = new Resend(env.RESEND_API_KEY);
-        await resend.emails.send({
-          from: env.FROM_EMAIL || "OrdoStage <noreply@ordostage.com>",
-          to: user.email,
-          subject: "Set or reset your OrdoStage password",
-          html: `<p>Use the link below to <strong>choose a password</strong> for your account (or reset it if you forgot it).</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>On the sign-in page, use <strong>Forgot password</strong> any time to get a new link. This link expires in 1 hour.</p>`,
-        });
-      } else {
-        console.warn(
-          "[auth] RESEND_API_KEY is not set — password reset emails are not sent. Reset link for development:",
-          user.email,
-          resetUrl
-        );
-      }
+      await sendPasswordResetEmailWithKnownToken(user, token);
     },
   },
   plugins: [

@@ -5,6 +5,7 @@ import { prisma } from "./prisma";
 import { env } from "./env";
 import { isPostgresDatabaseUrl } from "./databaseUrl";
 import { Resend } from "resend";
+import { createPasswordResetTokenAndSendEmail } from "./passwordResetFlow";
 
 async function findUserByEmailLoose(email: string) {
   const trimmed = email.trim();
@@ -22,8 +23,6 @@ export type AccountSetupResult =
   | { status: "skipped" }
   | { status: "sent"; createdUser: boolean }
   | { status: "failed"; error: string };
-
-const REDIRECT_PATH = "/reset-password";
 
 async function sendExistingUserAddedOrgEmail(input: { to: string; organizationName: string; roleName: string }) {
   const subject = `You've been added to ${input.organizationName} in OrdoStage`;
@@ -74,8 +73,6 @@ export async function provisionPersonAppAccountAndEmail(opts: {
   const orgRoleSlug = group.slug;
 
   const emailNorm = rawEmail.toLowerCase();
-  const baseFrontend = (env.FRONTEND_URL || env.BACKEND_URL || "http://localhost:5173").replace(/\/+$/, "");
-  const redirectTo = `${baseFrontend}${REDIRECT_PATH}`;
 
   let u = await findUserByEmailLoose(rawEmail);
   let createdUser = false;
@@ -147,9 +144,7 @@ export async function provisionPersonAppAccountAndEmail(opts: {
         roleName: group.name || group.slug,
       });
     } else {
-      await auth.api.requestPasswordReset({
-        body: { email: u.email, redirectTo },
-      } as { body: { email: string; redirectTo: string } });
+      await createPasswordResetTokenAndSendEmail(u.email);
     }
   } catch (e: unknown) {
     if (isAPIError(e)) {

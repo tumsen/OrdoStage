@@ -1,6 +1,9 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
+import { createPasswordResetTokenAndSendEmail } from "../passwordResetFlow";
 
 const ACCOUNT_DELETE_PHRASE = "DELETE";
 
@@ -8,6 +11,45 @@ const ACCOUNT_DELETE_PHRASE = "DELETE";
  * DELETE /api/me/account — irreversible; body must be { phrase: "DELETE" }
  */
 const accountRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
+
+/** Public — returns generic message when email unknown; surfaces Resend/config errors to the client. */
+accountRouter.post(
+  "/account/request-password-reset",
+  zValidator("json", z.object({ email: z.string().email() })),
+  async (c) => {
+    const { email } = c.req.valid("json");
+    const generic = {
+      data: {
+        status: true as const,
+        message: "If this email exists in our system, check your email for the reset link.",
+      },
+    };
+
+    try {
+      await createPasswordResetTokenAndSendEmail(email);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.includes("RESEND_API_KEY")) {
+        return c.json(
+          { error: { message: "Password reset email is not configured on the server.", code: "EMAIL_UNAVAILABLE" } },
+          503
+        );
+      }
+      console.error("[account] request-password-reset:", e);
+      return c.json(
+        {
+          error: {
+            message: "We could not send the email. Try again later or contact support.",
+            code: "EMAIL_SEND_FAILED",
+          },
+        },
+        502
+      );
+    }
+
+    return c.json(generic);
+  }
+);
 
 accountRouter.delete("/me/account", async (c) => {
   const sessionUser = c.get("user");

@@ -79,6 +79,10 @@ app.use("/api/*", async (c, next) => {
     await next();
     return;
   }
+  if (path === "/api/account/request-password-reset" && c.req.method === "POST") {
+    await next();
+    return;
+  }
   const sessionUser = c.get("user");
   if (!sessionUser?.id) {
     await next();
