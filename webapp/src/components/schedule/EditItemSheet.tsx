@@ -77,10 +77,12 @@ function eventMetaFromCustomFields(customFields: string | null | undefined): {
 function EventScheduleSummary({
   event,
   selectedShowId,
+  highlightJobId,
   onOpenEvent,
 }: {
   event: EventDetail;
   selectedShowId: string | null;
+  highlightJobId?: string | null;
   onOpenEvent: () => void;
 }) {
   const eventMeta = eventMetaFromCustomFields(event.customFields);
@@ -162,7 +164,14 @@ function EventScheduleSummary({
                 <div className="space-y-1">
                   <p className="text-xs text-white/50">Jobs</p>
                   {jobs.map((job) => (
-                    <div key={job.id} className="text-xs text-white/80 flex items-center justify-between gap-2">
+                    <div
+                      key={job.id}
+                      className={`text-xs text-white/80 flex items-center justify-between gap-2 rounded-md px-2 py-1 -mx-2 ${
+                        highlightJobId === job.id
+                          ? "ring-1 ring-amber-400/70 bg-amber-500/15"
+                          : ""
+                      }`}
+                    >
                       <span className="min-w-0 truncate">
                         {job.title} - <span className="text-white/95">{job.person?.name ?? "Unassigned"}</span>
                       </span>
@@ -677,14 +686,23 @@ export function EditItemSheet({ item, onClose, venues, people }: EditItemSheetPr
 
   const raw = item.raw;
   const isEv = isEvent(raw);
-  const selectedShowId = item.id.includes(":show:") ? item.id.split(":show:")[1] ?? null : null;
+  const showMatch = /^[^:]+:show:([^:]+)/.exec(item.id);
+  const selectedShowId = showMatch?.[1] ?? null;
+  const jobMatch = /:job:([^:]+)$/.exec(item.id);
+  const selectedJobId = jobMatch?.[1] ?? null;
 
   const BOOKING_TYPE_LABELS: Record<string, string> = {
     rehearsal: "Rehearsal", maintenance: "Maintenance", private: "Private", other: "Other",
   };
 
-  const kindLabel = isEv ? "Event" : (BOOKING_TYPE_LABELS[item.type ?? "other"]);
-  const kindColor = isEv ? "bg-indigo-600/70 text-indigo-100" : "bg-amber-600/70 text-amber-100";
+  const kindLabel =
+    item.kind === "job" ? "Job" : isEv ? "Event" : BOOKING_TYPE_LABELS[item.type ?? "other"];
+  const kindColor =
+    item.kind === "job"
+      ? "bg-teal-600/70 text-teal-100"
+      : isEv
+        ? "bg-indigo-600/70 text-indigo-100"
+        : "bg-amber-600/70 text-amber-100";
 
   return (
     <Sheet open={item !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -707,6 +725,7 @@ export function EditItemSheet({ item, onClose, venues, people }: EditItemSheetPr
           <EventScheduleSummary
             event={raw as EventDetail}
             selectedShowId={selectedShowId}
+            highlightJobId={selectedJobId}
             onOpenEvent={() => {
               navigate(`/events/${(raw as EventDetail).id}`);
               onClose();

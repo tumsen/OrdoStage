@@ -160,7 +160,12 @@ export function OutlookTimeGrid({
               return (
                 <div key={day.toISOString()} className="border-l border-white/10 bg-white/[0.01] p-0.5 min-h-[28px] flex flex-col gap-0.5">
                   {allDay.map((item) => {
-                    const eventVenueName = item.kind === "event" ? (item.raw as EventDetail).venue?.name : undefined;
+                    const eventVenueName =
+                      item.kind === "job"
+                        ? item.venueLabel
+                        : item.kind === "event"
+                          ? (item.raw as EventDetail).venue?.name
+                          : undefined;
                     return (
                       <div key={item.id} className="group/all relative flex items-center">
                         <button
@@ -173,14 +178,16 @@ export function OutlookTimeGrid({
                           {eventVenueName ? <span className="opacity-70"> @ {eventVenueName}</span> : null}
                           {" "}<StatusLabel status={item.status} />
                         </button>
-                        <button
-                          data-booking-block
-                          onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
-                          className="absolute right-0.5 top-0.5 opacity-0 group-hover/all:opacity-100 w-4 h-4 flex items-center justify-center rounded bg-red-900/80 text-red-300 hover:bg-red-700 transition-opacity z-10"
-                          title="Delete"
-                        >
-                          <Trash2 size={9} />
-                        </button>
+                        {item.kind === "job" ? null : (
+                          <button
+                            data-booking-block
+                            onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
+                            className="absolute right-0.5 top-0.5 opacity-0 group-hover/all:opacity-100 w-4 h-4 flex items-center justify-center rounded bg-red-900/80 text-red-300 hover:bg-red-700 transition-opacity z-10"
+                            title="Delete"
+                          >
+                            <Trash2 size={9} />
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -267,9 +274,11 @@ export function OutlookTimeGrid({
                   const { top, height, clippedStart, clippedEnd } = layout;
 
                   const venueName =
-                    item.kind === "event"
-                      ? (item.raw as EventDetail).venue?.name
-                      : (item.raw as InternalBookingDetail).venue?.name;
+                    item.kind === "job"
+                      ? item.venueLabel
+                      : item.kind === "event"
+                        ? (item.raw as EventDetail).venue?.name
+                        : (item.raw as InternalBookingDetail).venue?.name;
                   const creatorName =
                     item.kind === "booking" ? (item.raw as InternalBookingDetail).createdBy?.name : undefined;
 
@@ -327,7 +336,7 @@ export function OutlookTimeGrid({
                             {/* Title line */}
                             <div className="truncate font-semibold text-[11px] leading-tight shrink-0">
                               {item.title}
-                              {venueName && item.kind === "event" ? (
+                              {venueName && (item.kind === "event" || item.kind === "job") ? (
                                 <span className="font-normal opacity-75"> @ {venueName}</span>
                               ) : null}
                             </div>
@@ -344,16 +353,18 @@ export function OutlookTimeGrid({
                         )}
                       </button>
 
-                      {/* Delete button — appears on hover */}
-                      <button
-                        type="button"
-                        data-booking-block
-                        onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
-                        className="absolute top-0.5 right-0.5 opacity-0 group-hover/block:opacity-100 w-4 h-4 flex items-center justify-center rounded bg-black/60 text-white/80 hover:bg-red-700 hover:text-white transition-opacity z-20"
-                        title="Delete"
-                      >
-                        <Trash2 size={9} />
-                      </button>
+                      {/* Delete — hidden for per-show jobs (edit the event instead) */}
+                      {item.kind === "job" ? null : (
+                        <button
+                          type="button"
+                          data-booking-block
+                          onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
+                          className="absolute top-0.5 right-0.5 opacity-0 group-hover/block:opacity-100 w-4 h-4 flex items-center justify-center rounded bg-black/60 text-white/80 hover:bg-red-700 hover:text-white transition-opacity z-20"
+                          title="Delete"
+                        >
+                          <Trash2 size={9} />
+                        </button>
+                      )}
                     </div>
                   );
                 })}

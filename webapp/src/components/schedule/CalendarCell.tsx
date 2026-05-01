@@ -54,9 +54,11 @@ export function CalendarCell({ date, items, isToday, onItemClick }: CalendarCell
       <div className="flex flex-col gap-0.5 flex-1">
         {visible.map((item) => {
           const venueName =
-            item.kind === "event"
-              ? (item.raw as EventDetail).venue?.name
-              : undefined;
+            item.kind === "job"
+              ? item.venueLabel
+              : item.kind === "event"
+                ? (item.raw as EventDetail).venue?.name
+                : undefined;
           return (
             <button
               key={item.id}

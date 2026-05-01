@@ -109,7 +109,14 @@ scheduleRouter.get("/schedule", async (c) => {
   }
   if (venueId) eventWhere.venueId = venueId;
   if (personId) {
-    eventWhere.people = { some: { personId } };
+    eventWhere.AND = [
+      {
+        OR: [
+          { people: { some: { personId } } },
+          { shows: { some: { jobs: { some: { personId } } } } },
+        ],
+      },
+    ];
   }
 
   // Build booking where clause
@@ -157,16 +164,23 @@ scheduleRouter.get("/schedule", async (c) => {
             showTime: true,
             durationMinutes: true,
             venueId: true,
+            venue: true,
             jobs: {
               ...(jobDateRange ? { where: { jobDate: jobDateRange } } : {}),
               select: {
                 id: true,
+                showId: true,
                 title: true,
                 jobDate: true,
                 startTime: true,
                 durationMinutes: true,
                 venueId: true,
+                venue: true,
+                departmentId: true,
                 personId: true,
+                sortOrder: true,
+                createdAt: true,
+                updatedAt: true,
                 person: {
                   select: {
                     id: true,
@@ -207,13 +221,17 @@ scheduleRouter.get("/schedule", async (c) => {
       showTime: show.showTime,
       durationMinutes: show.durationMinutes,
       venueId: show.venueId,
+      venue: serializeVenue(show.venue),
       jobs: show.jobs.map((job) => ({
         id: job.id,
+        showId: job.showId,
         title: job.title,
         jobDate: serializeDate(job.jobDate),
         startTime: job.startTime,
         durationMinutes: job.durationMinutes,
         venueId: job.venueId,
+        venue: serializeVenue(job.venue)!,
+        departmentId: job.departmentId,
         personId: job.personId,
         person: job.person
           ? {
@@ -221,6 +239,9 @@ scheduleRouter.get("/schedule", async (c) => {
               name: job.person.name,
             }
           : null,
+        sortOrder: job.sortOrder,
+        createdAt: serializeDate(job.createdAt),
+        updatedAt: serializeDate(job.updatedAt),
       })),
     })),
   }));
