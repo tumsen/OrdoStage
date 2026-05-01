@@ -1,9 +1,3 @@
-import { isPostgresDatabaseUrl } from "./databaseUrl";
-
-// Vibecode proxy — only load when DATABASE_URL is not PostgreSQL; skip on Postgres (production).
-if (!isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
-  try { await import("@vibecodeapp/proxy"); } catch { /* not in Vibecode */ }
-}
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";

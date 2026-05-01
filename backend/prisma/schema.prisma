@@ -709,7 +709,10 @@ model TourShow {
   techRiderOpenedAt DateTime?
   techRiderOpenCount Int @default(0)
   techRiderLastOpenedAt DateTime?
-  techRiderPdfUrl   String?
+  /// Legacy: external PDF URL (e.g. old hosting). Prefer venueTechRiderPdfData.
+  techRiderPdfUrl          String?
+  venueTechRiderPdfData   Bytes?
+  venueTechRiderPdfName   String?
   showPeople     TourShowPerson[]
   personNotes    TourPersonNote[]
   createdAt      DateTime @default(now())

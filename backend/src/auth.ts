@@ -16,19 +16,11 @@ async function sendOTPEmail(email: string, otp: string) {
       html: `<p>Your login code is: <strong>${otp}</strong></p><p>This code expires in 10 minutes.</p>`,
     });
   } else {
-    // Development (Vibecode): use Vibecode SDK
-    try {
-      const { createVibecodeSDK } = await import("@vibecodeapp/backend-sdk");
-      const vibecode = createVibecodeSDK();
-      await vibecode.email.sendOTP({
-        to: email,
-        code: otp,
-        fromName: "OrdoStage",
-        lang: "en",
-      });
-    } catch {
-      console.log(`[DEV] OTP for ${email}: ${otp}`);
-    }
+    console.warn(
+      "[auth] RESEND_API_KEY is not set — OTP emails are not sent. Login code for development:",
+      email,
+      otp
+    );
   }
 }
 
@@ -41,11 +33,6 @@ export const auth = betterAuth({
   trustedOrigins: [
     "http://localhost:*",
     "http://127.0.0.1:*",
-    "https://*.dev.vibecode.run",
-    "https://*.vibecode.run",
-    "https://*.vibecodeapp.com",
-    "https://*.vibecode.dev",
-    "https://vibecode.dev",
     "https://*.railway.app",
     "https://*.up.railway.app",
     "https://ordostage.com",
@@ -67,7 +54,11 @@ export const auth = betterAuth({
           html: `<p>Use the link below to <strong>choose a password</strong> for your account (or reset it if you forgot it).</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>On the sign-in page, use <strong>Forgot password</strong> any time to get a new link. This link expires in 1 hour.</p>`,
         });
       } else {
-        console.log(`[DEV] Password reset link for ${user.email}: ${resetUrl}`);
+        console.warn(
+          "[auth] RESEND_API_KEY is not set — password reset emails are not sent. Reset link for development:",
+          user.email,
+          resetUrl
+        );
       }
     },
   },

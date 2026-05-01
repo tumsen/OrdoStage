@@ -102,7 +102,7 @@ export async function printVenueTechRider(
   setTimeout(() => URL.revokeObjectURL(url), 120_000);
 }
 
-/** Upload the venue tech rider PDF to storage, returns a public URL. */
+/** Upload the venue tech rider PDF to the API; returns the same tracking URL clients use to open the PDF. */
 export async function uploadVenueTechRiderForSharing(
   tour: TourDetail,
   show: TourShow

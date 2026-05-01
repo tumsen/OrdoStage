@@ -1,18 +1,13 @@
-# Vibecode Workspace
+# TheaterPlanner workspace
 
-This workspace contains a mobile app and backend server.
+Monorepo: React webapp + Hono API.
 
 <projects>
-  webapp/    — React app (port 8000, environment variable VITE_BASE_URL)
-  backend/   — Hono API server (port 3000)
+  webapp/    — React + Vite (port 8000). Use `VITE_BACKEND_URL` only when the API runs on another origin in development (e.g. `http://localhost:3000`). In production the app uses relative `/api/...` URLs.
 
-  In production, the webapp uses relative URLs (/api/...) so it works on any domain.
-  VITE_BACKEND_URL is only needed in development for cross-origin requests to the backend on a different port.
-
-  Set `baseURL: env.BACKEND_URL` in betterAuth() config (required for crossSubDomainCookies, harmless otherwise —
-  proxy headers override via trustedProxyHeaders: true).
-  The webapp auth client (createAuthClient) should use: baseURL: import.meta.env.VITE_BACKEND_URL || undefined
-  The webapp API helper should use: import.meta.env.VITE_BACKEND_URL || "" (empty string = relative URLs)
+  backend/   — Hono API (port 3000). Better Auth: `baseURL: env.BACKEND_URL` with `trustedProxyHeaders: true`.
+  Webapp auth client: `baseURL: import.meta.env.VITE_BACKEND_URL || undefined`.
+  Webapp API helper: `import.meta.env.VITE_BACKEND_URL || ""` (empty = relative URLs).
 </projects>
 
 <agents>
@@ -45,12 +40,3 @@ This workspace contains a mobile app and backend server.
   Frontend only skills:
   - frontend-app-design: Create distinctive, production-grade web interfaces using React, Tailwind, and shadcn/ui. Use when building pages, components, or styling any web UI.
 </skills>
-
-<environment>
-  System manages git and dev servers. DO NOT manage these.
-  The user views the app through Vibecode Mobile App with a webview preview or Vibecode Web App with an iframe preview.
-  The user cannot see code or terminal. Do everything for them.
-  Write one-off scripts to achieve tasks the user asks for.
-  Communicate in an easy to understand manner for non-technical users.
-  Be concise and don't talk too much.
-</environment>

@@ -11,9 +11,26 @@ import {
   AssignTourTeamSchema,
 } from "../types";
 import { canAction } from "../requestRole";
-import { createVibecodeSDK } from "@vibecodeapp/backend-sdk";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
+
+const MAX_VENUE_TECH_RIDER_BYTES = 25 * 1024 * 1024;
+
+function hasVenueTechRiderPdfStored(show: {
+  techRiderPdfUrl?: string | null;
+  venueTechRiderPdfData?: Buffer | Uint8Array | null;
+}): boolean {
+  return (
+    Boolean(show.techRiderPdfUrl?.trim()) ||
+    Boolean(show.venueTechRiderPdfData && show.venueTechRiderPdfData.length > 0)
+  );
+}
+
+function venueTechRiderContentDispositionFilename(name: string | null | undefined): string {
+  const raw = name?.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120);
+  if (raw && raw.toLowerCase().endsWith(".pdf")) return raw;
+  return `${raw || "tech-rider"}.pdf`;
+}
 
 const DEFAULT_RIDER_VISIBILITY = {
   venue: true,
@@ -99,6 +116,7 @@ function serializeTourShow(show: any) {
     techRiderOpenCount: show.techRiderOpenCount ?? 0,
     techRiderLastOpenedAt: show.techRiderLastOpenedAt instanceof Date ? show.techRiderLastOpenedAt.toISOString() : (show.techRiderLastOpenedAt ?? null),
     techRiderPdfUrl: show.techRiderPdfUrl ?? null,
+    hasVenueTechRiderPdf: hasVenueTechRiderPdfStored(show),
     showPeople: (show.showPeople ?? []).map((sp: any) => ({
       id: sp.id,
       showId: sp.showId,
@@ -953,7 +971,7 @@ toursRouter.delete("/tours/:id/tech-rider", async (c) => {
 });
 
 // POST /api/tours/:id/shows/:showId/venue-rider
-// Accepts a generated venue tech rider PDF, uploads to Vibecode storage, returns public URL
+// Accepts a generated venue tech rider PDF; stores bytes for the tracking link below.
 toursRouter.post("/tours/:id/shows/:showId/venue-rider", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId)
@@ -979,30 +997,55 @@ toursRouter.post("/tours/:id/shows/:showId/venue-rider", async (c) => {
     return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
 
   const pdfFile = file as File;
-  const vibecode = createVibecodeSDK();
-  const stored = await vibecode.storage.upload(pdfFile);
+  const ab = await pdfFile.arrayBuffer();
+  if (ab.byteLength > MAX_VENUE_TECH_RIDER_BYTES) {
+    return c.json(
+      { error: { message: `PDF must be at most ${MAX_VENUE_TECH_RIDER_BYTES / (1024 * 1024)} MB`, code: "BAD_REQUEST" } },
+      400
+    );
+  }
 
   await prisma.tourShow.update({
     where: { id: showId },
-    data: { techRiderPdfUrl: stored.url },
+    data: {
+      venueTechRiderPdfData: Buffer.from(ab),
+      venueTechRiderPdfName: pdfFile.name || "tech-rider.pdf",
+      techRiderPdfUrl: null,
+    },
   });
 
-  return c.json({ data: { url: stored.url, filename: pdfFile.name } }, 201);
+  return c.json({ data: { filename: pdfFile.name } }, 201);
 });
 
-// GET /api/tours/:id/shows/:showId/venue-rider/track — public tracking redirect
+// GET /api/tours/:id/shows/:showId/venue-rider/track — public tracking + PDF (stored) or redirect (legacy URL)
 toursRouter.get("/tours/:id/shows/:showId/venue-rider/track", async (c) => {
   const { id, showId } = c.req.param();
 
   const show = await prisma.tourShow.findUnique({
-    where: { id: showId, tourId: id },
+    where: { id: showId },
+    select: {
+      tourId: true,
+      techRiderPdfUrl: true,
+      venueTechRiderPdfData: true,
+      venueTechRiderPdfName: true,
+      techRiderOpenedAt: true,
+    },
   });
 
-  if (!show?.techRiderPdfUrl) {
+  if (!show || show.tourId !== id) {
     return c.text("Tech rider not found", 404);
   }
 
-  // Record the access
+  const storedBytes =
+    show.venueTechRiderPdfData != null && show.venueTechRiderPdfData.length > 0
+      ? show.venueTechRiderPdfData
+      : null;
+  const legacyUrl = show.techRiderPdfUrl?.trim();
+
+  if (!storedBytes && !legacyUrl) {
+    return c.text("Tech rider not found", 404);
+  }
+
   await prisma.tourShow.update({
     where: { id: showId },
     data: {
@@ -1012,7 +1055,20 @@ toursRouter.get("/tours/:id/shows/:showId/venue-rider/track", async (c) => {
     },
   });
 
-  return c.redirect(show.techRiderPdfUrl, 302);
+  if (storedBytes) {
+    const body = new Uint8Array(storedBytes);
+    const filename = venueTechRiderContentDispositionFilename(show.venueTechRiderPdfName);
+    return new Response(body, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${filename}"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
+  }
+
+  return c.redirect(legacyUrl!, 302);
 });
 
 // POST /api/tours/:id/shows/:showId/tech-rider-sent — mark as sent
