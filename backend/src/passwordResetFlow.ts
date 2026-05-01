@@ -1,6 +1,6 @@
 import { generateId } from "@better-auth/core/utils/id";
 import { prisma } from "./prisma";
-import { env } from "./env";
+import { env, isDeployedRuntime } from "./env";
 import { isPostgresDatabaseUrl } from "./databaseUrl";
 import { appOriginForEmailLinks, sendHtmlEmail } from "./resendMail";
 
@@ -35,7 +35,7 @@ export async function sendPasswordResetEmailWithKnownToken(user: { email: string
   const resetUrl = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
 
   if (!env.RESEND_API_KEY?.trim()) {
-    if (env.NODE_ENV === "production") {
+    if (isDeployedRuntime()) {
       console.error("[passwordReset] RESEND_API_KEY is not set — cannot send reset email.");
       throw new Error("RESEND_API_KEY is not configured");
     }
@@ -75,7 +75,7 @@ export async function createPasswordResetTokenAndSendEmail(emailInput: string): 
   const resetUrl = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
 
   if (!env.RESEND_API_KEY?.trim()) {
-    if (env.NODE_ENV === "production") {
+    if (isDeployedRuntime()) {
       await prisma.verification.deleteMany({ where: { identifier: `reset-password:${token}` } });
       throw new Error("RESEND_API_KEY is not configured");
     }
@@ -89,6 +89,7 @@ export async function createPasswordResetTokenAndSendEmail(emailInput: string): 
       subject: "Set or reset your OrdoStage password",
       html: resetEmailHtml(resetUrl),
     });
+    console.log("[password-reset] sent ok userId=%s", user.id);
   } catch (e) {
     await prisma.verification.deleteMany({ where: { identifier: `reset-password:${token}` } });
     throw e;

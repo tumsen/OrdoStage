@@ -56,7 +56,7 @@ export default function ForgotPassword() {
             <div className="space-y-4">
               <div className="bg-green-900/30 border border-green-500/30 rounded-lg p-4">
                 <p className="text-green-400 text-sm">
-                  Check your email for a reset link.
+                  If an account exists for that address, we sent a reset link. Check spam / promotions and use the exact email you log in with.
                 </p>
               </div>
               <Link

@@ -26,12 +26,21 @@ accountRouter.post(
     };
 
     try {
-      await createPasswordResetTokenAndSendEmail(email);
+      const sent = await createPasswordResetTokenAndSendEmail(email);
+      if (!sent) {
+        console.info("[password-reset] no user matches this email; generic response (enumeration-safe)");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
-      if (msg.includes("RESEND_API_KEY")) {
+      if (msg.includes("RESEND_API_KEY") || msg.includes("FROM_EMAIL")) {
         return c.json(
-          { error: { message: "Password reset email is not configured on the server.", code: "EMAIL_UNAVAILABLE" } },
+          {
+            error: {
+              message:
+                "Password reset email is not configured on the server (RESEND_API_KEY / FROM_EMAIL).",
+              code: "EMAIL_UNAVAILABLE",
+            },
+          },
           503
         );
       }

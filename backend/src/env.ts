@@ -57,6 +57,20 @@ function validateEnv() {
 export const env = validateEnv();
 
 /**
+ * Hosted environments often omit NODE_ENV=production. Treat common PaaS env vars as "deployed"
+ * so password reset and email paths require RESEND instead of silently skipping sends.
+ */
+export function isDeployedRuntime(): boolean {
+  if (env.NODE_ENV === "production") return true;
+  if (process.env.RAILWAY_ENVIRONMENT) return true;
+  if (process.env.RAILWAY_SERVICE_ID) return true;
+  if (process.env.RENDER) return true;
+  if (process.env.VERCEL) return true;
+  if (process.env.FLY_APP_NAME) return true;
+  return false;
+}
+
+/**
  * Type of the validated environment variables
  */
 export type Env = z.infer<typeof envSchema>;
