@@ -95,7 +95,6 @@ app.get("/me/announcement-bar", async (c) => {
   if (!sessionUser.organizationId) {
     return c.json({
       data: {
-        linkedPersonId: null,
         nextAssignedJob: null,
         nextOrgShow: null,
       },
@@ -104,31 +103,6 @@ app.get("/me/announcement-bar", async (c) => {
 
   const orgId = sessionUser.organizationId;
   const now = new Date();
-
-  let person =
-    sessionUser.email
-      ? await prisma.person.findFirst({
-          where: {
-            organizationId: orgId,
-            email: sessionUser.email,
-          },
-          select: { id: true },
-          orderBy: { createdAt: "asc" },
-        })
-      : null;
-
-  if (!person && sessionUser.email && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
-    person = await prisma.person.findFirst({
-      where: {
-        organizationId: orgId,
-        email: { equals: sessionUser.email, mode: "insensitive" },
-      },
-      select: { id: true },
-      orderBy: { createdAt: "asc" },
-    });
-  }
-
-  const linkedPersonId = person?.id ?? null;
 
   let nextAssignedJob: {
     id: string;
@@ -141,10 +115,18 @@ app.get("/me/announcement-bar", async (c) => {
     venueName: string | null;
   } | null = null;
 
-  if (linkedPersonId) {
+  const loginEmail = sessionUser.email?.trim();
+  if (loginEmail) {
+    const personEmailClause = isPostgresDatabaseUrl(process.env.DATABASE_URL)
+      ? { equals: loginEmail, mode: "insensitive" as const }
+      : loginEmail;
+
     const jobs = await prisma.eventShowJob.findMany({
       where: {
-        personId: linkedPersonId,
+        person: {
+          organizationId: orgId,
+          email: personEmailClause,
+        },
         show: { event: { organizationId: orgId } },
       },
       include: {
@@ -223,7 +205,6 @@ app.get("/me/announcement-bar", async (c) => {
 
   return c.json({
     data: {
-      linkedPersonId,
       nextAssignedJob,
       nextOrgShow,
     },

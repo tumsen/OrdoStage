@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { usePreferences } from "@/hooks/usePreferences";
 
 export type AnnouncementBarPayload = {
-  linkedPersonId: string | null;
   nextAssignedJob: {
     id: string;
     title: string;
@@ -45,7 +44,7 @@ function formatWhen(isoDate: string, timeHHmm: string, locale: string): string {
 }
 
 /**
- * Global strip: your next assigned show job (if People profile linked) + next upcoming show in the org.
+ * Global strip: your next assigned show job (matched by your account email on the crew record) + next upcoming show in the org.
  */
 export function WorkAnnouncementBar() {
   const { data: session } = useSession();
@@ -67,24 +66,11 @@ export function WorkAnnouncementBar() {
 
   if (!orgId || !data) return null;
 
-  const { nextAssignedJob, nextOrgShow, linkedPersonId } = data;
+  const { nextAssignedJob, nextOrgShow } = data;
   const hasJob = Boolean(nextAssignedJob);
   const hasShow = Boolean(nextOrgShow);
 
   if (!hasJob && !hasShow) {
-    if (!linkedPersonId) {
-      return (
-        <div
-          className="flex-shrink-0 border-b border-white/10 bg-white/[0.03] px-3 py-2 text-center text-[11px] text-white/40"
-          role="status"
-        >
-          Link your login email to a People profile to see your next assigned jobs here.{" "}
-          <Link to="/people" className="text-teal-400/90 hover:text-teal-300 underline underline-offset-2">
-            People
-          </Link>
-        </div>
-      );
-    }
     return null;
   }
 
