@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { cn } from "@/lib/utils";
 import {
   buildDatetimeLocal,
@@ -69,7 +70,11 @@ export function ShowJobsEditor({
     personId: string;
   } | null>(null);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["event", eventId] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["event", eventId] });
+    queryClient.invalidateQueries({ queryKey: ["schedule"] });
+    void invalidateWorkAnnouncementBar(queryClient);
+  };
 
   const createJob = useMutation({
     mutationFn: (body: Record<string, unknown>) =>

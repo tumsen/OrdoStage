@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import type { CreateInternalBooking, Venue, Person } from "../../../../backend/src/types";
 import { toast } from "@/hooks/use-toast";
 import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
@@ -88,6 +89,7 @@ export function NewBookingDialog({ open, onClose, venues, people, initialSlot }:
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      void invalidateWorkAnnouncementBar(queryClient);
       form.reset();
       onClose();
       toast({ title: "Booking created" });

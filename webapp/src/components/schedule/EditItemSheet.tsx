@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { toast } from "@/hooks/use-toast";
 import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
@@ -309,6 +310,7 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      void invalidateWorkAnnouncementBar(queryClient);
       toast({ title: "Event deleted" });
       onClose();
     },
@@ -332,6 +334,7 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
       queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+      void invalidateWorkAnnouncementBar(queryClient);
       toast({ title: "Event saved" });
       onSaved();
     },
@@ -343,6 +346,7 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
       api.post(`/api/events/${event.id}/people`, { personId, role: role || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      void invalidateWorkAnnouncementBar(queryClient);
       setNewPersonId("");
       setNewPersonRole("");
     },
@@ -352,7 +356,10 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
   const removeMutation = useMutation({
     mutationFn: (assignmentId: string) =>
       api.delete(`/api/events/${event.id}/people/${assignmentId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["schedule"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      void invalidateWorkAnnouncementBar(queryClient);
+    },
     onError: () => toast({ title: "Failed to remove person", variant: "destructive" }),
   });
 
@@ -533,6 +540,7 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
     mutationFn: () => api.delete(`/api/bookings/${booking.id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      void invalidateWorkAnnouncementBar(queryClient);
       toast({ title: "Booking deleted" });
       onClose();
     },
@@ -551,6 +559,7 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      void invalidateWorkAnnouncementBar(queryClient);
       toast({ title: "Booking saved" });
       onSaved();
     },

@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { EventDetail, InternalBookingDetail, Venue, Person } from "../../../backend/src/types";
 import {
@@ -342,6 +343,7 @@ export default function Schedule() {
     mutationFn: (id: string) => api.delete(`/api/bookings/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      void invalidateWorkAnnouncementBar(queryClient);
       toast({ title: "Booking deleted" });
     },
     onError: () => toast({ title: "Failed to delete booking", variant: "destructive" }),
@@ -359,6 +361,7 @@ export default function Schedule() {
       if (!confirmDeleteAction(`event "${item.title}"`)) return;
       api.delete(`/api/events/${eventId}`).then(() => {
         queryClient.invalidateQueries({ queryKey: ["schedule"] });
+        void invalidateWorkAnnouncementBar(queryClient);
         toast({ title: "Event deleted" });
       }).catch(() => toast({ title: "Failed to delete event", variant: "destructive" }));
     } else {

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronsUpDown } from "lucide-react";
 import { api } from "@/lib/api";
+import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +47,7 @@ export function OrgWorkspaceMenu({ onNav }: { onNav?: () => void }) {
       queryClient.invalidateQueries({ queryKey: ["preferences"] });
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      void invalidateWorkAnnouncementBar(queryClient);
       onNav?.();
       window.location.assign("/dashboard");
     },

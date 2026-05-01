@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ChevronDown, ChevronRight, Edit2, Trash2, Plus, X, Download, Upload } from "lucide-react";
 import { api, isApiError } from "@/lib/api";
+import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type {
   Event,
@@ -341,6 +342,7 @@ function DetailsTab({
     mutationFn: (data: Record<string, unknown>) => api.post<Event>("/api/events", data),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      void invalidateWorkAnnouncementBar(queryClient);
       onCreated(created.id);
     },
   });
@@ -351,7 +353,10 @@ function DetailsTab({
       return api.put(`/api/events/${event.id}`, data);
     },
     onSuccess: () => {
-      if (event) queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+      if (event) {
+        queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+        void invalidateWorkAnnouncementBar(queryClient);
+      }
     },
   });
 
@@ -360,7 +365,10 @@ function DetailsTab({
       if (!event) throw new Error("Event missing");
       return api.delete(`/api/events/${event.id}`);
     },
-    onSuccess: onDeleted,
+    onSuccess: () => {
+      void invalidateWorkAnnouncementBar(queryClient);
+      onDeleted();
+    },
   });
 
   function onSubmit(values: EventEditValues) {
@@ -1676,18 +1684,25 @@ function ShowsTab({ event }: { event: EventDetail }) {
       setCreating(false);
       setNewShow({ showDate: "", showTime: "", endTime: "", durationMinutes: "120", venueId: event.venueId ?? "" });
       queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+      void invalidateWorkAnnouncementBar(queryClient);
     },
   });
 
   const updateShow = useMutation({
     mutationFn: ({ showId, body }: { showId: string; body: Record<string, unknown> }) =>
       api.put(`/api/events/${event.id}/shows/${showId}`, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+      void invalidateWorkAnnouncementBar(queryClient);
+    },
   });
 
   const deleteShow = useMutation({
     mutationFn: (showId: string) => api.delete(`/api/events/${event.id}/shows/${showId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+      void invalidateWorkAnnouncementBar(queryClient);
+    },
   });
 
   const sortedShows = useMemo(
@@ -1731,7 +1746,10 @@ function ShowsTab({ event }: { event: EventDetail }) {
         notes: previousShow.notes ?? undefined,
       });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event", event.id] });
+      void invalidateWorkAnnouncementBar(queryClient);
+    },
   });
 
 

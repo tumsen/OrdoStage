@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Plus, Trash2, Eye, Filter } from "lucide-react";
 import { api } from "@/lib/api";
+import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Event } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -47,6 +48,7 @@ export default function Events() {
     mutationFn: (id: string) => api.delete(`/api/events/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      void invalidateWorkAnnouncementBar(queryClient);
       setDeleteId(null);
     },
   });
