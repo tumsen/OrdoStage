@@ -7,12 +7,13 @@ import { appOriginForEmailLinks, sendHtmlEmail } from "./resendMail";
 const RESET_TOKEN_TTL_MS = 3600 * 1000;
 
 async function findUserByEmailLoose(raw: string) {
-  const trimmed = raw.trim();
+  const trimmed = raw.trim().replace(/\u200c|\u200d|\ufeff/g, "");
   if (!trimmed) return null;
   const lower = trimmed.toLowerCase();
-  let user = await prisma.user.findUnique({ where: { email: trimmed } });
+  // Prefer lowercase first — sign-up and invites normalize to lower case.
+  let user = await prisma.user.findUnique({ where: { email: lower } });
   if (!user && lower !== trimmed) {
-    user = await prisma.user.findUnique({ where: { email: lower } });
+    user = await prisma.user.findUnique({ where: { email: trimmed } });
   }
   if (!user && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
     user = await prisma.user.findFirst({
@@ -24,6 +25,10 @@ async function findUserByEmailLoose(raw: string) {
 
 function resetEmailHtml(resetUrl: string): string {
   return `<p>Use the link below to <strong>choose a password</strong> for your account (or reset it if you forgot it).</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>On the sign-in page, use <strong>Forgot password</strong> any time to get a new link. This link expires in 1 hour.</p>`;
+}
+
+function resetEmailText(resetUrl: string): string {
+  return `Choose or reset your OrdoStage password:\n${resetUrl}\n\nThis link expires in 1 hour.\n`;
 }
 
 /**
@@ -44,9 +49,10 @@ export async function sendPasswordResetEmailWithKnownToken(user: { email: string
   }
 
   await sendHtmlEmail({
-    to: user.email,
+    to: user.email.trim(),
     subject: "Set or reset your OrdoStage password",
     html: resetEmailHtml(resetUrl),
+    text: resetEmailText(resetUrl),
   });
 }
 
@@ -85,9 +91,10 @@ export async function createPasswordResetTokenAndSendEmail(emailInput: string): 
 
   try {
     await sendHtmlEmail({
-      to: user.email,
+      to: user.email.trim(),
       subject: "Set or reset your OrdoStage password",
       html: resetEmailHtml(resetUrl),
+      text: resetEmailText(resetUrl),
     });
     console.log("[password-reset] sent ok userId=%s", user.id);
   } catch (e) {

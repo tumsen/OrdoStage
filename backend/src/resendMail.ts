@@ -18,7 +18,13 @@ function resolveFromHeader(): string {
  * Send HTML mail via Resend. Checks the API result (Resend does not throw on failure).
  * @throws Error if the API key is missing or Resend returns an error.
  */
-export async function sendHtmlEmail(opts: { to: string; subject: string; html: string }): Promise<void> {
+export async function sendHtmlEmail(opts: {
+  to: string;
+  subject: string;
+  html: string;
+  /** Plain-text body improves deliverability when set */
+  text?: string;
+}): Promise<void> {
   const apiKey = env.RESEND_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("RESEND_API_KEY is not configured");
@@ -27,9 +33,10 @@ export async function sendHtmlEmail(opts: { to: string; subject: string; html: s
   const resend = new Resend(apiKey);
   const { data, error } = await resend.emails.send({
     from: resolveFromHeader(),
-    to: opts.to,
+    to: opts.to.trim(),
     subject: opts.subject,
     html: opts.html,
+    ...(opts.text ? { text: opts.text } : {}),
   });
   if (error) {
     console.error("[resend] send failed:", error.name, error.message, error.statusCode);

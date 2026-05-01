@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { prisma } from "../prisma";
+import { env, isDeployedRuntime } from "../env";
 import { ensureCurrencyPriceMonthRollover, SUPPORTED_BILLING_CURRENCIES } from "../postpaidBilling";
 
 const DEFAULT_RIDER_VISIBILITY = {
@@ -52,6 +53,23 @@ function serializePublicPerson(person: any) {
 }
 
 const publicRouter = new Hono();
+
+// GET /api/public/mail-config — safe diagnostics for “no reset email” (no secrets)
+publicRouter.get("/mail-config", (c) => {
+  const hasResend = Boolean(env.RESEND_API_KEY?.trim());
+  const hasFrom = Boolean(env.FROM_EMAIL?.trim());
+  const hasFrontend = Boolean(env.FRONTEND_URL?.trim());
+  return c.json({
+    data: {
+      deployedRuntimeDetected: isDeployedRuntime(),
+      resendApiKeySet: hasResend,
+      fromEmailSet: hasFrom,
+      frontendUrlSet: hasFrontend,
+      /** Same gates as team invitation emails */
+      transactionalEmailReady: hasResend && hasFrom,
+    },
+  });
+});
 
 // GET /api/public/pricing — public pricing table
 publicRouter.get("/pricing", async (c) => {
