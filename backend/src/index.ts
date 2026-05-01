@@ -73,7 +73,10 @@ app.use("/api/*", async (c, next) => {
     await next();
     return;
   }
-  if (path === "/api/me" && c.req.method === "GET") {
+  if (
+    (path === "/api/me" || path === "/api/me/announcement-bar") &&
+    c.req.method === "GET"
+  ) {
     await next();
     return;
   }

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { prisma } from "../prisma";
+import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { auth } from "../auth";
 import { canAction } from "../requestRole";
 import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
@@ -66,6 +67,165 @@ app.get("/me", async (c) => {
       isActive,
       views: eff.views,
       actions: eff.actions,
+    },
+  });
+});
+
+function startOfShowUtc(showDate: Date, showTime: string): Date | null {
+  if (!/^\d{2}:\d{2}$/.test(showTime)) return null;
+  const [hhRaw, mmRaw] = showTime.split(":");
+  const hh = Number(hhRaw);
+  const mm = Number(mmRaw);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  const start = new Date(showDate);
+  start.setUTCHours(hh, mm, 0, 0);
+  return start;
+}
+
+function startOfJobUtc(jobDate: Date, startTime: string): Date | null {
+  return startOfShowUtc(jobDate, startTime);
+}
+
+// GET /api/me/announcement-bar — next assigned show job + next org-wide upcoming show (for global banner)
+app.get("/me/announcement-bar", async (c) => {
+  const sessionUser = c.get("user");
+  if (!sessionUser?.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!sessionUser.organizationId) {
+    return c.json({
+      data: {
+        linkedPersonId: null,
+        nextAssignedJob: null,
+        nextOrgShow: null,
+      },
+    });
+  }
+
+  const orgId = sessionUser.organizationId;
+  const now = new Date();
+
+  let person =
+    sessionUser.email
+      ? await prisma.person.findFirst({
+          where: {
+            organizationId: orgId,
+            email: sessionUser.email,
+          },
+          select: { id: true },
+          orderBy: { createdAt: "asc" },
+        })
+      : null;
+
+  if (!person && sessionUser.email && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
+    person = await prisma.person.findFirst({
+      where: {
+        organizationId: orgId,
+        email: { equals: sessionUser.email, mode: "insensitive" },
+      },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  const linkedPersonId = person?.id ?? null;
+
+  let nextAssignedJob: {
+    id: string;
+    title: string;
+    jobDate: string;
+    startTime: string;
+    eventId: string;
+    showId: string;
+    eventTitle: string;
+    venueName: string | null;
+  } | null = null;
+
+  if (linkedPersonId) {
+    const jobs = await prisma.eventShowJob.findMany({
+      where: {
+        personId: linkedPersonId,
+        show: { event: { organizationId: orgId } },
+      },
+      include: {
+        venue: { select: { name: true } },
+        show: {
+          select: {
+            id: true,
+            eventId: true,
+            event: { select: { id: true, title: true } },
+          },
+        },
+      },
+      orderBy: [{ jobDate: "asc" }, { startTime: "asc" }],
+      take: 48,
+    });
+
+    for (const j of jobs) {
+      const start = startOfJobUtc(j.jobDate, j.startTime);
+      if (!start || start.getTime() < now.getTime()) continue;
+      nextAssignedJob = {
+        id: j.id,
+        title: j.title,
+        jobDate: j.jobDate.toISOString(),
+        startTime: j.startTime,
+        eventId: j.show.event.id,
+        showId: j.show.id,
+        eventTitle: j.show.event.title,
+        venueName: j.venue?.name ?? null,
+      };
+      break;
+    }
+  }
+
+  const showRows = await prisma.eventShow.findMany({
+    where: {
+      event: { organizationId: orgId },
+      status: { not: "cancelled" },
+    },
+    select: {
+      id: true,
+      showDate: true,
+      showTime: true,
+      status: true,
+      event: { select: { id: true, title: true } },
+      venue: { select: { name: true } },
+    },
+    orderBy: [{ showDate: "asc" }, { showTime: "asc" }],
+    take: 96,
+  });
+
+  let nextOrgShow: {
+    showId: string;
+    eventId: string;
+    eventTitle: string;
+    showDate: string;
+    showTime: string;
+    venueName: string | null;
+    status: string;
+  } | null = null;
+
+  for (const s of showRows) {
+    const start = startOfShowUtc(s.showDate, s.showTime);
+    if (!start || start.getTime() < now.getTime()) continue;
+    if (nextAssignedJob && s.id === nextAssignedJob.showId) continue;
+    nextOrgShow = {
+      showId: s.id,
+      eventId: s.event.id,
+      eventTitle: s.event.title,
+      showDate: s.showDate.toISOString(),
+      showTime: s.showTime,
+      venueName: s.venue?.name ?? null,
+      status: s.status,
+    };
+    break;
+  }
+
+  return c.json({
+    data: {
+      linkedPersonId,
+      nextAssignedJob,
+      nextOrgShow,
     },
   });
 });

@@ -20,6 +20,31 @@ import { canAction } from "../requestRole";
 const eventsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 const prismaAny = prisma as any;
 
+function rollupEventStatusFromShowStatuses(statuses: string[]): "draft" | "confirmed" | "cancelled" {
+  if (statuses.length === 0) return "draft";
+  const first = statuses[0]!;
+  if (
+    statuses.every((s) => s === first) &&
+    (first === "draft" || first === "confirmed" || first === "cancelled")
+  ) {
+    return first;
+  }
+  return "draft";
+}
+
+/** Keeps Event.status in sync: same as all shows when uniform, otherwise draft (mixed). */
+async function syncEventRollupStatus(eventId: string): Promise<void> {
+  const shows = await prisma.eventShow.findMany({
+    where: { eventId },
+    select: { status: true },
+  });
+  const next = rollupEventStatusFromShowStatuses(shows.map((s) => s.status));
+  await prisma.event.update({
+    where: { id: eventId },
+    data: { status: next },
+  });
+}
+
 async function userOrgRole(userId: string): Promise<string | null> {
   const row = await prisma.user.findUnique({ where: { id: userId }, select: { orgRole: true } });
   return row?.orgRole ?? null;
@@ -504,6 +529,7 @@ function serializeFullEvent(event: any) {
       showDate: show.showDate.toISOString(),
       showTime: show.showTime,
       durationMinutes: show.durationMinutes,
+      status: show.status ?? "draft",
       venueId: show.venueId,
       venue: serializeVenue(show.venue)!,
       technicalNotes: show.technicalNotes,
@@ -590,7 +616,12 @@ eventsRouter.get("/events", async (c) => {
   const { status, venueId, from, to } = c.req.query();
 
   const where: Record<string, unknown> = { organizationId: user.organizationId };
-  if (status) where.status = status;
+  if (status) {
+    where.OR = [
+      { shows: { some: { status } } },
+      { AND: [{ shows: { none: {} } }, { status }] },
+    ];
+  }
   if (venueId) where.venueId = venueId;
   if (from || to) {
     where.startDate = {};
@@ -722,16 +753,6 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
     return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
 
-  if (body.status === "confirmed") {
-    const showCount = await prismaAny.eventShow.count({ where: { eventId: id } });
-    if (showCount < 1) {
-      return c.json(
-        { error: { message: "An event must have at least one show before it can be confirmed", code: "BAD_REQUEST" } },
-        400
-      );
-    }
-  }
-
   const event = await prisma.event.update({
     where: { id },
     data: {
@@ -741,7 +762,6 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
         startDate: body.startDate === null || body.startDate === "" ? null : new Date(body.startDate),
       }),
       ...(body.endDate !== undefined && { endDate: body.endDate ? new Date(body.endDate) : null }),
-      ...(body.status !== undefined && { status: body.status }),
       ...(body.venueId !== undefined && { venueId: body.venueId }),
       ...(body.tags !== undefined && { tags: body.tags }),
       ...(body.contactPerson !== undefined && { contactPerson: body.contactPerson }),
@@ -1346,6 +1366,7 @@ eventsRouter.post("/events/:id/shows", zValidator("json", CreateEventShowSchema)
       showTime: body.showTime,
       durationMinutes: body.durationMinutes,
       venueId: body.venueId,
+      status: body.status ?? event.status,
       technicalNotes: body.technicalNotes ?? null,
       fohNotes: body.fohNotes ?? null,
       ticketNotes: body.ticketNotes ?? null,
@@ -1364,6 +1385,7 @@ eventsRouter.post("/events/:id/shows", zValidator("json", CreateEventShowSchema)
       data: { startDate: new Date(body.showDate) },
     });
   }
+  await syncEventRollupStatus(eventId);
   return c.json({ data: { id: show.id } }, 201);
 });
 
@@ -1436,8 +1458,10 @@ eventsRouter.put("/events/:id/shows/:showId", zValidator("json", UpdateEventShow
       ...(body.breakTime !== undefined ? { breakTime: body.breakTime || null } : {}),
       ...(body.breakDurationMinutes !== undefined ? { breakDurationMinutes: body.breakDurationMinutes ?? null } : {}),
       ...(body.notes !== undefined ? { notes: body.notes || null } : {}),
+      ...(body.status !== undefined ? { status: body.status } : {}),
     },
   });
+  await syncEventRollupStatus(eventId);
   return c.json({ data: { ok: true } });
 });
 
@@ -1470,13 +1494,7 @@ eventsRouter.delete("/events/:id/shows/:showId", async (c) => {
     await removeJobFromSchedule(job.id, user.organizationId);
   }
   await prismaAny.eventShow.delete({ where: { id: showId } });
-  const remainingShows = await prismaAny.eventShow.count({ where: { eventId } });
-  if (remainingShows === 0) {
-    await prismaAny.event.update({
-      where: { id: eventId },
-      data: { status: "draft" },
-    });
-  }
+  await syncEventRollupStatus(eventId);
   return new Response(null, { status: 204 });
 });
 

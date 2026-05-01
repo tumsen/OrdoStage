@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -389,31 +389,6 @@ export default function Schedule() {
     queryFn: () => api.get<Person[]>("/api/people"),
   });
 
-  const { data: myPerson } = useQuery({
-    queryKey: ["people", "me"],
-    queryFn: () => api.get<Person | null>("/api/people/me"),
-  });
-
-  const upcomingFrom = toISODate(today);
-  const upcomingTo = toISODate(addDays(new Date(today.getFullYear(), today.getMonth(), today.getDate()), 60));
-
-  const { data: myAssignmentsData } = useQuery({
-    queryKey: ["schedule", "my-assignments", myPerson?.id, upcomingFrom, upcomingTo],
-    queryFn: () =>
-      api.get<ScheduleData>(
-        `/api/schedule?from=${upcomingFrom}&to=${upcomingTo}&personId=${myPerson!.id}`
-      ),
-    enabled: Boolean(myPerson?.id),
-  });
-
-  const myJobItems = useMemo(() => {
-    if (!myAssignmentsData || !myPerson?.id) return [];
-    const list = toCalendarItems(myAssignmentsData.events, myAssignmentsData.bookings, {
-      personIdFilter: myPerson.id,
-    }).filter((i) => i.kind === "job");
-    return list.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-  }, [myAssignmentsData, myPerson?.id]);
-
   const items: CalendarItem[] = scheduleData
     ? toCalendarItems(scheduleData.events, scheduleData.bookings, {
         personIdFilter: personId !== "all" ? personId : undefined,
@@ -428,11 +403,6 @@ export default function Schedule() {
     if (item.type === "private") return visibility.private;
     return visibility.other;
   });
-
-  const nowMs = Date.now();
-  const upcomingMine = myJobItems.filter((j) => new Date(j.startDate).getTime() >= nowMs);
-  const nextShift = upcomingMine[0] ?? null;
-  const moreShifts = upcomingMine.slice(1);
 
   function moveBackward() {
     if (viewMode === "year" || viewMode === "yeardisc") setAnchorDate((d) => addYears(d, -1));
@@ -512,40 +482,6 @@ export default function Schedule() {
 
         <ScheduleLegend />
       </div>
-
-      {/* Logged-in user: next shift + hint when not linked to a Person */}
-      {myPerson?.id ? (
-        <div className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-950/40 to-transparent px-4 py-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-teal-300/90">Your next shift</div>
-          {nextShift ? (
-            <button
-              type="button"
-              onClick={() => setSelectedItem(nextShift)}
-              className="mt-2 w-full text-left rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 hover:bg-white/[0.06] transition-colors"
-            >
-              <div className="text-sm font-semibold text-white">{nextShift.title}</div>
-              <div className="text-xs text-white/55 mt-0.5">
-                {new Date(nextShift.startDate).toLocaleString(locale, {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-                {nextShift.venueLabel ? ` · ${nextShift.venueLabel}` : ""}
-              </div>
-            </button>
-          ) : (
-            <p className="mt-2 text-sm text-white/50">
-              No upcoming shifts with your name in the next 60 days.
-            </p>
-          )}
-        </div>
-      ) : (
-        <p className="text-xs text-white/35 px-0.5">
-          When your account uses the same email as your People profile, your assigned show jobs appear here.
-        </p>
-      )}
 
       {/* Calendar */}
       <div className="bg-white/[0.02] border border-white/[0.07] rounded-xl p-3 md:p-4">
@@ -645,38 +581,6 @@ export default function Schedule() {
           </>
         )}
       </div>
-
-      {/* Upcoming assigned jobs (same window as next-shift lookup) */}
-      {myPerson?.id && moreShifts.length > 0 ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-white/40 mb-2">
-            More of your shifts
-          </div>
-          <ul className="space-y-2">
-            {moreShifts.map((j) => (
-              <li key={j.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedItem(j)}
-                  className="w-full text-left rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 hover:bg-white/[0.05] transition-colors"
-                >
-                  <div className="text-sm text-white/90">{j.title}</div>
-                  <div className="text-xs text-white/45">
-                    {new Date(j.startDate).toLocaleString(locale, {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {j.venueLabel ? ` · ${j.venueLabel}` : ""}
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
 
       {/* Edit sheet — slides in from right for events and bookings */}
       <EditItemSheet

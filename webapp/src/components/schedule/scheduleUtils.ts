@@ -43,6 +43,16 @@ export interface ToCalendarItemsOptions {
   personIdFilter?: string | null;
 }
 
+/** Per-show confirmation; falls back to event rollup when missing (legacy payloads). */
+function calendarStatusForShow(
+  show: { status?: string | null },
+  event: EventDetail
+): string {
+  const raw = show.status ?? event.status;
+  if (raw === "confirmed" || raw === "cancelled" || raw === "draft") return raw;
+  return "draft";
+}
+
 export function toCalendarItems(
   events: EventDetail[],
   bookings: InternalBookingDetail[],
@@ -67,7 +77,7 @@ export function toCalendarItems(
           id: `${e.id}:show:${show.id}:job:${job.id}`,
           title: `${job.title} · ${e.title}`,
           kind: "job",
-          status: e.status,
+          status: calendarStatusForShow(show, e),
           startDate,
           endDate,
           raw: e,
@@ -100,7 +110,7 @@ export function toCalendarItems(
           id: `${e.id}:show:${show.id}`,
           title: e.title,
           kind: "event" as const,
-          status: e.status,
+          status: calendarStatusForShow(show, e),
           startDate,
           endDate,
           raw: e,

@@ -160,9 +160,11 @@ scheduleRouter.get("/schedule", async (c) => {
           ...(showDateRange ? { where: { showDate: showDateRange } } : {}),
           select: {
             id: true,
+            eventId: true,
             showDate: true,
             showTime: true,
             durationMinutes: true,
+            status: true,
             venueId: true,
             venue: true,
             jobs: {
@@ -217,9 +219,11 @@ scheduleRouter.get("/schedule", async (c) => {
     documents: [],
     shows: event.shows.map((show) => ({
       id: show.id,
+      eventId: show.eventId,
       showDate: serializeDate(show.showDate),
       showTime: show.showTime,
       durationMinutes: show.durationMinutes,
+      status: show.status ?? "draft",
       venueId: show.venueId,
       venue: serializeVenue(show.venue),
       jobs: show.jobs.map((job) => ({

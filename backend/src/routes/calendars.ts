@@ -124,6 +124,7 @@ function buildICS(
     people: Array<{ person: { name: string; role: string | null }; role: string | null }>;
     shows?: Array<{
       id: string;
+      status: string;
       showDate: Date;
       showTime: string;
       durationMinutes: number;
@@ -171,7 +172,7 @@ function buildICS(
             end,
             venue: show.venue ?? event.venue ?? null,
             descriptionBase: event.description,
-            status: event.status,
+            status: show.status ?? event.status,
             categories,
             people: event.people,
             url: `${appBase}/events/${event.id}`,
@@ -459,6 +460,7 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
       shows: {
         select: {
           id: true,
+          status: true,
           showDate: true,
           showTime: true,
           durationMinutes: true,
