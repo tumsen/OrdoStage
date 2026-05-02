@@ -40,10 +40,11 @@ export default function Login() {
       }
     }
     setLoading(true);
+    const emailNorm = email.trim().toLowerCase();
     const result =
       mode === "signin"
-        ? await authClient.signIn.email({ email: email.trim(), password })
-        : await authClient.signUp.email({ name: name.trim(), email: email.trim(), password });
+        ? await authClient.signIn.email({ email: emailNorm, password })
+        : await authClient.signUp.email({ name: name.trim(), email: emailNorm, password });
     setLoading(false);
     if (result.error) {
       setError(result.error.message || (mode === "signin" ? "Invalid email or password" : "Could not create account"));

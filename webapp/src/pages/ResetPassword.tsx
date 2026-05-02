@@ -45,8 +45,20 @@ export default function ResetPassword() {
       setError(result.error.message || "Failed to reset password");
       return;
     }
+    let loginEmail = "";
+    try {
+      loginEmail = sessionStorage.getItem("postPasswordResetEmail") ?? "";
+      sessionStorage.removeItem("postPasswordResetEmail");
+    } catch {
+      /* ignore */
+    }
+    await authClient.signOut();
     setSuccess(true);
-    setTimeout(() => navigate("/login"), 2000);
+    const dest =
+      loginEmail !== ""
+        ? `/login?email=${encodeURIComponent(loginEmail)}`
+        : "/login";
+    setTimeout(() => navigate(dest), 1500);
   };
 
   return (

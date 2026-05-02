@@ -27,8 +27,14 @@ export default function ForgotPassword() {
   const onSubmit = async (values: FormValues) => {
     setError("");
     try {
+      const emailNorm = values.email.trim().toLowerCase();
+      try {
+        sessionStorage.setItem("postPasswordResetEmail", emailNorm);
+      } catch {
+        /* private mode */
+      }
       await api.post<{ status: boolean; message: string }>("/api/account/request-password-reset", {
-        email: values.email.trim().toLowerCase(),
+        email: emailNorm,
       });
       setSuccess(true);
     } catch (e: unknown) {
