@@ -758,6 +758,7 @@ function mapAdminUserListRow(u: {
 
 app.get("/admin/users", async (c) => {
   const users = await prisma.user.findMany({
+    where: { isAdmin: true },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -824,6 +825,19 @@ app.delete("/admin/users/:userId", async (c) => {
   });
   if (!existing) {
     return c.json({ error: { message: "User not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  if (!existing.isAdmin) {
+    return c.json(
+      {
+        error: {
+          message:
+            "Only platform admin accounts are managed here. Organization members are edited under Organizations.",
+          code: "FORBIDDEN",
+        },
+      },
+      403
+    );
   }
 
   if (PROTECTED_ADMIN_EMAILS.has(existing.email.toLowerCase())) {

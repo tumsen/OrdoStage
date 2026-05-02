@@ -95,8 +95,8 @@ export default function Users() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
       toast({
-        title: "User deleted",
-        description: "The admin user account was removed.",
+        title: "Platform admin removed",
+        description: "That login no longer has owner-admin access.",
       });
     },
     onError: (err) => {
@@ -146,6 +146,15 @@ export default function Users() {
 
   return (
     <div className="p-6 space-y-4">
+      <p className="text-sm text-white/45 max-w-2xl">
+        This list is only <strong className="text-white/70">OrdoStage platform admins</strong> (owner-admin console access).
+        Organization members and billing contacts are managed under{" "}
+        <Link to="/admin/orgs" className="text-rose-400 hover:text-rose-300 underline underline-offset-2">
+          Organizations
+        </Link>{" "}
+        → open an org → Users.
+      </p>
+
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3 max-w-xl">
         <h3 className="text-sm font-semibold text-white">Grant platform admin</h3>
         <p className="text-xs text-white/45">
@@ -220,7 +229,7 @@ export default function Users() {
             className="pl-9 bg-gray-900 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-rose-500/30"
           />
         </div>
-        <div className="text-white/30 text-sm">{filtered.length} users</div>
+        <div className="text-white/30 text-sm">{filtered.length} platform admin{filtered.length === 1 ? "" : "s"}</div>
       </div>
 
       {/* Table */}
@@ -233,7 +242,7 @@ export default function Users() {
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Organization</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Org role</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider text-center">
-                Admin
+                Platform admin
               </TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Joined</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider text-right">Actions</TableHead>
@@ -253,7 +262,7 @@ export default function Users() {
             ) : filtered.length === 0 ? (
               <TableRow className="border-white/5">
                 <TableCell colSpan={COL_COUNT} className="text-center text-white/30 py-12">
-                  {search ? "No users match your search" : "No users yet"}
+                  {search ? "No platform admins match your search" : "No platform admins yet"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -263,12 +272,7 @@ export default function Users() {
                 return (
                   <TableRow key={user.id} className="border-white/5 hover:bg-white/[0.02]">
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="text-white/80">{user.name ?? "—"}</span>
-                        {user.isAdmin ? (
-                          <Badge className="bg-rose-950/60 text-rose-400 border-rose-800/40 text-xs">Admin</Badge>
-                        ) : null}
-                      </div>
+                      <span className="text-white/80">{user.name ?? "—"}</span>
                     </TableCell>
                     <TableCell className="text-white/50">
                       {editingId === user.id ? (
@@ -382,8 +386,8 @@ export default function Users() {
       </div>
       {session?.user?.id ? (
         <p className="text-xs text-white/35 max-w-2xl">
-          To revoke your own admin access, turn off the switch on your row — unless you are the only admin, in which case
-          add another admin first. Deleting an admin user requires typing <span className="text-white/60">DELETE</span>.
+          To revoke your own platform admin access, turn off the switch on your row — unless you are the only platform admin,
+          add another first. Delete requires typing <span className="text-white/60">DELETE</span>.
           The protected account <span className="text-white/60">tumsen@gmail.com</span> cannot be deleted.
         </p>
       ) : null}
