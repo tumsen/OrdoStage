@@ -156,6 +156,12 @@ app.use("/api/*", async (c, next) => {
     return;
   }
 
+  // Password reset must run even when billing is overdue (session cookie may still identify an org user).
+  if (path === "/api/account/request-password-reset" && c.req.method === "POST") {
+    await next();
+    return;
+  }
+
   // Owner-admin routes enforce access in adminMiddleware; never block writes due to org billing state.
   if (path.startsWith("/api/admin")) {
     await next();
