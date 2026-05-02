@@ -36,7 +36,7 @@ type RoleRow = {
 
 const GROUP_LABEL: Record<string, string> = {
   content: "Production & content",
-  team: "Team",
+  team: "Teams",
   billing: "Billing",
   organization: "Organization",
   account: "Account",
@@ -223,7 +223,7 @@ export default function Roles() {
           <p className="text-sm text-white/40 mt-1 max-w-xl">
             Define what each role can <strong className="text-white/55">see</strong> in the sidebar and what they can{" "}
             <strong className="text-white/55">do</strong> in the app. Owner always has full permissions and is read-only; add custom roles and assign
-            them from the Team page.
+            them from the Teams page.
           </p>
         </div>
         {canManageGroups ? (

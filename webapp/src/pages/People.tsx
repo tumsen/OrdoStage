@@ -763,7 +763,7 @@ function PersonFormDialog({
               <Label className="text-white/50 text-xs uppercase tracking-wide">Default role</Label>
               <p className="text-[10px] text-white/30 leading-snug">
                 Job title in the directory. You can set a different <strong className="text-white/40">role per team</strong> on the
-                Team page. App access is not controlled here; use the permission group below (when the person has an email).
+                Teams page. App access is not controlled here; use the permission group below (when the person has an email).
               </p>
               <Controller
                 control={form.control}
@@ -973,7 +973,7 @@ function PersonFormDialog({
                   </div>
                 ) : (
                   <p className="text-xs text-amber-300/70">
-                    No teams yet — create teams on the Team page, then add this person to them here.
+                    No teams yet — create teams on the Teams page, then add this person to them here.
                   </p>
                 )}
               </>
