@@ -23,6 +23,16 @@ async function sendOTPEmail(email: string, otp: string) {
   }
 }
 
+function originsFromFrontendUrl(): string[] {
+  const raw = env.FRONTEND_URL?.trim();
+  if (!raw) return [];
+  try {
+    return [new URL(raw).origin];
+  } catch {
+    return [];
+  }
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
@@ -37,11 +47,12 @@ export const auth = betterAuth({
     "https://ordostage.com",
     "https://www.ordostage.com",
     "https://*.onrender.com",
+    ...originsFromFrontendUrl(),
   ],
   emailAndPassword: {
     enabled: true,
-    async sendResetPassword({ user, token }: { user: { email: string }; token: string }) {
-      await sendPasswordResetEmailWithKnownToken(user, token);
+    async sendResetPassword(payload: { user: { email: string }; token: string; url?: string }) {
+      await sendPasswordResetEmailWithKnownToken(payload.user, payload.token);
     },
   },
   plugins: [
