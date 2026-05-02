@@ -5,7 +5,8 @@ import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { auth } from "../auth";
 import { canAction } from "../requestRole";
 import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
-import { reassignUsersBeforeOrgDelete } from "../orgMembership";
+import { wipeOrganizationCompletely } from "../deleteOrganizationWipe";
+import { verifyUserCredentialPassword } from "../verifyCredentialPassword";
 import { DistanceUnitSchema, LanguageSchema, TimeFormatSchema } from "../types";
 import {
   enforceOverdueAccess,
@@ -640,7 +641,56 @@ app.patch("/org", async (c) => {
   return c.json({ data: { ok: true } });
 });
 
-// DELETE /api/org — type "DELETE <ORG NAME>" to confirm
+// GET /api/org/deletion-requirements — organisation name + owners (org.delete only)
+app.get("/org/deletion-requirements", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  if (!canAction(c, "org.delete")) {
+    return c.json(
+      { error: { message: "You do not have permission to delete the organization", code: "FORBIDDEN" } },
+      403
+    );
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { organizationId: true },
+  });
+  const orgId = dbUser?.organizationId;
+  if (!orgId) {
+    return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { name: true },
+  });
+  if (!org) {
+    return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const ownerRows = await prisma.organizationMembership.findMany({
+    where: { organizationId: orgId, orgRole: "owner" },
+    include: { user: { select: { id: true, email: true, name: true } } },
+    orderBy: { user: { email: "asc" } },
+  });
+
+  return c.json({
+    data: {
+      organizationName: org.name,
+      owners: ownerRows.map((r) => ({
+        id: r.user.id,
+        email: r.user.email,
+        name: r.user.name,
+      })),
+    },
+  });
+});
+
+// DELETE /api/org — confirm phrase + every organisation owner's login password
 app.delete("/org", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
@@ -654,8 +704,26 @@ app.delete("/org", async (c) => {
     );
   }
 
-  const body = await c.req.json().catch(() => ({} as { confirm?: string }));
-  const confirm = typeof body.confirm === "string" ? body.confirm.trim() : "";
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = z
+    .object({
+      confirm: z.string().min(1),
+      ownerPasswords: z.record(z.string(), z.string()),
+    })
+    .safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          message: 'Send JSON body { "confirm": "DELETE <exact organisation name>", "ownerPasswords": { "<ownerUserId>": "<password>", ... } }.',
+          code: "BAD_REQUEST",
+        },
+      },
+      400
+    );
+  }
+
+  const { confirm, ownerPasswords } = parsed.data;
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
@@ -676,12 +744,13 @@ app.delete("/org", async (c) => {
   if (!org) {
     return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
   }
+
   const expected = `DELETE ${org.name}`;
-  if (confirm !== expected) {
+  if (confirm.trim() !== expected) {
     return c.json(
       {
         error: {
-          message: `Send JSON body { "confirm": "${expected}" } to permanently delete this organization.`,
+          message: `Confirmation must be exactly: ${expected}`,
           code: "BAD_REQUEST",
         },
       },
@@ -689,8 +758,73 @@ app.delete("/org", async (c) => {
     );
   }
 
-  await reassignUsersBeforeOrgDelete(prisma, orgId);
-  await prisma.organization.delete({ where: { id: orgId } });
+  const ownerMemberships = await prisma.organizationMembership.findMany({
+    where: { organizationId: orgId, orgRole: "owner" },
+    select: { userId: true },
+  });
+  const ownerIds = [...new Set(ownerMemberships.map((m) => m.userId))].sort();
+  const submittedIds = Object.keys(ownerPasswords).sort();
+  if (ownerIds.length === 0) {
+    return c.json(
+      { error: { message: "This organization has no owner on file.", code: "BAD_REQUEST" } },
+      400
+    );
+  }
+  if (ownerIds.length !== submittedIds.length || ownerIds.some((id, i) => id !== submittedIds[i])) {
+    return c.json(
+      {
+        error: {
+          message: "ownerPasswords must include exactly one password field per organisation owner (use owner user ids as keys).",
+          code: "BAD_REQUEST",
+        },
+      },
+      400
+    );
+  }
+
+  const missingCredential: string[] = [];
+  for (const ownerId of ownerIds) {
+    const acc = await prisma.account.findFirst({
+      where: { userId: ownerId, providerId: "credential" },
+      select: { password: true },
+    });
+    if (!acc?.password) {
+      const u = await prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { email: true },
+      });
+      if (u?.email) missingCredential.push(u.email);
+    }
+  }
+  if (missingCredential.length > 0) {
+    return c.json(
+      {
+        error: {
+          message: `These organisation owners have no email/password login set up: ${missingCredential.join(", ")}. They must set a password before the organisation can be deleted this way.`,
+          code: "NO_CREDENTIAL",
+        },
+      },
+      400
+    );
+  }
+
+  for (const ownerId of ownerIds) {
+    const password = ownerPasswords[ownerId];
+    const ok = await verifyUserCredentialPassword(prisma, ownerId, password ?? "");
+    if (!ok) {
+      return c.json(
+        {
+          error: {
+            message: "Invalid password for one or more organisation owners.",
+            code: "INVALID_PASSWORD",
+          },
+        },
+        403
+      );
+    }
+  }
+
+  await wipeOrganizationCompletely(prisma, orgId);
 
   return c.json({ data: { ok: true } });
 });

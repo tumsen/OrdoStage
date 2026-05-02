@@ -33,7 +33,7 @@ export const ACTION_DEFS: {
   { id: "org.update", label: "Rename and general organization settings", group: "organization" },
   { id: "org.delete", label: "Delete the entire organization", group: "organization" },
   { id: "roles.manage", label: "Create & edit permission groups (except system groups)", group: "organization" },
-  { id: "account.danger", label: "Danger zone (delete account)", group: "account" },
+  { id: "account.danger", label: "Danger zone (delete organisation)", group: "account" },
 ];
 
 export const ALL_VIEW_IDS = VIEW_DEFS.map((v) => v.id);

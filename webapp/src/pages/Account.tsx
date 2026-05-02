@@ -37,8 +37,6 @@ import {
   type DocumentPermissionOptions,
 } from "@/components/DocumentPermissionsForm";
 
-const CONFIRM_PHRASE = "DELETE";
-
 async function uploadPersonPhoto(personId: string, file: File): Promise<void> {
   const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
   const formData = new FormData();
@@ -83,10 +81,23 @@ export default function Account() {
   const { t } = useI18n();
   const { canAction } = usePermissions();
   const canManageBranding = canAction("billing.manage");
+  const canDeleteOrganization = canAction("org.delete");
 
-  const [phrase, setPhrase] = useState("");
+  type DeletionRequirements = {
+    organizationName: string;
+    owners: { id: string; email: string; name: string | null }[];
+  };
+
+  const { data: deletionInfo } = useQuery<DeletionRequirements>({
+    queryKey: ["org", "deletion-requirements"],
+    queryFn: () => api.get<DeletionRequirements>("/api/org/deletion-requirements"),
+    enabled: canDeleteOrganization,
+  });
+
+  const [confirmPhrase, setConfirmPhrase] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [ownerPasswords, setOwnerPasswords] = useState<Record<string, string>>({});
   const [prefsError, setPrefsError] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -400,6 +411,11 @@ export default function Account() {
   }, [companyLogoFile]);
 
   useEffect(() => {
+    if (!deletionInfo?.owners?.length) return;
+    setOwnerPasswords(Object.fromEntries(deletionInfo.owners.map((o) => [o.id, ""])));
+  }, [deletionInfo?.organizationName, deletionInfo?.owners]);
+
+  useEffect(() => {
     if (!permissionState || !permissionsDoc) return;
     setPermissionDraft(
       normalizeDocumentPermissions(
@@ -410,17 +426,37 @@ export default function Account() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- draft resets when doc id / loaded state changes
   }, [permissionState, permissionsDoc?.id, permissionOptions?.teams]);
 
-  async function onDeleteAccount() {
+  const expectedOrgDeletePhrase = deletionInfo ? `DELETE ${deletionInfo.organizationName}` : "";
+  const ownersList = deletionInfo?.owners;
+  const ownerPasswordsComplete =
+    (ownersList?.length ?? 0) > 0 &&
+    (ownersList ?? []).every((o) => Boolean(ownerPasswords[o.id]?.trim()));
+  const canSubmitOrgDelete =
+    Boolean(deletionInfo?.owners?.length) &&
+    confirmPhrase.trim() === expectedOrgDeletePhrase &&
+    ownerPasswordsComplete;
+
+  async function onDeleteOrganization() {
     setError("");
-    if (phrase !== CONFIRM_PHRASE) {
-      setError(t("account.phraseError", { phrase: CONFIRM_PHRASE }));
+    if (!deletionInfo?.owners?.length) return;
+    const expected = `DELETE ${deletionInfo.organizationName}`;
+    if (confirmPhrase.trim() !== expected) {
+      setError(t("account.orgDeletePhraseError"));
       return;
+    }
+    for (const o of deletionInfo.owners) {
+      if (!ownerPasswords[o.id]?.trim()) {
+        setError(t("account.orgDeletePasswordMissing"));
+        return;
+      }
     }
     setLoading(true);
     try {
-      await api.delete<undefined>("/api/me/account", {
-        body: JSON.stringify({ phrase: CONFIRM_PHRASE }),
-        headers: { "Content-Type": "application/json" },
+      await api.deleteWithBody<{ ok: boolean }>("/api/org", {
+        confirm: expected,
+        ownerPasswords: Object.fromEntries(
+          deletionInfo.owners.map((o) => [o.id, ownerPasswords[o.id]!.trim()])
+        ),
       });
       await signOut();
       navigate("/login");
@@ -832,40 +868,74 @@ export default function Account() {
         </DialogContent>
       </Dialog>
 
-      <div className="rounded-xl border border-red-500/25 bg-red-950/20 p-5 space-y-4">
-        <div className="flex gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-white">{t("account.deleteTitle")}</p>
-            <p className="text-xs text-white/50 leading-relaxed">
-              {t("account.deleteHint")}
-            </p>
+      {canDeleteOrganization ? (
+        <div className="rounded-xl border border-red-500/25 bg-red-950/20 p-5 space-y-4">
+          <div className="flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-red-200">{t("account.deleteTitle")}</p>
+              <p className="text-xs font-medium text-red-300/90">Cannot be undone.</p>
+              <p className="text-xs text-white/50 leading-relaxed">{t("account.deleteHint")}</p>
+            </div>
           </div>
+          {!deletionInfo ? (
+            <p className="text-xs text-white/45">{t("account.deleteLoadingRequirements")}</p>
+          ) : deletionInfo.owners.length === 0 ? (
+            <p className="text-xs text-amber-300">{t("account.deleteNoOwners")}</p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="delete-org-phrase" className="text-white/70 text-xs uppercase tracking-wide">
+                  {t("account.typeConfirm", { phrase: expectedOrgDeletePhrase })}
+                </Label>
+                <Input
+                  id="delete-org-phrase"
+                  value={confirmPhrase}
+                  onChange={(e) => setConfirmPhrase(e.target.value)}
+                  placeholder={expectedOrgDeletePhrase}
+                  autoComplete="off"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/25"
+                />
+              </div>
+              <div className="space-y-3 pt-1">
+                <p className="text-xs font-medium text-white/70 uppercase tracking-wide">
+                  {t("account.ownerPasswordsHeading")}
+                </p>
+                {deletionInfo.owners.map((o) => (
+                  <div key={o.id} className="space-y-1.5">
+                    <Label htmlFor={`owner-pw-${o.id}`} className="text-white/60 text-xs">
+                      {t("account.ownerPasswordLabel", { email: o.email })}
+                      {o.name ? (
+                        <span className="text-white/35"> ({o.name})</span>
+                      ) : null}
+                    </Label>
+                    <Input
+                      id={`owner-pw-${o.id}`}
+                      type="password"
+                      autoComplete="current-password"
+                      value={ownerPasswords[o.id] ?? ""}
+                      onChange={(e) =>
+                        setOwnerPasswords((prev) => ({ ...prev, [o.id]: e.target.value }))
+                      }
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25"
+                    />
+                  </div>
+                ))}
+              </div>
+              {error ? <p className="text-sm text-red-400">{error}</p> : null}
+              <Button
+                type="button"
+                variant="destructive"
+                className="w-full bg-red-900 hover:bg-red-800"
+                disabled={loading || !canSubmitOrgDelete}
+                onClick={onDeleteOrganization}
+              >
+                {loading ? t("account.deleting") : t("account.deleteCta")}
+              </Button>
+            </>
+          )}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="delete-phrase" className="text-white/70 text-xs uppercase tracking-wide">
-            {t("account.typeConfirm", { phrase: CONFIRM_PHRASE })}
-          </Label>
-          <Input
-            id="delete-phrase"
-            value={phrase}
-            onChange={(e) => setPhrase(e.target.value)}
-            placeholder={CONFIRM_PHRASE}
-            autoComplete="off"
-            className="bg-white/5 border-white/10 text-white placeholder:text-white/25"
-          />
-        </div>
-        {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        <Button
-          type="button"
-          variant="destructive"
-          className="w-full bg-red-900 hover:bg-red-800"
-          disabled={loading || phrase !== CONFIRM_PHRASE}
-          onClick={onDeleteAccount}
-        >
-          {loading ? t("account.deleting") : t("account.deleteCta")}
-        </Button>
-      </div>
+      ) : null}
     </div>
   );
 }
