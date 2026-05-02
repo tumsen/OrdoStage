@@ -39,12 +39,18 @@ import Frontpage from "./pages/Frontpage";
 import PublicPricing from "./pages/PublicPricing";
 import LegalPage from "./pages/LegalPage";
 
+/** Opt into React Router v7 behaviors early — removes dev-only future-flag console warnings. */
+const ROUTER_FUTURE = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+} as const;
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter future={ROUTER_FUTURE}>
         <AppErrorBoundary>
         <Routes>
           {/* Guest-only routes */}
