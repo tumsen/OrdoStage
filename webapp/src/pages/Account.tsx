@@ -367,6 +367,7 @@ export default function Account() {
       emergencyContactName: mePerson.emergencyContactName ?? "",
       emergencyContactPhone: mePerson.emergencyContactPhone ?? "",
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh draft only when switching person
   }, [mePerson?.id]);
 
   useEffect(() => {
@@ -406,6 +407,7 @@ export default function Account() {
         permissionOptions?.teams
       )
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- draft resets when doc id / loaded state changes
   }, [permissionState, permissionsDoc?.id, permissionOptions?.teams]);
 
   async function onDeleteAccount() {

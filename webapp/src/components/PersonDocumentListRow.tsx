@@ -68,6 +68,7 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
     setName(doc.name);
     setExpires(formatDateForDateInput(doc.expiresAt ?? null));
     setDoesNotExpire(Boolean(doc.doesNotExpire));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when doc.id changes
   }, [doc.id]);
 
   const docDne = doc.doesNotExpire === true;

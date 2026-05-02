@@ -93,6 +93,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
       const p = parseProp(value);
       setHh(p.hh); setMm(p.mm); setIsAM(p.am);
       lastEmitted.current = value;
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- parseProp identity would thrash; value/is12h drive sync
     }, [value, is12h]);
 
     /* ── Emit ── */

@@ -100,8 +100,8 @@ export function toCalendarItems(
       return shows.map((show) => {
         const day = show.showDate.slice(0, 10);
         const hasTime = /^\d{2}:\d{2}$/.test(show.showTime);
-        let startDate = hasTime ? toLocalDatetime(day, show.showTime) : day;
-        let endDate: string | null =
+        const startDate = hasTime ? toLocalDatetime(day, show.showTime) : day;
+        const endDate: string | null =
           hasTime && show.durationMinutes > 0
             ? addMinutesLocal(startDate, show.durationMinutes)
             : null;

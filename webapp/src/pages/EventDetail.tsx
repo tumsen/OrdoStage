@@ -318,6 +318,7 @@ function DetailsTab({
 
   useEffect(() => {
     setContacts(splitFields.general.contacts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load contacts when switching event only
   }, [event?.id]);
 
   const vId = form.watch("venueId");
@@ -1559,6 +1560,7 @@ function ShowEventCard({
   useEffect(() => {
     setTechnicalNotes(show.technicalNotes ?? "");
     setFohNotes(show.fohNotes ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- notes stay local until save; reset only on show row change
   }, [show.id]);
 
   useEffect(

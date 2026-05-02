@@ -42,8 +42,9 @@ export function DatetimeScheduleFields({
     if (!startValue || !endValue) return 0;
     const a = new Date(startValue);
     const b = new Date(endValue);
-    if (!Number.isFinite(a.getTime()) || !Number.isFinite(b.getTime()) || b <= a) return 0;
-    return Math.round((b - a) / 60000);
+    if (!Number.isFinite(a.getTime()) || !Number.isFinite(b.getTime()) || b.getTime() <= a.getTime())
+      return 0;
+    return Math.round((b.getTime() - a.getTime()) / 60000);
   }, [startValue, endValue]);
 
   const setDate = (d: string) => {

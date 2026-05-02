@@ -511,6 +511,7 @@ function PersonFormDialog({
         permissionOptions?.teams
       )
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- draft aligns when permission payload / doc identity changes
   }, [permissionState, permissionsDoc?.id, permissionOptions?.teams]);
 
   const rolePreset = form.watch("rolePreset");
