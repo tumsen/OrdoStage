@@ -4,9 +4,10 @@ import { prisma } from "./prisma";
 import { isPostgresDatabaseUrl } from "./databaseUrl";
 
 /**
- * Find a user by email with the same rules we use for password reset and invites:
- * trim, strip common invisible chars, case-insensitive match on Postgres, credential accountId,
- * then Postgres trim-aware fallbacks (stored emails sometimes have accidental spaces).
+ * Find a user by email for password reset and invites:
+ * User.email / credential accountId (with trim fallbacks on Postgres), then — when still unmatched —
+ * a **directory Person** row whose email equals the input and sits in an org the user belongs to
+ * (`User.organizationId` or `OrganizationMembership`). Only used when that resolves to exactly one User.
  */
 export async function findUserByEmailLoose(raw: string): Promise<User | null> {
   const trimmed = raw.trim().replace(/\u200c|\u200d|\ufeff/g, "");
@@ -57,6 +58,38 @@ export async function findUserByEmailLoose(raw: string): Promise<User | null> {
     );
     if (row[0]?.userId) {
       user = await prisma.user.findUnique({ where: { id: row[0].userId } });
+    }
+  }
+
+  if (!user && pg) {
+    const viaPerson = await prisma.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT DISTINCT u.id
+        FROM "User" u
+        WHERE EXISTS (
+          SELECT 1
+          FROM "Person" p
+          WHERE p.email IS NOT NULL
+            AND trim(both from p.email) <> ''
+            AND lower(trim(both from p.email)) = ${lower}
+            AND (
+              (u."organizationId" IS NOT NULL AND p."organizationId" = u."organizationId")
+              OR EXISTS (
+                SELECT 1 FROM "OrganizationMembership" m
+                WHERE m."userId" = u.id
+                  AND m."organizationId" = p."organizationId"
+              )
+            )
+        )
+      `
+    );
+    if (viaPerson.length === 1 && viaPerson[0]?.id) {
+      console.info("[findUserByEmail] matched User via Person directory email (single org link)");
+      user = await prisma.user.findUnique({ where: { id: viaPerson[0].id } });
+    } else if (viaPerson.length > 1) {
+      console.warn(
+        "[findUserByEmail] multiple Users linked to Person email; skip ambiguous password-reset lookup"
+      );
     }
   }
 
