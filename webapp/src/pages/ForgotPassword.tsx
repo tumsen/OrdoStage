@@ -28,7 +28,7 @@ export default function ForgotPassword() {
     setError("");
     try {
       await api.post<{ status: boolean; message: string }>("/api/account/request-password-reset", {
-        email: values.email,
+        email: values.email.trim().toLowerCase(),
       });
       setSuccess(true);
     } catch (e: unknown) {

@@ -2,10 +2,10 @@ import { isAPIError } from "better-auth/api";
 import { generateRandomString } from "better-auth/crypto";
 import { auth } from "./auth";
 import { prisma } from "./prisma";
-import { env } from "./env";
+import { env, isDeployedRuntime } from "./env";
 import { isPostgresDatabaseUrl } from "./databaseUrl";
-import { Resend } from "resend";
 import { createPasswordResetTokenAndSendEmail } from "./passwordResetFlow";
+import { sendHtmlEmail } from "./resendMail";
 
 async function findUserByEmailLoose(email: string) {
   const trimmed = email.trim();
@@ -33,15 +33,17 @@ async function sendExistingUserAddedOrgEmail(input: { to: string; organizationNa
     <p>Just sign in as usual and choose the organization from your workspace list.</p>
   `;
 
-  if (env.RESEND_API_KEY) {
-    const resend = new Resend(env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: env.FROM_EMAIL || "OrdoStage <noreply@ordostage.com>",
+  if (env.RESEND_API_KEY?.trim()) {
+    await sendHtmlEmail({
       to: input.to,
       subject,
       html,
+      text: `${subject}\n\nYou've been added to ${input.organizationName} with role ${input.roleName}.`,
     });
     return;
+  }
+  if (isDeployedRuntime()) {
+    throw new Error("RESEND_API_KEY is not configured");
   }
   console.log(`[DEV] Multi-org invite email to ${input.to}: ${subject}`);
 }

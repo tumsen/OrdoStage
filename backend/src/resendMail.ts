@@ -1,8 +1,20 @@
 import { env, isDeployedRuntime } from "./env";
 
+/** Strip accidental quotes / newlines from Railway env UI paste mistakes */
+function sanitizeConfiguredFrom(raw: string): string {
+  let s = raw.trim();
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    s = s.slice(1, -1).trim();
+  }
+  return s.replace(/\r|\n/g, "");
+}
+
 function resolveFromHeader(): string {
   const f = env.FROM_EMAIL?.trim();
-  if (f) return f;
+  if (f) return sanitizeConfiguredFrom(f);
   if (isDeployedRuntime()) {
     throw new Error(
       "FROM_EMAIL is not configured. Set it to a verified sender in Resend (same as team invites)."
@@ -42,9 +54,12 @@ export async function sendHtmlEmail(opts: {
     console.error("[resend] send failed:", error.name, error.message, error.statusCode);
     throw new Error(error.message || "Email could not be sent");
   }
-  if (data?.id) {
-    console.log("[resend] email accepted id=%s to=%s subject=%s", data.id, opts.to, opts.subject);
+  const id = data && typeof data === "object" && "id" in data ? (data as { id?: string }).id : undefined;
+  if (!id) {
+    console.error("[resend] send returned no message id:", JSON.stringify(data));
+    throw new Error("Email provider returned no message id");
   }
+  console.log("[resend] email accepted id=%s to=%s subject=%s", id, opts.to, opts.subject);
 }
 
 /** Base URL for links inside emails (password reset, etc.). Prefer FRONTEND_URL in production. */

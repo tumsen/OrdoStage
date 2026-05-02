@@ -20,6 +20,18 @@ async function findUserByEmailLoose(raw: string) {
       where: { email: { equals: trimmed, mode: "insensitive" } },
     });
   }
+  if (!user) {
+    const acct = await prisma.account.findFirst({
+      where: {
+        providerId: "credential",
+        OR: [{ accountId: lower }, { accountId: trimmed }],
+      },
+      select: { userId: true },
+    });
+    if (acct) {
+      user = await prisma.user.findUnique({ where: { id: acct.userId } });
+    }
+  }
   return user;
 }
 

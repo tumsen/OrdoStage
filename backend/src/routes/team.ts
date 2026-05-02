@@ -5,7 +5,8 @@ import { auth } from "../auth";
 import { CreateInvitationSchema, UpdateRoleSchema } from "../types";
 import { isOwner } from "../permissions";
 import { canManageTeamRequest } from "../requestRole";
-import { env } from "../env";
+import { env, isDeployedRuntime } from "../env";
+import { sendHtmlEmail } from "../resendMail";
 
 const INVITE_DAYS = 14;
 
@@ -21,18 +22,15 @@ async function sendInvitationEmail(to: string, orgName: string, acceptUrl: strin
     <p><a href="${acceptUrl}">Accept invitation</a></p>
     <p style="color:#666;font-size:12px">This link expires in ${INVITE_DAYS} days.</p>
   `;
-  if (env.RESEND_API_KEY && env.FROM_EMAIL) {
-    const { Resend } = await import("resend");
-    const resend = new Resend(env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: env.FROM_EMAIL,
-      to,
-      subject,
-      html,
-    });
-  } else {
+  const text = `You've been invited to join ${orgName} on OrdoStage.\n${acceptUrl}\nThis link expires in ${INVITE_DAYS} days.\n`;
+  if (!env.RESEND_API_KEY?.trim()) {
+    if (isDeployedRuntime()) {
+      throw new Error("RESEND_API_KEY is not configured");
+    }
     console.log(`[INVITE EMAIL] to=${to} url=${acceptUrl}`);
+    return;
   }
+  await sendHtmlEmail({ to, subject, html, text });
 }
 
 const teamRouter = new Hono<{
@@ -157,6 +155,17 @@ teamRouter.post("/team/invitations", zValidator("json", CreateInvitationSchema),
     await sendInvitationEmail(email, org.name, url);
   } catch (e) {
     console.error("[INVITE EMAIL]", e);
+    await prisma.organizationInvitation.delete({ where: { id: invite.id } }).catch(() => {});
+    return c.json(
+      {
+        error: {
+          message:
+            e instanceof Error ? e.message : "Failed to send invitation email. Check RESEND_API_KEY and FROM_EMAIL.",
+          code: "EMAIL_SEND_FAILED",
+        },
+      },
+      502
+    );
   }
 
   return c.json(

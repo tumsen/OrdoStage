@@ -12,12 +12,22 @@ const ACCOUNT_DELETE_PHRASE = "DELETE";
  */
 const accountRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
+const PasswordResetEmailSchema = z.object({
+  /** Avoid strict RFC parsing differing between clients; normalize server-side */
+  email: z
+    .string()
+    .trim()
+    .min(3)
+    .max(254)
+    .refine((s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s), { message: "Invalid email address" }),
+});
+
 /** Public — returns generic message when email unknown; surfaces Resend/config errors to the client. */
 accountRouter.post(
   "/account/request-password-reset",
-  zValidator("json", z.object({ email: z.string().email() })),
+  zValidator("json", PasswordResetEmailSchema),
   async (c) => {
-    const { email } = c.req.valid("json");
+    const email = c.req.valid("json").email.trim().toLowerCase();
     const generic = {
       data: {
         status: true as const,
