@@ -1506,11 +1506,7 @@ export default function People() {
         <div>
           <p className="text-sm text-white/40">Cast, crew and contacts.</p>
           <p className="text-xs text-white/25 mt-1">
-            To invite someone to log in and use the app, use{" "}
-            <Link to="/team" className="text-white/45 hover:text-white/70 underline underline-offset-2">
-              Team
-            </Link>
-            .
+            Add a person with an email and they will receive a login link automatically.
           </p>
         </div>
         <Button
