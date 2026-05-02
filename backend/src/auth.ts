@@ -77,6 +77,22 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  databaseHooks: {
+    account: {
+      create: {
+        /** When a credential account is created, remove any pre-existing credential rows so there is always exactly one. */
+        before: async (data) => {
+          if (data.providerId !== "credential") return { data };
+          const existing = await prisma.account.findFirst({ where: { userId: data.userId, providerId: "credential" }, select: { id: true } });
+          if (existing) {
+            await prisma.account.deleteMany({ where: { userId: data.userId, providerId: "credential" } });
+            console.info("[auth] removed pre-existing credential row before create for userId=%s", data.userId);
+          }
+          return { data };
+        },
+      },
+    },
+  },
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BACKEND_URL,
   trustedOrigins: [

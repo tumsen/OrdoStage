@@ -885,6 +885,55 @@ app.post("/admin/users/grant-admin", async (c) => {
   return c.json({ data: mapAdminUserListRow(updated) }, 200);
 });
 
+// ── Fix credential accounts (squash duplicate rows) ─────────────────────────
+
+app.post("/admin/users/fix-credential", async (c) => {
+  const body = await c.req.json();
+  const { email } = z.object({ email: z.string().email() }).parse(body);
+  const lower = email.trim().toLowerCase();
+
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: lower, mode: "insensitive" } },
+    select: { id: true, email: true },
+  });
+  if (!user) {
+    return c.json({ error: { message: "No user found.", code: "NOT_FOUND" } }, 404);
+  }
+
+  const rows = await prisma.account.findMany({
+    where: { userId: user.id, providerId: "credential" },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  if (rows.length === 0) {
+    return c.json({ data: { message: "No credential accounts found.", rows: 0 } });
+  }
+
+  const hash = rows.find((r) => r.password != null && String(r.password).length > 0)?.password ?? null;
+  if (!hash) {
+    return c.json({ error: { message: "No password hash found on any credential row. User must set a password first.", code: "NO_HASH" } }, 422);
+  }
+
+  const { generateId } = await import("@better-auth/core/utils/id");
+  const accountId = user.email.trim().toLowerCase();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.account.deleteMany({ where: { userId: user.id, providerId: "credential" } });
+    await tx.account.create({
+      data: {
+        id: generateId(),
+        userId: user.id,
+        providerId: "credential",
+        accountId,
+        password: hash,
+      },
+    });
+  });
+
+  console.info("[admin] fix-credential: squashed %d rows → 1 for %s", rows.length, user.email);
+  return c.json({ data: { message: `Fixed. Squashed ${rows.length} credential row(s) into 1 for ${user.email}.`, rowsBefore: rows.length } });
+});
+
 // ── Support access / impersonation ──────────────────────────────────────────
 
 app.post("/admin/orgs/:id/support-access", async (c) => {
