@@ -288,7 +288,6 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [grantEmail, setGrantEmail] = useState("");
-
   const fixCredentialMutation = useMutation({
     mutationFn: (userId: string) =>
       api.post<{ message: string; rowsBefore: number }>(`/api/admin/users/${userId}/fix-credential`, {}),
@@ -300,6 +299,7 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
       toast({ title: "Fix failed", description: msg, variant: "destructive" });
     },
   });
+
   const [emailMode, setEmailMode] = useState<"all" | "selected">("all");
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(() => new Set());
   const [emailSubject, setEmailSubject] = useState("");

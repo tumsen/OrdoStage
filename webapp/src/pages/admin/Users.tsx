@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Trash2, Wrench } from "lucide-react";
+import { Search, Trash2, Wrench, Pencil, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/auth-client";
 
@@ -46,6 +46,8 @@ export default function Users() {
   const [search, setSearch] = useState("");
   const [grantEmail, setGrantEmail] = useState("");
   const [fixEmail, setFixEmail] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editEmailVal, setEditEmailVal] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
@@ -115,6 +117,20 @@ export default function Users() {
     onError: (err) => {
       const msg = isApiError(err) ? err.message : "Could not fix credential.";
       toast({ title: "Fix failed", description: msg, variant: "destructive" });
+    },
+  });
+
+  const changeEmailMutation = useMutation({
+    mutationFn: ({ userId, email }: { userId: string; email: string }) =>
+      api.put<{ message: string }>(`/api/admin/users/${userId}/email`, { email }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      setEditingId(null);
+      toast({ title: "Email updated", description: data.message });
+    },
+    onError: (err) => {
+      const msg = isApiError(err) ? err.message : "Could not update email.";
+      toast({ title: "Update failed", description: msg, variant: "destructive" });
     },
   });
 
@@ -254,7 +270,40 @@ export default function Users() {
                         ) : null}
                       </div>
                     </TableCell>
-                    <TableCell className="text-white/50">{user.email}</TableCell>
+                    <TableCell className="text-white/50">
+                      {editingId === user.id ? (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            autoFocus
+                            type="email"
+                            value={editEmailVal}
+                            onChange={(e) => setEditEmailVal(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") changeEmailMutation.mutate({ userId: user.id, email: editEmailVal });
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            className="h-7 py-0 px-2 text-sm bg-gray-900 border-white/20 text-white w-52"
+                          />
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-400 hover:text-emerald-300"
+                            disabled={changeEmailMutation.isPending}
+                            onClick={() => changeEmailMutation.mutate({ userId: user.id, email: editEmailVal })}>
+                            <Check size={13} />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-white/30 hover:text-white/60"
+                            onClick={() => setEditingId(null)}>
+                            <X size={13} />
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          className="flex items-center gap-1.5 group hover:text-white/80 transition-colors"
+                          onClick={() => { setEditingId(user.id); setEditEmailVal(user.email); }}
+                        >
+                          {user.email}
+                          <Pencil size={11} className="opacity-0 group-hover:opacity-40 transition-opacity" />
+                        </button>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {user.organizationMember ? (
                         <Link

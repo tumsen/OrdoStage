@@ -918,6 +918,30 @@ async function squashCredentialRows(userId: string, userEmail: string) {
   return { status: "ok" as const, rowsBefore: rows.length, email: userEmail };
 }
 
+app.put("/admin/users/:userId/email", async (c) => {
+  const userId = c.req.param("userId");
+  const body = await c.req.json();
+  const { email } = z.object({ email: z.string().email() }).parse(body);
+  const newEmail = email.trim().toLowerCase();
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+  if (!user) return c.json({ error: { message: "User not found.", code: "NOT_FOUND" } }, 404);
+
+  const conflict = await prisma.user.findFirst({
+    where: { email: { equals: newEmail, mode: "insensitive" }, NOT: { id: userId } },
+    select: { id: true },
+  });
+  if (conflict) return c.json({ error: { message: "Another account already uses that email.", code: "CONFLICT" } }, 409);
+
+  await prisma.user.update({ where: { id: userId }, data: { email: newEmail } });
+
+  // Re-squash credential rows so accountId matches the new email
+  const result = await squashCredentialRows(userId, newEmail);
+  console.info("[admin] updated email for userId=%s: %s → %s (credential squash: %s)", userId, user.email, newEmail, result.status);
+
+  return c.json({ data: { message: `Email updated to ${newEmail}. Sign in with the new address.` } });
+});
+
 app.post("/admin/users/:userId/fix-credential", async (c) => {
   const userId = c.req.param("userId");
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
