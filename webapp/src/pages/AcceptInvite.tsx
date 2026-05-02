@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useSession, signOut } from "@/lib/auth-client";
+import { useSession, signOut, authClient } from "@/lib/auth-client";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { RoleBadge } from "@/pages/team/RoleBadge";
 import { toast } from "@/components/ui/use-toast";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
@@ -19,6 +21,9 @@ export default function AcceptInvite() {
   const queryClient = useQueryClient();
   const token = searchParams.get("token")?.trim() ?? "";
   const { data: session, isPending: sessionPending } = useSession();
+  const [mode, setMode] = useState<"choose" | "signup" | "login">("choose");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
 
   const { data: preview, isLoading, isError, error } = useQuery({
     queryKey: ["public-invite", token],
@@ -36,11 +41,24 @@ export default function AcceptInvite() {
       navigate("/dashboard");
     },
     onError: (err: Error) => {
-      toast({
-        title: "Could not accept",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Could not accept", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const signUpMutation = useMutation({
+    mutationFn: async () => {
+      const email = preview!.email;
+      const res = await authClient.signUp.email({ email, password, name: name.trim() || email.split("@")[0] });
+      if (res.error) throw new Error(res.error.message ?? "Sign up failed");
+      await api.post("/api/team/invitations/accept", { token });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me", "permissions"] });
+      toast({ title: "Account created", description: "Welcome to the organisation." });
+      navigate("/dashboard");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not create account", description: err.message, variant: "destructive" });
     },
   });
 
@@ -111,17 +129,45 @@ export default function AcceptInvite() {
         </div>
 
         {!session?.user ? (
-          <div className="space-y-3">
-            <p className="text-xs text-white/40 text-center">
-              Sign in with this email address to accept.
-            </p>
-            <Button
-              className="w-full bg-gradient-to-r from-ordo-magenta to-ordo-violet hover:opacity-95 text-white border-0"
-              asChild
-            >
-              <Link to={loginHref}>Continue to sign in</Link>
-            </Button>
-          </div>
+          mode === "signup" ? (
+            <div className="space-y-3">
+              <p className="text-xs text-white/50 text-center">Create your account for <span className="text-white/80">{preview.email}</span></p>
+              <Input
+                placeholder="Your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="bg-gray-900 border-white/10 text-white placeholder:text-white/25"
+              />
+              <Input
+                type="password"
+                placeholder="Choose a password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && password.length >= 8) signUpMutation.mutate(); }}
+                className="bg-gray-900 border-white/10 text-white placeholder:text-white/25"
+              />
+              <Button
+                className="w-full bg-gradient-to-r from-ordo-magenta to-ordo-violet hover:opacity-95 text-white border-0"
+                disabled={signUpMutation.isPending || password.length < 8}
+                onClick={() => signUpMutation.mutate()}
+              >
+                {signUpMutation.isPending ? "Creating account…" : "Create account & join"}
+              </Button>
+              <button className="text-xs text-white/30 hover:text-white/60 w-full text-center" onClick={() => setMode("choose")}>← Back</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <Button
+                className="w-full bg-gradient-to-r from-ordo-magenta to-ordo-violet hover:opacity-95 text-white border-0"
+                onClick={() => setMode("signup")}
+              >
+                Create account & join
+              </Button>
+              <Button variant="outline" className="w-full border-white/20 text-white" asChild>
+                <Link to={loginHref}>I already have an account — sign in</Link>
+              </Button>
+            </div>
+          )
         ) : emailMatch ? (
           <Button
             className="w-full bg-gradient-to-r from-ordo-magenta to-ordo-violet hover:opacity-95 text-white border-0"
