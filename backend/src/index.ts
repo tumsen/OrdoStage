@@ -79,6 +79,7 @@ app.use("/api/*", async (c, next) => {
     await next();
     return;
   }
+  // Same rationale as billing skip below: recovery must work for overdue / locked-out payers.
   if (path === "/api/account/request-password-reset" && c.req.method === "POST") {
     await next();
     return;
@@ -156,7 +157,7 @@ app.use("/api/*", async (c, next) => {
     return;
   }
 
-  // Password reset must run even when billing is overdue (session cookie may still identify an org user).
+  // Account recovery is never billing-gated: overdue orgs must still reach login (pay invoices, etc.).
   if (path === "/api/account/request-password-reset" && c.req.method === "POST") {
     await next();
     return;
