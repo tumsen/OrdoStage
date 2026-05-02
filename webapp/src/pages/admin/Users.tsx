@@ -45,6 +45,7 @@ function formatDate(dateStr: string): string {
 export default function Users() {
   const [search, setSearch] = useState("");
   const [grantEmail, setGrantEmail] = useState("");
+  const [fixEmail, setFixEmail] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
@@ -156,6 +157,38 @@ export default function Users() {
             onClick={() => grantAdminMutation.mutate(grantEmail.trim())}
           >
             {grantAdminMutation.isPending ? "Granting…" : "Grant admin"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-amber-800/30 bg-amber-950/10 p-4 space-y-3 max-w-xl">
+        <h3 className="text-sm font-semibold text-amber-300">Fix login for a user</h3>
+        <p className="text-xs text-white/45">
+          If a user can't sign in after a password reset, enter their email here to consolidate any duplicate credential rows.
+        </p>
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-[200px] space-y-1">
+            <label htmlFor="fix-email" className="text-xs text-white/40">
+              Email
+            </label>
+            <Input
+              id="fix-email"
+              type="email"
+              autoComplete="off"
+              placeholder="name@example.com"
+              value={fixEmail}
+              onChange={(e) => setFixEmail(e.target.value)}
+              className="bg-gray-900 border-white/10 text-white placeholder:text-white/25"
+            />
+          </div>
+          <Button
+            type="button"
+            disabled={fixCredentialMutation.isPending || fixEmail.trim().length === 0}
+            className="bg-amber-700 hover:bg-amber-600"
+            onClick={() => fixCredentialMutation.mutate(fixEmail.trim())}
+          >
+            <Wrench size={14} className="mr-1.5" />
+            {fixCredentialMutation.isPending ? "Fixing…" : "Fix login"}
           </Button>
         </div>
       </div>
