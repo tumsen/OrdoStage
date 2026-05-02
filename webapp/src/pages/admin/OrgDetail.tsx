@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt, Mail, Wrench, Crown } from "lucide-react";
+import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt, Mail, Wrench, Crown, UserMinus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,6 +27,12 @@ interface OrgUser {
   orgRole: string;
   createdAt: string;
   isActive: boolean;
+}
+
+/** Labels organisation membership `owner` distinctly from platform administration. */
+function displayOrgRole(role: string): string {
+  if (role === "owner") return "Organisation Owner";
+  return role;
 }
 
 interface InvoiceLine {
@@ -308,7 +314,7 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
   const activeUsers = useMemo(() => users.filter((u) => u.isActive), [users]);
   const owners = useMemo(() => users.filter((u) => u.orgRole === "owner"), [users]);
 
-  const grantOrgAdminMutation = useMutation({
+  const grantOrgOwnerMutation = useMutation({
     mutationFn: (email: string) =>
       api.post(`/api/admin/orgs/${orgId}/grant-org-admin`, { email }),
     onSuccess: () => {
@@ -316,14 +322,34 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
       setGrantEmail("");
       toast({
-        title: "Organization admin granted",
-        description: "User now has owner role in this organization.",
+        title: "Organisation Owner granted",
+        description: "This account now has Organisation Owner for this organization (not platform admin).",
       });
     },
     onError: (err) => {
       toast({
         title: "Error",
-        description: isApiError(err) ? err.message : "Failed to grant organization admin.",
+        description: isApiError(err) ? err.message : "Failed to grant Organisation Owner.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const revokeOrgOwnerMutation = useMutation({
+    mutationFn: (userId: string) =>
+      api.post(`/api/admin/orgs/${orgId}/revoke-organisation-owner`, { userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      toast({
+        title: "Organisation Owner removed",
+        description: "They remain an organisation member with the member role.",
+      });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not remove",
+        description: isApiError(err) ? err.message : "Failed to revoke Organisation Owner.",
         variant: "destructive",
       });
     },
@@ -408,17 +434,17 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-white/90 flex items-center gap-2">
             <Crown size={16} className="text-rose-400/90 shrink-0" />
-            Organization owners
+            Organisation Owner
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-white/40">
-            Accounts with the <strong className="text-white/55">owner</strong> role in this organization (billing responsibility,
-            full org control in the app). You can add another owner below with Grant organization admin.
+            <strong className="text-white/55">Organisation Owner</strong> is this workspace&apos;s top role (billing and full control in the app).
+            This is separate from <strong className="text-white/55">platform administration</strong> (Ordo Stage staff).
           </p>
           {owners.length === 0 ? (
             <p className="text-sm text-amber-200/75 rounded-lg border border-amber-800/30 bg-amber-950/20 px-3 py-2">
-              No owner listed on membership rows. Use <strong className="text-white/80">Grant organization admin</strong> to assign an owner.
+              No Organisation Owner on file for membership rows. Grant one below by email.
             </p>
           ) : (
             <ul className="space-y-2">
@@ -430,8 +456,8 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-white/90">{o.name ?? "—"}</span>
-                      <Badge className="bg-rose-950/60 text-rose-400 border-rose-800/40 text-[10px] uppercase tracking-wide">
-                        Owner
+                      <Badge className="bg-rose-950/60 text-rose-400 border-rose-800/40 text-[10px] max-w-[min(100%,14rem)] whitespace-normal text-center leading-tight py-0.5 font-medium normal-case">
+                        Organisation Owner
                       </Badge>
                       {o.isActive ? (
                         <span className="text-[10px] text-emerald-400/90">Active</span>
@@ -446,21 +472,75 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
                       {o.email}
                     </a>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    title="Fix login — credential rows after password reset"
-                    disabled={fixCredentialMutation.isPending}
-                    className="text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 shrink-0"
-                    onClick={() => fixCredentialMutation.mutate(o.id)}
-                  >
-                    <Wrench size={14} className="mr-1.5" />
-                    Fix login
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Fix login — credential rows after password reset"
+                      disabled={fixCredentialMutation.isPending}
+                      className="text-amber-400 hover:text-amber-300 hover:bg-amber-950/30"
+                      onClick={() => fixCredentialMutation.mutate(o.id)}
+                    >
+                      <Wrench size={14} className="mr-1.5" />
+                      Fix login
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Remove Organisation Owner — demotes to member; needs another owner if more than one exists"
+                      disabled={
+                        revokeOrgOwnerMutation.isPending || owners.length <= 1
+                      }
+                      className="text-red-400/90 hover:text-red-300 hover:bg-red-950/30 disabled:opacity-40"
+                      onClick={() => {
+                        if (owners.length <= 1) return;
+                        if (
+                          !window.confirm(
+                            "Remove Organisation Owner from this person? They stay in the organisation as a member."
+                          )
+                        ) {
+                          return;
+                        }
+                        revokeOrgOwnerMutation.mutate(o.id);
+                      }}
+                    >
+                      <UserMinus size={14} className="mr-1.5" />
+                      Remove
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
+
+          <div className="border-t border-white/10 pt-4 space-y-2">
+            <p className="text-xs font-medium text-white/55">Grant Organisation Owner</p>
+            <p className="text-xs text-white/40">
+              Assign by email (existing user account). Does not grant Ordo Stage platform admin.
+            </p>
+            <div className="flex flex-wrap gap-2 items-end max-w-xl">
+              <div className="flex-1 min-w-[220px] space-y-1">
+                <label htmlFor="grant-org-owner-email" className="text-xs text-white/40">
+                  User email
+                </label>
+                <Input
+                  id="grant-org-owner-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={grantEmail}
+                  onChange={(e) => setGrantEmail(e.target.value)}
+                  className="bg-gray-800 border-white/10 text-white placeholder:text-white/25"
+                />
+              </div>
+              <Button
+                className="bg-rose-700 hover:bg-rose-600"
+                disabled={grantOrgOwnerMutation.isPending || grantEmail.trim().length === 0}
+                onClick={() => grantOrgOwnerMutation.mutate(grantEmail.trim())}
+              >
+                {grantOrgOwnerMutation.isPending ? "Granting…" : "Grant"}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -536,39 +616,6 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
         </CardContent>
       </Card>
 
-      <Card className="bg-gray-900 border border-white/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-white/70">Grant organization admin</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-xs text-white/40">
-            Grants owner role in this organization only (not OrdoStage platform admin).
-          </p>
-          <div className="flex flex-wrap gap-2 items-end max-w-xl">
-            <div className="flex-1 min-w-[220px] space-y-1">
-              <label htmlFor="grant-org-admin-email" className="text-xs text-white/40">
-                User email
-              </label>
-              <Input
-                id="grant-org-admin-email"
-                type="email"
-                placeholder="name@example.com"
-                value={grantEmail}
-                onChange={(e) => setGrantEmail(e.target.value)}
-                className="bg-gray-800 border-white/10 text-white placeholder:text-white/25"
-              />
-            </div>
-            <Button
-              className="bg-rose-700 hover:bg-rose-600"
-              disabled={grantOrgAdminMutation.isPending || grantEmail.trim().length === 0}
-              onClick={() => grantOrgAdminMutation.mutate(grantEmail.trim())}
-            >
-              {grantOrgAdminMutation.isPending ? "Granting..." : "Grant org admin"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="rounded-lg border border-white/10 overflow-hidden">
         <Table>
           <TableHeader>
@@ -629,7 +676,7 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
                           : "bg-white/5 text-white/50 border-white/10 text-xs"
                       }
                     >
-                      {user.orgRole}
+                      {displayOrgRole(user.orgRole)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-white/40 text-sm">{formatDate(user.createdAt)}</TableCell>

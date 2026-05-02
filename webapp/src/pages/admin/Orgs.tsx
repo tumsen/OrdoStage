@@ -103,7 +103,7 @@ export default function Orgs() {
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3 max-w-2xl">
         <h3 className="text-sm font-semibold text-white">Create organization</h3>
         <p className="text-xs text-white/45">
-          Create a new organization and optionally grant org admin (owner role) to an existing user email.
+          Create a new organization and optionally grant Organisation Owner to an existing user email.
         </p>
         <div className="grid sm:grid-cols-2 gap-2">
           <Input
@@ -113,7 +113,7 @@ export default function Orgs() {
             className="bg-gray-900 border-white/10 text-white placeholder:text-white/30"
           />
           <Input
-            placeholder="Org admin email (optional)"
+            placeholder="Organisation Owner email (optional)"
             type="email"
             value={newOrgAdminEmail}
             onChange={(e) => setNewOrgAdminEmail(e.target.value)}

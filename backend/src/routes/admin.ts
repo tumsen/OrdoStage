@@ -586,6 +586,70 @@ app.post("/admin/orgs/:id/grant-org-admin", async (c) => {
   });
 });
 
+/** Platform admin: demote an Organisation Owner to member (cannot remove the last owner). */
+app.post("/admin/orgs/:id/revoke-organisation-owner", async (c) => {
+  const orgId = c.req.param("id");
+  const body = await c.req.json();
+  const { userId } = z.object({ userId: z.string().min(1) }).parse(body);
+
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { id: true },
+  });
+  if (!org) {
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const mem = await prisma.organizationMembership.findUnique({
+    where: { userId_organizationId: { userId, organizationId: orgId } },
+    include: { user: { select: { organizationId: true } } },
+  });
+  if (!mem) {
+    return c.json({ error: { message: "User is not a member of this organization.", code: "NOT_FOUND" } }, 404);
+  }
+  if (mem.orgRole !== "owner") {
+    return c.json(
+      {
+        error: {
+          message: "That member is not an Organisation Owner for this organization.",
+          code: "BAD_REQUEST",
+        },
+      },
+      400
+    );
+  }
+
+  const ownerCount = await prisma.organizationMembership.count({
+    where: { organizationId: orgId, orgRole: "owner" },
+  });
+  if (ownerCount <= 1) {
+    return c.json(
+      {
+        error: {
+          message:
+            "Cannot remove the last Organisation Owner. Grant another Organisation Owner first, then remove this one.",
+          code: "BAD_REQUEST",
+        },
+      },
+      400
+    );
+  }
+
+  await prisma.organizationMembership.update({
+    where: { userId_organizationId: { userId, organizationId: orgId } },
+    data: { orgRole: "member" },
+  });
+
+  if (mem.user.organizationId === orgId) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { orgRole: "member" },
+    });
+  }
+
+  return c.json({ data: { ok: true, orgRole: "member" as const } });
+});
+
 function escapeHtmlForEmail(s: string): string {
   return s
     .replace(/&/g, "&amp;")
