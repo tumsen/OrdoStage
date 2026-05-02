@@ -7,6 +7,7 @@ import { z } from "zod";
 import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 import { ensureSystemRoles } from "../effectiveRole";
 import { env, isDeployedRuntime } from "../env";
+import { findUserByEmailLoose } from "../findUserByEmail";
 import {
   estimateMonthlyOrgAmountCents,
   generateMonthlyInvoices,
@@ -890,12 +891,10 @@ app.post("/admin/users/grant-admin", async (c) => {
 app.post("/admin/users/fix-credential", async (c) => {
   const body = await c.req.json();
   const { email } = z.object({ email: z.string().email() }).parse(body);
-  const lower = email.trim().toLowerCase();
 
-  const user = await prisma.user.findFirst({
-    where: { email: { equals: lower, mode: "insensitive" } },
-    select: { id: true, email: true },
-  });
+  // Use the same loose lookup as the password-reset flow (handles Person-directory bridging,
+  // case-insensitive matching, invisible chars, etc.)
+  const user = await findUserByEmailLoose(email);
   if (!user) {
     return c.json({ error: { message: "No user found.", code: "NOT_FOUND" } }, 404);
   }
