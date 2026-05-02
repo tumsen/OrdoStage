@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Trash2 } from "lucide-react";
+import { Search, Trash2, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/auth-client";
 
@@ -99,6 +99,21 @@ export default function Users() {
     onError: (err) => {
       const msg = isApiError(err) ? err.message : "Could not delete user.";
       toast({ title: "Error", description: msg, variant: "destructive" });
+    },
+  });
+
+  const fixCredentialMutation = useMutation({
+    mutationFn: (email: string) =>
+      api.post<{ message: string; rowsBefore: number }>("/api/admin/users/fix-credential", { email }),
+    onSuccess: (data) => {
+      toast({
+        title: "Login fixed",
+        description: data.message,
+      });
+    },
+    onError: (err) => {
+      const msg = isApiError(err) ? err.message : "Could not fix credential.";
+      toast({ title: "Fix failed", description: msg, variant: "destructive" });
     },
   });
 
@@ -249,19 +264,32 @@ export default function Users() {
                     </TableCell>
                     <TableCell className="text-white/40 text-sm">{formatDate(user.createdAt)}</TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy || isProtected}
-                        className="text-red-300 hover:text-red-200 hover:bg-red-950/30 disabled:opacity-40"
-                        onClick={() => {
-                          if (!confirmDeleteAction(user.email)) return;
-                          deleteUserMutation.mutate(user.id);
-                        }}
-                      >
-                        <Trash2 size={14} className="mr-1.5" />
-                        Delete
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={fixCredentialMutation.isPending}
+                          title="Fix login — consolidates duplicate credential rows so password works after reset"
+                          className="text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 disabled:opacity-40"
+                          onClick={() => fixCredentialMutation.mutate(user.email)}
+                        >
+                          <Wrench size={14} className="mr-1.5" />
+                          Fix login
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy || isProtected}
+                          className="text-red-300 hover:text-red-200 hover:bg-red-950/30 disabled:opacity-40"
+                          onClick={() => {
+                            if (!confirmDeleteAction(user.email)) return;
+                            deleteUserMutation.mutate(user.id);
+                          }}
+                        >
+                          <Trash2 size={14} className="mr-1.5" />
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
