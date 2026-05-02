@@ -1,5 +1,6 @@
-# Build context = Git repository ROOT (not webapp/).
-# Railway: set this service "Root Directory" to "." so COPY backend/... works.
+# Build context = Git repository ROOT (not webapp/). Do not add webapp/railway.json
+# with a chroot to webapp — Railway will shrink the context and COPY backend/... fails.
+# In Railway: Root Directory = repo root, Dockerfile path = webapp/Dockerfile.
 # The webapp imports ../../../backend/src/types (shared Zod); those paths resolve
 # only when backend/src/types.ts exists next to webapp/ (monorepo layout).
 FROM oven/bun:1-alpine AS builder
