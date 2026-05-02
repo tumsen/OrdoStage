@@ -325,7 +325,7 @@ app.post("/admin/email/test", async (c) => {
   const body = await c.req.json();
   const { to } = z.object({ to: z.string().email() }).parse(body);
 
-  if (!env.RESEND_API_KEY || !env.FROM_EMAIL) {
+  if (!env.RESEND_API_KEY?.trim() || !env.FROM_EMAIL?.trim()) {
     return c.json(
       {
         error: {
@@ -337,19 +337,28 @@ app.post("/admin/email/test", async (c) => {
     );
   }
 
-  const { Resend } = await import("resend");
-  const resend = new Resend(env.RESEND_API_KEY);
-
-  await resend.emails.send({
-    from: env.FROM_EMAIL,
-    to,
-    subject: "OrdoStage test email",
-    html: `
+  try {
+    await sendHtmlEmail({
+      to,
+      subject: "OrdoStage test email",
+      html: `
       <p>This is a test email from <strong>OrdoStage Owner Admin</strong>.</p>
       <p>If you received this, your Resend setup works.</p>
       <p style="color:#666;font-size:12px">Sent at ${new Date().toISOString()}</p>
     `,
-  });
+    });
+  } catch (e) {
+    console.error("[admin] email/test:", e);
+    return c.json(
+      {
+        error: {
+          message: e instanceof Error ? e.message : "Failed to send test email.",
+          code: "EMAIL_SEND_FAILED",
+        },
+      },
+      502
+    );
+  }
 
   return c.json({ data: { ok: true } });
 });

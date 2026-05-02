@@ -49,14 +49,17 @@ export default function ForgotPassword() {
         <div className="bg-gray-900 border border-white/10 rounded-xl p-6">
           <h2 className="text-xl font-semibold text-white mb-1">Forgot password?</h2>
           <p className="text-gray-400 text-sm mb-6">
-            Enter your email and we&apos;ll send a link to set or reset your password. New team members can use the same link
-            if they need another try.
+            Use the <strong className="text-gray-300">same email you use to sign in</strong> to OrdoStage (not only an address
+            that can receive mail). We&apos;ll send a link to set or reset your password; invited members can use this too if
+            they need another try.
           </p>
           {success ? (
             <div className="space-y-4">
               <div className="bg-green-900/30 border border-green-500/30 rounded-lg p-4">
                 <p className="text-green-400 text-sm">
-                  If an account exists for that address, we sent a reset link. Check spam / promotions and use the exact email you log in with.
+                  If an account exists for that address, we sent a reset link. Check spam / promotions, and confirm you used the
+                  exact email you use to sign in—test messages can reach any inbox, but reset links are only sent for registered
+                  addresses.
                 </p>
               </div>
               <Link

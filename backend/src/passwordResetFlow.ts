@@ -1,39 +1,10 @@
 import { generateId } from "@better-auth/core/utils/id";
 import { prisma } from "./prisma";
 import { env, isDeployedRuntime } from "./env";
-import { isPostgresDatabaseUrl } from "./databaseUrl";
+import { findUserByEmailLoose } from "./findUserByEmail";
 import { appOriginForEmailLinks, sendHtmlEmail } from "./resendMail";
 
 const RESET_TOKEN_TTL_MS = 3600 * 1000;
-
-async function findUserByEmailLoose(raw: string) {
-  const trimmed = raw.trim().replace(/\u200c|\u200d|\ufeff/g, "");
-  if (!trimmed) return null;
-  const lower = trimmed.toLowerCase();
-  // Prefer lowercase first — sign-up and invites normalize to lower case.
-  let user = await prisma.user.findUnique({ where: { email: lower } });
-  if (!user && lower !== trimmed) {
-    user = await prisma.user.findUnique({ where: { email: trimmed } });
-  }
-  if (!user && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
-    user = await prisma.user.findFirst({
-      where: { email: { equals: trimmed, mode: "insensitive" } },
-    });
-  }
-  if (!user) {
-    const acct = await prisma.account.findFirst({
-      where: {
-        providerId: "credential",
-        OR: [{ accountId: lower }, { accountId: trimmed }],
-      },
-      select: { userId: true },
-    });
-    if (acct) {
-      user = await prisma.user.findUnique({ where: { id: acct.userId } });
-    }
-  }
-  return user;
-}
 
 function resetEmailHtml(resetUrl: string): string {
   return `<p>Use the link below to <strong>choose a password</strong> for your account (or reset it if you forgot it).</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>On the sign-in page, use <strong>Forgot password</strong> any time to get a new link. This link expires in 1 hour.</p>`;

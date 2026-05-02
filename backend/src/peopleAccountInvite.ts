@@ -3,21 +3,9 @@ import { generateRandomString } from "better-auth/crypto";
 import { auth } from "./auth";
 import { prisma } from "./prisma";
 import { env, isDeployedRuntime } from "./env";
-import { isPostgresDatabaseUrl } from "./databaseUrl";
+import { findUserByEmailLoose } from "./findUserByEmail";
 import { createPasswordResetTokenAndSendEmail } from "./passwordResetFlow";
 import { sendHtmlEmail } from "./resendMail";
-
-async function findUserByEmailLoose(email: string) {
-  const trimmed = email.trim();
-  if (!trimmed) return null;
-  let u = await prisma.user.findUnique({ where: { email: trimmed.toLowerCase() } });
-  if (!u && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
-    u = await prisma.user.findFirst({
-      where: { email: { equals: trimmed, mode: "insensitive" } },
-    });
-  }
-  return u;
-}
 
 export type AccountSetupResult =
   | { status: "skipped" }
