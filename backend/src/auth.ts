@@ -143,6 +143,12 @@ export const auth = betterAuth({
       },
     },
   },
+  /** Avoid stale organisation fields in the session cookie snapshot after `/api/org/switch`. */
+  session: {
+    cookieCache: {
+      enabled: false,
+    },
+  },
   advanced: {
     trustedProxyHeaders: true,
     disableCSRFCheck: true,

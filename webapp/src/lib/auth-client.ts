@@ -19,3 +19,8 @@ export const authClient = createAuthClient({
 });
 
 export const { useSession, signOut, getSession } = authClient;
+
+/** After switching workspace or support-access; bypasses Better Auth cookie snapshot so UI matches DB. */
+export async function syncAuthSessionAfterWorkspaceChange(): Promise<void> {
+  await getSession({ query: { disableCookieCache: true } });
+}

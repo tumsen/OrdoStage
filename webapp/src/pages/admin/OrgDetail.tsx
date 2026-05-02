@@ -19,6 +19,7 @@ import {
   AdminOrgEmailMembersResultSchema,
   type AdminOrgEmailMembersResult,
 } from "../../../../backend/src/types";
+import { syncAuthSessionAfterWorkspaceChange } from "@/lib/auth-client";
 
 interface OrgUser {
   id: string;
@@ -224,16 +225,23 @@ function BillingTab({ org }: { org: OrgDetail }) {
 
 function SupportAccessTab({ org }: { org: OrgDetail }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [role, setRole] = useState<"owner" | "manager" | "viewer">("owner");
 
   const accessMutation = useMutation({
     mutationFn: (data: { mode: "impersonate" | "incognito"; role?: "owner" | "manager" | "viewer" }) =>
       api.post(`/api/admin/orgs/${org.id}/support-access`, data),
-    onSuccess: (_, variables) => {
+    onSuccess: async (_, variables) => {
+      await syncAuthSessionAfterWorkspaceChange();
+      queryClient.invalidateQueries({ queryKey: ["org"] });
+      queryClient.invalidateQueries({ queryKey: ["org-memberships"] });
+      queryClient.invalidateQueries({ queryKey: ["me", "permissions"] });
+      const assumedRole =
+        variables.mode === "incognito" ? "viewer" : variables.role ?? role;
       toast({
         title: variables.mode === "incognito" ? "Incognito support mode enabled" : "Support access enabled",
-        description: `You are now entering ${org.name} as ${variables.mode === "incognito" ? "viewer" : role}.`,
+        description: `You are now entering ${org.name} as ${assumedRole}.`,
       });
       navigate("/dashboard");
     },

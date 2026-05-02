@@ -27,11 +27,21 @@ import { enforceOverdueAccess } from "./postpaidBilling";
 
 const SUPPORT_EMAILS = new Set(["tumsen@gmail.com"]);
 
+/** Loaded once per request after session — single source of truth vs Better Auth cookie/session snapshot. */
+type DbUserSnapshot = {
+  organizationId: string | null;
+  orgRole: string;
+  isActive: boolean;
+  email: string;
+  isAdmin: boolean;
+};
+
 const app = new Hono<{
   Variables: {
     user: typeof auth.$Infer.Session.user | null;
     session: typeof auth.$Infer.Session.session | null;
     effectiveRole?: EffectiveRole;
+    dbUser: DbUserSnapshot | null;
   };
 }>();
 
@@ -57,6 +67,45 @@ app.use("*", async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   c.set("user", session?.user ?? null);
   c.set("session", session?.session ?? null);
+  await next();
+});
+
+// Align session user with DB (organization switch / support access update session cookie snapshot lazily).
+app.use("*", async (c, next) => {
+  c.set("dbUser", null);
+  const sessionUser = c.get("user");
+  if (!sessionUser?.id) {
+    await next();
+    return;
+  }
+  const row = await prisma.user.findUnique({
+    where: { id: sessionUser.id },
+    select: {
+      organizationId: true,
+      orgRole: true,
+      isActive: true,
+      email: true,
+      isAdmin: true,
+    },
+  });
+  if (!row) {
+    await next();
+    return;
+  }
+  const snapshot: DbUserSnapshot = {
+    organizationId: row.organizationId,
+    orgRole: row.orgRole,
+    isActive: row.isActive,
+    email: row.email,
+    isAdmin: row.isAdmin,
+  };
+  c.set("dbUser", snapshot);
+  c.set("user", {
+    ...sessionUser,
+    organizationId: row.organizationId ?? undefined,
+    orgRole: row.orgRole,
+    isAdmin: row.isAdmin,
+  });
   await next();
 });
 
@@ -89,10 +138,7 @@ app.use("/api/*", async (c, next) => {
     await next();
     return;
   }
-  const dbUser = await prisma.user.findUnique({
-    where: { id: sessionUser.id },
-    select: { isActive: true, isAdmin: true, email: true },
-  });
+  const dbUser = c.get("dbUser");
   const isSupport =
     Boolean(dbUser?.isAdmin) || SUPPORT_EMAILS.has((dbUser?.email || "").toLowerCase());
   if (dbUser && !dbUser.isActive && !isSupport) {
@@ -120,18 +166,15 @@ app.use("/api/*", async (c, next) => {
     return;
   }
   const sessionUser = c.get("user");
-  if (!sessionUser?.id || !sessionUser.organizationId) {
+  const dbUser = c.get("dbUser");
+  if (!sessionUser?.id || !dbUser?.organizationId) {
     await next();
     return;
   }
-  const dbUser = await prisma.user.findUnique({
-    where: { id: sessionUser.id },
-    select: { organizationId: true, orgRole: true, isActive: true },
-  });
   const eff = await resolveEffectiveRole(prisma, {
-    organizationId: dbUser?.organizationId ?? undefined,
-    orgRole: dbUser?.orgRole,
-    isActive: dbUser?.isActive,
+    organizationId: dbUser.organizationId ?? undefined,
+    orgRole: dbUser.orgRole,
+    isActive: dbUser.isActive,
     userId: sessionUser.id,
   });
   c.set("effectiveRole", eff);

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { api } from "@/lib/api";
-import { authClient } from "@/lib/auth-client";
+import { syncAuthSessionAfterWorkspaceChange } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import type { OrgMembershipDTO } from "@/lib/postAuthRouting";
 
@@ -20,7 +20,7 @@ export default function SelectOrg() {
   const switchMutation = useMutation({
     mutationFn: (organizationId: string) => api.post("/api/org/switch", { organizationId }),
     onSuccess: async () => {
-      await authClient.getSession();
+      await syncAuthSessionAfterWorkspaceChange();
       queryClient.invalidateQueries({ queryKey: ["org"] });
       queryClient.invalidateQueries({ queryKey: ["org-memberships"] });
       queryClient.invalidateQueries({ queryKey: ["me", "permissions"] });

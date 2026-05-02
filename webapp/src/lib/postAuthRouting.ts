@@ -1,6 +1,6 @@
 import type { NavigateFunction } from "react-router-dom";
 import { api } from "@/lib/api";
-import { authClient } from "@/lib/auth-client";
+import { syncAuthSessionAfterWorkspaceChange } from "@/lib/auth-client";
 
 export type OrgMembershipDTO = { organizationId: string; name: string; orgRole: string };
 
@@ -24,7 +24,7 @@ export async function completePostAuthenticationNavigation(
 
   if (rows.length === 1) {
     await api.post("/api/org/switch", { organizationId: rows[0].organizationId });
-    await authClient.getSession();
+    await syncAuthSessionAfterWorkspaceChange();
     navigate("/dashboard");
     return;
   }

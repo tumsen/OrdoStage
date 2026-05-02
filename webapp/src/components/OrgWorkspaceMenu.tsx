@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronsUpDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
-import { authClient } from "@/lib/auth-client";
+import { syncAuthSessionAfterWorkspaceChange } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -40,7 +40,7 @@ export function OrgWorkspaceMenu({ onNav }: { onNav?: () => void }) {
   const switchMutation = useMutation({
     mutationFn: (organizationId: string) => api.post("/api/org/switch", { organizationId }),
     onSuccess: async () => {
-      await authClient.getSession();
+      await syncAuthSessionAfterWorkspaceChange();
       queryClient.invalidateQueries({ queryKey: ["org"] });
       queryClient.invalidateQueries({ queryKey: ["org-memberships"] });
       queryClient.invalidateQueries({ queryKey: ["me", "permissions"] });
