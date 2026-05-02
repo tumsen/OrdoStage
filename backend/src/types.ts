@@ -770,6 +770,36 @@ export const TourPersonNoteSchema = z.object({
 });
 export type TourPersonNote = z.infer<typeof TourPersonNoteSchema>;
 
+/** Owner admin: bulk email to organization members (POST /api/admin/orgs/:id/email-members). */
+export const AdminOrgEmailMembersBodySchema = z
+  .object({
+    mode: z.enum(["all", "selected"]),
+    userIds: z.array(z.string().min(1)).optional(),
+    subject: z.string().min(1).max(200),
+    body: z.string().min(1).max(50_000),
+  })
+  .superRefine((val, ctx) => {
+    if (val.mode === "selected" && (!val.userIds || val.userIds.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select at least one user when mode is selected.",
+        path: ["userIds"],
+      });
+    }
+  });
+
+export type AdminOrgEmailMembersBody = z.infer<typeof AdminOrgEmailMembersBodySchema>;
+
+export const AdminOrgEmailMembersResultSchema = z.object({
+  sent: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  devPreview: z.boolean().optional(),
+  skipped: z.number().int().nonnegative().optional(),
+  failedEmails: z.array(z.string()).optional(),
+});
+
+export type AdminOrgEmailMembersResult = z.infer<typeof AdminOrgEmailMembersResultSchema>;
+
 // TourPerson
 export const TourPersonSchema = z.object({
   id: z.string(),

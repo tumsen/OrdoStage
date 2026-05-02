@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
@@ -9,8 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt } from "lucide-react";
+import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  AdminOrgEmailMembersResultSchema,
+  type AdminOrgEmailMembersResult,
+} from "../../../../backend/src/types";
 
 interface OrgUser {
   id: string;
@@ -18,6 +26,7 @@ interface OrgUser {
   email: string;
   orgRole: string;
   createdAt: string;
+  isActive: boolean;
 }
 
 interface InvoiceLine {
@@ -279,6 +288,12 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [grantEmail, setGrantEmail] = useState("");
+  const [emailMode, setEmailMode] = useState<"all" | "selected">("all");
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(() => new Set());
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+
+  const activeUsers = useMemo(() => users.filter((u) => u.isActive), [users]);
 
   const grantOrgAdminMutation = useMutation({
     mutationFn: (email: string) =>
@@ -301,8 +316,153 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
     },
   });
 
+  const emailMembersMutation = useMutation({
+    mutationFn: () =>
+      api.post<AdminOrgEmailMembersResult>(`/api/admin/orgs/${orgId}/email-members`, {
+        mode: emailMode,
+        ...(emailMode === "selected" ? { userIds: Array.from(selectedUserIds) } : {}),
+        subject: emailSubject.trim(),
+        body: emailBody.trim(),
+      }),
+    onSuccess: (data) => {
+      const parsed = AdminOrgEmailMembersResultSchema.safeParse(data);
+      if (!parsed.success) {
+        toast({ title: "Sent", description: "Email request completed." });
+        return;
+      }
+      const r = parsed.data;
+      if (r.devPreview) {
+        toast({
+          title: "Dev preview",
+          description: `Resend is not configured — no emails sent (${r.skipped ?? 0} would-be recipients). Check server logs.`,
+        });
+        return;
+      }
+      if (r.failed > 0) {
+        toast({
+          title: "Partially sent",
+          description: `Delivered ${r.sent}, failed ${r.failed}.${r.failedEmails?.length ? ` Examples: ${r.failedEmails.slice(0, 3).join(", ")}` : ""}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Emails sent",
+        description: `Message queued for ${r.sent} recipient${r.sent === 1 ? "" : "s"}.`,
+      });
+      setEmailSubject("");
+      setEmailBody("");
+      setSelectedUserIds(new Set());
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not send",
+        description: isApiError(err) ? err.message : "Email request failed.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const allActiveSelected =
+    activeUsers.length > 0 && activeUsers.every((u) => selectedUserIds.has(u.id));
+  const someActiveSelected = activeUsers.some((u) => selectedUserIds.has(u.id));
+
+  function toggleUser(id: string) {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllActive() {
+    if (allActiveSelected) {
+      setSelectedUserIds(new Set());
+      return;
+    }
+    setSelectedUserIds(new Set(activeUsers.map((u) => u.id)));
+  }
+
+  const canSubmitEmail =
+    emailSubject.trim().length > 0 &&
+    emailBody.trim().length > 0 &&
+    (emailMode === "all" ? activeUsers.length > 0 : selectedUserIds.size > 0);
+
   return (
     <div className="space-y-4">
+      <Card className="bg-gray-900 border border-white/10">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-white/70 flex items-center gap-2">
+            <Mail size={16} className="text-white/50" />
+            Email members
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-white/40">
+            Send a message to active organization accounts via the same email system as invites. Plain text;
+            line breaks are preserved.
+          </p>
+          <div className="space-y-2">
+            <Label className="text-xs text-white/50">Recipients</Label>
+            <RadioGroup
+              value={emailMode}
+              onValueChange={(v) => setEmailMode(v as "all" | "selected")}
+              className="gap-2"
+            >
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="all" id="email-all" className="border-white/30 text-rose-400" />
+                <Label htmlFor="email-all" className="text-sm text-white/80 font-normal cursor-pointer">
+                  All active users ({activeUsers.length})
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem
+                  value="selected"
+                  id="email-selected"
+                  className="border-white/30 text-rose-400"
+                />
+                <Label htmlFor="email-selected" className="text-sm text-white/80 font-normal cursor-pointer">
+                  Selected users only
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="org-email-subject" className="text-xs text-white/50">
+              Subject
+            </Label>
+            <Input
+              id="org-email-subject"
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              placeholder="Subject line"
+              className="bg-gray-800 border-white/10 text-white placeholder:text-white/25"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="org-email-body" className="text-xs text-white/50">
+              Message
+            </Label>
+            <Textarea
+              id="org-email-body"
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              placeholder="Write your message…"
+              rows={6}
+              className="bg-gray-800 border-white/10 text-white placeholder:text-white/25 resize-y min-h-[120px]"
+            />
+          </div>
+          <Button
+            className="bg-rose-700 hover:bg-rose-600"
+            disabled={!canSubmitEmail || emailMembersMutation.isPending}
+            onClick={() => emailMembersMutation.mutate()}
+          >
+            {emailMembersMutation.isPending ? "Sending…" : "Send email"}
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card className="bg-gray-900 border border-white/10">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-white/70">Grant organization admin</CardTitle>
@@ -340,22 +500,51 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
         <Table>
           <TableHeader>
             <TableRow className="border-white/10 hover:bg-transparent">
+              {emailMode === "selected" ? (
+                <TableHead className="w-10 text-white/40 font-medium text-xs uppercase tracking-wider">
+                  <Checkbox
+                    checked={allActiveSelected ? true : someActiveSelected ? "indeterminate" : false}
+                    onCheckedChange={() => toggleSelectAllActive()}
+                    disabled={activeUsers.length === 0}
+                    aria-label="Select all active users"
+                    className="border-white/30 data-[state=checked]:bg-rose-700 data-[state=checked]:border-rose-600"
+                  />
+                </TableHead>
+              ) : null}
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Name</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Email</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Role</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Joined</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.length === 0 ? (
               <TableRow className="border-white/5">
-                <TableCell colSpan={4} className="text-center text-white/30 py-10">
+                <TableCell
+                  colSpan={emailMode === "selected" ? 6 : 5}
+                  className="text-center text-white/30 py-10"
+                >
                   No users in this organization
                 </TableCell>
               </TableRow>
             ) : (
               users.map((user) => (
-                <TableRow key={user.id} className="border-white/5 hover:bg-white/[0.02]">
+                <TableRow
+                  key={user.id}
+                  className={`border-white/5 hover:bg-white/[0.02] ${!user.isActive ? "opacity-50" : ""}`}
+                >
+                  {emailMode === "selected" ? (
+                    <TableCell className="w-10">
+                      <Checkbox
+                        checked={selectedUserIds.has(user.id)}
+                        onCheckedChange={() => user.isActive && toggleUser(user.id)}
+                        disabled={!user.isActive}
+                        aria-label={`Select ${user.email}`}
+                        className="border-white/30 data-[state=checked]:bg-rose-700 data-[state=checked]:border-rose-600"
+                      />
+                    </TableCell>
+                  ) : null}
                   <TableCell className="text-white/80">{user.name ?? "—"}</TableCell>
                   <TableCell className="text-white/50">{user.email}</TableCell>
                   <TableCell>
@@ -370,6 +559,13 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-white/40 text-sm">{formatDate(user.createdAt)}</TableCell>
+                  <TableCell className="text-white/40 text-sm">
+                    {user.isActive ? (
+                      <span className="text-emerald-400/90">Active</span>
+                    ) : (
+                      <span className="text-white/35">Inactive</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))
             )}

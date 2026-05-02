@@ -6,7 +6,7 @@ import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { z } from "zod";
 import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 import { ensureSystemRoles } from "../effectiveRole";
-import { env } from "../env";
+import { env, isDeployedRuntime } from "../env";
 import {
   estimateMonthlyOrgAmountCents,
   generateMonthlyInvoices,
@@ -18,6 +18,8 @@ import {
   SUPPORTED_BILLING_CURRENCIES,
 } from "../postpaidBilling";
 import { createPaddleCustomer, createPaddleTransactionForInvoice } from "../paddleClient";
+import { AdminOrgEmailMembersBodySchema } from "../types";
+import { sendHtmlEmail } from "../resendMail";
 
 const app = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -468,6 +470,7 @@ app.get("/admin/orgs/:id", async (c) => {
               name: true,
               email: true,
               createdAt: true,
+              isActive: true,
             },
           },
         },
@@ -486,6 +489,7 @@ app.get("/admin/orgs/:id", async (c) => {
     email: m.user.email,
     orgRole: m.orgRole,
     createdAt: m.user.createdAt,
+    isActive: m.user.isActive,
   }));
 
   const currency = (org.billingCurrencyCode || "USD").toUpperCase();
@@ -568,6 +572,96 @@ app.post("/admin/orgs/:id/grant-org-admin", async (c) => {
       organizationId: org.id,
       organizationName: org.name,
       orgRole: "owner",
+    },
+  });
+});
+
+function escapeHtmlForEmail(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+app.post("/admin/orgs/:id/email-members", async (c) => {
+  const orgId = c.req.param("id");
+  const raw = await c.req.json();
+  const body = AdminOrgEmailMembersBodySchema.parse(raw);
+
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { id: true, name: true },
+  });
+  if (!org) {
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const memberships = await prisma.organizationMembership.findMany({
+    where: {
+      organizationId: orgId,
+      user: { isActive: true },
+      ...(body.mode === "selected" ? { userId: { in: body.userIds } } : {}),
+    },
+    select: { userId: true, user: { select: { email: true } } },
+  });
+
+  if (body.mode === "selected") {
+    const found = new Set(memberships.map((m) => m.userId));
+    const missing = body.userIds!.filter((id) => !found.has(id));
+    if (missing.length > 0) {
+      return c.json(
+        {
+          error: {
+            message: "Some selected users are not active members of this organization.",
+            code: "BAD_REQUEST",
+          },
+        },
+        400
+      );
+    }
+  }
+
+  const recipients = memberships.map((m) => m.user.email.trim()).filter(Boolean);
+  if (recipients.length === 0) {
+    return c.json({ error: { message: "No recipients to email.", code: "BAD_REQUEST" } }, 400);
+  }
+
+  const subject = body.subject.trim();
+  const plain = body.body;
+  const footer = `Sent by Ordo Stage regarding ${org.name}.`;
+  const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;color:#111">${escapeHtmlForEmail(plain).replace(/\r\n/g, "\n").replace(/\n/g, "<br/>")}</div><p style="color:#666;font-size:12px;margin-top:24px">${escapeHtmlForEmail(footer)}</p>`;
+
+  if (!env.RESEND_API_KEY?.trim()) {
+    if (isDeployedRuntime()) {
+      return c.json(
+        { error: { message: "Email is not configured (RESEND_API_KEY).", code: "SERVICE_UNAVAILABLE" } },
+        503
+      );
+    }
+    console.log(
+      `[admin org email] dev skip — ${recipients.length} recipients subject=${subject.slice(0, 80)}`
+    );
+    return c.json({ data: { sent: 0, failed: 0, skipped: recipients.length, devPreview: true } });
+  }
+
+  let sent = 0;
+  const failedEmails: string[] = [];
+  for (const to of recipients) {
+    try {
+      await sendHtmlEmail({ to, subject, html, text: `${plain}\n\n${footer}` });
+      sent++;
+    } catch (e) {
+      console.error("[admin org email] send failed", { to, err: e });
+      failedEmails.push(to);
+    }
+  }
+
+  return c.json({
+    data: {
+      sent,
+      failed: failedEmails.length,
+      ...(failedEmails.length > 0 ? { failedEmails: failedEmails.slice(0, 50) } : {}),
     },
   });
 });
