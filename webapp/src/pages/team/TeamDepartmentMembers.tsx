@@ -83,6 +83,7 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["department-members", departmentId] });
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["people"] });
       setAddPersonId("");
       setAddRoles("");
@@ -101,6 +102,7 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
       api.patch<DepartmentMember>(`/api/departments/${departmentId}/members/${personId}`, { role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["department-members", departmentId] });
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
     },
     onError: (e: unknown) => {
       toast({
@@ -115,6 +117,7 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
       api.delete(`/api/departments/${departmentId}/members/${personId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["department-members", departmentId] });
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["people"] });
       setRemoveTarget(null);
       toast({ title: "Removed from team" });

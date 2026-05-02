@@ -14,18 +14,27 @@ const departmentsRouter = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
 }>();
 
-function serializeDepartment(dept: {
-  id: string;
-  name: string;
-  color: string;
-  organizationId: string;
-  createdAt: Date;
-}) {
+function serializeDepartment(
+  dept: {
+    id: string;
+    name: string;
+    color: string;
+    organizationId: string;
+    createdAt: Date;
+  },
+  extras?: { memberCount: number; memberNames: string[] }
+) {
   return {
     id: dept.id,
     name: dept.name,
     color: dept.color,
     createdAt: dept.createdAt.toISOString(),
+    ...(extras
+      ? {
+          memberCount: extras.memberCount,
+          memberNames: extras.memberNames,
+        }
+      : {}),
   };
 }
 
@@ -47,7 +56,34 @@ departmentsRouter.get("/departments", async (c) => {
     orderBy: { name: "asc" },
   });
 
-  return c.json({ data: departments.map(serializeDepartment) });
+  const deptIds = departments.map((d) => d.id);
+  const memberships =
+    deptIds.length === 0
+      ? []
+      : await prisma.personTeam.findMany({
+          where: { departmentId: { in: deptIds } },
+          select: {
+            departmentId: true,
+            person: { select: { name: true } },
+          },
+          orderBy: { person: { name: "asc" } },
+        });
+
+  const namesByDept = new Map<string, string[]>();
+  for (const m of memberships) {
+    const list = namesByDept.get(m.departmentId) ?? [];
+    list.push(m.person.name);
+    namesByDept.set(m.departmentId, list);
+  }
+
+  return c.json({
+    data: departments.map((d) =>
+      serializeDepartment(d, {
+        memberCount: namesByDept.get(d.id)?.length ?? 0,
+        memberNames: namesByDept.get(d.id) ?? [],
+      })
+    ),
+  });
 });
 
 // GET /api/departments/:id/members

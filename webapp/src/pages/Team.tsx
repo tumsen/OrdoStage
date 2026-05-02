@@ -1,13 +1,11 @@
 import { usePermissions } from "@/hooks/usePermissions";
-import { TeamMembersSection } from "./team/TeamMembersSection";
 import { DepartmentsSection } from "./team/DepartmentsSection";
 
 export default function Team() {
-  const { isOwner, canWrite, canManageTeam } = usePermissions();
+  const { canWrite } = usePermissions();
 
   return (
     <div className="p-6 space-y-10">
-      <TeamMembersSection isOwner={isOwner} canManageTeam={canManageTeam} />
       <DepartmentsSection canWrite={canWrite} />
     </div>
   );

@@ -25,6 +25,9 @@ export interface Department {
   name: string;
   color: string;
   createdAt: string;
+  /** Present from GET /api/departments — roster preview for the list view */
+  memberCount?: number;
+  memberNames?: string[];
 }
 
 const PRESET_COLORS = [
@@ -116,28 +119,46 @@ function DeptRow({ dept, canWrite, onDelete }: DeptRowProps) {
     );
   }
 
+  const count = dept.memberCount ?? 0;
+  const names = dept.memberNames ?? [];
+  const namesLine = names.join(", ");
+
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border-b border-white/5">
-      <div className="flex items-center gap-2 px-4 py-3 group hover:bg-white/[0.02] transition-colors">
+      <div className="flex items-start gap-2 px-4 py-3 group hover:bg-white/[0.02] transition-colors">
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="flex flex-1 items-center gap-2 min-w-0 text-left rounded-md -mx-1 px-1 py-0.5 hover:bg-white/[0.04]"
+            className="flex flex-1 items-start gap-2 min-w-0 text-left rounded-md -mx-1 px-1 py-0.5 hover:bg-white/[0.04]"
           >
             <ChevronDown
               className={cn(
-                "w-4 h-4 text-white/35 shrink-0 transition-transform",
+                "w-4 h-4 text-white/35 shrink-0 transition-transform mt-0.5",
                 open ? "rotate-180" : ""
               )}
             />
             <div
-              className="w-3 h-3 rounded-full flex-shrink-0"
+              className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
               style={{ backgroundColor: dept.color }}
             />
-            <span className="flex-1 text-sm text-white/80 truncate">{dept.name}</span>
-            <span className="text-[10px] text-white/25 uppercase tracking-wide shrink-0 hidden sm:inline">
-              Members
-            </span>
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="text-sm text-white/85 font-medium">{dept.name}</span>
+                <span className="text-[11px] text-white/40 tabular-nums shrink-0">
+                  {count === 0 ? "0 members" : `${count} ${count === 1 ? "member" : "members"}`}
+                </span>
+              </div>
+              {names.length > 0 ? (
+                <p
+                  className="text-[11px] text-white/45 leading-snug line-clamp-2"
+                  title={namesLine}
+                >
+                  {namesLine}
+                </p>
+              ) : (
+                <p className="text-[11px] text-white/25 italic">No one assigned yet</p>
+              )}
+            </div>
           </button>
         </CollapsibleTrigger>
         {canWrite ? (
