@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt, Mail, Wrench } from "lucide-react";
+import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt, Mail, Wrench, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -306,6 +306,7 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
   const [emailBody, setEmailBody] = useState("");
 
   const activeUsers = useMemo(() => users.filter((u) => u.isActive), [users]);
+  const owners = useMemo(() => users.filter((u) => u.orgRole === "owner"), [users]);
 
   const grantOrgAdminMutation = useMutation({
     mutationFn: (email: string) =>
@@ -403,6 +404,66 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
 
   return (
     <div className="space-y-4">
+      <Card className="bg-gray-900 border border-rose-800/35">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-white/90 flex items-center gap-2">
+            <Crown size={16} className="text-rose-400/90 shrink-0" />
+            Organization owners
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-white/40">
+            Accounts with the <strong className="text-white/55">owner</strong> role in this organization (billing responsibility,
+            full org control in the app). You can add another owner below with Grant organization admin.
+          </p>
+          {owners.length === 0 ? (
+            <p className="text-sm text-amber-200/75 rounded-lg border border-amber-800/30 bg-amber-950/20 px-3 py-2">
+              No owner listed on membership rows. Use <strong className="text-white/80">Grant organization admin</strong> to assign an owner.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {owners.map((o) => (
+                <li
+                  key={o.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-white/90">{o.name ?? "—"}</span>
+                      <Badge className="bg-rose-950/60 text-rose-400 border-rose-800/40 text-[10px] uppercase tracking-wide">
+                        Owner
+                      </Badge>
+                      {o.isActive ? (
+                        <span className="text-[10px] text-emerald-400/90">Active</span>
+                      ) : (
+                        <span className="text-[10px] text-white/35">Inactive</span>
+                      )}
+                    </div>
+                    <a
+                      href={`mailto:${o.email}`}
+                      className="text-xs text-white/45 hover:text-rose-300 truncate block mt-0.5"
+                    >
+                      {o.email}
+                    </a>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Fix login — credential rows after password reset"
+                    disabled={fixCredentialMutation.isPending}
+                    className="text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 shrink-0"
+                    onClick={() => fixCredentialMutation.mutate(o.id)}
+                  >
+                    <Wrench size={14} className="mr-1.5" />
+                    Fix login
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="bg-gray-900 border border-white/10">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-white/70 flex items-center gap-2">
