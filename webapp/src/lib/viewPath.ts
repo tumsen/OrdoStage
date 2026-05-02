@@ -6,7 +6,7 @@ export function viewIdForPath(pathname: string): string | null {
   if (pathname.startsWith("/tours")) return "tours";
   if (pathname.startsWith("/venues")) return "venues";
   if (pathname.startsWith("/people")) return "people";
-  if (pathname.startsWith("/team")) return "team";
+  if (pathname.startsWith("/teams")) return "team";
   if (pathname.startsWith("/calendars")) return "calendars";
   if (pathname.startsWith("/billing")) return "billing";
   if (pathname.startsWith("/account")) return "account";

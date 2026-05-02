@@ -6,7 +6,7 @@ export const VIEW_DEFS: { id: string; label: string; path: string }[] = [
   { id: "tours", label: "Tours", path: "/tours" },
   { id: "venues", label: "Venues", path: "/venues" },
   { id: "people", label: "People", path: "/people" },
-  { id: "team", label: "Team", path: "/team" },
+  { id: "team", label: "Teams", path: "/teams" },
   { id: "calendars", label: "Calendars", path: "/calendars" },
   { id: "billing", label: "Billing", path: "/billing" },
   { id: "account", label: "Account", path: "/account" },

@@ -200,7 +200,7 @@ const App = () => (
             }
           />
           <Route
-            path="/team"
+            path="/teams"
             element={
               <ProtectedRoute>
                 <Layout>

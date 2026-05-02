@@ -46,7 +46,7 @@ const navItems: { to: string; labelKey: string; icon: LucideIcon; view: string }
   { to: "/tours", labelKey: "nav.tours", icon: Route, view: "tours" },
   { to: "/venues", labelKey: "nav.venues", icon: MapPin, view: "venues" },
   { to: "/people", labelKey: "nav.people", icon: Users, view: "people" },
-  { to: "/team", labelKey: "nav.team", icon: UsersRound, view: "team" },
+  { to: "/teams", labelKey: "nav.team", icon: UsersRound, view: "team" },
   { to: "/calendars", labelKey: "nav.calendars", icon: Share2, view: "calendars" },
   { to: "/roles", labelKey: "nav.roles", icon: KeyRound, view: "roles" },
   { to: "/account", labelKey: "nav.account", icon: UserCircle, view: "account" },
