@@ -888,49 +888,58 @@ app.post("/admin/users/grant-admin", async (c) => {
 
 // ── Fix credential accounts (squash duplicate rows) ─────────────────────────
 
-app.post("/admin/users/fix-credential", async (c) => {
-  const body = await c.req.json();
-  const { email } = z.object({ email: z.string().email() }).parse(body);
-
-  // Use the same loose lookup as the password-reset flow (handles Person-directory bridging,
-  // case-insensitive matching, invisible chars, etc.)
-  const user = await findUserByEmailLoose(email);
-  if (!user) {
-    return c.json({ error: { message: "No user found.", code: "NOT_FOUND" } }, 404);
-  }
-
+/** Shared logic: squash all credential Account rows for a user down to exactly one. */
+async function squashCredentialRows(userId: string, userEmail: string) {
   const rows = await prisma.account.findMany({
-    where: { userId: user.id, providerId: "credential" },
+    where: { userId, providerId: "credential" },
     orderBy: { updatedAt: "desc" },
   });
 
   if (rows.length === 0) {
-    return c.json({ data: { message: "No credential accounts found.", rows: 0 } });
+    return { status: "no_rows" as const };
   }
 
   const hash = rows.find((r) => r.password != null && String(r.password).length > 0)?.password ?? null;
   if (!hash) {
-    return c.json({ error: { message: "No password hash found on any credential row. User must set a password first.", code: "NO_HASH" } }, 422);
+    return { status: "no_hash" as const };
   }
 
   const { generateId } = await import("@better-auth/core/utils/id");
-  const accountId = user.email.trim().toLowerCase();
+  const accountId = userEmail.trim().toLowerCase();
 
   await prisma.$transaction(async (tx) => {
-    await tx.account.deleteMany({ where: { userId: user.id, providerId: "credential" } });
+    await tx.account.deleteMany({ where: { userId, providerId: "credential" } });
     await tx.account.create({
-      data: {
-        id: generateId(),
-        userId: user.id,
-        providerId: "credential",
-        accountId,
-        password: hash,
-      },
+      data: { id: generateId(), userId, providerId: "credential", accountId, password: hash },
     });
   });
 
-  console.info("[admin] fix-credential: squashed %d rows → 1 for %s", rows.length, user.email);
-  return c.json({ data: { message: `Fixed. Squashed ${rows.length} credential row(s) into 1 for ${user.email}.`, rowsBefore: rows.length } });
+  console.info("[admin] fix-credential: squashed %d rows → 1 for userId=%s", rows.length, userId);
+  return { status: "ok" as const, rowsBefore: rows.length, email: userEmail };
+}
+
+app.post("/admin/users/:userId/fix-credential", async (c) => {
+  const userId = c.req.param("userId");
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+  if (!user) return c.json({ error: { message: "User not found.", code: "NOT_FOUND" } }, 404);
+
+  const result = await squashCredentialRows(user.id, user.email);
+  if (result.status === "no_rows") return c.json({ data: { message: "No credential accounts found.", rowsBefore: 0 } });
+  if (result.status === "no_hash") return c.json({ error: { message: "No password hash found. User must reset their password first.", code: "NO_HASH" } }, 422);
+  return c.json({ data: { message: `Fixed. Squashed ${result.rowsBefore} credential row(s) into 1 for ${result.email}.`, rowsBefore: result.rowsBefore } });
+});
+
+app.post("/admin/users/fix-credential", async (c) => {
+  const body = await c.req.json();
+  const { email } = z.object({ email: z.string().email() }).parse(body);
+
+  const user = await findUserByEmailLoose(email);
+  if (!user) return c.json({ error: { message: "No user found.", code: "NOT_FOUND" } }, 404);
+
+  const result = await squashCredentialRows(user.id, user.email);
+  if (result.status === "no_rows") return c.json({ data: { message: "No credential accounts found.", rowsBefore: 0 } });
+  if (result.status === "no_hash") return c.json({ error: { message: "No password hash found. User must reset their password first.", code: "NO_HASH" } }, 422);
+  return c.json({ data: { message: `Fixed. Squashed ${result.rowsBefore} credential row(s) into 1 for ${result.email}.`, rowsBefore: result.rowsBefore } });
 });
 
 // ── Support access / impersonation ──────────────────────────────────────────

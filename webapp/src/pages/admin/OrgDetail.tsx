@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt, Mail } from "lucide-react";
+import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt, Mail, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -288,6 +288,18 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [grantEmail, setGrantEmail] = useState("");
+
+  const fixCredentialMutation = useMutation({
+    mutationFn: (userId: string) =>
+      api.post<{ message: string; rowsBefore: number }>(`/api/admin/users/${userId}/fix-credential`, {}),
+    onSuccess: (data) => {
+      toast({ title: "Login fixed", description: data.message });
+    },
+    onError: (err) => {
+      const msg = isApiError(err) ? err.message : "Could not fix credential.";
+      toast({ title: "Fix failed", description: msg, variant: "destructive" });
+    },
+  });
   const [emailMode, setEmailMode] = useState<"all" | "selected">("all");
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(() => new Set());
   const [emailSubject, setEmailSubject] = useState("");
@@ -516,13 +528,14 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Role</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Joined</TableHead>
               <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Status</TableHead>
+              <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.length === 0 ? (
               <TableRow className="border-white/5">
                 <TableCell
-                  colSpan={emailMode === "selected" ? 6 : 5}
+                  colSpan={emailMode === "selected" ? 7 : 6}
                   className="text-center text-white/30 py-10"
                 >
                   No users in this organization
@@ -565,6 +578,19 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
                     ) : (
                       <span className="text-white/35">Inactive</span>
                     )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Fix login — consolidates duplicate credential rows so password works after reset"
+                      disabled={fixCredentialMutation.isPending}
+                      className="text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 disabled:opacity-40"
+                      onClick={() => fixCredentialMutation.mutate(user.id)}
+                    >
+                      <Wrench size={14} className="mr-1.5" />
+                      Fix login
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
