@@ -1,20 +1,12 @@
-# Build context = Git repository ROOT (not webapp/). Do not add webapp/railway.json
-# with a chroot to webapp — Railway will shrink the context and COPY backend/... fails.
-# In Railway: Root Directory = repo root, Dockerfile path = webapp/Dockerfile.
-# The webapp imports ../../../backend/src/types (shared Zod); those paths resolve
-# only when backend/src/types.ts exists next to webapp/ (monorepo layout).
+# Build context = webapp/ (Railway Root Directory "webapp").
+# Shared API Zod lives in src/contracts/backendTypes.ts (sync from backend via `bun run sync-contracts`).
 FROM oven/bun:1-alpine AS builder
+WORKDIR /app
 
-WORKDIR /workspace
-
-RUN mkdir -p backend/src
-COPY backend/src/types.ts backend/src/types.ts
-
-WORKDIR /workspace/webapp
-COPY webapp/package.json ./
+COPY package.json ./
 RUN bun install
 
-COPY webapp/ .
+COPY . .
 
 ARG VITE_BACKEND_URL
 ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
@@ -26,8 +18,8 @@ FROM nginx:stable-bullseye
 
 RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /workspace/webapp/dist /usr/share/nginx/html
-COPY --from=builder /workspace/webapp/nginx.conf /etc/nginx/conf.d/default.conf.template
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/nginx.conf /etc/nginx/conf.d/default.conf.template
 
 EXPOSE 8080
 CMD ["/bin/sh", "-c", "envsubst '${BACKEND_URL} ${BACKEND_HOST}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
