@@ -10,7 +10,7 @@ import { isPostgresDatabaseUrl } from "./databaseUrl";
  * (`User.organizationId` or `OrganizationMembership`). Only used when that resolves to exactly one User.
  */
 export async function findUserByEmailLoose(raw: string): Promise<User | null> {
-  const trimmed = raw.trim().replace(/\u200c|\u200d|\ufeff/g, "");
+  const trimmed = raw.trim().replace(/\u200c|\u200d|\ufeff/g, "").normalize("NFKC");
   if (!trimmed) return null;
   const lower = trimmed.toLowerCase();
   const pg = isPostgresDatabaseUrl(process.env.DATABASE_URL);
