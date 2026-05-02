@@ -1,3 +1,4 @@
+import { generateId } from "@better-auth/core/utils/id";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { emailOTP } from "better-auth/plugins";
@@ -34,26 +35,42 @@ function originsFromFrontendUrl(): string[] {
 }
 
 /**
- * Better Auth sign-in uses `accounts.find(p => p.providerId === "credential")` (first match).
- * Duplicate credential rows (e.g. invited user + password reset) can leave a stale row first
- * and break login even after a successful reset. Keep a single row, preferring accountId = email.
+ * Email/password sign-in uses the first `credential` account row. Multiple rows (invite + reset,
+ * etc.) can leave a stale row first; `updatePassword` may still leave ambiguous orders.
+ * After reset, delete ALL credential rows and insert exactly ONE row with the freshly updated
+ * hash (reuse hash bytes — no plaintext) and `accountId = email`, matching normal sign-up.
  */
-async function dedupeCredentialAccounts(userId: string, email: string) {
+async function squashCredentialAccountsAfterReset(user: { id: string; email: string }) {
   const rows = await prisma.account.findMany({
-    where: { userId, providerId: "credential" },
+    where: { userId: user.id, providerId: "credential" },
     orderBy: { updatedAt: "desc" },
   });
-  if (rows.length <= 1) return;
-  const emailLower = email.trim().toLowerCase();
-  const keeper: (typeof rows)[0] =
-    rows.find((r) => r.accountId === emailLower) ??
-    rows.find((r) => r.password != null && String(r.password).length > 0) ??
-    rows[0]!;
-  const dropIds = rows.filter((r) => r.id !== keeper.id).map((r) => r.id);
-  if (dropIds.length > 0) {
-    await prisma.account.deleteMany({ where: { id: { in: dropIds } } });
-    console.info("[auth] removed duplicate credential Account row(s) for userId=%s", userId);
+  if (rows.length === 0) return;
+  const hash =
+    rows.find((r) => r.password != null && String(r.password).length > 0)?.password ?? null;
+  if (!hash) {
+    console.error("[auth] squashCredentialAccountsAfterReset: no password hash on credential rows", user.id);
+    return;
   }
+  const accountId = user.email.trim().toLowerCase();
+  const only = rows.length === 1 ? rows[0] : undefined;
+  if (only && only.accountId === accountId) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.account.deleteMany({
+      where: { userId: user.id, providerId: "credential" },
+    });
+    await tx.account.create({
+      data: {
+        id: generateId(),
+        userId: user.id,
+        providerId: "credential",
+        accountId,
+        password: hash,
+      },
+    });
+  });
+  console.info("[auth] squashed credential Account to single row for userId=%s", user.id);
 }
 
 export const auth = betterAuth({
@@ -80,7 +97,7 @@ export const auth = betterAuth({
       await sendPasswordResetEmailWithKnownToken(payload.user, payload.token);
     },
     async onPasswordReset({ user }) {
-      await dedupeCredentialAccounts(user.id, user.email);
+      await squashCredentialAccountsAfterReset(user);
     },
   },
   plugins: [
