@@ -301,7 +301,6 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
     (event.status as "draft" | "confirmed" | "cancelled") ?? "draft"
   );
   const [venueId, setVenueId] = useState(event.venue?.id ?? "none");
-  const [tags, setTags] = useState(event.tags ?? "");
   const [primaryContact, setPrimaryContact] = useState(() => parseStoredContactRow(event.contactPerson));
   const [getInTime, setGetInTime] = useState(event.getInTime ?? "");
   const [setupTime, setSetupTime] = useState(event.setupTime ?? "");
@@ -333,7 +332,6 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
         endDate: endDate || undefined,
         status,
         venueId: venueId === "none" ? undefined : venueId,
-        tags: tags.trim() || undefined,
         contactPerson: serializeContactRow(primaryContact) || undefined,
         getInTime: getInTime.trim() || undefined,
         setupTime: setupTime.trim() || undefined,
@@ -443,11 +441,6 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
             notePlaceholder="Booking lead, channel, context…"
           />
         </div>
-      </div>
-
-      <div>
-        <Label className={lbl}>Tags</Label>
-        <Input className={`${inp} mt-1`} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="comma separated" />
       </div>
 
       {/* People */}

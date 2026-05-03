@@ -4,7 +4,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { MapPin, Clock, Users, Tag, UserCircle } from "lucide-react";
+import { MapPin, Clock, Users, UserCircle } from "lucide-react";
 import type { CalendarItem } from "./scheduleUtils";
 import { formatTime, itemColor } from "./scheduleUtils";
 import { cn } from "@/lib/utils";
@@ -136,20 +136,6 @@ export function ItemDetailSheet({ item, onClose }: ItemDetailSheetProps) {
                     {raw.venue.capacity ? (
                       <div className="text-xs text-white/30 mt-0.5">Capacity: {raw.venue.capacity}</div>
                     ) : null}
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Tags (events only) */}
-              {isEventDetail(raw) && raw.tags ? (
-                <div className="flex items-start gap-2.5">
-                  <Tag size={14} className="text-white/30 mt-0.5 flex-shrink-0" />
-                  <div className="flex flex-wrap gap-1">
-                    {raw.tags.split(",").map((tag) => (
-                      <span key={tag} className="text-[11px] px-2 py-0.5 bg-white/5 border border-white/10 rounded text-white/50">
-                        {tag.trim()}
-                      </span>
-                    ))}
                   </div>
                 </div>
               ) : null}

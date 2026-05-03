@@ -161,9 +161,6 @@ export default function Events() {
                       </span>
                     )}
                   </div>
-                  {event.tags ? (
-                    <div className="text-xs text-white/30 mt-0.5 truncate">{event.tags}</div>
-                  ) : null}
                 </div>
                 <div
                   className="px-5 py-3.5 border-b border-white/5 text-sm text-white/50 hidden sm:flex items-center cursor-pointer"

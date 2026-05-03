@@ -110,7 +110,6 @@ const EventEditSchema = z.object({
   description: z.string().optional(),
   status: z.enum(["draft", "confirmed", "cancelled"]),
   venueId: z.string().optional(),
-  tags: z.string().optional(),
   primaryContactRole: z.string().optional(),
   primaryContactName: z.string().optional(),
   primaryContactPhone: z.string().optional(),
@@ -153,7 +152,6 @@ function emptyEventFormValues(): EventEditValues {
     description: "",
     status: "draft",
     venueId: "",
-    tags: "",
     primaryContactRole: "",
     primaryContactName: "",
     primaryContactPhone: "",
@@ -226,7 +224,6 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
     description: e.description ?? "",
     status: normalizeEventStatus(e.status),
     venueId: e.venueId ?? "",
-    tags: e.tags ?? "",
     primaryContactRole: primary.role,
     primaryContactName: primary.name,
     primaryContactPhone: primary.phone,
@@ -583,7 +580,6 @@ function DetailsTab({
       };
       if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
       if (values.description) payload.description = values.description;
-      if (values.tags) payload.tags = values.tags;
       if (primaryContactSerialized) payload.contactPerson = primaryContactSerialized;
       if (values.allergies) payload.allergies = values.allergies;
       if (stageEnc) payload.stageSize = stageEnc;
@@ -604,7 +600,6 @@ function DetailsTab({
     if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
     else payload.venueId = undefined;
     if (values.description) payload.description = values.description;
-    if (values.tags) payload.tags = values.tags;
     if (primaryContactSerialized) payload.contactPerson = primaryContactSerialized;
     if (values.allergies) payload.allergies = values.allergies;
     payload.stageSize = stageEnc ?? null;
@@ -765,18 +760,6 @@ function DetailsTab({
                 ))}
               </div>
             ) : null}
-            <FormField
-              control={form.control}
-              name="tags"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Tags</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
 
             {/* ── Production Info ── */}
             <SectionHeader>Production Info</SectionHeader>
@@ -1003,7 +986,7 @@ function DetailsTab({
             <SectionHeader>Technical</SectionHeader>
 
             <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3">
+              <div className="flex flex-nowrap items-end gap-x-4 overflow-x-auto pb-0.5 -mx-0.5 px-0.5">
                 {(
                   [
                     { label: "Width", name: "stageWidth" as const },
@@ -1016,7 +999,7 @@ function DetailsTab({
                     control={form.control}
                     name={row.name}
                     render={({ field }) => (
-                      <FormItem className="space-y-1.5">
+                      <FormItem className="shrink-0 space-y-1.5 w-[5.75rem]">
                         <FormLabel className="text-white/60 text-xs uppercase tracking-wide">{row.label}</FormLabel>
                         <div className="flex items-center gap-1.5">
                           <FormControl>
@@ -1028,7 +1011,7 @@ function DetailsTab({
                               placeholder="0"
                               autoComplete="off"
                               aria-label={`Stage ${row.label.toLowerCase()} (m)`}
-                              className="h-9 w-full min-w-0 max-w-[5.5rem] bg-white/5 border-white/10 text-white tabular-nums text-sm"
+                              className="h-9 w-[4.5rem] min-w-[4.5rem] bg-white/5 border-white/10 text-white tabular-nums text-sm"
                             />
                           </FormControl>
                           <span className="text-[10px] text-white/35 shrink-0">m</span>
