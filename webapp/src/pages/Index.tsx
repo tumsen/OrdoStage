@@ -214,8 +214,7 @@ export default function Dashboard() {
 
   const upcomingEvents = (events ?? [])
     .filter((e) => eventStartsOnOrAfterToday(e.startDate))
-    .sort((a, b) => new Date(a.startDate!.slice(0, 10)).getTime() - new Date(b.startDate!.slice(0, 10)).getTime())
-    .slice(0, 8);
+    .sort((a, b) => new Date(a.startDate!.slice(0, 10)).getTime() - new Date(b.startDate!.slice(0, 10)).getTime());
 
   // Upcoming tour shows (next 60 days across all tours)
   const now = new Date();
@@ -279,7 +278,7 @@ export default function Dashboard() {
           ) : upcomingEvents.length === 0 ? (
             <div className="py-10 text-center text-white/30 text-sm">No upcoming events with a scheduled start date.</div>
           ) : (
-            <div className="divide-y divide-white/5">
+            <div className="max-h-[min(28rem,50svh)] overflow-y-auto overscroll-contain divide-y divide-white/5 min-h-0">
               {upcomingEvents.map((event) => (
                 <Link key={event.id} to={`/events/${event.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-white/[0.03] transition-colors group">
                   <div className="flex-1 min-w-0">
