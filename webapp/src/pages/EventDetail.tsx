@@ -1451,6 +1451,22 @@ function ShowTimeEditor({
           </SelectContent>
         </Select>
       </div>
+      <div className="w-[11rem] shrink-0">
+        <FieldLabel>Status</FieldLabel>
+        <Select
+          value={show.status}
+          onValueChange={(v) => onUpdate({ status: v })}
+        >
+          <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-[#16161f] border-white/10 text-white">
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="confirmed">Confirmed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       {tickets ? (
         <>
           <div className="w-[6.25rem] shrink-0">
@@ -1466,8 +1482,7 @@ function ShowTimeEditor({
               className="bg-white/5 border-white/10 text-white h-10"
             />
           </div>
-          <div className="w-[6.25rem] shrink-0">
-            <FieldLabel>Sold</FieldLabel>
+          <div className="flex items-end gap-2 shrink-0">
             <Input
               type="number"
               min={0}
@@ -1476,18 +1491,22 @@ function ShowTimeEditor({
               value={tickets.soldValue}
               onChange={(e) => tickets.soldChange(e.target.value)}
               onBlur={tickets.soldBlur}
-              className="bg-white/5 border-white/10 text-white h-10"
+              className="bg-white/5 border-white/10 text-white h-10 w-[6.25rem]"
+              aria-label="Sold tickets"
             />
-            {tickets.soldRecordedAt ? (
-              <p className="text-[10px] text-white/40 mt-0.5 leading-tight">
-                Updated{" "}
+            <span className="text-xs text-white/55 pb-2.5 leading-none whitespace-nowrap">Sold</span>
+          </div>
+          {tickets.soldRecordedAt ? (
+            <div className="w-full basis-full min-w-0 pt-0.5">
+              <p className="text-[10px] text-white/40 leading-tight">
+                Sold tickets updated{" "}
                 {new Date(tickets.soldRecordedAt).toLocaleString(undefined, {
                   dateStyle: "short",
                   timeStyle: "short",
                 })}
               </p>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>
