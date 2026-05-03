@@ -53,7 +53,21 @@ function MonthCalendar({ events, tourDetails }: { events: EventDetail[]; tourDet
   }
 
   for (const e of events) {
-    addEntry(e.startDate, { label: e.title, color: "event", href: `/events/${e.id}` });
+    const shows = e.shows ?? [];
+    if (shows.length > 0) {
+      for (const show of shows) {
+        const venue = show.venue?.name?.trim();
+        const time = show.showTime?.trim();
+        const bits = [e.title, time || undefined, venue].filter(Boolean) as string[];
+        addEntry(show.showDate, {
+          label: bits.join(" · "),
+          color: "show",
+          href: `/events/${e.id}`,
+        });
+      }
+    } else {
+      addEntry(e.startDate, { label: e.title, color: "event", href: `/events/${e.id}` });
+    }
   }
   for (const tour of tourDetails) {
     for (const show of tour.shows ?? []) {
