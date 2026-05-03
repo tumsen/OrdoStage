@@ -186,7 +186,13 @@ export default function Events() {
                   </div>
                   {shows.length > 0 ? (
                     <div className="mt-1 overflow-x-auto -mx-1 px-1">
-                      <ul className="min-w-[min(100%,52rem)] space-y-px">
+                      <ul
+                        className="min-w-[min(100%,56rem)] grid items-center gap-x-1 gap-y-px text-[10px] leading-none"
+                        style={{
+                          gridTemplateColumns:
+                            "auto 7rem 13rem minmax(0,10rem) 9.5rem 2.5rem 3.75rem minmax(5rem,1fr)",
+                        }}
+                      >
                         {shows.map((show) => {
                           const stats = computeShowStaffingStats(show, teams);
                           const { ok, total } = stats;
@@ -196,58 +202,71 @@ export default function Events() {
                           const when = formatEventListWhenParts(show, prefsLocale, hour12);
                           const showStatus = effectiveShowStatus(show);
                           const hoursLabel = formatPlannedHoursShort(stats.jobHours);
+                          const rowTone = showOff
+                            ? "text-white/30 line-through decoration-white/20"
+                            : "text-white/50";
+                          const whenTone = showOff ? undefined : "text-white/[0.82]";
+                          const venueTone = showOff ? undefined : "text-white/55";
                           return (
-                            <li
-                              key={show.id}
-                              className={cn(
-                                "grid items-center gap-x-2 text-[10px] leading-none py-px",
-                                showOff ? "text-white/30 line-through decoration-white/20" : "text-white/50"
-                              )}
-                              style={{
-                                gridTemplateColumns:
-                                  "auto minmax(6.5rem,max-content) auto minmax(0,12rem) max-content 1.75rem 3rem minmax(5rem,1fr)",
-                              }}
-                            >
-                              <div className="shrink-0 justify-self-start">
+                            <li key={show.id} className="contents">
+                              <div className="justify-self-start">
                                 <StatusBadge
                                   status={showStatus}
-                                  className="text-[10px] py-px px-1.5 font-medium"
+                                  className={cn(
+                                    "text-[10px] py-px px-1.5 font-medium",
+                                    showOff && "opacity-50"
+                                  )}
                                 />
                               </div>
                               <span
                                 className={cn(
-                                  "min-w-0 text-left leading-tight",
-                                  showOff ? undefined : "text-white/[0.82]"
+                                  "min-w-0 truncate leading-tight",
+                                  rowTone,
+                                  whenTone
                                 )}
+                                title={when.weekdayLabel}
                               >
                                 {when.weekdayLabel}
                               </span>
                               <div
                                 className={cn(
-                                  "flex items-center gap-0 shrink-0 tabular-nums justify-start whitespace-nowrap",
-                                  showOff ? undefined : "text-white/[0.82]"
+                                  "flex min-w-0 items-center gap-0 whitespace-nowrap tabular-nums",
+                                  rowTone,
+                                  whenTone
                                 )}
                               >
-                                <span>{when.dateOnlyLabel}</span>
-                                <span className="pl-0.5 text-right tabular-nums">{when.timeLabel}</span>
+                                <span className="min-w-0 truncate">{when.dateOnlyLabel}</span>
+                                <span className="shrink-0 pl-0.5 text-right tabular-nums">
+                                  {when.timeLabel}
+                                </span>
                               </div>
                               <span
-                                className={cn("truncate min-w-0", showOff ? undefined : "text-white/55")}
+                                className={cn("min-w-0 truncate", rowTone, venueTone)}
                                 title={venueName}
                               >
                                 {venueName}
                               </span>
-                              <div className="min-w-0 truncate justify-self-start">
+                              <div className="min-w-0 truncate">
                                 <EventListStaffingHint ok={ok} total={total} muted={showOff} />
                               </div>
                               <span
-                                className="inline-block w-full text-center tabular-nums text-white/45"
+                                className={cn(
+                                  "block w-full text-right tabular-nums",
+                                  showOff
+                                    ? "text-white/25 line-through decoration-white/20"
+                                    : "text-white/45"
+                                )}
                                 title={`${stats.people} people on this show`}
                               >
                                 {stats.people}
                               </span>
                               <span
-                                className="inline-block w-full text-right tabular-nums text-white/45"
+                                className={cn(
+                                  "block w-full text-right tabular-nums",
+                                  showOff
+                                    ? "text-white/25 line-through decoration-white/20"
+                                    : "text-white/45"
+                                )}
                                 title={`${hoursLabel} h planned jobs`}
                               >
                                 {hoursLabel}h
@@ -255,7 +274,8 @@ export default function Events() {
                               <div
                                 className={cn(
                                   "min-w-0 truncate text-right sm:text-left",
-                                  ticketBits ? (showOff ? "text-white/35" : "text-white/45") : "text-white/25"
+                                  ticketBits ? (showOff ? "text-white/35" : "text-white/45") : "text-white/25",
+                                  showOff && "line-through decoration-white/20"
                                 )}
                                 title={ticketBits ?? undefined}
                               >
