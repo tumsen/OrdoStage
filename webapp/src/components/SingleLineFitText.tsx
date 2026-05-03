@@ -1,66 +1,53 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-/** Small slack so rounded widths do not clip the last pixel. */
-const WIDTH_EPS = 0.5;
-
-/** Measure at this size, then scale down with font-size = REF_PX * min(1, available / width). */
-const REF_PX = 12;
+const WIDTH_EPS = 0.75;
 
 type Props = {
   text: string;
   className?: string;
-  minPx?: number;
+  /** Largest font size (px) when the line is short. */
   maxPx?: number;
-  /**
-   * Width of the text column in px (e.g. sidebar row minus avatar), from a parent ResizeObserver.
-   * When set, fitting uses this value instead of the inner container’s width.
-   */
+  /** Smallest font size (px) to try before applying zoom squeeze. */
+  minPx?: number;
   fitWidth?: number;
 };
 
-function clamp(n: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, n));
-}
-
 /**
- * Scales font size to fit `available` width: starts from REF_PX, applies linear scale, then clamps.
+ * Find largest font size in [minPx, maxPx] such that scrollWidth <= cap (binary search).
  */
-function fitFontSizeToWidth(
+function fitFontBinary(
   el: HTMLElement,
-  available: number,
+  cap: number,
   minPx: number,
-  maxPx: number,
-  text: string
+  maxPx: number
 ): number {
-  if (text.trim() === "") return maxPx;
-  const cap = Math.max(0, available - WIDTH_EPS);
-  if (cap <= 0) return minPx;
-
-  el.style.fontSize = `${REF_PX}px`;
-  const textWidth = el.scrollWidth;
-  if (textWidth <= 0) return maxPx;
-
-  const scale = Math.min(1, cap / textWidth);
-  let px = clamp(REF_PX * scale, minPx, maxPx);
-  el.style.fontSize = `${px}px`;
-  while (el.scrollWidth > cap && px > minPx + 0.01) {
-    px = Math.max(minPx, px - 0.35);
-    el.style.fontSize = `${px}px`;
+  el.style.fontSize = `${maxPx}px`;
+  if (el.scrollWidth <= cap) return maxPx;
+  el.style.fontSize = `${minPx}px`;
+  if (el.scrollWidth > cap) return minPx;
+  let lo = minPx;
+  let hi = maxPx;
+  for (let i = 0; i < 36; i++) {
+    const mid = (lo + hi) / 2;
+    el.style.fontSize = `${mid}px`;
+    if (el.scrollWidth <= cap) lo = mid;
+    else hi = mid;
   }
-  return px;
+  return lo;
 }
 
 export function SingleLineFitText({
   text,
   className,
-  minPx = 3,
+  minPx = 2,
   maxPx = 6,
   fitWidth,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
-  const [fontSize, setFontSize] = useState(minPx);
+  const [fontSize, setFontSize] = useState(maxPx);
+  const [zoomSqueeze, setZoomSqueeze] = useState(1);
   const rafAttemptsRef = useRef(0);
 
   useLayoutEffect(() => {
@@ -82,29 +69,44 @@ export function SingleLineFitText({
       const available = fromParent > 0 ? fromParent : readLocalWidth();
 
       if (available <= 1) {
-        if (rafAttemptsRef.current < 20) {
+        if (rafAttemptsRef.current < 24) {
           rafAttemptsRef.current += 1;
-          requestAnimationFrame(() => {
-            requestAnimationFrame(run);
-          });
+          requestAnimationFrame(() => requestAnimationFrame(run));
         } else {
           rafAttemptsRef.current = 0;
           setFontSize(minPx);
+          setZoomSqueeze(1);
         }
         return;
       }
       rafAttemptsRef.current = 0;
 
-      const px = fitFontSizeToWidth(el, available, minPx, maxPx, text);
+      const cap = Math.max(0, available - WIDTH_EPS);
+
+      if (text.trim() === "") {
+        el.style.removeProperty("font-size");
+        setFontSize(maxPx);
+        setZoomSqueeze(1);
+        return;
+      }
+
+      const px = fitFontBinary(el, cap, minPx, maxPx);
+      el.style.fontSize = `${px}px`;
+
+      let squeeze = 1;
+      if (el.scrollWidth > cap && cap > 0) {
+        squeeze = Math.min(1, cap / el.scrollWidth);
+      }
       el.style.removeProperty("font-size");
+
       setFontSize(px);
+      setZoomSqueeze(squeeze);
     };
 
     run();
     const ro = new ResizeObserver(() => run());
     ro.observe(container);
-    const onFonts = () => run();
-    void document.fonts?.ready?.then(onFonts);
+    void document.fonts?.ready?.then(run);
     return () => ro.disconnect();
   }, [text, minPx, maxPx, fitWidth]);
 
@@ -116,7 +118,12 @@ export function SingleLineFitText({
       <span
         ref={measureRef}
         className="inline-block max-w-none whitespace-nowrap leading-none tracking-tight"
-        style={{ fontSize: `${fontSize}px`, lineHeight: 1.15 }}
+        style={{
+          fontSize: `${fontSize}px`,
+          lineHeight: 1.15,
+          // Second pass when browser minimum font-size prevents shrinking far enough:
+          zoom: zoomSqueeze,
+        }}
       >
         {text}
       </span>
