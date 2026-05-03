@@ -83,7 +83,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
-import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/AddressFields";
+import { AddressFields, type Address } from "@/components/AddressFields";
 
 type TeamDocument = {
   id: string;
@@ -164,11 +164,11 @@ function emptyEventFormValues(): EventEditValues {
 }
 
 type CustomField = { key: string; value: string; departments: string[] };
-/** Contract person: same field pattern as People (name, email, phone, structured address). */
-type ContactRow = { role: string; name: string; phone: string; email: string } & Address;
+/** Event contract contact (booker / production); no per-person address (company address is separate). */
+type ContactRow = { role: string; name: string; phone: string; email: string; note: string };
 
 function emptyContactRow(): ContactRow {
-  return { role: "", name: "", email: "", phone: "", ...EMPTY_ADDRESS };
+  return { role: "", name: "", email: "", phone: "", note: "" };
 }
 
 function migrateContactRow(raw: unknown): ContactRow {
@@ -178,12 +178,7 @@ function migrateContactRow(raw: unknown): ContactRow {
     name: String(o.name ?? ""),
     email: String(o.email ?? ""),
     phone: String(o.phone ?? ""),
-    street: String(o.street ?? ""),
-    number: String(o.number ?? ""),
-    zip: String(o.zip ?? ""),
-    city: String(o.city ?? ""),
-    state: String(o.state ?? ""),
-    country: String(o.country ?? ""),
+    note: String(o.note ?? ""),
   };
 }
 
@@ -494,26 +489,9 @@ function DetailsTab({
         name: row.name.trim(),
         phone: row.phone.trim(),
         email: row.email.trim(),
-        street: row.street.trim(),
-        number: row.number.trim(),
-        zip: row.zip.trim(),
-        city: row.city.trim(),
-        state: row.state.trim(),
-        country: row.country.trim(),
+        note: row.note.trim(),
       }))
-      .filter(
-        (row) =>
-          row.role ||
-          row.name ||
-          row.phone ||
-          row.email ||
-          row.street ||
-          row.number ||
-          row.zip ||
-          row.city ||
-          row.state ||
-          row.country
-      );
+      .filter((row) => row.role || row.name || row.phone || row.email || row.note);
     const audienceFxNote =
       values.smokeFx || values.hazeFx || values.strobeFx
         ? "Audience announcement required: This performance uses smoke/haze/strobe effects."
@@ -974,40 +952,27 @@ function DetailsTab({
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Input
+                      value={row.phone}
+                      onChange={(e) => updateContact(idx, { phone: e.target.value })}
+                      placeholder="Phone"
+                      className="bg-white/5 border-white/10 text-white h-9"
+                    />
+                    <Input
                       type="email"
                       value={row.email}
                       onChange={(e) => updateContact(idx, { email: e.target.value })}
                       placeholder="Email"
                       className="bg-white/5 border-white/10 text-white h-9"
                     />
-                    <Input
-                      value={row.phone}
-                      onChange={(e) => updateContact(idx, { phone: e.target.value })}
-                      placeholder="Phone"
-                      className="bg-white/5 border-white/10 text-white h-9"
-                    />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-[10px] text-white/45 uppercase tracking-wide">Address</Label>
-                    <AddressFields
-                      value={{
-                        street: row.street,
-                        number: row.number,
-                        zip: row.zip,
-                        city: row.city,
-                        state: row.state,
-                        country: row.country,
-                      }}
-                      onChange={(addr) =>
-                        updateContact(idx, {
-                          street: addr.street,
-                          number: addr.number,
-                          zip: addr.zip,
-                          city: addr.city,
-                          state: addr.state,
-                          country: addr.country,
-                        })
-                      }
+                    <Label className="text-[10px] text-white/45 uppercase tracking-wide">Note</Label>
+                    <Textarea
+                      value={row.note}
+                      onChange={(e) => updateContact(idx, { note: e.target.value })}
+                      placeholder="Availability, preferred channel, extra context…"
+                      rows={3}
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
                     />
                   </div>
                 </div>

@@ -39,7 +39,7 @@ interface EditItemSheetProps {
   people: Person[];
 }
 
-type EventContactRow = { role?: string; name?: string; phone?: string; email?: string };
+type EventContactRow = { role?: string; name?: string; phone?: string; email?: string; note?: string };
 
 function eventMetaFromCustomFields(customFields: string | null | undefined): {
   contacts: EventContactRow[];
@@ -191,11 +191,16 @@ function EventScheduleSummary({
           {eventMeta.contacts.length > 0 ? (
             <div className="space-y-1">
               {eventMeta.contacts.map((c, idx) => (
-                <div key={idx} className="text-xs text-white/80">
-                  <span className="text-white/95">{c.role || "Contact"}</span>
-                  {c.name ? ` - ${c.name}` : ""}
-                  {c.phone ? ` - ${c.phone}` : ""}
-                  {c.email ? ` - ${c.email}` : ""}
+                <div key={idx} className="text-xs text-white/80 space-y-0.5">
+                  <div>
+                    <span className="text-white/95">{c.role || "Contact"}</span>
+                    {c.name ? ` — ${c.name}` : ""}
+                    {c.phone ? ` — ${c.phone}` : ""}
+                    {c.email ? ` — ${c.email}` : ""}
+                  </div>
+                  {c.note?.trim() ? (
+                    <p className="text-white/55 border-l-2 border-white/15 pl-2">{c.note.trim()}</p>
+                  ) : null}
                 </div>
               ))}
             </div>
