@@ -187,10 +187,11 @@ export default function Events() {
                   {shows.length > 0 ? (
                     <div className="mt-1 overflow-x-auto -mx-1 px-1">
                       <ul
-                        className="min-w-[min(100%,46rem)] grid items-center gap-x-0 gap-y-px text-[10px] leading-none"
+                        className="min-w-[min(100%,42rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
                         style={{
+                          /* Badge | Wednesday-width | Sep… + year + time | … */
                           gridTemplateColumns:
-                            "auto 6.75rem minmax(10rem,11.75rem) minmax(0,7rem) 6.75rem 2.25rem 3.5rem minmax(0,1fr)",
+                            "auto 10ch minmax(14rem,24ch) minmax(0,6.5rem) 6.5rem 2.25rem 3.25rem minmax(0,1fr)",
                         }}
                       >
                         {shows.map((show) => {
@@ -220,7 +221,7 @@ export default function Events() {
                               </div>
                               <span
                                 className={cn(
-                                  "min-w-0 truncate leading-tight",
+                                  "min-w-0 truncate text-left",
                                   rowTone,
                                   whenTone
                                 )}
@@ -230,12 +231,12 @@ export default function Events() {
                               </span>
                               <div
                                 className={cn(
-                                  "flex min-w-0 items-center gap-0 whitespace-nowrap tabular-nums",
+                                  "flex min-w-0 items-center gap-0 whitespace-nowrap pl-2 tabular-nums",
                                   rowTone,
                                   whenTone
                                 )}
                               >
-                                <span className="min-w-0 truncate">{when.dateOnlyLabel}</span>
+                                <span className="min-w-0 truncate pr-1">{when.dateOnlyLabel}</span>
                                 <span className="shrink-0 pl-0.5 text-right tabular-nums">
                                   {when.timeLabel}
                                 </span>
