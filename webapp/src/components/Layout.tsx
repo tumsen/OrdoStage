@@ -26,7 +26,6 @@ import { useSession, signOut } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import { usePermissions } from "@/hooks/usePermissions";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
-import { SingleLineFitText } from "@/components/SingleLineFitText";
 import { OrgWorkspaceMenu } from "@/components/OrgWorkspaceMenu";
 import { WorkAnnouncementBar } from "@/components/WorkAnnouncementBar";
 import { useI18n } from "@/lib/i18n";
@@ -229,19 +228,11 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
                 <span className="text-white text-[11px] font-semibold leading-none">{initials || "?"}</span>
               )}
             </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-px justify-center leading-none self-stretch">
-              <SingleLineFitText
-                text={displayName}
-                maxPx={8}
-                minPx={4}
-                className="font-medium text-white/90"
-              />
-              <SingleLineFitText
-                text={userEmail}
-                maxPx={7}
-                minPx={4}
-                className="text-white/45"
-              />
+            <div className="flex-1 min-w-0 flex flex-col gap-px justify-center leading-tight self-stretch">
+              <p className="min-w-0 truncate text-[10px] font-medium text-white/90">
+                {displayName}
+              </p>
+              <p className="min-w-0 truncate text-[9px] text-white/45">{userEmail}</p>
             </div>
           </div>
         ) : null}
