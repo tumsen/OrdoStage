@@ -24,6 +24,8 @@ import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementB
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { toast } from "@/hooks/use-toast";
 import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
+import { ContactFieldsOneRowNote } from "@/components/event/ContactFieldsOneRowNote";
+import { parseStoredContactRow, serializeContactRow } from "@/lib/eventContactRow";
 import type { CalendarItem } from "./scheduleUtils";
 import type {
   EventDetail,
@@ -300,7 +302,7 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
   );
   const [venueId, setVenueId] = useState(event.venue?.id ?? "none");
   const [tags, setTags] = useState(event.tags ?? "");
-  const [contactPerson, setContactPerson] = useState(event.contactPerson ?? "");
+  const [primaryContact, setPrimaryContact] = useState(() => parseStoredContactRow(event.contactPerson));
   const [getInTime, setGetInTime] = useState(event.getInTime ?? "");
   const [setupTime, setSetupTime] = useState(event.setupTime ?? "");
   const [assignedPeople, setAssignedPeople] = useState<{ id: string; personId: string; role: string; person: Person }[]>(
@@ -332,7 +334,7 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
         status,
         venueId: venueId === "none" ? undefined : venueId,
         tags: tags.trim() || undefined,
-        contactPerson: contactPerson.trim() || undefined,
+        contactPerson: serializeContactRow(primaryContact) || undefined,
         getInTime: getInTime.trim() || undefined,
         setupTime: setupTime.trim() || undefined,
       }),
@@ -432,15 +434,20 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className={lbl}>Contact person</Label>
-          <Input className={`${inp} mt-1`} value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} />
+      <div>
+        <Label className={lbl}>Primary / contract contact</Label>
+        <div className="mt-1">
+          <ContactFieldsOneRowNote
+            row={primaryContact}
+            onChange={(patch) => setPrimaryContact((p) => ({ ...p, ...patch }))}
+            notePlaceholder="Booking lead, channel, context…"
+          />
         </div>
-        <div>
-          <Label className={lbl}>Tags</Label>
-          <Input className={`${inp} mt-1`} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="comma separated" />
-        </div>
+      </div>
+
+      <div>
+        <Label className={lbl}>Tags</Label>
+        <Input className={`${inp} mt-1`} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="comma separated" />
       </div>
 
       {/* People */}

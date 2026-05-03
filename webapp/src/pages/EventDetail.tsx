@@ -84,6 +84,14 @@ import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
 import { AddressFields, type Address } from "@/components/AddressFields";
+import { ContactFieldsOneRowNote } from "@/components/event/ContactFieldsOneRowNote";
+import {
+  emptyContactRowFields,
+  migrateContactRowFields,
+  parseStoredContactRow,
+  serializeContactRow,
+  type EventContactRowFields,
+} from "@/lib/eventContactRow";
 
 type TeamDocument = {
   id: string;
@@ -103,7 +111,11 @@ const EventEditSchema = z.object({
   status: z.enum(["draft", "confirmed", "cancelled"]),
   venueId: z.string().optional(),
   tags: z.string().optional(),
-  contactPerson: z.string().optional(),
+  primaryContactRole: z.string().optional(),
+  primaryContactName: z.string().optional(),
+  primaryContactPhone: z.string().optional(),
+  primaryContactEmail: z.string().optional(),
+  primaryContactNote: z.string().optional(),
   actorCount: z.string().optional(),
   allergies: z.string().optional(),
   stageWidth: z.string().optional(),
@@ -117,7 +129,11 @@ const EventEditSchema = z.object({
   hazeFx: z.boolean().optional(),
   strobeFx: z.boolean().optional(),
   fohNotes: z.string().optional(),
-  technicalContactInfo: z.string().optional(),
+  technicalContactRole: z.string().optional(),
+  technicalContactName: z.string().optional(),
+  technicalContactPhone: z.string().optional(),
+  technicalContactEmail: z.string().optional(),
+  technicalContactNote: z.string().optional(),
   contractNotes: z.string().optional(),
   companyLegalName: z.string().optional(),
   companyVat: z.string().optional(),
@@ -138,7 +154,11 @@ function emptyEventFormValues(): EventEditValues {
     status: "draft",
     venueId: "",
     tags: "",
-    contactPerson: "",
+    primaryContactRole: "",
+    primaryContactName: "",
+    primaryContactPhone: "",
+    primaryContactEmail: "",
+    primaryContactNote: "",
     actorCount: "",
     allergies: "",
     ...decodeToFormFields(null),
@@ -150,7 +170,11 @@ function emptyEventFormValues(): EventEditValues {
     hazeFx: false,
     strobeFx: false,
     fohNotes: "",
-    technicalContactInfo: "",
+    technicalContactRole: "",
+    technicalContactName: "",
+    technicalContactPhone: "",
+    technicalContactEmail: "",
+    technicalContactNote: "",
     contractNotes: "",
     companyLegalName: "",
     companyVat: "",
@@ -164,23 +188,8 @@ function emptyEventFormValues(): EventEditValues {
 }
 
 type CustomField = { key: string; value: string; departments: string[] };
-/** Event contract contact (booker / production); no per-person address (company address is separate). */
-type ContactRow = { role: string; name: string; phone: string; email: string; note: string };
-
-function emptyContactRow(): ContactRow {
-  return { role: "", name: "", email: "", phone: "", note: "" };
-}
-
-function migrateContactRow(raw: unknown): ContactRow {
-  const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  return {
-    role: String(o.role ?? ""),
-    name: String(o.name ?? ""),
-    email: String(o.email ?? ""),
-    phone: String(o.phone ?? ""),
-    note: String(o.note ?? ""),
-  };
-}
+/** Extra contact persons (same columns as primary / technical). */
+type ContactRow = EventContactRowFields;
 
 type GeneralEventFields = {
   smokeFx: boolean;
@@ -210,13 +219,19 @@ function normalizeEventStatus(s: string | undefined): "draft" | "confirmed" | "c
 }
 
 function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditValues {
+  const primary = parseStoredContactRow(e.contactPerson);
+  const technical = parseStoredContactRow(g.technicalContactInfo);
   return {
     title: e.title,
     description: e.description ?? "",
     status: normalizeEventStatus(e.status),
     venueId: e.venueId ?? "",
     tags: e.tags ?? "",
-    contactPerson: e.contactPerson ?? "",
+    primaryContactRole: primary.role,
+    primaryContactName: primary.name,
+    primaryContactPhone: primary.phone,
+    primaryContactEmail: primary.email,
+    primaryContactNote: primary.note,
     actorCount: e.actorCount != null ? String(e.actorCount) : "",
     allergies: e.allergies ?? "",
     ...decodeToFormFields(e.stageSize),
@@ -228,7 +243,11 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
     hazeFx: g.hazeFx,
     strobeFx: g.strobeFx,
     fohNotes: g.fohNotes,
-    technicalContactInfo: g.technicalContactInfo ?? "",
+    technicalContactRole: technical.role,
+    technicalContactName: technical.name,
+    technicalContactPhone: technical.phone,
+    technicalContactEmail: technical.email,
+    technicalContactNote: technical.note,
     contractNotes: g.contractNotes ?? "",
     companyLegalName: g.companyLegalName ?? "",
     companyVat: g.companyVat ?? "",
@@ -290,7 +309,7 @@ function splitGeneralEventFields(fields: CustomField[]): {
       try {
         const parsed = JSON.parse(value) as unknown[];
         if (Array.isArray(parsed)) {
-          general.contacts = parsed.map((row) => migrateContactRow(row));
+          general.contacts = parsed.map((row) => migrateContactRowFields(row));
           continue;
         }
       } catch {
@@ -511,7 +530,16 @@ function DetailsTab({
       { key: "Get-in start", value: values.getInStart?.trim() || "" },
       { key: "Get-in end", value: values.getInEnd?.trim() || "" },
       { key: "Get-in duration", value: values.getInDuration?.trim() || "" },
-      { key: "Technical contact info", value: values.technicalContactInfo?.trim() || "" },
+      {
+        key: "Technical contact info",
+        value: serializeContactRow({
+          role: values.technicalContactRole ?? "",
+          name: values.technicalContactName ?? "",
+          phone: values.technicalContactPhone ?? "",
+          email: values.technicalContactEmail ?? "",
+          note: values.technicalContactNote ?? "",
+        }),
+      },
       { key: "Company legal name", value: values.companyLegalName?.trim() || "" },
       { key: "Company VAT", value: values.companyVat?.trim() || "" },
       {
@@ -540,6 +568,14 @@ function DetailsTab({
       stageHeight: values.stageHeight ?? "",
     });
 
+    const primaryContactSerialized = serializeContactRow({
+      role: values.primaryContactRole ?? "",
+      name: values.primaryContactName ?? "",
+      phone: values.primaryContactPhone ?? "",
+      email: values.primaryContactEmail ?? "",
+      note: values.primaryContactNote ?? "",
+    });
+
     if (isNew) {
       const payload: Record<string, unknown> = {
         title: values.title,
@@ -548,7 +584,7 @@ function DetailsTab({
       if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
       if (values.description) payload.description = values.description;
       if (values.tags) payload.tags = values.tags;
-      if (values.contactPerson) payload.contactPerson = values.contactPerson;
+      if (primaryContactSerialized) payload.contactPerson = primaryContactSerialized;
       if (values.allergies) payload.allergies = values.allergies;
       if (stageEnc) payload.stageSize = stageEnc;
       if (values.getInStart) payload.getInTime = values.getInStart;
@@ -569,7 +605,7 @@ function DetailsTab({
     else payload.venueId = undefined;
     if (values.description) payload.description = values.description;
     if (values.tags) payload.tags = values.tags;
-    if (values.contactPerson) payload.contactPerson = values.contactPerson;
+    if (primaryContactSerialized) payload.contactPerson = primaryContactSerialized;
     if (values.allergies) payload.allergies = values.allergies;
     payload.stageSize = stageEnc ?? null;
     if (values.getInStart) payload.getInTime = values.getInStart;
@@ -580,7 +616,7 @@ function DetailsTab({
   }
 
   function addContact() {
-    setContacts((prev) => [...prev, emptyContactRow()]);
+    setContacts((prev) => [...prev, emptyContactRowFields()]);
   }
 
   function removeContact(idx: number) {
@@ -777,23 +813,26 @@ function DetailsTab({
               Booker contact details, company, technical liaison, and contract notes for confirming the engagement.
             </p>
 
-            <FormField
-              control={form.control}
-              name="contactPerson"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Primary / contract contact</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      value={field.value ?? ""}
-                      placeholder="Name, phone, email as needed"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            <FormItem>
+              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Primary / contract contact</FormLabel>
+              <ContactFieldsOneRowNote
+                row={{
+                  role: form.watch("primaryContactRole") ?? "",
+                  name: form.watch("primaryContactName") ?? "",
+                  phone: form.watch("primaryContactPhone") ?? "",
+                  email: form.watch("primaryContactEmail") ?? "",
+                  note: form.watch("primaryContactNote") ?? "",
+                }}
+                onChange={(patch) => {
+                  if (patch.role !== undefined) form.setValue("primaryContactRole", patch.role);
+                  if (patch.name !== undefined) form.setValue("primaryContactName", patch.name);
+                  if (patch.phone !== undefined) form.setValue("primaryContactPhone", patch.phone);
+                  if (patch.email !== undefined) form.setValue("primaryContactEmail", patch.email);
+                  if (patch.note !== undefined) form.setValue("primaryContactNote", patch.note);
+                }}
+                notePlaceholder="Booking lead: availability, preferred channel…"
+              />
+            </FormItem>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField
@@ -854,24 +893,26 @@ function DetailsTab({
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="technicalContactInfo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical contact</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      value={field.value ?? ""}
-                      placeholder="Technical lead on booker side: name, phone, email…"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
-                      rows={3}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            <FormItem>
+              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical contact</FormLabel>
+              <ContactFieldsOneRowNote
+                row={{
+                  role: form.watch("technicalContactRole") ?? "",
+                  name: form.watch("technicalContactName") ?? "",
+                  phone: form.watch("technicalContactPhone") ?? "",
+                  email: form.watch("technicalContactEmail") ?? "",
+                  note: form.watch("technicalContactNote") ?? "",
+                }}
+                onChange={(patch) => {
+                  if (patch.role !== undefined) form.setValue("technicalContactRole", patch.role);
+                  if (patch.name !== undefined) form.setValue("technicalContactName", patch.name);
+                  if (patch.phone !== undefined) form.setValue("technicalContactPhone", patch.phone);
+                  if (patch.email !== undefined) form.setValue("technicalContactEmail", patch.email);
+                  if (patch.note !== undefined) form.setValue("technicalContactNote", patch.note);
+                }}
+                notePlaceholder="Technical lead on booker side: channel, rider links…"
+              />
+            </FormItem>
 
             <FormField
               control={form.control}
@@ -936,45 +977,11 @@ function DetailsTab({
                       Remove
                     </Button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input
-                      value={row.role}
-                      onChange={(e) => updateContact(idx, { role: e.target.value })}
-                      placeholder="Role (e.g. Tour manager)"
-                      className="bg-white/5 border-white/10 text-white h-9"
-                    />
-                    <Input
-                      value={row.name}
-                      onChange={(e) => updateContact(idx, { name: e.target.value })}
-                      placeholder="Full name"
-                      className="bg-white/5 border-white/10 text-white h-9"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input
-                      value={row.phone}
-                      onChange={(e) => updateContact(idx, { phone: e.target.value })}
-                      placeholder="Phone"
-                      className="bg-white/5 border-white/10 text-white h-9"
-                    />
-                    <Input
-                      type="email"
-                      value={row.email}
-                      onChange={(e) => updateContact(idx, { email: e.target.value })}
-                      placeholder="Email"
-                      className="bg-white/5 border-white/10 text-white h-9"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[10px] text-white/45 uppercase tracking-wide">Note</Label>
-                    <Textarea
-                      value={row.note}
-                      onChange={(e) => updateContact(idx, { note: e.target.value })}
-                      placeholder="Availability, preferred channel, extra context…"
-                      rows={3}
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
-                    />
-                  </div>
+                  <ContactFieldsOneRowNote
+                    row={row}
+                    onChange={(patch) => updateContact(idx, patch)}
+                    notePlaceholder="Availability, preferred channel, extra context…"
+                  />
                 </div>
               ))}
 
