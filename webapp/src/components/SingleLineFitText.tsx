@@ -39,7 +39,7 @@ type Props = {
   maxPx?: number;
 };
 
-export function SingleLineFitText({ text, className, minPx = 6, maxPx = 10 }: Props) {
+export function SingleLineFitText({ text, className, minPx = 4, maxPx = 6 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const [fontSize, setFontSize] = useState(minPx);
@@ -95,8 +95,8 @@ export function SingleLineFitText({ text, className, minPx = 6, maxPx = 10 }: Pr
     >
       <span
         ref={measureRef}
-        className="inline-block max-w-none whitespace-nowrap leading-snug"
-        style={{ fontSize: `${fontSize}px` }}
+        className="inline-block max-w-none whitespace-nowrap leading-none tracking-tight"
+        style={{ fontSize: `${fontSize}px`, lineHeight: 1.15 }}
       >
         {text}
       </span>

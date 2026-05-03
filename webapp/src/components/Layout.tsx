@@ -229,17 +229,17 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
                 <span className="text-white text-[11px] font-semibold leading-none">{initials || "?"}</span>
               )}
             </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-0.5 justify-center">
+            <div className="flex-1 min-w-0 flex flex-col gap-px justify-center leading-none">
               <SingleLineFitText
                 text={displayName}
-                maxPx={10}
-                minPx={6}
+                maxPx={6}
+                minPx={4}
                 className="font-medium text-white/90"
               />
               <SingleLineFitText
                 text={userEmail}
-                maxPx={9}
-                minPx={6}
+                maxPx={5}
+                minPx={4}
                 className="text-white/45"
               />
             </div>
