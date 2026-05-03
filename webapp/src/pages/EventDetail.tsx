@@ -44,7 +44,8 @@ import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
 import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
-import { computeShowStaffingStats, parseStaffingOkMap } from "@/lib/eventShowStaffing";
+import { computeEventWorkTotals, computeShowStaffingStats, parseStaffingOkMap } from "@/lib/eventShowStaffing";
+import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -1241,55 +1242,21 @@ function formatShowCardSummaryLine(show: EventShow): string {
 function EventStaffingOverviewBanner({ event }: { event: EventDetail }) {
   const teams = event.teams ?? [];
   const shows = event.shows ?? [];
-  const teamIds = teams.map((t) => t.team.id);
-  const slots = teamIds.length * shows.length;
-  let okTotal = 0;
-  for (const show of shows) {
-    const okMap = parseStaffingOkMap(show.staffingOkByDepartment);
-    for (const tid of teamIds) {
-      if (okMap[tid]) okTotal++;
-    }
-  }
-  const peopleIds = new Set<string>();
-  let jobMinutes = 0;
-  for (const show of shows) {
-    for (const j of show.jobs ?? []) {
-      jobMinutes += j.durationMinutes ?? 0;
-      if (j.personId) peopleIds.add(j.personId);
-    }
-    for (const s of show.staffing ?? []) {
-      peopleIds.add(s.personId);
-    }
-  }
-  const jobHours = jobMinutes / 60;
+  const eventWorkTotals = computeEventWorkTotals(shows);
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 space-y-1.5">
-      <p className="text-[10px] text-white/40 uppercase tracking-wide">Shows &amp; staffing overview</p>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-white/85">
-        <span>
-          <span className="text-white/45">{shows.length}</span> show{shows.length === 1 ? "" : "s"}
-        </span>
-        <span className="flex items-center gap-1.5">
-          {slots > 0 && okTotal === slots ? (
-            <Check size={14} className="text-emerald-400 shrink-0" aria-hidden />
-          ) : null}
-          <span>
-            Staffing OK{" "}
-            <span className="text-white/45">
-              {slots > 0 ? `${okTotal}/${slots}` : "—"}
-            </span>
-            {teamIds.length === 0 ? (
-              <span className="text-white/35 text-xs ml-1">(add teams on the Teams tab)</span>
-            ) : null}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 min-w-0">
+        <p className="text-[10px] text-white/40 uppercase tracking-wide shrink-0">Shows &amp; staffing overview</p>
+        {shows.length > 0 ? (
+          <span
+            className="text-[10px] tabular-nums text-white/40 shrink-0"
+            title="People and planned hours (all shows on this event)"
+          >
+            {eventWorkTotals.people} p · {formatPlannedHoursShort(eventWorkTotals.jobHours)} h
           </span>
-        </span>
-        <span>
-          <span className="text-white/45">{peopleIds.size}</span> people assigned
-        </span>
-        <span>
-          <span className="text-white/45">{jobHours >= 10 ? jobHours.toFixed(1) : jobHours.toFixed(2)}</span> h jobs (est.)
-        </span>
+        ) : null}
       </div>
+      <EventShowsOverviewGrid shows={shows} teams={teams} className="mt-0" />
     </div>
   );
 }

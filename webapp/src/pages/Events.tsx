@@ -1,14 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { Plus, Trash2, Eye, Filter, Check } from "lucide-react";
+import { Plus, Trash2, Eye, Filter } from "lucide-react";
 import { api } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import { computeEventWorkTotals, computeShowStaffingStats } from "@/lib/eventShowStaffing";
-import type { EventDetail, EventShow } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import { StatusBadge } from "@/components/StatusBadge";
+import { computeEventWorkTotals } from "@/lib/eventShowStaffing";
+import type { EventDetail } from "@/lib/types";
+import {
+  EventShowsOverviewGrid,
+  effectiveShowStatus,
+  formatPlannedHoursShort,
+} from "@/components/event/EventShowsOverviewGrid";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,17 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { usePreferences } from "@/hooks/usePreferences";
-import { localeForLanguage } from "@/lib/preferences";
-
 type StatusFilter = "all" | "draft" | "confirmed" | "cancelled";
-
-/** Show is draft unless explicitly confirmed or cancelled. */
-function effectiveShowStatus(show: EventShow): "draft" | "confirmed" | "cancelled" {
-  if (show.status === "confirmed") return "confirmed";
-  if (show.status === "cancelled") return "cancelled";
-  return "draft";
-}
 
 function eventPassesShowStatusFilter(event: EventDetail, filter: StatusFilter): boolean {
   if (filter === "all") return true;
@@ -51,9 +44,6 @@ function eventPassesShowStatusFilter(event: EventDetail, filter: StatusFilter): 
 export default function Events() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { effective } = usePreferences();
-  const prefsLocale = localeForLanguage(effective?.language ?? "en");
-  const hour12 = effective?.timeFormat === "12h";
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -184,120 +174,7 @@ export default function Events() {
                       </span>
                     ) : null}
                   </div>
-                  {shows.length > 0 ? (
-                    <div className="mt-1 overflow-x-auto -mx-1 px-1">
-                      <ul
-                        className="min-w-[min(100%,42rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
-                        style={{
-                          /* Venue, staffing, people, hours: max-content; little pad after venue; tickets 1fr. */
-                          gridTemplateColumns: hour12
-                            ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content max-content minmax(0,1fr)"
-                            : "auto 10ch max-content 6ch max-content max-content max-content max-content minmax(0,1fr)",
-                        }}
-                      >
-                        {shows.map((show) => {
-                          const stats = computeShowStaffingStats(show, teams);
-                          const { ok, total } = stats;
-                          const showOff = effectiveShowStatus(show) === "cancelled";
-                          const venueName = show.venue?.name ?? "Venue";
-                          const ticketBits = formatEventListTicketBits(show, prefsLocale, hour12);
-                          const when = formatEventListWhenParts(show, prefsLocale, hour12);
-                          const showStatus = effectiveShowStatus(show);
-                          const hoursLabel = formatPlannedHoursShort(stats.jobHours);
-                          const rowTone = showOff
-                            ? "text-white/30 line-through decoration-white/20"
-                            : "text-white/50";
-                          const whenTone = showOff ? undefined : "text-white/[0.82]";
-                          const venueTone = showOff ? undefined : "text-white/55";
-                          return (
-                            <li key={show.id} className="contents">
-                              <div className="justify-self-start pr-2">
-                                <StatusBadge
-                                  status={showStatus}
-                                  className={cn(
-                                    "text-[10px] py-px px-1.5 font-medium",
-                                    showOff && "opacity-50"
-                                  )}
-                                />
-                              </div>
-                              <span
-                                className={cn(
-                                  "min-w-0 truncate text-left",
-                                  rowTone,
-                                  whenTone
-                                )}
-                                title={when.weekdayLabel}
-                              >
-                                {when.weekdayLabel}
-                              </span>
-                              <span
-                                className={cn(
-                                  "min-w-0 truncate pl-2 text-left",
-                                  rowTone,
-                                  whenTone
-                                )}
-                                title={when.dateOnlyLabel}
-                              >
-                                {when.dateOnlyLabel}
-                              </span>
-                              <span
-                                className={cn(
-                                  "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
-                                  rowTone,
-                                  whenTone
-                                )}
-                              >
-                                {when.timeLabel}
-                              </span>
-                              <span
-                                className={cn("min-w-0 truncate pr-2", rowTone, venueTone)}
-                                title={venueName}
-                              >
-                                {venueName}
-                              </span>
-                              <div className="min-w-0 truncate pr-4">
-                                <EventListStaffingHint ok={ok} total={total} muted={showOff} />
-                              </div>
-                              <span
-                                className={cn(
-                                  "block whitespace-nowrap pr-3 text-right tabular-nums",
-                                  showOff
-                                    ? "text-white/25 line-through decoration-white/20"
-                                    : "text-white/45"
-                                )}
-                                title={`${stats.people} people on this show`}
-                              >
-                                {stats.people}
-                              </span>
-                              <span
-                                className={cn(
-                                  "block whitespace-nowrap pl-2 pr-2 text-right tabular-nums",
-                                  showOff
-                                    ? "text-white/25 line-through decoration-white/20"
-                                    : "text-white/45"
-                                )}
-                                title="Total planned hours for this show"
-                              >
-                                {hoursLabel} h
-                              </span>
-                              <div
-                                className={cn(
-                                  "min-w-0 truncate pl-2 text-right sm:text-left",
-                                  ticketBits ? (showOff ? "text-white/35" : "text-white/45") : "text-white/25",
-                                  showOff && "line-through decoration-white/20"
-                                )}
-                                title={ticketBits ?? undefined}
-                              >
-                                {ticketBits ?? "—"}
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-[11px] text-white/35">No shows scheduled</p>
-                  )}
+                  <EventShowsOverviewGrid shows={shows} teams={teams} />
                 </div>
                 <div className="px-5 py-3.5 border-b border-white/5 flex items-center gap-2">
                   <Button
@@ -351,77 +228,5 @@ export default function Events() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function formatPlannedHoursShort(jobHours: number): string {
-  return jobHours >= 10 ? jobHours.toFixed(1) : jobHours.toFixed(2);
-}
-
-function formatEventListWhenParts(
-  show: EventShow,
-  locale: string,
-  hour12: boolean
-): { weekdayLabel: string; dateOnlyLabel: string; timeLabel: string } {
-  const base = new Date(show.showDate.slice(0, 10));
-  const [hh, mm] = show.showTime.split(":").map((x) => Number(x));
-  if (Number.isFinite(hh) && Number.isFinite(mm)) {
-    base.setHours(hh, mm, 0, 0);
-  }
-  const weekdayLabel = base.toLocaleDateString(locale, { weekday: "long" });
-  const dateOnlyLabel = base.toLocaleDateString(locale, {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-  const timeLabel = base.toLocaleTimeString(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12,
-  });
-  return { weekdayLabel, dateOnlyLabel, timeLabel };
-}
-
-function formatEventListSoldAt(iso: string, locale: string, hour12: boolean): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short", hour12 });
-}
-
-/** Returns null when no ticket fields are set. */
-function formatEventListTicketBits(show: EventShow, locale: string, hour12: boolean): string | null {
-  const parts: string[] = [];
-  if (show.ticketsOnSale != null) parts.push(`On sale ${show.ticketsOnSale}`);
-  if (show.soldTickets != null) parts.push(`Sold ${show.soldTickets}`);
-  if (show.soldTicketsRecordedAt) {
-    parts.push(`Sold updated ${formatEventListSoldAt(show.soldTicketsRecordedAt, locale, hour12)}`);
-  }
-  return parts.length > 0 ? parts.join(" · ") : null;
-}
-
-function EventListStaffingHint({
-  ok,
-  total,
-  muted,
-}: {
-  ok: number;
-  total: number;
-  muted?: boolean;
-}) {
-  if (total === 0) {
-    return <span className={cn("text-white/35", muted && "text-white/25")}>No teams</span>;
-  }
-  if (ok === total) {
-    return (
-      <span
-        className={cn("inline-flex items-center gap-0.5 text-emerald-400", muted && "text-emerald-400/50")}
-      >
-        <Check size={10} className="shrink-0" aria-hidden />
-        Staffing OK
-      </span>
-    );
-  }
-  return (
-    <span className={cn("text-amber-400/90", muted && "text-amber-400/40")}>{ok}/{total} teams OK</span>
   );
 }
