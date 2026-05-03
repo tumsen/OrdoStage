@@ -200,59 +200,66 @@ export default function Events() {
                             <li
                               key={show.id}
                               className={cn(
-                                "flex flex-nowrap items-center gap-x-1 text-[10px] leading-none py-px",
+                                "grid items-center gap-x-2 text-[10px] leading-none py-px",
                                 showOff ? "text-white/30 line-through decoration-white/20" : "text-white/50"
                               )}
+                              style={{
+                                gridTemplateColumns:
+                                  "auto 1.625rem auto minmax(5rem,1fr) minmax(7.25rem,auto) 1.75rem 3rem minmax(5.5rem,1fr)",
+                              }}
                             >
-                              <div
+                              <div className="shrink-0 justify-self-start">
+                                <StatusBadge
+                                  status={showStatus}
+                                  className="text-[10px] py-px px-1.5 font-medium"
+                                />
+                              </div>
+                              <span
                                 className={cn(
-                                  "flex items-center gap-1 shrink-0 tabular-nums",
+                                  "text-center tabular-nums",
                                   showOff ? undefined : "text-white/[0.82]"
                                 )}
                               >
-                                <span className="w-[1.625rem] text-center">{when.weekdayLabel}</span>
-                                <div className="flex items-center gap-0">
-                                  <span className="w-[2.875rem] text-center">{when.dateOnlyLabel}</span>
-                                  <span className="w-[3.875rem] text-right">{when.timeLabel}</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-x-2 min-w-0 shrink flex-1">
-                                <span
-                                  className={cn("truncate max-w-[12rem]", showOff ? undefined : "text-white/55")}
-                                  title={venueName}
-                                >
-                                  {venueName}
-                                </span>
-                                <div className="flex items-center gap-x-1 shrink-0">
-                                  <EventListStaffingHint ok={ok} total={total} muted={showOff} />
-                                  <span
-                                    className="w-[1.125rem] text-center tabular-nums text-white/45"
-                                    title={`${stats.people} people on this show`}
-                                  >
-                                    {stats.people}
-                                  </span>
-                                  <span
-                                    className="w-[2.375rem] text-right tabular-nums text-white/45"
-                                    title={`${hoursLabel} h planned jobs`}
-                                  >
-                                    {hoursLabel}h
-                                  </span>
-                                </div>
-                              </div>
+                                {when.weekdayLabel}
+                              </span>
                               <div
                                 className={cn(
-                                  "min-w-0 flex-1 truncate text-right sm:text-left",
+                                  "flex items-center gap-0 shrink-0 tabular-nums justify-start",
+                                  showOff ? undefined : "text-white/[0.82]"
+                                )}
+                              >
+                                <span className="inline-block w-[2.75rem] text-center">{when.dateOnlyLabel}</span>
+                                <span className="inline-block w-[3.25rem] text-right pl-0.5">{when.timeLabel}</span>
+                              </div>
+                              <span
+                                className={cn("truncate min-w-0", showOff ? undefined : "text-white/55")}
+                                title={venueName}
+                              >
+                                {venueName}
+                              </span>
+                              <div className="min-w-0 truncate justify-self-start">
+                                <EventListStaffingHint ok={ok} total={total} muted={showOff} />
+                              </div>
+                              <span
+                                className="inline-block w-full text-center tabular-nums text-white/45"
+                                title={`${stats.people} people on this show`}
+                              >
+                                {stats.people}
+                              </span>
+                              <span
+                                className="inline-block w-full text-right tabular-nums text-white/45"
+                                title={`${hoursLabel} h planned jobs`}
+                              >
+                                {hoursLabel}h
+                              </span>
+                              <div
+                                className={cn(
+                                  "min-w-0 truncate text-right sm:text-left",
                                   ticketBits ? (showOff ? "text-white/35" : "text-white/45") : "text-white/25"
                                 )}
                                 title={ticketBits ?? undefined}
                               >
                                 {ticketBits ?? "—"}
-                              </div>
-                              <div className="shrink-0">
-                                <StatusBadge
-                                  status={showStatus}
-                                  className="text-[10px] py-px px-1.5 font-medium"
-                                />
                               </div>
                             </li>
                           );
