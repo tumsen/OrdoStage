@@ -171,14 +171,22 @@ export default function Events() {
                   className="px-5 py-3.5 border-b border-white/5 cursor-pointer"
                   onClick={() => navigate(`/events/${event.id}`)}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-baseline gap-x-2 flex-wrap min-w-0">
                     <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
                       {event.title}
                     </span>
+                    {(event.shows?.length ?? 0) > 0 ? (
+                      <span
+                        className="text-[10px] tabular-nums text-white/40 shrink-0"
+                        title="People and planned hours (all shows on this event)"
+                      >
+                        {eventWorkTotals.people} p · {formatPlannedHoursShort(eventWorkTotals.jobHours)} h
+                      </span>
+                    ) : null}
                   </div>
                   {shows.length > 0 ? (
                     <div className="mt-1 overflow-x-auto -mx-1 px-1">
-                      <ul className="min-w-[min(100%,56rem)]">
+                      <ul className="min-w-[min(100%,42rem)] space-y-px">
                         {shows.map((show) => {
                           const stats = computeShowStaffingStats(show, teams);
                           const { ok, total } = stats;
@@ -187,68 +195,58 @@ export default function Events() {
                           const ticketBits = formatEventListTicketBits(show, prefsLocale, hour12);
                           const when = formatEventListWhenParts(show, prefsLocale, hour12);
                           const showStatus = effectiveShowStatus(show);
-                          const hoursLabel =
-                            stats.jobHours >= 10 ? stats.jobHours.toFixed(1) : stats.jobHours.toFixed(2);
+                          const hoursLabel = formatPlannedHoursShort(stats.jobHours);
                           return (
                             <li
                               key={show.id}
                               className={cn(
-                                "grid gap-x-1.5 text-[10px] leading-none items-center py-px [grid-template-columns:2.25rem_minmax(3.25rem,4.5rem)_4.5rem_minmax(0,1fr)_minmax(5rem,auto)_minmax(0,1fr)_2rem_2.75rem_auto]",
+                                "flex flex-nowrap items-center gap-x-1 text-[10px] leading-none py-px",
                                 showOff ? "text-white/30 line-through decoration-white/20" : "text-white/50"
                               )}
                             >
                               <div
                                 className={cn(
-                                  "text-center shrink-0 tabular-nums",
-                                  showOff ? undefined : "text-white/65"
+                                  "flex items-center gap-px shrink-0 tabular-nums",
+                                  showOff ? undefined : "text-white/[0.82]"
                                 )}
                               >
-                                {when.weekdayLabel}
+                                <span className="w-[1.625rem] text-center">{when.weekdayLabel}</span>
+                                <span className="w-[2.875rem] text-center">{when.dateOnlyLabel}</span>
+                                <span className="w-[3.875rem] text-right">{when.timeLabel}</span>
                               </div>
-                              <div
-                                className={cn("min-w-0 tabular-nums text-center", showOff ? undefined : "text-white/70")}
-                              >
-                                {when.dateOnlyLabel}
+                              <div className="flex items-center gap-x-1 min-w-0 shrink">
+                                <span
+                                  className={cn("truncate max-w-[12rem]", showOff ? undefined : "text-white/55")}
+                                  title={venueName}
+                                >
+                                  {venueName}
+                                </span>
+                                <span className="shrink-0">
+                                  <EventListStaffingHint ok={ok} total={total} muted={showOff} />
+                                </span>
+                                <span
+                                  className="w-[1.125rem] text-center tabular-nums shrink-0 text-white/45"
+                                  title={`${stats.people} people on this show`}
+                                >
+                                  {stats.people}
+                                </span>
+                                <span
+                                  className="w-[2.375rem] text-right tabular-nums shrink-0 text-white/45"
+                                  title={`${hoursLabel} h planned jobs`}
+                                >
+                                  {hoursLabel}h
+                                </span>
                               </div>
                               <div
                                 className={cn(
-                                  "text-right tabular-nums tracking-tight shrink-0 w-[4.5rem]",
-                                  showOff ? undefined : "text-white/65"
-                                )}
-                              >
-                                {when.timeLabel}
-                              </div>
-                              <div
-                                className={cn("min-w-0 truncate", showOff ? undefined : "text-white/55")}
-                                title={venueName}
-                              >
-                                {venueName}
-                              </div>
-                              <div className="min-w-0">
-                                <EventListStaffingHint ok={ok} total={total} muted={showOff} />
-                              </div>
-                              <div
-                                className={cn(
-                                  "min-w-0 text-right sm:text-left truncate",
+                                  "min-w-0 flex-1 truncate text-right sm:text-left",
                                   ticketBits ? (showOff ? "text-white/35" : "text-white/45") : "text-white/25"
                                 )}
                                 title={ticketBits ?? undefined}
                               >
                                 {ticketBits ?? "—"}
                               </div>
-                              <div
-                                className="text-center tabular-nums shrink-0 text-white/45"
-                                title={`${stats.people} people on this show`}
-                              >
-                                {stats.people}
-                              </div>
-                              <div
-                                className="text-right tabular-nums shrink-0 text-white/45"
-                                title={`${hoursLabel} h planned jobs`}
-                              >
-                                {hoursLabel}h
-                              </div>
-                              <div className="shrink-0 justify-self-end">
+                              <div className="shrink-0">
                                 <StatusBadge
                                   status={showStatus}
                                   className="text-[10px] py-px px-1.5 font-medium"
@@ -258,15 +256,6 @@ export default function Events() {
                           );
                         })}
                       </ul>
-                      {event.shows && event.shows.length > 0 ? (
-                        <p className="text-[10px] leading-tight text-white/35 mt-1 pt-0.5 border-t border-white/[0.06] tabular-nums">
-                          Event total: {eventWorkTotals.people} people ·{" "}
-                          {eventWorkTotals.jobHours >= 10
-                            ? eventWorkTotals.jobHours.toFixed(1)
-                            : eventWorkTotals.jobHours.toFixed(2)}{" "}
-                          h planned
-                        </p>
-                      ) : null}
                     </div>
                   ) : (
                     <p className="mt-1 text-[11px] text-white/35">No shows scheduled</p>
@@ -325,6 +314,10 @@ export default function Events() {
       </AlertDialog>
     </div>
   );
+}
+
+function formatPlannedHoursShort(jobHours: number): string {
+  return jobHours >= 10 ? jobHours.toFixed(1) : jobHours.toFixed(2);
 }
 
 function formatEventListWhenParts(
