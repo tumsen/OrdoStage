@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import type { Event, Venue } from "@/lib/types";
 import type { TourDetail } from "../../../backend/src/types";
 import { StatusBadge } from "@/components/StatusBadge";
-import { formatDate, isNext30Days } from "@/lib/dateUtils";
+import { formatDate, eventStartsOnOrAfterToday } from "@/lib/dateUtils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -207,15 +207,15 @@ export default function Dashboard() {
     .filter((d): d is TourDetail => !!d);
 
   const totalEvents = events?.length ?? 0;
-  const upcomingThisMonth = events?.filter((e) => isNext30Days(e.startDate)).length ?? 0;
+  const upcomingCount = events?.filter((e) => eventStartsOnOrAfterToday(e.startDate)).length ?? 0;
   const confirmedEvents = events?.filter((e) => e.status === "confirmed").length ?? 0;
   const venueCount = venues?.length ?? 0;
   const tourCount = tours?.length ?? 0;
 
   const upcomingEvents = (events ?? [])
-    .filter((e) => e.startDate && isNext30Days(e.startDate))
-    .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime())
-    .slice(0, 6);
+    .filter((e) => eventStartsOnOrAfterToday(e.startDate))
+    .sort((a, b) => new Date(a.startDate!.slice(0, 10)).getTime() - new Date(b.startDate!.slice(0, 10)).getTime())
+    .slice(0, 8);
 
   // Upcoming tour shows (next 60 days across all tours)
   const now = new Date();
@@ -253,7 +253,7 @@ export default function Dashboard() {
         ) : (
           <>
             <StatCard icon={CalendarDays} label="Total Events" value={totalEvents} color="bg-indigo-500/15 text-indigo-400" />
-            <StatCard icon={TrendingUp} label="Next 30 Days" value={upcomingThisMonth} color="bg-purple-500/15 text-purple-400" />
+            <StatCard icon={TrendingUp} label="Upcoming" value={upcomingCount} color="bg-purple-500/15 text-purple-400" />
             <StatCard icon={CheckCircle2} label="Confirmed" value={confirmedEvents} color="bg-emerald-500/15 text-emerald-400" />
             <StatCard icon={MapPin} label="Venues" value={venueCount} color="bg-red-500/15 text-red-400" />
             <StatCard icon={Route} label="Tours" value={tourCount} color="bg-amber-500/15 text-amber-400" />
@@ -277,7 +277,7 @@ export default function Dashboard() {
           {eventsLoading ? (
             <div className="p-4 space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 rounded bg-white/5" />)}</div>
           ) : upcomingEvents.length === 0 ? (
-            <div className="py-10 text-center text-white/30 text-sm">No upcoming events in the next 30 days.</div>
+            <div className="py-10 text-center text-white/30 text-sm">No upcoming events with a scheduled start date.</div>
           ) : (
             <div className="divide-y divide-white/5">
               {upcomingEvents.map((event) => (

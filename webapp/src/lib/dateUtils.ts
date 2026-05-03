@@ -44,6 +44,22 @@ export function isNext30Days(dateStr: string | null | undefined): boolean {
   return d >= now && d <= future;
 }
 
+/** True when `startDate` has a `YYYY-MM-DD` on or after local today (calendar day). */
+export function eventStartsOnOrAfterToday(startDate: string | null | undefined): boolean {
+  if (!startDate) return false;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(startDate.trim());
+  if (!m) return false;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return false;
+  const eventDay = new Date(y, mo - 1, d);
+  if (Number.isNaN(eventDay.getTime())) return false;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return eventDay >= today;
+}
+
 export function formatWeekdayDate(value: string | null | undefined): string {
   if (!value) return "—";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
