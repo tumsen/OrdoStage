@@ -1360,10 +1360,21 @@ function ShowTimeEditor({
   show,
   venues,
   onUpdate,
+  tickets,
 }: {
   show: EventShow;
   venues: { id: string; name: string }[] | undefined;
   onUpdate: (body: Record<string, unknown>) => void;
+  /** When set, renders ticket counts on the same row, after Venue. */
+  tickets?: {
+    onSaleValue: string;
+    onSaleChange: (v: string) => void;
+    onSaleBlur: () => void;
+    soldValue: string;
+    soldChange: (v: string) => void;
+    soldBlur: () => void;
+    soldRecordedAt?: string | null;
+  };
 }) {
   const [showDate, setShowDate] = useState("");
   const [start, setStart] = useState("");
@@ -1456,13 +1467,13 @@ function ShowTimeEditor({
           }}
         />
       </div>
-      <div className="min-w-0 flex-1 max-w-xs">
+      <div className="min-w-0 flex-1 max-w-[min(100%,14rem)]">
         <FieldLabel>Venue</FieldLabel>
         <Select
           value={show.venueId}
           onValueChange={(v) => onUpdate({ venueId: v })}
         >
-          <SelectTrigger className="bg-white/5 border-white/10 text-white w-full min-w-0">
+          <SelectTrigger className="bg-white/5 border-white/10 text-white w-full min-w-0 h-10">
             <SelectValue placeholder="Venue" />
           </SelectTrigger>
           <SelectContent className="bg-[#16161f] border-white/10 text-white">
@@ -1474,6 +1485,45 @@ function ShowTimeEditor({
           </SelectContent>
         </Select>
       </div>
+      {tickets ? (
+        <>
+          <div className="w-[6.25rem] shrink-0">
+            <FieldLabel>On sale</FieldLabel>
+            <Input
+              type="number"
+              min={0}
+              inputMode="numeric"
+              placeholder="—"
+              value={tickets.onSaleValue}
+              onChange={(e) => tickets.onSaleChange(e.target.value)}
+              onBlur={tickets.onSaleBlur}
+              className="bg-white/5 border-white/10 text-white h-10"
+            />
+          </div>
+          <div className="w-[6.25rem] shrink-0">
+            <FieldLabel>Sold</FieldLabel>
+            <Input
+              type="number"
+              min={0}
+              inputMode="numeric"
+              placeholder="—"
+              value={tickets.soldValue}
+              onChange={(e) => tickets.soldChange(e.target.value)}
+              onBlur={tickets.soldBlur}
+              className="bg-white/5 border-white/10 text-white h-10"
+            />
+            {tickets.soldRecordedAt ? (
+              <p className="text-[10px] text-white/40 mt-0.5 leading-tight">
+                Updated{" "}
+                {new Date(tickets.soldRecordedAt).toLocaleString(undefined, {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })}
+              </p>
+            ) : null}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -2018,65 +2068,44 @@ function ShowEventCard({
       </div>
 
       <CollapsibleContent className="p-4 pt-3 space-y-3">
-      <ShowTimeEditor show={show} venues={venues} onUpdate={patch} />
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <FieldLabel>Tickets on sale</FieldLabel>
-          <Input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            placeholder="—"
-            value={ticketsOnSaleInput}
-            onChange={(e) => setTicketsOnSaleInput(e.target.value)}
-            onBlur={() => {
-              const raw = ticketsOnSaleInput.trim();
-              if (raw === "") {
-                patch({ ticketsOnSale: null });
-                return;
-              }
-              const n = Number.parseInt(raw, 10);
-              if (!Number.isFinite(n) || n < 0) {
-                setTicketsOnSaleInput(show.ticketsOnSale != null ? String(show.ticketsOnSale) : "");
-                return;
-              }
-              patch({ ticketsOnSale: n });
-            }}
-            className="bg-white/5 border-white/10 text-white"
-          />
-        </div>
-        <div>
-          <FieldLabel>Sold tickets</FieldLabel>
-          <Input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            placeholder="—"
-            value={soldTicketsInput}
-            onChange={(e) => setSoldTicketsInput(e.target.value)}
-            onBlur={() => {
-              const raw = soldTicketsInput.trim();
-              if (raw === "") {
-                patch({ soldTickets: null });
-                return;
-              }
-              const n = Number.parseInt(raw, 10);
-              if (!Number.isFinite(n) || n < 0) {
-                setSoldTicketsInput(show.soldTickets != null ? String(show.soldTickets) : "");
-                return;
-              }
-              patch({ soldTickets: n });
-            }}
-            className="bg-white/5 border-white/10 text-white"
-          />
-          {show.soldTicketsRecordedAt ? (
-            <p className="text-[11px] text-white/40 mt-1">
-              Last updated {new Date(show.soldTicketsRecordedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-            </p>
-          ) : null}
-        </div>
-      </div>
+      <ShowTimeEditor
+        show={show}
+        venues={venues}
+        onUpdate={patch}
+        tickets={{
+          onSaleValue: ticketsOnSaleInput,
+          onSaleChange: setTicketsOnSaleInput,
+          onSaleBlur: () => {
+            const raw = ticketsOnSaleInput.trim();
+            if (raw === "") {
+              patch({ ticketsOnSale: null });
+              return;
+            }
+            const n = Number.parseInt(raw, 10);
+            if (!Number.isFinite(n) || n < 0) {
+              setTicketsOnSaleInput(show.ticketsOnSale != null ? String(show.ticketsOnSale) : "");
+              return;
+            }
+            patch({ ticketsOnSale: n });
+          },
+          soldValue: soldTicketsInput,
+          soldChange: setSoldTicketsInput,
+          soldBlur: () => {
+            const raw = soldTicketsInput.trim();
+            if (raw === "") {
+              patch({ soldTickets: null });
+              return;
+            }
+            const n = Number.parseInt(raw, 10);
+            if (!Number.isFinite(n) || n < 0) {
+              setSoldTicketsInput(show.soldTickets != null ? String(show.soldTickets) : "");
+              return;
+            }
+            patch({ soldTickets: n });
+          },
+          soldRecordedAt: show.soldTicketsRecordedAt,
+        }}
+      />
 
       <div className="grid gap-3 md:grid-cols-2">
         <div>
