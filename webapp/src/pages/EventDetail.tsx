@@ -790,29 +790,8 @@ function DetailsTab({
             {/* ── Booking & contract ── */}
             <SectionHeader>Booking &amp; contract</SectionHeader>
             <p className="text-xs text-white/45 -mt-1 mb-2">
-              Booker contact details, company, technical liaison, and contract notes for confirming the engagement.
+              Company and booking party, contract contact, technical liaison, and contract notes for confirming the engagement.
             </p>
-
-            <FormItem>
-              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Primary / contract contact</FormLabel>
-              <ContactFieldsOneRowNote
-                row={{
-                  role: form.watch("primaryContactRole") ?? "",
-                  name: form.watch("primaryContactName") ?? "",
-                  phone: form.watch("primaryContactPhone") ?? "",
-                  email: form.watch("primaryContactEmail") ?? "",
-                  note: form.watch("primaryContactNote") ?? "",
-                }}
-                onChange={(patch) => {
-                  if (patch.role !== undefined) form.setValue("primaryContactRole", patch.role);
-                  if (patch.name !== undefined) form.setValue("primaryContactName", patch.name);
-                  if (patch.phone !== undefined) form.setValue("primaryContactPhone", patch.phone);
-                  if (patch.email !== undefined) form.setValue("primaryContactEmail", patch.email);
-                  if (patch.note !== undefined) form.setValue("primaryContactNote", patch.note);
-                }}
-                notePlaceholder="Booking lead: availability, preferred channel…"
-              />
-            </FormItem>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField
@@ -872,6 +851,27 @@ function DetailsTab({
                 }}
               />
             </div>
+
+            <FormItem>
+              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Primary / contract contact</FormLabel>
+              <ContactFieldsOneRowNote
+                row={{
+                  role: form.watch("primaryContactRole") ?? "",
+                  name: form.watch("primaryContactName") ?? "",
+                  phone: form.watch("primaryContactPhone") ?? "",
+                  email: form.watch("primaryContactEmail") ?? "",
+                  note: form.watch("primaryContactNote") ?? "",
+                }}
+                onChange={(patch) => {
+                  if (patch.role !== undefined) form.setValue("primaryContactRole", patch.role);
+                  if (patch.name !== undefined) form.setValue("primaryContactName", patch.name);
+                  if (patch.phone !== undefined) form.setValue("primaryContactPhone", patch.phone);
+                  if (patch.email !== undefined) form.setValue("primaryContactEmail", patch.email);
+                  if (patch.note !== undefined) form.setValue("primaryContactNote", patch.note);
+                }}
+                notePlaceholder="Booking lead: availability, preferred channel…"
+              />
+            </FormItem>
 
             <FormItem>
               <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical contact</FormLabel>
