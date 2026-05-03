@@ -95,6 +95,7 @@ import {
   type EventContactRowFields,
 } from "@/lib/eventContactRow";
 import { parseEventCustomFieldsJson, type EventCustomField } from "@/lib/eventCustomFields";
+import { StatusBadge } from "@/components/StatusBadge";
 
 type TeamDocument = {
   id: string;
@@ -1457,13 +1458,19 @@ function ShowTimeEditor({
           value={show.status}
           onValueChange={(v) => onUpdate({ status: v })}
         >
-          <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
+          <SelectTrigger className="bg-white/5 border-white/10 text-white h-10 [&>span]:flex [&>span]:min-w-0 [&>span]:items-center">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-[#16161f] border-white/10 text-white">
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="confirmed">Confirmed</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
+          <SelectContent className="bg-[#16161f] border-white/10 text-white min-w-[10.5rem]">
+            <SelectItem value="draft">
+              <StatusBadge status="draft" className="text-[10px] py-px" />
+            </SelectItem>
+            <SelectItem value="confirmed">
+              <StatusBadge status="confirmed" className="text-[10px] py-px" />
+            </SelectItem>
+            <SelectItem value="cancelled">
+              <StatusBadge status="cancelled" className="text-[10px] py-px" />
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
