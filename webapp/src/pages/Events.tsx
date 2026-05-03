@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { Plus, Trash2, Eye, Filter } from "lucide-react";
+import { Plus, Trash2, Eye, Filter, Check } from "lucide-react";
 import { api } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import type { Event } from "@/lib/types";
+import { computeShowStaffingStats } from "@/lib/eventShowStaffing";
+import type { EventDetail, EventShow } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate } from "@/lib/dateUtils";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
@@ -41,7 +43,7 @@ export default function Events() {
 
   const { data: events, isLoading, error } = useQuery({
     queryKey: ["events"],
-    queryFn: () => api.get<Event[]>("/api/events"),
+    queryFn: () => api.get<EventDetail[]>("/api/events"),
   });
 
   const deleteMutation = useMutation({
@@ -135,6 +137,13 @@ export default function Events() {
               const isDraft = event.status === "draft";
               const isCancelled = event.status === "cancelled";
               const isConfirmed = event.status === "confirmed";
+              const teams = event.teams ?? [];
+              const shows = [...(event.shows ?? [])].sort((a, b) => {
+                const da = a.showDate.slice(0, 10);
+                const db = b.showDate.slice(0, 10);
+                if (da !== db) return da.localeCompare(db);
+                return a.showTime.localeCompare(b.showTime);
+              });
               return (
               <div key={event.id} className="contents group">
                 <div
@@ -161,6 +170,30 @@ export default function Events() {
                       </span>
                     )}
                   </div>
+                  {shows.length > 0 ? (
+                    <ul className="mt-2 space-y-1">
+                      {shows.map((show) => {
+                        const { ok, total } = computeShowStaffingStats(show, teams);
+                        const showOff = show.status === "cancelled";
+                        return (
+                          <li
+                            key={show.id}
+                            className={cn(
+                              "flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] leading-snug",
+                              showOff ? "text-white/30 line-through decoration-white/20" : "text-white/50"
+                            )}
+                          >
+                            <span className={showOff ? undefined : "text-white/70"}>
+                              {formatEventListShowWhen(show)}
+                            </span>
+                            <EventListStaffingHint ok={ok} total={total} muted={showOff} />
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-[11px] text-white/35">No shows scheduled</p>
+                  )}
                 </div>
                 <div
                   className="px-5 py-3.5 border-b border-white/5 text-sm text-white/50 hidden sm:flex items-center cursor-pointer"
@@ -226,5 +259,42 @@ export default function Events() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function formatEventListShowWhen(show: EventShow): string {
+  const day = new Date(show.showDate.slice(0, 10));
+  const dateStr = day.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  return `${dateStr} · ${show.showTime}`;
+}
+
+function EventListStaffingHint({
+  ok,
+  total,
+  muted,
+}: {
+  ok: number;
+  total: number;
+  muted?: boolean;
+}) {
+  if (total === 0) {
+    return <span className={cn("text-white/35", muted && "text-white/25")}>No teams</span>;
+  }
+  if (ok === total) {
+    return (
+      <span
+        className={cn("inline-flex items-center gap-0.5 text-emerald-400", muted && "text-emerald-400/50")}
+      >
+        <Check size={10} className="shrink-0" aria-hidden />
+        Staffing OK
+      </span>
+    );
+  }
+  return (
+    <span className={cn("text-amber-400/90", muted && "text-amber-400/40")}>{ok}/{total} teams OK</span>
   );
 }
