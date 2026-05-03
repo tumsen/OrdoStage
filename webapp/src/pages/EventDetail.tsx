@@ -111,7 +111,6 @@ type TeamDocument = {
 const EventEditSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  status: z.enum(["draft", "confirmed", "cancelled"]),
   venueId: z.string().optional(),
   primaryContactRole: z.string().optional(),
   primaryContactName: z.string().optional(),
@@ -153,7 +152,6 @@ function emptyEventFormValues(): EventEditValues {
   return {
     title: "",
     description: "",
-    status: "draft",
     venueId: "",
     primaryContactRole: "",
     primaryContactName: "",
@@ -213,18 +211,12 @@ type GeneralEventFields = {
   companyCountry: string;
 };
 
-function normalizeEventStatus(s: string | undefined): "draft" | "confirmed" | "cancelled" {
-  if (s === "confirmed" || s === "cancelled" || s === "draft") return s;
-  return "draft";
-}
-
 function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditValues {
   const primary = parseStoredContactRow(e.contactPerson);
   const technical = parseStoredContactRow(g.technicalContactInfo);
   return {
     title: e.title,
     description: e.description ?? "",
-    status: normalizeEventStatus(e.status),
     venueId: e.venueId ?? "",
     primaryContactRole: primary.role,
     primaryContactName: primary.name,
@@ -575,7 +567,7 @@ function DetailsTab({
     if (isNew) {
       const payload: Record<string, unknown> = {
         title: values.title,
-        status: values.status,
+        status: "draft",
       };
       if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
       if (values.description) payload.description = values.description;
@@ -592,7 +584,6 @@ function DetailsTab({
 
     const payload: Record<string, unknown> = {
       title: values.title,
-      status: values.status,
     };
     payload.startDate = null;
     payload.endDate = null;
@@ -689,67 +680,42 @@ function DetailsTab({
             />
             <p className="text-xs text-white/40">
               Schedule and duration are per show (below). Default venue is for reference; each show can use a different venue.
+              Draft / confirmed / cancelled is set on each show below, not here.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
+            <FormField
+              control={form.control}
+              name="venueId"
+              render={({ field }) => {
+                const vid = field.value ?? "";
+                const venueIds = new Set((venues ?? []).map((x) => x.id));
+                const orphan =
+                  Boolean(vid && vid !== "__none__" && !venueIds.has(vid));
+                const selectValue = orphan ? vid : vid || "__none__";
+                return (
                   <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={normalizeEventStatus(field.value)}
-                    >
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Venue</FormLabel>
+                    <Select onValueChange={field.onChange} value={selectValue}>
                       <FormControl>
                         <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                          <SelectValue />
+                          <SelectValue placeholder="No venue" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="confirmed">Confirmed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="__none__">No venue</SelectItem>
+                        {orphan ? (
+                          <SelectItem value={vid}>Unavailable venue (re-select or clear)</SelectItem>
+                        ) : null}
+                        {(venues ?? []).map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="venueId"
-                render={({ field }) => {
-                  const vid = field.value ?? "";
-                  const venueIds = new Set((venues ?? []).map((x) => x.id));
-                  const orphan =
-                    Boolean(vid && vid !== "__none__" && !venueIds.has(vid));
-                  const selectValue = orphan ? vid : vid || "__none__";
-                  return (
-                    <FormItem>
-                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Venue</FormLabel>
-                      <Select onValueChange={field.onChange} value={selectValue}>
-                        <FormControl>
-                          <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                            <SelectValue placeholder="No venue" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                          <SelectItem value="__none__">No venue</SelectItem>
-                          {orphan ? (
-                            <SelectItem value={vid}>Unavailable venue (re-select or clear)</SelectItem>
-                          ) : null}
-                          {(venues ?? []).map((v) => (
-                            <SelectItem key={v.id} value={v.id}>
-                              {v.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  );
-                }}
-              />
-            </div>
+                );
+              }}
+            />
             {venueSizeWarnings && venueSizeWarnings.length > 0 ? (
               <div
                 role="status"

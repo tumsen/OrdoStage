@@ -189,10 +189,10 @@ export default function Events() {
                       <ul
                         className="min-w-[min(100%,42rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
                         style={{
-                          /* Venue=max longest name in this event; flex space goes to tickets (last 1fr). */
+                          /* Venue, staffing, people, hours: max-content; little pad after venue; tickets 1fr. */
                           gridTemplateColumns: hour12
-                            ? "auto 10ch max-content minmax(8rem,11ch) max-content 6.5rem 2.25rem 3.25rem minmax(0,1fr)"
-                            : "auto 10ch max-content 6ch max-content 6.5rem 2.25rem 3.25rem minmax(0,1fr)",
+                            ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content max-content minmax(0,1fr)"
+                            : "auto 10ch max-content 6ch max-content max-content max-content max-content minmax(0,1fr)",
                         }}
                       >
                         {shows.map((show) => {
@@ -250,7 +250,7 @@ export default function Events() {
                                 {when.timeLabel}
                               </span>
                               <span
-                                className={cn("min-w-0 truncate", rowTone, venueTone)}
+                                className={cn("min-w-0 truncate pr-2", rowTone, venueTone)}
                                 title={venueName}
                               >
                                 {venueName}
@@ -260,7 +260,7 @@ export default function Events() {
                               </div>
                               <span
                                 className={cn(
-                                  "block w-full text-right tabular-nums",
+                                  "block whitespace-nowrap text-right tabular-nums",
                                   showOff
                                     ? "text-white/25 line-through decoration-white/20"
                                     : "text-white/45"
@@ -271,7 +271,7 @@ export default function Events() {
                               </span>
                               <span
                                 className={cn(
-                                  "block w-full text-right tabular-nums",
+                                  "block whitespace-nowrap pr-2 text-right tabular-nums",
                                   showOff
                                     ? "text-white/25 line-through decoration-white/20"
                                     : "text-white/45"
@@ -282,7 +282,7 @@ export default function Events() {
                               </span>
                               <div
                                 className={cn(
-                                  "min-w-0 truncate text-right sm:text-left",
+                                  "min-w-0 truncate pl-2 text-right sm:text-left",
                                   ticketBits ? (showOff ? "text-white/35" : "text-white/45") : "text-white/25",
                                   showOff && "line-through decoration-white/20"
                                 )}
