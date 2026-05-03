@@ -247,22 +247,28 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
             </div>
             <div
               ref={profileTextColRef}
-              className="flex-1 min-w-0 flex flex-col gap-px justify-center leading-none self-stretch"
+              className="flex-1 min-w-0 flex flex-col justify-center leading-none self-stretch"
             >
-              <SingleLineFitText
-                text={displayName}
-                fitWidth={profileTextColWidth}
-                maxPx={6}
-                minPx={3}
-                className="font-medium text-white/90"
-              />
-              <SingleLineFitText
-                text={userEmail}
-                fitWidth={profileTextColWidth}
-                maxPx={5}
-                minPx={3}
-                className="text-white/45"
-              />
+              {/* zoom shrinks rendering below browser “minimum font size” quirks */}
+              <div
+                className="w-full min-w-0 flex flex-col gap-px origin-top-left"
+                style={{ zoom: 0.72 }}
+              >
+                <SingleLineFitText
+                  text={displayName}
+                  fitWidth={profileTextColWidth}
+                  maxPx={5}
+                  minPx={3}
+                  className="font-medium text-white/90"
+                />
+                <SingleLineFitText
+                  text={userEmail}
+                  fitWidth={profileTextColWidth}
+                  maxPx={4}
+                  minPx={3}
+                  className="text-white/45"
+                />
+              </div>
             </div>
           </div>
         ) : null}
