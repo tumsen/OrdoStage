@@ -5,7 +5,7 @@ import { Plus, Trash2, Eye, Filter, Check } from "lucide-react";
 import { api } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import { computeShowStaffingStats } from "@/lib/eventShowStaffing";
+import { computeEventWorkTotals, computeShowStaffingStats } from "@/lib/eventShowStaffing";
 import type { EventDetail, EventShow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -164,6 +164,7 @@ export default function Events() {
                 statusFilter === "all"
                   ? showsSorted
                   : showsSorted.filter((s) => effectiveShowStatus(s) === statusFilter);
+              const eventWorkTotals = computeEventWorkTotals(event.shows ?? []);
               return (
               <div key={event.id} className="contents group">
                 <div
@@ -177,24 +178,37 @@ export default function Events() {
                   </div>
                   {shows.length > 0 ? (
                     <div className="mt-1 overflow-x-auto -mx-1 px-1">
-                      <ul className="space-y-px min-w-[min(100%,32rem)]">
+                      <ul className="min-w-[min(100%,56rem)]">
                         {shows.map((show) => {
-                          const { ok, total } = computeShowStaffingStats(show, teams);
+                          const stats = computeShowStaffingStats(show, teams);
+                          const { ok, total } = stats;
                           const showOff = effectiveShowStatus(show) === "cancelled";
                           const venueName = show.venue?.name ?? "Venue";
                           const ticketBits = formatEventListTicketBits(show, prefsLocale, hour12);
                           const when = formatEventListWhenParts(show, prefsLocale, hour12);
                           const showStatus = effectiveShowStatus(show);
+                          const hoursLabel =
+                            stats.jobHours >= 10 ? stats.jobHours.toFixed(1) : stats.jobHours.toFixed(2);
                           return (
                             <li
                               key={show.id}
                               className={cn(
-                                "grid gap-x-2 text-[11px] leading-tight items-center [grid-template-columns:minmax(6.25rem,auto)_4.5rem_minmax(0,1fr)_minmax(6rem,auto)_minmax(0,1.1fr)_auto]",
+                                "grid gap-x-1.5 text-[10px] leading-none items-center py-px [grid-template-columns:2.25rem_minmax(3.25rem,4.5rem)_4.5rem_minmax(0,1fr)_minmax(5rem,auto)_minmax(0,1fr)_2rem_2.75rem_auto]",
                                 showOff ? "text-white/30 line-through decoration-white/20" : "text-white/50"
                               )}
                             >
-                              <div className={cn("min-w-0 truncate", showOff ? undefined : "text-white/70")}>
-                                {when.dateLabel}
+                              <div
+                                className={cn(
+                                  "text-center shrink-0 tabular-nums",
+                                  showOff ? undefined : "text-white/65"
+                                )}
+                              >
+                                {when.weekdayLabel}
+                              </div>
+                              <div
+                                className={cn("min-w-0 tabular-nums text-center", showOff ? undefined : "text-white/70")}
+                              >
+                                {when.dateOnlyLabel}
                               </div>
                               <div
                                 className={cn(
@@ -222,6 +236,18 @@ export default function Events() {
                               >
                                 {ticketBits ?? "—"}
                               </div>
+                              <div
+                                className="text-center tabular-nums shrink-0 text-white/45"
+                                title={`${stats.people} people on this show`}
+                              >
+                                {stats.people}
+                              </div>
+                              <div
+                                className="text-right tabular-nums shrink-0 text-white/45"
+                                title={`${hoursLabel} h planned jobs`}
+                              >
+                                {hoursLabel}h
+                              </div>
                               <div className="shrink-0 justify-self-end">
                                 <StatusBadge
                                   status={showStatus}
@@ -232,6 +258,15 @@ export default function Events() {
                           );
                         })}
                       </ul>
+                      {event.shows && event.shows.length > 0 ? (
+                        <p className="text-[10px] leading-tight text-white/35 mt-1 pt-0.5 border-t border-white/[0.06] tabular-nums">
+                          Event total: {eventWorkTotals.people} people ·{" "}
+                          {eventWorkTotals.jobHours >= 10
+                            ? eventWorkTotals.jobHours.toFixed(1)
+                            : eventWorkTotals.jobHours.toFixed(2)}{" "}
+                          h planned
+                        </p>
+                      ) : null}
                     </div>
                   ) : (
                     <p className="mt-1 text-[11px] text-white/35">No shows scheduled</p>
@@ -296,14 +331,14 @@ function formatEventListWhenParts(
   show: EventShow,
   locale: string,
   hour12: boolean
-): { dateLabel: string; timeLabel: string } {
+): { weekdayLabel: string; dateOnlyLabel: string; timeLabel: string } {
   const base = new Date(show.showDate.slice(0, 10));
   const [hh, mm] = show.showTime.split(":").map((x) => Number(x));
   if (Number.isFinite(hh) && Number.isFinite(mm)) {
     base.setHours(hh, mm, 0, 0);
   }
-  const dateLabel = base.toLocaleDateString(locale, {
-    weekday: "short",
+  const weekdayLabel = base.toLocaleDateString(locale, { weekday: "short" });
+  const dateOnlyLabel = base.toLocaleDateString(locale, {
     day: "numeric",
     month: "short",
   });
@@ -312,7 +347,7 @@ function formatEventListWhenParts(
     minute: "2-digit",
     hour12,
   });
-  return { dateLabel, timeLabel };
+  return { weekdayLabel, dateOnlyLabel, timeLabel };
 }
 
 function formatEventListSoldAt(iso: string, locale: string, hour12: boolean): string {

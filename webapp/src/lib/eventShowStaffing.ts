@@ -30,3 +30,19 @@ export function computeShowStaffingStats(show: EventShow, eventTeams: EventTeam[
     jobHours: jobMinutes / 60,
   };
 }
+
+/** Unique people and total job hours across all shows on an event (staffing + jobs). */
+export function computeEventWorkTotals(shows: EventShow[]) {
+  const people = new Set<string>();
+  let jobMinutes = 0;
+  for (const show of shows) {
+    for (const j of show.jobs ?? []) {
+      jobMinutes += j.durationMinutes ?? 0;
+      if (j.personId) people.add(j.personId);
+    }
+    for (const s of show.staffing ?? []) {
+      people.add(s.personId);
+    }
+  }
+  return { people: people.size, jobHours: jobMinutes / 60 };
+}
