@@ -186,7 +186,7 @@ export default function Events() {
                   </div>
                   {shows.length > 0 ? (
                     <div className="mt-1 overflow-x-auto -mx-1 px-1">
-                      <ul className="min-w-[min(100%,42rem)] space-y-px">
+                      <ul className="min-w-[min(100%,52rem)] space-y-px">
                         {shows.map((show) => {
                           const stats = computeShowStaffingStats(show, teams);
                           const { ok, total } = stats;
@@ -205,7 +205,7 @@ export default function Events() {
                               )}
                               style={{
                                 gridTemplateColumns:
-                                  "auto 1.625rem auto minmax(5rem,1fr) minmax(7.25rem,auto) 1.75rem 3rem minmax(5.5rem,1fr)",
+                                  "auto minmax(6.5rem,max-content) auto minmax(8rem,1fr) 1.75rem 3rem minmax(5.5rem,1fr)",
                               }}
                             >
                               <div className="shrink-0 justify-self-start">
@@ -216,7 +216,7 @@ export default function Events() {
                               </div>
                               <span
                                 className={cn(
-                                  "text-center tabular-nums",
+                                  "min-w-0 text-left leading-tight",
                                   showOff ? undefined : "text-white/[0.82]"
                                 )}
                               >
@@ -224,21 +224,23 @@ export default function Events() {
                               </span>
                               <div
                                 className={cn(
-                                  "flex items-center gap-0 shrink-0 tabular-nums justify-start",
+                                  "flex items-center gap-0 shrink-0 tabular-nums justify-start whitespace-nowrap",
                                   showOff ? undefined : "text-white/[0.82]"
                                 )}
                               >
-                                <span className="inline-block w-[2.75rem] text-center">{when.dateOnlyLabel}</span>
-                                <span className="inline-block w-[3.25rem] text-right pl-0.5">{when.timeLabel}</span>
+                                <span>{when.dateOnlyLabel}</span>
+                                <span className="pl-0.5 text-right tabular-nums">{when.timeLabel}</span>
                               </div>
-                              <span
-                                className={cn("truncate min-w-0", showOff ? undefined : "text-white/55")}
-                                title={venueName}
-                              >
-                                {venueName}
-                              </span>
-                              <div className="min-w-0 truncate justify-self-start">
-                                <EventListStaffingHint ok={ok} total={total} muted={showOff} />
+                              <div className="flex min-w-0 items-center gap-x-2">
+                                <span
+                                  className={cn("truncate min-w-0", showOff ? undefined : "text-white/55")}
+                                  title={venueName}
+                                >
+                                  {venueName}
+                                </span>
+                                <div className="shrink-0 truncate">
+                                  <EventListStaffingHint ok={ok} total={total} muted={showOff} />
+                                </div>
                               </div>
                               <span
                                 className="inline-block w-full text-center tabular-nums text-white/45"
@@ -339,10 +341,11 @@ function formatEventListWhenParts(
   if (Number.isFinite(hh) && Number.isFinite(mm)) {
     base.setHours(hh, mm, 0, 0);
   }
-  const weekdayLabel = base.toLocaleDateString(locale, { weekday: "short" });
+  const weekdayLabel = base.toLocaleDateString(locale, { weekday: "long" });
   const dateOnlyLabel = base.toLocaleDateString(locale, {
     day: "numeric",
-    month: "short",
+    month: "long",
+    year: "numeric",
   });
   const timeLabel = base.toLocaleTimeString(locale, {
     hour: "2-digit",
