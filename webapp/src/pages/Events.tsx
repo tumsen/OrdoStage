@@ -187,10 +187,10 @@ export default function Events() {
                   {shows.length > 0 ? (
                     <div className="mt-1 overflow-x-auto -mx-1 px-1">
                       <ul
-                        className="min-w-[min(100%,56rem)] grid items-center gap-x-1 gap-y-px text-[10px] leading-none"
+                        className="min-w-[min(100%,46rem)] grid items-center gap-x-0 gap-y-px text-[10px] leading-none"
                         style={{
                           gridTemplateColumns:
-                            "auto 7rem 13rem minmax(0,10rem) 9.5rem 2.5rem 3.75rem minmax(5rem,1fr)",
+                            "auto 6.75rem minmax(10rem,11.75rem) minmax(0,7rem) 6.75rem 2.25rem 3.5rem minmax(0,1fr)",
                         }}
                       >
                         {shows.map((show) => {
