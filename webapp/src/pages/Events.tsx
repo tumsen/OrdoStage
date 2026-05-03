@@ -255,12 +255,12 @@ export default function Events() {
                               >
                                 {venueName}
                               </span>
-                              <div className="min-w-0 truncate">
+                              <div className="min-w-0 truncate pr-4">
                                 <EventListStaffingHint ok={ok} total={total} muted={showOff} />
                               </div>
                               <span
                                 className={cn(
-                                  "block whitespace-nowrap text-right tabular-nums",
+                                  "block whitespace-nowrap pr-3 text-right tabular-nums",
                                   showOff
                                     ? "text-white/25 line-through decoration-white/20"
                                     : "text-white/45"
@@ -271,14 +271,14 @@ export default function Events() {
                               </span>
                               <span
                                 className={cn(
-                                  "block whitespace-nowrap pr-2 text-right tabular-nums",
+                                  "block whitespace-nowrap pl-2 pr-2 text-right tabular-nums",
                                   showOff
                                     ? "text-white/25 line-through decoration-white/20"
                                     : "text-white/45"
                                 )}
-                                title={`${hoursLabel} h planned jobs`}
+                                title="Total planned hours for this show"
                               >
-                                {hoursLabel}h
+                                {hoursLabel} h
                               </span>
                               <div
                                 className={cn(
