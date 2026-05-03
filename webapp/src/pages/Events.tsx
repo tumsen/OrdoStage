@@ -205,7 +205,7 @@ export default function Events() {
                               )}
                               style={{
                                 gridTemplateColumns:
-                                  "auto minmax(6.5rem,max-content) auto minmax(8rem,1fr) 1.75rem 3rem minmax(5.5rem,1fr)",
+                                  "auto minmax(6.5rem,max-content) auto minmax(0,12rem) max-content 1.75rem 3rem minmax(5rem,1fr)",
                               }}
                             >
                               <div className="shrink-0 justify-self-start">
@@ -231,16 +231,14 @@ export default function Events() {
                                 <span>{when.dateOnlyLabel}</span>
                                 <span className="pl-0.5 text-right tabular-nums">{when.timeLabel}</span>
                               </div>
-                              <div className="flex min-w-0 items-center gap-x-2">
-                                <span
-                                  className={cn("truncate min-w-0", showOff ? undefined : "text-white/55")}
-                                  title={venueName}
-                                >
-                                  {venueName}
-                                </span>
-                                <div className="shrink-0 truncate">
-                                  <EventListStaffingHint ok={ok} total={total} muted={showOff} />
-                                </div>
+                              <span
+                                className={cn("truncate min-w-0", showOff ? undefined : "text-white/55")}
+                                title={venueName}
+                              >
+                                {venueName}
+                              </span>
+                              <div className="min-w-0 truncate justify-self-start">
+                                <EventListStaffingHint ok={ok} total={total} muted={showOff} />
                               </div>
                               <span
                                 className="inline-block w-full text-center tabular-nums text-white/45"
