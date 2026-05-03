@@ -29,12 +29,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { usePreferences } from "@/hooks/usePreferences";
+import { localeForLanguage } from "@/lib/preferences";
 
 type StatusFilter = "all" | "draft" | "confirmed" | "cancelled";
 
 export default function Events() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { effective } = usePreferences();
+  const prefsLocale = localeForLanguage(effective?.language ?? "en");
+  const hour12 = effective?.timeFormat === "12h";
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -169,37 +174,55 @@ export default function Events() {
                     )}
                   </div>
                   {shows.length > 0 ? (
-                    <ul className="mt-2 space-y-1">
-                      {shows.map((show) => {
-                        const { ok, total } = computeShowStaffingStats(show, teams);
-                        const showOff = show.status === "cancelled";
-                        const venueName = show.venue?.name ?? "Venue";
-                        const ticketBits = formatEventListTicketBits(show);
-                        return (
-                          <li
-                            key={show.id}
-                            className={cn(
-                              "flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] leading-snug",
-                              showOff ? "text-white/30 line-through decoration-white/20" : "text-white/50"
-                            )}
-                          >
-                            <span className={showOff ? undefined : "text-white/70"}>
-                              {formatEventListShowWhen(show)}
-                            </span>
-                            <span className="text-white/40">·</span>
-                            <span className={cn(showOff ? undefined : "text-white/55")}>{venueName}</span>
-                            <span className="text-white/40">·</span>
-                            <EventListStaffingHint ok={ok} total={total} muted={showOff} />
-                            {ticketBits ? (
-                              <>
-                                <span className="text-white/40">·</span>
-                                <span className={cn(showOff ? "text-white/35" : "text-white/45")}>{ticketBits}</span>
-                              </>
-                            ) : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <div className="mt-2 overflow-x-auto -mx-1 px-1">
+                      <ul className="space-y-1.5 min-w-[min(100%,36rem)]">
+                        {shows.map((show) => {
+                          const { ok, total } = computeShowStaffingStats(show, teams);
+                          const showOff = show.status === "cancelled";
+                          const venueName = show.venue?.name ?? "Venue";
+                          const ticketBits = formatEventListTicketBits(show, prefsLocale, hour12);
+                          const when = formatEventListWhenParts(show, prefsLocale, hour12);
+                          return (
+                            <li
+                              key={show.id}
+                              className={cn(
+                                "grid gap-x-3 gap-y-0.5 text-[11px] leading-snug items-start [grid-template-columns:minmax(9.25rem,11rem)_minmax(0,1fr)_minmax(7rem,auto)_minmax(0,1.15fr)]",
+                                showOff ? "text-white/30 line-through decoration-white/20" : "text-white/50"
+                              )}
+                            >
+                              <div className="min-w-0">
+                                <div className="leading-tight">
+                                  <span className={cn("block", showOff ? undefined : "text-white/70")}>
+                                    {when.dateLabel}
+                                  </span>
+                                  <span className={cn("block", showOff ? undefined : "text-white/60")}>
+                                    {when.timeLabel}
+                                  </span>
+                                </div>
+                              </div>
+                              <div
+                                className={cn("min-w-0 truncate", showOff ? undefined : "text-white/55")}
+                                title={venueName}
+                              >
+                                {venueName}
+                              </div>
+                              <div className="min-w-0">
+                                <EventListStaffingHint ok={ok} total={total} muted={showOff} />
+                              </div>
+                              <div
+                                className={cn(
+                                  "min-w-0 text-right sm:text-left truncate",
+                                  ticketBits ? (showOff ? "text-white/35" : "text-white/45") : "text-white/25"
+                                )}
+                                title={ticketBits ?? undefined}
+                              >
+                                {ticketBits ?? "—"}
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
                   ) : (
                     <p className="mt-2 text-[11px] text-white/35">No shows scheduled</p>
                   )}
@@ -265,29 +288,42 @@ export default function Events() {
   );
 }
 
-function formatEventListShowWhen(show: EventShow): string {
-  const day = new Date(show.showDate.slice(0, 10));
-  const dateStr = day.toLocaleDateString(undefined, {
+function formatEventListWhenParts(
+  show: EventShow,
+  locale: string,
+  hour12: boolean
+): { dateLabel: string; timeLabel: string } {
+  const base = new Date(show.showDate.slice(0, 10));
+  const [hh, mm] = show.showTime.split(":").map((x) => Number(x));
+  if (Number.isFinite(hh) && Number.isFinite(mm)) {
+    base.setHours(hh, mm, 0, 0);
+  }
+  const dateLabel = base.toLocaleDateString(locale, {
     weekday: "short",
     day: "numeric",
     month: "short",
   });
-  return `${dateStr} · ${show.showTime}`;
+  const timeLabel = base.toLocaleTimeString(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12,
+  });
+  return { dateLabel, timeLabel };
 }
 
-function formatEventListSoldAt(iso: string): string {
+function formatEventListSoldAt(iso: string, locale: string, hour12: boolean): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return d.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short", hour12 });
 }
 
 /** Returns null when no ticket fields are set. */
-function formatEventListTicketBits(show: EventShow): string | null {
+function formatEventListTicketBits(show: EventShow, locale: string, hour12: boolean): string | null {
   const parts: string[] = [];
   if (show.ticketsOnSale != null) parts.push(`On sale ${show.ticketsOnSale}`);
   if (show.soldTickets != null) parts.push(`Sold ${show.soldTickets}`);
   if (show.soldTicketsRecordedAt) {
-    parts.push(`Sold updated ${formatEventListSoldAt(show.soldTicketsRecordedAt)}`);
+    parts.push(`Sold updated ${formatEventListSoldAt(show.soldTicketsRecordedAt, locale, hour12)}`);
   }
   return parts.length > 0 ? parts.join(" · ") : null;
 }

@@ -28,7 +28,12 @@ export type AnnouncementBarPayload = {
   } | null;
 };
 
-function formatWhen(isoDate: string, timeHHmm: string, locale: string): string {
+function formatWhen(
+  isoDate: string,
+  timeHHmm: string,
+  locale: string,
+  hour12: boolean
+): string {
   const day = new Date(isoDate);
   if (!Number.isFinite(day.getTime())) return timeHHmm;
   const [hh, mm] = timeHHmm.split(":").map((x) => Number(x));
@@ -40,6 +45,7 @@ function formatWhen(isoDate: string, timeHHmm: string, locale: string): string {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12,
   });
 }
 
@@ -56,6 +62,7 @@ export function WorkAnnouncementBar() {
       : effective?.language === "de"
         ? "de-DE"
         : "en-US";
+  const hour12 = effective?.timeFormat === "12h";
 
   const { data } = useQuery({
     queryKey: ["me", "announcement-bar"],
@@ -96,7 +103,7 @@ export function WorkAnnouncementBar() {
               <span className="text-white/55"> · {nextAssignedJob.eventTitle}</span>
               <span className="text-white/45 text-xs sm:text-sm">
                 {" "}
-                — {formatWhen(nextAssignedJob.jobDate, nextAssignedJob.startTime, locale)}
+                — {formatWhen(nextAssignedJob.jobDate, nextAssignedJob.startTime, locale, hour12)}
                 {nextAssignedJob.venueName ? ` · ${nextAssignedJob.venueName}` : ""}
               </span>
             </span>
@@ -122,7 +129,7 @@ export function WorkAnnouncementBar() {
               <span className="font-medium text-white">{nextOrgShow.eventTitle}</span>
               <span className="text-white/45 text-xs sm:text-sm">
                 {" "}
-                — {formatWhen(nextOrgShow.showDate, nextOrgShow.showTime, locale)}
+                — {formatWhen(nextOrgShow.showDate, nextOrgShow.showTime, locale, hour12)}
                 {nextOrgShow.venueName ? ` · ${nextOrgShow.venueName}` : ""}
               </span>
               {nextOrgShow.status === "draft" ? (
