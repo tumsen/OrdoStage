@@ -2031,7 +2031,10 @@ function ShowEventCard({
           >
             {cardOpen ? <ChevronDown size={16} className="text-white/45 shrink-0 mt-0.5" /> : <ChevronRight size={16} className="text-white/45 shrink-0 mt-0.5" />}
             <div className="min-w-0 flex-1 space-y-1">
-              <p className="text-sm font-medium text-white/90 leading-snug">{summaryLine}</p>
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <StatusBadge status={show.status} className="text-[10px] py-px shrink-0" />
+                <p className="text-sm font-medium text-white/90 leading-snug min-w-0">{summaryLine}</p>
+              </div>
               <p className="text-[11px] text-white/45 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                 <span className="inline-flex items-center gap-1">
                   {stats.total > 0 && stats.ok === stats.total ? (
