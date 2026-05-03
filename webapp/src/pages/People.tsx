@@ -67,7 +67,6 @@ interface Team {
 
 // ── Form schema ───────────────────────────────────────────────────────────────
 
-const PRESET_ROLES = ["Tour Manager", "Actor", "Tech"] as const;
 const SOFTWARE_OWNER_EMAIL = "tumsen@gmail.com";
 
 const PersonFormSchema = z.object({
@@ -75,8 +74,8 @@ const PersonFormSchema = z.object({
   affiliation: z.enum(["internal", "external"], {
     required_error: "Choose internal or external",
   }),
-  rolePreset: z.string().optional(),
-  roleCustom: z.string().optional(),
+  /** Directory job title (free text). */
+  role: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
   addressStreet:  z.string().optional(),
@@ -135,18 +134,6 @@ function sortPeopleList(people: Person[], mode: PeopleSortMode): Person[] {
     default:
       return list;
   }
-}
-
-function resolveRole(values: PersonFormValues): string | undefined {
-  if (!values.rolePreset || values.rolePreset === "") return undefined;
-  if (values.rolePreset === "other") return values.roleCustom || undefined;
-  return values.rolePreset;
-}
-
-function roleToFormValues(role: string | null): { rolePreset: string; roleCustom: string } {
-  if (!role) return { rolePreset: "", roleCustom: "" };
-  if ((PRESET_ROLES as readonly string[]).includes(role)) return { rolePreset: role, roleCustom: "" };
-  return { rolePreset: "other", roleCustom: role };
 }
 
 function toFriendlyPeopleSaveError(message: string): string {
@@ -411,19 +398,13 @@ function PersonFormDialog({
     enabled: open,
   });
 
-  const { rolePreset: defaultPreset, roleCustom: defaultCustom } = useMemo(
-    () => roleToFormValues(person?.role ?? null),
-    [person?.role]
-  );
-
   const form = useForm<PersonFormValues>({
     resolver: zodResolver(PersonFormSchema),
     values: person
       ? {
           name: person.name,
           affiliation: person.affiliation ?? "internal",
-          rolePreset: defaultPreset,
-          roleCustom: defaultCustom,
+          role: person.role ?? "",
           permissionGroupId: person.permissionGroupId ?? "",
           email: person.email ?? "",
           phone: person.phone ?? "",
@@ -445,8 +426,7 @@ function PersonFormDialog({
       : {
           name: "",
           affiliation: "internal",
-          rolePreset: "",
-          roleCustom: "",
+          role: "",
           permissionGroupId: "",
           email: "",
           phone: "",
@@ -514,7 +494,6 @@ function PersonFormDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- draft aligns when permission payload / doc identity changes
   }, [permissionState, permissionsDoc?.id, permissionOptions?.teams]);
 
-  const rolePreset = form.watch("rolePreset");
   const watchedAssignments = form.watch("teamAssignments");
   const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
   const sortedTeams = [...(teams ?? [])].sort((a, b) => a.name.localeCompare(b.name));
@@ -542,7 +521,7 @@ function PersonFormDialog({
       const payload = {
         name: values.name,
         affiliation: values.affiliation,
-        role: resolveRole(values),
+        role: values.role?.trim() || undefined,
         email: values.email || undefined,
         phone: values.phone || undefined,
         addressStreet:  values.addressStreet  || undefined,
@@ -595,6 +574,7 @@ function PersonFormDialog({
         );
       }
       queryClient.invalidateQueries({ queryKey: ["people"] });
+      queryClient.invalidateQueries({ queryKey: ["people", "me"] });
       if (personId) {
         queryClient.invalidateQueries({ queryKey: ["people", personId, "documents"] });
       }
@@ -625,6 +605,7 @@ function PersonFormDialog({
     mutationFn: () => api.delete(`/api/people/${person!.id}/photo`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["people"] });
+      queryClient.invalidateQueries({ queryKey: ["people", "me"] });
     },
   });
 
@@ -765,37 +746,13 @@ function PersonFormDialog({
                 Job title in the directory. You can set a different <strong className="text-white/40">role per team</strong> on the
                 Teams page. App access is not controlled here; use the permission group below (when the person has an email).
               </p>
-              <Controller
-                control={form.control}
-                name="rolePreset"
-                render={({ field }) => (
-                  <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                    <SelectTrigger className="bg-white/5 border-white/10 text-white mt-1">
-                      <SelectValue placeholder="Select default role…" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                      {PRESET_ROLES.map((r) => (
-                        <SelectItem key={r} value={r}>{r}</SelectItem>
-                      ))}
-                      <SelectItem value="other">Other...</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
+              <Input
+                {...form.register("role")}
+                placeholder="e.g. Tour Manager, Actor, Sound Engineer…"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 mt-1"
               />
             </div>
           </div>
-
-          {/* Custom role input */}
-          {rolePreset === "other" ? (
-            <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Custom default role</Label>
-              <Input
-                {...form.register("roleCustom")}
-                placeholder="e.g. Sound Engineer, Driver..."
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
-              />
-            </div>
-          ) : null}
 
           {/* Email + Phone */}
           <div className="grid grid-cols-2 gap-3">

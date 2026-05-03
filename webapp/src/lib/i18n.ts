@@ -27,6 +27,7 @@ const en = {
     switchOrganization: "Switch organization",
     current: "current",
     organizationFallback: "Organization",
+    defaultRole: "Default role",
   },
   billingAlerts: {
     overdueReadOnly: "Billing overdue. Your account is in read-only mode.",
@@ -143,6 +144,7 @@ const da: DeepPartial<typeof en> = {
     workspace: "Arbejdsrum",
     switchOrganization: "Skift organisation",
     current: "aktuel",
+    defaultRole: "Primær rolle",
   },
   account: {
     title: "Konto",
@@ -217,6 +219,7 @@ const de: DeepPartial<typeof en> = {
     workspace: "Arbeitsbereich",
     switchOrganization: "Organisation wechseln",
     current: "aktuell",
+    defaultRole: "Standardrolle",
   },
   account: {
     title: "Konto",

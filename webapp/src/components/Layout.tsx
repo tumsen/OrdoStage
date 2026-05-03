@@ -29,6 +29,7 @@ import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 import { OrgWorkspaceMenu } from "@/components/OrgWorkspaceMenu";
 import { WorkAnnouncementBar } from "@/components/WorkAnnouncementBar";
 import { useI18n } from "@/lib/i18n";
+import type { Person } from "../../../backend/src/types";
 
 interface OrgData {
   id: string;
@@ -73,12 +74,25 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
 
   const userEmail = session?.user?.email ?? "";
   const userName = session?.user?.name ?? userEmail;
-  const orgRole = (session?.user as Record<string, unknown>)?.orgRole as string ?? "viewer";
+
+  const { data: mePerson } = useQuery<Person | null>({
+    queryKey: ["people", "me"],
+    queryFn: () => api.get<Person | null>("/api/people/me"),
+    enabled: Boolean(session?.user),
+    staleTime: 60_000,
+  });
+
+  const displayName = mePerson?.name?.trim() || userName;
+  const defaultRoleLabel = mePerson?.role?.trim() || "";
+  const photoSrc =
+    mePerson?.id && mePerson.hasPhoto
+      ? `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${mePerson.id}/photo?ts=${mePerson.photoUpdatedAt ?? ""}`
+      : null;
   const isAdmin = Boolean((session?.user as Record<string, unknown> | undefined)?.isAdmin);
   const isSupportUser = userEmail.toLowerCase() === "tumsen@gmail.com";
   const canAccessOwnerAdmin = isAdmin || isSupportUser;
   const navBypass = canAccessOwnerAdmin;
-  const initials = userName
+  const initials = displayName
     .split(" ")
     .map((part: string) => part[0])
     .join("")
@@ -203,13 +217,33 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
       {/* User + Sign out */}
       <div className="px-3 py-4 border-t border-white/10 space-y-2">
         {session?.user ? (
-          <div className="flex items-center gap-2 px-3 py-2">
-            <div className="w-7 h-7 rounded-full bg-ordo-violet/45 ring-1 ring-ordo-magenta/25 flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-xs font-semibold">{initials || "?"}</span>
+          <div className="flex items-start gap-2.5 px-3 py-2">
+            <div className="w-9 h-9 rounded-full bg-ordo-violet/45 ring-1 ring-ordo-magenta/25 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {photoSrc ? (
+                <img
+                  src={photoSrc}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-white text-[11px] font-semibold leading-none">{initials || "?"}</span>
+              )}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-white/70 text-xs truncate">{userName}</div>
-              <span className="text-xs text-white/30 capitalize">{orgRole}</span>
+            <div className="flex-1 min-w-0 space-y-0.5">
+              <div className="text-white/90 text-xs font-medium leading-snug truncate" title={displayName}>
+                {displayName}
+              </div>
+              <div className="text-white/45 text-[11px] leading-snug truncate" title={userEmail}>
+                {userEmail}
+              </div>
+              <div className="text-white/35 text-[11px] leading-snug truncate" title={defaultRoleLabel || undefined}>
+                <span className="text-white/25">{t("nav.defaultRole")}</span>
+                {defaultRoleLabel ? (
+                  <span className="text-white/50"> · {defaultRoleLabel}</span>
+                ) : (
+                  <span className="text-white/25"> · —</span>
+                )}
+              </div>
             </div>
           </div>
         ) : null}
