@@ -83,7 +83,6 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
   });
 
   const displayName = mePerson?.name?.trim() || userName;
-  const defaultRoleLabel = mePerson?.role?.trim() || "";
   const photoSrc =
     mePerson?.id && mePerson.hasPhoto
       ? `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${mePerson.id}/photo?ts=${mePerson.photoUpdatedAt ?? ""}`
@@ -229,21 +228,19 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
                 <span className="text-white text-[11px] font-semibold leading-none">{initials || "?"}</span>
               )}
             </div>
-            <div className="flex-1 min-w-0 space-y-0.5">
-              <div className="text-white/90 text-xs font-medium leading-snug truncate" title={displayName}>
+            <div className="@container flex-1 min-w-0 flex flex-col gap-0.5 justify-center">
+              <p
+                className="font-medium leading-snug text-white/90 break-words [overflow-wrap:anywhere]"
+                style={{ fontSize: "clamp(10px, calc(8px + 2.8cqw), 12px)" }}
+              >
                 {displayName}
-              </div>
-              <div className="text-white/45 text-[11px] leading-snug truncate" title={userEmail}>
+              </p>
+              <p
+                className="leading-snug text-white/45 break-all [overflow-wrap:anywhere]"
+                style={{ fontSize: "clamp(9px, calc(7px + 2.4cqw), 11px)" }}
+              >
                 {userEmail}
-              </div>
-              <div className="text-white/35 text-[11px] leading-snug truncate" title={defaultRoleLabel || undefined}>
-                <span className="text-white/25">{t("nav.defaultRole")}</span>
-                {defaultRoleLabel ? (
-                  <span className="text-white/50"> · {defaultRoleLabel}</span>
-                ) : (
-                  <span className="text-white/25"> · —</span>
-                )}
-              </div>
+              </p>
             </div>
           </div>
         ) : null}
