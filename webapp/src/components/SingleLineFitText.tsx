@@ -1,45 +1,63 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-/** Small slack avoids subpixel overflow when rounded widths barely exceed the box. */
-const WIDTH_EPS = 1;
+/** Small slack so rounded widths do not clip the last pixel. */
+const WIDTH_EPS = 0.5;
 
-function fitFontSizePx(
-  el: HTMLElement,
-  available: number,
-  minPx: number,
-  maxPx: number
-): number {
-  const cap = Math.max(0, available - WIDTH_EPS);
-  el.style.fontSize = `${maxPx}px`;
-  if (el.scrollWidth <= cap) {
-    return maxPx;
-  }
-  el.style.fontSize = `${minPx}px`;
-  if (el.scrollWidth > cap) {
-    el.style.fontSize = `${minPx}px`;
-    return minPx;
-  }
-  let lo = minPx;
-  let hi = maxPx;
-  for (let i = 0; i < 24; i++) {
-    const mid = (lo + hi) / 2;
-    el.style.fontSize = `${mid}px`;
-    if (el.scrollWidth <= cap) lo = mid;
-    else hi = mid;
-  }
-  el.style.fontSize = `${lo}px`;
-  return lo;
-}
+/** Measure at this size, then scale down with font-size = REF_PX * min(1, available / width). */
+const REF_PX = 12;
 
 type Props = {
   text: string;
   className?: string;
   minPx?: number;
   maxPx?: number;
+  /**
+   * Width of the text column in px (e.g. sidebar row minus avatar), from a parent ResizeObserver.
+   * When set, fitting uses this value instead of the inner container’s width.
+   */
+  fitWidth?: number;
 };
 
-export function SingleLineFitText({ text, className, minPx = 4, maxPx = 6 }: Props) {
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
+/**
+ * Scales font size to fit `available` width: starts from REF_PX, applies linear scale, then clamps.
+ */
+function fitFontSizeToWidth(
+  el: HTMLElement,
+  available: number,
+  minPx: number,
+  maxPx: number,
+  text: string
+): number {
+  if (text.trim() === "") return maxPx;
+  const cap = Math.max(0, available - WIDTH_EPS);
+  if (cap <= 0) return minPx;
+
+  el.style.fontSize = `${REF_PX}px`;
+  const textWidth = el.scrollWidth;
+  if (textWidth <= 0) return maxPx;
+
+  const scale = Math.min(1, cap / textWidth);
+  let px = clamp(REF_PX * scale, minPx, maxPx);
+  el.style.fontSize = `${px}px`;
+  while (el.scrollWidth > cap && px > minPx + 0.01) {
+    px = Math.max(minPx, px - 0.35);
+    el.style.fontSize = `${px}px`;
+  }
+  return px;
+}
+
+export function SingleLineFitText({
+  text,
+  className,
+  minPx = 4,
+  maxPx = 11,
+  fitWidth,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const [fontSize, setFontSize] = useState(minPx);
@@ -51,7 +69,7 @@ export function SingleLineFitText({ text, className, minPx = 4, maxPx = 6 }: Pro
     const el = measureRef.current;
     if (!container || !el) return;
 
-    const readAvailableWidth = () => {
+    const readLocalWidth = () => {
       const cw = container.clientWidth;
       if (cw > 1) return cw;
       const rw = container.getBoundingClientRect().width;
@@ -59,9 +77,12 @@ export function SingleLineFitText({ text, className, minPx = 4, maxPx = 6 }: Pro
     };
 
     const run = () => {
-      const available = readAvailableWidth();
+      const fromParent =
+        fitWidth != null && Number.isFinite(fitWidth) && fitWidth > 1 ? fitWidth : 0;
+      const available = fromParent > 0 ? fromParent : readLocalWidth();
+
       if (available <= 1) {
-        if (rafAttemptsRef.current < 12) {
+        if (rafAttemptsRef.current < 20) {
           rafAttemptsRef.current += 1;
           requestAnimationFrame(() => {
             requestAnimationFrame(run);
@@ -74,8 +95,7 @@ export function SingleLineFitText({ text, className, minPx = 4, maxPx = 6 }: Pro
       }
       rafAttemptsRef.current = 0;
 
-      const px =
-        text.trim() === "" ? maxPx : fitFontSizePx(el, available, minPx, maxPx);
+      const px = fitFontSizeToWidth(el, available, minPx, maxPx, text);
       el.style.removeProperty("font-size");
       setFontSize(px);
     };
@@ -86,7 +106,7 @@ export function SingleLineFitText({ text, className, minPx = 4, maxPx = 6 }: Pro
     const onFonts = () => run();
     void document.fonts?.ready?.then(onFonts);
     return () => ro.disconnect();
-  }, [text, minPx, maxPx]);
+  }, [text, minPx, maxPx, fitWidth]);
 
   return (
     <div

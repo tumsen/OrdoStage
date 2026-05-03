@@ -16,7 +16,7 @@ import {
   KeyRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -98,6 +98,22 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  const profileTextColRef = useRef<HTMLDivElement>(null);
+  const [profileTextColWidth, setProfileTextColWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = profileTextColRef.current;
+    if (!el) {
+      setProfileTextColWidth(0);
+      return;
+    }
+    const update = () => setProfileTextColWidth(el.getBoundingClientRect().width);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [session?.user]);
 
   return (
     <div className="flex flex-col h-full">
@@ -229,16 +245,21 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
                 <span className="text-white text-[11px] font-semibold leading-none">{initials || "?"}</span>
               )}
             </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-px justify-center leading-none">
+            <div
+              ref={profileTextColRef}
+              className="flex-1 min-w-0 flex flex-col gap-px justify-center leading-none self-stretch"
+            >
               <SingleLineFitText
                 text={displayName}
-                maxPx={6}
+                fitWidth={profileTextColWidth}
+                maxPx={11}
                 minPx={4}
                 className="font-medium text-white/90"
               />
               <SingleLineFitText
                 text={userEmail}
-                maxPx={5}
+                fitWidth={profileTextColWidth}
+                maxPx={10}
                 minPx={4}
                 className="text-white/45"
               />
