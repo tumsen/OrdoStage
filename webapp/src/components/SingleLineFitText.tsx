@@ -3,6 +3,9 @@ import { cn } from "@/lib/utils";
 
 const WIDTH_EPS = 0.75;
 
+/** Extra zoom so short lines are not stuck at maxPx (still respects column width). */
+const VISUAL_SHRINK = 0.78;
+
 type Props = {
   text: string;
   className?: string;
@@ -40,8 +43,8 @@ function fitFontBinary(
 export function SingleLineFitText({
   text,
   className,
-  minPx = 2,
-  maxPx = 6,
+  minPx = 1.5,
+  maxPx = 4,
   fitWidth,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,14 +96,17 @@ export function SingleLineFitText({
       const px = fitFontBinary(el, cap, minPx, maxPx);
       el.style.fontSize = `${px}px`;
 
-      let squeeze = 1;
-      if (el.scrollWidth > cap && cap > 0) {
-        squeeze = Math.min(1, cap / el.scrollWidth);
+      const sw = Math.max(el.scrollWidth, 1);
+      let z = 1;
+      if (sw > cap && cap > 0) {
+        z = cap / sw;
       }
+      // Always apply a modest zoom so “fits at maxPx” lines are not visually huge.
+      z = Math.min(z * VISUAL_SHRINK, cap / sw);
       el.style.removeProperty("font-size");
 
       setFontSize(px);
-      setZoomSqueeze(squeeze);
+      setZoomSqueeze(z);
     };
 
     run();

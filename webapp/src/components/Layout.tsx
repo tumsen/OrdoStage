@@ -252,15 +252,15 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
               <SingleLineFitText
                 text={displayName}
                 fitWidth={profileTextColWidth}
-                maxPx={6}
-                minPx={2}
+                maxPx={4}
+                minPx={1.5}
                 className="font-medium text-white/90"
               />
               <SingleLineFitText
                 text={userEmail}
                 fitWidth={profileTextColWidth}
-                maxPx={5}
-                minPx={2}
+                maxPx={3.5}
+                minPx={1.5}
                 className="text-white/45"
               />
             </div>
