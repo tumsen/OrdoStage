@@ -33,45 +33,6 @@ export function durationMinutesBetween(start: string, end: string): number | nul
   return d;
 }
 
-/** Upper bound for a single job span when counting forward (23 h 59 m). */
-export const MAX_JOB_FORWARD_DURATION_MINUTES = 23 * 60 + 59;
-
-/**
- * Duration between two full `datetime-local` strings, counting **forwards** only.
- * Same **parsed calendar date**: compare **clock times only** (fixes 14:00→15:00 showing ~25 h when `Date`
- * comparisons crossed midnight or TZ quirks).
- * Same date with end clock ≤ start: overnight block toward **next calendar day**, capped at {@link MAX_JOB_FORWARD_DURATION_MINUTES}.
- * Different dates: timestamp difference with optional +24 h when end ≤ start; result capped at {@link MAX_JOB_FORWARD_DURATION_MINUTES}.
- */
-export function durationMinutesForwardBetweenDatetimes(
-  startValue: string,
-  endValue: string
-): number | null {
-  const sd = parseDatetimeLocal(startValue);
-  const ed = parseDatetimeLocal(endValue);
-  if (!sd.date || !sd.time || !ed.date || !ed.time) return null;
-  const sm = timeToMinutes(sd.time);
-  const em = timeToMinutes(ed.time);
-  if (sm === null || em === null) return null;
-
-  const maxM = MAX_JOB_FORWARD_DURATION_MINUTES;
-
-  if (sd.date === ed.date) {
-    if (em > sm) {
-      return Math.min(maxM, Math.max(1, em - sm));
-    }
-    const overnight = 24 * 60 + em - sm;
-    return Math.min(maxM, Math.max(1, overnight));
-  }
-
-  const a = new Date(startValue).getTime();
-  let b = new Date(endValue).getTime();
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-  if (b <= a) b += 24 * 60 * 60 * 1000;
-  const raw = Math.round((b - a) / 60_000);
-  return Math.min(maxM, Math.max(1, raw));
-}
-
 export const TIME_INPUT_CLASS =
   "w-[5.75rem] min-w-[5.75rem] max-w-[5.75rem] shrink-0 font-mono text-sm tabular-nums [color-scheme:dark] bg-white/5 border-white/10 text-white";
 
@@ -126,6 +87,45 @@ export function parseDatetimeLocal(s: string): { date: string; time: string } {
   const timePart = (rest || "").slice(0, 5);
   if (!timePart || timePart.length < 4) return { date: d, time: "" };
   return { date: d, time: timePart.length === 5 ? timePart : `${timePart.slice(0, 2).padStart(2, "0")}:${timePart.slice(3, 5).padStart(2, "0")}` };
+}
+
+/** Upper bound for a single job span when counting forward (23 h 59 m). */
+export const MAX_JOB_FORWARD_DURATION_MINUTES = 23 * 60 + 59;
+
+/**
+ * Duration between two full `datetime-local` strings, counting **forwards** only.
+ * Same **parsed calendar date**: compare **clock times only** (fixes 14:00→15:00 showing ~25 h when `Date`
+ * comparisons crossed midnight or TZ quirks).
+ * Same date with end clock ≤ start: overnight block toward **next calendar day**, capped at {@link MAX_JOB_FORWARD_DURATION_MINUTES}.
+ * Different dates: timestamp difference with optional +24 h when end ≤ start; result capped at {@link MAX_JOB_FORWARD_DURATION_MINUTES}.
+ */
+export function durationMinutesForwardBetweenDatetimes(
+  startValue: string,
+  endValue: string
+): number | null {
+  const sd = parseDatetimeLocal(startValue);
+  const ed = parseDatetimeLocal(endValue);
+  if (!sd.date || !sd.time || !ed.date || !ed.time) return null;
+  const sm = timeToMinutes(sd.time);
+  const em = timeToMinutes(ed.time);
+  if (sm === null || em === null) return null;
+
+  const maxM = MAX_JOB_FORWARD_DURATION_MINUTES;
+
+  if (sd.date === ed.date) {
+    if (em > sm) {
+      return Math.min(maxM, Math.max(1, em - sm));
+    }
+    const overnight = 24 * 60 + em - sm;
+    return Math.min(maxM, Math.max(1, overnight));
+  }
+
+  const a = new Date(startValue).getTime();
+  let b = new Date(endValue).getTime();
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  if (b <= a) b += 24 * 60 * 60 * 1000;
+  const raw = Math.round((b - a) / 60_000);
+  return Math.min(maxM, Math.max(1, raw));
 }
 
 export function buildDatetimeLocal(date: string, time: string): string {
