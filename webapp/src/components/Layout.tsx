@@ -26,6 +26,7 @@ import { useSession, signOut } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import { usePermissions } from "@/hooks/usePermissions";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
+import { SingleLineFitText } from "@/components/SingleLineFitText";
 import { OrgWorkspaceMenu } from "@/components/OrgWorkspaceMenu";
 import { WorkAnnouncementBar } from "@/components/WorkAnnouncementBar";
 import { useI18n } from "@/lib/i18n";
@@ -228,19 +229,19 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
                 <span className="text-white text-[11px] font-semibold leading-none">{initials || "?"}</span>
               )}
             </div>
-            <div className="@container flex-1 min-w-0 flex flex-col gap-0.5 justify-center">
-              <p
-                className="font-medium leading-snug text-white/90 break-words [overflow-wrap:anywhere]"
-                style={{ fontSize: "clamp(10px, calc(8px + 2.8cqw), 12px)" }}
-              >
-                {displayName}
-              </p>
-              <p
-                className="leading-snug text-white/45 break-all [overflow-wrap:anywhere]"
-                style={{ fontSize: "clamp(9px, calc(7px + 2.4cqw), 11px)" }}
-              >
-                {userEmail}
-              </p>
+            <div className="flex-1 min-w-0 flex flex-col gap-0.5 justify-center">
+              <SingleLineFitText
+                text={displayName}
+                maxPx={12}
+                minPx={8}
+                className="font-medium text-white/90"
+              />
+              <SingleLineFitText
+                text={userEmail}
+                maxPx={11}
+                minPx={7}
+                className="text-white/45"
+              />
             </div>
           </div>
         ) : null}
