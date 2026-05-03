@@ -9,7 +9,6 @@ import { computeShowStaffingStats } from "@/lib/eventShowStaffing";
 import type { EventDetail, EventShow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
-import { formatDate } from "@/lib/dateUtils";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -107,27 +106,26 @@ export default function Events() {
 
       {/* Table */}
       <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-0">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-0">
           {/* Header */}
           <div className="contents">
             <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">Title</div>
-            <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10 hidden sm:block">Date / venue</div>
             <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">Status</div>
             <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10"></div>
           </div>
 
           {isLoading ? (
-            <div className="col-span-4 p-5 space-y-3">
+            <div className="col-span-3 p-5 space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-10 w-full rounded bg-white/5" />
               ))}
             </div>
           ) : error ? (
-            <div className="col-span-4 py-10 text-center text-red-400 text-sm">
+            <div className="col-span-3 py-10 text-center text-red-400 text-sm">
               Failed to load events.
             </div>
           ) : filtered.length === 0 ? (
-            <div className="col-span-4 py-12 text-center text-white/30 text-sm">
+            <div className="col-span-3 py-12 text-center text-white/30 text-sm">
               {(events ?? []).length === 0
                 ? "No events yet. Create your first one!"
                 : "No events match your filters."}
@@ -170,9 +168,6 @@ export default function Events() {
                       </span>
                     )}
                   </div>
-                  <p className="sm:hidden text-[11px] text-white/35 mt-1 truncate" title={event.venue?.name ?? undefined}>
-                    {event.venue?.name ?? "No venue"}
-                  </p>
                   {shows.length > 0 ? (
                     <ul className="mt-2 space-y-1">
                       {shows.map((show) => {
@@ -208,15 +203,6 @@ export default function Events() {
                   ) : (
                     <p className="mt-2 text-[11px] text-white/35">No shows scheduled</p>
                   )}
-                </div>
-                <div
-                  className="px-5 py-3.5 border-b border-white/5 text-sm text-white/50 hidden sm:flex flex-col justify-center gap-0.5 cursor-pointer min-w-[9rem]"
-                  onClick={() => navigate(`/events/${event.id}`)}
-                >
-                  <span>{formatDate(event.startDate)}</span>
-                  <span className="text-xs text-white/35 truncate" title={event.venue?.name ?? undefined}>
-                    {event.venue?.name ?? "—"}
-                  </span>
                 </div>
                 <div
                   className="px-5 py-3.5 border-b border-white/5 flex items-center cursor-pointer"
