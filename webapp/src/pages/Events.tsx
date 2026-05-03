@@ -193,14 +193,14 @@ export default function Events() {
                             </span>
                             <span className="text-white/40">·</span>
                             <span className={cn(showOff ? undefined : "text-white/55")}>{venueName}</span>
+                            <span className="text-white/40">·</span>
+                            <EventListStaffingHint ok={ok} total={total} muted={showOff} />
                             {ticketBits ? (
                               <>
                                 <span className="text-white/40">·</span>
                                 <span className={cn(showOff ? "text-white/35" : "text-white/45")}>{ticketBits}</span>
                               </>
                             ) : null}
-                            <span className="text-white/40">·</span>
-                            <EventListStaffingHint ok={ok} total={total} muted={showOff} />
                           </li>
                         );
                       })}
