@@ -4,7 +4,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ChevronDown, ChevronRight, Edit2, Trash2, Plus, X, Download, Upload } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  Edit2,
+  Trash2,
+  Plus,
+  X,
+  Download,
+  Upload,
+} from "lucide-react";
 import { api, isApiError } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
@@ -71,6 +81,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
 
 type TeamDocument = {
@@ -105,6 +116,9 @@ const EventEditSchema = z.object({
   hazeFx: z.boolean().optional(),
   strobeFx: z.boolean().optional(),
   fohNotes: z.string().optional(),
+  technicalContactInfo: z.string().optional(),
+  companyInfo: z.string().optional(),
+  contractNotes: z.string().optional(),
 });
 
 type EventEditValues = z.infer<typeof EventEditSchema>;
@@ -128,6 +142,9 @@ function emptyEventFormValues(): EventEditValues {
     hazeFx: false,
     strobeFx: false,
     fohNotes: "",
+    technicalContactInfo: "",
+    companyInfo: "",
+    contractNotes: "",
   };
 }
 
@@ -143,6 +160,9 @@ type GeneralEventFields = {
   getInStart: string;
   getInEnd: string;
   getInDuration: string;
+  technicalContactInfo: string;
+  companyInfo: string;
+  contractNotes: string;
 };
 
 function normalizeEventStatus(s: string | undefined): "draft" | "confirmed" | "cancelled" {
@@ -169,6 +189,9 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
     hazeFx: g.hazeFx,
     strobeFx: g.strobeFx,
     fohNotes: g.fohNotes,
+    technicalContactInfo: g.technicalContactInfo ?? "",
+    companyInfo: g.companyInfo ?? "",
+    contractNotes: g.contractNotes ?? "",
   };
 }
 
@@ -186,6 +209,9 @@ function splitGeneralEventFields(fields: CustomField[]): {
     getInStart: "",
     getInEnd: "",
     getInDuration: "",
+    technicalContactInfo: "",
+    companyInfo: "",
+    contractNotes: "",
   };
   const rest: CustomField[] = [];
   for (const field of fields) {
@@ -239,6 +265,18 @@ function splitGeneralEventFields(fields: CustomField[]): {
       general.getInDuration = value;
       continue;
     }
+    if (key === "Technical contact info") {
+      general.technicalContactInfo = value;
+      continue;
+    }
+    if (key === "Company info") {
+      general.companyInfo = value;
+      continue;
+    }
+    if (key === "Contract booking notes") {
+      general.contractNotes = value;
+      continue;
+    }
     rest.push(field);
   }
   return { general, rest };
@@ -275,6 +313,7 @@ function DetailsTab({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [descriptionOpen, setDescriptionOpen] = useState(true);
 
   const parsedCustomFields: CustomField[] = (() => {
     if (!event) return [];
@@ -401,6 +440,9 @@ function DetailsTab({
       { key: "Get-in start", value: values.getInStart?.trim() || "" },
       { key: "Get-in end", value: values.getInEnd?.trim() || "" },
       { key: "Get-in duration", value: values.getInDuration?.trim() || "" },
+      { key: "Technical contact info", value: values.technicalContactInfo?.trim() || "" },
+      { key: "Company info", value: values.companyInfo?.trim() || "" },
+      { key: "Contract booking notes", value: values.contractNotes?.trim() || "" },
     ]
       .filter((row) => row.value)
       .map((row) => ({ ...row, departments: [] as string[] }));
@@ -497,10 +539,34 @@ function DetailsTab({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Description</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30 resize-none" rows={2} />
-                  </FormControl>
+                  <Collapsible open={descriptionOpen} onOpenChange={setDescriptionOpen}>
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.06]"
+                      >
+                        <span className="text-white/60 text-xs uppercase tracking-wide">Description</span>
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 shrink-0 text-white/45 transition-transform",
+                            descriptionOpen && "rotate-180"
+                          )}
+                        />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          value={field.value ?? ""}
+                          id="event-description"
+                          className="bg-white/5 border-white/10 text-white focus:border-white/30 resize-y min-h-[200px] text-sm leading-relaxed"
+                          rows={12}
+                          placeholder="Show summary, audience, notes for the team…"
+                        />
+                      </FormControl>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </FormItem>
               )}
             />
@@ -595,19 +661,6 @@ function DetailsTab({
 
             <FormField
               control={form.control}
-              name="contactPerson"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contact Person</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value ?? ""} placeholder="Name and phone number" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="actorCount"
               render={({ field }) => (
                 <FormItem>
@@ -632,16 +685,150 @@ function DetailsTab({
               )}
             />
 
+            {/* ── Booking & contract ── */}
+            <SectionHeader>Booking &amp; contract</SectionHeader>
+            <p className="text-xs text-white/45 -mt-1 mb-2">
+              Booker contact details, company, technical liaison, and contract notes for confirming the engagement.
+            </p>
+
+            <FormField
+              control={form.control}
+              name="contactPerson"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Primary / contract contact</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      value={field.value ?? ""}
+                      placeholder="Name, phone, email as needed"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="companyInfo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Company info</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      value={field.value ?? ""}
+                      placeholder="Legal name, address, VAT / org number, invoicing…"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
+                      rows={3}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="technicalContactInfo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical contact</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      value={field.value ?? ""}
+                      placeholder="Technical lead on booker side: name, phone, email…"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
+                      rows={3}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="contractNotes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contract &amp; booking notes</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      value={field.value ?? ""}
+                      placeholder="Deal terms, references, special clauses…"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
+                      rows={3}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <div className="space-y-2">
+              <p className="text-[11px] text-white/50 uppercase tracking-wide">Contract persons</p>
+              {contacts.map((row, idx) => (
+                <div
+                  key={idx}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] gap-2 items-center"
+                >
+                  <Input
+                    value={row.role}
+                    onChange={(e) => updateContact(idx, { role: e.target.value })}
+                    placeholder="Role"
+                    className="bg-white/5 border-white/10 text-white h-9"
+                  />
+                  <Input
+                    value={row.name}
+                    onChange={(e) => updateContact(idx, { name: e.target.value })}
+                    placeholder="Name"
+                    className="bg-white/5 border-white/10 text-white h-9"
+                  />
+                  <Input
+                    value={row.phone}
+                    onChange={(e) => updateContact(idx, { phone: e.target.value })}
+                    placeholder="Phone"
+                    className="bg-white/5 border-white/10 text-white h-9"
+                  />
+                  <Input
+                    value={row.email}
+                    onChange={(e) => updateContact(idx, { email: e.target.value })}
+                    placeholder="Email"
+                    className="bg-white/5 border-white/10 text-white h-9"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeContact(idx)}
+                    className="h-8 w-8 justify-self-end text-white/35 hover:text-red-400"
+                  >
+                    <X size={14} />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="border-white/10 text-white/70 bg-transparent"
+                onClick={addContact}
+              >
+                <Plus size={13} className="mr-1" /> Add contact
+              </Button>
+            </div>
+
             {/* ── Technical ── */}
             <SectionHeader>Technical</SectionHeader>
 
-            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-3">
+              <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
                 {(
                   [
-                    { full: "Width", name: "stageWidth" as const },
-                    { full: "Depth", name: "stageDepth" as const },
-                    { full: "Height", name: "stageHeight" as const },
+                    { short: "W", full: "Width", name: "stageWidth" as const },
+                    { short: "D", full: "Depth", name: "stageDepth" as const },
+                    { short: "H", full: "Height", name: "stageHeight" as const },
                   ] as const
                 ).map((row) => (
                   <FormField
@@ -649,9 +836,12 @@ function DetailsTab({
                     control={form.control}
                     name={row.name}
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-white/60 text-xs uppercase tracking-wide">{row.full}</FormLabel>
+                      <FormItem className="space-y-0">
+                        <FormLabel className="sr-only">{row.full}</FormLabel>
                         <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-white/45 w-3 shrink-0 tabular-nums" title={row.full}>
+                            {row.short}
+                          </span>
                           <FormControl>
                             <Input
                               {...field}
@@ -660,29 +850,33 @@ function DetailsTab({
                               maxLength={7}
                               placeholder="0"
                               autoComplete="off"
-                              className="h-10 w-[5.75rem] min-w-[5.75rem] shrink-0 bg-white/5 border-white/10 text-white tabular-nums"
+                              aria-label={`Stage ${row.full.toLowerCase()} (m)`}
+                              className="h-9 w-[4.5rem] min-w-[4.5rem] shrink-0 bg-white/5 border-white/10 text-white tabular-nums text-sm"
                             />
                           </FormControl>
-                          <span className="text-[10px] text-white/40 shrink-0">m</span>
+                          <span className="text-[10px] text-white/35 shrink-0">m</span>
                         </div>
                       </FormItem>
                     )}
                   />
                 ))}
               </div>
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-1 border-t border-white/[0.06]">
+                <span className="text-[10px] text-white/35 uppercase tracking-wide shrink-0">FX</span>
                 <FormField
                   control={form.control}
                   name="smokeFx"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Smoke</FormLabel>
-                      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
-                        <FormControl>
-                          <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
-                        </FormControl>
-                        <span className="text-white/70 text-xs">Enabled</span>
-                      </div>
+                    <FormItem className="flex flex-row items-center gap-1.5 space-y-0">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-ordo-yellow"
+                          checked={Boolean(field.value)}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                        />
+                      </FormControl>
+                      <FormLabel className="text-white/70 text-xs font-normal cursor-pointer">Smoke</FormLabel>
                     </FormItem>
                   )}
                 />
@@ -690,14 +884,16 @@ function DetailsTab({
                   control={form.control}
                   name="hazeFx"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Haze</FormLabel>
-                      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
-                        <FormControl>
-                          <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
-                        </FormControl>
-                        <span className="text-white/70 text-xs">Enabled</span>
-                      </div>
+                    <FormItem className="flex flex-row items-center gap-1.5 space-y-0">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-ordo-yellow"
+                          checked={Boolean(field.value)}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                        />
+                      </FormControl>
+                      <FormLabel className="text-white/70 text-xs font-normal cursor-pointer">Haze</FormLabel>
                     </FormItem>
                   )}
                 />
@@ -705,14 +901,16 @@ function DetailsTab({
                   control={form.control}
                   name="strobeFx"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Strobe</FormLabel>
-                      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
-                        <FormControl>
-                          <input type="checkbox" checked={Boolean(field.value)} onChange={(e) => field.onChange(e.target.checked)} />
-                        </FormControl>
-                        <span className="text-white/70 text-xs">Enabled</span>
-                      </div>
+                    <FormItem className="flex flex-row items-center gap-1.5 space-y-0">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-ordo-yellow"
+                          checked={Boolean(field.value)}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                        />
+                      </FormControl>
+                      <FormLabel className="text-white/70 text-xs font-normal cursor-pointer">Strobe</FormLabel>
                     </FormItem>
                   )}
                 />
@@ -834,24 +1032,6 @@ function DetailsTab({
                 FOH audience announcement note will be added automatically when saving.
               </p>
             ) : null}
-
-            <SectionHeader>Contacts</SectionHeader>
-            <div className="space-y-2">
-              {contacts.map((row, idx) => (
-                <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr_1fr_1.2fr_auto] gap-2 items-center">
-                  <Input value={row.role} onChange={(e) => updateContact(idx, { role: e.target.value })} placeholder="Role" className="bg-white/5 border-white/10 text-white h-9" />
-                  <Input value={row.name} onChange={(e) => updateContact(idx, { name: e.target.value })} placeholder="Name" className="bg-white/5 border-white/10 text-white h-9" />
-                  <Input value={row.phone} onChange={(e) => updateContact(idx, { phone: e.target.value })} placeholder="Phone" className="bg-white/5 border-white/10 text-white h-9" />
-                  <Input value={row.email} onChange={(e) => updateContact(idx, { email: e.target.value })} placeholder="Email" className="bg-white/5 border-white/10 text-white h-9" />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => removeContact(idx)} className="h-8 w-8 text-white/35 hover:text-red-400">
-                    <X size={14} />
-                  </Button>
-                </div>
-              ))}
-              <Button type="button" size="sm" variant="outline" className="border-white/10 text-white/70 bg-transparent" onClick={addContact}>
-                <Plus size={13} className="mr-1" /> Add contact
-              </Button>
-            </div>
 
             {!isNew && event ? <EventDocumentsSection event={event} /> : null}
 
