@@ -108,9 +108,12 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
       setProfileTextColWidth(0);
       return;
     }
-    const update = () => setProfileTextColWidth(el.getBoundingClientRect().width);
+    const update = () => {
+      // content box width = pixels available for the text column (beside avatar)
+      setProfileTextColWidth(el.clientWidth);
+    };
     update();
-    const ro = new ResizeObserver(update);
+    const ro = new ResizeObserver(() => update());
     ro.observe(el);
     return () => ro.disconnect();
   }, [session?.user]);
@@ -252,15 +255,15 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
               <SingleLineFitText
                 text={displayName}
                 fitWidth={profileTextColWidth}
-                maxPx={4}
-                minPx={1.5}
+                maxPx={9}
+                minPx={2}
                 className="font-medium text-white/90"
               />
               <SingleLineFitText
                 text={userEmail}
                 fitWidth={profileTextColWidth}
-                maxPx={3.5}
-                minPx={1.5}
+                maxPx={8}
+                minPx={2}
                 className="text-white/45"
               />
             </div>

@@ -1,23 +1,19 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-const WIDTH_EPS = 0.75;
-
-/** Extra zoom so short lines are not stuck at maxPx (still respects column width). */
-const VISUAL_SHRINK = 0.78;
+/** Padding so subpixel rounding does not clip the last glyph. */
+const WIDTH_EPS = 0.25;
 
 type Props = {
   text: string;
   className?: string;
-  /** Largest font size (px) when the line is short. */
   maxPx?: number;
-  /** Smallest font size (px) to try before applying zoom squeeze. */
   minPx?: number;
   fitWidth?: number;
 };
 
 /**
- * Find largest font size in [minPx, maxPx] such that scrollWidth <= cap (binary search).
+ * Largest font size in [minPx, maxPx] such that scrollWidth <= cap.
  */
 function fitFontBinary(
   el: HTMLElement,
@@ -31,7 +27,7 @@ function fitFontBinary(
   if (el.scrollWidth > cap) return minPx;
   let lo = minPx;
   let hi = maxPx;
-  for (let i = 0; i < 36; i++) {
+  for (let i = 0; i < 40; i++) {
     const mid = (lo + hi) / 2;
     el.style.fontSize = `${mid}px`;
     if (el.scrollWidth <= cap) lo = mid;
@@ -43,8 +39,8 @@ function fitFontBinary(
 export function SingleLineFitText({
   text,
   className,
-  minPx = 1.5,
-  maxPx = 4,
+  minPx = 2,
+  maxPx = 9,
   fitWidth,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -96,13 +92,13 @@ export function SingleLineFitText({
       const px = fitFontBinary(el, cap, minPx, maxPx);
       el.style.fontSize = `${px}px`;
 
-      const sw = Math.max(el.scrollWidth, 1);
+      const sw = el.scrollWidth;
+      // Exact horizontal fit to `cap` px: CSS zoom scales rendered width ~linearly.
+      // No upscale past natural width (short lines stay sharp).
       let z = 1;
-      if (sw > cap && cap > 0) {
-        z = cap / sw;
+      if (sw > 0 && cap > 0) {
+        z = Math.min(1, cap / sw);
       }
-      // Always apply a modest zoom so “fits at maxPx” lines are not visually huge.
-      z = Math.min(z * VISUAL_SHRINK, cap / sw);
       el.style.removeProperty("font-size");
 
       setFontSize(px);
@@ -127,7 +123,6 @@ export function SingleLineFitText({
         style={{
           fontSize: `${fontSize}px`,
           lineHeight: 1.15,
-          // Second pass when browser minimum font-size prevents shrinking far enough:
           zoom: zoomSqueeze,
         }}
       >
