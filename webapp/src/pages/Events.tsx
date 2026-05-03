@@ -209,7 +209,7 @@ export default function Events() {
                           const venueTone = showOff ? undefined : "text-white/55";
                           return (
                             <li key={show.id} className="contents">
-                              <div className="justify-self-start">
+                              <div className="justify-self-start pr-2">
                                 <StatusBadge
                                   status={showStatus}
                                   className={cn(
