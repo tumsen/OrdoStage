@@ -13,6 +13,8 @@ import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementB
 import { cn } from "@/lib/utils";
 import {
   buildDatetimeLocal,
+  calendarDateKeyFromJobDate,
+  durationMinutesForwardBetweenDatetimes,
   parseDatetimeLocal,
   toDatetimeLocalString,
 } from "@/lib/showTiming";
@@ -22,7 +24,9 @@ function jobWindow(j: EventShowJob, show: EventShow): { startValue: string; endV
   const fallback = show.showDate.slice(0, 10);
   const rawDate = j.jobDate ?? "";
   const d =
-    typeof rawDate === "string" && rawDate.length >= 10 ? rawDate.slice(0, 10) : fallback;
+    typeof rawDate === "string" && rawDate.length >= 10
+      ? calendarDateKeyFromJobDate(rawDate, fallback)
+      : fallback;
   const start = buildDatetimeLocal(d, j.startTime || "00:00");
   const t0 = new Date(start).getTime();
   const end = toDatetimeLocalString(new Date(t0 + j.durationMinutes * 60_000));
@@ -30,10 +34,8 @@ function jobWindow(j: EventShowJob, show: EventShow): { startValue: string; endV
 }
 
 function rangeToJobBody(startValue: string, endValue: string) {
-  const a = new Date(startValue);
-  const b = new Date(endValue);
-  if (!Number.isFinite(a.getTime()) || !Number.isFinite(b.getTime()) || b <= a) return null;
-  const durationMinutes = Math.max(1, Math.round((b.getTime() - a.getTime()) / 60_000));
+  const durationMinutes = durationMinutesForwardBetweenDatetimes(startValue, endValue);
+  if (durationMinutes == null) return null;
   const st = parseDatetimeLocal(startValue);
   if (!st.date || !st.time) return null;
   return { jobDate: st.date, startTime: st.time, durationMinutes };
@@ -238,12 +240,14 @@ export function ShowJobsEditor({
                 onClick={() => {
                   if (!canEdit) return;
                   const { startValue, endValue } = w;
-                  const a = new Date(startValue);
-                  const b = new Date(endValue);
-                  const durationMinutes = Math.max(1, Math.round((b.getTime() - a.getTime()) / 60_000));
+                  const durationMinutes = durationMinutesForwardBetweenDatetimes(startValue, endValue);
+                  if (durationMinutes == null) return;
                   createJob.mutate({
                     title: j.title,
-                    jobDate: (j.jobDate ? String(j.jobDate) : show.showDate).slice(0, 10),
+                    jobDate: calendarDateKeyFromJobDate(
+                      j.jobDate ? String(j.jobDate) : show.showDate,
+                      show.showDate.slice(0, 10)
+                    ),
                     startTime: j.startTime,
                     durationMinutes,
                     venueId: j.venueId,

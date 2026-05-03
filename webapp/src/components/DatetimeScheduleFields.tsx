@@ -5,6 +5,7 @@ import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Label } from "@/components/ui/label";
 import {
   buildDatetimeLocal,
+  durationMinutesForwardBetweenDatetimes,
   parseDatetimeLocal,
   toDatetimeLocalString,
 } from "@/lib/showTiming";
@@ -40,11 +41,7 @@ export function DatetimeScheduleFields({
 
   const durationMin = useMemo(() => {
     if (!startValue || !endValue) return 0;
-    const a = new Date(startValue);
-    const b = new Date(endValue);
-    if (!Number.isFinite(a.getTime()) || !Number.isFinite(b.getTime()) || b.getTime() <= a.getTime())
-      return 0;
-    return Math.round((b.getTime() - a.getTime()) / 60000);
+    return durationMinutesForwardBetweenDatetimes(startValue, endValue) ?? 0;
   }, [startValue, endValue]);
 
   const setDate = (d: string) => {

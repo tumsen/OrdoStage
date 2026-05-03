@@ -33,6 +33,25 @@ export function durationMinutesBetween(start: string, end: string): number | nul
   return d;
 }
 
+/**
+ * Duration between two full `datetime-local` strings, counting **forwards** only.
+ * If end is not strictly after start on the timeline, end is advanced by one day (same clock time),
+ * e.g. start 12:00 and end 11:00 on the same calendar date → **23 hours**.
+ */
+export function durationMinutesForwardBetweenDatetimes(
+  startValue: string,
+  endValue: string
+): number | null {
+  const a = new Date(startValue);
+  const b = new Date(endValue);
+  if (!Number.isFinite(a.getTime()) || !Number.isFinite(b.getTime())) return null;
+  let endMs = b.getTime();
+  if (endMs <= a.getTime()) {
+    endMs += 24 * 60 * 60 * 1000;
+  }
+  return Math.max(1, Math.round((endMs - a.getTime()) / 60_000));
+}
+
 export const TIME_INPUT_CLASS =
   "w-[5.75rem] min-w-[5.75rem] max-w-[5.75rem] shrink-0 font-mono text-sm tabular-nums [color-scheme:dark] bg-white/5 border-white/10 text-white";
 
@@ -54,6 +73,27 @@ export function durationHhMmToTotalMinutes(hhStr: string, mmStr: string): number
   const h = Math.min(99, Math.max(0, parseInt(dH || "0", 10) || 0));
   const m = Math.min(59, Math.max(0, parseInt(dM || "0", 10) || 0));
   return h * 60 + m;
+}
+
+/**
+ * Calendar `YYYY-MM-DD` for a job row when `jobDate` is JSON ISO (`…T…Z`).
+ * Using `.slice(0, 10)` on UTC ISO picks the **UTC** date, which can differ from the local
+ * calendar day and yields wrong start/end when paired with local wall-clock `startTime`
+ * (broken durations like ~31h for a same-day 14–21 block).
+ */
+export function calendarDateKeyFromJobDate(isoOrDay: string, fallback: string): string {
+  if (!isoOrDay || typeof isoOrDay !== "string") return fallback.slice(0, 10);
+  const t = isoOrDay.trim();
+  if (t.length < 10) return fallback.slice(0, 10);
+  if (t.includes("T") || t.length > 10) {
+    const d = new Date(t);
+    if (!Number.isFinite(d.getTime())) return fallback.slice(0, 10);
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${day}`;
+  }
+  return t.slice(0, 10);
 }
 
 /** Parse `datetime-local` value to YYYY-MM-DD and HH:mm (local). */
