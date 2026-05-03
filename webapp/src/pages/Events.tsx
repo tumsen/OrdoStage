@@ -174,8 +174,8 @@ export default function Events() {
                     )}
                   </div>
                   {shows.length > 0 ? (
-                    <div className="mt-2 overflow-x-auto -mx-1 px-1">
-                      <ul className="space-y-1.5 min-w-[min(100%,36rem)]">
+                    <div className="mt-1 overflow-x-auto -mx-1 px-1">
+                      <ul className="space-y-px min-w-[min(100%,32rem)]">
                         {shows.map((show) => {
                           const { ok, total } = computeShowStaffingStats(show, teams);
                           const showOff = show.status === "cancelled";
@@ -186,19 +186,18 @@ export default function Events() {
                             <li
                               key={show.id}
                               className={cn(
-                                "grid gap-x-3 gap-y-0.5 text-[11px] leading-snug items-start [grid-template-columns:minmax(9.25rem,11rem)_minmax(0,1fr)_minmax(7rem,auto)_minmax(0,1.15fr)]",
+                                "grid gap-x-2 text-[11px] leading-tight items-baseline [grid-template-columns:minmax(8rem,10.5rem)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1.15fr)]",
                                 showOff ? "text-white/30 line-through decoration-white/20" : "text-white/50"
                               )}
                             >
-                              <div className="min-w-0">
-                                <div className="leading-tight">
-                                  <span className={cn("block", showOff ? undefined : "text-white/70")}>
-                                    {when.dateLabel}
-                                  </span>
-                                  <span className={cn("block", showOff ? undefined : "text-white/60")}>
-                                    {when.timeLabel}
-                                  </span>
-                                </div>
+                              <div className="min-w-0 whitespace-nowrap">
+                                <span className={cn(showOff ? undefined : "text-white/70")}>
+                                  {when.dateLabel}
+                                </span>
+                                <span className="text-white/35 px-1">·</span>
+                                <span className={cn(showOff ? undefined : "text-white/60")}>
+                                  {when.timeLabel}
+                                </span>
                               </div>
                               <div
                                 className={cn("min-w-0 truncate", showOff ? undefined : "text-white/55")}
@@ -224,7 +223,7 @@ export default function Events() {
                       </ul>
                     </div>
                   ) : (
-                    <p className="mt-2 text-[11px] text-white/35">No shows scheduled</p>
+                    <p className="mt-1 text-[11px] text-white/35">No shows scheduled</p>
                   )}
                 </div>
                 <div
