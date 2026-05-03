@@ -1003,12 +1003,12 @@ function DetailsTab({
             <SectionHeader>Technical</SectionHeader>
 
             <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-3">
-              <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3">
                 {(
                   [
-                    { short: "W", full: "Width", name: "stageWidth" as const },
-                    { short: "D", full: "Depth", name: "stageDepth" as const },
-                    { short: "H", full: "Height", name: "stageHeight" as const },
+                    { label: "Width", name: "stageWidth" as const },
+                    { label: "Depth", name: "stageDepth" as const },
+                    { label: "Height", name: "stageHeight" as const },
                   ] as const
                 ).map((row) => (
                   <FormField
@@ -1016,12 +1016,9 @@ function DetailsTab({
                     control={form.control}
                     name={row.name}
                     render={({ field }) => (
-                      <FormItem className="space-y-0">
-                        <FormLabel className="sr-only">{row.full}</FormLabel>
+                      <FormItem className="space-y-1.5">
+                        <FormLabel className="text-white/60 text-xs uppercase tracking-wide">{row.label}</FormLabel>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-white/45 w-3 shrink-0 tabular-nums" title={row.full}>
-                            {row.short}
-                          </span>
                           <FormControl>
                             <Input
                               {...field}
@@ -1030,8 +1027,8 @@ function DetailsTab({
                               maxLength={7}
                               placeholder="0"
                               autoComplete="off"
-                              aria-label={`Stage ${row.full.toLowerCase()} (m)`}
-                              className="h-9 w-[4.5rem] min-w-[4.5rem] shrink-0 bg-white/5 border-white/10 text-white tabular-nums text-sm"
+                              aria-label={`Stage ${row.label.toLowerCase()} (m)`}
+                              className="h-9 w-full min-w-0 max-w-[5.5rem] bg-white/5 border-white/10 text-white tabular-nums text-sm"
                             />
                           </FormControl>
                           <span className="text-[10px] text-white/35 shrink-0">m</span>
@@ -1041,8 +1038,8 @@ function DetailsTab({
                   />
                 ))}
               </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-1 border-t border-white/[0.06]">
-                <span className="text-[10px] text-white/35 uppercase tracking-wide shrink-0">FX</span>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 border-t border-white/[0.06]">
+                <Label className="text-white/60 text-xs uppercase tracking-wide shrink-0">Effects</Label>
                 <FormField
                   control={form.control}
                   name="smokeFx"
