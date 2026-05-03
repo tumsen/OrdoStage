@@ -191,8 +191,8 @@ export default function Events() {
                         style={{
                           /* Badge | weekday | date | HH:MM (+ pad) | venue | … — time track matches format */
                           gridTemplateColumns: hour12
-                            ? "auto 10ch minmax(11rem,20ch) minmax(6.25rem,11ch) minmax(0,6.5rem) 6.5rem 2.25rem 3.25rem minmax(0,1fr)"
-                            : "auto 10ch minmax(11rem,20ch) minmax(3.25rem,6ch) minmax(0,6.5rem) 6.5rem 2.25rem 3.25rem minmax(0,1fr)",
+                            ? "auto 10ch minmax(0,max-content) minmax(6.25rem,11ch) minmax(0,6.5rem) 6.5rem 2.25rem 3.25rem minmax(0,1fr)"
+                            : "auto 10ch minmax(0,max-content) minmax(3.25rem,6ch) minmax(0,6.5rem) 6.5rem 2.25rem 3.25rem minmax(0,1fr)",
                         }}
                       >
                         {shows.map((show) => {
@@ -232,7 +232,7 @@ export default function Events() {
                               </span>
                               <span
                                 className={cn(
-                                  "min-w-0 truncate pl-2 pr-0.5 text-left",
+                                  "min-w-0 truncate pl-2 text-left",
                                   rowTone,
                                   whenTone
                                 )}
@@ -242,7 +242,7 @@ export default function Events() {
                               </span>
                               <span
                                 className={cn(
-                                  "block w-full whitespace-nowrap text-right tabular-nums pr-1",
+                                  "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
                                   rowTone,
                                   whenTone
                                 )}
