@@ -111,7 +111,7 @@ export default function Events() {
           {/* Header */}
           <div className="contents">
             <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">Title</div>
-            <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10 hidden sm:block">Date</div>
+            <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10 hidden sm:block">Date / venue</div>
             <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">Status</div>
             <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10"></div>
           </div>
@@ -170,11 +170,16 @@ export default function Events() {
                       </span>
                     )}
                   </div>
+                  <p className="sm:hidden text-[11px] text-white/35 mt-1 truncate" title={event.venue?.name ?? undefined}>
+                    {event.venue?.name ?? "No venue"}
+                  </p>
                   {shows.length > 0 ? (
                     <ul className="mt-2 space-y-1">
                       {shows.map((show) => {
                         const { ok, total } = computeShowStaffingStats(show, teams);
                         const showOff = show.status === "cancelled";
+                        const venueName = show.venue?.name ?? "Venue";
+                        const ticketBits = formatEventListTicketBits(show);
                         return (
                           <li
                             key={show.id}
@@ -186,6 +191,15 @@ export default function Events() {
                             <span className={showOff ? undefined : "text-white/70"}>
                               {formatEventListShowWhen(show)}
                             </span>
+                            <span className="text-white/40">·</span>
+                            <span className={cn(showOff ? undefined : "text-white/55")}>{venueName}</span>
+                            {ticketBits ? (
+                              <>
+                                <span className="text-white/40">·</span>
+                                <span className={cn(showOff ? "text-white/35" : "text-white/45")}>{ticketBits}</span>
+                              </>
+                            ) : null}
+                            <span className="text-white/40">·</span>
                             <EventListStaffingHint ok={ok} total={total} muted={showOff} />
                           </li>
                         );
@@ -196,10 +210,13 @@ export default function Events() {
                   )}
                 </div>
                 <div
-                  className="px-5 py-3.5 border-b border-white/5 text-sm text-white/50 hidden sm:flex items-center cursor-pointer"
+                  className="px-5 py-3.5 border-b border-white/5 text-sm text-white/50 hidden sm:flex flex-col justify-center gap-0.5 cursor-pointer min-w-[9rem]"
                   onClick={() => navigate(`/events/${event.id}`)}
                 >
-                  {formatDate(event.startDate)}
+                  <span>{formatDate(event.startDate)}</span>
+                  <span className="text-xs text-white/35 truncate" title={event.venue?.name ?? undefined}>
+                    {event.venue?.name ?? "—"}
+                  </span>
                 </div>
                 <div
                   className="px-5 py-3.5 border-b border-white/5 flex items-center cursor-pointer"
@@ -270,6 +287,23 @@ function formatEventListShowWhen(show: EventShow): string {
     month: "short",
   });
   return `${dateStr} · ${show.showTime}`;
+}
+
+function formatEventListSoldAt(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+/** Returns null when no ticket fields are set. */
+function formatEventListTicketBits(show: EventShow): string | null {
+  const parts: string[] = [];
+  if (show.ticketsOnSale != null) parts.push(`On sale ${show.ticketsOnSale}`);
+  if (show.soldTickets != null) parts.push(`Sold ${show.soldTickets}`);
+  if (show.soldTicketsRecordedAt) {
+    parts.push(`Sold updated ${formatEventListSoldAt(show.soldTicketsRecordedAt)}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 function EventListStaffingHint({

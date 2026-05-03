@@ -1951,9 +1951,18 @@ function ShowEventCard({
   const techDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fohDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [ticketsOnSaleInput, setTicketsOnSaleInput] = useState(() =>
+    show.ticketsOnSale != null ? String(show.ticketsOnSale) : ""
+  );
+  const [soldTicketsInput, setSoldTicketsInput] = useState(() =>
+    show.soldTickets != null ? String(show.soldTickets) : ""
+  );
+
   useEffect(() => {
     setTechnicalNotes(show.technicalNotes ?? "");
     setFohNotes(show.fohNotes ?? "");
+    setTicketsOnSaleInput(show.ticketsOnSale != null ? String(show.ticketsOnSale) : "");
+    setSoldTicketsInput(show.soldTickets != null ? String(show.soldTickets) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- notes stay local until save; reset only on show row change
   }, [show.id]);
 
@@ -2010,6 +2019,64 @@ function ShowEventCard({
 
       <CollapsibleContent className="p-4 pt-3 space-y-3">
       <ShowTimeEditor show={show} venues={venues} onUpdate={patch} />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <FieldLabel>Tickets on sale</FieldLabel>
+          <Input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            placeholder="—"
+            value={ticketsOnSaleInput}
+            onChange={(e) => setTicketsOnSaleInput(e.target.value)}
+            onBlur={() => {
+              const raw = ticketsOnSaleInput.trim();
+              if (raw === "") {
+                patch({ ticketsOnSale: null });
+                return;
+              }
+              const n = Number.parseInt(raw, 10);
+              if (!Number.isFinite(n) || n < 0) {
+                setTicketsOnSaleInput(show.ticketsOnSale != null ? String(show.ticketsOnSale) : "");
+                return;
+              }
+              patch({ ticketsOnSale: n });
+            }}
+            className="bg-white/5 border-white/10 text-white"
+          />
+        </div>
+        <div>
+          <FieldLabel>Sold tickets</FieldLabel>
+          <Input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            placeholder="—"
+            value={soldTicketsInput}
+            onChange={(e) => setSoldTicketsInput(e.target.value)}
+            onBlur={() => {
+              const raw = soldTicketsInput.trim();
+              if (raw === "") {
+                patch({ soldTickets: null });
+                return;
+              }
+              const n = Number.parseInt(raw, 10);
+              if (!Number.isFinite(n) || n < 0) {
+                setSoldTicketsInput(show.soldTickets != null ? String(show.soldTickets) : "");
+                return;
+              }
+              patch({ soldTickets: n });
+            }}
+            className="bg-white/5 border-white/10 text-white"
+          />
+          {show.soldTicketsRecordedAt ? (
+            <p className="text-[11px] text-white/40 mt-1">
+              Last updated {new Date(show.soldTicketsRecordedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+            </p>
+          ) : null}
+        </div>
+      </div>
 
       <div className="grid gap-3 md:grid-cols-2">
         <div>
@@ -2169,6 +2236,8 @@ function ShowsTab({ event }: { event: EventDetail }) {
         hospitalityNotes: previousShow.hospitalityNotes ?? undefined,
         teamResponsibleId: previousShow.teamResponsibleId ?? undefined,
         notes: previousShow.notes ?? undefined,
+        ticketsOnSale: previousShow.ticketsOnSale ?? undefined,
+        soldTickets: previousShow.soldTickets ?? undefined,
       });
     },
     onSuccess: () => {

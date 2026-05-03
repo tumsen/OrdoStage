@@ -482,6 +482,12 @@ model EventShow {
   status               String       @default("draft")
   /** departmentId -> staffing signed-off for this show */
   staffingOkByDepartment Json?
+  /** Tickets offered for sale for this performance (optional manual count). */
+  ticketsOnSale        Int?
+  /** Tickets sold so far (optional manual count). */
+  soldTickets          Int?
+  /** When `soldTickets` was last updated (set server-side on sale count changes). */
+  soldTicketsRecordedAt DateTime?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
   staffing             EventShowStaffing[]

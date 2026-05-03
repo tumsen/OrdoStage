@@ -560,6 +560,11 @@ function serializeFullEvent(event: any) {
       breakDurationMinutes: show.breakDurationMinutes,
       notes: show.notes,
       staffingOkByDepartment: normalizeStaffingOkByDepartmentJson(show.staffingOkByDepartment),
+      ticketsOnSale: show.ticketsOnSale ?? null,
+      soldTickets: show.soldTickets ?? null,
+      soldTicketsRecordedAt: show.soldTicketsRecordedAt
+        ? show.soldTicketsRecordedAt.toISOString()
+        : null,
       jobs: (show.jobs ?? []).map((job: any) => ({
         id: job.id,
         showId: job.showId,
@@ -1384,6 +1389,9 @@ eventsRouter.post("/events/:id/shows", zValidator("json", CreateEventShowSchema)
       hospitalityNotes: body.hospitalityNotes ?? null,
       teamResponsibleId: body.teamResponsibleId ?? null,
       notes: body.notes ?? null,
+      ticketsOnSale: body.ticketsOnSale ?? null,
+      soldTickets: body.soldTickets ?? null,
+      soldTicketsRecordedAt: body.soldTickets != null ? new Date() : null,
     },
   });
   const ev = await prismaAny.event.findUnique({
@@ -1476,6 +1484,13 @@ eventsRouter.put("/events/:id/shows/:showId", zValidator("json", UpdateEventShow
               body.staffingOkByDepartment == null
                 ? null
                 : (body.staffingOkByDepartment as Record<string, boolean>),
+          }
+        : {}),
+      ...(body.ticketsOnSale !== undefined ? { ticketsOnSale: body.ticketsOnSale } : {}),
+      ...(body.soldTickets !== undefined
+        ? {
+            soldTickets: body.soldTickets,
+            soldTicketsRecordedAt: body.soldTickets == null ? null : new Date(),
           }
         : {}),
     },

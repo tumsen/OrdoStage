@@ -432,6 +432,9 @@ export const EventShowSchema = z.object({
   notes: z.string().nullable(),
   /** departmentId -> signed off */
   staffingOkByDepartment: z.record(z.string(), z.boolean()).nullable().optional(),
+  ticketsOnSale: z.number().int().nullable().optional(),
+  soldTickets: z.number().int().nullable().optional(),
+  soldTicketsRecordedAt: z.string().nullable().optional(),
   staffing: z.array(EventShowStaffingSchema),
   jobs: z.array(EventShowJobSchema),
   createdAt: z.string(),
@@ -451,6 +454,8 @@ export const CreateEventShowSchema = z.object({
   teamResponsibleId: z.string().optional(),
   notes: z.string().optional(),
   staffingOkByDepartment: z.record(z.string(), z.boolean()).optional(),
+  ticketsOnSale: z.number().int().min(0).nullable().optional(),
+  soldTickets: z.number().int().min(0).nullable().optional(),
 });
 
 /** Legacy per-show timing slots (DB columns). Optional on update only; not used by the current UI. */
