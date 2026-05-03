@@ -189,9 +189,10 @@ export default function Events() {
                       <ul
                         className="min-w-[min(100%,42rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
                         style={{
-                          /* Badge | Wednesday-width | Sep… + year + time | … */
-                          gridTemplateColumns:
-                            "auto 10ch minmax(14rem,24ch) minmax(0,6.5rem) 6.5rem 2.25rem 3.25rem minmax(0,1fr)",
+                          /* Badge | weekday | date | HH:MM (+ pad) | venue | … — time track matches format */
+                          gridTemplateColumns: hour12
+                            ? "auto 10ch minmax(11rem,20ch) minmax(6.25rem,11ch) minmax(0,6.5rem) 6.5rem 2.25rem 3.25rem minmax(0,1fr)"
+                            : "auto 10ch minmax(11rem,20ch) minmax(3.25rem,6ch) minmax(0,6.5rem) 6.5rem 2.25rem 3.25rem minmax(0,1fr)",
                         }}
                       >
                         {shows.map((show) => {
@@ -229,18 +230,25 @@ export default function Events() {
                               >
                                 {when.weekdayLabel}
                               </span>
-                              <div
+                              <span
                                 className={cn(
-                                  "flex min-w-0 items-center gap-0 whitespace-nowrap pl-2 tabular-nums",
+                                  "min-w-0 truncate pl-2 pr-0.5 text-left",
+                                  rowTone,
+                                  whenTone
+                                )}
+                                title={when.dateOnlyLabel}
+                              >
+                                {when.dateOnlyLabel}
+                              </span>
+                              <span
+                                className={cn(
+                                  "block w-full whitespace-nowrap text-right tabular-nums pr-1",
                                   rowTone,
                                   whenTone
                                 )}
                               >
-                                <span className="min-w-0 truncate pr-1">{when.dateOnlyLabel}</span>
-                                <span className="shrink-0 pl-0.5 text-right tabular-nums">
-                                  {when.timeLabel}
-                                </span>
-                              </div>
+                                {when.timeLabel}
+                              </span>
                               <span
                                 className={cn("min-w-0 truncate", rowTone, venueTone)}
                                 title={venueName}
