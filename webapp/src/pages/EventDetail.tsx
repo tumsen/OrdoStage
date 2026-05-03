@@ -186,6 +186,17 @@ function emptyEventFormValues(): EventEditValues {
 }
 
 type CustomField = { key: string; value: string; departments: string[] };
+
+function parseEventCustomFieldsJson(customFields: string | null | undefined): CustomField[] {
+  if (!customFields?.trim()) return [];
+  try {
+    const p = JSON.parse(customFields) as unknown;
+    return Array.isArray(p) ? (p as CustomField[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Extra contact persons (same columns as primary / technical). */
 type ContactRow = EventContactRowFields;
 
@@ -401,17 +412,20 @@ function DetailsTab({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [descriptionOpen, setDescriptionOpen] = useState(true);
 
-  const parsedCustomFields: CustomField[] = (() => {
-    if (!event) return [];
-    try {
-      return event.customFields ? (JSON.parse(event.customFields) as CustomField[]) : [];
-    } catch {
-      return [];
-    }
-  })();
-  const splitFields = splitGeneralEventFields(parsedCustomFields);
-  const [customFields] = useState<CustomField[]>(splitFields.rest);
-  const [contacts, setContacts] = useState<ContactRow[]>(splitFields.general.contacts);
+  const eventId = event?.id ?? null;
+  const customFieldsRaw = event?.customFields ?? null;
+
+  const parsedCustomFields = useMemo(
+    () => parseEventCustomFieldsJson(customFieldsRaw),
+    [customFieldsRaw]
+  );
+  const splitFields = useMemo(() => splitGeneralEventFields(parsedCustomFields), [parsedCustomFields]);
+  const customFields = splitFields.rest;
+  const [contacts, setContacts] = useState<ContactRow[]>(() =>
+    eventId
+      ? splitGeneralEventFields(parseEventCustomFieldsJson(customFieldsRaw)).general.contacts
+      : []
+  );
 
   const { data: venues } = useQuery({
     queryKey: ["venues"],
@@ -423,16 +437,7 @@ function DetailsTab({
 
   const formValues = useMemo((): EventEditValues => {
     if (isNew || !event) return emptyEventFormValues();
-    const s = splitGeneralEventFields(
-      (() => {
-        try {
-          if (!event.customFields) return [] as CustomField[];
-          return JSON.parse(event.customFields) as CustomField[];
-        } catch {
-          return [] as CustomField[];
-        }
-      })()
-    );
+    const s = splitGeneralEventFields(parseEventCustomFieldsJson(event.customFields));
     return formValuesFromEvent(event, s.general);
   }, [isNew, event]);
 
@@ -442,9 +447,12 @@ function DetailsTab({
   });
 
   useEffect(() => {
-    setContacts(splitFields.general.contacts);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load contacts when switching event only
-  }, [event?.id]);
+    if (!eventId) {
+      setContacts([]);
+      return;
+    }
+    setContacts(splitGeneralEventFields(parseEventCustomFieldsJson(customFieldsRaw)).general.contacts);
+  }, [eventId, customFieldsRaw]);
 
   const vId = form.watch("venueId");
   const sW = form.watch("stageWidth");
