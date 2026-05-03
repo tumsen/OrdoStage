@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
+  Check,
   ChevronDown,
   ChevronRight,
   Edit2,
@@ -632,6 +633,7 @@ function DetailsTab({
   return (
     <div className="space-y-4">
       <h2 className="text-base font-semibold text-white">{isNew ? "New event" : "Details"}</h2>
+      {!isNew && event && (event.shows?.length ?? 0) > 0 ? <EventStaffingOverviewBanner event={event} /> : null}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
           {/* ── Core fields ── */}
@@ -1255,6 +1257,106 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <Label className="text-white/60 text-xs uppercase tracking-wide block mb-1.5">{children}</Label>;
 }
 
+function parseStaffingOkMap(raw: unknown): Record<string, boolean> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === "boolean") out[k] = v;
+  }
+  return out;
+}
+
+function computeShowStaffingStats(show: EventShow, eventTeams: EventTeam[]) {
+  const teamIds = eventTeams.map((t) => t.team.id);
+  const okMap = parseStaffingOkMap(show.staffingOkByDepartment);
+  let ok = 0;
+  for (const id of teamIds) {
+    if (okMap[id]) ok++;
+  }
+  const people = new Set<string>();
+  for (const j of show.jobs ?? []) {
+    if (j.personId) people.add(j.personId);
+  }
+  for (const s of show.staffing ?? []) people.add(s.personId);
+  let jobMinutes = 0;
+  for (const j of show.jobs ?? []) jobMinutes += j.durationMinutes ?? 0;
+  return {
+    ok,
+    total: teamIds.length,
+    people: people.size,
+    jobHours: jobMinutes / 60,
+  };
+}
+
+function formatShowCardSummaryLine(show: EventShow): string {
+  const day = new Date(show.showDate.slice(0, 10));
+  const dateStr = day.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const end = endTimeFromStartAndDuration(show.showTime, show.durationMinutes);
+  const venue = show.venue?.name ?? "Venue";
+  return `${dateStr} · ${show.showTime}–${end} · ${show.durationMinutes} min · ${venue}`;
+}
+
+function EventStaffingOverviewBanner({ event }: { event: EventDetail }) {
+  const teams = event.teams ?? [];
+  const shows = event.shows ?? [];
+  const teamIds = teams.map((t) => t.team.id);
+  const slots = teamIds.length * shows.length;
+  let okTotal = 0;
+  for (const show of shows) {
+    const okMap = parseStaffingOkMap(show.staffingOkByDepartment);
+    for (const tid of teamIds) {
+      if (okMap[tid]) okTotal++;
+    }
+  }
+  const peopleIds = new Set<string>();
+  let jobMinutes = 0;
+  for (const show of shows) {
+    for (const j of show.jobs ?? []) {
+      jobMinutes += j.durationMinutes ?? 0;
+      if (j.personId) peopleIds.add(j.personId);
+    }
+    for (const s of show.staffing ?? []) {
+      peopleIds.add(s.personId);
+    }
+  }
+  const jobHours = jobMinutes / 60;
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 space-y-1.5">
+      <p className="text-[10px] text-white/40 uppercase tracking-wide">Shows &amp; staffing overview</p>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-white/85">
+        <span>
+          <span className="text-white/45">{shows.length}</span> show{shows.length === 1 ? "" : "s"}
+        </span>
+        <span className="flex items-center gap-1.5">
+          {slots > 0 && okTotal === slots ? (
+            <Check size={14} className="text-emerald-400 shrink-0" aria-hidden />
+          ) : null}
+          <span>
+            Staffing OK{" "}
+            <span className="text-white/45">
+              {slots > 0 ? `${okTotal}/${slots}` : "—"}
+            </span>
+            {teamIds.length === 0 ? (
+              <span className="text-white/35 text-xs ml-1">(add teams on the Teams tab)</span>
+            ) : null}
+          </span>
+        </span>
+        <span>
+          <span className="text-white/45">{peopleIds.size}</span> people assigned
+        </span>
+        <span>
+          <span className="text-white/45">{jobHours >= 10 ? jobHours.toFixed(1) : jobHours.toFixed(2)}</span> h jobs (est.)
+        </span>
+      </div>
+    </div>
+  );
+}
+
 type NewShowFormState = {
   showDate: string;
   showTime: string;
@@ -1716,16 +1818,17 @@ function ShowStaffingSections({
   eventTeams,
   venues,
   people,
+  onPatchShow,
 }: {
   eventId: string;
   show: EventShow;
   eventTeams: EventTeam[];
   venues: { id: string; name: string }[] | undefined;
   people: Person[];
+  onPatchShow: (body: Record<string, unknown>) => void;
 }) {
   const queryClient = useQueryClient();
   const [openDeptIds, setOpenDeptIds] = useState<Record<string, boolean>>({});
-  const [addedDeptIds, setAddedDeptIds] = useState<string[]>([]);
 
   const upsertStaffing = useMutation({
     mutationFn: (args: { personId: string; departmentId: string; isLead?: boolean }) =>
@@ -1744,82 +1847,62 @@ function ShowStaffingSections({
   });
 
   const departments = eventTeams.map((t) => t.team);
-  const staffedDepartmentIds = new Set(
-    (show.jobs ?? [])
-      .map((j) => j.departmentId)
-      .filter((id): id is string => Boolean(id))
-  );
-  for (const s of show.staffing ?? []) {
-    if (s.departmentId) staffedDepartmentIds.add(s.departmentId);
-  }
-  const visibleDepartmentIds = new Set<string>([...Array.from(staffedDepartmentIds), ...addedDeptIds]);
-  const visibleDepartments = departments.filter((d) => visibleDepartmentIds.has(d.id));
-  const addableDepartments = departments.filter((d) => !visibleDepartmentIds.has(d.id));
+  const staffingOk = parseStaffingOkMap(show.staffingOkByDepartment);
 
   function setDeptOpen(deptId: string, open: boolean) {
     setOpenDeptIds((prev) => ({ ...prev, [deptId]: open }));
   }
 
-  function addDepartmentSection(deptId: string) {
-    setAddedDeptIds((prev) => (prev.includes(deptId) ? prev : [...prev, deptId]));
-    setDeptOpen(deptId, true);
+  function setStaffingOk(deptId: string, ok: boolean) {
+    const next = { ...staffingOk, [deptId]: ok };
+    onPatchShow({ staffingOkByDepartment: next });
   }
 
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs uppercase tracking-wide text-white/45">Show staffing</p>
-        <Select
-          value="__none__"
-          onValueChange={(deptId) => {
-            if (deptId === "__none__") return;
-            addDepartmentSection(deptId);
-          }}
-          disabled={addableDepartments.length === 0}
-        >
-          <SelectTrigger className="h-8 w-[13rem] bg-white/5 border-white/10 text-white text-xs">
-            <SelectValue placeholder="Add Team Job Section" />
-          </SelectTrigger>
-          <SelectContent className="bg-[#16161f] border-white/10 text-white">
-            <SelectItem value="__none__" disabled>
-              Add Team Job Section
-            </SelectItem>
-            {addableDepartments.map((d) => (
-              <SelectItem key={d.id} value={d.id}>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
-                  {d.name}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <p className="text-xs uppercase tracking-wide text-white/45">Show staffing</p>
+      <p className="text-[11px] text-white/35 -mt-1">
+        One row per event team. Mark <span className="text-white/55">Staffing OK</span> when that department is staffed for this show.
+      </p>
 
-      {visibleDepartments.length === 0 ? (
-        <p className="text-xs text-white/35">No team sections added for this show yet.</p>
+      {departments.length === 0 ? (
+        <p className="text-xs text-white/35">Add teams on the Teams tab to plan staffing by department.</p>
       ) : (
         <div className="space-y-3">
-          {visibleDepartments.map((dept) => {
+          {departments.map((dept) => {
             const deptStaffing = (show.staffing ?? []).filter((s) => s.departmentId === dept.id);
             const lead = deptStaffing.find((s) => s.isLead) ?? null;
             const leadValue = lead?.personId ?? "__none__";
             const isOpen = openDeptIds[dept.id] ?? true;
+            const ok = staffingOk[dept.id] ?? false;
 
             return (
               <div key={dept.id} className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setDeptOpen(dept.id, !isOpen)}
-                  className="w-full flex items-center justify-between gap-2 text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    {isOpen ? <ChevronDown size={14} className="text-white/50" /> : <ChevronRight size={14} className="text-white/50" />}
-                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: dept.color }} />
-                    <span className="text-sm font-medium text-white/85">{dept.name}</span>
-                  </div>
-                  <span className="text-xs text-white/45">{(show.jobs ?? []).filter((j) => j.departmentId === dept.id).length} jobs</span>
-                </button>
+                <div className="flex flex-wrap items-center gap-2 justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setDeptOpen(dept.id, !isOpen)}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {isOpen ? <ChevronDown size={14} className="text-white/50 shrink-0" /> : <ChevronRight size={14} className="text-white/50 shrink-0" />}
+                      <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: dept.color }} />
+                      <span className="text-sm font-medium text-white/85 truncate">{dept.name}</span>
+                    </div>
+                    <span className="text-xs text-white/45 shrink-0">
+                      {(show.jobs ?? []).filter((j) => j.departmentId === dept.id).length} jobs
+                    </span>
+                  </button>
+                  <label className="flex items-center gap-2 text-xs text-white/70 cursor-pointer shrink-0 select-none">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-emerald-500"
+                      checked={ok}
+                      onChange={(e) => setStaffingOk(dept.id, e.target.checked)}
+                    />
+                    <span className="text-white/55">Staffing OK</span>
+                  </label>
+                </div>
 
                 {isOpen ? (
                   <>
@@ -1872,6 +1955,7 @@ function ShowStaffingSections({
 function ShowEventCard({
   eventId,
   show,
+  showIndex,
   eventTeams,
   venues,
   people,
@@ -1880,6 +1964,7 @@ function ShowEventCard({
 }: {
   eventId: string;
   show: EventShow;
+  showIndex: number;
   eventTeams: EventTeam[];
   venues: { id: string; name: string }[] | undefined;
   people: Person[];
@@ -1887,6 +1972,8 @@ function ShowEventCard({
   deleteShow: { mutate: (id: string) => void };
 }) {
   const patch = (body: Record<string, unknown>) => updateShow.mutate({ showId: show.id, body });
+  const [cardOpen, setCardOpen] = useState(showIndex === 0);
+  const stats = useMemo(() => computeShowStaffingStats(show, eventTeams), [show, eventTeams]);
 
   /** Local note text: controlled value must not track the query on every keystroke or saves race and drop characters. */
   const [technicalNotes, setTechnicalNotes] = useState(() => show.technicalNotes ?? "");
@@ -1908,17 +1995,41 @@ function ShowEventCard({
     []
   );
 
+  const summaryLine = formatShowCardSummaryLine(show);
+  const staffingLabel =
+    stats.total > 0 ? `${stats.ok}/${stats.total} teams OK` : "No event teams";
+  const hoursLabel = stats.jobHours >= 10 ? stats.jobHours.toFixed(1) : stats.jobHours.toFixed(2);
+
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <ShowTimeEditor show={show} venues={venues} onUpdate={patch} />
-        </div>
+    <Collapsible open={cardOpen} onOpenChange={setCardOpen} className="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+      <div className="flex items-start justify-between gap-2 p-3 sm:p-4 border-b border-white/[0.06] bg-white/[0.02]">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-start gap-2 text-left rounded-md py-0.5 -my-0.5 px-1 -mx-1 hover:bg-white/[0.04]"
+          >
+            {cardOpen ? <ChevronDown size={16} className="text-white/45 shrink-0 mt-0.5" /> : <ChevronRight size={16} className="text-white/45 shrink-0 mt-0.5" />}
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-sm font-medium text-white/90 leading-snug">{summaryLine}</p>
+              <p className="text-[11px] text-white/45 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                <span className="inline-flex items-center gap-1">
+                  {stats.total > 0 && stats.ok === stats.total ? (
+                    <Check size={12} className="text-emerald-400 shrink-0" aria-hidden />
+                  ) : null}
+                  Staffing {staffingLabel}
+                </span>
+                <span>{stats.people} people</span>
+                <span>{hoursLabel} h jobs</span>
+              </p>
+            </div>
+          </button>
+        </CollapsibleTrigger>
         <Button
           variant="ghost"
           size="icon"
           className="h-7 w-7 shrink-0 text-white/30 hover:text-red-400"
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             if (!confirmDeleteAction("show")) return;
             deleteShow.mutate(show.id);
           }}
@@ -1926,6 +2037,9 @@ function ShowEventCard({
           <Trash2 size={13} />
         </Button>
       </div>
+
+      <CollapsibleContent className="p-4 pt-3 space-y-3">
+      <ShowTimeEditor show={show} venues={venues} onUpdate={patch} />
 
       <div className="grid gap-3 md:grid-cols-2">
         <div>
@@ -1984,8 +2098,10 @@ function ShowEventCard({
         eventTeams={eventTeams}
         venues={venues}
         people={people}
+        onPatchShow={patch}
       />
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -2173,11 +2289,12 @@ function ShowsTab({ event }: { event: EventDetail }) {
         <div className="text-center text-white/35 text-sm py-10">No shows yet. Add the first show to start planning technical, FOH, and team staffing.</div>
       ) : (
         <div className="space-y-3">
-          {sortedShows.map((show: EventShow) => (
+          {sortedShows.map((show: EventShow, idx: number) => (
             <ShowEventCard
               key={show.id}
               eventId={event.id}
               show={show}
+              showIndex={idx}
               eventTeams={event.teams ?? []}
               venues={venues}
               people={availablePeople}

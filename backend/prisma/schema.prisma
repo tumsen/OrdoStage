@@ -480,6 +480,8 @@ model EventShow {
   notes                String?
   /** draft | confirmed | cancelled — primary confirmation is per show; Event.status is a rollup. */
   status               String       @default("draft")
+  /** departmentId -> staffing signed-off for this show */
+  staffingOkByDepartment Json?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
   staffing             EventShowStaffing[]

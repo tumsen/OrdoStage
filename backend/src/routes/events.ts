@@ -20,6 +20,16 @@ import { canAction } from "../requestRole";
 const eventsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 const prismaAny = prisma as any;
 
+function normalizeStaffingOkByDepartmentJson(json: unknown): Record<string, boolean> | null {
+  if (json == null) return null;
+  if (typeof json !== "object" || Array.isArray(json)) return null;
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(json as Record<string, unknown>)) {
+    if (typeof v === "boolean") out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 function rollupEventStatusFromShowStatuses(statuses: string[]): "draft" | "confirmed" | "cancelled" {
   if (statuses.length === 0) return "draft";
   const first = statuses[0]!;
@@ -549,6 +559,7 @@ function serializeFullEvent(event: any) {
       breakTime: show.breakTime,
       breakDurationMinutes: show.breakDurationMinutes,
       notes: show.notes,
+      staffingOkByDepartment: normalizeStaffingOkByDepartmentJson(show.staffingOkByDepartment),
       jobs: (show.jobs ?? []).map((job: any) => ({
         id: job.id,
         showId: job.showId,
@@ -1459,6 +1470,14 @@ eventsRouter.put("/events/:id/shows/:showId", zValidator("json", UpdateEventShow
       ...(body.breakDurationMinutes !== undefined ? { breakDurationMinutes: body.breakDurationMinutes ?? null } : {}),
       ...(body.notes !== undefined ? { notes: body.notes || null } : {}),
       ...(body.status !== undefined ? { status: body.status } : {}),
+      ...(body.staffingOkByDepartment !== undefined
+        ? {
+            staffingOkByDepartment:
+              body.staffingOkByDepartment == null
+                ? null
+                : (body.staffingOkByDepartment as Record<string, boolean>),
+          }
+        : {}),
     },
   });
   await syncEventRollupStatus(eventId);
