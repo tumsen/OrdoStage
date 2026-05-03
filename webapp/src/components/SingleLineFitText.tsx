@@ -1,130 +1,87 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-/** Padding so subpixel rounding does not clip the last glyph. */
-const WIDTH_EPS = 0.25;
-
 type Props = {
   text: string;
   className?: string;
+  /** Try these bounds; binary search picks the largest size that fits the container. */
   maxPx?: number;
   minPx?: number;
-  fitWidth?: number;
 };
 
 /**
- * Largest font size in [minPx, maxPx] such that scrollWidth <= cap.
+ * One line of text that shrinks to fit its container width (the flex column beside the avatar).
+ * No parent-supplied width — uses this element’s own layout box.
  */
-function fitFontBinary(
-  el: HTMLElement,
-  cap: number,
-  minPx: number,
-  maxPx: number
-): number {
-  el.style.fontSize = `${maxPx}px`;
-  if (el.scrollWidth <= cap) return maxPx;
-  el.style.fontSize = `${minPx}px`;
-  if (el.scrollWidth > cap) return minPx;
-  let lo = minPx;
-  let hi = maxPx;
-  for (let i = 0; i < 40; i++) {
-    const mid = (lo + hi) / 2;
-    el.style.fontSize = `${mid}px`;
-    if (el.scrollWidth <= cap) lo = mid;
-    else hi = mid;
-  }
-  return lo;
-}
-
-export function SingleLineFitText({
-  text,
-  className,
-  minPx = 2,
-  maxPx = 9,
-  fitWidth,
-}: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const measureRef = useRef<HTMLSpanElement>(null);
-  const [fontSize, setFontSize] = useState(maxPx);
-  const [zoomSqueeze, setZoomSqueeze] = useState(1);
-  const rafAttemptsRef = useRef(0);
+export function SingleLineFitText({ text, className, minPx = 5, maxPx = 9 }: Props) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const lineRef = useRef<HTMLSpanElement>(null);
+  const [fontPx, setFontPx] = useState(maxPx);
+  const [zoom, setZoom] = useState(1);
 
   useLayoutEffect(() => {
-    rafAttemptsRef.current = 0;
-    const container = containerRef.current;
-    const el = measureRef.current;
-    if (!container || !el) return;
+    const wrap = wrapRef.current;
+    const line = lineRef.current;
+    if (!wrap || !line) return;
 
-    const readLocalWidth = () => {
-      const cw = container.clientWidth;
-      if (cw > 1) return cw;
-      const rw = container.getBoundingClientRect().width;
-      return rw > 1 ? rw : 0;
-    };
+    const fit = () => {
+      const w = wrap.clientWidth;
+      if (w < 2) return;
 
-    const run = () => {
-      const fromParent =
-        fitWidth != null && Number.isFinite(fitWidth) && fitWidth > 1 ? fitWidth : 0;
-      const available = fromParent > 0 ? fromParent : readLocalWidth();
-
-      if (available <= 1) {
-        if (rafAttemptsRef.current < 24) {
-          rafAttemptsRef.current += 1;
-          requestAnimationFrame(() => requestAnimationFrame(run));
-        } else {
-          rafAttemptsRef.current = 0;
-          setFontSize(minPx);
-          setZoomSqueeze(1);
-        }
-        return;
-      }
-      rafAttemptsRef.current = 0;
-
-      const cap = Math.max(0, available - WIDTH_EPS);
-
-      if (text.trim() === "") {
-        el.style.removeProperty("font-size");
-        setFontSize(maxPx);
-        setZoomSqueeze(1);
+      const cap = w - 0.5;
+      if (!text.trim()) {
+        setFontPx(maxPx);
+        setZoom(1);
         return;
       }
 
-      const px = fitFontBinary(el, cap, minPx, maxPx);
-      el.style.fontSize = `${px}px`;
+      line.style.fontSize = `${maxPx}px`;
+      if (line.scrollWidth <= cap) {
+        line.style.removeProperty("font-size");
+        setFontPx(maxPx);
+        setZoom(1);
+        return;
+      }
 
-      const sw = el.scrollWidth;
-      // Exact horizontal fit to `cap` px: CSS zoom scales rendered width ~linearly.
-      // No upscale past natural width (short lines stay sharp).
+      line.style.fontSize = `${minPx}px`;
+      const swAtMin = line.scrollWidth;
+      if (swAtMin > cap) {
+        line.style.removeProperty("font-size");
+        setFontPx(minPx);
+        setZoom(cap / Math.max(swAtMin, 1));
+        return;
+      }
+
+      let lo = minPx;
+      let hi = maxPx;
+      for (let i = 0; i < 36; i++) {
+        const mid = (lo + hi) / 2;
+        line.style.fontSize = `${mid}px`;
+        if (line.scrollWidth <= cap) lo = mid;
+        else hi = mid;
+      }
+
+      line.style.fontSize = `${lo}px`;
       let z = 1;
-      if (sw > 0 && cap > 0) {
-        z = Math.min(1, cap / sw);
-      }
-      el.style.removeProperty("font-size");
-
-      setFontSize(px);
-      setZoomSqueeze(z);
+      if (line.scrollWidth > cap) z = cap / line.scrollWidth;
+      line.style.removeProperty("font-size");
+      setFontPx(lo);
+      setZoom(z);
     };
 
-    run();
-    const ro = new ResizeObserver(() => run());
-    ro.observe(container);
-    void document.fonts?.ready?.then(run);
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(wrap);
+    void document.fonts?.ready?.then(fit);
     return () => ro.disconnect();
-  }, [text, minPx, maxPx, fitWidth]);
+  }, [text, minPx, maxPx]);
 
   return (
-    <div
-      ref={containerRef}
-      className={cn("min-w-0 w-full max-w-full overflow-hidden box-border", className)}
-    >
+    <div ref={wrapRef} className="min-w-0 w-full overflow-hidden">
       <span
-        ref={measureRef}
-        className="inline-block max-w-none whitespace-nowrap leading-none tracking-tight"
-        style={{
-          fontSize: `${fontSize}px`,
-          lineHeight: 1.15,
-          zoom: zoomSqueeze,
-        }}
+        ref={lineRef}
+        className={cn("inline-block max-w-none whitespace-nowrap leading-tight", className)}
+        style={{ fontSize: `${fontPx}px`, zoom }}
       >
         {text}
       </span>

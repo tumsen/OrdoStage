@@ -16,7 +16,7 @@ import {
   KeyRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -98,43 +98,6 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-
-  /** Profile row: avatar + gap + text column — measure text slot explicitly (minus photo). */
-  const profileRowRef = useRef<HTMLDivElement>(null);
-  const profileAvatarRef = useRef<HTMLDivElement>(null);
-  const profileTextColRef = useRef<HTMLDivElement>(null);
-  const [profileTextColWidth, setProfileTextColWidth] = useState(0);
-
-  useLayoutEffect(() => {
-    const update = () => {
-      const row = profileRowRef.current;
-      const avatar = profileAvatarRef.current;
-      const text = profileTextColRef.current;
-      if (!row || !avatar) {
-        setProfileTextColWidth(0);
-        return;
-      }
-      // Pixels for name/email = row inner width − avatar − flex gap (not full sidebar).
-      const gapPx =
-        text != null
-          ? Math.max(
-              0,
-              Math.round(text.getBoundingClientRect().left - avatar.getBoundingClientRect().right)
-            )
-          : 10;
-      const w = row.clientWidth - avatar.offsetWidth - gapPx;
-      setProfileTextColWidth(Math.max(0, w));
-    };
-    update();
-    const row = profileRowRef.current;
-    const avatar = profileAvatarRef.current;
-    const text = profileTextColRef.current;
-    const ro = new ResizeObserver(update);
-    if (row) ro.observe(row);
-    if (avatar) ro.observe(avatar);
-    if (text) ro.observe(text);
-    return () => ro.disconnect();
-  }, [session?.user]);
 
   return (
     <div className="flex flex-col h-full">
@@ -254,14 +217,8 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
       {/* User + Sign out */}
       <div className="px-3 py-4 border-t border-white/10 space-y-2">
         {session?.user ? (
-          <div
-            ref={profileRowRef}
-            className="flex items-start gap-2.5 px-3 py-2"
-          >
-            <div
-              ref={profileAvatarRef}
-              className="w-9 h-9 rounded-full bg-ordo-violet/45 ring-1 ring-ordo-magenta/25 flex items-center justify-center flex-shrink-0 overflow-hidden"
-            >
+          <div className="flex items-start gap-2.5 px-3 py-2">
+            <div className="w-9 h-9 rounded-full bg-ordo-violet/45 ring-1 ring-ordo-magenta/25 flex items-center justify-center flex-shrink-0 overflow-hidden">
               {photoSrc ? (
                 <img
                   src={photoSrc}
@@ -272,22 +229,17 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
                 <span className="text-white text-[11px] font-semibold leading-none">{initials || "?"}</span>
               )}
             </div>
-            <div
-              ref={profileTextColRef}
-              className="flex-1 min-w-0 flex flex-col gap-px justify-center leading-none self-stretch"
-            >
+            <div className="flex-1 min-w-0 flex flex-col gap-px justify-center leading-none self-stretch">
               <SingleLineFitText
                 text={displayName}
-                fitWidth={profileTextColWidth}
-                maxPx={9}
-                minPx={2}
+                maxPx={8}
+                minPx={4}
                 className="font-medium text-white/90"
               />
               <SingleLineFitText
                 text={userEmail}
-                fitWidth={profileTextColWidth}
-                maxPx={8}
-                minPx={2}
+                maxPx={7}
+                minPx={4}
                 className="text-white/45"
               />
             </div>
