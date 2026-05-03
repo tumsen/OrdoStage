@@ -92,6 +92,7 @@ import {
   serializeContactRow,
   type EventContactRowFields,
 } from "@/lib/eventContactRow";
+import { parseEventCustomFieldsJson, type EventCustomField } from "@/lib/eventCustomFields";
 
 type TeamDocument = {
   id: string;
@@ -185,18 +186,6 @@ function emptyEventFormValues(): EventEditValues {
   };
 }
 
-type CustomField = { key: string; value: string; departments: string[] };
-
-function parseEventCustomFieldsJson(customFields: string | null | undefined): CustomField[] {
-  if (!customFields?.trim()) return [];
-  try {
-    const p = JSON.parse(customFields) as unknown;
-    return Array.isArray(p) ? (p as CustomField[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 /** Extra contact persons (same columns as primary / technical). */
 type ContactRow = EventContactRowFields;
 
@@ -268,9 +257,9 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
   };
 }
 
-function splitGeneralEventFields(fields: CustomField[]): {
+function splitGeneralEventFields(fields: EventCustomField[]): {
   general: GeneralEventFields;
-  rest: CustomField[];
+  rest: EventCustomField[];
 } {
   const general: GeneralEventFields = {
     smokeFx: false,
@@ -293,7 +282,7 @@ function splitGeneralEventFields(fields: CustomField[]): {
     companyState: "",
     companyCountry: "",
   };
-  const rest: CustomField[] = [];
+  const rest: EventCustomField[] = [];
   for (const field of fields) {
     const key = field.key?.trim();
     const value = field.value ?? "";

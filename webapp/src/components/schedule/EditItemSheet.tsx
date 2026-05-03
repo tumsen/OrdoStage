@@ -23,6 +23,8 @@ import { api } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { toast } from "@/hooks/use-toast";
 import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
+import { migrateContactRowFields } from "@/lib/eventContactRow";
+import { parseEventCustomFieldsJson } from "@/lib/eventCustomFields";
 import type { CalendarItem } from "./scheduleUtils";
 import type {
   EventDetail,
@@ -46,32 +48,27 @@ function eventMetaFromCustomFields(customFields: string | null | undefined): {
   hazeFx: boolean;
   strobeFx: boolean;
 } {
-  if (!customFields) return { contacts: [], smokeFx: false, hazeFx: false, strobeFx: false };
-  try {
-    const fields = JSON.parse(customFields) as Array<{ key?: string; value?: string }>;
-    if (!Array.isArray(fields)) return { contacts: [], smokeFx: false, hazeFx: false, strobeFx: false };
-    let contacts: EventContactRow[] = [];
-    let smokeFx = false;
-    let hazeFx = false;
-    let strobeFx = false;
-    for (const f of fields) {
-      const key = (f.key ?? "").trim();
-      const value = (f.value ?? "").trim();
-      if (key === "Contacts" && value) {
-        try {
-          const parsed = JSON.parse(value) as EventContactRow[];
-          if (Array.isArray(parsed)) contacts = parsed;
-        } catch {
-          // ignore invalid legacy value
-        }
-      } else if (key === "Use smoke fx") smokeFx = value === "true";
-      else if (key === "Use haze fx") hazeFx = value === "true";
-      else if (key === "Use strobe fx") strobeFx = value === "true";
-    }
-    return { contacts, smokeFx, hazeFx, strobeFx };
-  } catch {
-    return { contacts: [], smokeFx: false, hazeFx: false, strobeFx: false };
+  const fields = parseEventCustomFieldsJson(customFields);
+  if (fields.length === 0) return { contacts: [], smokeFx: false, hazeFx: false, strobeFx: false };
+  let contacts: EventContactRow[] = [];
+  let smokeFx = false;
+  let hazeFx = false;
+  let strobeFx = false;
+  for (const f of fields) {
+    const key = f.key.trim();
+    const value = f.value.trim();
+    if (key === "Contacts" && value) {
+      try {
+        const parsed = JSON.parse(value) as unknown[];
+        if (Array.isArray(parsed)) contacts = parsed.map((row) => migrateContactRowFields(row));
+      } catch {
+        /* ignore invalid legacy value */
+      }
+    } else if (key === "Use smoke fx") smokeFx = value === "true";
+    else if (key === "Use haze fx") hazeFx = value === "true";
+    else if (key === "Use strobe fx") strobeFx = value === "true";
   }
+  return { contacts, smokeFx, hazeFx, strobeFx };
 }
 
 function EventScheduleSummary({

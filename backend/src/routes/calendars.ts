@@ -28,7 +28,30 @@ function normalizeTagList(tags: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
-type ContactRow = { role?: string; name?: string; phone?: string; email?: string };
+/** Primary / contract contact may be JSON (`contactPerson` on event) or legacy plain text. */
+function formatContactPersonForDisplay(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  const s = raw.trim();
+  try {
+    const o = JSON.parse(s) as unknown;
+    if (o && typeof o === "object" && !Array.isArray(o)) {
+      const r = o as Record<string, unknown>;
+      const line = [r.role, r.name, r.phone, r.email]
+        .map((x) => (typeof x === "string" ? x.trim() : ""))
+        .filter(Boolean)
+        .join(" — ");
+      const note = typeof r.note === "string" && r.note.trim() ? r.note.trim() : "";
+      if (line && note) return `${line}. ${note}`;
+      if (line) return line;
+      if (note) return note;
+    }
+  } catch {
+    /* plain text */
+  }
+  return s;
+}
+
+type ContactRow = { role?: string; name?: string; phone?: string; email?: string; note?: string };
 
 function parseEventCustomFields(customFields: string | null | undefined): {
   contacts: ContactRow[];
@@ -49,8 +72,19 @@ function parseEventCustomFields(customFields: string | null | undefined): {
       const value = (field.value ?? "").trim();
       if (key === "Contacts" && value) {
         try {
-          const parsed = JSON.parse(value) as ContactRow[];
-          if (Array.isArray(parsed)) contacts = parsed;
+          const parsed = JSON.parse(value) as unknown[];
+          if (Array.isArray(parsed)) {
+            contacts = parsed.map((row) => {
+              const o = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+              return {
+                role: typeof o.role === "string" ? o.role : undefined,
+                name: typeof o.name === "string" ? o.name : undefined,
+                phone: typeof o.phone === "string" ? o.phone : undefined,
+                email: typeof o.email === "string" ? o.email : undefined,
+                note: typeof o.note === "string" ? o.note : undefined,
+              };
+            });
+          }
         } catch {
           // ignore malformed contacts payload
         }
@@ -249,7 +283,8 @@ function buildICS(
       if (row.showId) parts.push(`Show ID: ${row.showId}`);
       if (row.showTime && row.showDurationMinutes != null)
         parts.push(`Show: ${row.showTime} (${row.showDurationMinutes} min)`);
-      if (row.contactPerson) parts.push(`Contact: ${row.contactPerson}`);
+      const contactLine = formatContactPersonForDisplay(row.contactPerson);
+      if (contactLine) parts.push(`Contact: ${contactLine}`);
       if (row.getInTime) parts.push(`Get-in: ${row.getInTime}`);
       if (row.setupTime) parts.push(`Setup: ${row.setupTime}`);
       if (row.stageSize) parts.push(`Stage size: ${row.stageSize}`);
@@ -272,7 +307,12 @@ function buildICS(
       const meta = parseEventCustomFields(row.customFields);
       if (meta.contacts.length > 0) {
         const contactSummary = meta.contacts
-          .map((c) => [c.role, c.name, c.phone, c.email].filter(Boolean).join(" - "))
+          .map((c) => {
+            const main = [c.role, c.name, c.phone, c.email].filter(Boolean).join(" - ");
+            const n = c.note?.trim();
+            if (main && n) return `${main} (${n})`;
+            return main || n || "";
+          })
           .filter(Boolean)
           .join("; ");
         if (contactSummary) parts.push(`Contacts: ${contactSummary}`);
