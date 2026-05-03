@@ -470,16 +470,23 @@ function EventForm({ event, venues, people, onSaved, onClose }: EventFormProps) 
           </div>
         ))}
         {unassigned.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Select value={newPersonId} onValueChange={setNewPersonId}>
-              <SelectTrigger className="flex-1 bg-white/5 border-white/10 text-white text-sm h-8"><SelectValue placeholder="Add person…" /></SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                {unassigned.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Input placeholder="Role" value={newPersonRole} onChange={(e) => setNewPersonRole(e.target.value)}
-              className="w-24 bg-white/5 border-white/10 text-white placeholder:text-white/25 h-8 text-sm" />
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50 hover:text-white flex-shrink-0"
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[140px] space-y-1">
+              <Label className={lbl}>Person</Label>
+              <Select value={newPersonId} onValueChange={setNewPersonId}>
+                <SelectTrigger className="w-full bg-white/5 border-white/10 text-white text-sm h-8"><SelectValue placeholder="Choose…" /></SelectTrigger>
+                <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                  {unassigned.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-24 space-y-1">
+              <Label className={lbl}>Role</Label>
+              <Input value={newPersonRole} onChange={(e) => setNewPersonRole(e.target.value)}
+                placeholder="Role"
+                className="w-full bg-white/5 border-white/10 text-white placeholder:text-white/25 h-8 text-sm" />
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50 hover:text-white flex-shrink-0 mb-0.5"
               disabled={!newPersonId}
               onClick={() => {
                 if (!newPersonId) return;
@@ -648,16 +655,23 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
           </div>
         ))}
         {unassigned.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Select value={newPersonId} onValueChange={setNewPersonId}>
-              <SelectTrigger className="flex-1 bg-white/5 border-white/10 text-white text-sm h-8"><SelectValue placeholder="Add person…" /></SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                {unassigned.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Input placeholder="Role" value={newPersonRole} onChange={(e) => setNewPersonRole(e.target.value)}
-              className="w-24 bg-white/5 border-white/10 text-white placeholder:text-white/25 h-8 text-sm" />
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50 hover:text-white flex-shrink-0"
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[140px] space-y-1">
+              <Label className={lbl}>Person</Label>
+              <Select value={newPersonId} onValueChange={setNewPersonId}>
+                <SelectTrigger className="w-full bg-white/5 border-white/10 text-white text-sm h-8"><SelectValue placeholder="Choose…" /></SelectTrigger>
+                <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                  {unassigned.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-24 space-y-1">
+              <Label className={lbl}>Role</Label>
+              <Input value={newPersonRole} onChange={(e) => setNewPersonRole(e.target.value)}
+                placeholder="Role"
+                className="w-full bg-white/5 border-white/10 text-white placeholder:text-white/25 h-8 text-sm" />
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/50 hover:text-white flex-shrink-0 mb-0.5"
               disabled={!newPersonId}
               onClick={() => {
                 if (!newPersonId) return;
