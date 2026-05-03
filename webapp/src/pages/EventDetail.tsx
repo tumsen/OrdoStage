@@ -83,6 +83,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
+import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/AddressFields";
 
 type TeamDocument = {
   id: string;
@@ -117,8 +118,15 @@ const EventEditSchema = z.object({
   strobeFx: z.boolean().optional(),
   fohNotes: z.string().optional(),
   technicalContactInfo: z.string().optional(),
-  companyInfo: z.string().optional(),
   contractNotes: z.string().optional(),
+  companyLegalName: z.string().optional(),
+  companyVat: z.string().optional(),
+  companyStreet: z.string().optional(),
+  companyNumber: z.string().optional(),
+  companyZip: z.string().optional(),
+  companyCity: z.string().optional(),
+  companyState: z.string().optional(),
+  companyCountry: z.string().optional(),
 });
 
 type EventEditValues = z.infer<typeof EventEditSchema>;
@@ -143,13 +151,42 @@ function emptyEventFormValues(): EventEditValues {
     strobeFx: false,
     fohNotes: "",
     technicalContactInfo: "",
-    companyInfo: "",
     contractNotes: "",
+    companyLegalName: "",
+    companyVat: "",
+    companyStreet: "",
+    companyNumber: "",
+    companyZip: "",
+    companyCity: "",
+    companyState: "",
+    companyCountry: "",
   };
 }
 
 type CustomField = { key: string; value: string; departments: string[] };
-type ContactRow = { role: string; name: string; phone: string; email: string };
+/** Contract person: same field pattern as People (name, email, phone, structured address). */
+type ContactRow = { role: string; name: string; phone: string; email: string } & Address;
+
+function emptyContactRow(): ContactRow {
+  return { role: "", name: "", email: "", phone: "", ...EMPTY_ADDRESS };
+}
+
+function migrateContactRow(raw: unknown): ContactRow {
+  const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    role: String(o.role ?? ""),
+    name: String(o.name ?? ""),
+    email: String(o.email ?? ""),
+    phone: String(o.phone ?? ""),
+    street: String(o.street ?? ""),
+    number: String(o.number ?? ""),
+    zip: String(o.zip ?? ""),
+    city: String(o.city ?? ""),
+    state: String(o.state ?? ""),
+    country: String(o.country ?? ""),
+  };
+}
+
 type GeneralEventFields = {
   smokeFx: boolean;
   hazeFx: boolean;
@@ -161,8 +198,15 @@ type GeneralEventFields = {
   getInEnd: string;
   getInDuration: string;
   technicalContactInfo: string;
-  companyInfo: string;
   contractNotes: string;
+  companyLegalName: string;
+  companyVat: string;
+  companyStreet: string;
+  companyNumber: string;
+  companyZip: string;
+  companyCity: string;
+  companyState: string;
+  companyCountry: string;
 };
 
 function normalizeEventStatus(s: string | undefined): "draft" | "confirmed" | "cancelled" {
@@ -190,8 +234,15 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
     strobeFx: g.strobeFx,
     fohNotes: g.fohNotes,
     technicalContactInfo: g.technicalContactInfo ?? "",
-    companyInfo: g.companyInfo ?? "",
     contractNotes: g.contractNotes ?? "",
+    companyLegalName: g.companyLegalName ?? "",
+    companyVat: g.companyVat ?? "",
+    companyStreet: g.companyStreet ?? "",
+    companyNumber: g.companyNumber ?? "",
+    companyZip: g.companyZip ?? "",
+    companyCity: g.companyCity ?? "",
+    companyState: g.companyState ?? "",
+    companyCountry: g.companyCountry ?? "",
   };
 }
 
@@ -210,8 +261,15 @@ function splitGeneralEventFields(fields: CustomField[]): {
     getInEnd: "",
     getInDuration: "",
     technicalContactInfo: "",
-    companyInfo: "",
     contractNotes: "",
+    companyLegalName: "",
+    companyVat: "",
+    companyStreet: "",
+    companyNumber: "",
+    companyZip: "",
+    companyCity: "",
+    companyState: "",
+    companyCountry: "",
   };
   const rest: CustomField[] = [];
   for (const field of fields) {
@@ -235,14 +293,9 @@ function splitGeneralEventFields(fields: CustomField[]): {
     }
     if (key === "Contacts") {
       try {
-        const parsed = JSON.parse(value) as ContactRow[];
+        const parsed = JSON.parse(value) as unknown[];
         if (Array.isArray(parsed)) {
-          general.contacts = parsed.map((row) => ({
-            role: String(row.role ?? ""),
-            name: String(row.name ?? ""),
-            phone: String(row.phone ?? ""),
-            email: String(row.email ?? ""),
-          }));
+          general.contacts = parsed.map((row) => migrateContactRow(row));
           continue;
         }
       } catch {
@@ -269,8 +322,30 @@ function splitGeneralEventFields(fields: CustomField[]): {
       general.technicalContactInfo = value;
       continue;
     }
+    if (key === "Company legal name") {
+      general.companyLegalName = value;
+      continue;
+    }
+    if (key === "Company VAT") {
+      general.companyVat = value;
+      continue;
+    }
+    if (key === "Company address") {
+      try {
+        const a = JSON.parse(value) as Partial<Address>;
+        general.companyStreet = String(a.street ?? "");
+        general.companyNumber = String(a.number ?? "");
+        general.companyZip = String(a.zip ?? "");
+        general.companyCity = String(a.city ?? "");
+        general.companyState = String(a.state ?? "");
+        general.companyCountry = String(a.country ?? "");
+      } catch {
+        /* ignore */
+      }
+      continue;
+    }
     if (key === "Company info") {
-      general.companyInfo = value;
+      if (!general.companyLegalName.trim()) general.companyLegalName = value;
       continue;
     }
     if (key === "Contract booking notes") {
@@ -419,8 +494,26 @@ function DetailsTab({
         name: row.name.trim(),
         phone: row.phone.trim(),
         email: row.email.trim(),
+        street: row.street.trim(),
+        number: row.number.trim(),
+        zip: row.zip.trim(),
+        city: row.city.trim(),
+        state: row.state.trim(),
+        country: row.country.trim(),
       }))
-      .filter((row) => row.role || row.name || row.phone || row.email);
+      .filter(
+        (row) =>
+          row.role ||
+          row.name ||
+          row.phone ||
+          row.email ||
+          row.street ||
+          row.number ||
+          row.zip ||
+          row.city ||
+          row.state ||
+          row.country
+      );
     const audienceFxNote =
       values.smokeFx || values.hazeFx || values.strobeFx
         ? "Audience announcement required: This performance uses smoke/haze/strobe effects."
@@ -441,7 +534,22 @@ function DetailsTab({
       { key: "Get-in end", value: values.getInEnd?.trim() || "" },
       { key: "Get-in duration", value: values.getInDuration?.trim() || "" },
       { key: "Technical contact info", value: values.technicalContactInfo?.trim() || "" },
-      { key: "Company info", value: values.companyInfo?.trim() || "" },
+      { key: "Company legal name", value: values.companyLegalName?.trim() || "" },
+      { key: "Company VAT", value: values.companyVat?.trim() || "" },
+      {
+        key: "Company address",
+        value: (() => {
+          const a = {
+            street: values.companyStreet?.trim() ?? "",
+            number: values.companyNumber?.trim() ?? "",
+            zip: values.companyZip?.trim() ?? "",
+            city: values.companyCity?.trim() ?? "",
+            state: values.companyState?.trim() ?? "",
+            country: values.companyCountry?.trim() ?? "",
+          };
+          return Object.values(a).some(Boolean) ? JSON.stringify(a) : "";
+        })(),
+      },
       { key: "Contract booking notes", value: values.contractNotes?.trim() || "" },
     ]
       .filter((row) => row.value)
@@ -494,7 +602,7 @@ function DetailsTab({
   }
 
   function addContact() {
-    setContacts((prev) => [...prev, { role: "", name: "", phone: "", email: "" }]);
+    setContacts((prev) => [...prev, emptyContactRow()]);
   }
 
   function removeContact(idx: number) {
@@ -709,24 +817,64 @@ function DetailsTab({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="companyInfo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Company info</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      value={field.value ?? ""}
-                      placeholder="Legal name, address, VAT / org number, invoicing…"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
-                      rows={3}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="companyLegalName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Company legal name</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value ?? ""}
+                        placeholder="Registered company name"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="companyVat"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">VAT / org number</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value ?? ""}
+                        placeholder="VAT, CVR, EIN…"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-white/60 text-xs uppercase tracking-wide">Company address</Label>
+              <AddressFields
+                value={{
+                  street: form.watch("companyStreet") ?? "",
+                  number: form.watch("companyNumber") ?? "",
+                  zip: form.watch("companyZip") ?? "",
+                  city: form.watch("companyCity") ?? "",
+                  state: form.watch("companyState") ?? "",
+                  country: form.watch("companyCountry") ?? "",
+                }}
+                onChange={(addr) => {
+                  form.setValue("companyStreet", addr.street);
+                  form.setValue("companyNumber", addr.number);
+                  form.setValue("companyZip", addr.zip);
+                  form.setValue("companyCity", addr.city);
+                  form.setValue("companyState", addr.state);
+                  form.setValue("companyCountry", addr.country);
+                }}
+              />
+            </div>
 
             <FormField
               control={form.control}
@@ -766,57 +914,117 @@ function DetailsTab({
               )}
             />
 
-            <div className="space-y-2">
-              <p className="text-[11px] text-white/50 uppercase tracking-wide">Contract persons</p>
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] text-white/50 uppercase tracking-wide">Contact persons</p>
+                  <p className="text-xs text-white/40 mt-0.5 max-w-md">
+                    Add as many people as you need for this event (e.g. tour manager, agent, production). Use the
+                    button for each new person.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={addContact}
+                  className="shrink-0 bg-ordo-violet/30 hover:bg-ordo-violet/40 text-white border border-white/10"
+                >
+                  <Plus size={15} className="mr-1.5" />
+                  Add contact person
+                </Button>
+              </div>
+
+              {contacts.length === 0 ? (
+                <p className="text-sm text-white/35 rounded-md border border-dashed border-white/15 bg-white/[0.02] px-3 py-4 text-center">
+                  No contact persons yet. Click &ldquo;Add contact person&rdquo; to add the first one.
+                </p>
+              ) : null}
+
               {contacts.map((row, idx) => (
                 <div
                   key={idx}
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] gap-2 items-center"
+                  className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3"
                 >
-                  <Input
-                    value={row.role}
-                    onChange={(e) => updateContact(idx, { role: e.target.value })}
-                    placeholder="Role"
-                    className="bg-white/5 border-white/10 text-white h-9"
-                  />
-                  <Input
-                    value={row.name}
-                    onChange={(e) => updateContact(idx, { name: e.target.value })}
-                    placeholder="Name"
-                    className="bg-white/5 border-white/10 text-white h-9"
-                  />
-                  <Input
-                    value={row.phone}
-                    onChange={(e) => updateContact(idx, { phone: e.target.value })}
-                    placeholder="Phone"
-                    className="bg-white/5 border-white/10 text-white h-9"
-                  />
-                  <Input
-                    value={row.email}
-                    onChange={(e) => updateContact(idx, { email: e.target.value })}
-                    placeholder="Email"
-                    className="bg-white/5 border-white/10 text-white h-9"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeContact(idx)}
-                    className="h-8 w-8 justify-self-end text-white/35 hover:text-red-400"
-                  >
-                    <X size={14} />
-                  </Button>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-white/50">Person {idx + 1}</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeContact(idx)}
+                      className="h-7 text-red-400/80 hover:text-red-400 hover:bg-red-500/10 -mr-1"
+                    >
+                      <X size={14} className="mr-1" />
+                      Remove
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      value={row.role}
+                      onChange={(e) => updateContact(idx, { role: e.target.value })}
+                      placeholder="Role (e.g. Tour manager)"
+                      className="bg-white/5 border-white/10 text-white h-9"
+                    />
+                    <Input
+                      value={row.name}
+                      onChange={(e) => updateContact(idx, { name: e.target.value })}
+                      placeholder="Full name"
+                      className="bg-white/5 border-white/10 text-white h-9"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      type="email"
+                      value={row.email}
+                      onChange={(e) => updateContact(idx, { email: e.target.value })}
+                      placeholder="Email"
+                      className="bg-white/5 border-white/10 text-white h-9"
+                    />
+                    <Input
+                      value={row.phone}
+                      onChange={(e) => updateContact(idx, { phone: e.target.value })}
+                      placeholder="Phone"
+                      className="bg-white/5 border-white/10 text-white h-9"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] text-white/45 uppercase tracking-wide">Address</Label>
+                    <AddressFields
+                      value={{
+                        street: row.street,
+                        number: row.number,
+                        zip: row.zip,
+                        city: row.city,
+                        state: row.state,
+                        country: row.country,
+                      }}
+                      onChange={(addr) =>
+                        updateContact(idx, {
+                          street: addr.street,
+                          number: addr.number,
+                          zip: addr.zip,
+                          city: addr.city,
+                          state: addr.state,
+                          country: addr.country,
+                        })
+                      }
+                    />
+                  </div>
                 </div>
               ))}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="border-white/10 text-white/70 bg-transparent"
-                onClick={addContact}
-              >
-                <Plus size={13} className="mr-1" /> Add contact
-              </Button>
+
+              {contacts.length > 0 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full sm:w-auto border-white/15 text-white/85 hover:bg-white/[0.06]"
+                  onClick={addContact}
+                >
+                  <Plus size={15} className="mr-1.5" />
+                  Add another contact person
+                </Button>
+              ) : null}
             </div>
 
             {/* ── Technical ── */}
