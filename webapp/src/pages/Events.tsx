@@ -206,36 +206,38 @@ export default function Events() {
                             >
                               <div
                                 className={cn(
-                                  "flex items-center gap-px shrink-0 tabular-nums",
+                                  "flex items-center gap-1 shrink-0 tabular-nums",
                                   showOff ? undefined : "text-white/[0.82]"
                                 )}
                               >
                                 <span className="w-[1.625rem] text-center">{when.weekdayLabel}</span>
-                                <span className="w-[2.875rem] text-center">{when.dateOnlyLabel}</span>
-                                <span className="w-[3.875rem] text-right">{when.timeLabel}</span>
+                                <div className="flex items-center gap-0">
+                                  <span className="w-[2.875rem] text-center">{when.dateOnlyLabel}</span>
+                                  <span className="w-[3.875rem] text-right">{when.timeLabel}</span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-x-1 min-w-0 shrink">
+                              <div className="flex items-center gap-x-2 min-w-0 shrink flex-1">
                                 <span
                                   className={cn("truncate max-w-[12rem]", showOff ? undefined : "text-white/55")}
                                   title={venueName}
                                 >
                                   {venueName}
                                 </span>
-                                <span className="shrink-0">
+                                <div className="flex items-center gap-x-1 shrink-0">
                                   <EventListStaffingHint ok={ok} total={total} muted={showOff} />
-                                </span>
-                                <span
-                                  className="w-[1.125rem] text-center tabular-nums shrink-0 text-white/45"
-                                  title={`${stats.people} people on this show`}
-                                >
-                                  {stats.people}
-                                </span>
-                                <span
-                                  className="w-[2.375rem] text-right tabular-nums shrink-0 text-white/45"
-                                  title={`${hoursLabel} h planned jobs`}
-                                >
-                                  {hoursLabel}h
-                                </span>
+                                  <span
+                                    className="w-[1.125rem] text-center tabular-nums text-white/45"
+                                    title={`${stats.people} people on this show`}
+                                  >
+                                    {stats.people}
+                                  </span>
+                                  <span
+                                    className="w-[2.375rem] text-right tabular-nums text-white/45"
+                                    title={`${hoursLabel} h planned jobs`}
+                                  >
+                                    {hoursLabel}h
+                                  </span>
+                                </div>
                               </div>
                               <div
                                 className={cn(
