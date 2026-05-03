@@ -34,6 +34,20 @@ import { localeForLanguage } from "@/lib/preferences";
 
 type StatusFilter = "all" | "draft" | "confirmed" | "cancelled";
 
+/** Show is draft unless explicitly confirmed or cancelled. */
+function effectiveShowStatus(show: EventShow): "draft" | "confirmed" | "cancelled" {
+  if (show.status === "confirmed") return "confirmed";
+  if (show.status === "cancelled") return "cancelled";
+  return "draft";
+}
+
+function eventPassesShowStatusFilter(event: EventDetail, filter: StatusFilter): boolean {
+  if (filter === "all") return true;
+  const shows = event.shows ?? [];
+  if (shows.length === 0) return filter === "draft";
+  return shows.some((s) => effectiveShowStatus(s) === filter);
+}
+
 export default function Events() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -60,7 +74,7 @@ export default function Events() {
   });
 
   const filtered = (events ?? []).filter((e) => {
-    if (statusFilter !== "all" && e.status !== statusFilter) return false;
+    if (!eventPassesShowStatusFilter(e, statusFilter)) return false;
     if (dateFrom && e.startDate && new Date(e.startDate) < new Date(dateFrom)) return false;
     if (dateTo && e.startDate && new Date(e.startDate) > new Date(dateTo + "T23:59:59")) return false;
     if ((dateFrom || dateTo) && !e.startDate) return false;
@@ -77,7 +91,10 @@ export default function Events() {
             <span className="text-xs">Filter:</span>
           </div>
           <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-            <SelectTrigger className="w-36 bg-white/5 border-white/10 text-white text-sm h-8">
+            <SelectTrigger
+              className="w-36 bg-white/5 border-white/10 text-white text-sm h-8"
+              title="Filter by each show's status"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-[#16161f] border-white/10 text-white">
@@ -111,42 +128,42 @@ export default function Events() {
 
       {/* Table */}
       <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_auto] gap-0">
+        <div className="grid grid-cols-[1fr_auto] gap-0">
           {/* Header */}
           <div className="contents">
             <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">Title</div>
-            <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">Status</div>
             <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10"></div>
           </div>
 
           {isLoading ? (
-            <div className="col-span-3 p-5 space-y-3">
+            <div className="col-span-2 p-5 space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-10 w-full rounded bg-white/5" />
               ))}
             </div>
           ) : error ? (
-            <div className="col-span-3 py-10 text-center text-red-400 text-sm">
+            <div className="col-span-2 py-10 text-center text-red-400 text-sm">
               Failed to load events.
             </div>
           ) : filtered.length === 0 ? (
-            <div className="col-span-3 py-12 text-center text-white/30 text-sm">
+            <div className="col-span-2 py-12 text-center text-white/30 text-sm">
               {(events ?? []).length === 0
                 ? "No events yet. Create your first one!"
                 : "No events match your filters."}
             </div>
           ) : (
             filtered.map((event) => {
-              const isDraft = event.status === "draft";
-              const isCancelled = event.status === "cancelled";
-              const isConfirmed = event.status === "confirmed";
               const teams = event.teams ?? [];
-              const shows = [...(event.shows ?? [])].sort((a, b) => {
+              const showsSorted = [...(event.shows ?? [])].sort((a, b) => {
                 const da = a.showDate.slice(0, 10);
                 const db = b.showDate.slice(0, 10);
                 if (da !== db) return da.localeCompare(db);
                 return a.showTime.localeCompare(b.showTime);
               });
+              const shows =
+                statusFilter === "all"
+                  ? showsSorted
+                  : showsSorted.filter((s) => effectiveShowStatus(s) === statusFilter);
               return (
               <div key={event.id} className="contents group">
                 <div
@@ -157,47 +174,35 @@ export default function Events() {
                     <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
                       {event.title}
                     </span>
-                    {isConfirmed && (
-                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-700/50">
-                        Confirmed
-                      </span>
-                    )}
-                    {isDraft && (
-                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-ordo-yellow/20 text-ordo-yellow border border-ordo-yellow/40">
-                        Draft
-                      </span>
-                    )}
-                    {isCancelled && (
-                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-700/50">
-                        Cancelled
-                      </span>
-                    )}
                   </div>
                   {shows.length > 0 ? (
                     <div className="mt-1 overflow-x-auto -mx-1 px-1">
                       <ul className="space-y-px min-w-[min(100%,32rem)]">
                         {shows.map((show) => {
                           const { ok, total } = computeShowStaffingStats(show, teams);
-                          const showOff = show.status === "cancelled";
+                          const showOff = effectiveShowStatus(show) === "cancelled";
                           const venueName = show.venue?.name ?? "Venue";
                           const ticketBits = formatEventListTicketBits(show, prefsLocale, hour12);
                           const when = formatEventListWhenParts(show, prefsLocale, hour12);
+                          const showStatus = effectiveShowStatus(show);
                           return (
                             <li
                               key={show.id}
                               className={cn(
-                                "grid gap-x-2 text-[11px] leading-tight items-baseline [grid-template-columns:minmax(8rem,10.5rem)_minmax(0,1fr)_minmax(6.5rem,auto)_minmax(0,1.15fr)]",
+                                "grid gap-x-2 text-[11px] leading-tight items-center [grid-template-columns:minmax(6.25rem,auto)_4.5rem_minmax(0,1fr)_minmax(6rem,auto)_minmax(0,1.1fr)_auto]",
                                 showOff ? "text-white/30 line-through decoration-white/20" : "text-white/50"
                               )}
                             >
-                              <div className="min-w-0 whitespace-nowrap">
-                                <span className={cn(showOff ? undefined : "text-white/70")}>
-                                  {when.dateLabel}
-                                </span>
-                                <span className="text-white/35 px-1">·</span>
-                                <span className={cn(showOff ? undefined : "text-white/60")}>
-                                  {when.timeLabel}
-                                </span>
+                              <div className={cn("min-w-0 truncate", showOff ? undefined : "text-white/70")}>
+                                {when.dateLabel}
+                              </div>
+                              <div
+                                className={cn(
+                                  "text-right tabular-nums tracking-tight shrink-0 w-[4.5rem]",
+                                  showOff ? undefined : "text-white/65"
+                                )}
+                              >
+                                {when.timeLabel}
                               </div>
                               <div
                                 className={cn("min-w-0 truncate", showOff ? undefined : "text-white/55")}
@@ -217,6 +222,12 @@ export default function Events() {
                               >
                                 {ticketBits ?? "—"}
                               </div>
+                              <div className="shrink-0 justify-self-end">
+                                <StatusBadge
+                                  status={showStatus}
+                                  className="text-[10px] py-px px-1.5 font-medium"
+                                />
+                              </div>
                             </li>
                           );
                         })}
@@ -225,12 +236,6 @@ export default function Events() {
                   ) : (
                     <p className="mt-1 text-[11px] text-white/35">No shows scheduled</p>
                   )}
-                </div>
-                <div
-                  className="px-5 py-3.5 border-b border-white/5 flex items-center cursor-pointer"
-                  onClick={() => navigate(`/events/${event.id}`)}
-                >
-                  <StatusBadge status={event.status} />
                 </div>
                 <div className="px-5 py-3.5 border-b border-white/5 flex items-center gap-2">
                   <Button
