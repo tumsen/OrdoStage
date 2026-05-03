@@ -232,14 +232,14 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
             <div className="flex-1 min-w-0 flex flex-col gap-0.5 justify-center">
               <SingleLineFitText
                 text={displayName}
-                maxPx={12}
-                minPx={8}
+                maxPx={10}
+                minPx={6}
                 className="font-medium text-white/90"
               />
               <SingleLineFitText
                 text={userEmail}
-                maxPx={11}
-                minPx={7}
+                maxPx={9}
+                minPx={6}
                 className="text-white/45"
               />
             </div>
