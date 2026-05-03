@@ -189,10 +189,10 @@ export default function Events() {
                       <ul
                         className="min-w-[min(100%,42rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
                         style={{
-                          /* Date=max longest string; time=fixed HH:MM (6ch) or 12h width; venue=1fr (only flexible). */
+                          /* Venue=max longest name in this event; flex space goes to tickets (last 1fr). */
                           gridTemplateColumns: hour12
-                            ? "auto 10ch max-content minmax(8rem,11ch) minmax(0,1fr) 6.5rem 2.25rem 3.25rem minmax(0,max-content)"
-                            : "auto 10ch max-content 6ch minmax(0,1fr) 6.5rem 2.25rem 3.25rem minmax(0,max-content)",
+                            ? "auto 10ch max-content minmax(8rem,11ch) max-content 6.5rem 2.25rem 3.25rem minmax(0,1fr)"
+                            : "auto 10ch max-content 6ch max-content 6.5rem 2.25rem 3.25rem minmax(0,1fr)",
                         }}
                       >
                         {shows.map((show) => {
