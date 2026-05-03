@@ -2,14 +2,14 @@ import { useQuery, useQueries } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { CalendarDays, MapPin, CheckCircle2, Plus, ArrowRight, TrendingUp, Route, ChevronLeft, ChevronRight, Coffee, Truck } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Event, Venue } from "@/lib/types";
+import type { EventDetail, Venue } from "@/lib/types";
 import type { TourDetail } from "../../../backend/src/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, eventStartsOnOrAfterToday } from "@/lib/dateUtils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -38,7 +38,7 @@ function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType
 
 type CalEntry = { label: string; color: "event" | "show" | "travel" | "day_off"; href: string };
 
-function MonthCalendar({ events, tourDetails }: { events: Event[]; tourDetails: TourDetail[] }) {
+function MonthCalendar({ events, tourDetails }: { events: EventDetail[]; tourDetails: TourDetail[] }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth()); // 0-indexed
@@ -179,7 +179,7 @@ export default function Dashboard() {
 
   const { data: events, isLoading: eventsLoading } = useQuery({
     queryKey: ["events"],
-    queryFn: () => api.get<Event[]>("/api/events"),
+    queryFn: () => api.get<EventDetail[]>("/api/events"),
   });
 
   const { data: venues, isLoading: venuesLoading } = useQuery({
@@ -207,14 +207,27 @@ export default function Dashboard() {
     .filter((d): d is TourDetail => !!d);
 
   const totalEvents = events?.length ?? 0;
-  const upcomingCount = events?.filter((e) => eventStartsOnOrAfterToday(e.startDate)).length ?? 0;
+  const upcomingShowsList = useMemo(() => {
+    const rows: { event: EventDetail; show: EventDetail["shows"][number] }[] = [];
+    for (const event of events ?? []) {
+      for (const show of event.shows ?? []) {
+        if (!eventStartsOnOrAfterToday(show.showDate)) continue;
+        rows.push({ event, show });
+      }
+    }
+    rows.sort((a, b) => {
+      const da = a.show.showDate.slice(0, 10);
+      const db = b.show.showDate.slice(0, 10);
+      if (da !== db) return da.localeCompare(db);
+      return a.show.showTime.localeCompare(b.show.showTime);
+    });
+    return rows;
+  }, [events]);
+
+  const upcomingCount = upcomingShowsList.length;
   const confirmedEvents = events?.filter((e) => e.status === "confirmed").length ?? 0;
   const venueCount = venues?.length ?? 0;
   const tourCount = tours?.length ?? 0;
-
-  const upcomingEvents = (events ?? [])
-    .filter((e) => eventStartsOnOrAfterToday(e.startDate))
-    .sort((a, b) => new Date(a.startDate!.slice(0, 10)).getTime() - new Date(b.startDate!.slice(0, 10)).getTime());
 
   // Upcoming tour shows (next 60 days across all tours)
   const now = new Date();
@@ -252,7 +265,7 @@ export default function Dashboard() {
         ) : (
           <>
             <StatCard icon={CalendarDays} label="Total Events" value={totalEvents} color="bg-indigo-500/15 text-indigo-400" />
-            <StatCard icon={TrendingUp} label="Upcoming" value={upcomingCount} color="bg-purple-500/15 text-purple-400" />
+            <StatCard icon={TrendingUp} label="Upcoming shows" value={upcomingCount} color="bg-purple-500/15 text-purple-400" />
             <StatCard icon={CheckCircle2} label="Confirmed" value={confirmedEvents} color="bg-emerald-500/15 text-emerald-400" />
             <StatCard icon={MapPin} label="Venues" value={venueCount} color="bg-red-500/15 text-red-400" />
             <StatCard icon={Route} label="Tours" value={tourCount} color="bg-amber-500/15 text-amber-400" />
@@ -268,24 +281,32 @@ export default function Dashboard() {
         {/* Upcoming Events */}
         <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">Upcoming Events</h3>
+            <h3 className="text-sm font-semibold text-white">Upcoming shows</h3>
             <Link to="/events" className="text-xs text-white/40 hover:text-white/70 flex items-center gap-1">
               View all <ArrowRight size={12} />
             </Link>
           </div>
           {eventsLoading ? (
             <div className="p-4 space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 rounded bg-white/5" />)}</div>
-          ) : upcomingEvents.length === 0 ? (
-            <div className="py-10 text-center text-white/30 text-sm">No upcoming events with a scheduled start date.</div>
+          ) : upcomingShowsList.length === 0 ? (
+            <div className="py-10 text-center text-white/30 text-sm">No upcoming shows scheduled.</div>
           ) : (
             <div className="max-h-[min(28rem,50svh)] overflow-y-auto overscroll-contain divide-y divide-white/5 min-h-0">
-              {upcomingEvents.map((event) => (
-                <Link key={event.id} to={`/events/${event.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-white/[0.03] transition-colors group">
+              {upcomingShowsList.map(({ event, show }) => (
+                <Link
+                  key={show.id}
+                  to={`/events/${event.id}`}
+                  className="flex items-center gap-4 px-5 py-3 hover:bg-white/[0.03] transition-colors group"
+                >
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-white/90 truncate group-hover:text-white">{event.title}</div>
-                    <div className="text-xs text-white/40 mt-0.5">{formatDate(event.startDate)}</div>
+                    <div className="text-xs text-white/40 mt-0.5 truncate">
+                      {formatDate(show.showDate)}
+                      {show.showTime ? ` · ${show.showTime}` : ""}
+                      {show.venue?.name ? ` · ${show.venue.name}` : ""}
+                    </div>
                   </div>
-                  <StatusBadge status={event.status} />
+                  <StatusBadge status={show.status} />
                 </Link>
               ))}
             </div>
