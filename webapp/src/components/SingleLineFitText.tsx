@@ -54,8 +54,8 @@ function fitFontSizeToWidth(
 export function SingleLineFitText({
   text,
   className,
-  minPx = 4,
-  maxPx = 11,
+  minPx = 3,
+  maxPx = 6,
   fitWidth,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
