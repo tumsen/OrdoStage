@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   addMonths,
   addWeeks,
@@ -13,7 +14,7 @@ import {
   subWeeks,
 } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, BarChart2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -209,6 +210,7 @@ export default function TimeTracking() {
         note: string | null;
         timeProjectId: string | null;
         tagIds: string[];
+        category: string;
       }>;
     }) => api.patch<TimeEntry>(`/api/time/entries/${id}`, body),
     onSuccess: () => {
@@ -230,6 +232,7 @@ export default function TimeTracking() {
         startsAt: body.startsAt as string,
         endsAt: body.endsAt as string,
         kind,
+        category: "work",
         eventShowJobId: kind === "job" ? (body.eventShowJobId as string | null) ?? null : null,
         eventId: body.eventId != null ? (body.eventId as string) : null,
         timeProjectId: body.timeProjectId != null ? (body.timeProjectId as string) : null,
@@ -735,6 +738,19 @@ export default function TimeTracking() {
               </SelectContent>
             </Select>
           ) : null}
+          {readAll && (
+            <Link to="/time/reports">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
+              >
+                <BarChart2 className="h-4 w-4" />
+                {t("time.reportsLink")}
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 

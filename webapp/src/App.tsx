@@ -19,6 +19,7 @@ import Team from "./pages/Team";
 import Calendars from "./pages/Calendars";
 import Schedule from "./pages/Schedule";
 import TimeTracking from "./pages/TimeTracking";
+import TimeReport from "./pages/TimeReport";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -246,6 +247,16 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <TimeTracking />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/time/reports"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TimeReport />
                 </Layout>
               </ProtectedRoute>
             }

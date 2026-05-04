@@ -314,6 +314,8 @@ model Person {
   isActive         Boolean                 @default(true)
   /** Cast/crew: in-house vs contractor — required for new people; existing rows default to internal. */
   affiliation      String                  @default("internal")
+  /** Expected work hours per week — used in reports to compute overtime. */
+  weeklyContractHours Float?
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
   timeEntries      TimeEntry[]
@@ -821,6 +823,8 @@ model TimeEntry {
   startsAt       DateTime
   endsAt         DateTime
   kind           String
+  /** work | vacation | sick | holiday  — for time-report categorisation */
+  category       String       @default("work")
   eventShowJobId String?
   eventShowJob   EventShowJob? @relation(fields: [eventShowJobId], references: [id], onDelete: SetNull)
   eventId        String?
@@ -835,6 +839,7 @@ model TimeEntry {
   @@index([organizationId, personId, startsAt])
   @@index([personId, startsAt])
   @@index([eventShowJobId])
+  @@index([organizationId, category])
 }
 
 model TimeEntryTag {

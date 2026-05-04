@@ -13,6 +13,8 @@ import {
   PatchTimeProjectSchema,
   CreateTimeEntrySchema,
   PatchTimeEntrySchema,
+  SetPersonContractSchema,
+  TIME_CATEGORIES,
 } from "../types";
 
 const timeRouter = new Hono<{
@@ -132,6 +134,7 @@ function serializeEntry(row: {
   startsAt: Date;
   endsAt: Date;
   kind: string;
+  category: string;
   eventShowJobId: string | null;
   eventId: string | null;
   timeProjectId: string | null;
@@ -148,6 +151,7 @@ function serializeEntry(row: {
     startsAt: iso(row.startsAt),
     endsAt: iso(row.endsAt),
     kind: row.kind,
+    category: (row.category || "work") as "work" | "vacation" | "sick" | "holiday",
     eventShowJobId: row.eventShowJobId,
     eventId: row.eventId,
     timeProjectId: row.timeProjectId,
@@ -158,7 +162,7 @@ function serializeEntry(row: {
   };
 }
 
-// GET /api/time/people — directory for admin filter
+// GET /api/time/people — directory for admin filter / reports
 timeRouter.get("/time/people", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
@@ -169,10 +173,234 @@ timeRouter.get("/time/people", async (c) => {
   }
   const people = await prisma.person.findMany({
     where: { organizationId: user.organizationId, isActive: true },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, weeklyContractHours: true },
     orderBy: { name: "asc" },
   });
   return c.json({ data: people });
+});
+
+// PATCH /api/time/person-contract/:personId — set weekly contract hours
+timeRouter.patch(
+  "/time/person-contract/:personId",
+  zValidator("json", SetPersonContractSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId) {
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    }
+    if (!canAction(c, "time.read_all")) {
+      return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+    }
+    const personId = c.req.param("personId");
+    const body = c.req.valid("json");
+    const person = await prisma.person.findFirst({
+      where: { id: personId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!person) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+    await prisma.person.update({
+      where: { id: personId },
+      data: { weeklyContractHours: body.weeklyContractHours },
+    });
+    return c.json({ ok: true });
+  }
+);
+
+// GET /api/time/report — comprehensive time report with aggregations
+timeRouter.get("/time/report", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time") || !canAction(c, "time.read_all")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+
+  const r = parseRange(c);
+  if ("error" in r) return c.json({ error: { message: r.error, code: "BAD_REQUEST" } }, 400);
+  const { rangeStart, rangeEndExclusive } = r;
+
+  const rangeDays = Math.round((rangeEndExclusive.getTime() - rangeStart.getTime()) / 86_400_000);
+
+  const qPersonIds = c.req.query("personIds");
+  const qProjectIds = c.req.query("projectIds");
+  const qTagIds = c.req.query("tagIds");
+  const qCategories = c.req.query("categories");
+
+  const personIdFilter = qPersonIds ? qPersonIds.split(",").filter(Boolean) : [];
+  const projectIdFilter = qProjectIds ? qProjectIds.split(",").filter(Boolean) : [];
+  const tagIdFilter = qTagIds ? qTagIds.split(",").filter(Boolean) : [];
+  const categoryFilter = qCategories
+    ? qCategories.split(",").filter((x) => TIME_CATEGORIES.includes(x as never))
+    : [];
+
+  const where: Record<string, unknown> = {
+    organizationId: user.organizationId,
+    startsAt: { gte: rangeStart },
+    endsAt: { lt: rangeEndExclusive },
+  };
+  if (personIdFilter.length) where.personId = { in: personIdFilter };
+  if (categoryFilter.length) where.category = { in: categoryFilter };
+  if (projectIdFilter.length) {
+    const pf: unknown[] = projectIdFilter.map((id) => ({ timeProjectId: id }));
+    if (projectIdFilter.includes("__none__")) pf.push({ timeProjectId: null });
+    where.OR = pf;
+  }
+  if (tagIdFilter.length) {
+    where.tagLinks = { some: { timeTagId: { in: tagIdFilter } } };
+  }
+
+  const rows = await prisma.timeEntry.findMany({
+    where,
+    include: {
+      person: { select: { id: true, name: true, weeklyContractHours: true } },
+      timeProject: { select: { id: true, name: true } },
+      tagLinks: { include: { timeTag: { select: { id: true, name: true } } } },
+    },
+    orderBy: { startsAt: "asc" },
+    take: 5000,
+  });
+
+  type PersonAgg = {
+    personName: string;
+    workMinutes: number;
+    vacationMinutes: number;
+    sickMinutes: number;
+    holidayMinutes: number;
+    weeklyContractHours: number | null;
+  };
+  type ProjectAgg = { projectName: string; workMinutes: number; totalMinutes: number };
+  type DayAgg = {
+    workMinutes: number;
+    vacationMinutes: number;
+    sickMinutes: number;
+    holidayMinutes: number;
+  };
+
+  const byPerson = new Map<string, PersonAgg>();
+  const byProject = new Map<string | null, ProjectAgg>();
+  const byDay = new Map<string, DayAgg>();
+
+  for (const row of rows) {
+    const durMin = Math.max(0, (row.endsAt.getTime() - row.startsAt.getTime()) / 60_000);
+    const cat = (row.category || "work") as string;
+    const dateKey = row.startsAt.toISOString().substring(0, 10);
+
+    // byPerson
+    if (!byPerson.has(row.personId)) {
+      byPerson.set(row.personId, {
+        personName: row.person.name,
+        workMinutes: 0,
+        vacationMinutes: 0,
+        sickMinutes: 0,
+        holidayMinutes: 0,
+        weeklyContractHours: row.person.weeklyContractHours ?? null,
+      });
+    }
+    const pa = byPerson.get(row.personId)!;
+    if (cat === "work") pa.workMinutes += durMin;
+    else if (cat === "vacation") pa.vacationMinutes += durMin;
+    else if (cat === "sick") pa.sickMinutes += durMin;
+    else if (cat === "holiday") pa.holidayMinutes += durMin;
+
+    // byProject
+    const projKey = row.timeProjectId ?? null;
+    if (!byProject.has(projKey)) {
+      byProject.set(projKey, {
+        projectName: row.timeProject?.name ?? "No project",
+        workMinutes: 0,
+        totalMinutes: 0,
+      });
+    }
+    const pp = byProject.get(projKey)!;
+    pp.totalMinutes += durMin;
+    if (cat === "work") pp.workMinutes += durMin;
+
+    // byDay
+    if (!byDay.has(dateKey)) {
+      byDay.set(dateKey, { workMinutes: 0, vacationMinutes: 0, sickMinutes: 0, holidayMinutes: 0 });
+    }
+    const dp = byDay.get(dateKey)!;
+    if (cat === "work") dp.workMinutes += durMin;
+    else if (cat === "vacation") dp.vacationMinutes += durMin;
+    else if (cat === "sick") dp.sickMinutes += durMin;
+    else if (cat === "holiday") dp.holidayMinutes += durMin;
+  }
+
+  const byPersonArr = [...byPerson.entries()].map(([personId, pa]) => {
+    const total = pa.workMinutes + pa.vacationMinutes + pa.sickMinutes + pa.holidayMinutes;
+    const contractMinutes =
+      pa.weeklyContractHours != null ? (rangeDays / 7) * pa.weeklyContractHours * 60 : null;
+    return {
+      personId,
+      personName: pa.personName,
+      totalMinutes: total,
+      workMinutes: pa.workMinutes,
+      vacationMinutes: pa.vacationMinutes,
+      sickMinutes: pa.sickMinutes,
+      holidayMinutes: pa.holidayMinutes,
+      weeklyContractHours: pa.weeklyContractHours,
+      contractMinutes,
+      overtimeMinutes: contractMinutes != null ? pa.workMinutes - contractMinutes : null,
+    };
+  });
+
+  const byProjectArr = [...byProject.entries()].map(([projectId, pp]) => ({
+    projectId,
+    projectName: pp.projectName,
+    totalMinutes: pp.totalMinutes,
+    workMinutes: pp.workMinutes,
+  })).sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+  const byDayArr = [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, dp]) => ({
+      date,
+      totalMinutes: dp.workMinutes + dp.vacationMinutes + dp.sickMinutes + dp.holidayMinutes,
+      workMinutes: dp.workMinutes,
+      vacationMinutes: dp.vacationMinutes,
+      sickMinutes: dp.sickMinutes,
+      holidayMinutes: dp.holidayMinutes,
+    }));
+
+  const summaryWork = byPersonArr.reduce((s, p) => s + p.workMinutes, 0);
+  const summaryVac = byPersonArr.reduce((s, p) => s + p.vacationMinutes, 0);
+  const summarySick = byPersonArr.reduce((s, p) => s + p.sickMinutes, 0);
+  const summaryHoliday = byPersonArr.reduce((s, p) => s + p.holidayMinutes, 0);
+
+  const entries = rows.map((row) => ({
+    id: row.id,
+    personId: row.personId,
+    personName: row.person.name,
+    startsAt: iso(row.startsAt),
+    endsAt: iso(row.endsAt),
+    durationMinutes: Math.round((row.endsAt.getTime() - row.startsAt.getTime()) / 60_000),
+    kind: row.kind,
+    category: (row.category || "work") as "work" | "vacation" | "sick" | "holiday",
+    note: row.note,
+    projectId: row.timeProjectId,
+    projectName: row.timeProject?.name ?? null,
+    tagIds: row.tagLinks.map((t) => t.timeTagId),
+    tagNames: row.tagLinks.map((t) => t.timeTag.name),
+  }));
+
+  return c.json({
+    data: {
+      summary: {
+        totalMinutes: summaryWork + summaryVac + summarySick + summaryHoliday,
+        workMinutes: summaryWork,
+        vacationMinutes: summaryVac,
+        sickMinutes: summarySick,
+        holidayMinutes: summaryHoliday,
+        entryCount: rows.length,
+        rangeDays,
+      },
+      byPerson: byPersonArr,
+      byProject: byProjectArr,
+      byDay: byDayArr,
+      entries,
+    },
+  });
 });
 
 /** Lightweight events + shows for linking time projects (catalog admins). */
@@ -626,6 +854,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         data: {
           startsAt,
           endsAt,
+          category: body.category ?? "work",
           timeProjectId: body.timeProjectId ?? null,
           note: body.note ?? null,
           tagLinks: {
@@ -646,6 +875,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         startsAt,
         endsAt,
         kind: "job",
+        category: body.category ?? "work",
         eventShowJobId,
         eventId,
         timeProjectId: body.timeProjectId ?? null,
@@ -692,6 +922,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       startsAt,
       endsAt,
       kind: "custom",
+      category: body.category ?? "work",
       eventShowJobId: null,
       eventId,
       timeProjectId: body.timeProjectId ?? null,
@@ -763,6 +994,7 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
       ...(body.startsAt !== undefined ? { startsAt } : {}),
       ...(body.endsAt !== undefined ? { endsAt } : {}),
       ...(body.kind !== undefined ? { kind: body.kind } : {}),
+      ...(body.category !== undefined ? { category: body.category } : {}),
       ...(body.eventShowJobId !== undefined ? { eventShowJobId: body.eventShowJobId } : {}),
       ...(body.eventId !== undefined ? { eventId: body.eventId } : {}),
       ...(body.timeProjectId !== undefined ? { timeProjectId: body.timeProjectId } : {}),

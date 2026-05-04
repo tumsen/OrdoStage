@@ -3,6 +3,7 @@ import { format, parseISO } from "date-fns";
 import { useI18n } from "@/lib/i18n";
 import { usePreferences } from "@/hooks/usePreferences";
 import type { TimeEntry, TimeProject, TimeTag } from "@/contracts/backendTypes";
+import type { TimeCategory } from "@/contracts/backendTypes";
 import type { TimeFormat } from "@/lib/preferences";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,6 +30,7 @@ type PatchBody = {
   note: string | null;
   timeProjectId: string | null;
   tagIds: string[];
+  category: TimeCategory;
 };
 
 export function TimeEntryEditSheet(props: {
@@ -62,6 +64,7 @@ export function TimeEntryEditSheet(props: {
   const [note, setNote] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [category, setCategory] = useState<TimeCategory>("work");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const activeProjects = useMemo(
@@ -82,6 +85,7 @@ export function TimeEntryEditSheet(props: {
     setNote(entry.note ?? "");
     setProjectId(entry.timeProjectId);
     setSelectedTags(new Set(entry.tagIds));
+    setCategory((entry.category as TimeCategory) ?? "work");
     setConfirmDelete(false);
   }, [entry, open]);
 
@@ -110,6 +114,7 @@ export function TimeEntryEditSheet(props: {
       note: note.trim() ? note.trim() : null,
       timeProjectId: projectId,
       tagIds: [...selectedTags],
+      category,
     });
   }
 
@@ -121,6 +126,13 @@ export function TimeEntryEditSheet(props: {
     }
     onDelete(entry.id);
   }
+
+  const categoryOptions: { value: TimeCategory; label: string; color: string }[] = [
+    { value: "work", label: t("time.categoryWork"), color: "text-blue-300" },
+    { value: "vacation", label: t("time.categoryVacation"), color: "text-emerald-300" },
+    { value: "sick", label: t("time.categorySick"), color: "text-orange-300" },
+    { value: "holiday", label: t("time.categoryHoliday"), color: "text-purple-300" },
+  ];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -136,6 +148,29 @@ export function TimeEntryEditSheet(props: {
         </SheetHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
+            <Label className="text-white/80">{t("time.categoryLabel")}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {categoryOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setCategory(opt.value)}
+                  className={cn(
+                    "rounded-md border px-3 py-2 text-sm font-medium transition-colors text-left",
+                    category === opt.value
+                      ? "border-ordo-yellow bg-ordo-yellow/10 text-white"
+                      : "border-white/10 bg-white/[0.03] text-white/60 hover:bg-white/[0.07]"
+                  )}
+                >
+                  <span className={cn("block text-xs mb-0.5", opt.color)}>
+                    {opt.value === "work" ? "●" : opt.value === "vacation" ? "●" : opt.value === "sick" ? "●" : "●"}
+                  </span>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-2">
             <Label className="text-white/80">{t("time.projectLabel")}</Label>
             <Select
               value={projectId ?? "none"}
@@ -144,7 +179,7 @@ export function TimeEntryEditSheet(props: {
               <SelectTrigger className="bg-white/5 border-white/10 text-white">
                 <SelectValue placeholder={t("time.noProject")} />
               </SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white">
+              <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-60">
                 <SelectItem value="none">{t("time.noProject")}</SelectItem>
                 {activeProjects.map((p) => (
                   <SelectItem key={p.id} value={p.id}>

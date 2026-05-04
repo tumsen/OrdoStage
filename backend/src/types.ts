@@ -903,6 +903,9 @@ export const TimeProjectSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const TIME_CATEGORIES = ["work", "vacation", "sick", "holiday"] as const;
+export type TimeCategory = (typeof TIME_CATEGORIES)[number];
+
 export const TimeEntrySchema = z.object({
   id: z.string(),
   organizationId: z.string(),
@@ -911,6 +914,7 @@ export const TimeEntrySchema = z.object({
   startsAt: z.string(),
   endsAt: z.string(),
   kind: z.enum(["job", "custom"]),
+  category: z.enum(TIME_CATEGORIES).default("work"),
   eventShowJobId: z.string().nullable(),
   eventId: z.string().nullable(),
   timeProjectId: z.string().nullable(),
@@ -961,6 +965,7 @@ export const CreateTimeEntrySchema = z.object({
   startsAt: z.string().min(1),
   endsAt: z.string().min(1),
   kind: z.enum(["job", "custom"]),
+  category: z.enum(TIME_CATEGORIES).optional(),
   eventShowJobId: z.string().nullable().optional(),
   eventId: z.string().nullable().optional(),
   timeProjectId: z.string().nullable().optional(),
@@ -972,12 +977,84 @@ export const PatchTimeEntrySchema = z.object({
   startsAt: z.string().optional(),
   endsAt: z.string().optional(),
   kind: z.enum(["job", "custom"]).optional(),
+  category: z.enum(TIME_CATEGORIES).optional(),
   eventShowJobId: z.string().nullable().optional(),
   eventId: z.string().nullable().optional(),
   timeProjectId: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   tagIds: z.array(z.string()).optional(),
 });
+
+export const SetPersonContractSchema = z.object({
+  weeklyContractHours: z.number().min(0).max(168).nullable(),
+});
+
+export const TimeReportPersonSchema = z.object({
+  personId: z.string(),
+  personName: z.string(),
+  totalMinutes: z.number(),
+  workMinutes: z.number(),
+  vacationMinutes: z.number(),
+  sickMinutes: z.number(),
+  holidayMinutes: z.number(),
+  weeklyContractHours: z.number().nullable(),
+  contractMinutes: z.number().nullable(),
+  overtimeMinutes: z.number().nullable(),
+});
+
+export const TimeReportProjectSchema = z.object({
+  projectId: z.string().nullable(),
+  projectName: z.string(),
+  totalMinutes: z.number(),
+  workMinutes: z.number(),
+});
+
+export const TimeReportDaySchema = z.object({
+  date: z.string(),
+  totalMinutes: z.number(),
+  workMinutes: z.number(),
+  vacationMinutes: z.number(),
+  sickMinutes: z.number(),
+  holidayMinutes: z.number(),
+});
+
+export const TimeReportEntrySchema = z.object({
+  id: z.string(),
+  personId: z.string(),
+  personName: z.string(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+  durationMinutes: z.number(),
+  kind: z.string(),
+  category: z.enum(TIME_CATEGORIES),
+  note: z.string().nullable(),
+  projectId: z.string().nullable(),
+  projectName: z.string().nullable(),
+  tagIds: z.array(z.string()),
+  tagNames: z.array(z.string()),
+});
+
+export const TimeReportSchema = z.object({
+  summary: z.object({
+    totalMinutes: z.number(),
+    workMinutes: z.number(),
+    vacationMinutes: z.number(),
+    sickMinutes: z.number(),
+    holidayMinutes: z.number(),
+    entryCount: z.number(),
+    rangeDays: z.number(),
+  }),
+  byPerson: z.array(TimeReportPersonSchema),
+  byProject: z.array(TimeReportProjectSchema),
+  byDay: z.array(TimeReportDaySchema),
+  entries: z.array(TimeReportEntrySchema),
+});
+
+export type TimeReport = z.infer<typeof TimeReportSchema>;
+export type TimeReportPerson = z.infer<typeof TimeReportPersonSchema>;
+export type TimeReportProject = z.infer<typeof TimeReportProjectSchema>;
+export type TimeReportDay = z.infer<typeof TimeReportDaySchema>;
+export type TimeReportEntry = z.infer<typeof TimeReportEntrySchema>;
 
 export type TimeTag = z.infer<typeof TimeTagSchema>;
 export type TimeProject = z.infer<typeof TimeProjectSchema>;
