@@ -399,6 +399,63 @@ timeRouter.get("/time/jobs", async (c) => {
   return c.json({ data });
 });
 
+/** Assigned show jobs from today forward (for “upcoming” list beyond the visible week). */
+timeRouter.get("/time/jobs/upcoming", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") || "50")));
+  const qPerson = c.req.query("personId");
+  const target = await resolveTargetPersonId(c, user.organizationId, qPerson);
+  if ("error" in target) {
+    return c.json({ error: { message: target.error, code: "BAD_REQUEST" } }, target.status);
+  }
+
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  const jobs = await prisma.eventShowJob.findMany({
+    where: {
+      personId: target.personId,
+      jobDate: { gte: todayStart },
+      show: { event: { organizationId: user.organizationId } },
+    },
+    include: {
+      venue: { select: { name: true } },
+      show: { select: { id: true, showDate: true, event: { select: { id: true, title: true } } } },
+    },
+    orderBy: [{ jobDate: "asc" }, { sortOrder: "asc" }],
+    take: limit,
+  });
+
+  const data = jobs.map((j) => {
+    const plannedStart = toDateTimeFromDateAndTime(j.jobDate.toISOString(), j.startTime);
+    const plannedEnd =
+      plannedStart != null
+        ? new Date(plannedStart.getTime() + j.durationMinutes * 60_000)
+        : null;
+    return {
+      id: j.id,
+      title: j.title,
+      jobDate: iso(j.jobDate),
+      startTime: j.startTime,
+      durationMinutes: j.durationMinutes,
+      plannedStartsAt: plannedStart ? iso(plannedStart) : iso(j.jobDate),
+      plannedEndsAt: plannedEnd ? iso(plannedEnd) : iso(j.jobDate),
+      eventId: j.show.event.id,
+      eventTitle: j.show.event.title,
+      showId: j.show.id,
+      showDate: iso(j.show.showDate),
+      venueName: j.venue.name,
+    };
+  });
+  return c.json({ data });
+});
+
 timeRouter.get("/time/entries", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
