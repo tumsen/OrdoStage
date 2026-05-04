@@ -44,6 +44,9 @@ import {
 const WEEK_STARTS_ON = 1 as const;
 const PX_PER_HOUR = 36;
 const COLUMN_HEIGHT_PX = (MINUTES_PER_DAY / 60) * PX_PER_HOUR;
+/** Same height for corner spacer and day headers so the hour grid lines up with columns. */
+const WEEK_GRID_HEADER_CLASS =
+  "h-[4.5rem] shrink-0 border-b border-white/10 box-border flex flex-col items-center justify-center gap-0.5 px-1 text-center";
 
 const DISPLAY_START_STORAGE_KEY = "timeGrid.displayStartHour";
 
@@ -528,24 +531,27 @@ export default function TimeTracking() {
       ) : (
         <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-x-auto">
           <div className="flex min-w-[720px]">
-            <div className="w-14 shrink-0 pt-8 flex flex-col">
-              {Array.from({ length: 24 }).map((_, i) => {
-                const hour24 = (displayStartHour + i) % 24;
-                const label = formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h");
-                return (
-                  <div
-                    key={i}
-                    style={{ height: PX_PER_HOUR }}
-                    className="relative flex-shrink-0 border-t border-white/15"
-                  >
-                    <span className="absolute -top-2.5 right-1 text-[10px] text-white/45 tabular-nums">
-                      {label}
-                    </span>
-                  </div>
-                );
-              })}
-              <div className="relative h-0 flex-shrink-0 border-t border-white/15">
-                <span className="absolute -top-2.5 right-1 text-[10px] text-white/45 tabular-nums">
+            <div className="w-14 shrink-0 flex flex-col">
+              <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full")} aria-hidden />
+              <div
+                className="relative flex flex-col border-b border-white/15"
+                style={{ height: COLUMN_HEIGHT_PX }}
+              >
+                {Array.from({ length: 24 }).map((_, i) => {
+                  const hour24 = (displayStartHour + i) % 24;
+                  const label = formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h");
+                  return (
+                    <div
+                      key={i}
+                      className="relative flex-1 min-h-0 border-t border-white/15"
+                    >
+                      <span className="absolute left-0 right-1 top-0 z-[1] -translate-y-1/2 text-right text-[10px] leading-none text-white/50 tabular-nums pointer-events-none">
+                        {label}
+                      </span>
+                    </div>
+                  );
+                })}
+                <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1/2 text-right text-[10px] leading-none text-white/50 tabular-nums pointer-events-none">
                   {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
                 </span>
               </div>
@@ -553,8 +559,8 @@ export default function TimeTracking() {
             {weekDays.map((day) => {
               const dayYmd = format(day, "yyyy-MM-dd");
               return (
-                <div key={dayYmd} className="flex-1 min-w-[100px] border-l border-white/10">
-                  <div className="text-center py-2 border-b border-white/10 text-xs text-white/70">
+                <div key={dayYmd} className="flex-1 min-w-[100px] border-l border-white/10 flex flex-col">
+                  <div className={cn(WEEK_GRID_HEADER_CLASS, "text-xs text-white/70")}>
                     <div className="uppercase tracking-wide text-[10px] text-white/40">
                       {format(day, "EEE")}
                     </div>
@@ -562,16 +568,14 @@ export default function TimeTracking() {
                   </div>
                   <div
                     data-day-col={dayYmd}
-                    className="relative border-b border-white/10"
+                    className="relative flex flex-col border-b border-white/15"
                     style={{ height: COLUMN_HEIGHT_PX }}
                   >
-                    {Array.from({ length: 24 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute left-0 right-0 border-t border-white/[0.08] pointer-events-none"
-                        style={{ top: `${(i / 24) * 100}%` }}
-                      />
-                    ))}
+                    <div className="absolute inset-0 z-0 flex flex-col pointer-events-none">
+                      {Array.from({ length: 24 }).map((_, i) => (
+                        <div key={i} className="flex-1 min-h-0 border-t border-white/[0.1]" />
+                      ))}
+                    </div>
                     {(jobs ?? [])
                       .filter(
                         (j) =>
