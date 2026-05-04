@@ -45,9 +45,8 @@ const WEEK_STARTS_ON = 1 as const;
 const PX_PER_HOUR = 36;
 const COLUMN_HEIGHT_PX = (MINUTES_PER_DAY / 60) * PX_PER_HOUR;
 /** Same height for corner spacer and day headers so the hour grid lines up with columns. */
-/** No border-b: avoids a stroke sitting on the same edge as the first hour label (00:00). */
 const WEEK_GRID_HEADER_CLASS =
-  "h-[4.5rem] shrink-0 box-border flex flex-col items-center justify-center gap-0.5 px-1 text-center";
+  "h-[4.5rem] shrink-0 border-b border-white/10 box-border flex flex-col items-center justify-center gap-0.5 px-1 text-center";
 
 const DISPLAY_START_STORAGE_KEY = "timeGrid.displayStartHour";
 
@@ -568,10 +567,7 @@ export default function TimeTracking() {
                   >
                     <div className="absolute inset-0 z-0 flex flex-col pointer-events-none">
                       {Array.from({ length: 24 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="flex-1 min-h-0 border-t border-white/[0.1] first:border-t-0"
-                        />
+                        <div key={i} className="flex-1 min-h-0 border-t border-white/[0.1]" />
                       ))}
                     </div>
                     {(jobs ?? [])
