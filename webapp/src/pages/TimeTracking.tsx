@@ -532,7 +532,7 @@ export default function TimeTracking() {
         <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-x-auto">
           <div className="flex min-w-[720px]">
             <div className="w-14 shrink-0 flex flex-col">
-              <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full")} aria-hidden />
+              <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full border-b-0")} aria-hidden />
               <div className="relative flex flex-col" style={{ height: COLUMN_HEIGHT_PX }}>
                 {Array.from({ length: 24 }).map((_, i) => {
                   const hour24 = (displayStartHour + i) % 24;
