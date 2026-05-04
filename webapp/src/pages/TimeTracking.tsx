@@ -567,7 +567,10 @@ export default function TimeTracking() {
                   >
                     <div className="absolute inset-0 z-0 flex flex-col pointer-events-none">
                       {Array.from({ length: 24 }).map((_, i) => (
-                        <div key={i} className="flex-1 min-h-0 border-t border-white/[0.1]" />
+                        <div
+                          key={i}
+                          className="flex-1 min-h-0 border-t border-white/[0.1] first:border-t-0"
+                        />
                       ))}
                     </div>
                     {(jobs ?? [])
