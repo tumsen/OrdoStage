@@ -66,7 +66,8 @@ function snapMinutes(m: number, step = 15): number {
 
 /** Smooth preview during drag; commit uses quarter-hour snaps. */
 const SNAP_COMMIT = 15;
-const MIN_CREATE_DRAG_PX = 6;
+/** Same idea as schedule booking: ignore plain clicks; require real drag distance. */
+const MIN_CREATE_DRAG_PX = 8;
 
 type EntryDragRef = {
   entryId: string;
@@ -81,6 +82,8 @@ type CreateDragRef = {
   dayYmd: string;
   startY: number;
   currentY: number;
+  /** True once pointer moved far enough to show selection (not a bare click). */
+  thresholdPassed: boolean;
 };
 
 function pctRangeFromWindowMinutes(lo: number, hi: number): { topPct: number; heightPct: number } {
@@ -214,12 +217,50 @@ export default function TimeTracking() {
 
   const createEntry = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.post<TimeEntry>("/api/time/entries", body),
-    onSuccess: () => {
+    onMutate: async (body) => {
+      const tempId = `optimistic-${Date.now()}`;
+      const kind = body.kind === "job" ? "job" : "custom";
+      const optimistic: TimeEntry = {
+        id: tempId,
+        organizationId: "",
+        userId: "",
+        personId: "",
+        startsAt: body.startsAt as string,
+        endsAt: body.endsAt as string,
+        kind,
+        eventShowJobId: kind === "job" ? (body.eventShowJobId as string | null) ?? null : null,
+        eventId: body.eventId != null ? (body.eventId as string) : null,
+        timeProjectId: body.timeProjectId != null ? (body.timeProjectId as string) : null,
+        note: body.note != null ? (body.note as string) : null,
+        tagIds: Array.isArray(body.tagIds) ? (body.tagIds as string[]) : [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await queryClient.cancelQueries({ queryKey: ["time-entries"] });
+      queryClient.setQueriesData<TimeEntry[]>({ queryKey: ["time-entries"] }, (old) => {
+        if (!old) return [optimistic];
+        return [...old, optimistic].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      });
+      return { tempId };
+    },
+    onError: (_err, _body, ctx) => {
+      if (ctx?.tempId) {
+        queryClient.setQueriesData<TimeEntry[]>({ queryKey: ["time-entries"] }, (old) =>
+          old ? old.filter((e) => e.id !== ctx.tempId) : old
+        );
+      }
+      toast({ title: t("time.saveError"), variant: "destructive" });
+    },
+    onSuccess: (data, _vars, ctx) => {
+      queryClient.setQueriesData<TimeEntry[]>({ queryKey: ["time-entries"] }, (old) => {
+        if (!old) return [data];
+        const rest = ctx?.tempId ? old.filter((e) => e.id !== ctx.tempId) : old;
+        return [...rest, data].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      });
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       queryClient.invalidateQueries({ queryKey: ["time-jobs-upcoming"] });
       toast({ title: t("time.entryCreated") });
     },
-    onError: () => toast({ title: t("time.saveError"), variant: "destructive" }),
   });
 
   const deleteEntry = useMutation({
@@ -315,10 +356,12 @@ export default function TimeTracking() {
     (dayYmd: string, startClientY: number) => {
       const col = document.querySelector(`[data-day-col="${dayYmd}"]`) as HTMLElement | null;
       if (!col) return;
-      createDragRef.current = { dayYmd, startY: startClientY, currentY: startClientY };
-      const rect = col.getBoundingClientRect();
-      const startRaw = rawWindowMinutesFromY(startClientY, rect.top, COLUMN_HEIGHT_PX);
-      updateCreateOverlayDom(dayYmd, startRaw, startRaw);
+      createDragRef.current = {
+        dayYmd,
+        startY: startClientY,
+        currentY: startClientY,
+        thresholdPassed: false,
+      };
 
       let createRafPending = false;
       let latestClientY = startClientY;
@@ -327,6 +370,10 @@ export default function TimeTracking() {
         const c = createDragRef.current;
         if (!c || c.dayYmd !== dayYmd) return;
         c.currentY = ev.clientY;
+        if (!c.thresholdPassed) {
+          if (Math.abs(ev.clientY - c.startY) < MIN_CREATE_DRAG_PX) return;
+          c.thresholdPassed = true;
+        }
         latestClientY = ev.clientY;
         if (createRafPending) return;
         createRafPending = true;
@@ -347,17 +394,20 @@ export default function TimeTracking() {
         window.removeEventListener("pointercancel", finish);
         const c = createDragRef.current;
         createDragRef.current = null;
-        if (c) hideCreateOverlay(c.dayYmd);
         if (!c || c.dayYmd !== dayYmd) return;
         const r = col.getBoundingClientRect();
         const dy = Math.abs(ev.clientY - c.startY);
+
+        if (dy < MIN_CREATE_DRAG_PX || !c.thresholdPassed) {
+          if (c.thresholdPassed) hideCreateOverlay(c.dayYmd);
+          return;
+        }
+
         const startRaw = rawWindowMinutesFromY(c.startY, r.top, COLUMN_HEIGHT_PX);
         const endRaw = rawWindowMinutesFromY(ev.clientY, r.top, COLUMN_HEIGHT_PX);
         const lo = Math.min(startRaw, endRaw);
-        let hi = Math.max(startRaw, endRaw);
-        if (dy < MIN_CREATE_DRAG_PX) {
-          hi = Math.min(lo + SNAP_COMMIT, MINUTES_PER_DAY);
-        }
+        const hi = Math.max(startRaw, endRaw);
+
         let startWin = snapMinutes(Math.round(lo));
         let endWin = snapMinutes(Math.round(hi));
         if (endWin - startWin < SNAP_COMMIT) {
@@ -366,15 +416,29 @@ export default function TimeTracking() {
             startWin = Math.max(0, endWin - SNAP_COMMIT);
           }
         }
-        createEntry.mutate({
-          kind: "custom",
-          startsAt: dateFromColumnAndWindowMinutes(
-            dayYmd,
-            startWin,
-            displayStartHourRef.current
-          ).toISOString(),
-          endsAt: dateFromColumnAndWindowMinutes(dayYmd, endWin, displayStartHourRef.current).toISOString(),
-        });
+        if (endWin <= startWin) {
+          hideCreateOverlay(dayYmd);
+          return;
+        }
+
+        createEntry.mutate(
+          {
+            kind: "custom",
+            startsAt: dateFromColumnAndWindowMinutes(
+              dayYmd,
+              startWin,
+              displayStartHourRef.current
+            ).toISOString(),
+            endsAt: dateFromColumnAndWindowMinutes(dayYmd, endWin, displayStartHourRef.current).toISOString(),
+          },
+          {
+            onSettled: () => {
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => hideCreateOverlay(dayYmd));
+              });
+            },
+          }
+        );
       };
 
       window.addEventListener("pointermove", onMove, { passive: true });
