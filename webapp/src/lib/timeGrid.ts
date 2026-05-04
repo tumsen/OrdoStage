@@ -37,6 +37,17 @@ export function clampMinutesToDay(m: number): number {
   return Math.max(0, Math.min(MINUTES_PER_DAY, m));
 }
 
+/** Linear minutes in the rolling window from pointer Y (smooth drag preview; snap at commit). */
+export function rawWindowMinutesFromY(
+  clientY: number,
+  columnRectTop: number,
+  columnHeightPx: number
+): number {
+  const y = clientY - columnRectTop;
+  const clamped = Math.max(0, Math.min(columnHeightPx, y));
+  return (clamped / columnHeightPx) * MINUTES_PER_DAY;
+}
+
 export function formatHourLabel(hour24: number, timeFormat: "12h" | "24h"): string {
   const h = ((hour24 % 24) + 24) % 24;
   if (timeFormat === "24h") {

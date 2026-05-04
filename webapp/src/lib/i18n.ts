@@ -51,7 +51,7 @@ const en = {
     addBlock: "Add custom time",
     logJob: "Log",
     dragHint:
-      "Drag on empty space to create a block. Drag a block to move it; drag the top or bottom edge to adjust length. Use the pencil to set project, tags, and note.",
+      "Drag on empty space to create a block (times show while you drag). Drag a block to move; drag the top or bottom edge to adjust. Pencil: project, tags, note.",
     gridStartsAt: "Day starts",
     upcomingTitle: "Upcoming assigned jobs",
     upcomingHint: "Show jobs from today onward. Add one to your grid as a movable time block.",
