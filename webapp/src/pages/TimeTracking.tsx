@@ -30,6 +30,7 @@ import { useI18n } from "@/lib/i18n";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
+import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
 import type { TimeEntry, TimeProject, TimeTag, TimeTrackingJob } from "@/contracts/backendTypes";
 import type { TimeFormat } from "@/lib/preferences";
 import {
@@ -112,6 +113,7 @@ export default function TimeTracking() {
   const canUsePage = canView("time");
   const canEdit = canAction("time.write");
   const readAll = canAction("time.read_all");
+  const canManageTimeCatalog = canAction("time.manage_catalog");
 
   const [mode, setMode] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(() => new Date());
@@ -1129,6 +1131,12 @@ export default function TimeTracking() {
           </div>
         </div>
       )}
+
+      {canManageTimeCatalog && mode === "week" ? (
+        <div className="mt-8 space-y-3">
+          <TimeCatalogSettings />
+        </div>
+      ) : null}
 
       {canEdit && mode === "week" ? (
         <p className="text-xs text-white/40">{t("time.dragHint")}</p>

@@ -896,6 +896,7 @@ export const TimeProjectSchema = z.object({
   organizationId: z.string(),
   name: z.string(),
   eventId: z.string().nullable(),
+  eventShowId: z.string().nullable(),
   isArchived: z.boolean(),
   sortOrder: z.number(),
   createdAt: z.string(),
@@ -944,12 +945,14 @@ export const PatchTimeTagSchema = CreateTimeTagSchema.partial();
 export const CreateTimeProjectSchema = z.object({
   name: z.string().min(1),
   eventId: z.string().nullable().optional(),
+  eventShowId: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
 
 export const PatchTimeProjectSchema = z.object({
   name: z.string().min(1).optional(),
   eventId: z.string().nullable().optional(),
+  eventShowId: z.string().nullable().optional(),
   isArchived: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
 });

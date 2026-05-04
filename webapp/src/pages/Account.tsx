@@ -24,7 +24,6 @@ import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/AddressFields";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { usePermissions } from "@/hooks/usePermissions";
-import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
 import Billing from "@/pages/Billing";
 import {
   PersonDocumentListRow,
@@ -83,8 +82,6 @@ export default function Account() {
   const { canAction } = usePermissions();
   const canManageBranding = canAction("billing.manage");
   const canDeleteOrganization = canAction("org.delete");
-  const canManageTimeCatalog = canAction("time.manage_catalog");
-
   type DeletionRequirements = {
     organizationName: string;
     owners: { id: string; email: string; name: string | null }[];
@@ -669,8 +666,6 @@ export default function Account() {
         </div>
         <Billing embedded />
       </div>
-
-      {canManageTimeCatalog ? <TimeCatalogSettings /> : null}
 
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
         <div>

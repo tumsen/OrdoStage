@@ -111,6 +111,7 @@ function serializeProject(row: {
   organizationId: string;
   name: string;
   eventId: string | null;
+  eventShowId: string | null;
   isArchived: boolean;
   sortOrder: number;
   createdAt: Date;
@@ -172,6 +173,41 @@ timeRouter.get("/time/people", async (c) => {
     orderBy: { name: "asc" },
   });
   return c.json({ data: people });
+});
+
+/** Lightweight events + shows for linking time projects (catalog admins). */
+timeRouter.get("/time/catalog-event-options", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "time.manage_catalog")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const events = await prisma.event.findMany({
+    where: { organizationId: user.organizationId },
+    select: {
+      id: true,
+      title: true,
+      shows: {
+        select: { id: true, showDate: true, showTime: true, status: true },
+        orderBy: { showDate: "asc" },
+      },
+    },
+    orderBy: { title: "asc" },
+  });
+  return c.json({
+    data: events.map((e) => ({
+      id: e.id,
+      title: e.title,
+      shows: e.shows.map((s) => ({
+        id: s.id,
+        showDate: s.showDate.toISOString(),
+        showTime: s.showTime,
+        status: s.status,
+      })),
+    })),
+  });
 });
 
 timeRouter.get("/time/tags", async (c) => {
@@ -277,18 +313,44 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
   const body = c.req.valid("json");
-  if (body.eventId) {
+  let eventId: string | null = body.eventId ?? null;
+  let eventShowId: string | null = body.eventShowId ?? null;
+
+  if (eventShowId) {
+    const existingShowProj = await prisma.timeProject.findFirst({
+      where: { organizationId: user.organizationId, eventShowId },
+    });
+    if (existingShowProj) {
+      return c.json({ data: serializeProject(existingShowProj) });
+    }
+    const show = await prisma.eventShow.findFirst({
+      where: {
+        id: eventShowId,
+        event: { organizationId: user.organizationId },
+      },
+      select: { id: true, eventId: true },
+    });
+    if (!show) {
+      return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
+    }
+    eventId = show.eventId;
+    if (body.eventId != null && body.eventId !== show.eventId) {
+      return c.json({ error: { message: "Show does not belong to that event", code: "BAD_REQUEST" } }, 400);
+    }
+  } else if (eventId) {
     const ev = await prisma.event.findFirst({
-      where: { id: body.eventId, organizationId: user.organizationId },
+      where: { id: eventId, organizationId: user.organizationId },
       select: { id: true },
     });
     if (!ev) return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
+
   const row = await prisma.timeProject.create({
     data: {
       organizationId: user.organizationId,
       name: body.name.trim(),
-      eventId: body.eventId ?? null,
+      eventId,
+      eventShowId,
       sortOrder: body.sortOrder ?? 0,
     },
   });
@@ -309,7 +371,19 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
     where: { id, organizationId: user.organizationId },
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
-  if (body.eventId) {
+  if (body.eventShowId !== undefined && body.eventShowId !== null) {
+    const show = await prisma.eventShow.findFirst({
+      where: {
+        id: body.eventShowId,
+        event: { organizationId: user.organizationId },
+      },
+      select: { eventId: true },
+    });
+    if (!show) return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
+    if (body.eventId !== undefined && body.eventId !== null && body.eventId !== show.eventId) {
+      return c.json({ error: { message: "Show does not belong to that event", code: "BAD_REQUEST" } }, 400);
+    }
+  } else if (body.eventId !== undefined && body.eventId !== null) {
     const ev = await prisma.event.findFirst({
       where: { id: body.eventId, organizationId: user.organizationId },
       select: { id: true },
@@ -321,6 +395,7 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
     data: {
       ...(body.name !== undefined ? { name: body.name.trim() } : {}),
       ...(body.eventId !== undefined ? { eventId: body.eventId } : {}),
+      ...(body.eventShowId !== undefined ? { eventShowId: body.eventShowId } : {}),
       ...(body.isArchived !== undefined ? { isArchived: body.isArchived } : {}),
       ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
     },

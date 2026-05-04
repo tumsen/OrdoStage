@@ -463,6 +463,7 @@ model EventShow {
   id                   String       @id @default(cuid())
   eventId              String
   event                Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  timeProjects         TimeProject[]
   showDate             DateTime
   showTime             String
   durationMinutes      Int
@@ -796,6 +797,8 @@ model TimeProject {
   name           String
   eventId        String?
   event          Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  eventShowId    String?
+  eventShow      EventShow?   @relation(fields: [eventShowId], references: [id], onDelete: SetNull)
   isArchived     Boolean      @default(false)
   sortOrder      Int          @default(0)
   createdAt      DateTime     @default(now())
@@ -804,6 +807,7 @@ model TimeProject {
 
   @@index([organizationId, sortOrder])
   @@index([eventId])
+  @@index([eventShowId])
 }
 
 model TimeEntry {
