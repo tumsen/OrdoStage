@@ -83,6 +83,60 @@ export async function ensureSystemRoles(prisma: PrismaClient, organizationId: st
     where: { organizationId, slug: { in: ["manager", "member"] } },
     data: { isSystem: false },
   });
+
+  await retrofitTimeWithSchedule(prisma, organizationId);
+}
+
+/**
+ * Permission groups created before Time tracking only store view/action ids that existed then.
+ * Mirror schedule access: add `time` / `time.write` when the group already has schedule / write.schedule.
+ */
+async function retrofitTimeWithSchedule(prisma: PrismaClient, organizationId: string): Promise<void> {
+  if (isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
+    await prisma.$executeRaw`
+      UPDATE "RoleDefinition"
+      SET
+        views = CASE
+          WHEN 'schedule' = ANY(views) AND NOT ('time' = ANY(views))
+          THEN array_append(views, 'time')
+          ELSE views
+        END,
+        actions = CASE
+          WHEN 'write.schedule' = ANY(actions) AND NOT ('time.write' = ANY(actions))
+          THEN array_append(actions, 'time.write')
+          ELSE actions
+        END
+      WHERE "organizationId" = ${organizationId}
+        AND (
+          ('schedule' = ANY(views) AND NOT ('time' = ANY(views)))
+          OR ('write.schedule' = ANY(actions) AND NOT ('time.write' = ANY(actions)))
+        )
+    `;
+    return;
+  }
+
+  const rows = await prisma.roleDefinition.findMany({ where: { organizationId } });
+  for (const row of rows) {
+    const views = [...row.views];
+    const actions = [...row.actions];
+    let changed = false;
+    if (views.includes("schedule") && !views.includes("time")) {
+      views.push("time");
+      changed = true;
+    }
+    if (actions.includes("write.schedule") && !actions.includes("time.write")) {
+      actions.push("time.write");
+      changed = true;
+    }
+    if (!changed) continue;
+    await prisma.roleDefinition.update({
+      where: { id: row.id },
+      data: {
+        views: views.filter((id) => ALL_VIEW_IDS.includes(id)),
+        actions: actions.filter((id) => ALL_ACTION_IDS.includes(id)),
+      },
+    });
+  }
 }
 
 async function findPersonWithGroup(
