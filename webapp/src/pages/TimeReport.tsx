@@ -759,6 +759,12 @@ export default function TimeReport() {
                         >
                           {t("time.reportColOvertime")} <SortIcon col="overtime" />
                         </th>
+                        <th className="text-right px-4 py-3 font-medium text-emerald-400/60 text-xs whitespace-nowrap">
+                          {t("time.reportColVacUsed")}
+                        </th>
+                        <th className="text-right px-4 py-3 font-medium text-emerald-400/60 text-xs whitespace-nowrap">
+                          {t("time.reportColVacLeft")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -818,6 +824,27 @@ export default function TimeReport() {
                               <span className="text-white/20">—</span>
                             )}
                           </td>
+                          <td className="px-4 py-3 text-right tabular-nums text-emerald-300/70">
+                            {p.vacationDaysUsed != null ? (
+                              `${p.vacationDaysUsed}d`
+                            ) : (
+                              <span className="text-white/20">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {p.vacationDaysRemaining != null ? (
+                              <span className={cn(
+                                "font-medium",
+                                p.vacationDaysRemaining < 0 ? "text-red-300" : "text-emerald-300/80"
+                              )}>
+                                {p.vacationDaysRemaining}d
+                              </span>
+                            ) : p.vacationDaysPerYear != null ? (
+                              <span className="text-emerald-300/60">{p.vacationDaysPerYear}d</span>
+                            ) : (
+                              <span className="text-white/20">—</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -845,6 +872,8 @@ export default function TimeReport() {
                         <td className="px-4 py-3 text-right tabular-nums font-bold text-white">
                           {fmtMins(report.summary.totalMinutes)}
                         </td>
+                        <td />
+                        <td />
                         <td />
                         <td />
                       </tr>

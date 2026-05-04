@@ -146,9 +146,10 @@ export default function TimeTracking() {
     enabled: readAll,
   });
 
+  type MePerson = { id: string; weeklyContractHours?: number | null; vacationDaysPerYear?: number | null };
   const { data: mePerson } = useQuery({
     queryKey: ["people", "me"],
-    queryFn: () => api.get<{ id: string } | null>("/api/people/me"),
+    queryFn: () => api.get<MePerson | null>("/api/people/me"),
   });
 
   const personQs =
@@ -634,6 +635,10 @@ export default function TimeTracking() {
     );
   }
 
+  // Hours per work day (for vacation/sick day sizing). Danish default: 37h/wk ÷ 5 = 7.4h
+  const hoursPerWorkDay =
+    mePerson.weeklyContractHours != null ? mePerson.weeklyContractHours / 5 : 7.4;
+
   const weekJobIds = new Set((jobs ?? []).map((j) => j.id));
   const hasUpcomingUnlogged =
     mode === "week" &&
@@ -871,19 +876,78 @@ export default function TimeTracking() {
             </div>
             {weekDays.map((day) => {
               const dayYmd = format(day, "yyyy-MM-dd");
+              const dayOffEntry = (entries ?? []).find(
+                (e) =>
+                  (e.category === "vacation" || e.category === "sick" || e.category === "holiday") &&
+                  columnDayYmdForInstant(parseISO(e.startsAt), displayStartHour) === dayYmd
+              );
+              const dayOffCategory = dayOffEntry?.category ?? null;
+              const dayOffColors: Record<string, { bg: string; text: string; border: string }> = {
+                vacation: { bg: "bg-emerald-500/8", text: "text-emerald-300", border: "border-emerald-500/25" },
+                sick: { bg: "bg-orange-500/8", text: "text-orange-300", border: "border-orange-500/25" },
+                holiday: { bg: "bg-purple-500/8", text: "text-purple-300", border: "border-purple-500/25" },
+              };
+              const col = dayOffCategory ? dayOffColors[dayOffCategory] : null;
+
+              const addDayOff = (category: "vacation" | "sick") => {
+                if (!canEdit) return;
+                // Start at 09:00 UTC for the day, span hoursPerWorkDay
+                const [y, m, d] = dayYmd.split("-").map(Number);
+                const startsAt = new Date(Date.UTC(y!, m! - 1, d!, 8, 0, 0));
+                const endsAt = new Date(startsAt.getTime() + hoursPerWorkDay * 60 * 60 * 1000);
+                createEntry.mutate({
+                  startsAt: startsAt.toISOString(),
+                  endsAt: endsAt.toISOString(),
+                  kind: "custom",
+                  category,
+                });
+              };
+
               return (
-                <div key={dayYmd} className="flex-1 min-w-[100px] border-l border-white/10 flex flex-col">
-                  <div className={cn(WEEK_GRID_HEADER_CLASS, "text-xs text-white/70")}>
-                    <div className="uppercase tracking-wide text-[10px] text-white/40">
-                      {format(day, "EEE")}
+                <div key={dayYmd} className="flex-1 min-w-[100px] border-l border-white/10 flex flex-col group">
+                  <div className={cn(WEEK_GRID_HEADER_CLASS, "text-xs text-white/70", col?.bg, col ? `border-b ${col.border}` : "")}>
+                    <div className="flex items-start justify-between gap-1">
+                      <div>
+                        <div className="uppercase tracking-wide text-[10px] text-white/40">
+                          {format(day, "EEE")}
+                        </div>
+                        <div className={cn("font-medium", col ? col.text : "text-white")}>{format(day, "d")}</div>
+                      </div>
+                      {canEdit && !dayOffEntry && (
+                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            title={t("time.addVacationDay")}
+                            onClick={() => addDayOff("vacation")}
+                            className="text-[9px] font-bold px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-300/70 hover:bg-emerald-500/30 hover:text-emerald-200 leading-none"
+                          >
+                            V
+                          </button>
+                          <button
+                            type="button"
+                            title={t("time.addSickDay")}
+                            onClick={() => addDayOff("sick")}
+                            className="text-[9px] font-bold px-1 py-0.5 rounded bg-orange-500/15 text-orange-300/70 hover:bg-orange-500/30 hover:text-orange-200 leading-none"
+                          >
+                            S
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className="font-medium text-white">{format(day, "d")}</div>
+                    {dayOffEntry && (
+                      <div className={cn("text-[9px] font-medium mt-0.5 capitalize", col?.text)}>
+                        {t(`time.category${dayOffEntry.category.charAt(0).toUpperCase()}${dayOffEntry.category.slice(1)}` as never)}
+                      </div>
+                    )}
                   </div>
                   <div
                     data-day-col={dayYmd}
-                    className="relative flex flex-col border-b border-white/15"
+                    className={cn("relative flex flex-col border-b border-white/15", col?.bg)}
                     style={{ height: COLUMN_HEIGHT_PX }}
                   >
+                    {col && (
+                      <div className={cn("absolute inset-0 z-0 pointer-events-none", col.bg)} />
+                    )}
                     <div className="absolute inset-0 z-0 flex flex-col pointer-events-none">
                       {Array.from({ length: 24 }).map((_, i) => (
                         <div key={i} className="flex-1 min-h-0 border-t border-white/[0.1]" />
@@ -953,8 +1017,12 @@ export default function TimeTracking() {
                         const end = parseISO(e.endsAt);
                         const durMin = (end.getTime() - start.getTime()) / 60000;
                         const isJob = e.kind === "job";
+                        const cat = e.category ?? "work";
+                        const isDayOff = cat === "vacation" || cat === "sick" || cat === "holiday";
                         const label =
-                          isJob && e.eventShowJobId
+                          isDayOff
+                            ? t(`time.category${cat.charAt(0).toUpperCase()}${cat.slice(1)}` as never)
+                            : isJob && e.eventShowJobId
                             ? (jobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
                               (upcomingJobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
                               t("time.job")
@@ -978,7 +1046,13 @@ export default function TimeTracking() {
                             key={e.id}
                             className={cn(
                               "absolute left-0.5 right-0.5 rounded border px-1 pt-1 pb-2 text-[10px] overflow-hidden shadow-sm select-none",
-                              isJob
+                              cat === "vacation"
+                                ? "border-emerald-400/60 bg-emerald-500/30 text-emerald-50"
+                                : cat === "sick"
+                                ? "border-orange-400/60 bg-orange-500/30 text-orange-50"
+                                : cat === "holiday"
+                                ? "border-purple-400/60 bg-purple-500/30 text-purple-50"
+                                : isJob
                                 ? "border-emerald-400/50 bg-emerald-500/25 text-emerald-50"
                                 : "border-sky-400/50 bg-sky-500/25 text-sky-50"
                             )}

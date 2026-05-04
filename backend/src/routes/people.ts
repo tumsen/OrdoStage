@@ -178,6 +178,8 @@ function serializePerson(person: {
   photoUpdatedAt?: Date | null;
   departmentId: string | null;
   isActive?: boolean;
+  weeklyContractHours?: number | null;
+  vacationDaysPerYear?: number | null;
   teamMemberships?: Array<{
     departmentId: string;
     role: string | null;
@@ -224,6 +226,8 @@ function serializePerson(person: {
     photoUpdatedAt: person.photoUpdatedAt ? person.photoUpdatedAt.toISOString() : null,
     departmentId: person.departmentId,
     isActive: person.isActive ?? true,
+    weeklyContractHours: person.weeklyContractHours ?? null,
+    vacationDaysPerYear: person.vacationDaysPerYear ?? null,
     teamIds: (person.teamMemberships ?? []).map((membership) => membership.departmentId),
     teams: (person.teamMemberships ?? []).map((membership) => ({
       id: membership.department.id,

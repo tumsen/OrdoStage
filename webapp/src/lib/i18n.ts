@@ -126,6 +126,10 @@ const en = {
     reportNoData: "No entries found for the selected filters.",
     reportContractHint:
       "Click the contract hours cell to set expected weekly hours per person. Overtime = logged work hours − contracted hours over the period.",
+    reportColVacUsed: "Vac. used",
+    reportColVacLeft: "Vac. left",
+    addVacationDay: "Add vacation day",
+    addSickDay: "Add sick day",
   },
   account: {
     title: "Account",

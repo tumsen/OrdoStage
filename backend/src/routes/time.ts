@@ -173,7 +173,7 @@ timeRouter.get("/time/people", async (c) => {
   }
   const people = await prisma.person.findMany({
     where: { organizationId: user.organizationId, isActive: true },
-    select: { id: true, name: true, email: true, weeklyContractHours: true },
+    select: { id: true, name: true, email: true, weeklyContractHours: true, vacationDaysPerYear: true },
     orderBy: { name: "asc" },
   });
   return c.json({ data: people });
@@ -200,7 +200,10 @@ timeRouter.patch(
     if (!person) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
     await prisma.person.update({
       where: { id: personId },
-      data: { weeklyContractHours: body.weeklyContractHours },
+      data: {
+        ...(body.weeklyContractHours !== undefined ? { weeklyContractHours: body.weeklyContractHours } : {}),
+        ...(body.vacationDaysPerYear !== undefined ? { vacationDaysPerYear: body.vacationDaysPerYear } : {}),
+      },
     });
     return c.json({ ok: true });
   }
@@ -253,7 +256,7 @@ timeRouter.get("/time/report", async (c) => {
   const rows = await prisma.timeEntry.findMany({
     where,
     include: {
-      person: { select: { id: true, name: true, weeklyContractHours: true } },
+      person: { select: { id: true, name: true, weeklyContractHours: true, vacationDaysPerYear: true } },
       timeProject: { select: { id: true, name: true } },
       tagLinks: { include: { timeTag: { select: { id: true, name: true } } } },
     },
@@ -268,6 +271,7 @@ timeRouter.get("/time/report", async (c) => {
     sickMinutes: number;
     holidayMinutes: number;
     weeklyContractHours: number | null;
+    vacationDaysPerYear: number | null;
   };
   type ProjectAgg = { projectName: string; workMinutes: number; totalMinutes: number };
   type DayAgg = {
@@ -295,6 +299,7 @@ timeRouter.get("/time/report", async (c) => {
         sickMinutes: 0,
         holidayMinutes: 0,
         weeklyContractHours: row.person.weeklyContractHours ?? null,
+        vacationDaysPerYear: row.person.vacationDaysPerYear ?? null,
       });
     }
     const pa = byPerson.get(row.personId)!;
@@ -331,6 +336,11 @@ timeRouter.get("/time/report", async (c) => {
     const total = pa.workMinutes + pa.vacationMinutes + pa.sickMinutes + pa.holidayMinutes;
     const contractMinutes =
       pa.weeklyContractHours != null ? (rangeDays / 7) * pa.weeklyContractHours * 60 : null;
+    // Vacation days: use hoursPerWorkDay = weeklyContractHours / 5; fall back to 8h
+    const hoursPerDay = pa.weeklyContractHours != null ? pa.weeklyContractHours / 5 : 8;
+    const vacationDaysUsed = Math.round((pa.vacationMinutes / 60 / hoursPerDay) * 10) / 10;
+    const vacationDaysRemaining =
+      pa.vacationDaysPerYear != null ? Math.round((pa.vacationDaysPerYear - vacationDaysUsed) * 10) / 10 : null;
     return {
       personId,
       personName: pa.personName,
@@ -342,6 +352,9 @@ timeRouter.get("/time/report", async (c) => {
       weeklyContractHours: pa.weeklyContractHours,
       contractMinutes,
       overtimeMinutes: contractMinutes != null ? pa.workMinutes - contractMinutes : null,
+      vacationDaysPerYear: pa.vacationDaysPerYear,
+      vacationDaysUsed: pa.vacationDaysPerYear != null || pa.vacationMinutes > 0 ? vacationDaysUsed : null,
+      vacationDaysRemaining,
     };
   });
 

@@ -380,8 +380,14 @@ function PersonFormDialog({
 }) {
   const documentRowHandleMap = useRef(new Map<string, PersonDocumentListRowHandle>());
   const queryClient = useQueryClient();
-  const { canWrite: canWriteOrg } = usePermissions();
+  const { canWrite: canWriteOrg, canAction } = usePermissions();
+  const canManageContracts = canAction("time.read_all");
   const { data: session } = useSession();
+
+  // Work contract state (separate from main form — saved independently)
+  const [contractWeeklyHours, setContractWeeklyHours] = useState<string>("");
+  const [contractVacationDays, setContractVacationDays] = useState<string>("");
+  const [contractSaving, setContractSaving] = useState(false);
   const { data: teams } = useQuery({
     queryKey: ["departments"],
     queryFn: () => api.get<Team[]>("/api/departments"),
@@ -493,6 +499,14 @@ function PersonFormDialog({
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- draft aligns when permission payload / doc identity changes
   }, [permissionState, permissionsDoc?.id, permissionOptions?.teams]);
+
+  // Sync contract fields when editing a person
+  useEffect(() => {
+    if (!open) return;
+    setContractWeeklyHours(person?.weeklyContractHours != null ? String(person.weeklyContractHours) : "");
+    setContractVacationDays(person?.vacationDaysPerYear != null ? String(person.vacationDaysPerYear) : "");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [person?.id, open]);
 
   const watchedAssignments = form.watch("teamAssignments");
   const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
@@ -1169,6 +1183,88 @@ function PersonFormDialog({
             <p className="text-red-400 text-xs">{uploadError}</p>
           ) : null}
         </div>
+
+        {/* Work contract — shown to admins with time.read_all, only in edit mode */}
+        {person && canManageContracts && (
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Work contract</p>
+              <p className="text-[11px] text-white/30 mt-0.5">
+                Used for overtime and vacation tracking in time reports.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-white/55 text-xs">Weekly hours</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="168"
+                  step="0.5"
+                  value={contractWeeklyHours}
+                  onChange={(e) => setContractWeeklyHours(e.target.value)}
+                  placeholder="e.g. 37"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/55 text-xs">Vacation days / year</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="365"
+                  step="0.5"
+                  value={contractVacationDays}
+                  onChange={(e) => setContractVacationDays(e.target.value)}
+                  placeholder="e.g. 25"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                />
+              </div>
+            </div>
+            {/* Derived display */}
+            {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) && (
+              <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
+                {[
+                  { label: "Hours/day", value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
+                  { label: "Monthly", value: `${((parseFloat(contractWeeklyHours) * 52) / 12).toFixed(0)} h` },
+                  { label: "Yearly", value: `${(parseFloat(contractWeeklyHours) * 52).toFixed(0)} h` },
+                ].map((item) => (
+                  <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
+                    <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
+                    <p className="font-semibold text-white/70 mt-0.5">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-white/15 text-white/70 hover:bg-white/5 h-8"
+              disabled={contractSaving}
+              onClick={async () => {
+                setContractSaving(true);
+                try {
+                  const wh = contractWeeklyHours.trim() === "" ? null : parseFloat(contractWeeklyHours);
+                  const vd = contractVacationDays.trim() === "" ? null : parseFloat(contractVacationDays);
+                  await api.patch(`/api/time/person-contract/${person.id}`, {
+                    weeklyContractHours: wh,
+                    vacationDaysPerYear: vd,
+                  });
+                  queryClient.invalidateQueries({ queryKey: ["people"] });
+                  queryClient.invalidateQueries({ queryKey: ["time-people"] });
+                  toast({ title: "Contract saved" });
+                } catch {
+                  toast({ title: "Could not save contract", variant: "destructive" });
+                } finally {
+                  setContractSaving(false);
+                }
+              }}
+            >
+              {contractSaving ? "Saving…" : "Save contract"}
+            </Button>
+          </div>
+        )}
 
         <DialogFooter className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
           {canResendAppAccess ? (

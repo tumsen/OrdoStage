@@ -316,6 +316,8 @@ model Person {
   affiliation      String                  @default("internal")
   /** Expected work hours per week — used in reports to compute overtime. */
   weeklyContractHours Float?
+  /** Yearly vacation day allowance (e.g. 25 days in Denmark). */
+  vacationDaysPerYear Float?
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
   timeEntries      TimeEntry[]

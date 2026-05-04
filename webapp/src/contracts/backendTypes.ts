@@ -143,6 +143,9 @@ export const PersonSchema = z.object({
     .nullable()
     .optional(),
   isActive: z.boolean(),
+  /** Work contract — set by admins with time.read_all. */
+  weeklyContractHours: z.number().nullable().optional(),
+  vacationDaysPerYear: z.number().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   /** Set on create/update when app-access provisioning runs (not stored in DB). */
@@ -986,7 +989,8 @@ export const PatchTimeEntrySchema = z.object({
 });
 
 export const SetPersonContractSchema = z.object({
-  weeklyContractHours: z.number().min(0).max(168).nullable(),
+  weeklyContractHours: z.number().min(0).max(168).nullable().optional(),
+  vacationDaysPerYear: z.number().min(0).max(365).nullable().optional(),
 });
 
 export const TimeReportPersonSchema = z.object({
@@ -1000,6 +1004,9 @@ export const TimeReportPersonSchema = z.object({
   weeklyContractHours: z.number().nullable(),
   contractMinutes: z.number().nullable(),
   overtimeMinutes: z.number().nullable(),
+  vacationDaysPerYear: z.number().nullable(),
+  vacationDaysUsed: z.number().nullable(),
+  vacationDaysRemaining: z.number().nullable(),
 });
 
 export const TimeReportProjectSchema = z.object({
