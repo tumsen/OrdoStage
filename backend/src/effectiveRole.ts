@@ -89,7 +89,8 @@ export async function ensureSystemRoles(prisma: PrismaClient, organizationId: st
 
 /**
  * Permission groups created before Time tracking only store view/action ids that existed then.
- * Mirror schedule access: add `time` / `time.write` when the group already has schedule / write.schedule.
+ * Grant Time when the group already has Events or Schedule (typical “day job” access).
+ * Grant time.write when they can write events or schedule.
  */
 async function retrofitTimeWithSchedule(prisma: PrismaClient, organizationId: string): Promise<void> {
   if (isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
@@ -97,19 +98,24 @@ async function retrofitTimeWithSchedule(prisma: PrismaClient, organizationId: st
       UPDATE "RoleDefinition"
       SET
         views = CASE
-          WHEN 'schedule' = ANY(views) AND NOT ('time' = ANY(views))
+          WHEN NOT ('time' = ANY(views))
+            AND ('schedule' = ANY(views) OR 'events' = ANY(views))
           THEN array_append(views, 'time')
           ELSE views
         END,
         actions = CASE
-          WHEN 'write.schedule' = ANY(actions) AND NOT ('time.write' = ANY(actions))
+          WHEN NOT ('time.write' = ANY(actions))
+            AND ('write.schedule' = ANY(actions) OR 'write.events' = ANY(actions))
           THEN array_append(actions, 'time.write')
           ELSE actions
         END
       WHERE "organizationId" = ${organizationId}
         AND (
-          ('schedule' = ANY(views) AND NOT ('time' = ANY(views)))
-          OR ('write.schedule' = ANY(actions) AND NOT ('time.write' = ANY(actions)))
+          (NOT ('time' = ANY(views)) AND ('schedule' = ANY(views) OR 'events' = ANY(views)))
+          OR (
+            NOT ('time.write' = ANY(actions))
+            AND ('write.schedule' = ANY(actions) OR 'write.events' = ANY(actions))
+          )
         )
     `;
     return;
@@ -120,11 +126,17 @@ async function retrofitTimeWithSchedule(prisma: PrismaClient, organizationId: st
     const views = [...row.views];
     const actions = [...row.actions];
     let changed = false;
-    if (views.includes("schedule") && !views.includes("time")) {
+    if (
+      !views.includes("time") &&
+      (views.includes("schedule") || views.includes("events"))
+    ) {
       views.push("time");
       changed = true;
     }
-    if (actions.includes("write.schedule") && !actions.includes("time.write")) {
+    if (
+      !actions.includes("time.write") &&
+      (actions.includes("write.schedule") || actions.includes("write.events"))
+    ) {
       actions.push("time.write");
       changed = true;
     }
