@@ -13,7 +13,7 @@ import {
   subWeeks,
 } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import type { TimeEntry, TimeProject, TimeTag, TimeTrackingJob } from "@/contracts/backendTypes";
 import type { TimeFormat } from "@/lib/preferences";
 import {
@@ -64,12 +65,14 @@ function snapMinutes(m: number, step = 15): number {
 
 type DragState = {
   entryId: string;
-  kind: "move" | "resize";
+  kind: "move" | "resizeEnd" | "resizeStart";
   origStartWinMin: number;
   origEndWinMin: number;
   dayYmd: string;
   durationMin: number;
 };
+
+type CreateDraftState = { dayYmd: string; a: number; b: number };
 
 export default function TimeTracking() {
   const { t } = useI18n();
@@ -157,9 +160,22 @@ export default function TimeTracking() {
   const tagById = useMemo(() => new Map((tags ?? []).map((x) => [x.id, x])), [tags]);
   const projectById = useMemo(() => new Map((projects ?? []).map((x) => [x.id, x])), [projects]);
 
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+
   const updateEntry = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Partial<{ startsAt: string; endsAt: string }> }) =>
-      api.patch<TimeEntry>(`/api/time/entries/${id}`, body),
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: Partial<{
+        startsAt: string;
+        endsAt: string;
+        note: string | null;
+        timeProjectId: string | null;
+        tagIds: string[];
+      }>;
+    }) => api.patch<TimeEntry>(`/api/time/entries/${id}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
     },
@@ -176,8 +192,35 @@ export default function TimeTracking() {
     onError: () => toast({ title: t("time.saveError"), variant: "destructive" }),
   });
 
+  const deleteEntry = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/time/entries/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["time-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["time-jobs-upcoming"] });
+      toast({ title: t("time.entryDeleted") });
+      setEditingEntryId(null);
+    },
+    onError: () => toast({ title: t("time.deleteError"), variant: "destructive" }),
+  });
+
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  const [createDraft, setCreateDraft] = useState<CreateDraftState | null>(null);
+  const createDraftRef = useRef<CreateDraftState | null>(null);
+
+  const editingEntry = useMemo(
+    () => (entries ?? []).find((x) => x.id === editingEntryId) ?? null,
+    [entries, editingEntryId]
+  );
+
+  const editingEntryJobSummary = useMemo(() => {
+    if (!editingEntry || editingEntry.kind !== "job" || !editingEntry.eventShowJobId) return null;
+    return (
+      (jobs ?? []).find((j) => j.id === editingEntry.eventShowJobId)?.title ??
+      (upcomingJobs ?? []).find((j) => j.id === editingEntry.eventShowJobId)?.title ??
+      null
+    );
+  }, [editingEntry, jobs, upcomingJobs]);
 
   const minutesFromY = useCallback((clientY: number, colEl: HTMLElement | null) => {
     if (!colEl) return null;
@@ -194,6 +237,10 @@ export default function TimeTracking() {
   }, [drag]);
 
   useEffect(() => {
+    if (editingEntryId && !editingEntry) setEditingEntryId(null);
+  }, [editingEntryId, editingEntry]);
+
+  useEffect(() => {
     if (!drag) return;
     const onUp = (ev: PointerEvent) => {
       const d = dragRef.current;
@@ -203,7 +250,7 @@ export default function TimeTracking() {
       setDrag(null);
       if (m === null) return;
 
-      if (d.kind === "resize") {
+      if (d.kind === "resizeEnd") {
         const newEndWin = clampMinutesToDay(Math.max(d.origStartWinMin + 15, m));
         updateEntry.mutate({
           id: d.entryId,
@@ -214,6 +261,26 @@ export default function TimeTracking() {
               displayStartHour
             ).toISOString(),
             endsAt: dateFromColumnAndWindowMinutes(d.dayYmd, newEndWin, displayStartHour).toISOString(),
+          },
+        });
+        return;
+      }
+
+      if (d.kind === "resizeStart") {
+        const newStartWin = clampMinutesToDay(Math.min(m, d.origEndWinMin - 15));
+        updateEntry.mutate({
+          id: d.entryId,
+          body: {
+            startsAt: dateFromColumnAndWindowMinutes(
+              d.dayYmd,
+              newStartWin,
+              displayStartHour
+            ).toISOString(),
+            endsAt: dateFromColumnAndWindowMinutes(
+              d.dayYmd,
+              d.origEndWinMin,
+              displayStartHour
+            ).toISOString(),
           },
         });
         return;
@@ -570,6 +637,90 @@ export default function TimeTracking() {
                         <div key={i} className="flex-1 min-h-0 border-t border-white/[0.1]" />
                       ))}
                     </div>
+                    {canEdit ? (
+                      <>
+                        <div
+                          className="absolute inset-0 z-[1] cursor-crosshair touch-none"
+                          onPointerDown={(ev) => {
+                            const col = ev.currentTarget.parentElement as HTMLElement | null;
+                            const m = minutesFromY(ev.clientY, col);
+                            if (m === null) return;
+                            const draft: CreateDraftState = { dayYmd, a: m, b: m };
+                            createDraftRef.current = draft;
+                            setCreateDraft(draft);
+                            ev.currentTarget.setPointerCapture(ev.pointerId);
+                          }}
+                          onPointerMove={(ev) => {
+                            const d = createDraftRef.current;
+                            if (!d || d.dayYmd !== dayYmd) return;
+                            const col = document.querySelector(
+                              `[data-day-col="${dayYmd}"]`
+                            ) as HTMLElement | null;
+                            const m = minutesFromY(ev.clientY, col);
+                            if (m === null) return;
+                            const next = { ...d, b: m };
+                            createDraftRef.current = next;
+                            setCreateDraft(next);
+                          }}
+                          onPointerUp={(ev) => {
+                            const d = createDraftRef.current;
+                            createDraftRef.current = null;
+                            setCreateDraft(null);
+                            try {
+                              ev.currentTarget.releasePointerCapture(ev.pointerId);
+                            } catch {
+                              /* released */
+                            }
+                            if (!d || d.dayYmd !== dayYmd) return;
+                            const lo = Math.min(d.a, d.b);
+                            const hi = Math.max(d.a, d.b);
+                            let startWin = lo;
+                            let endWin = hi;
+                            if (endWin - startWin < 15) {
+                              endWin = Math.min(startWin + 15, MINUTES_PER_DAY);
+                              if (endWin - startWin < 15) {
+                                startWin = Math.max(0, endWin - 15);
+                              }
+                            }
+                            createEntry.mutate({
+                              kind: "custom",
+                              startsAt: dateFromColumnAndWindowMinutes(
+                                dayYmd,
+                                startWin,
+                                displayStartHour
+                              ).toISOString(),
+                              endsAt: dateFromColumnAndWindowMinutes(
+                                dayYmd,
+                                endWin,
+                                displayStartHour
+                              ).toISOString(),
+                            });
+                          }}
+                          onPointerCancel={(ev) => {
+                            createDraftRef.current = null;
+                            setCreateDraft(null);
+                            try {
+                              ev.currentTarget.releasePointerCapture(ev.pointerId);
+                            } catch {
+                              /* released */
+                            }
+                          }}
+                        />
+                        {createDraft?.dayYmd === dayYmd ? (
+                          <div
+                            className="absolute left-0.5 right-0.5 z-[1] rounded border border-sky-400/50 bg-sky-400/15 pointer-events-none"
+                            style={{
+                              top: `${(Math.min(createDraft.a, createDraft.b) / MINUTES_PER_DAY) * 100}%`,
+                              height: `${Math.max(
+                                ((Math.abs(createDraft.b - createDraft.a) || 0) / MINUTES_PER_DAY) *
+                                  100,
+                                0.35
+                              )}%`,
+                            }}
+                          />
+                        ) : null}
+                      </>
+                    ) : null}
                     {(jobs ?? [])
                       .filter(
                         (j) =>
@@ -625,7 +776,7 @@ export default function TimeTracking() {
                           <div
                             key={e.id}
                             className={cn(
-                              "absolute left-0.5 right-0.5 rounded border px-1 text-[10px] overflow-hidden shadow-sm select-none",
+                              "absolute left-0.5 right-0.5 rounded border px-1 pt-1 pb-2 text-[10px] overflow-hidden shadow-sm select-none",
                               isJob
                                 ? "border-emerald-400/50 bg-emerald-500/25 text-emerald-50"
                                 : "border-sky-400/50 bg-sky-500/25 text-sky-50"
@@ -637,7 +788,7 @@ export default function TimeTracking() {
                             }}
                             onPointerDown={(ev) => {
                               if (!canEdit) return;
-                              if ((ev.target as HTMLElement).dataset.handle === "resize") return;
+                              if ((ev.target as HTMLElement).closest("[data-handle]")) return;
                               ev.currentTarget.setPointerCapture(ev.pointerId);
                               const sWin = minutesFromWindowStart(start, dayYmd, displayStartHour);
                               setDrag({
@@ -650,30 +801,69 @@ export default function TimeTracking() {
                               });
                             }}
                           >
-                            <div className="font-medium truncate">{label}</div>
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                className="absolute top-0 right-0 z-[3] flex h-5 w-5 items-center justify-center rounded-sm text-white/70 hover:bg-white/15 hover:text-white"
+                                data-handle="edit"
+                                aria-label={t("time.editEntry")}
+                                onPointerDown={(ev) => {
+                                  ev.stopPropagation();
+                                }}
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  setEditingEntryId(e.id);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            ) : null}
+                            <div className="font-medium truncate pr-4">{label}</div>
                             {proj ? <div className="text-[9px] opacity-80 truncate">{proj}</div> : null}
                             {tagLabel ? (
                               <div className="text-[9px] opacity-70 truncate">{tagLabel}</div>
                             ) : null}
                             {canEdit ? (
-                              <button
-                                type="button"
-                                data-handle="resize"
-                                className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-white/20 hover:bg-white/35"
-                                onPointerDown={(ev) => {
-                                  ev.stopPropagation();
-                                  ev.currentTarget.setPointerCapture(ev.pointerId);
-                                  const sWin = minutesFromWindowStart(start, dayYmd, displayStartHour);
-                                  setDrag({
-                                    entryId: e.id,
-                                    kind: "resize",
-                                    origStartWinMin: sWin,
-                                    origEndWinMin: sWin + durMin,
-                                    dayYmd,
-                                    durationMin: durMin,
-                                  });
-                                }}
-                              />
+                              <>
+                                <button
+                                  type="button"
+                                  data-handle="resizeStart"
+                                  className="absolute top-0 left-0 right-6 h-1.5 cursor-ns-resize bg-white/15 hover:bg-white/30 rounded-t-sm"
+                                  aria-hidden
+                                  onPointerDown={(ev) => {
+                                    ev.stopPropagation();
+                                    ev.currentTarget.setPointerCapture(ev.pointerId);
+                                    const sWin = minutesFromWindowStart(start, dayYmd, displayStartHour);
+                                    setDrag({
+                                      entryId: e.id,
+                                      kind: "resizeStart",
+                                      origStartWinMin: sWin,
+                                      origEndWinMin: sWin + durMin,
+                                      dayYmd,
+                                      durationMin: durMin,
+                                    });
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  data-handle="resizeEnd"
+                                  className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-white/20 hover:bg-white/35 rounded-b-sm"
+                                  aria-hidden
+                                  onPointerDown={(ev) => {
+                                    ev.stopPropagation();
+                                    ev.currentTarget.setPointerCapture(ev.pointerId);
+                                    const sWin = minutesFromWindowStart(start, dayYmd, displayStartHour);
+                                    setDrag({
+                                      entryId: e.id,
+                                      kind: "resizeEnd",
+                                      origStartWinMin: sWin,
+                                      origEndWinMin: sWin + durMin,
+                                      dayYmd,
+                                      durationMin: durMin,
+                                    });
+                                  }}
+                                />
+                              </>
                             ) : null}
                           </div>
                         );
@@ -746,6 +936,30 @@ export default function TimeTracking() {
       {canEdit && mode === "week" ? (
         <p className="text-xs text-white/40">{t("time.dragHint")}</p>
       ) : null}
+
+      <TimeEntryEditSheet
+        entry={editingEntry}
+        open={Boolean(editingEntry)}
+        onOpenChange={(o) => {
+          if (!o) setEditingEntryId(null);
+        }}
+        projects={projects ?? []}
+        tags={tags ?? []}
+        onSave={(id, body) => {
+          updateEntry.mutate(
+            { id, body },
+            {
+              onSuccess: () => {
+                toast({ title: t("time.entryUpdated") });
+              },
+            }
+          );
+        }}
+        saving={updateEntry.isPending}
+        onDelete={(id) => deleteEntry.mutate(id)}
+        deleting={deleteEntry.isPending}
+        entrySummary={editingEntryJobSummary}
+      />
     </div>
   );
 }
