@@ -11,6 +11,7 @@ export const VIEW_DEFS: { id: string; label: string; path: string }[] = [
   { id: "billing", label: "Billing", path: "/billing" },
   { id: "account", label: "Account", path: "/account" },
   { id: "roles", label: "Permission groups", path: "/roles" },
+  { id: "time", label: "Time tracking", path: "/time" },
 ];
 
 /** Things a user can do beyond opening a page. */
@@ -34,6 +35,9 @@ export const ACTION_DEFS: {
   { id: "org.delete", label: "Delete the entire organization", group: "organization" },
   { id: "roles.manage", label: "Create & edit permission groups (except system groups)", group: "organization" },
   { id: "account.danger", label: "Danger zone (delete organisation)", group: "account" },
+  { id: "time.write", label: "Log & edit own time entries", group: "organization" },
+  { id: "time.read_all", label: "View everyone’s time & hours (reports)", group: "organization" },
+  { id: "time.manage_catalog", label: "Manage time projects & tags for the organization", group: "organization" },
 ];
 
 export const ALL_VIEW_IDS = VIEW_DEFS.map((v) => v.id);
@@ -58,7 +62,15 @@ export const LEGACY_PRESETS: Record<
     views: allExceptViews(["roles"]),
     actions: ALL_ACTION_IDS.filter(
       (a) =>
-        !["org.policies", "org.update", "org.delete", "roles.manage", "billing.manage"].includes(a)
+        ![
+          "org.policies",
+          "org.update",
+          "org.delete",
+          "roles.manage",
+          "billing.manage",
+          "time.read_all",
+          "time.manage_catalog",
+        ].includes(a)
     ),
   },
   member: {
@@ -73,6 +85,8 @@ export const LEGACY_PRESETS: Record<
           "org.delete",
           "roles.manage",
           "account.danger",
+          "time.read_all",
+          "time.manage_catalog",
         ].includes(a)
     ),
   },

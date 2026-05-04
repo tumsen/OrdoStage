@@ -18,6 +18,7 @@ import teamRouter from "./routes/team";
 import toursRouter from "./routes/tours";
 import publicRouter from "./routes/public";
 import siteContentRouter from "./routes/site-content";
+import timeRouter from "./routes/time";
 import accountRouter from "./routes/account";
 import roleDefinitionsRouter from "./routes/roleDefinitions";
 import type { EffectiveRole } from "./effectiveRole";
@@ -273,6 +274,7 @@ app.route("/api", departmentsRouter);
 app.route("/api", teamRouter);
 app.route("/api", toursRouter);
 app.route("/api", siteContentRouter);
+app.route("/api", timeRouter);
 
 const port = Number(process.env.PORT) || 3000;
 

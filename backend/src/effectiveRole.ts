@@ -64,11 +64,18 @@ export async function ensureSystemRoles(prisma: PrismaClient, organizationId: st
         },
       });
     } else {
-      const nextActions =
-        s.slug === "owner" ? existing.actions : existing.actions.filter((a) => a !== "org.delete");
+      const mergedViews = [...new Set([...existing.views, ...s.views])].filter((id) =>
+        ALL_VIEW_IDS.includes(id)
+      );
+      let mergedActions = [...new Set([...existing.actions, ...s.actions])].filter((id) =>
+        ALL_ACTION_IDS.includes(id)
+      );
+      if (s.slug !== "owner") {
+        mergedActions = mergedActions.filter((a) => a !== "org.delete");
+      }
       await prisma.roleDefinition.update({
         where: { id: existing.id },
-        data: { isSystem: true, actions: nextActions },
+        data: { isSystem: true, views: mergedViews, actions: mergedActions },
       });
     }
   }

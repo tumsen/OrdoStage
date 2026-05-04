@@ -880,6 +880,107 @@ export const CreateTourSchema = z.object({
 
 export const UpdateTourSchema = CreateTourSchema.partial();
 
+// —— Time tracking ——
+
+export const TimeTagSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  name: z.string(),
+  sortOrder: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const TimeProjectSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  name: z.string(),
+  eventId: z.string().nullable(),
+  isArchived: z.boolean(),
+  sortOrder: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const TimeEntrySchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  userId: z.string(),
+  personId: z.string(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+  kind: z.enum(["job", "custom"]),
+  eventShowJobId: z.string().nullable(),
+  eventId: z.string().nullable(),
+  timeProjectId: z.string().nullable(),
+  note: z.string().nullable(),
+  tagIds: z.array(z.string()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const TimeTrackingJobSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  jobDate: z.string(),
+  startTime: z.string(),
+  durationMinutes: z.number(),
+  plannedStartsAt: z.string(),
+  plannedEndsAt: z.string(),
+  eventId: z.string(),
+  eventTitle: z.string(),
+  showId: z.string(),
+  showDate: z.string(),
+  venueName: z.string(),
+});
+
+export const CreateTimeTagSchema = z.object({
+  name: z.string().min(1),
+  sortOrder: z.number().int().optional(),
+});
+
+export const PatchTimeTagSchema = CreateTimeTagSchema.partial();
+
+export const CreateTimeProjectSchema = z.object({
+  name: z.string().min(1),
+  eventId: z.string().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const PatchTimeProjectSchema = z.object({
+  name: z.string().min(1).optional(),
+  eventId: z.string().nullable().optional(),
+  isArchived: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const CreateTimeEntrySchema = z.object({
+  startsAt: z.string().min(1),
+  endsAt: z.string().min(1),
+  kind: z.enum(["job", "custom"]),
+  eventShowJobId: z.string().nullable().optional(),
+  eventId: z.string().nullable().optional(),
+  timeProjectId: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  tagIds: z.array(z.string()).optional(),
+});
+
+export const PatchTimeEntrySchema = z.object({
+  startsAt: z.string().optional(),
+  endsAt: z.string().optional(),
+  kind: z.enum(["job", "custom"]).optional(),
+  eventShowJobId: z.string().nullable().optional(),
+  eventId: z.string().nullable().optional(),
+  timeProjectId: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  tagIds: z.array(z.string()).optional(),
+});
+
+export type TimeTag = z.infer<typeof TimeTagSchema>;
+export type TimeProject = z.infer<typeof TimeProjectSchema>;
+export type TimeEntry = z.infer<typeof TimeEntrySchema>;
+export type TimeTrackingJob = z.infer<typeof TimeTrackingJobSchema>;
+
 // Tour type exports
 export type TourShow = z.infer<typeof TourShowSchema>;
 export type CreateTourShow = z.infer<typeof CreateTourShowSchema>;

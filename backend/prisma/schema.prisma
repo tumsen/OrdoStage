@@ -29,6 +29,7 @@ model User {
   preferredLanguage String?
   preferredTimeFormat String?
   preferredDistanceUnit String?
+  timeEntries        TimeEntry[]
 }
 
 model Session {
@@ -115,6 +116,9 @@ model Organization {
   roleDefinitions  RoleDefinition[]
   invoices         BillingInvoice[]
   usageSnapshots   BillingUsageSnapshot[]
+  timeTags         TimeTag[]
+  timeProjects     TimeProject[]
+  timeEntries      TimeEntry[]
 }
 
 model BillingConfig {
@@ -312,6 +316,7 @@ model Person {
   affiliation      String                  @default("internal")
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
+  timeEntries      TimeEntry[]
 }
 
 model PersonDocument {
@@ -386,6 +391,8 @@ model Event {
   teams          EventTeam[]
   teamNotes      EventTeamNote[]
   teamDocuments  EventTeamDocument[]
+  timeProjects   TimeProject[]
+  timeEntries    TimeEntry[]
 
   @@index([ownerTeamId])
 }
@@ -515,6 +522,7 @@ model EventShowJob {
   sortOrder       Int       @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  timeEntries     TimeEntry[]
 
   @@index([showId, sortOrder])
   @@index([venueId])
@@ -764,4 +772,73 @@ model TourShowPerson {
   role     String?
 
   @@unique([showId, personId])
+}
+
+// —— Time tracking (worked hours, projects, tags) ——
+
+model TimeTag {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  entryLinks     TimeEntryTag[]
+
+  @@index([organizationId, sortOrder])
+}
+
+model TimeProject {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  eventId        String?
+  event          Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  isArchived     Boolean      @default(false)
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  entries        TimeEntry[]
+
+  @@index([organizationId, sortOrder])
+  @@index([eventId])
+}
+
+model TimeEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personId       String
+  person         Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+  startsAt       DateTime
+  endsAt         DateTime
+  kind           String
+  eventShowJobId String?
+  eventShowJob   EventShowJob? @relation(fields: [eventShowJobId], references: [id], onDelete: SetNull)
+  eventId        String?
+  event          Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  timeProjectId  String?
+  timeProject    TimeProject? @relation(fields: [timeProjectId], references: [id], onDelete: SetNull)
+  note           String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  tagLinks       TimeEntryTag[]
+
+  @@index([organizationId, personId, startsAt])
+  @@index([personId, startsAt])
+  @@index([eventShowJobId])
+}
+
+model TimeEntryTag {
+  timeEntryId String
+  timeTagId   String
+  timeEntry   TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  timeTag     TimeTag   @relation(fields: [timeTagId], references: [id], onDelete: Cascade)
+
+  @@id([timeEntryId, timeTagId])
+  @@index([timeTagId])
 }

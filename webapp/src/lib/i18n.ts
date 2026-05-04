@@ -21,6 +21,7 @@ const en = {
     billing: "Billing",
     roles: "Permission groups",
     account: "Account",
+    time: "Time",
     ownerAdmin: "Owner Admin",
     signOut: "Sign out",
     workspace: "Workspace",
@@ -35,6 +36,39 @@ const en = {
       "Invoice due soon: {{days}} {{daysLabel}} remaining to avoid read-only mode.",
     day: "day",
     days: "days",
+  },
+  time: {
+    title: "Time tracking",
+    subtitle: "Log hours against show jobs and custom work. Drag blocks to match real start and end times.",
+    week: "Week",
+    month: "Month",
+    noAccess: "You do not have access to time tracking in this organization.",
+    needPersonLink: "Link your user account to a person in the directory (same email) to use time tracking.",
+    planned: "Planned",
+    job: "Job",
+    customBlock: "Time",
+    addBlock: "Add custom time",
+    logJob: "Log",
+    dragHint: "Drag a block to move it; drag the bottom edge to shorten or lengthen.",
+    saveError: "Could not save time entry.",
+    entryCreated: "Time entry saved.",
+    entryDeleted: "Deleted.",
+    personFilter: "Person",
+    me: "Me",
+    catalogTitle: "Time tracking catalog",
+    catalogHint:
+      "Define tags (meeting, cleaning, …) and projects so entries can be classified. Grant this to admins or delegated roles via Permission groups.",
+    tagsHeading: "Tags",
+    projectsHeading: "Projects",
+    tagPlaceholder: "e.g. Meeting",
+    projectPlaceholder: "e.g. Front of house",
+    add: "Add",
+    remove: "Remove",
+    catalogTagAdded: "Tag added.",
+    catalogProjectAdded: "Project added.",
+    catalogRemoved: "Removed.",
+    catalogSaveError: "Could not save catalog.",
+    catalogDeleteConfirm: "Remove this item?",
   },
   account: {
     title: "Account",
@@ -127,6 +161,7 @@ const en = {
 
 const da: DeepPartial<typeof en> = {
   nav: {
+    time: "Tid",
     dashboard: "Dashboard",
     events: "Begivenheder",
     schedule: "Plan",
@@ -143,6 +178,16 @@ const da: DeepPartial<typeof en> = {
     workspace: "Arbejdsrum",
     switchOrganization: "Skift organisation",
     current: "aktuel",
+  },
+  time: {
+    title: "Tidsregistrering",
+    subtitle: "Registrer timer mod jobs og eget arbejde. Træk blokke så de matcher start og slut.",
+    week: "Uge",
+    month: "Måned",
+    needPersonLink: "Din konto skal være koblet til en person i kataloget (samme e-mail).",
+    addBlock: "Tilføj tidsblok",
+    logJob: "Log",
+    planned: "Planlagt",
   },
   account: {
     title: "Konto",
@@ -202,6 +247,7 @@ const da: DeepPartial<typeof en> = {
 
 const de: DeepPartial<typeof en> = {
   nav: {
+    time: "Zeit",
     events: "Ereignisse",
     schedule: "Zeitplan",
     tours: "Tourneen",
