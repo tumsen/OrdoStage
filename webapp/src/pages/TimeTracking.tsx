@@ -533,18 +533,12 @@ export default function TimeTracking() {
           <div className="flex min-w-[720px]">
             <div className="w-14 shrink-0 flex flex-col">
               <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full")} aria-hidden />
-              <div
-                className="relative flex flex-col border-b border-white/15"
-                style={{ height: COLUMN_HEIGHT_PX }}
-              >
+              <div className="relative flex flex-col" style={{ height: COLUMN_HEIGHT_PX }}>
                 {Array.from({ length: 24 }).map((_, i) => {
                   const hour24 = (displayStartHour + i) % 24;
                   const label = formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h");
                   return (
-                    <div
-                      key={i}
-                      className="relative flex-1 min-h-0 border-t border-white/15"
-                    >
+                    <div key={i} className="relative flex-1 min-h-0">
                       <span className="absolute left-0 right-1 top-0 z-[1] -translate-y-1/2 text-right text-[10px] leading-none text-white/50 tabular-nums pointer-events-none">
                         {label}
                       </span>
