@@ -701,6 +701,29 @@ export default function TimeTracking() {
     return acc;
   }, [entries]);
 
+  const totalsByColumnDay = useMemo(() => {
+    const acc = new Map<string, number>();
+    for (const e of entries ?? []) {
+      const start = parseISO(e.startsAt);
+      const end = parseISO(e.endsAt);
+      const mins = Math.max(0, (end.getTime() - start.getTime()) / 60_000);
+      const dayKey = columnDayYmdForInstant(start, displayStartHour);
+      acc.set(dayKey, (acc.get(dayKey) ?? 0) + mins);
+    }
+    return acc;
+  }, [entries, displayStartHour]);
+
+  const weekTotalMinutes = useMemo(() => {
+    return weekDays.reduce((sum, d) => {
+      const k = format(d, "yyyy-MM-dd");
+      return sum + (totalsByColumnDay.get(k) ?? 0);
+    }, 0);
+  }, [weekDays, totalsByColumnDay]);
+
+  const periodWeek = getISOWeek(anchor);
+  const periodMonth = format(anchor, "MMMM", { locale: dfLocale });
+  const periodYear = format(anchor, "yyyy");
+
   function jumpToJobWeek(job: TimeTrackingJob) {
     const d = parseISO(job.plannedStartsAt);
     if (Number.isFinite(d.getTime())) setAnchor(d);
@@ -846,6 +869,14 @@ export default function TimeTracking() {
               ? `${format(weekStart, "d MMM")} – ${format(weekEnd, "d MMM yyyy")}`
               : format(anchor, "MMMM yyyy")}
           </span>
+          <span className="text-xs text-white/50 tabular-nums whitespace-nowrap">
+            W{periodWeek} · {periodMonth} · {periodYear}
+          </span>
+          {mode === "week" ? (
+            <span className="text-xs text-white/60 tabular-nums whitespace-nowrap">
+              Week total {Math.round((weekTotalMinutes / 60) * 10) / 10}h
+            </span>
+          ) : null}
           {readAll && peopleForFilter && peopleForFilter.length > 0 ? (
             <Select
               value={selectedPersonId ?? mePerson.id}
@@ -1018,6 +1049,7 @@ export default function TimeTracking() {
             </div>
             {weekDays.map((day) => {
               const dayYmd = format(day, "yyyy-MM-dd");
+              const dayTotalMinutes = totalsByColumnDay.get(dayYmd) ?? 0;
               const dayOffEntry = (entries ?? []).find(
                 (e) =>
                   (e.category === "vacation" || e.category === "sick" || e.category === "holiday") &&
@@ -1063,6 +1095,9 @@ export default function TimeTracking() {
                         </div>
                         <div className="text-[10px] text-white/45 leading-snug mt-0.5 tabular-nums">
                           {t("time.calendarWeekIso", { week: getISOWeek(day) })}
+                        </div>
+                        <div className="text-[10px] text-white/40 leading-snug tabular-nums">
+                          {Math.round((dayTotalMinutes / 60) * 10) / 10}h
                         </div>
                       </div>
                       {canEdit && !dayOffEntry ? (
