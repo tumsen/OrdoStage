@@ -1201,7 +1201,7 @@ export default function TimeTracking() {
                             ? (jobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
                               (upcomingJobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
                               t("time.job")
-                            : e.note || t("time.customBlock");
+                            : t("time.customBlock");
                         const projEntity = e.timeProjectId
                           ? projectById.get(e.timeProjectId)
                           : undefined;
@@ -1397,6 +1397,11 @@ export default function TimeTracking() {
                                     </span>
                                   );
                                 })}
+                              </div>
+                            ) : null}
+                            {e.note && !isDayOff ? (
+                              <div className="mt-0.5 pr-4 text-[9px] leading-snug text-white/85 whitespace-pre-wrap break-words">
+                                {e.note}
                               </div>
                             ) : null}
                             {canEdit ? (
