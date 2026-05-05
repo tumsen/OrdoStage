@@ -66,6 +66,7 @@ function readDisplayStartHour(): number {
 
 /** Same idea as schedule booking: ignore plain clicks; require real drag distance. */
 const MIN_CREATE_DRAG_PX = 8;
+const MIN_ENTRY_MOVE_DRAG_PX = 8;
 
 type EntryDragRef = {
   entryId: string;
@@ -74,6 +75,10 @@ type EntryDragRef = {
   origEndWinMin: number;
   dayYmd: string;
   durationMin: number;
+  /** Move only: set until pointer moves past MIN_ENTRY_MOVE_DRAG_PX (plain click → edit). */
+  moveStartClientX?: number;
+  moveStartClientY?: number;
+  moveThresholdPassed?: boolean;
 };
 
 type CreateDragRef = {
@@ -512,6 +517,14 @@ export default function TimeTracking() {
       const mSnap = snapWindowMinutes(rawWindowMinutesFromY(ev.clientY, r.top, COLUMN_HEIGHT_PX));
 
       if (cur.kind === "move") {
+        if (!cur.moveThresholdPassed) {
+          const sx = cur.moveStartClientX ?? ev.clientX;
+          const sy = cur.moveStartClientY ?? ev.clientY;
+          const dx = ev.clientX - sx;
+          const dy = ev.clientY - sy;
+          if (dx * dx + dy * dy < MIN_ENTRY_MOVE_DRAG_PX * MIN_ENTRY_MOVE_DRAG_PX) return;
+          cur.moveThresholdPassed = true;
+        }
         const dur =
           Math.max(TIME_SNAP_MINUTES, Math.round(cur.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES);
         const newStart = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, mSnap)));
@@ -577,6 +590,12 @@ export default function TimeTracking() {
       activeColElRef.current = null;
       const sh = displayStartHourRef.current;
 
+      if (d.kind === "move" && !d.moveThresholdPassed) {
+        setEditingEntryId(d.entryId);
+        setDragOverride(null);
+        return;
+      }
+
       if (m === null) {
         setDragOverride(null);
         return;
@@ -625,7 +644,7 @@ export default function TimeTracking() {
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", finish);
-  }, [minutesFromY, updateEntry]);
+  }, [minutesFromY, updateEntry, setEditingEntryId]);
 
   const entryByJobId = useMemo(() => {
     const m = new Map<string, TimeEntry>();
@@ -1187,6 +1206,9 @@ export default function TimeTracking() {
                                 origEndWinMin: sWin + durMin,
                                 dayYmd,
                                 durationMin: durMin,
+                                moveStartClientX: ev.clientX,
+                                moveStartClientY: ev.clientY,
+                                moveThresholdPassed: false,
                               };
                               attachEntryDragListeners();
                             }}
