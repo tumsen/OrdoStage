@@ -1201,7 +1201,7 @@ export default function TimeTracking() {
                             ? (jobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
                               (upcomingJobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
                               t("time.job")
-                            : t("time.customBlock");
+                            : "";
                         const projEntity = e.timeProjectId
                           ? projectById.get(e.timeProjectId)
                           : undefined;
@@ -1366,7 +1366,7 @@ export default function TimeTracking() {
                                 ) : null}
                               </>
                             ) : null}
-                            <div className="font-medium truncate pr-4">{label}</div>
+                            {label ? <div className="font-medium truncate pr-4">{label}</div> : null}
                             <div className="text-[9px] tabular-nums text-white/90 leading-tight pr-4">
                               {startTimeLabel} – {endTimeLabel} · {durationLabel}
                             </div>
