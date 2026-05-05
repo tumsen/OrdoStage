@@ -854,6 +854,8 @@ model TimeEntry {
   timeProjectId  String?
   timeProject    TimeProject? @relation(fields: [timeProjectId], references: [id], onDelete: SetNull)
   note           String?
+  /** True when entry is locked from edits/deletes until explicitly unlocked. */
+  isLocked       Boolean      @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   tagLinks       TimeEntryTag[]

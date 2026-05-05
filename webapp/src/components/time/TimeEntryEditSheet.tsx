@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown, Lock, LockOpen } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { usePreferences } from "@/hooks/usePreferences";
 import type { TimeEntry, TimeProject, TimeTag } from "@/contracts/backendTypes";
@@ -38,6 +38,7 @@ type PatchBody = {
   category: TimeCategory;
   startsAt: string;
   endsAt: string;
+  isLocked?: boolean;
 };
 
 function hmFromDate(d: Date): string {
@@ -67,6 +68,7 @@ export function TimeEntryEditSheet(props: {
   projects: TimeProject[];
   tags: TimeTag[];
   onSave: (id: string, body: PatchBody) => void;
+  onToggleLock: (id: string, locked: boolean) => void;
   saving: boolean;
   onDelete: (id: string) => void;
   deleting: boolean;
@@ -83,6 +85,7 @@ export function TimeEntryEditSheet(props: {
     projects,
     tags,
     onSave,
+    onToggleLock,
     saving,
     onDelete,
     deleting,
@@ -227,6 +230,34 @@ export function TimeEntryEditSheet(props: {
           </SheetDescription>
         </SheetHeader>
         <div className="grid gap-4 py-4">
+          <div className="rounded-md border border-white/10 bg-white/[0.03] p-2.5 flex items-center justify-between gap-2">
+            <div className="text-xs text-white/65">
+              {entry?.isLocked ? t("time.lockedEntryHint") : t("time.unlockedEntryHint")}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-white/15 text-white/80 bg-transparent"
+              disabled={saving || !entry}
+              onClick={() => {
+                if (!entry) return;
+                onToggleLock(entry.id, !entry.isLocked);
+              }}
+            >
+              {entry?.isLocked ? (
+                <>
+                  <LockOpen className="h-3.5 w-3.5 mr-1" />
+                  {t("time.unlockEntry")}
+                </>
+              ) : (
+                <>
+                  <Lock className="h-3.5 w-3.5 mr-1" />
+                  {t("time.lockEntry")}
+                </>
+              )}
+            </Button>
+          </div>
           <div className="grid gap-2">
             <Label className="text-white/80">{t("time.categoryLabel")}</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -234,6 +265,7 @@ export function TimeEntryEditSheet(props: {
                 <button
                   key={opt.value}
                   type="button"
+                  disabled={entry?.isLocked}
                   onClick={() => setCategory(opt.value)}
                   className={cn(
                     "rounded-md border px-3 py-2 text-sm font-medium transition-colors text-left",
@@ -259,6 +291,7 @@ export function TimeEntryEditSheet(props: {
                 step={300}
                 value={startHm}
                 onChange={(e) => setStartHm(e.target.value)}
+                disabled={entry?.isLocked}
                 className="h-10 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white [color-scheme:dark]"
               />
             </div>
@@ -269,6 +302,7 @@ export function TimeEntryEditSheet(props: {
                 step={300}
                 value={endHm}
                 onChange={(e) => setEndHm(e.target.value)}
+                disabled={entry?.isLocked}
                 className="h-10 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white [color-scheme:dark]"
               />
             </div>
@@ -283,6 +317,7 @@ export function TimeEntryEditSheet(props: {
                   type="button"
                   variant="outline"
                   aria-expanded={projectOpen}
+                  disabled={entry?.isLocked}
                   className="w-full justify-between bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white font-normal"
                 >
                   <span className="flex min-w-0 items-center gap-2 truncate text-left">
@@ -365,6 +400,7 @@ export function TimeEntryEditSheet(props: {
                     >
                       <Checkbox
                         checked={selectedTags.has(tag.id)}
+                        disabled={entry?.isLocked}
                         onCheckedChange={() => toggleTag(tag.id)}
                         className="border-white/30 data-[state=checked]:bg-ordo-yellow data-[state=checked]:border-ordo-yellow data-[state=checked]:text-[#0d0d14]"
                       />
@@ -389,6 +425,7 @@ export function TimeEntryEditSheet(props: {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={t("time.notePlaceholder")}
+              disabled={entry?.isLocked}
               className="bg-white/5 border-white/10 text-white placeholder:text-white/35 min-h-[100px]"
             />
           </div>
@@ -397,7 +434,7 @@ export function TimeEntryEditSheet(props: {
           <Button
             type="button"
             className="w-full bg-ordo-yellow text-[#0d0d14] hover:bg-ordo-yellow/90"
-            disabled={saving || !entry}
+            disabled={saving || !entry || entry.isLocked}
             onClick={handleSave}
           >
             {saving ? t("time.saving") : t("time.saveEntry")}
@@ -409,7 +446,7 @@ export function TimeEntryEditSheet(props: {
               "w-full border-white/15",
               confirmDelete ? "border-red-400/50 text-red-300 hover:bg-red-950/50" : "text-white/70"
             )}
-            disabled={deleting || !entry}
+            disabled={deleting || !entry || entry.isLocked}
             onClick={handleDelete}
           >
             {confirmDelete ? t("time.deleteEntryConfirm") : t("time.deleteEntry")}

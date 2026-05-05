@@ -236,6 +236,7 @@ function serializeEntry(row: {
   eventId: string | null;
   timeProjectId: string | null;
   note: string | null;
+  isLocked: boolean;
   createdAt: Date;
   updatedAt: Date;
   tagLinks: { timeTagId: string }[];
@@ -253,6 +254,7 @@ function serializeEntry(row: {
     eventId: row.eventId,
     timeProjectId: row.timeProjectId,
     note: row.note,
+    isLocked: row.isLocked,
     tagIds: row.tagLinks.map((t) => t.timeTagId),
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
@@ -978,6 +980,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           category: body.category ?? "work",
           timeProjectId: body.timeProjectId ?? null,
           note: body.note ?? null,
+          isLocked: body.isLocked ?? false,
           tagLinks: {
             deleteMany: {},
             createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) },
@@ -1001,6 +1004,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         eventId,
         timeProjectId: body.timeProjectId ?? null,
         note: body.note ?? null,
+        isLocked: body.isLocked ?? false,
         tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
       },
       include: { tagLinks: { select: { timeTagId: true } } },
@@ -1048,6 +1052,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       eventId,
       timeProjectId: body.timeProjectId ?? null,
       note: body.note ?? null,
+      isLocked: body.isLocked ?? false,
       tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
     },
     include: { tagLinks: { select: { timeTagId: true } } },
@@ -1076,6 +1081,22 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
   const canEditAny = canAction(c, "time.read_all");
   if (!canEditOwn && !canEditAny) {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+
+  if (existing.isLocked) {
+    const wantsUnlock = body.isLocked === false;
+    const hasOtherChanges = Object.keys(body).some((k) => k !== "isLocked");
+    if (!wantsUnlock || hasOtherChanges) {
+      return c.json(
+        {
+          error: {
+            message: "Entry is locked. Unlock it before editing.",
+            code: "ENTRY_LOCKED",
+          },
+        },
+        423
+      );
+    }
   }
 
   const startsAt = body.startsAt !== undefined ? new Date(body.startsAt) : existing.startsAt;
@@ -1120,6 +1141,7 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
       ...(body.eventId !== undefined ? { eventId: body.eventId } : {}),
       ...(body.timeProjectId !== undefined ? { timeProjectId: body.timeProjectId } : {}),
       ...(body.note !== undefined ? { note: body.note } : {}),
+      ...(body.isLocked !== undefined ? { isLocked: body.isLocked } : {}),
       ...(body.tagIds !== undefined
         ? {
             tagLinks: {
@@ -1152,6 +1174,17 @@ timeRouter.delete("/time/entries/:id", async (c) => {
   const canDelAny = canAction(c, "time.read_all");
   if (!canDelOwn && !canDelAny) {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  if (existing.isLocked) {
+    return c.json(
+      {
+        error: {
+          message: "Entry is locked. Unlock it before deleting.",
+          code: "ENTRY_LOCKED",
+        },
+      },
+      423
+    );
   }
   await prisma.timeEntry.delete({ where: { id } });
   return c.json({ ok: true });

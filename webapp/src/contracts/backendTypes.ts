@@ -945,6 +945,7 @@ export const TimeEntrySchema = z.object({
   eventId: z.string().nullable(),
   timeProjectId: z.string().nullable(),
   note: z.string().nullable(),
+  isLocked: z.boolean(),
   tagIds: z.array(z.string()),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -999,6 +1000,7 @@ export const CreateTimeEntrySchema = z.object({
   eventId: z.string().nullable().optional(),
   timeProjectId: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
+  isLocked: z.boolean().optional(),
   tagIds: z.array(z.string()).optional(),
 });
 
@@ -1011,6 +1013,7 @@ export const PatchTimeEntrySchema = z.object({
   eventId: z.string().nullable().optional(),
   timeProjectId: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
+  isLocked: z.boolean().optional(),
   tagIds: z.array(z.string()).optional(),
 });
 

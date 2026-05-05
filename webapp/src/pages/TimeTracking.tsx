@@ -17,7 +17,15 @@ import {
 import type { Locale } from "date-fns";
 import { da as localeDa, de as localeDe, enGB as localeEnGB } from "date-fns/locale";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, BarChart2, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  Pencil,
+  BarChart2,
+  Trash2,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -235,6 +243,7 @@ export default function TimeTracking() {
         timeProjectId: string | null;
         tagIds: string[];
         category: string;
+        isLocked: boolean;
       }>;
     }) => api.patch<TimeEntry>(`/api/time/entries/${id}`, body),
     onMutate: (variables) => {
@@ -254,6 +263,7 @@ export default function TimeTracking() {
             ...(b.category !== undefined
               ? { category: b.category as TimeEntry["category"] }
               : {}),
+            ...(b.isLocked !== undefined ? { isLocked: b.isLocked } : {}),
           };
         });
       });
@@ -289,6 +299,7 @@ export default function TimeTracking() {
         eventId: body.eventId != null ? (body.eventId as string) : null,
         timeProjectId: body.timeProjectId != null ? (body.timeProjectId as string) : null,
         note: body.note != null ? (body.note as string) : null,
+        isLocked: body.isLocked === true,
         tagIds: Array.isArray(body.tagIds) ? (body.tagIds as string[]) : [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -1177,6 +1188,7 @@ export default function TimeTracking() {
                         const end = parseISO(e.endsAt);
                         const durMin = (end.getTime() - start.getTime()) / 60000;
                         const isJob = e.kind === "job";
+                        const isLocked = e.isLocked === true;
                         const cat = e.category ?? "work";
                         const isDayOff = cat === "vacation" || cat === "sick" || cat === "holiday";
                         const label =
@@ -1247,7 +1259,8 @@ export default function TimeTracking() {
                                 ? "border-purple-400/60 bg-purple-500/30 text-purple-50"
                                 : isJob
                                 ? "border-emerald-400/50 bg-emerald-500/25 text-emerald-50"
-                                : "border-sky-400/50 bg-sky-500/25 text-sky-50"
+                                : "border-sky-400/50 bg-sky-500/25 text-sky-50",
+                              isLocked ? "opacity-90" : ""
                             )}
                             data-entry-block={e.id}
                             style={{
@@ -1260,6 +1273,7 @@ export default function TimeTracking() {
                             }}
                             onPointerDown={(ev) => {
                               if (!canEdit) return;
+                              if (isLocked) return;
                               if ((ev.target as HTMLElement).closest("[data-handle]")) return;
                               const col = (ev.currentTarget as HTMLElement).closest("[data-day-col]");
                               activeColElRef.current = col instanceof HTMLElement ? col : null;
@@ -1300,7 +1314,7 @@ export default function TimeTracking() {
                                   className="absolute bottom-0.5 right-0 z-[4] flex h-5 w-5 items-center justify-center rounded-sm text-white/70 hover:bg-red-500/25 hover:text-red-200 disabled:opacity-40"
                                   data-handle="delete"
                                   aria-label={t("time.deleteEntry")}
-                                  disabled={deleteEntry.isPending}
+                                  disabled={deleteEntry.isPending || isLocked}
                                   onPointerDown={(ev) => ev.stopPropagation()}
                                   onClick={(ev) => {
                                     ev.stopPropagation();
@@ -1309,6 +1323,15 @@ export default function TimeTracking() {
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </button>
+                                {isLocked ? (
+                                  <span
+                                    className="absolute top-0 left-0 z-[3] inline-flex items-center gap-1 rounded-br bg-black/35 px-1 py-0.5 text-[9px] text-white/80"
+                                    title={t("time.lockedEntryHint")}
+                                  >
+                                    <Lock className="h-2.5 w-2.5" />
+                                    {t("time.lockedShort")}
+                                  </span>
+                                ) : null}
                               </>
                             ) : null}
                             <div className="font-medium truncate pr-4">{label}</div>
@@ -1352,6 +1375,7 @@ export default function TimeTracking() {
                                   className="absolute top-0 left-0 right-6 h-1.5 cursor-ns-resize bg-white/15 hover:bg-white/30 rounded-t-sm"
                                   aria-hidden
                                   onPointerDown={(ev) => {
+                                    if (isLocked) return;
                                     ev.stopPropagation();
                                     const col = (ev.currentTarget as HTMLElement).closest(
                                       "[data-day-col]"
@@ -1375,6 +1399,7 @@ export default function TimeTracking() {
                                   className="absolute bottom-0 left-0 right-6 h-1.5 cursor-ns-resize bg-white/20 hover:bg-white/35 rounded-b-sm"
                                   aria-hidden
                                   onPointerDown={(ev) => {
+                                    if (isLocked) return;
                                     ev.stopPropagation();
                                     const col = (ev.currentTarget as HTMLElement).closest(
                                       "[data-day-col]"
@@ -1430,6 +1455,16 @@ export default function TimeTracking() {
             {
               onSuccess: () => {
                 toast({ title: t("time.entryUpdated") });
+              },
+            }
+          );
+        }}
+        onToggleLock={(id, locked) => {
+          updateEntry.mutate(
+            { id, body: { isLocked: locked } },
+            {
+              onSuccess: () => {
+                toast({ title: locked ? t("time.entryLocked") : t("time.entryUnlocked") });
               },
             }
           );
