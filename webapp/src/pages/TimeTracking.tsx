@@ -1003,17 +1003,17 @@ export default function TimeTracking() {
                   const label = formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h");
                   return (
                     <div key={i} className="relative flex-1 min-h-0">
-                      <span className="absolute left-0 right-1 top-0 z-[1] -translate-y-1/2 text-right text-[10px] leading-none text-white/50 tabular-nums pointer-events-none">
+                      <span className="absolute left-0 right-1 top-0 z-[1] -translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
                         {label}
                       </span>
                     </div>
                   );
                 })}
-                <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1/2 text-right text-[10px] leading-none text-white/50 tabular-nums pointer-events-none">
+                <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
                   {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
                 </span>
               </div>
-              <div className="h-3 border-b border-white/15" />
+              <div className="h-6 border-b border-white/15" />
             </div>
             {weekDays.map((day) => {
               const dayYmd = format(day, "yyyy-MM-dd");
@@ -1424,7 +1424,7 @@ export default function TimeTracking() {
                         );
                       })}
                   </div>
-                  <div className="h-3 border-b border-white/15" />
+                  <div className="h-6 border-b border-white/15" />
                 </div>
               );
             })}
