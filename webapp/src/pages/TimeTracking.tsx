@@ -220,10 +220,38 @@ export default function TimeTracking() {
         category: string;
       }>;
     }) => api.patch<TimeEntry>(`/api/time/entries/${id}`, body),
+    onMutate: (variables) => {
+      const previous = queryClient.getQueriesData<TimeEntry[]>({ queryKey: ["time-entries"] });
+      queryClient.setQueriesData<TimeEntry[]>({ queryKey: ["time-entries"] }, (old) => {
+        if (!old) return old;
+        return old.map((x) => {
+          if (x.id !== variables.id) return x;
+          const b = variables.body;
+          return {
+            ...x,
+            ...(b.startsAt !== undefined ? { startsAt: b.startsAt } : {}),
+            ...(b.endsAt !== undefined ? { endsAt: b.endsAt } : {}),
+            ...(b.note !== undefined ? { note: b.note } : {}),
+            ...(b.timeProjectId !== undefined ? { timeProjectId: b.timeProjectId } : {}),
+            ...(b.tagIds !== undefined ? { tagIds: b.tagIds } : {}),
+            ...(b.category !== undefined
+              ? { category: b.category as TimeEntry["category"] }
+              : {}),
+          };
+        });
+      });
+      void queryClient.cancelQueries({ queryKey: ["time-entries"] });
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.previous?.forEach(([queryKey, data]) => {
+        queryClient.setQueryData(queryKey, data);
+      });
+      toast({ title: t("time.saveError"), variant: "destructive" });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
     },
-    onError: () => toast({ title: t("time.saveError"), variant: "destructive" }),
   });
 
   const createEntry = useMutation({
@@ -286,11 +314,13 @@ export default function TimeTracking() {
     onError: () => toast({ title: t("time.deleteError"), variant: "destructive" }),
   });
 
-  /** Live position while dragging an entry (smooth preview; committed with snap on pointer up). */
+  /** Live position + window minutes while dragging (labels follow pointer; snap on release). */
   const [dragOverride, setDragOverride] = useState<{
     entryId: string;
     topPct: number;
     heightPct: number;
+    startWinMin: number;
+    endWinMin: number;
   } | null>(null);
 
   const entryDragRef = useRef<EntryDragRef | null>(null);
@@ -353,12 +383,6 @@ export default function TimeTracking() {
     },
     [timeFormat]
   );
-
-  const tearDownEntryDrag = useCallback(() => {
-    entryDragRef.current = null;
-    activeColElRef.current = null;
-    setDragOverride(null);
-  }, []);
 
   useEffect(() => {
     if (editingEntryId && !editingEntry) setEditingEntryId(null);
@@ -480,11 +504,17 @@ export default function TimeTracking() {
 
         if (cur.kind === "move") {
           const dur =
-            Math.max(1, Math.round(cur.durationMin / TIME_SNAP_MINUTES)) * TIME_SNAP_MINUTES;
+            Math.max(TIME_SNAP_MINUTES, Math.round(cur.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES);
           const newStart = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, mSnap)));
           const newEnd = newStart + dur;
           const { topPct, heightPct } = pctRangeFromWindowMinutes(newStart, newEnd);
-          setDragOverride({ entryId: cur.entryId, topPct, heightPct });
+          setDragOverride({
+            entryId: cur.entryId,
+            topPct,
+            heightPct,
+            startWinMin: newStart,
+            endWinMin: newEnd,
+          });
           return;
         }
 
@@ -493,7 +523,13 @@ export default function TimeTracking() {
             Math.max(cur.origStartWinMin + TIME_SNAP_MINUTES, mSnap)
           );
           const { topPct, heightPct } = pctRangeFromWindowMinutes(cur.origStartWinMin, newEnd);
-          setDragOverride({ entryId: cur.entryId, topPct, heightPct });
+          setDragOverride({
+            entryId: cur.entryId,
+            topPct,
+            heightPct,
+            startWinMin: cur.origStartWinMin,
+            endWinMin: newEnd,
+          });
           return;
         }
 
@@ -502,7 +538,13 @@ export default function TimeTracking() {
             Math.min(mSnap, cur.origEndWinMin - TIME_SNAP_MINUTES)
           );
           const { topPct, heightPct } = pctRangeFromWindowMinutes(newStart, cur.origEndWinMin);
-          setDragOverride({ entryId: cur.entryId, topPct, heightPct });
+          setDragOverride({
+            entryId: cur.entryId,
+            topPct,
+            heightPct,
+            startWinMin: newStart,
+            endWinMin: cur.origEndWinMin,
+          });
         }
       });
     };
@@ -513,11 +555,21 @@ export default function TimeTracking() {
       window.removeEventListener("pointercancel", finish);
       const d = entryDragRef.current;
       const col = activeColElRef.current;
-      tearDownEntryDrag();
-      if (!d || !col) return;
+      if (!d || !col) {
+        entryDragRef.current = null;
+        activeColElRef.current = null;
+        setDragOverride(null);
+        return;
+      }
       const m = minutesFromY(ev.clientY, col);
-      if (m === null) return;
+      entryDragRef.current = null;
+      activeColElRef.current = null;
       const sh = displayStartHourRef.current;
+
+      if (m === null) {
+        setDragOverride(null);
+        return;
+      }
 
       if (d.kind === "resizeEnd") {
         const newEndWin = clampMinutesToDay(Math.max(d.origStartWinMin + TIME_SNAP_MINUTES, m));
@@ -528,6 +580,7 @@ export default function TimeTracking() {
             endsAt: dateFromColumnAndWindowMinutes(d.dayYmd, newEndWin, sh).toISOString(),
           },
         });
+        setDragOverride(null);
         return;
       }
 
@@ -540,6 +593,7 @@ export default function TimeTracking() {
             endsAt: dateFromColumnAndWindowMinutes(d.dayYmd, d.origEndWinMin, sh).toISOString(),
           },
         });
+        setDragOverride(null);
         return;
       }
 
@@ -554,12 +608,13 @@ export default function TimeTracking() {
           endsAt: dateFromColumnAndWindowMinutes(d.dayYmd, newEndWin, sh).toISOString(),
         },
       });
+      setDragOverride(null);
     };
 
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", finish);
-  }, [minutesFromY, tearDownEntryDrag, updateEntry]);
+  }, [minutesFromY, updateEntry]);
 
   const entryByJobId = useMemo(() => {
     const m = new Map<string, TimeEntry>();
@@ -1048,18 +1103,44 @@ export default function TimeTracking() {
                             ? projectById.get(e.timeProjectId)!.name
                             : null;
                         const timeTf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
-                        const startDisp = snapLocalClockToGrid(start);
-                        const endDisp = snapLocalClockToGrid(end);
-                        const startTimeLabel = format(startDisp, timeTf);
-                        const endTimeLabel = format(endDisp, timeTf);
-                        const durRounded =
-                          Math.max(
-                            TIME_SNAP_MINUTES,
-                            Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
-                          );
-                        const durationLabel = formatDurationShort(durRounded);
                         const override =
                           dragOverride?.entryId === e.id ? dragOverride : null;
+                        const liveStart =
+                          override &&
+                          dateFromColumnAndWindowMinutes(
+                            dayYmd,
+                            override.startWinMin,
+                            displayStartHour
+                          );
+                        const liveEnd =
+                          override &&
+                          dateFromColumnAndWindowMinutes(
+                            dayYmd,
+                            override.endWinMin,
+                            displayStartHour
+                          );
+                        const startDisp = override && liveStart && liveEnd
+                          ? snapLocalClockToGrid(liveStart)
+                          : snapLocalClockToGrid(start);
+                        const endDisp = override && liveStart && liveEnd
+                          ? snapLocalClockToGrid(liveEnd)
+                          : snapLocalClockToGrid(end);
+                        const startTimeLabel = format(startDisp, timeTf);
+                        const endTimeLabel = format(endDisp, timeTf);
+                        const durForLabel = override && liveStart && liveEnd
+                          ? Math.max(
+                              TIME_SNAP_MINUTES,
+                              Math.round(
+                                (liveEnd.getTime() - liveStart.getTime()) /
+                                  60000 /
+                                  TIME_SNAP_MINUTES
+                              ) * TIME_SNAP_MINUTES
+                            )
+                          : Math.max(
+                              TIME_SNAP_MINUTES,
+                              Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
+                            );
+                        const durationLabel = formatDurationShort(durForLabel);
                         return (
                           <div
                             key={e.id}
