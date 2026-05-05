@@ -270,8 +270,24 @@ model Venue {
   internalBookings InternalBooking[]
   eventShows       EventShow[]
   eventShowJobs    EventShowJob[]
+  documents        VenueDocument[]
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
+}
+
+model VenueDocument {
+  id        String   @id @default(cuid())
+  venueId   String
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  name      String
+  /** drawing | image | other */
+  kind      String   @default("other")
+  filename  String
+  data      Bytes
+  mimeType  String   @default("application/octet-stream")
+  createdAt DateTime @default(now())
+
+  @@index([venueId])
 }
 
 model Person {

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
-import { CreateVenueSchema, UpdateVenueSchema } from "../types";
+import { CreateVenueSchema, UpdateVenueSchema, type VenueDocumentKind } from "../types";
 import { canAction } from "../requestRole";
 import { env } from "../env";
 
@@ -24,30 +24,62 @@ function parseCustomFields(value: string | null | undefined) {
   }
 }
 
-function serializeVenue(venue: {
-  id: string;
-  name: string;
-  addressStreet:  string | null;
-  addressNumber:  string | null;
-  addressZip:     string | null;
-  addressCity:    string | null;
-  addressState:   string | null;
-  addressCountry: string | null;
-  capacity: number | null;
-  width: string | null;
-  length: string | null;
-  height: string | null;
-  customFields: string | null;
-  notes: string | null;
-  organizationId: string;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function serializeVenue(
+  venue: {
+    id: string;
+    name: string;
+    addressStreet:  string | null;
+    addressNumber:  string | null;
+    addressZip:     string | null;
+    addressCity:    string | null;
+    addressState:   string | null;
+    addressCountry: string | null;
+    capacity: number | null;
+    width: string | null;
+    length: string | null;
+    height: string | null;
+    customFields: string | null;
+    notes: string | null;
+    organizationId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  documentCount?: number
+) {
+  const { organizationId: _org, ...rest } = venue;
   return {
-    ...venue,
+    ...rest,
     customFields: parseCustomFields(venue.customFields),
     createdAt: venue.createdAt.toISOString(),
     updatedAt: venue.updatedAt.toISOString(),
+    ...(documentCount !== undefined ? { documentCount } : {}),
+  };
+}
+
+function normalizeVenueDocKind(raw: string | undefined): VenueDocumentKind {
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (s === "drawing" || s === "image" || s === "other") return s;
+  return "other";
+}
+
+function serializeVenueDocument(row: {
+  id: string;
+  venueId: string;
+  name: string;
+  kind: string;
+  filename: string;
+  mimeType: string;
+  createdAt: Date;
+}) {
+  const kind = normalizeVenueDocKind(row.kind);
+  return {
+    id: row.id,
+    venueId: row.venueId,
+    name: row.name,
+    kind,
+    filename: row.filename,
+    mimeType: row.mimeType,
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -60,8 +92,14 @@ venuesRouter.get("/venues", async (c) => {
   const venues = await prisma.venue.findMany({
     where: { organizationId: user.organizationId },
     orderBy: { createdAt: "desc" },
+    include: { _count: { select: { documents: true } } },
   });
-  return c.json({ data: venues.map(serializeVenue) });
+  return c.json({
+    data: venues.map((v) => {
+      const { _count, ...row } = v;
+      return serializeVenue(row, _count.documents);
+    }),
+  });
 });
 
 // GET /api/venues/address-search?q=...
@@ -195,7 +233,129 @@ venuesRouter.post("/venues", zValidator("json", CreateVenueSchema), async (c) =>
       organizationId: user.organizationId,
     },
   });
-  return c.json({ data: serializeVenue(venue) }, 201);
+  return c.json({ data: serializeVenue(venue, 0) }, 201);
+});
+
+// GET /api/venues/documents/:docId/download — before /venues/:id
+venuesRouter.get("/venues/documents/:docId/download", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { docId } = c.req.param();
+  const doc = await prisma.venueDocument.findFirst({
+    where: { id: docId, venue: { organizationId: user.organizationId } },
+    select: { id: true, data: true, mimeType: true, filename: true },
+  });
+  if (!doc) {
+    return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+  return new Response(doc.data, {
+    headers: {
+      "Content-Type": doc.mimeType,
+      "Content-Disposition": `attachment; filename="${doc.filename}"`,
+      "Content-Length": String(doc.data.length),
+    },
+  });
+});
+
+venuesRouter.delete("/venues/documents/:docId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "write.venues")) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  const { docId } = c.req.param();
+  const doc = await prisma.venueDocument.findFirst({
+    where: { id: docId, venue: { organizationId: user.organizationId } },
+    select: { id: true },
+  });
+  if (!doc) {
+    return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+  await prisma.venueDocument.delete({ where: { id: doc.id } });
+  return new Response(null, { status: 204 });
+});
+
+// GET /api/venues/:id/documents
+venuesRouter.get("/venues/:id/documents", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { id } = c.req.param();
+  const venue = await prisma.venue.findUnique({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true },
+  });
+  if (!venue) {
+    return c.json({ error: { message: "Venue not found", code: "NOT_FOUND" } }, 404);
+  }
+  const rows = await prisma.venueDocument.findMany({
+    where: { venueId: id },
+    select: {
+      id: true,
+      venueId: true,
+      name: true,
+      kind: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  return c.json({ data: rows.map(serializeVenueDocument) });
+});
+
+// POST /api/venues/:id/documents (multipart)
+venuesRouter.post("/venues/:id/documents", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "write.venues")) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  const { id } = c.req.param();
+  const venue = await prisma.venue.findUnique({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true },
+  });
+  if (!venue) {
+    return c.json({ error: { message: "Venue not found", code: "NOT_FOUND" } }, 404);
+  }
+  const formData = await c.req.parseBody();
+  const file = formData["file"];
+  const name = formData["name"];
+  const kindField = formData["kind"];
+  if (!file || typeof file === "string") {
+    return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
+  }
+  const rawName = typeof name === "string" && name.trim() ? name.trim() : file.name;
+  const kind = normalizeVenueDocKind(typeof kindField === "string" ? kindField : undefined);
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const row = await prisma.venueDocument.create({
+    data: {
+      venueId: venue.id,
+      name: rawName,
+      kind,
+      filename: file.name,
+      data: bytes,
+      mimeType: file.type || "application/octet-stream",
+    },
+    select: {
+      id: true,
+      venueId: true,
+      name: true,
+      kind: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+  });
+  return c.json({ data: serializeVenueDocument(row) }, 201);
 });
 
 // GET /api/venues/:id
@@ -211,7 +371,8 @@ venuesRouter.get("/venues/:id", async (c) => {
   if (!venue) {
     return c.json({ error: { message: "Venue not found", code: "NOT_FOUND" } }, 404);
   }
-  return c.json({ data: serializeVenue(venue) });
+  const count = await prisma.venueDocument.count({ where: { venueId: venue.id } });
+  return c.json({ data: serializeVenue(venue, count) });
 });
 
 // PUT /api/venues/:id
@@ -252,7 +413,8 @@ venuesRouter.put("/venues/:id", zValidator("json", UpdateVenueSchema), async (c)
       ...(body.notes !== undefined && { notes: body.notes }),
     },
   });
-  return c.json({ data: serializeVenue(venue) });
+  const docCount = await prisma.venueDocument.count({ where: { venueId: venue.id } });
+  return c.json({ data: serializeVenue(venue, docCount) });
 });
 
 // DELETE /api/venues/:id

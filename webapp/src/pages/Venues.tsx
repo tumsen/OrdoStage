@@ -9,7 +9,9 @@ import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Venue } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { VenueDocumentsSection } from "@/components/VenueDocumentsSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
@@ -71,7 +73,7 @@ function CustomFieldsEditor({
   onChange: (fields: Array<{ key: string; value: string }>) => void;
 }) {
   return (
-    <div className="mt-2 space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
+    <div className="space-y-2">
       {fields.map((field, index) => (
         <div key={`${index}-${field.key}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
           <Input
@@ -208,44 +210,68 @@ function VenueRow({
             }}
           />
         </td>
-        <td className="px-5 py-3 hidden md:table-cell">
-          <div className="grid grid-cols-2 gap-2 max-w-[220px]">
-            <Input
-              {...form.register("width")}
-              placeholder="Width"
-              className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-            />
-            <Input
-              {...form.register("length")}
-              placeholder="Length"
-              className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-            />
-            <Input
-              {...form.register("height")}
-              placeholder="Height"
-              className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-            />
-            <Input
-              {...form.register("capacity")}
-              type="number"
-              min={0}
-              placeholder="Capacity"
-              className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-            />
+        <td className="px-5 py-3 hidden md:table-cell align-top">
+          <div className="space-y-3 max-w-md">
+            <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Stage &amp; room size</Label>
+              <p className="text-[10px] text-white/35 leading-snug">
+                Interior dimensions; include units if helpful (e.g. 12&nbsp;m).
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-white/45 text-[10px] uppercase tracking-wide">Width</Label>
+                  <Input
+                    {...form.register("width")}
+                    placeholder="e.g. 14 m"
+                    className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-white/45 text-[10px] uppercase tracking-wide">Length</Label>
+                  <Input
+                    {...form.register("length")}
+                    placeholder="e.g. 20 m"
+                    className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-white/45 text-[10px] uppercase tracking-wide">Height</Label>
+                  <Input
+                    {...form.register("height")}
+                    placeholder="e.g. 8 m"
+                    className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-white/45 text-[10px] uppercase tracking-wide">Audience capacity</Label>
+                  <Input
+                    {...form.register("capacity")}
+                    type="number"
+                    min={0}
+                    placeholder="e.g. 500"
+                    className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
+              <Input
+                {...form.register("notes")}
+                placeholder="Access, loading dock, quirks…"
+                className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
+              />
+            </div>
+            <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Custom fields</Label>
+              <Textarea {...form.register("customFieldsText")} className="hidden" />
+              <CustomFieldsEditor
+                fields={textToCustomFields(form.watch("customFieldsText"))}
+                onChange={(fields) => form.setValue("customFieldsText", customFieldsToText(fields))}
+              />
+            </div>
+            <VenueDocumentsSection venueId={venue.id} canWrite={canWrite} />
           </div>
-          <Input
-            {...form.register("notes")}
-            placeholder="Notes"
-            className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-          />
-          <Textarea
-            {...form.register("customFieldsText")}
-            className="hidden"
-          />
-          <CustomFieldsEditor
-            fields={textToCustomFields(form.watch("customFieldsText"))}
-            onChange={(fields) => form.setValue("customFieldsText", customFieldsToText(fields))}
-          />
         </td>
         <td className="px-5 py-3">
           <div className="flex items-center gap-1">
@@ -326,6 +352,11 @@ function VenueRow({
         <div className="text-[11px] text-white/30">
           W {venue.width ?? "—"} · L {venue.length ?? "—"} · H {venue.height ?? "—"}
         </div>
+        {venue.documentCount != null && venue.documentCount > 0 ? (
+          <div className="text-[11px] text-white/40 mt-0.5">
+            {venue.documentCount} file{venue.documentCount === 1 ? "" : "s"}
+          </div>
+        ) : null}
         {venue.notes ? <div className="text-[11px] text-white/30 truncate max-w-56">{venue.notes}</div> : null}
         {(venue.customFields ?? []).length > 0 ? (
           <div className="text-[11px] text-white/30 truncate max-w-56">
@@ -444,44 +475,72 @@ function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite
           }}
         />
       </td>
-      <td className="px-5 py-3 hidden md:table-cell">
-        <div className="grid grid-cols-2 gap-2 max-w-[220px]">
-          <Input
-            {...form.register("width")}
-            placeholder="Width"
-            className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-          />
-          <Input
-            {...form.register("length")}
-            placeholder="Length"
-            className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-          />
-          <Input
-            {...form.register("height")}
-            placeholder="Height"
-            className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-          />
-          <Input
-            {...form.register("capacity")}
-            type="number"
-            min={0}
-            placeholder="Capacity"
-            className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-          />
+      <td className="px-5 py-3 hidden md:table-cell align-top">
+        <div className="space-y-3 max-w-md">
+          <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">Stage &amp; room size</Label>
+            <p className="text-[10px] text-white/35 leading-snug">
+              Interior dimensions; include units if helpful (e.g. 12&nbsp;m).
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-white/45 text-[10px] uppercase tracking-wide">Width</Label>
+                <Input
+                  {...form.register("width")}
+                  placeholder="e.g. 14 m"
+                  className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/45 text-[10px] uppercase tracking-wide">Length</Label>
+                <Input
+                  {...form.register("length")}
+                  placeholder="e.g. 20 m"
+                  className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/45 text-[10px] uppercase tracking-wide">Height</Label>
+                <Input
+                  {...form.register("height")}
+                  placeholder="e.g. 8 m"
+                  className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/45 text-[10px] uppercase tracking-wide">Audience capacity</Label>
+                <Input
+                  {...form.register("capacity")}
+                  type="number"
+                  min={0}
+                  placeholder="e.g. 500"
+                  className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
+            <Input
+              {...form.register("notes")}
+              placeholder="Access, loading dock, quirks…"
+              className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+            />
+          </div>
+          <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">Custom fields</Label>
+            <Textarea {...form.register("customFieldsText")} className="hidden" />
+            <CustomFieldsEditor
+              fields={textToCustomFields(form.watch("customFieldsText"))}
+              onChange={(fields) => form.setValue("customFieldsText", customFieldsToText(fields))}
+            />
+          </div>
+          <div className="rounded-lg border border-dashed border-white/15 bg-white/[0.02] p-3">
+            <p className="text-[11px] text-white/45 leading-snug">
+              Save this venue first, then use <span className="text-white/60">Edit</span> to upload drawings and photos.
+            </p>
+          </div>
         </div>
-        <Input
-          {...form.register("notes")}
-          placeholder="Notes"
-          className="mt-2 bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-        />
-        <Textarea
-          {...form.register("customFieldsText")}
-          className="hidden"
-        />
-        <CustomFieldsEditor
-          fields={textToCustomFields(form.watch("customFieldsText"))}
-          onChange={(fields) => form.setValue("customFieldsText", customFieldsToText(fields))}
-        />
       </td>
       <td className="px-5 py-3">
         <Button

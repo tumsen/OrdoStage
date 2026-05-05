@@ -66,6 +66,9 @@ export const DepartmentMemberSchema = z.object({
 });
 
 // Venue
+export const VENUE_DOCUMENT_KINDS = ["drawing", "image", "other"] as const;
+export type VenueDocumentKind = (typeof VENUE_DOCUMENT_KINDS)[number];
+
 export const VenueSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -81,8 +84,20 @@ export const VenueSchema = z.object({
   height: z.string().nullable(),
   customFields: z.array(CustomFieldSchema),
   notes: z.string().nullable(),
+  /** Present on list/detail from API when included. */
+  documentCount: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+export const VenueDocumentSchema = z.object({
+  id: z.string(),
+  venueId: z.string(),
+  name: z.string(),
+  kind: z.enum(VENUE_DOCUMENT_KINDS),
+  filename: z.string(),
+  mimeType: z.string(),
+  createdAt: z.string(),
 });
 
 export const CreateVenueSchema = z.object({
@@ -643,6 +658,7 @@ export type CustomField = z.infer<typeof CustomFieldSchema>;
 export type RiderVisibility = z.infer<typeof RiderVisibilitySchema>;
 export type Venue = z.infer<typeof VenueSchema>;
 export type CreateVenue = z.infer<typeof CreateVenueSchema>;
+export type VenueDocument = z.infer<typeof VenueDocumentSchema>;
 export type Person = z.infer<typeof PersonSchema>;
 export type PersonDocument = z.infer<typeof PersonDocumentSchema>;
 export type PersonTeamMembership = z.infer<typeof PersonTeamMembershipSchema>;

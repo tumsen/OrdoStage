@@ -1,6 +1,7 @@
 // Re-export all shared types from the backend
 export type {
   Venue,
+  VenueDocument,
   CreateVenue,
   Person,
   CreatePerson,
