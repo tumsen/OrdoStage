@@ -1711,16 +1711,30 @@ function EventDocumentsSection({ event }: { event: EventDetail }) {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label className="text-white/60 text-xs uppercase tracking-wide">File</Label>
-              <Input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
+              <div
+                className="rounded-md border border-dashed border-white/20 bg-white/[0.02] p-2"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const f = e.dataTransfer.files?.[0] ?? null;
                   setFile(f);
                   if (f && !docName) setDocName(f.name.replace(/\.[^.]+$/, ""));
                 }}
-                className="bg-white/5 border-white/10 text-white file:text-white/60 file:bg-white/10 file:border-0 file:rounded file:px-2 file:py-1 file:mr-3 file:text-xs cursor-pointer"
-              />
+              >
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    setFile(f);
+                    if (f && !docName) setDocName(f.name.replace(/\.[^.]+$/, ""));
+                  }}
+                  className="bg-white/5 border-white/10 text-white file:text-white/60 file:bg-white/10 file:border-0 file:rounded file:px-2 file:py-1 file:mr-3 file:text-xs cursor-pointer"
+                />
+                <p className="mt-1 text-[10px] text-white/35">Drag & drop supported</p>
+              </div>
             </div>
             <div className="space-y-2">
               <Label className="text-white/60 text-xs uppercase tracking-wide">Name</Label>
@@ -2728,11 +2742,29 @@ function TeamsTab({ event }: { event: EventDetail }) {
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
         <p className="text-xs uppercase tracking-wide text-white/45">Team documents</p>
         <div className="grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto]">
-          <Input
-            type="file"
-            onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-            className="bg-white/5 border-white/10 text-white file:text-white"
-          />
+          <div
+            className="rounded-md border border-dashed border-white/20 bg-white/[0.02] p-1.5"
+            onDragOver={(e) => {
+              e.preventDefault();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const f = e.dataTransfer.files?.[0] ?? null;
+              setUploadFile(f);
+              if (f && !uploadName.trim()) setUploadName(f.name.replace(/\.[^.]+$/, ""));
+            }}
+          >
+            <Input
+              type="file"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setUploadFile(f);
+                if (f && !uploadName.trim()) setUploadName(f.name.replace(/\.[^.]+$/, ""));
+              }}
+              className="bg-white/5 border-white/10 text-white file:text-white"
+            />
+            <p className="mt-1 text-[10px] text-white/35">Drag & drop</p>
+          </div>
           <Input
             value={uploadName}
             onChange={(e) => setUploadName(e.target.value)}

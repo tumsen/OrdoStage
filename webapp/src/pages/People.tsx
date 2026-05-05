@@ -1129,11 +1129,29 @@ function PersonFormDialog({
                     className="h-9 w-[170px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs disabled:opacity-40"
                     weekdayClassName="text-sm text-white/45"
                   />
-                  <Input
-                    type="file"
-                    onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
-                    className="w-[230px] bg-white/5 border-white/10 text-white file:text-white"
-                  />
+                  <div
+                    className="w-[230px] rounded-md border border-dashed border-white/20 bg-white/[0.02] p-1.5"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const f = e.dataTransfer.files?.[0] ?? null;
+                      setDocFile(f);
+                      if (f && !docName.trim()) setDocName(f.name.replace(/\.[^.]+$/, ""));
+                    }}
+                  >
+                    <Input
+                      type="file"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        setDocFile(f);
+                        if (f && !docName.trim()) setDocName(f.name.replace(/\.[^.]+$/, ""));
+                      }}
+                      className="w-full bg-white/5 border-white/10 text-white file:text-white"
+                    />
+                    <p className="mt-1 text-[10px] text-white/35 text-center">Drag & drop</p>
+                  </div>
                   {person ? (
                     <Button
                       type="button"

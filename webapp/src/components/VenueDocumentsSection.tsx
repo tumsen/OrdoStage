@@ -85,6 +85,23 @@ export function VenueDocumentsSection({
     },
   });
 
+  async function handleSelectedFile(file: File | null) {
+    if (!file) return;
+    try {
+      await uploadVenueDocument(venueId, file, uploadLabel.trim() || file.name, uploadKind);
+      queryClient.invalidateQueries({ queryKey: ["venues", venueId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["venues"] });
+      setUploadLabel("");
+      toast({ title: "File uploaded" });
+    } catch (err) {
+      toast({
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
+
   return (
     <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
       <Label className="text-white/50 text-xs uppercase tracking-wide">Drawings &amp; photos</Label>
@@ -164,28 +181,26 @@ export function VenueDocumentsSection({
               />
             </div>
           </div>
-          <input
+          <div
+            className="rounded-md border border-dashed border-white/15 bg-white/[0.02] p-2"
+            onDragOver={(e) => {
+              e.preventDefault();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              void handleSelectedFile(e.dataTransfer.files?.[0] ?? null);
+            }}
+          >
+            <p className="text-[10px] text-white/40 mb-2">Drop a file here or choose one</p>
+            <input
             ref={fileRef}
             type="file"
             className="hidden"
             accept="image/*,.pdf,.svg,application/pdf"
             onChange={async (e) => {
-              const file = e.target.files?.[0];
+              const file = e.target.files?.[0] ?? null;
               e.target.value = "";
-              if (!file) return;
-              try {
-                await uploadVenueDocument(venueId, file, uploadLabel.trim() || file.name, uploadKind);
-                queryClient.invalidateQueries({ queryKey: ["venues", venueId, "documents"] });
-                queryClient.invalidateQueries({ queryKey: ["venues"] });
-                setUploadLabel("");
-                toast({ title: "File uploaded" });
-              } catch (err) {
-                toast({
-                  title: "Upload failed",
-                  description: err instanceof Error ? err.message : "Unknown error",
-                  variant: "destructive",
-                });
-              }
+              await handleSelectedFile(file);
             }}
           />
           <Button
@@ -198,6 +213,7 @@ export function VenueDocumentsSection({
             <FileUp className="h-3.5 w-3.5" />
             Upload file
           </Button>
+          </div>
         </div>
       ) : null}
     </div>

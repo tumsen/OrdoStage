@@ -2521,8 +2521,7 @@ function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
     },
   });
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function processUploadFile(file: File | null) {
     if (!file) return;
 
     if (file.size > MAX_TECH_RIDER_BYTES) {
@@ -2531,12 +2530,16 @@ function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
         description: `Please choose a PDF smaller than ${MAX_TECH_RIDER_MB} MB.`,
         variant: "destructive",
       });
-      e.target.value = "";
       return;
     }
 
     uploadMutation.mutate(file);
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
     e.target.value = "";
+    processUploadFile(file);
   }
 
   return (
@@ -2550,7 +2553,16 @@ function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
           <span className="text-sm text-white/70 flex-1 truncate">
             {tour.techRiderPdfName}
           </span>
-          <label className="cursor-pointer">
+          <label
+            className="cursor-pointer rounded px-1 py-0.5 border border-dashed border-white/15"
+            onDragOver={(e) => {
+              e.preventDefault();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              processUploadFile(e.dataTransfer.files?.[0] ?? null);
+            }}
+          >
             <span className="text-xs text-white/40 hover:text-white transition-colors">
               {uploadMutation.isPending ? "Uploading..." : "Replace"}
             </span>
@@ -2576,7 +2588,16 @@ function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
           </Button>
         </div>
       ) : (
-        <label className="cursor-pointer block">
+        <label
+          className="cursor-pointer block"
+          onDragOver={(e) => {
+            e.preventDefault();
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            processUploadFile(e.dataTransfer.files?.[0] ?? null);
+          }}
+        >
           <div
             className={`border border-dashed border-white/15 rounded-lg px-4 py-3 flex items-center gap-3 hover:border-white/30 transition-colors ${
               uploadMutation.isPending ? "opacity-50 pointer-events-none" : ""
@@ -2593,6 +2614,7 @@ function TechRiderPDFSection({ tour }: { tour: TourDetail }) {
                 : "Upload static tech rider PDF (light plans, stage plot, etc.)"}
             </span>
           </div>
+          <p className="mt-1 text-[10px] text-white/35">Drag and drop a PDF here</p>
           <input
             type="file"
             accept=".pdf"
