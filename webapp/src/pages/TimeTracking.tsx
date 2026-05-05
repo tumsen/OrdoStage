@@ -36,6 +36,7 @@ import type { TimeEntry, TimeProject, TimeTag, TimeTrackingJob } from "@/contrac
 import type { TimeFormat } from "@/lib/preferences";
 import {
   MINUTES_PER_DAY,
+  TIME_SNAP_MINUTES,
   bottomBoundaryLabel,
   clampMinutesToDay,
   columnDayYmdForInstant,
@@ -43,6 +44,7 @@ import {
   formatHourLabel,
   minutesFromWindowStart,
   rawWindowMinutesFromY,
+  snapWindowMinutes,
 } from "@/lib/timeGrid";
 
 const WEEK_STARTS_ON = 1 as const;
@@ -62,12 +64,6 @@ function readDisplayStartHour(): number {
   return n;
 }
 
-function snapMinutes(m: number, step = 15): number {
-  return Math.round(m / step) * step;
-}
-
-/** Smooth preview during drag; commit uses quarter-hour snaps. */
-const SNAP_COMMIT = 15;
 /** Same idea as schedule booking: ignore plain clicks; require real drag distance. */
 const MIN_CREATE_DRAG_PX = 8;
 
@@ -97,12 +93,22 @@ function pctRangeFromWindowMinutes(lo: number, hi: number): { topPct: number; he
 }
 
 function formatDurationShort(totalMin: number): string {
-  const m = Math.round(totalMin);
+  const m = Math.round(totalMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
   if (!Number.isFinite(m) || m <= 0) return "0 min";
   if (m < 60) return `${m} min`;
   const h = Math.floor(m / 60);
   const mm = m % 60;
   return mm > 0 ? `${h}h ${mm}m` : `${h}h`;
+}
+
+/** Snap local wall-clock to grid for on-block labels. */
+function snapLocalClockToGrid(d: Date): Date {
+  const x = new Date(d.getTime());
+  let mins = x.getHours() * 60 + x.getMinutes();
+  mins = Math.round(mins / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
+  mins = Math.min(mins, MINUTES_PER_DAY - TIME_SNAP_MINUTES);
+  x.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+  return x;
 }
 
 export default function TimeTracking() {
@@ -311,7 +317,7 @@ export default function TimeTracking() {
     if (!colEl) return null;
     const rect = colEl.getBoundingClientRect();
     const raw = rawWindowMinutesFromY(clientY, rect.top, COLUMN_HEIGHT_PX);
-    return snapMinutes(Math.round(raw));
+    return snapWindowMinutes(raw);
   }, []);
 
   const hideCreateOverlay = useCallback((dayYmd: string) => {
@@ -390,7 +396,7 @@ export default function TimeTracking() {
           const r = col.getBoundingClientRect();
           const curRaw = rawWindowMinutesFromY(latestClientY, r.top, COLUMN_HEIGHT_PX);
           const startRaw2 = rawWindowMinutesFromY(c2.startY, r.top, COLUMN_HEIGHT_PX);
-          updateCreateOverlayDom(dayYmd, startRaw2, curRaw);
+          updateCreateOverlayDom(dayYmd, snapWindowMinutes(curRaw), snapWindowMinutes(startRaw2));
         });
       };
 
@@ -414,12 +420,12 @@ export default function TimeTracking() {
         const lo = Math.min(startRaw, endRaw);
         const hi = Math.max(startRaw, endRaw);
 
-        let startWin = snapMinutes(Math.round(lo));
-        let endWin = snapMinutes(Math.round(hi));
-        if (endWin - startWin < SNAP_COMMIT) {
-          endWin = Math.min(startWin + SNAP_COMMIT, MINUTES_PER_DAY);
-          if (endWin - startWin < SNAP_COMMIT) {
-            startWin = Math.max(0, endWin - SNAP_COMMIT);
+        let startWin = snapWindowMinutes(lo);
+        let endWin = snapWindowMinutes(hi);
+        if (endWin - startWin < TIME_SNAP_MINUTES) {
+          endWin = Math.min(startWin + TIME_SNAP_MINUTES, MINUTES_PER_DAY);
+          if (endWin - startWin < TIME_SNAP_MINUTES) {
+            startWin = Math.max(0, endWin - TIME_SNAP_MINUTES);
           }
         }
         if (endWin <= startWin) {
@@ -470,11 +476,12 @@ export default function TimeTracking() {
         const colEl = activeColElRef.current;
         if (!cur || !colEl) return;
         const r = colEl.getBoundingClientRect();
-        const mRaw = rawWindowMinutesFromY(latestClientY, r.top, COLUMN_HEIGHT_PX);
+        const mSnap = snapWindowMinutes(rawWindowMinutesFromY(latestClientY, r.top, COLUMN_HEIGHT_PX));
 
         if (cur.kind === "move") {
-          const dur = cur.durationMin;
-          const newStart = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, mRaw)));
+          const dur =
+            Math.max(1, Math.round(cur.durationMin / TIME_SNAP_MINUTES)) * TIME_SNAP_MINUTES;
+          const newStart = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, mSnap)));
           const newEnd = newStart + dur;
           const { topPct, heightPct } = pctRangeFromWindowMinutes(newStart, newEnd);
           setDragOverride({ entryId: cur.entryId, topPct, heightPct });
@@ -482,14 +489,18 @@ export default function TimeTracking() {
         }
 
         if (cur.kind === "resizeEnd") {
-          const newEnd = clampMinutesToDay(Math.max(cur.origStartWinMin + SNAP_COMMIT, mRaw));
+          const newEnd = clampMinutesToDay(
+            Math.max(cur.origStartWinMin + TIME_SNAP_MINUTES, mSnap)
+          );
           const { topPct, heightPct } = pctRangeFromWindowMinutes(cur.origStartWinMin, newEnd);
           setDragOverride({ entryId: cur.entryId, topPct, heightPct });
           return;
         }
 
         if (cur.kind === "resizeStart") {
-          const newStart = clampMinutesToDay(Math.min(mRaw, cur.origEndWinMin - SNAP_COMMIT));
+          const newStart = clampMinutesToDay(
+            Math.min(mSnap, cur.origEndWinMin - TIME_SNAP_MINUTES)
+          );
           const { topPct, heightPct } = pctRangeFromWindowMinutes(newStart, cur.origEndWinMin);
           setDragOverride({ entryId: cur.entryId, topPct, heightPct });
         }
@@ -509,7 +520,7 @@ export default function TimeTracking() {
       const sh = displayStartHourRef.current;
 
       if (d.kind === "resizeEnd") {
-        const newEndWin = clampMinutesToDay(Math.max(d.origStartWinMin + SNAP_COMMIT, m));
+        const newEndWin = clampMinutesToDay(Math.max(d.origStartWinMin + TIME_SNAP_MINUTES, m));
         updateEntry.mutate({
           id: d.entryId,
           body: {
@@ -521,7 +532,7 @@ export default function TimeTracking() {
       }
 
       if (d.kind === "resizeStart") {
-        const newStartWin = clampMinutesToDay(Math.min(m, d.origEndWinMin - SNAP_COMMIT));
+        const newStartWin = clampMinutesToDay(Math.min(m, d.origEndWinMin - TIME_SNAP_MINUTES));
         updateEntry.mutate({
           id: d.entryId,
           body: {
@@ -532,9 +543,10 @@ export default function TimeTracking() {
         return;
       }
 
-      const dur = d.durationMin;
+      const dur =
+        Math.max(TIME_SNAP_MINUTES, Math.round(d.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES);
       const newStartWin = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, m)));
-      const newEndWin = newStartWin + dur;
+      const newEndWin = clampMinutesToDay(newStartWin + dur);
       updateEntry.mutate({
         id: d.entryId,
         body: {
@@ -1036,9 +1048,16 @@ export default function TimeTracking() {
                             ? projectById.get(e.timeProjectId)!.name
                             : null;
                         const timeTf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
-                        const startTimeLabel = format(start, timeTf);
-                        const endTimeLabel = format(end, timeTf);
-                        const durationLabel = formatDurationShort(durMin);
+                        const startDisp = snapLocalClockToGrid(start);
+                        const endDisp = snapLocalClockToGrid(end);
+                        const startTimeLabel = format(startDisp, timeTf);
+                        const endTimeLabel = format(endDisp, timeTf);
+                        const durRounded =
+                          Math.max(
+                            TIME_SNAP_MINUTES,
+                            Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
+                          );
+                        const durationLabel = formatDurationShort(durRounded);
                         const override =
                           dragOverride?.entryId === e.id ? dragOverride : null;
                         return (

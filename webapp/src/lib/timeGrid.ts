@@ -2,6 +2,9 @@
 
 export const MINUTES_PER_DAY = 24 * 60;
 
+/** Snap drag / edit times to this grid (e.g. 5 → only :00 :05 :10 …). */
+export const TIME_SNAP_MINUTES = 5;
+
 export function windowStartForColumnDay(dayYmd: string, startHour: number): Date {
   const [y, mo, d] = dayYmd.split("-").map(Number);
   return new Date(y, (mo ?? 1) - 1, d ?? 1, startHour, 0, 0, 0);
@@ -35,6 +38,12 @@ export function dateFromColumnAndWindowMinutes(
 
 export function clampMinutesToDay(m: number): number {
   return Math.max(0, Math.min(MINUTES_PER_DAY, m));
+}
+
+/** Snap a position in the rolling day window (0…1440) to the time grid. */
+export function snapWindowMinutes(m: number): number {
+  const stepped = Math.round(m / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
+  return clampMinutesToDay(stepped);
 }
 
 /** Linear minutes in the rolling window from pointer Y (smooth drag preview; snap at commit). */

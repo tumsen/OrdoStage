@@ -1,20 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
+import { ChevronsUpDown } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { usePreferences } from "@/hooks/usePreferences";
 import type { TimeEntry, TimeProject, TimeTag } from "@/contracts/backendTypes";
 import type { TimeCategory } from "@/contracts/backendTypes";
 import type { TimeFormat } from "@/lib/preferences";
+import { TIME_SNAP_MINUTES } from "@/lib/timeGrid";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Sheet,
   SheetContent,
@@ -31,7 +35,27 @@ type PatchBody = {
   timeProjectId: string | null;
   tagIds: string[];
   category: TimeCategory;
+  startsAt: string;
+  endsAt: string;
 };
+
+function hmFromDate(d: Date): string {
+  return format(d, "HH:mm");
+}
+
+/** Snap minutes-within-day and apply to the calendar day of `base`. */
+function applySnappedHm(base: Date, hm: string): Date {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
+  if (!m) return base;
+  let mins = Number(m[1]) * 60 + Number(m[2]);
+  if (!Number.isFinite(mins)) return base;
+  mins = Math.round(mins / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
+  const cap = 24 * 60 - TIME_SNAP_MINUTES;
+  mins = Math.min(Math.max(0, mins), cap);
+  const out = new Date(base.getTime());
+  out.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+  return out;
+}
 
 export function TimeEntryEditSheet(props: {
   entry: TimeEntry | null;
@@ -63,9 +87,12 @@ export function TimeEntryEditSheet(props: {
 
   const [note, setNote] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectOpen, setProjectOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState<TimeCategory>("work");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [startHm, setStartHm] = useState("09:00");
+  const [endHm, setEndHm] = useState("10:00");
 
   const activeProjects = useMemo(
     () =>
@@ -80,6 +107,11 @@ export function TimeEntryEditSheet(props: {
     [tags]
   );
 
+  const selectedProjectLabel = useMemo(() => {
+    if (!projectId) return t("time.noProject");
+    return activeProjects.find((p) => p.id === projectId)?.name ?? t("time.noProject");
+  }, [projectId, activeProjects, t]);
+
   useEffect(() => {
     if (!entry || !open) return;
     setNote(entry.note ?? "");
@@ -87,6 +119,10 @@ export function TimeEntryEditSheet(props: {
     setSelectedTags(new Set(entry.tagIds));
     setCategory((entry.category as TimeCategory) ?? "work");
     setConfirmDelete(false);
+    const s = parseISO(entry.startsAt);
+    const e = parseISO(entry.endsAt);
+    setStartHm(Number.isFinite(s.getTime()) ? hmFromDate(s) : "09:00");
+    setEndHm(Number.isFinite(e.getTime()) ? hmFromDate(e) : "10:00");
   }, [entry, open]);
 
   const timeRangeLabel = useMemo(() => {
@@ -96,7 +132,18 @@ export function TimeEntryEditSheet(props: {
     if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return "";
     const dateLabel = format(start, "EEE d MMM");
     const tf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
-    return `${dateLabel} · ${format(start, tf)} – ${format(end, tf)}`;
+    const sSnap = applySnappedHm(start, hmFromDate(start));
+    const eSnap = applySnappedHm(end, hmFromDate(end));
+    const rawDur = (end.getTime() - start.getTime()) / 60000;
+    const durMin = Math.max(
+      TIME_SNAP_MINUTES,
+      Math.round(rawDur / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
+    );
+    const durH = Math.floor(durMin / 60);
+    const durM = durMin % 60;
+    const durStr =
+      durMin < 60 ? `${durMin} min` : durM > 0 ? `${durH}h ${durM}m` : `${durH}h`;
+    return `${dateLabel} · ${format(sSnap, tf)} – ${format(eSnap, tf)} · ${durStr}`;
   }, [entry, timeFormat]);
 
   function toggleTag(id: string) {
@@ -110,11 +157,20 @@ export function TimeEntryEditSheet(props: {
 
   function handleSave() {
     if (!entry) return;
+    const startBase = parseISO(entry.startsAt);
+    const endBase = parseISO(entry.endsAt);
+    const newStart = applySnappedHm(startBase, startHm);
+    let newEnd = applySnappedHm(endBase, endHm);
+    if (newEnd.getTime() <= newStart.getTime()) {
+      newEnd = new Date(newEnd.getTime() + 24 * 60 * 60 * 1000);
+    }
     onSave(entry.id, {
       note: note.trim() ? note.trim() : null,
       timeProjectId: projectId,
       tagIds: [...selectedTags],
       category,
+      startsAt: newStart.toISOString(),
+      endsAt: newEnd.toISOString(),
     });
   }
 
@@ -170,24 +226,85 @@ export function TimeEntryEditSheet(props: {
               ))}
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-2">
+              <Label className="text-white/80">{t("time.startTimeLabel")}</Label>
+              <input
+                type="time"
+                step={300}
+                value={startHm}
+                onChange={(e) => setStartHm(e.target.value)}
+                className="h-10 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white [color-scheme:dark]"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label className="text-white/80">{t("time.endTimeLabel")}</Label>
+              <input
+                type="time"
+                step={300}
+                value={endHm}
+                onChange={(e) => setEndHm(e.target.value)}
+                className="h-10 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white [color-scheme:dark]"
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-white/40 -mt-1">{t("time.fiveMinuteGridHint")}</p>
+
           <div className="grid gap-2">
             <Label className="text-white/80">{t("time.projectLabel")}</Label>
-            <Select
-              value={projectId ?? "none"}
-              onValueChange={(v) => setProjectId(v === "none" ? null : v)}
-            >
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder={t("time.noProject")} />
-              </SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-60">
-                <SelectItem value="none">{t("time.noProject")}</SelectItem>
-                {activeProjects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={projectOpen} onOpenChange={setProjectOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-expanded={projectOpen}
+                  className="w-full justify-between bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white font-normal"
+                >
+                  <span className="truncate text-left">{selectedProjectLabel}</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] p-0 bg-[#16161f] border-white/10 text-white"
+                align="start"
+              >
+                <Command className="bg-[#16161f] text-white [&_[cmdk-input-wrapper]]:border-white/10">
+                  <CommandInput
+                    placeholder={t("time.searchProjects")}
+                    className="text-white placeholder:text-white/35"
+                  />
+                  <CommandList>
+                    <CommandEmpty className="text-white/50 py-4 text-sm">{t("time.noProjectMatches")}</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="__none__ none"
+                        onSelect={() => {
+                          setProjectId(null);
+                          setProjectOpen(false);
+                        }}
+                        className="text-white aria-selected:bg-white/10"
+                      >
+                        {t("time.noProject")}
+                      </CommandItem>
+                      {activeProjects.map((p) => (
+                        <CommandItem
+                          key={p.id}
+                          value={`${p.name} ${p.id}`}
+                          onSelect={() => {
+                            setProjectId(p.id);
+                            setProjectOpen(false);
+                          }}
+                          className="text-white aria-selected:bg-white/10"
+                        >
+                          {p.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="grid gap-2">
             <Label className="text-white/80">{t("time.tagsLabel")}</Label>
