@@ -7,12 +7,15 @@ import {
   endOfMonth,
   endOfWeek,
   format,
+  getISOWeek,
   parseISO,
   startOfMonth,
   startOfWeek,
   subMonths,
   subWeeks,
 } from "date-fns";
+import type { Locale } from "date-fns";
+import { da as localeDa, de as localeDe, enGB as localeEnGB } from "date-fns/locale";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Pencil, BarChart2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -34,7 +37,7 @@ import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
 import type { TimeEntry, TimeProject, TimeTag, TimeTrackingJob } from "@/contracts/backendTypes";
-import type { TimeFormat } from "@/lib/preferences";
+import type { Language, TimeFormat } from "@/lib/preferences";
 import {
   MINUTES_PER_DAY,
   TIME_SNAP_MINUTES,
@@ -53,7 +56,13 @@ const PX_PER_HOUR = 36;
 const COLUMN_HEIGHT_PX = (MINUTES_PER_DAY / 60) * PX_PER_HOUR;
 /** Same height for corner spacer and day headers so the hour grid lines up with columns. */
 const WEEK_GRID_HEADER_CLASS =
-  "h-[4.5rem] shrink-0 border-b border-white/10 box-border flex flex-col items-center justify-center gap-0.5 px-1 text-center";
+  "min-h-[6.75rem] shrink-0 border-b border-white/10 box-border flex flex-col items-stretch justify-center gap-0.5 px-1.5 py-2";
+
+function dateFnsLocale(language: Language): Locale {
+  if (language === "da") return localeDa;
+  if (language === "de") return localeDe;
+  return localeEnGB;
+}
 
 const DISPLAY_START_STORAGE_KEY = "timeGrid.displayStartHour";
 
@@ -118,7 +127,8 @@ function snapLocalClockToGrid(d: Date): Date {
 }
 
 export default function TimeTracking() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const dfLocale = useMemo(() => dateFnsLocale(language), [language]);
   const queryClient = useQueryClient();
   const { effective } = usePreferences();
   const timeFormat: TimeFormat = effective?.timeFormat ?? "24h";
@@ -1008,14 +1018,24 @@ export default function TimeTracking() {
                 <div key={dayYmd} className="flex-1 min-w-[100px] border-l border-white/10 flex flex-col group">
                   <div className={cn(WEEK_GRID_HEADER_CLASS, "text-xs text-white/70", col?.bg, col ? `border-b ${col.border}` : "")}>
                     <div className="flex items-start justify-between gap-1">
-                      <div>
-                        <div className="uppercase tracking-wide text-[10px] text-white/40">
-                          {format(day, "EEE")}
+                      <div className="min-w-0 flex-1 text-left">
+                        <div
+                          className={cn(
+                            "text-[11px] font-semibold leading-tight",
+                            col ? col.text : "text-white"
+                          )}
+                        >
+                          {format(day, "EEEE", { locale: dfLocale })}
                         </div>
-                        <div className={cn("font-medium", col ? col.text : "text-white")}>{format(day, "d")}</div>
+                        <div className="text-[10px] text-white/60 leading-snug mt-1">
+                          {format(day, "d MMMM yyyy", { locale: dfLocale })}
+                        </div>
+                        <div className="text-[10px] text-white/45 leading-snug mt-0.5 tabular-nums">
+                          {t("time.calendarWeekIso", { week: getISOWeek(day) })}
+                        </div>
                       </div>
-                      {canEdit && !dayOffEntry && (
-                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {canEdit && !dayOffEntry ? (
+                        <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             type="button"
                             title={t("time.addVacationDay")}
@@ -1033,13 +1053,13 @@ export default function TimeTracking() {
                             S
                           </button>
                         </div>
-                      )}
+                      ) : null}
                     </div>
-                    {dayOffEntry && (
-                      <div className={cn("text-[9px] font-medium mt-0.5 capitalize", col?.text)}>
+                    {dayOffEntry ? (
+                      <div className={cn("text-[9px] font-medium mt-1 capitalize", col?.text)}>
                         {t(`time.category${dayOffEntry.category.charAt(0).toUpperCase()}${dayOffEntry.category.slice(1)}` as never)}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                   <div
                     data-day-col={dayYmd}
@@ -1360,37 +1380,6 @@ export default function TimeTracking() {
                         );
                       })}
                   </div>
-                  {canEdit ? (
-                    <div className="p-1 border-t border-white/10 space-y-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="w-full h-7 text-[11px] text-white/70"
-                        onClick={() => {
-                          const [y, mo, d] = dayYmd.split("-").map(Number);
-                          const nine = new Date(y, (mo ?? 1) - 1, d ?? 1, 9, 0, 0, 0);
-                          const winStart = minutesFromWindowStart(nine, dayYmd, displayStartHour);
-                          const endWin = winStart + 60;
-                          createEntry.mutate({
-                            startsAt: dateFromColumnAndWindowMinutes(
-                              dayYmd,
-                              winStart,
-                              displayStartHour
-                            ).toISOString(),
-                            endsAt: dateFromColumnAndWindowMinutes(
-                              dayYmd,
-                              endWin,
-                              displayStartHour
-                            ).toISOString(),
-                            kind: "custom",
-                          });
-                        }}
-                      >
-                        {t("time.addBlock")}
-                      </Button>
-                    </div>
-                  ) : null}
                 </div>
               );
             })}

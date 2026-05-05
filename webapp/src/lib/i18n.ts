@@ -52,6 +52,7 @@ const en = {
     logJob: "Log",
     dragHint:
       "Drag on empty space to create a block (snaps to 5 minutes). Drag a block to move; drag the top or bottom edge to adjust. Pencil: project, times, tags, note.",
+    calendarWeekIso: "Week {{week}}",
     gridStartsAt: "Day starts",
     upcomingTitle: "Upcoming assigned jobs",
     upcomingHint: "Show jobs from today onward. Add one to your grid as a movable time block.",
