@@ -1093,17 +1093,38 @@ export default function TimeTracking() {
                         return (
                           <div
                             key={`plan-${j.id}`}
-                            className="absolute left-0.5 right-0.5 rounded border border-dashed border-white/25 bg-white/[0.04] px-1 text-[10px] text-white/50 pointer-events-none overflow-hidden"
+                            className="absolute left-0.5 right-0.5 z-[2] flex flex-col rounded border border-dashed border-white/25 bg-white/[0.04] px-1 py-0.5 text-[10px] text-white/50 overflow-hidden select-none"
                             style={{
                               top: `${Math.max(0, topPct)}%`,
                               height: `${Math.max(3, heightPct)}%`,
                             }}
                             title={j.eventTitle}
+                            onPointerDown={(ev) => {
+                              ev.stopPropagation();
+                            }}
                           >
-                            {j.title}
-                            {logged ? null : (
-                              <span className="block text-white/35">{t("time.planned")}</span>
-                            )}
+                            <div className="min-h-0 flex-1 overflow-hidden leading-tight">
+                              <div className="font-medium text-white/65 truncate">{j.title}</div>
+                              {logged ? null : (
+                                <span className="block text-[9px] text-white/35">{t("time.planned")}</span>
+                              )}
+                            </div>
+                            {canEdit && !logged ? (
+                              <button
+                                type="button"
+                                className="mt-0.5 w-full shrink-0 rounded border border-emerald-400/40 bg-emerald-500/20 px-0.5 py-0.5 text-[9px] font-semibold leading-tight text-emerald-100 hover:bg-emerald-500/35"
+                                disabled={createEntry.isPending}
+                                onPointerDown={(ev) => {
+                                  ev.stopPropagation();
+                                }}
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  addJobToTime(j);
+                                }}
+                              >
+                                {t("time.addToTime")}
+                              </button>
+                            ) : null}
                           </div>
                         );
                       })}
@@ -1368,32 +1389,6 @@ export default function TimeTracking() {
                       >
                         {t("time.addBlock")}
                       </Button>
-                      {(jobs ?? [])
-                        .filter(
-                          (j) =>
-                            columnDayYmdForInstant(parseISO(j.plannedStartsAt), displayStartHour) ===
-                              dayYmd && !entryByJobId.has(j.id)
-                        )
-                        .map((j) => (
-                          <Button
-                            key={`log-${j.id}`}
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="w-full h-7 text-[11px] text-emerald-300/90"
-                            onClick={() => {
-                              createEntry.mutate({
-                                startsAt: j.plannedStartsAt,
-                                endsAt: j.plannedEndsAt,
-                                kind: "job",
-                                eventShowJobId: j.id,
-                                eventId: j.eventId,
-                              });
-                            }}
-                          >
-                            {t("time.addToTime")}: {j.title}
-                          </Button>
-                        ))}
                     </div>
                   ) : null}
                 </div>
