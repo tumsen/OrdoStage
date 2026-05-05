@@ -124,7 +124,7 @@ export default function Calendars() {
         <div>
           <div className="text-sm font-medium text-white/80 mb-1">Calendar Subscriptions</div>
           <p className="text-sm text-white/45 leading-relaxed">
-            Share these URLs with your team. They can subscribe in Google Calendar, Apple Calendar, Outlook, or any app that supports ICS feeds. The feed stays live — new events appear automatically.
+            Share these URLs with your team. They can subscribe in Google Calendar, Apple Calendar, Outlook, or any app that supports ICS feeds. The feed stays live — new events and tour shows appear automatically.
           </p>
         </div>
       </div>
@@ -167,10 +167,10 @@ export default function Calendars() {
                     <div className="text-sm font-semibold text-white/90">{cal.name}</div>
                     {cal.filter ? (
                       <div className="text-xs text-white/40 mt-0.5 capitalize">
-                        Filter: {cal.filter}
+                        Event status filter: {cal.filter}
                       </div>
                     ) : (
-                      <div className="text-xs text-white/30 mt-0.5">All events</div>
+                      <div className="text-xs text-white/30 mt-0.5">All events + tours</div>
                     )}
                   </div>
                   <Button
@@ -223,7 +223,7 @@ export default function Calendars() {
                 name="filter"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Filter by status (optional)</FormLabel>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Filter by event status (optional)</FormLabel>
                     <Select
                       onValueChange={(v) => field.onChange(v === "__all__" ? "" : v)}
                       defaultValue="__all__"
@@ -240,6 +240,9 @@ export default function Calendars() {
                         <SelectItem value="cancelled">Cancelled only</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-[11px] text-white/35 mt-1">
+                      Tour shows are always included in the feed.
+                    </p>
                   </FormItem>
                 )}
               />
