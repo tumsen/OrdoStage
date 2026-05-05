@@ -1336,9 +1336,9 @@ export default function TimeTracking() {
                                   }}
                                 >
                                   {isLocked ? (
-                                    <LockOpen className="h-3 w-3" />
-                                  ) : (
                                     <Lock className="h-3 w-3" />
+                                  ) : (
+                                    <LockOpen className="h-3 w-3" />
                                   )}
                                 </button>
                                 <button
@@ -1357,7 +1357,7 @@ export default function TimeTracking() {
                                 </button>
                                 {isLocked ? (
                                   <span
-                                    className="absolute top-0 left-0 z-[3] inline-flex items-center gap-1 rounded-br bg-black/35 px-1 py-0.5 text-[9px] text-white/80"
+                                    className="absolute bottom-0.5 left-0.5 z-[3] inline-flex items-center gap-1 rounded bg-black/35 px-1 py-0.5 text-[9px] text-white/80"
                                     title={t("time.lockedEntryHint")}
                                   >
                                     <Lock className="h-2.5 w-2.5" />
