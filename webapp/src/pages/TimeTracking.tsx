@@ -30,6 +30,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
 import type { TimeEntry, TimeProject, TimeTag, TimeTrackingJob } from "@/contracts/backendTypes";
@@ -492,6 +493,9 @@ export default function TimeTracking() {
             endsAt: dateFromColumnAndWindowMinutes(dayYmd, endWin, displayStartHourRef.current).toISOString(),
           },
           {
+            onSuccess: (created) => {
+              setEditingEntryId(created.id);
+            },
             onSettled: () => {
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => hideCreateOverlay(dayYmd));
@@ -505,7 +509,7 @@ export default function TimeTracking() {
       window.addEventListener("pointerup", finish);
       window.addEventListener("pointercancel", finish);
     },
-    [createEntry, hideCreateOverlay, updateCreateOverlayDom]
+    [createEntry, hideCreateOverlay, updateCreateOverlayDom, setEditingEntryId]
   );
 
   const attachEntryDragListeners = useCallback(() => {
@@ -1124,14 +1128,13 @@ export default function TimeTracking() {
                               (upcomingJobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
                               t("time.job")
                             : e.note || t("time.customBlock");
-                        const tagLabel = e.tagIds
-                          .map((id) => tagById.get(id)?.name)
-                          .filter(Boolean)
-                          .join(", ");
-                        const proj =
-                          e.timeProjectId && projectById.get(e.timeProjectId)
-                            ? projectById.get(e.timeProjectId)!.name
-                            : null;
+                        const projEntity = e.timeProjectId
+                          ? projectById.get(e.timeProjectId)
+                          : undefined;
+                        const projStripe = projEntity
+                          ? displayHex(projEntity.color, projEntity.id)
+                          : null;
+                        const proj = projEntity?.name ?? null;
                         const timeTf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
                         const override =
                           dragOverride?.entryId === e.id ? dragOverride : null;
@@ -1192,6 +1195,9 @@ export default function TimeTracking() {
                               top: `${override?.topPct ?? Math.max(0, topPct)}%`,
                               height: `${override?.heightPct ?? Math.max(4, heightPct)}%`,
                               zIndex: 2,
+                              ...(projStripe
+                                ? { boxShadow: `inset 4px 0 0 0 ${projStripe}` }
+                                : {}),
                             }}
                             onPointerDown={(ev) => {
                               if (!canEdit) return;
@@ -1250,9 +1256,34 @@ export default function TimeTracking() {
                             <div className="text-[9px] tabular-nums text-white/90 leading-tight pr-4">
                               {startTimeLabel} – {endTimeLabel} · {durationLabel}
                             </div>
-                            {proj ? <div className="text-[9px] opacity-80 truncate">{proj}</div> : null}
-                            {tagLabel ? (
-                              <div className="text-[9px] opacity-70 truncate">{tagLabel}</div>
+                            {proj ? (
+                              <div
+                                className="text-[9px] font-medium truncate pr-4"
+                                style={projStripe ? { color: projStripe } : undefined}
+                              >
+                                {proj}
+                              </div>
+                            ) : null}
+                            {e.tagIds.length > 0 ? (
+                              <div className="flex flex-wrap gap-0.5 mt-0.5 pr-4">
+                                {e.tagIds.map((tid) => {
+                                  const tag = tagById.get(tid);
+                                  if (!tag) return null;
+                                  const col = displayHex(tag.color, tag.id);
+                                  return (
+                                    <span
+                                      key={tid}
+                                      className="max-w-full truncate rounded px-1 py-px text-[8px] font-semibold leading-tight text-white shadow-sm"
+                                      style={{
+                                        backgroundColor: hexToRgba(col, 0.55),
+                                        boxShadow: `inset 0 0 0 1px ${hexToRgba(col, 0.35)}`,
+                                      }}
+                                    >
+                                      {tag.name}
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             ) : null}
                             {canEdit ? (
                               <>

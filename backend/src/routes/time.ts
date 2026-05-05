@@ -192,6 +192,7 @@ function serializeTag(row: {
   id: string;
   organizationId: string;
   name: string;
+  color: string | null;
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
@@ -207,6 +208,7 @@ function serializeProject(row: {
   id: string;
   organizationId: string;
   name: string;
+  color: string | null;
   eventId: string | null;
   eventShowId: string | null;
   isArchived: boolean;
@@ -575,6 +577,7 @@ timeRouter.post("/time/tags", zValidator("json", CreateTimeTagSchema), async (c)
       organizationId: user.organizationId,
       name: body.name.trim(),
       sortOrder: body.sortOrder ?? 0,
+      color: body.color ?? null,
     },
   });
   return c.json({ data: serializeTag(row) });
@@ -599,6 +602,7 @@ timeRouter.patch("/time/tags/:id", zValidator("json", PatchTimeTagSchema), async
     data: {
       ...(body.name !== undefined ? { name: body.name.trim() } : {}),
       ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
+      ...(body.color !== undefined ? { color: body.color } : {}),
     },
   });
   return c.json({ data: serializeTag(row) });
@@ -695,6 +699,7 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
       eventId,
       eventShowId,
       sortOrder: body.sortOrder ?? 0,
+      color: body.color ?? null,
     },
   });
   return c.json({ data: serializeProject(row) });
@@ -741,6 +746,7 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
       ...(body.eventShowId !== undefined ? { eventShowId: body.eventShowId } : {}),
       ...(body.isArchived !== undefined ? { isArchived: body.isArchived } : {}),
       ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
+      ...(body.color !== undefined ? { color: body.color } : {}),
     },
   });
   return c.json({ data: serializeProject(row) });

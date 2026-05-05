@@ -98,6 +98,8 @@ const en = {
     catalogRemoved: "Removed.",
     catalogSaveError: "Could not save catalog.",
     catalogDeleteConfirm: "Remove this item?",
+    catalogColorLabel: "Colour",
+    catalogColorReset: "Use automatic colour",
     linkFromEventsHeading: "Link events & shows",
     linkFromEventsHint:
       "Add a time project tied to an event or a single performance. Those projects appear in the project picker on each time entry.",

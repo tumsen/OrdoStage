@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 
 type PatchBody = {
   note: string | null;
@@ -117,6 +118,12 @@ export function TimeEntryEditSheet(props: {
     if (!projectId) return t("time.noProject");
     return activeProjects.find((p) => p.id === projectId)?.name ?? t("time.noProject");
   }, [projectId, activeProjects, t]);
+
+  const selectedProjectColor = useMemo(() => {
+    if (!projectId) return null;
+    const p = activeProjects.find((x) => x.id === projectId);
+    return p ? displayHex(p.color, p.id) : null;
+  }, [projectId, activeProjects]);
 
   useEffect(() => {
     if (!entry || !open) return;
@@ -278,7 +285,16 @@ export function TimeEntryEditSheet(props: {
                   aria-expanded={projectOpen}
                   className="w-full justify-between bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white font-normal"
                 >
-                  <span className="truncate text-left">{selectedProjectLabel}</span>
+                  <span className="flex min-w-0 items-center gap-2 truncate text-left">
+                    {selectedProjectColor ? (
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full border border-white/20"
+                        style={{ backgroundColor: selectedProjectColor }}
+                        aria-hidden
+                      />
+                    ) : null}
+                    <span className="truncate">{selectedProjectLabel}</span>
+                  </span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -304,19 +320,29 @@ export function TimeEntryEditSheet(props: {
                       >
                         {t("time.noProject")}
                       </CommandItem>
-                      {activeProjects.map((p) => (
-                        <CommandItem
-                          key={p.id}
-                          value={`${p.name} ${p.id}`}
-                          onSelect={() => {
-                            setProjectId(p.id);
-                            setProjectOpen(false);
-                          }}
-                          className="text-white aria-selected:bg-white/10"
-                        >
-                          {p.name}
-                        </CommandItem>
-                      ))}
+                      {activeProjects.map((p) => {
+                        const c = displayHex(p.color, p.id);
+                        return (
+                          <CommandItem
+                            key={p.id}
+                            value={`${p.name} ${p.id}`}
+                            onSelect={() => {
+                              setProjectId(p.id);
+                              setProjectOpen(false);
+                            }}
+                            className="text-white aria-selected:bg-white/10"
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full border border-white/20"
+                                style={{ backgroundColor: c }}
+                                aria-hidden
+                              />
+                              <span className="truncate">{p.name}</span>
+                            </span>
+                          </CommandItem>
+                        );
+                      })}
                     </CommandGroup>
                   </CommandList>
                 </Command>
@@ -329,19 +355,31 @@ export function TimeEntryEditSheet(props: {
               {sortedTags.length === 0 ? (
                 <p className="text-xs text-white/45">{t("time.tagsEmpty")}</p>
               ) : (
-                sortedTags.map((tag) => (
-                  <label
-                    key={tag.id}
-                    className="flex items-center gap-2 text-sm text-white/85 cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={selectedTags.has(tag.id)}
-                      onCheckedChange={() => toggleTag(tag.id)}
-                      className="border-white/30 data-[state=checked]:bg-ordo-yellow data-[state=checked]:border-ordo-yellow data-[state=checked]:text-[#0d0d14]"
-                    />
-                    <span>{tag.name}</span>
-                  </label>
-                ))
+                sortedTags.map((tag) => {
+                  const c = displayHex(tag.color, tag.id);
+                  return (
+                    <label
+                      key={tag.id}
+                      className="flex items-center gap-2 text-sm cursor-pointer rounded-md px-1 py-0.5 -mx-1"
+                      style={{ backgroundColor: hexToRgba(c, 0.12) }}
+                    >
+                      <Checkbox
+                        checked={selectedTags.has(tag.id)}
+                        onCheckedChange={() => toggleTag(tag.id)}
+                        className="border-white/30 data-[state=checked]:bg-ordo-yellow data-[state=checked]:border-ordo-yellow data-[state=checked]:text-[#0d0d14]"
+                      />
+                      <span
+                        className="text-white font-medium rounded px-1.5 py-0.5 text-xs"
+                        style={{
+                          backgroundColor: hexToRgba(c, 0.4),
+                          boxShadow: `inset 0 0 0 1px ${hexToRgba(c, 0.25)}`,
+                        }}
+                      >
+                        {tag.name}
+                      </span>
+                    </label>
+                  );
+                })
               )}
             </div>
           </div>

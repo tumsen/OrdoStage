@@ -885,10 +885,16 @@ export const UpdateTourSchema = CreateTourSchema.partial();
 
 // —— Time tracking ——
 
+/** Stored as #RRGGBB or null (clients pick a stable fallback when null). */
+export const TimeCatalogHexColorSchema = z
+  .string()
+  .regex(/^#[0-9A-Fa-f]{6}$/, "Expected #RRGGBB");
+
 export const TimeTagSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
   name: z.string(),
+  color: z.union([TimeCatalogHexColorSchema, z.null()]),
   sortOrder: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -898,6 +904,7 @@ export const TimeProjectSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
   name: z.string(),
+  color: z.union([TimeCatalogHexColorSchema, z.null()]),
   eventId: z.string().nullable(),
   eventShowId: z.string().nullable(),
   isArchived: z.boolean(),
@@ -945,6 +952,7 @@ export const TimeTrackingJobSchema = z.object({
 export const CreateTimeTagSchema = z.object({
   name: z.string().min(1),
   sortOrder: z.number().int().optional(),
+  color: z.union([TimeCatalogHexColorSchema, z.null()]).optional(),
 });
 
 export const PatchTimeTagSchema = CreateTimeTagSchema.partial();
@@ -954,6 +962,7 @@ export const CreateTimeProjectSchema = z.object({
   eventId: z.string().nullable().optional(),
   eventShowId: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
+  color: z.union([TimeCatalogHexColorSchema, z.null()]).optional(),
 });
 
 export const PatchTimeProjectSchema = z.object({
@@ -962,6 +971,7 @@ export const PatchTimeProjectSchema = z.object({
   eventShowId: z.string().nullable().optional(),
   isArchived: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+  color: z.union([TimeCatalogHexColorSchema, z.null()]).optional(),
 });
 
 export const CreateTimeEntrySchema = z.object({

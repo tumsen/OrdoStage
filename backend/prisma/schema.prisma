@@ -786,6 +786,8 @@ model TimeTag {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
+  /** Optional UI colour (#RRGGBB). When null, clients use a stable fallback by id. */
+  color          String?
   sortOrder      Int          @default(0)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -799,6 +801,8 @@ model TimeProject {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
+  /** Optional UI colour (#RRGGBB). When null, clients use a stable fallback by id. */
+  color          String?
   eventId        String?
   event          Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   eventShowId    String?

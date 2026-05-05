@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
 import type { TimeProject, TimeTag } from "@/contracts/backendTypes";
+import { displayHex } from "@/lib/timeCatalogColors";
 
 export function TimeCatalogSettings() {
   const { t } = useI18n();
@@ -62,6 +64,20 @@ export function TimeCatalogSettings() {
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
   });
 
+  const patchTagColor = useMutation({
+    mutationFn: (vars: { id: string; color: string | null }) =>
+      api.patch(`/api/time/tags/${vars.id}`, { color: vars.color }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["time-tags"] }),
+    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
+  });
+
+  const patchProjectColor = useMutation({
+    mutationFn: (vars: { id: string; color: string | null }) =>
+      api.patch(`/api/time/projects/${vars.id}`, { color: vars.color }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["time-projects"] }),
+    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
+  });
+
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-6">
       <div>
@@ -98,20 +114,45 @@ export function TimeCatalogSettings() {
                 key={x.id}
                 className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5"
               >
-                <span className="text-white/85">{x.name}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-400 hover:text-red-300"
-                  disabled={delTag.isPending}
-                  onClick={() => {
-                    if (!confirm(t("time.catalogDeleteConfirm"))) return;
-                    delTag.mutate(x.id);
-                  }}
-                >
-                  {t("time.remove")}
-                </Button>
+                <div className="flex min-w-0 items-center gap-2 flex-1">
+                  <input
+                    type="color"
+                    aria-label={t("time.catalogColorLabel")}
+                    title={t("time.catalogColorLabel")}
+                    className="h-8 w-10 shrink-0 cursor-pointer rounded border border-white/15 bg-transparent p-0"
+                    value={displayHex(x.color, x.id)}
+                    onChange={(e) =>
+                      patchTagColor.mutate({ id: x.id, color: e.target.value })
+                    }
+                  />
+                  <span className="text-white/85 truncate">{x.name}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-white/45 hover:text-white/80"
+                    title={t("time.catalogColorReset")}
+                    disabled={patchTagColor.isPending || x.color == null}
+                    onClick={() => patchTagColor.mutate({ id: x.id, color: null })}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-400 hover:text-red-300"
+                    disabled={delTag.isPending}
+                    onClick={() => {
+                      if (!confirm(t("time.catalogDeleteConfirm"))) return;
+                      delTag.mutate(x.id);
+                    }}
+                  >
+                    {t("time.remove")}
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -141,27 +182,52 @@ export function TimeCatalogSettings() {
                 key={x.id}
                 className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5"
               >
-                <span className="text-white/85 min-w-0">
-                  {x.name}
-                  {x.eventShowId ? (
-                    <span className="block text-[10px] text-white/40 truncate">{t("time.projectLinkedShow")}</span>
-                  ) : x.eventId ? (
-                    <span className="block text-[10px] text-white/40 truncate">{t("time.projectLinkedEvent")}</span>
-                  ) : null}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-400 hover:text-red-300 shrink-0"
-                  disabled={delProject.isPending}
-                  onClick={() => {
-                    if (!confirm(t("time.catalogDeleteConfirm"))) return;
-                    delProject.mutate(x.id);
-                  }}
-                >
-                  {t("time.remove")}
-                </Button>
+                <div className="flex min-w-0 items-start gap-2 flex-1">
+                  <input
+                    type="color"
+                    aria-label={t("time.catalogColorLabel")}
+                    title={t("time.catalogColorLabel")}
+                    className="h-8 w-10 shrink-0 cursor-pointer rounded border border-white/15 bg-transparent p-0 mt-0.5"
+                    value={displayHex(x.color, x.id)}
+                    onChange={(e) =>
+                      patchProjectColor.mutate({ id: x.id, color: e.target.value })
+                    }
+                  />
+                  <span className="text-white/85 min-w-0">
+                    {x.name}
+                    {x.eventShowId ? (
+                      <span className="block text-[10px] text-white/40 truncate">{t("time.projectLinkedShow")}</span>
+                    ) : x.eventId ? (
+                      <span className="block text-[10px] text-white/40 truncate">{t("time.projectLinkedEvent")}</span>
+                    ) : null}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-white/45 hover:text-white/80"
+                    title={t("time.catalogColorReset")}
+                    disabled={patchProjectColor.isPending || x.color == null}
+                    onClick={() => patchProjectColor.mutate({ id: x.id, color: null })}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-400 hover:text-red-300 shrink-0"
+                    disabled={delProject.isPending}
+                    onClick={() => {
+                      if (!confirm(t("time.catalogDeleteConfirm"))) return;
+                      delProject.mutate(x.id);
+                    }}
+                  >
+                    {t("time.remove")}
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
