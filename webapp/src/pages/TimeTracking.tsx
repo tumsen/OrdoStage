@@ -14,7 +14,7 @@ import {
   subWeeks,
 } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Pencil, BarChart2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, BarChart2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -1192,21 +1192,37 @@ export default function TimeTracking() {
                             }}
                           >
                             {canEdit ? (
-                              <button
-                                type="button"
-                                className="absolute top-0 right-0 z-[3] flex h-5 w-5 items-center justify-center rounded-sm text-white/70 hover:bg-white/15 hover:text-white"
-                                data-handle="edit"
-                                aria-label={t("time.editEntry")}
-                                onPointerDown={(ev) => {
-                                  ev.stopPropagation();
-                                }}
-                                onClick={(ev) => {
-                                  ev.stopPropagation();
-                                  setEditingEntryId(e.id);
-                                }}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  className="absolute top-0 right-0 z-[3] flex h-5 w-5 items-center justify-center rounded-sm text-white/70 hover:bg-white/15 hover:text-white"
+                                  data-handle="edit"
+                                  aria-label={t("time.editEntry")}
+                                  onPointerDown={(ev) => {
+                                    ev.stopPropagation();
+                                  }}
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setEditingEntryId(e.id);
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="absolute bottom-0.5 right-0 z-[4] flex h-5 w-5 items-center justify-center rounded-sm text-white/70 hover:bg-red-500/25 hover:text-red-200 disabled:opacity-40"
+                                  data-handle="delete"
+                                  aria-label={t("time.deleteEntry")}
+                                  disabled={deleteEntry.isPending}
+                                  onPointerDown={(ev) => ev.stopPropagation()}
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    deleteEntry.mutate(e.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </>
                             ) : null}
                             <div className="font-medium truncate pr-4">{label}</div>
                             <div className="text-[9px] tabular-nums text-white/90 leading-tight pr-4">
@@ -1244,7 +1260,7 @@ export default function TimeTracking() {
                                 <button
                                   type="button"
                                   data-handle="resizeEnd"
-                                  className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-white/20 hover:bg-white/35 rounded-b-sm"
+                                  className="absolute bottom-0 left-0 right-6 h-1.5 cursor-ns-resize bg-white/20 hover:bg-white/35 rounded-b-sm"
                                   aria-hidden
                                   onPointerDown={(ev) => {
                                     ev.stopPropagation();
