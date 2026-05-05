@@ -1012,7 +1012,6 @@ export default function TimeTracking() {
                 <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
                   {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
                 </span>
-                <div className="absolute bottom-0 left-0 right-0 z-[2] border-t border-white/[0.18] pointer-events-none" />
               </div>
               <div className="h-6 border-b border-white/15" />
             </div>
@@ -1105,7 +1104,7 @@ export default function TimeTracking() {
                         <div key={i} className="flex-1 min-h-0 border-t border-white/[0.1]" />
                       ))}
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 z-[2] border-t border-white/[0.18] pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1] pointer-events-none" />
                     {canEdit ? (
                       <>
                         <div
