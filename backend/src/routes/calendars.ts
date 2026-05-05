@@ -388,6 +388,81 @@ function buildICS(
     .join("\r\n");
 }
 
+function buildTourICSVEvents(
+  tours: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    status: string;
+    notes: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    shows: Array<{
+      id: string;
+      date: Date;
+      type: string;
+      showTime: string | null;
+      venueName: string | null;
+      venueStreet: string | null;
+      venueCity: string | null;
+      venueCountry: string | null;
+      notes: string | null;
+    }>;
+  }>,
+  organizationName: string
+): string {
+  const now = formatICSDate(new Date());
+  const appBase = (env.FRONTEND_URL || env.BACKEND_URL || "http://localhost:5173").replace(/\/+$/, "");
+  const statusMap: Record<string, string> = {
+    active: "CONFIRMED",
+    completed: "CONFIRMED",
+    draft: "TENTATIVE",
+  };
+  return tours
+    .flatMap((tour) =>
+      tour.shows.map((show) => {
+        const d = new Date(show.date);
+        const hhmm = show.showTime && /^\d{2}:\d{2}$/.test(show.showTime) ? show.showTime : "09:00";
+        const [hhRaw, mmRaw] = hhmm.split(":");
+        const hh = Number(hhRaw);
+        const mm = Number(mmRaw);
+        const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mm, 0, 0));
+        const end = new Date(start.getTime() + 60 * 60 * 1000);
+        const parts: string[] = [];
+        if (tour.description) parts.push(tour.description);
+        if (tour.notes) parts.push(`Tour notes: ${tour.notes}`);
+        if (show.notes) parts.push(`Show notes: ${show.notes}`);
+        const description = parts.length ? `DESCRIPTION:${escapeICSText(parts.join("\\n"))}` : null;
+        const addr = [show.venueStreet, show.venueCity, show.venueCountry].filter(Boolean).join(", ");
+        const loc = show.venueName ? (addr ? `${show.venueName}, ${addr}` : show.venueName) : null;
+        const location = loc ? `LOCATION:${escapeICSText(loc)}` : null;
+        const icsStatus = statusMap[tour.status] ?? "TENTATIVE";
+        return [
+          "BEGIN:VEVENT",
+          `UID:tour-${tour.id}-${show.id}@ordostage`,
+          `DTSTAMP:${now}`,
+          `DTSTART:${formatICSDate(start)}`,
+          `DTEND:${formatICSDate(end)}`,
+          `SUMMARY:${escapeICSText(`Tour · ${tour.name}`)}`,
+          description,
+          location,
+          `CATEGORIES:${escapeICSText(`Tour,${show.type || "show"}`)}`,
+          `URL:${escapeICSText(`${appBase}/tours/${tour.id}`)}`,
+          `ORGANIZER;CN=${escapeICSText(organizationName)}:mailto:no-reply@ordostage.local`,
+          `LAST-MODIFIED:${formatICSDate(tour.updatedAt)}`,
+          `CREATED:${formatICSDate(tour.createdAt)}`,
+          `SEQUENCE:${Math.max(0, Math.floor(tour.updatedAt.getTime() / 1000))}`,
+          `STATUS:${icsStatus}`,
+          "TRANSP:OPAQUE",
+          "END:VEVENT",
+        ]
+          .filter(Boolean)
+          .join("\r\n");
+      })
+    )
+    .join("\r\n");
+}
+
 // GET /api/calendars
 calendarsRouter.get("/calendars", async (c) => {
   const user = c.get("user");
@@ -530,7 +605,39 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
     },
   });
 
-  const icsContent = buildICS(calendar.name, calendar.organization.name, events);
+  const tours = await prisma.tour.findMany({
+    where: { organizationId: calendar.organizationId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      status: true,
+      notes: true,
+      createdAt: true,
+      updatedAt: true,
+      shows: {
+        select: {
+          id: true,
+          date: true,
+          type: true,
+          showTime: true,
+          venueName: true,
+          venueStreet: true,
+          venueCity: true,
+          venueCountry: true,
+          notes: true,
+        },
+        orderBy: { date: "asc" },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const eventCalendar = buildICS(calendar.name, calendar.organization.name, events);
+  const tourVEvents = buildTourICSVEvents(tours, calendar.organization.name);
+  const icsContent = tourVEvents
+    ? eventCalendar.replace("\r\nEND:VCALENDAR", `\r\n${tourVEvents}\r\nEND:VCALENDAR`)
+    : eventCalendar;
 
   return new Response(icsContent, {
     headers: {

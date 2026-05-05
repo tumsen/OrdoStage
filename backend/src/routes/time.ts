@@ -49,9 +49,8 @@ function formatDayUtc(d: Date): string {
 }
 
 /**
- * Ensure every org event and performance has a matching TimeProject row so they appear
- * in pickers without manual "link" steps. Names: event title for whole event;
- * "{title} · {date}" for each show.
+ * Ensure every org event/performance and tour/show has a matching TimeProject row so
+ * they appear in pickers without manual link steps.
  */
 async function syncEventShowTimeProjects(organizationId: string) {
   const events = await prisma.event.findMany({
@@ -115,6 +114,74 @@ async function syncEventShowTimeProjects(organizationId: string) {
             name: targetName,
             eventId: ev.id,
             eventShowId: show.id,
+            sortOrder: 0,
+          },
+        });
+      }
+    }
+  }
+
+  const tours = await prisma.tour.findMany({
+    where: { organizationId },
+    select: {
+      id: true,
+      name: true,
+      shows: {
+        select: { id: true, date: true, showTime: true },
+        orderBy: { date: "asc" },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  for (const tour of tours) {
+    const tourTitle = tour.name.trim() || "Untitled tour";
+    const tourProjectName = `Tour · ${tourTitle}`;
+    const existingTourProj = await prisma.timeProject.findFirst({
+      where: { organizationId, tourId: tour.id, tourShowId: null },
+    });
+    if (existingTourProj) {
+      if (existingTourProj.name !== tourProjectName) {
+        await prisma.timeProject.update({
+          where: { id: existingTourProj.id },
+          data: { name: tourProjectName },
+        });
+      }
+    } else {
+      await prisma.timeProject.create({
+        data: {
+          organizationId,
+          name: tourProjectName,
+          tourId: tour.id,
+          tourShowId: null,
+          sortOrder: 0,
+        },
+      });
+    }
+
+    for (const show of tour.shows) {
+      const datePart = formatDayUtc(show.date);
+      const baseTitle = `${tourTitle} · ${datePart}`;
+      const targetName = show.showTime?.trim()
+        ? `${baseTitle} ${show.showTime.trim()}`
+        : baseTitle;
+      const existingShowProj = await prisma.timeProject.findFirst({
+        where: { organizationId, tourShowId: show.id },
+      });
+      if (existingShowProj) {
+        if (existingShowProj.name !== targetName || existingShowProj.tourId !== tour.id) {
+          await prisma.timeProject.update({
+            where: { id: existingShowProj.id },
+            data: { name: targetName, tourId: tour.id },
+          });
+        }
+      } else {
+        await prisma.timeProject.create({
+          data: {
+            organizationId,
+            name: targetName,
+            tourId: tour.id,
+            tourShowId: show.id,
             sortOrder: 0,
           },
         });
@@ -259,6 +326,8 @@ function serializeProject(row: {
   color: string | null;
   eventId: string | null;
   eventShowId: string | null;
+  tourId: string | null;
+  tourShowId: string | null;
   isArchived: boolean;
   sortOrder: number;
   createdAt: Date;
@@ -741,6 +810,27 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
       return c.json({ data: serializeProject(existingEvProj) });
     }
   }
+  if (body.tourShowId) {
+    const show = await prisma.tourShow.findFirst({
+      where: { id: body.tourShowId, tour: { organizationId: user.organizationId } },
+      select: { id: true, tourId: true },
+    });
+    if (!show) {
+      return c.json({ error: { message: "Tour show not found", code: "NOT_FOUND" } }, 404);
+    }
+    if (body.tourId != null && body.tourId !== show.tourId) {
+      return c.json(
+        { error: { message: "Tour show does not belong to that tour", code: "BAD_REQUEST" } },
+        400
+      );
+    }
+  } else if (body.tourId) {
+    const tour = await prisma.tour.findFirst({
+      where: { id: body.tourId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!tour) return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+  }
 
   const row = await prisma.timeProject.create({
     data: {
@@ -748,6 +838,8 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
       name: body.name.trim(),
       eventId,
       eventShowId,
+      tourId: body.tourId ?? null,
+      tourShowId: body.tourShowId ?? null,
       sortOrder: body.sortOrder ?? 0,
       color: body.color ?? null,
     },
@@ -788,12 +880,33 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
     });
     if (!ev) return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
+  if (body.tourShowId !== undefined && body.tourShowId !== null) {
+    const show = await prisma.tourShow.findFirst({
+      where: { id: body.tourShowId, tour: { organizationId: user.organizationId } },
+      select: { tourId: true },
+    });
+    if (!show) return c.json({ error: { message: "Tour show not found", code: "NOT_FOUND" } }, 404);
+    if (body.tourId !== undefined && body.tourId !== null && body.tourId !== show.tourId) {
+      return c.json(
+        { error: { message: "Tour show does not belong to that tour", code: "BAD_REQUEST" } },
+        400
+      );
+    }
+  } else if (body.tourId !== undefined && body.tourId !== null) {
+    const tour = await prisma.tour.findFirst({
+      where: { id: body.tourId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!tour) return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+  }
   const row = await prisma.timeProject.update({
     where: { id },
     data: {
       ...(body.name !== undefined ? { name: body.name.trim() } : {}),
       ...(body.eventId !== undefined ? { eventId: body.eventId } : {}),
       ...(body.eventShowId !== undefined ? { eventShowId: body.eventShowId } : {}),
+      ...(body.tourId !== undefined ? { tourId: body.tourId } : {}),
+      ...(body.tourShowId !== undefined ? { tourShowId: body.tourShowId } : {}),
       ...(body.isArchived !== undefined ? { isArchived: body.isArchived } : {}),
       ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
       ...(body.color !== undefined ? { color: body.color } : {}),

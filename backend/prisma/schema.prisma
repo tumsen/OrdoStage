@@ -683,6 +683,7 @@ model Tour {
   organizationId   String
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   shows            TourShow[]
+  timeProjects     TimeProject[]
   people           TourPerson[]
   teams            TourTeam[]
   personNotes      TourPersonNote[]
@@ -705,6 +706,7 @@ model TourShow {
   id             String   @id @default(cuid())
   tourId         String
   tour           Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  timeProjects   TimeProject[]
   date           DateTime
   type           String   @default("show")  // show | travel | day_off
   fromLocation   String?
@@ -823,6 +825,10 @@ model TimeProject {
   event          Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   eventShowId    String?
   eventShow      EventShow?   @relation(fields: [eventShowId], references: [id], onDelete: SetNull)
+  tourId         String?
+  tour           Tour?        @relation(fields: [tourId], references: [id], onDelete: SetNull)
+  tourShowId     String?
+  tourShow       TourShow?    @relation(fields: [tourShowId], references: [id], onDelete: SetNull)
   isArchived     Boolean      @default(false)
   sortOrder      Int          @default(0)
   createdAt      DateTime     @default(now())
@@ -832,6 +838,8 @@ model TimeProject {
   @@index([organizationId, sortOrder])
   @@index([eventId])
   @@index([eventShowId])
+  @@index([tourId])
+  @@index([tourShowId])
 }
 
 model TimeEntry {
