@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
+  LockOpen,
   Pencil,
   BarChart2,
   Trash2,
@@ -1310,6 +1311,35 @@ export default function TimeTracking() {
                                   }}
                                 >
                                   <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="absolute top-5 right-0 z-[4] flex h-5 w-5 items-center justify-center rounded-sm text-white/70 hover:bg-white/15 hover:text-white disabled:opacity-40"
+                                  data-handle="lock"
+                                  aria-label={isLocked ? t("time.unlockEntry") : t("time.lockEntry")}
+                                  disabled={updateEntry.isPending}
+                                  onPointerDown={(ev) => ev.stopPropagation()}
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    updateEntry.mutate(
+                                      { id: e.id, body: { isLocked: !isLocked } },
+                                      {
+                                        onSuccess: () => {
+                                          toast({
+                                            title: !isLocked
+                                              ? t("time.entryLocked")
+                                              : t("time.entryUnlocked"),
+                                          });
+                                        },
+                                      }
+                                    );
+                                  }}
+                                >
+                                  {isLocked ? (
+                                    <LockOpen className="h-3 w-3" />
+                                  ) : (
+                                    <Lock className="h-3 w-3" />
+                                  )}
                                 </button>
                                 <button
                                   type="button"
