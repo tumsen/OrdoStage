@@ -17,7 +17,7 @@ import {
 import type { Locale } from "date-fns";
 import { da as localeDa, de as localeDe, enGB as localeEnGB } from "date-fns/locale";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Pencil, BarChart2, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, BarChart2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -141,6 +141,7 @@ export default function TimeTracking() {
   const [mode, setMode] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(() => new Date());
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [upcomingCollapsed, setUpcomingCollapsed] = useState(true);
   const [displayStartHour, setDisplayStartHour] = useState(readDisplayStartHour);
 
   useEffect(() => {
@@ -872,54 +873,72 @@ export default function TimeTracking() {
 
       {hasUpcomingUnlogged ? (
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
-          <div>
-            <p className="text-sm font-medium text-white">{t("time.upcomingTitle")}</p>
-            <p className="text-xs text-white/45 mt-0.5">{t("time.upcomingHint")}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-white">{t("time.upcomingTitle")}</p>
+              <p className="text-xs text-white/45 mt-0.5">{t("time.upcomingHint")}</p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-white/60 hover:text-white"
+              onClick={() => setUpcomingCollapsed((v) => !v)}
+            >
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  upcomingCollapsed ? "-rotate-90" : "rotate-0"
+                )}
+              />
+            </Button>
           </div>
-          <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
-            {(upcomingJobs ?? [])
-              .filter((job) => !entryByJobId.has(job.id))
-              .map((job) => {
-              const inCurrentWeek = weekJobIds.has(job.id);
-              const dayLabel = format(parseISO(job.plannedStartsAt), "EEE d MMM");
-              const timeLabel = format(parseISO(job.plannedStartsAt), "HH:mm");
-              return (
-                <li
-                  key={`up-${job.id}`}
-                  className="flex flex-wrap items-center gap-2 justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-white/90 font-medium truncate">{job.title}</div>
-                    <div className="text-[11px] text-white/45 truncate">
-                      {job.eventTitle} · {dayLabel} {timeLabel}
-                      {inCurrentWeek ? ` · ${t("time.inThisWeek")}` : null}
+          {upcomingCollapsed ? null : (
+            <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {(upcomingJobs ?? [])
+                .filter((job) => !entryByJobId.has(job.id))
+                .map((job) => {
+                const inCurrentWeek = weekJobIds.has(job.id);
+                const dayLabel = format(parseISO(job.plannedStartsAt), "EEE d MMM");
+                const timeLabel = format(parseISO(job.plannedStartsAt), "HH:mm");
+                return (
+                  <li
+                    key={`up-${job.id}`}
+                    className="flex flex-wrap items-center gap-2 justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-white/90 font-medium truncate">{job.title}</div>
+                      <div className="text-[11px] text-white/45 truncate">
+                        {job.eventTitle} · {dayLabel} {timeLabel}
+                        {inCurrentWeek ? ` · ${t("time.inThisWeek")}` : null}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 gap-1.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-white/15 text-white/80 h-8 text-xs"
-                      onClick={() => jumpToJobWeek(job)}
-                    >
-                      {t("time.showWeek")}
-                    </Button>
-                    {canEdit ? (
+                    <div className="flex shrink-0 gap-1.5">
                       <Button
                         type="button"
+                        variant="outline"
                         size="sm"
-                        className="h-8 text-xs bg-emerald-700 hover:bg-emerald-600"
-                        onClick={() => addJobToTime(job)}
+                        className="border-white/15 text-white/80 h-8 text-xs"
+                        onClick={() => jumpToJobWeek(job)}
                       >
-                        {t("time.addToTime")}
+                        {t("time.showWeek")}
                       </Button>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                      {canEdit ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 text-xs bg-emerald-700 hover:bg-emerald-600"
+                          onClick={() => addJobToTime(job)}
+                        >
+                          {t("time.addToTime")}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       ) : null}
 
