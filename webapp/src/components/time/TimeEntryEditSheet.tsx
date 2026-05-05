@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ChevronsUpDown } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
@@ -59,6 +59,8 @@ function applySnappedHm(base: Date, hm: string): Date {
 
 export function TimeEntryEditSheet(props: {
   entry: TimeEntry | null;
+  /** While dragging this entry on the week grid, reflects live start/end (ISO). */
+  liveRange?: { startsAt: string; endsAt: string } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projects: TimeProject[];
@@ -74,6 +76,7 @@ export function TimeEntryEditSheet(props: {
   const timeFormat: TimeFormat = effective?.timeFormat ?? "24h";
   const {
     entry,
+    liveRange = null,
     open,
     onOpenChange,
     projects,
@@ -84,6 +87,9 @@ export function TimeEntryEditSheet(props: {
     deleting,
     entrySummary,
   } = props;
+
+  const liveRangeRef = useRef(liveRange);
+  liveRangeRef.current = liveRange;
 
   const [note, setNote] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -119,16 +125,27 @@ export function TimeEntryEditSheet(props: {
     setSelectedTags(new Set(entry.tagIds));
     setCategory((entry.category as TimeCategory) ?? "work");
     setConfirmDelete(false);
-    const s = parseISO(entry.startsAt);
-    const e = parseISO(entry.endsAt);
-    setStartHm(Number.isFinite(s.getTime()) ? hmFromDate(s) : "09:00");
-    setEndHm(Number.isFinite(e.getTime()) ? hmFromDate(e) : "10:00");
+    if (!liveRangeRef.current) {
+      const s = parseISO(entry.startsAt);
+      const e = parseISO(entry.endsAt);
+      setStartHm(Number.isFinite(s.getTime()) ? hmFromDate(s) : "09:00");
+      setEndHm(Number.isFinite(e.getTime()) ? hmFromDate(e) : "10:00");
+    }
   }, [entry, open]);
+
+  useEffect(() => {
+    if (!liveRange || !open) return;
+    const s = parseISO(liveRange.startsAt);
+    const e = parseISO(liveRange.endsAt);
+    if (!Number.isFinite(s.getTime()) || !Number.isFinite(e.getTime())) return;
+    setStartHm(hmFromDate(s));
+    setEndHm(hmFromDate(e));
+  }, [liveRange, open]);
 
   const timeRangeLabel = useMemo(() => {
     if (!entry) return "";
-    const start = parseISO(entry.startsAt);
-    const end = parseISO(entry.endsAt);
+    const start = parseISO(liveRange?.startsAt ?? entry.startsAt);
+    const end = parseISO(liveRange?.endsAt ?? entry.endsAt);
     if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return "";
     const dateLabel = format(start, "EEE d MMM");
     const tf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
@@ -144,7 +161,7 @@ export function TimeEntryEditSheet(props: {
     const durStr =
       durMin < 60 ? `${durMin} min` : durM > 0 ? `${durH}h ${durM}m` : `${durH}h`;
     return `${dateLabel} · ${format(sSnap, tf)} – ${format(eSnap, tf)} · ${durStr}`;
-  }, [entry, timeFormat]);
+  }, [entry, timeFormat, liveRange]);
 
   function toggleTag(id: string) {
     setSelectedTags((prev) => {

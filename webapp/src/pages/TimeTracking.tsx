@@ -317,6 +317,7 @@ export default function TimeTracking() {
   /** Live position + window minutes while dragging (labels follow pointer; snap on release). */
   const [dragOverride, setDragOverride] = useState<{
     entryId: string;
+    dayYmd: string;
     topPct: number;
     heightPct: number;
     startWinMin: number;
@@ -342,6 +343,24 @@ export default function TimeTracking() {
       null
     );
   }, [editingEntry, jobs, upcomingJobs]);
+
+  /** Live ISO range while dragging the entry open in the sheet (matches grid labels). */
+  const entryLiveDragRange = useMemo(() => {
+    if (!dragOverride || !editingEntryId || dragOverride.entryId !== editingEntryId) return null;
+    const sh = displayStartHour;
+    return {
+      startsAt: dateFromColumnAndWindowMinutes(
+        dragOverride.dayYmd,
+        dragOverride.startWinMin,
+        sh
+      ).toISOString(),
+      endsAt: dateFromColumnAndWindowMinutes(
+        dragOverride.dayYmd,
+        dragOverride.endWinMin,
+        sh
+      ).toISOString(),
+    };
+  }, [dragOverride, editingEntryId, displayStartHour]);
 
   const minutesFromY = useCallback((clientY: number, colEl: HTMLElement | null) => {
     if (!colEl) return null;
@@ -485,68 +504,60 @@ export default function TimeTracking() {
   );
 
   const attachEntryDragListeners = useCallback(() => {
-    let entryRafPending = false;
-    let latestClientY = 0;
-
     const onMove = (ev: PointerEvent) => {
       const col = activeColElRef.current;
-      if (!entryDragRef.current || !col) return;
-      latestClientY = ev.clientY;
-      if (entryRafPending) return;
-      entryRafPending = true;
-      requestAnimationFrame(() => {
-        entryRafPending = false;
-        const cur = entryDragRef.current;
-        const colEl = activeColElRef.current;
-        if (!cur || !colEl) return;
-        const r = colEl.getBoundingClientRect();
-        const mSnap = snapWindowMinutes(rawWindowMinutesFromY(latestClientY, r.top, COLUMN_HEIGHT_PX));
+      const cur = entryDragRef.current;
+      if (!cur || !col) return;
+      const r = col.getBoundingClientRect();
+      const mSnap = snapWindowMinutes(rawWindowMinutesFromY(ev.clientY, r.top, COLUMN_HEIGHT_PX));
 
-        if (cur.kind === "move") {
-          const dur =
-            Math.max(TIME_SNAP_MINUTES, Math.round(cur.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES);
-          const newStart = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, mSnap)));
-          const newEnd = newStart + dur;
-          const { topPct, heightPct } = pctRangeFromWindowMinutes(newStart, newEnd);
-          setDragOverride({
-            entryId: cur.entryId,
-            topPct,
-            heightPct,
-            startWinMin: newStart,
-            endWinMin: newEnd,
-          });
-          return;
-        }
+      if (cur.kind === "move") {
+        const dur =
+          Math.max(TIME_SNAP_MINUTES, Math.round(cur.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES);
+        const newStart = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, mSnap)));
+        const newEnd = newStart + dur;
+        const { topPct, heightPct } = pctRangeFromWindowMinutes(newStart, newEnd);
+        setDragOverride({
+          entryId: cur.entryId,
+          dayYmd: cur.dayYmd,
+          topPct,
+          heightPct,
+          startWinMin: newStart,
+          endWinMin: newEnd,
+        });
+        return;
+      }
 
-        if (cur.kind === "resizeEnd") {
-          const newEnd = clampMinutesToDay(
-            Math.max(cur.origStartWinMin + TIME_SNAP_MINUTES, mSnap)
-          );
-          const { topPct, heightPct } = pctRangeFromWindowMinutes(cur.origStartWinMin, newEnd);
-          setDragOverride({
-            entryId: cur.entryId,
-            topPct,
-            heightPct,
-            startWinMin: cur.origStartWinMin,
-            endWinMin: newEnd,
-          });
-          return;
-        }
+      if (cur.kind === "resizeEnd") {
+        const newEnd = clampMinutesToDay(
+          Math.max(cur.origStartWinMin + TIME_SNAP_MINUTES, mSnap)
+        );
+        const { topPct, heightPct } = pctRangeFromWindowMinutes(cur.origStartWinMin, newEnd);
+        setDragOverride({
+          entryId: cur.entryId,
+          dayYmd: cur.dayYmd,
+          topPct,
+          heightPct,
+          startWinMin: cur.origStartWinMin,
+          endWinMin: newEnd,
+        });
+        return;
+      }
 
-        if (cur.kind === "resizeStart") {
-          const newStart = clampMinutesToDay(
-            Math.min(mSnap, cur.origEndWinMin - TIME_SNAP_MINUTES)
-          );
-          const { topPct, heightPct } = pctRangeFromWindowMinutes(newStart, cur.origEndWinMin);
-          setDragOverride({
-            entryId: cur.entryId,
-            topPct,
-            heightPct,
-            startWinMin: newStart,
-            endWinMin: cur.origEndWinMin,
-          });
-        }
-      });
+      if (cur.kind === "resizeStart") {
+        const newStart = clampMinutesToDay(
+          Math.min(mSnap, cur.origEndWinMin - TIME_SNAP_MINUTES)
+        );
+        const { topPct, heightPct } = pctRangeFromWindowMinutes(newStart, cur.origEndWinMin);
+        setDragOverride({
+          entryId: cur.entryId,
+          dayYmd: cur.dayYmd,
+          topPct,
+          heightPct,
+          startWinMin: newStart,
+          endWinMin: cur.origEndWinMin,
+        });
+      }
     };
 
     const finish = (ev: PointerEvent) => {
@@ -1105,17 +1116,18 @@ export default function TimeTracking() {
                         const timeTf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
                         const override =
                           dragOverride?.entryId === e.id ? dragOverride : null;
+                        const colYmd = override?.dayYmd ?? dayYmd;
                         const liveStart =
                           override &&
                           dateFromColumnAndWindowMinutes(
-                            dayYmd,
+                            colYmd,
                             override.startWinMin,
                             displayStartHour
                           );
                         const liveEnd =
                           override &&
                           dateFromColumnAndWindowMinutes(
-                            dayYmd,
+                            colYmd,
                             override.endWinMin,
                             displayStartHour
                           );
@@ -1334,6 +1346,7 @@ export default function TimeTracking() {
 
       <TimeEntryEditSheet
         entry={editingEntry}
+        liveRange={entryLiveDragRange}
         open={Boolean(editingEntry)}
         onOpenChange={(o) => {
           if (!o) setEditingEntryId(null);
