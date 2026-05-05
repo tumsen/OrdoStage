@@ -28,6 +28,101 @@ function iso(d: Date) {
   return d.toISOString();
 }
 
+const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** Calendar day in UTC, e.g. "12 May 2026" — matches how show dates are stored. */
+function formatDayUtc(d: Date): string {
+  return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+/**
+ * Ensure every org event and performance has a matching TimeProject row so they appear
+ * in pickers without manual "link" steps. Names: event title for whole event;
+ * "{title} · {date}" for each show.
+ */
+async function syncEventShowTimeProjects(organizationId: string) {
+  const events = await prisma.event.findMany({
+    where: { organizationId },
+    select: {
+      id: true,
+      title: true,
+      shows: {
+        select: { id: true, showDate: true, showTime: true },
+        orderBy: { showDate: "asc" },
+      },
+    },
+    orderBy: { title: "asc" },
+  });
+
+  for (const ev of events) {
+    const eventTitle = ev.title.trim() || "Untitled event";
+
+    const existingEvProj = await prisma.timeProject.findFirst({
+      where: { organizationId, eventId: ev.id, eventShowId: null },
+    });
+    if (existingEvProj) {
+      if (existingEvProj.name !== eventTitle) {
+        await prisma.timeProject.update({
+          where: { id: existingEvProj.id },
+          data: { name: eventTitle },
+        });
+      }
+    } else {
+      await prisma.timeProject.create({
+        data: {
+          organizationId,
+          name: eventTitle,
+          eventId: ev.id,
+          eventShowId: null,
+          sortOrder: 0,
+        },
+      });
+    }
+
+    for (const show of ev.shows) {
+      const datePart = formatDayUtc(show.showDate);
+      const baseTitle = `${eventTitle} · ${datePart}`;
+      const targetName = show.showTime?.trim()
+        ? `${baseTitle} ${show.showTime.trim()}`
+        : baseTitle;
+      const existingShowProj = await prisma.timeProject.findFirst({
+        where: { organizationId, eventShowId: show.id },
+      });
+      if (existingShowProj) {
+        if (existingShowProj.name !== targetName || existingShowProj.eventId !== ev.id) {
+          await prisma.timeProject.update({
+            where: { id: existingShowProj.id },
+            data: { name: targetName, eventId: ev.id },
+          });
+        }
+      } else {
+        await prisma.timeProject.create({
+          data: {
+            organizationId,
+            name: targetName,
+            eventId: ev.id,
+            eventShowId: show.id,
+            sortOrder: 0,
+          },
+        });
+      }
+    }
+  }
+}
+
 function toDateTimeFromDateAndTime(dateIso: string, hhmm: string): Date | null {
   const d = new Date(dateIso);
   if (Number.isNaN(d.getTime())) return null;
@@ -534,6 +629,7 @@ timeRouter.get("/time/projects", async (c) => {
   if (!canView(c, "time")) {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
+  await syncEventShowTimeProjects(user.organizationId);
   const archived = c.req.query("archived") === "1";
   const rows = await prisma.timeProject.findMany({
     where: {
@@ -584,6 +680,12 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
       select: { id: true },
     });
     if (!ev) return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
+    const existingEvProj = await prisma.timeProject.findFirst({
+      where: { organizationId: user.organizationId, eventId, eventShowId: null },
+    });
+    if (existingEvProj) {
+      return c.json({ data: serializeProject(existingEvProj) });
+    }
   }
 
   const row = await prisma.timeProject.create({

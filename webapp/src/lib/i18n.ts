@@ -79,7 +79,9 @@ const en = {
     me: "Me",
     catalogTitle: "Time tracking catalog",
     catalogHint:
-      "Define tags and custom-named projects, or link an event or performance below. Linked projects appear in the picker when editing time entries.",
+      "Add tags and your own project names. Every event and each show is also available as a time project (created automatically; see the note below).",
+    eventsProjectsAutoHint:
+      "Each event is a project named like the event. Each performance is a project named “Event name · date” (and show time when set). The list refreshes when projects load — you do not need to create or link them manually.",
     tagsHeading: "Tags",
     projectsHeading: "Projects",
     tagPlaceholder: "e.g. Meeting",

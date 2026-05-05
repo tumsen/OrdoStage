@@ -1,36 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
 import type { TimeProject, TimeTag } from "@/contracts/backendTypes";
-
-type CatalogEventRow = {
-  id: string;
-  title: string;
-  shows: { id: string; showDate: string; showTime: string; status: string }[];
-};
-
-const WHOLE_EVENT_VALUE = "__whole__";
 
 export function TimeCatalogSettings() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [tagName, setTagName] = useState("");
   const [projectName, setProjectName] = useState("");
-  const [linkEventId, setLinkEventId] = useState<string>("");
-  const [linkShowScope, setLinkShowScope] = useState<string>(WHOLE_EVENT_VALUE);
 
   const { data: tags } = useQuery({
     queryKey: ["time-tags"],
@@ -41,20 +23,6 @@ export function TimeCatalogSettings() {
     queryKey: ["time-projects"],
     queryFn: () => api.get<TimeProject[]>("/api/time/projects"),
   });
-
-  const { data: catalogEvents } = useQuery({
-    queryKey: ["time-catalog-event-options"],
-    queryFn: () => api.get<CatalogEventRow[]>("/api/time/catalog-event-options"),
-  });
-
-  const selectedLinkEvent = useMemo(
-    () => (catalogEvents ?? []).find((e) => e.id === linkEventId),
-    [catalogEvents, linkEventId]
-  );
-
-  useEffect(() => {
-    setLinkShowScope(WHOLE_EVENT_VALUE);
-  }, [linkEventId]);
 
   const addTag = useMutation({
     mutationFn: (name: string) => api.post("/api/time/tags", { name }),
@@ -72,35 +40,6 @@ export function TimeCatalogSettings() {
       queryClient.invalidateQueries({ queryKey: ["time-projects"] });
       toast({ title: t("time.catalogProjectAdded") });
       setProjectName("");
-    },
-    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
-  });
-
-  const addLinkedProject = useMutation({
-    mutationFn: async () => {
-      if (!selectedLinkEvent) throw new Error("missing event");
-      const ev = selectedLinkEvent;
-      if (linkShowScope !== WHOLE_EVENT_VALUE) {
-        const show = ev.shows.find((s) => s.id === linkShowScope);
-        if (!show) throw new Error("missing show");
-        const dateLabel = format(parseISO(show.showDate), "d MMM yyyy");
-        const name = `${ev.title} · ${dateLabel} ${show.showTime}`;
-        return api.post<TimeProject>("/api/time/projects", {
-          name,
-          eventId: ev.id,
-          eventShowId: show.id,
-        });
-      }
-      return api.post<TimeProject>("/api/time/projects", {
-        name: ev.title,
-        eventId: ev.id,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["time-projects"] });
-      toast({ title: t("time.catalogProjectAdded") });
-      setLinkEventId("");
-      setLinkShowScope(WHOLE_EVENT_VALUE);
     },
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
   });
@@ -130,51 +69,8 @@ export function TimeCatalogSettings() {
         <p className="text-xs text-white/50 mt-1">{t("time.catalogHint")}</p>
       </div>
 
-      <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-3">
-        <Label className="text-white/70 text-xs uppercase tracking-wide">{t("time.linkFromEventsHeading")}</Label>
-        <p className="text-xs text-white/45">{t("time.linkFromEventsHint")}</p>
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-          <div className="flex-1 grid gap-2 sm:grid-cols-2">
-            <Select value={linkEventId} onValueChange={setLinkEventId}>
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder={t("time.selectEventPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-56">
-                {(catalogEvents ?? []).map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={linkShowScope}
-              onValueChange={setLinkShowScope}
-              disabled={!selectedLinkEvent}
-            >
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder={t("time.selectShowPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-56">
-                <SelectItem value={WHOLE_EVENT_VALUE}>{t("time.wholeEventProject")}</SelectItem>
-                {(selectedLinkEvent?.shows ?? []).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {format(parseISO(s.showDate), "EEE d MMM")} · {s.showTime}
-                    {s.status === "cancelled" ? ` (${t("time.showCancelled")})` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            type="button"
-            className="shrink-0 bg-violet-700 hover:bg-violet-600"
-            disabled={!linkEventId || addLinkedProject.isPending}
-            onClick={() => addLinkedProject.mutate()}
-          >
-            {t("time.addLinkedProject")}
-          </Button>
-        </div>
+      <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+        <p className="text-xs text-white/55">{t("time.eventsProjectsAutoHint")}</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
