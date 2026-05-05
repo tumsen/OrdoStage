@@ -161,6 +161,54 @@ function parseRange(c: { req: { query: (k: string) => string | undefined } }) {
   return { rangeStart, rangeEndExclusive };
 }
 
+type TimeSpan = { startsAt: Date; endsAt: Date };
+
+function subtractSpan(base: TimeSpan, blockers: TimeSpan[]): TimeSpan[] {
+  let out: TimeSpan[] = [base];
+  for (const b of blockers) {
+    const next: TimeSpan[] = [];
+    for (const s of out) {
+      if (b.endsAt <= s.startsAt || b.startsAt >= s.endsAt) {
+        next.push(s);
+        continue;
+      }
+      if (b.startsAt > s.startsAt) {
+        next.push({ startsAt: s.startsAt, endsAt: b.startsAt });
+      }
+      if (b.endsAt < s.endsAt) {
+        next.push({ startsAt: b.endsAt, endsAt: s.endsAt });
+      }
+    }
+    out = next.filter((s) => s.endsAt.getTime() > s.startsAt.getTime());
+    if (out.length === 0) break;
+  }
+  return out;
+}
+
+async function computeNonOverlappingSpans(args: {
+  organizationId: string;
+  personId: string;
+  startsAt: Date;
+  endsAt: Date;
+  excludeEntryId?: string;
+}): Promise<TimeSpan[]> {
+  const overlaps = await prisma.timeEntry.findMany({
+    where: {
+      organizationId: args.organizationId,
+      personId: args.personId,
+      startsAt: { lt: args.endsAt },
+      endsAt: { gt: args.startsAt },
+      ...(args.excludeEntryId ? { id: { not: args.excludeEntryId } } : {}),
+    },
+    select: { startsAt: true, endsAt: true },
+    orderBy: { startsAt: "asc" },
+  });
+  return subtractSpan(
+    { startsAt: args.startsAt, endsAt: args.endsAt },
+    overlaps.map((o) => ({ startsAt: o.startsAt, endsAt: o.endsAt }))
+  );
+}
+
 async function resolveTargetPersonId(
   c: Context,
   organizationId: string,
@@ -972,11 +1020,31 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
     }
 
     if (existing) {
+      const spans = await computeNonOverlappingSpans({
+        organizationId: user.organizationId,
+        personId: myPersonId,
+        startsAt,
+        endsAt,
+        excludeEntryId: existing.id,
+      });
+      if (spans.length === 0) {
+        return c.json(
+          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          409
+        );
+      }
+      const primary = spans[0];
+      if (!primary) {
+        return c.json(
+          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          409
+        );
+      }
       const updated = await prisma.timeEntry.update({
         where: { id: existing.id },
         data: {
-          startsAt,
-          endsAt,
+          startsAt: primary.startsAt,
+          endsAt: primary.endsAt,
           category: body.category ?? "work",
           timeProjectId: body.timeProjectId ?? null,
           note: body.note ?? null,
@@ -988,16 +1056,56 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         },
         include: { tagLinks: { select: { timeTagId: true } } },
       });
+      if (spans.length > 1) {
+        for (const s of spans.slice(1)) {
+          await prisma.timeEntry.create({
+            data: {
+              organizationId: user.organizationId,
+              userId: user.id,
+              personId: myPersonId,
+              startsAt: s.startsAt,
+              endsAt: s.endsAt,
+              kind: "custom",
+              category: body.category ?? "work",
+              eventShowJobId: null,
+              eventId,
+              timeProjectId: body.timeProjectId ?? null,
+              note: body.note ?? null,
+              isLocked: body.isLocked ?? false,
+              tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
+            },
+          });
+        }
+      }
       return c.json({ data: serializeEntry(updated) });
     }
 
+    const spans = await computeNonOverlappingSpans({
+      organizationId: user.organizationId,
+      personId: myPersonId,
+      startsAt,
+      endsAt,
+    });
+    if (spans.length === 0) {
+      return c.json(
+        { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+        409
+      );
+    }
+    const primary = spans[0];
+    if (!primary) {
+      return c.json(
+        { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+        409
+      );
+    }
     const created = await prisma.timeEntry.create({
       data: {
         organizationId: user.organizationId,
         userId: user.id,
         personId: myPersonId,
-        startsAt,
-        endsAt,
+        startsAt: primary.startsAt,
+        endsAt: primary.endsAt,
         kind: "job",
         category: body.category ?? "work",
         eventShowJobId,
@@ -1009,6 +1117,27 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       },
       include: { tagLinks: { select: { timeTagId: true } } },
     });
+    if (spans.length > 1) {
+      for (const s of spans.slice(1)) {
+        await prisma.timeEntry.create({
+          data: {
+            organizationId: user.organizationId,
+            userId: user.id,
+            personId: myPersonId,
+            startsAt: s.startsAt,
+            endsAt: s.endsAt,
+            kind: "custom",
+            category: body.category ?? "work",
+            eventShowJobId: null,
+            eventId,
+            timeProjectId: body.timeProjectId ?? null,
+            note: body.note ?? null,
+            isLocked: body.isLocked ?? false,
+            tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
+          },
+        });
+      }
+    }
     return c.json({ data: serializeEntry(created) });
   }
 
@@ -1039,13 +1168,32 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
     }
   }
 
+  const spans = await computeNonOverlappingSpans({
+    organizationId: user.organizationId,
+    personId: myPersonId,
+    startsAt,
+    endsAt,
+  });
+  if (spans.length === 0) {
+    return c.json(
+      { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+      409
+    );
+  }
+  const primary = spans[0];
+  if (!primary) {
+    return c.json(
+      { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+      409
+    );
+  }
   const created = await prisma.timeEntry.create({
     data: {
       organizationId: user.organizationId,
       userId: user.id,
       personId: myPersonId,
-      startsAt,
-      endsAt,
+      startsAt: primary.startsAt,
+      endsAt: primary.endsAt,
       kind: "custom",
       category: body.category ?? "work",
       eventShowJobId: null,
@@ -1057,6 +1205,27 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
     },
     include: { tagLinks: { select: { timeTagId: true } } },
   });
+  if (spans.length > 1) {
+    for (const s of spans.slice(1)) {
+      await prisma.timeEntry.create({
+        data: {
+          organizationId: user.organizationId,
+          userId: user.id,
+          personId: myPersonId,
+          startsAt: s.startsAt,
+          endsAt: s.endsAt,
+          kind: "custom",
+          category: body.category ?? "work",
+          eventShowJobId: null,
+          eventId,
+          timeProjectId: body.timeProjectId ?? null,
+          note: body.note ?? null,
+          isLocked: body.isLocked ?? false,
+          tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
+        },
+      });
+    }
+  }
   return c.json({ data: serializeEntry(created) });
 });
 
@@ -1130,29 +1299,77 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
     }
   }
 
+  const spans = await computeNonOverlappingSpans({
+    organizationId: user.organizationId,
+    personId: existing.personId,
+    startsAt,
+    endsAt,
+    excludeEntryId: existing.id,
+  });
+  if (spans.length === 0) {
+    return c.json(
+      { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+      409
+    );
+  }
+  const primary = spans[0];
+  if (!primary) {
+    return c.json(
+      { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+      409
+    );
+  }
+
+  const finalKind = body.kind ?? existing.kind;
+  const finalCategory = body.category ?? existing.category;
+  const finalEventShowJobId =
+    body.eventShowJobId !== undefined ? body.eventShowJobId : existing.eventShowJobId;
+  const finalEventId = body.eventId !== undefined ? body.eventId : existing.eventId;
+  const finalProjectId = body.timeProjectId !== undefined ? body.timeProjectId : existing.timeProjectId;
+  const finalNote = body.note !== undefined ? body.note : existing.note;
+  const finalIsLocked = body.isLocked !== undefined ? body.isLocked : existing.isLocked;
+  const finalTagIds = body.tagIds !== undefined ? body.tagIds : existing.tagLinks.map((t) => t.timeTagId);
+
   const updated = await prisma.timeEntry.update({
     where: { id },
     data: {
-      ...(body.startsAt !== undefined ? { startsAt } : {}),
-      ...(body.endsAt !== undefined ? { endsAt } : {}),
-      ...(body.kind !== undefined ? { kind: body.kind } : {}),
-      ...(body.category !== undefined ? { category: body.category } : {}),
-      ...(body.eventShowJobId !== undefined ? { eventShowJobId: body.eventShowJobId } : {}),
-      ...(body.eventId !== undefined ? { eventId: body.eventId } : {}),
-      ...(body.timeProjectId !== undefined ? { timeProjectId: body.timeProjectId } : {}),
-      ...(body.note !== undefined ? { note: body.note } : {}),
-      ...(body.isLocked !== undefined ? { isLocked: body.isLocked } : {}),
-      ...(body.tagIds !== undefined
-        ? {
-            tagLinks: {
-              deleteMany: {},
-              createMany: { data: body.tagIds.map((timeTagId) => ({ timeTagId })) },
-            },
-          }
-        : {}),
+      startsAt: primary.startsAt,
+      endsAt: primary.endsAt,
+      kind: finalKind,
+      category: finalCategory,
+      eventShowJobId: finalEventShowJobId,
+      eventId: finalEventId,
+      timeProjectId: finalProjectId,
+      note: finalNote,
+      isLocked: finalIsLocked,
+      tagLinks: {
+        deleteMany: {},
+        createMany: { data: finalTagIds.map((timeTagId) => ({ timeTagId })) },
+      },
     },
     include: { tagLinks: { select: { timeTagId: true } } },
   });
+  if (spans.length > 1) {
+    for (const s of spans.slice(1)) {
+      await prisma.timeEntry.create({
+        data: {
+          organizationId: user.organizationId,
+          userId: existing.userId,
+          personId: existing.personId,
+          startsAt: s.startsAt,
+          endsAt: s.endsAt,
+          kind: finalEventShowJobId ? "custom" : finalKind,
+          category: finalCategory,
+          eventShowJobId: finalEventShowJobId ? null : finalEventShowJobId,
+          eventId: finalEventId,
+          timeProjectId: finalProjectId,
+          note: finalNote,
+          isLocked: finalIsLocked,
+          tagLinks: { createMany: { data: finalTagIds.map((timeTagId) => ({ timeTagId })) } },
+        },
+      });
+    }
+  }
   return c.json({ data: serializeEntry(updated) });
 });
 

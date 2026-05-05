@@ -1013,6 +1013,7 @@ export default function TimeTracking() {
                   {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
                 </span>
               </div>
+              <div className="h-3 border-b border-white/15" />
             </div>
             {weekDays.map((day) => {
               const dayYmd = format(day, "yyyy-MM-dd");
@@ -1092,7 +1093,7 @@ export default function TimeTracking() {
                   </div>
                   <div
                     data-day-col={dayYmd}
-                    className={cn("relative flex flex-col border-b border-white/15", col?.bg)}
+                    className={cn("relative flex flex-col", col?.bg)}
                     style={{ height: COLUMN_HEIGHT_PX }}
                   >
                     {col && (
@@ -1423,6 +1424,7 @@ export default function TimeTracking() {
                         );
                       })}
                   </div>
+                  <div className="h-3 border-b border-white/15" />
                 </div>
               );
             })}
