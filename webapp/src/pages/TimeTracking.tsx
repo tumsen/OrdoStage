@@ -763,7 +763,7 @@ export default function TimeTracking() {
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
           <p className="text-sm text-white/50 mt-1">{t("time.subtitle")}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 whitespace-nowrap">
           <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
             <button
               type="button"
