@@ -232,7 +232,12 @@ scheduleRouter.get("/schedule", async (c) => {
           : {}),
       },
       orderBy: { name: "asc" },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
         shows: {
           ...(fromDate || toDateExclusive
             ? {
@@ -245,27 +250,18 @@ scheduleRouter.get("/schedule", async (c) => {
               }
             : {}),
           orderBy: [{ date: "asc" }, { showTime: "asc" }],
-          include: {
-            showPeople: {
-              include: {
-                person: true,
-              },
-            },
-          },
-        },
-        people: {
-          include: {
-            person: true,
-          },
-        },
-        teams: {
-          include: {
-            department: true,
-          },
-        },
-        personNotes: {
-          include: {
-            person: true,
+          select: {
+            id: true,
+            tourId: true,
+            type: true,
+            date: true,
+            showTime: true,
+            travelTimeMinutes: true,
+            techRiderSentAt: true,
+            techRiderOpenedAt: true,
+            techRiderLastOpenedAt: true,
+            createdAt: true,
+            updatedAt: true,
           },
         },
       },
@@ -344,25 +340,11 @@ scheduleRouter.get("/schedule", async (c) => {
       techRiderLastOpenedAt: show.techRiderLastOpenedAt ? serializeDate(show.techRiderLastOpenedAt) : null,
       createdAt: serializeDate(show.createdAt),
       updatedAt: serializeDate(show.updatedAt),
-      showPeople: show.showPeople.map((sp) => ({
-        ...sp,
-        person: serializePerson(sp.person),
-      })),
+      showPeople: [],
     })),
-    people: tour.people.map((tp) => ({
-      ...tp,
-      person: serializePerson(tp.person),
-    })),
-    personNotes: tour.personNotes.map((pn) => ({
-      ...pn,
-      person: {
-        id: pn.person.id,
-        name: pn.person.name,
-        role: pn.person.role,
-      },
-      createdAt: serializeDate(pn.createdAt),
-      updatedAt: serializeDate(pn.updatedAt),
-    })),
+    people: [],
+    teams: [],
+    personNotes: [],
   }));
 
   return c.json({
