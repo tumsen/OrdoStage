@@ -146,6 +146,7 @@ export function toCalendarItems(
     startDate: b.startDate,
     endDate: b.endDate,
     raw: b,
+    renderBehind: b.type === "venue_booking" && Boolean(b.eventId),
   }));
 
   const tourItems: CalendarItem[] = tours.flatMap((tour) =>
