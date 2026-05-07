@@ -23,6 +23,7 @@ const BOOKING_TYPE_LABELS: Record<string, string> = {
   rehearsal: "Rehearsal",
   maintenance: "Maintenance",
   private: "Private",
+  venue_booking: "Venue booking",
   other: "Other",
 };
 

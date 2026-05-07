@@ -43,6 +43,7 @@ import { formatDate } from "@/lib/dateUtils";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
+import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
 import { computeEventWorkTotals, computeShowStaffingStats, parseStaffingOkMap } from "@/lib/eventShowStaffing";
 import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
@@ -416,6 +417,11 @@ function DetailsTab({
     queryKey: ["venues"],
     queryFn: () => api.get<Venue[]>("/api/venues"),
   });
+  const { data: people = [] } = useQuery({
+    queryKey: ["people"],
+    queryFn: () => api.get<Person[]>("/api/people"),
+  });
+  const [venueBookingOpen, setVenueBookingOpen] = useState(false);
 
   const getInEndFieldRef = useRef<SplitTimeFieldHandle>(null);
   const getInDurFieldRef = useRef<SplitTimeFieldHandle>(null);
@@ -456,6 +462,10 @@ function DetailsTab({
     });
     return venueSmallerThanStageWarnings(tot, venueRecordToMeters(v));
   }, [venues, vId, sW, sD, sH]);
+  const eventBookingSlot = useMemo(
+    () => (event ? bookingSlotFromEventShows(event) : null),
+    [event]
+  );
 
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => api.post<Event>("/api/events", data),
@@ -684,6 +694,24 @@ function DetailsTab({
               Schedule and duration are per show (below). Default venue is for reference; each show can use a different venue.
               Draft / confirmed / cancelled is set on each show below, not here.
             </p>
+            {!isNew && event ? (
+              <div className="rounded-md border border-white/10 bg-white/[0.02] p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-white/55">Create an editable venue booking based on show timings.</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-white/10 bg-transparent text-white/85"
+                    onClick={() => setVenueBookingOpen(true)}
+                    disabled={!eventBookingSlot}
+                    title={!eventBookingSlot ? "Add at least one timed show first." : undefined}
+                  >
+                    Venue booking
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             <FormField
               control={form.control}
               name="venueId"
@@ -1218,6 +1246,21 @@ function DetailsTab({
             </AlertDialog>
           </>
         ) : null}
+        {!isNew && event ? (
+          <NewBookingDialog
+            open={venueBookingOpen}
+            onClose={() => setVenueBookingOpen(false)}
+            venues={venues ?? []}
+            people={people}
+            initialSlot={eventBookingSlot}
+            initialValues={{
+              title: `${event.title} · Venue booking`,
+              type: "venue_booking",
+              venueId: event.venueId ?? "",
+              description: event.description ?? "",
+            }}
+          />
+        ) : null}
     </div>
   );
 }
@@ -1237,6 +1280,35 @@ function formatShowCardSummaryLine(show: EventShow): string {
   const end = endTimeFromStartAndDuration(show.showTime, show.durationMinutes);
   const venue = show.venue?.name ?? "Venue";
   return `${dateStr} · ${show.showTime}–${end} · ${show.durationMinutes} min · ${venue}`;
+}
+
+function bookingSlotFromShow(show: Pick<EventShow, "showDate" | "showTime" | "durationMinutes">) {
+  if (!/^\d{2}:\d{2}$/.test(show.showTime)) return null;
+  const day = show.showDate.slice(0, 10);
+  const end = endTimeFromStartAndDuration(show.showTime, show.durationMinutes);
+  return {
+    startDate: `${day}T${show.showTime}`,
+    endDate: `${day}T${end}`,
+  };
+}
+
+function bookingSlotFromEventShows(event: EventDetail) {
+  const slots = (event.shows ?? [])
+    .map((show) => bookingSlotFromShow(show))
+    .filter((slot): slot is { startDate: string; endDate: string } => Boolean(slot));
+  if (slots.length === 0) return null;
+  const starts = slots.map((slot) => new Date(slot.startDate).getTime()).filter((ts) => Number.isFinite(ts));
+  const ends = slots.map((slot) => new Date(slot.endDate).getTime()).filter((ts) => Number.isFinite(ts));
+  if (starts.length === 0 || ends.length === 0) return null;
+  const startTs = Math.min(...starts);
+  const endTs = Math.max(...ends);
+  const toLocalInput = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+      d.getMinutes()
+    )}`;
+  };
+  return { startDate: toLocalInput(new Date(startTs)), endDate: toLocalInput(new Date(endTs)) };
 }
 
 function EventStaffingOverviewBanner({ event }: { event: EventDetail }) {
@@ -1954,6 +2026,7 @@ function ShowEventCard({
   people,
   updateShow,
   deleteShow,
+  onCreateVenueBooking,
 }: {
   eventId: string;
   show: EventShow;
@@ -1963,6 +2036,7 @@ function ShowEventCard({
   people: Person[];
   updateShow: { mutate: (a: { showId: string; body: Record<string, unknown> }) => void };
   deleteShow: { mutate: (id: string) => void };
+  onCreateVenueBooking: (show: EventShow) => void;
 }) {
   const patch = (body: Record<string, unknown>) => updateShow.mutate({ showId: show.id, body });
   const [cardOpen, setCardOpen] = useState(showIndex === 0);
@@ -2029,18 +2103,32 @@ function ShowEventCard({
             </div>
           </button>
         </CollapsibleTrigger>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 text-white/30 hover:text-red-400"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!confirmDeleteAction("show")) return;
-            deleteShow.mutate(show.id);
-          }}
-        >
-          <Trash2 size={13} />
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[11px] text-white/60 hover:text-white hover:bg-white/10"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCreateVenueBooking(show);
+            }}
+          >
+            Venue booking
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-white/30 hover:text-red-400"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!confirmDeleteAction("show")) return;
+              deleteShow.mutate(show.id);
+            }}
+          >
+            <Trash2 size={13} />
+          </Button>
+        </div>
       </div>
 
       <CollapsibleContent className="p-4 pt-3 space-y-3">
@@ -2158,6 +2246,7 @@ function ShowsTab({ event }: { event: EventDetail }) {
     queryFn: () => api.get<Person[]>("/api/people"),
   });
   const [creating, setCreating] = useState(false);
+  const [bookingShowId, setBookingShowId] = useState<string | null>(null);
   const [newShow, setNewShow] = useState<NewShowFormState>({
     showDate: "",
     showTime: "",
@@ -2222,6 +2311,10 @@ function ShowsTab({ event }: { event: EventDetail }) {
 
   const previousShow = sortedShows.length > 0 ? sortedShows[sortedShows.length - 1] : null;
   const availablePeople = allPeople;
+  const bookingShow = useMemo(
+    () => sortedShows.find((show) => show.id === bookingShowId) ?? null,
+    [sortedShows, bookingShowId]
+  );
 
   const copyPreviousShow = useMutation({
     mutationFn: () => {
@@ -2344,10 +2437,29 @@ function ShowsTab({ event }: { event: EventDetail }) {
               people={availablePeople}
               updateShow={updateShow}
               deleteShow={deleteShow}
+              onCreateVenueBooking={(targetShow) => setBookingShowId(targetShow.id)}
             />
           ))}
         </div>
       )}
+      <NewBookingDialog
+        open={bookingShow != null}
+        onClose={() => setBookingShowId(null)}
+        venues={venues ?? []}
+        people={availablePeople}
+        initialSlot={bookingShow ? bookingSlotFromShow(bookingShow) : null}
+        initialValues={{
+          title: bookingShow
+            ? `${event.title} · ${new Date(bookingShow.showDate).toLocaleDateString(undefined, {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              })}`
+            : `${event.title} · Venue booking`,
+          type: "venue_booking",
+          venueId: bookingShow?.venueId ?? event.venueId ?? "",
+        }}
+      />
       <div className="space-y-2 pt-1">
         <p className="text-xs text-white/45">{sortedShows.length} show{sortedShows.length === 1 ? "" : "s"}</p>
         <div className="flex flex-wrap gap-2">

@@ -39,6 +39,8 @@ interface NewBookingDialogProps {
   people: Person[];
   /** Prefill start/end from week/day grid drag */
   initialSlot?: { startDate: string; endDate: string } | null;
+  /** Optional prefilled values (still editable). */
+  initialValues?: Partial<Pick<CreateInternalBooking, "title" | "description" | "type" | "venueId" | "personIds">>;
 }
 
 const emptyForm: CreateInternalBooking = {
@@ -51,7 +53,14 @@ const emptyForm: CreateInternalBooking = {
   personIds: [],
 };
 
-export function NewBookingDialog({ open, onClose, venues, people, initialSlot }: NewBookingDialogProps) {
+export function NewBookingDialog({
+  open,
+  onClose,
+  venues,
+  people,
+  initialSlot,
+  initialValues,
+}: NewBookingDialogProps) {
   const queryClient = useQueryClient();
 
   const form = useForm<CreateInternalBooking>({
@@ -63,13 +72,14 @@ export function NewBookingDialog({ open, onClose, venues, people, initialSlot }:
     if (initialSlot?.startDate && initialSlot?.endDate) {
       form.reset({
         ...emptyForm,
+        ...initialValues,
         startDate: initialSlot.startDate,
         endDate: initialSlot.endDate,
       });
     } else {
-      form.reset(emptyForm);
+      form.reset({ ...emptyForm, ...initialValues });
     }
-  }, [open, initialSlot, form]);
+  }, [open, initialSlot, initialValues, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -147,6 +157,7 @@ export function NewBookingDialog({ open, onClose, venues, people, initialSlot }:
                       <SelectItem value="rehearsal">Rehearsal</SelectItem>
                       <SelectItem value="maintenance">Maintenance</SelectItem>
                       <SelectItem value="private">Private</SelectItem>
+                      <SelectItem value="venue_booking">Venue booking</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
@@ -194,14 +205,17 @@ export function NewBookingDialog({ open, onClose, venues, people, initialSlot }:
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className={labelClass}>Venue</FormLabel>
-                  <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value || "__none__"}
+                    onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
+                  >
                     <FormControl>
                       <SelectTrigger className={inputClass}>
                         <SelectValue placeholder="No venue" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                      <SelectItem value="none">No venue</SelectItem>
+                      <SelectItem value="__none__">No venue</SelectItem>
                       {venues.map((v) => (
                         <SelectItem key={v.id} value={v.id}>
                           {v.name}

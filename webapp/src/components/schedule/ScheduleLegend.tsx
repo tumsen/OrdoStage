@@ -6,6 +6,7 @@ const LEGEND_ITEMS = [
   { label: "Rehearsal", colorKey: "rehearsal" },
   { label: "Maintenance", colorKey: "maintenance" },
   { label: "Private", colorKey: "private" },
+  { label: "Venue booking", colorKey: "venue_booking" },
   { label: "Other booking", colorKey: "other" },
 ];
 

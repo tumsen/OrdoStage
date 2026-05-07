@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import type { EventDetail, InternalBookingDetail, Venue, Person } from "../../../backend/src/types";
+import type { EventDetail, InternalBookingDetail, Venue, Person, TourDetail } from "../../../backend/src/types";
 import {
   ScheduleFilters,
   type ScheduleViewMode,
@@ -31,6 +31,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 interface ScheduleData {
   events: EventDetail[];
   bookings: InternalBookingDetail[];
+  tours: TourDetail[];
 }
 
 function toISODate(date: Date): string {
@@ -143,6 +144,7 @@ type OccupancyEntry = {
 };
 
 function resolveItemVenue(item: CalendarItem): { id: string; name: string } | null {
+  if (item.id.startsWith("tour:")) return null;
   if (item.kind === "booking") {
     const booking = item.raw as InternalBookingDetail;
     if (!booking.venueId || !booking.venue?.name) return null;
@@ -336,6 +338,7 @@ export default function Schedule() {
     rehearsal: true,
     maintenance: true,
     private: true,
+    venue_booking: true,
     other: true,
   });
 
@@ -350,10 +353,12 @@ export default function Schedule() {
   });
 
   function handleItemClick(item: CalendarItem) {
+    if (item.id.startsWith("tour:")) return;
     setSelectedItem(item);
   }
 
   function handleDeleteItem(item: CalendarItem) {
+    if (item.id.startsWith("tour:")) return;
     if (item.kind === "job") return;
     if (item.kind === "event") {
       const rawEvent = item.raw as EventDetail;
@@ -393,7 +398,7 @@ export default function Schedule() {
   });
 
   const items: CalendarItem[] = scheduleData
-    ? toCalendarItems(scheduleData.events, scheduleData.bookings, {
+    ? toCalendarItems(scheduleData.events, scheduleData.bookings, scheduleData.tours ?? [], {
         personIdFilter: personId !== "all" ? personId : undefined,
       })
     : [];
@@ -404,6 +409,7 @@ export default function Schedule() {
     if (item.type === "rehearsal") return visibility.rehearsal;
     if (item.type === "maintenance") return visibility.maintenance;
     if (item.type === "private") return visibility.private;
+    if (item.type === "venue_booking") return visibility.venue_booking;
     return visibility.other;
   });
 

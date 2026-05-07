@@ -363,6 +363,7 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
               <SelectItem value="rehearsal">Rehearsal</SelectItem>
               <SelectItem value="maintenance">Maintenance</SelectItem>
               <SelectItem value="private">Private</SelectItem>
+              <SelectItem value="venue_booking">Venue booking</SelectItem>
               <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>
@@ -472,7 +473,11 @@ export function EditItemSheet({ item, onClose, venues, people }: EditItemSheetPr
   const selectedJobId = jobMatch?.[1] ?? null;
 
   const BOOKING_TYPE_LABELS: Record<string, string> = {
-    rehearsal: "Rehearsal", maintenance: "Maintenance", private: "Private", other: "Other",
+    rehearsal: "Rehearsal",
+    maintenance: "Maintenance",
+    private: "Private",
+    venue_booking: "Venue booking",
+    other: "Other",
   };
 
   const kindLabel =

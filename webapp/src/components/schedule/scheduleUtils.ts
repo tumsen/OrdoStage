@@ -1,6 +1,6 @@
-import type { EventDetail, InternalBookingDetail } from "../../../../backend/src/types";
+import type { EventDetail, InternalBookingDetail, TourDetail } from "../../../../backend/src/types";
 
-export type BookingType = "rehearsal" | "maintenance" | "private" | "other";
+export type BookingType = "rehearsal" | "maintenance" | "private" | "venue_booking" | "other";
 
 export interface CalendarItem {
   id: string;
@@ -56,6 +56,7 @@ function calendarStatusForShow(
 export function toCalendarItems(
   events: EventDetail[],
   bookings: InternalBookingDetail[],
+  tours: TourDetail[] = [],
   options?: ToCalendarItemsOptions
 ): CalendarItem[] {
   const personJobFilter = options?.personIdFilter;
@@ -143,7 +144,31 @@ export function toCalendarItems(
     raw: b,
   }));
 
-  return [...eventItems, ...jobItems, ...bookingItems];
+  const tourItems: CalendarItem[] = tours.flatMap((tour) =>
+    (tour.shows ?? [])
+      .filter((show) => Boolean(show.date))
+      .map((show) => {
+        const day = show.date.slice(0, 10);
+        const hasTime = typeof show.showTime === "string" && /^\d{2}:\d{2}$/.test(show.showTime);
+        const startDate = hasTime ? toLocalDatetime(day, show.showTime!) : day;
+        const endDate: string | null =
+          hasTime && show.travelTimeMinutes && show.travelTimeMinutes > 0
+            ? addMinutesLocal(startDate, show.travelTimeMinutes)
+            : null;
+        const typeLabel = show.type === "travel" ? "Travel" : show.type === "day_off" ? "Day off" : "Show";
+        return {
+          id: `tour:${tour.id}:show:${show.id}`,
+          title: `${tour.name} · ${typeLabel}`,
+          kind: "event",
+          status: tour.status,
+          startDate,
+          endDate,
+          raw: tour as unknown as EventDetail,
+        } satisfies CalendarItem;
+      })
+  );
+
+  return [...eventItems, ...tourItems, ...jobItems, ...bookingItems];
 }
 
 export function getMonthDays(year: number, month: number): (Date | null)[] {
@@ -222,6 +247,7 @@ export const ITEM_COLORS: Record<string, string> = {
   rehearsal: "bg-amber-600/80 text-amber-100 border border-amber-500/40",
   maintenance: "bg-slate-600/80 text-slate-100 border border-slate-500/40",
   private: "bg-purple-600/80 text-purple-100 border border-purple-500/40",
+  venue_booking: "bg-rose-600/80 text-rose-100 border border-rose-500/40",
   other: "bg-blue-600/80 text-blue-100 border border-blue-500/40",
 };
 

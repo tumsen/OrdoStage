@@ -133,7 +133,7 @@ scheduleRouter.get("/schedule", async (c) => {
     bookingWhere.people = { some: { personId } };
   }
 
-  const [events, bookings] = await Promise.all([
+  const [events, bookings, tours] = await Promise.all([
     prisma.event.findMany({
       where: eventWhere,
       orderBy: { startDate: "asc" },
@@ -206,6 +206,70 @@ scheduleRouter.get("/schedule", async (c) => {
         people: { include: { person: true } },
       },
     }),
+    prisma.tour.findMany({
+      where: {
+        organizationId: user.organizationId,
+        ...(fromDate || toDateExclusive
+          ? {
+              shows: {
+                some: {
+                  date: {
+                    ...(fromDate ? { gte: fromDate } : {}),
+                    ...(toDateExclusive ? { lt: toDateExclusive } : {}),
+                  },
+                },
+              },
+            }
+          : {}),
+        ...(personId
+          ? {
+              shows: {
+                some: {
+                  showPeople: { some: { personId } },
+                },
+              },
+            }
+          : {}),
+      },
+      orderBy: { name: "asc" },
+      include: {
+        shows: {
+          ...(fromDate || toDateExclusive
+            ? {
+                where: {
+                  date: {
+                    ...(fromDate ? { gte: fromDate } : {}),
+                    ...(toDateExclusive ? { lt: toDateExclusive } : {}),
+                  },
+                },
+              }
+            : {}),
+          orderBy: [{ date: "asc" }, { showTime: "asc" }],
+          include: {
+            showPeople: {
+              include: {
+                person: true,
+              },
+            },
+          },
+        },
+        people: {
+          include: {
+            person: true,
+          },
+        },
+        teams: {
+          include: {
+            department: true,
+          },
+        },
+        personNotes: {
+          include: {
+            person: true,
+          },
+        },
+      },
+    }),
   ]);
 
   const serializedEvents = events.map((event) => ({
@@ -268,10 +332,44 @@ scheduleRouter.get("/schedule", async (c) => {
     })),
   }));
 
+  const serializedTours = tours.map((tour) => ({
+    ...tour,
+    createdAt: serializeDate(tour.createdAt),
+    updatedAt: serializeDate(tour.updatedAt),
+    shows: tour.shows.map((show) => ({
+      ...show,
+      date: serializeDate(show.date),
+      techRiderSentAt: show.techRiderSentAt ? serializeDate(show.techRiderSentAt) : null,
+      techRiderOpenedAt: show.techRiderOpenedAt ? serializeDate(show.techRiderOpenedAt) : null,
+      techRiderLastOpenedAt: show.techRiderLastOpenedAt ? serializeDate(show.techRiderLastOpenedAt) : null,
+      createdAt: serializeDate(show.createdAt),
+      updatedAt: serializeDate(show.updatedAt),
+      showPeople: show.showPeople.map((sp) => ({
+        ...sp,
+        person: serializePerson(sp.person),
+      })),
+    })),
+    people: tour.people.map((tp) => ({
+      ...tp,
+      person: serializePerson(tp.person),
+    })),
+    personNotes: tour.personNotes.map((pn) => ({
+      ...pn,
+      person: {
+        id: pn.person.id,
+        name: pn.person.name,
+        role: pn.person.role,
+      },
+      createdAt: serializeDate(pn.createdAt),
+      updatedAt: serializeDate(pn.updatedAt),
+    })),
+  }));
+
   return c.json({
     data: {
       events: serializedEvents,
       bookings: serializedBookings,
+      tours: serializedTours,
     },
   });
 });

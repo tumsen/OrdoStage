@@ -15,6 +15,7 @@ export interface VisibilityFilters {
   rehearsal: boolean;
   maintenance: boolean;
   private: boolean;
+  venue_booking: boolean;
   other: boolean;
 }
 
@@ -100,6 +101,7 @@ export function ScheduleFilters({
             ["rehearsal", "Rehearsals"],
             ["maintenance", "Maintenance"],
             ["private", "Private"],
+            ["venue_booking", "Venue bookings"],
             ["other", "Other bookings"],
           ] as Array<[keyof VisibilityFilters, string]>
         ).map(([key, label]) => (
