@@ -173,6 +173,28 @@ function resolveItemVenue(item: CalendarItem): { id: string; name: string } | nu
   return null;
 }
 
+function backingVenueBookingFor(item: CalendarItem, candidates: CalendarItem[]): CalendarItem | null {
+  if (item.kind !== "event") return null;
+  const eventId = (item.raw as EventDetail).id;
+  const itemStart = new Date(item.startDate);
+  const itemEnd = item.endDate ? new Date(item.endDate) : new Date(itemStart.getTime() + 60 * 60 * 1000);
+  if (!Number.isFinite(itemStart.getTime()) || !Number.isFinite(itemEnd.getTime())) return null;
+
+  return (
+    candidates.find((candidate) => {
+      if (candidate.renderBehind !== true || candidate.kind !== "booking") return false;
+      const booking = candidate.raw as InternalBookingDetail & { eventId?: string | null };
+      if (booking.eventId !== eventId) return false;
+      const bookingStart = new Date(candidate.startDate);
+      const bookingEnd = candidate.endDate
+        ? new Date(candidate.endDate)
+        : new Date(bookingStart.getTime() + 60 * 60 * 1000);
+      if (!Number.isFinite(bookingStart.getTime()) || !Number.isFinite(bookingEnd.getTime())) return false;
+      return bookingStart.getTime() < itemEnd.getTime() && bookingEnd.getTime() > itemStart.getTime();
+    }) ?? null
+  );
+}
+
 function VenueOccupationView({
   items,
   venues,
@@ -557,6 +579,8 @@ export default function Schedule() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {getRangeDays(viewMode, anchorDate).map((date) => {
                   const dayItems = itemsForDay(visibleItems, date);
+                  const backingItems = dayItems.filter((item) => item.renderBehind === true);
+                  const foregroundItems = dayItems.filter((item) => item.renderBehind !== true);
                   return (
                     <div key={date.toISOString()} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
                       <div className="text-xs text-white/40 mb-2">
@@ -567,19 +591,28 @@ export default function Schedule() {
                           year: "numeric",
                         })}
                       </div>
-                      {dayItems.length === 0 ? (
+                      {foregroundItems.length === 0 ? (
                         <div className="text-xs text-white/25 italic">No items</div>
                       ) : (
                         <div className="space-y-1">
-                          {dayItems.map((item) => (
-                            <button
-                              key={item.id}
-                              onClick={() => setSelectedItem(item)}
-                              className="w-full text-left text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80"
-                            >
-                              {item.title}
-                            </button>
-                          ))}
+                          {foregroundItems.map((item) => {
+                            const backing = backingVenueBookingFor(item, backingItems);
+                            return (
+                              <button
+                                key={item.id}
+                                onClick={() => setSelectedItem(item)}
+                                className={`relative w-full overflow-hidden text-left text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 ${
+                                  backing ? "ring-2 ring-rose-300/70 shadow-[0_0_0_2px_rgba(244,63,94,0.22)]" : ""
+                                }`}
+                                title={backing ? `${item.title} · venue booked` : item.title}
+                              >
+                                {backing ? (
+                                  <span className="absolute inset-0 bg-rose-500/20 pointer-events-none" aria-hidden="true" />
+                                ) : null}
+                                <span className="relative">{item.title}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
