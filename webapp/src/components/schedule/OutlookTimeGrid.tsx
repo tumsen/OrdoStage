@@ -91,6 +91,10 @@ function isItemLocked(item: CalendarItem): boolean {
   return isBookingItem(item) && (item.raw as InternalBookingDetail & { isLocked?: boolean }).isLocked === true;
 }
 
+function blocksOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
+  return aStart.getTime() < bEnd.getTime() && aEnd.getTime() > bStart.getTime();
+}
+
 function StatusLabel({ status }: { status?: string }) {
   if (status === "confirmed")
     return (
@@ -448,7 +452,9 @@ export function OutlookTimeGrid({
               .map((item) => ({ item, ...getItemTimeRange(item) }))
               .filter(({ hasExplicitTime }) => hasExplicitTime);
 
-            const laidOut = computeOverlapLayout(timedRaw);
+            const backgroundRaw = timedRaw.filter(({ item }) => item.renderBehind === true);
+            const foregroundRaw = timedRaw.filter(({ item }) => item.renderBehind !== true);
+            const laidOut = computeOverlapLayout(foregroundRaw);
 
             // Create-drag selection overlay (faded red rectangle).
             let selectionOverlay: React.ReactNode = null;
@@ -571,6 +577,144 @@ export function OutlookTimeGrid({
 
                 {selectionOverlay}
                 {moveOverlay}
+
+                {/* Event-linked venue bookings render as a backing layer, not an
+                    overlap column. If they overlap this event/show, use the
+                    foreground block's width so the booking visually belongs to it. */}
+                {backgroundRaw.map(({ item, start, end }) => {
+                  const layout = layoutTimedBlockInDay(day, start, end, HOUR_HEIGHT);
+                  if (!layout) return null;
+                  const { top, height, clippedStart, clippedEnd } = layout;
+                  const booking = item.raw as InternalBookingDetail & { eventId?: string | null };
+                  const target = laidOut.find((fg) => {
+                    if (fg.item.kind !== "event") return false;
+                    const ev = fg.item.raw as EventDetail;
+                    return ev.id === booking.eventId && blocksOverlap(start, end, fg.start, fg.end);
+                  });
+
+                  const gapPx = 2;
+                  const leftPct = target ? (target.colIndex / target.totalCols) * 100 : 0;
+                  const widthPct = target ? (1 / target.totalCols) * 100 : 100;
+                  const isLocked = isItemLocked(item);
+                  const canDrag = isBookingItem(item) && !item.disabled && !isLocked && Boolean(onUpdateItemTime);
+                  const isBeingDragged = moveDrag?.item.id === item.id && moveDrag.passed;
+                  const timeLabel = `${clippedStart.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: effective?.timeFormat === "12h",
+                  })}–${clippedEnd.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: effective?.timeFormat === "12h",
+                  })}`;
+
+                  return (
+                    <div
+                      key={`behind-${item.id}`}
+                      className={`absolute group/behind ${isBeingDragged ? "opacity-30" : ""}`}
+                      style={{
+                        top: Math.max(0, top - 2),
+                        height: Math.max(height + 4, 20),
+                        left: target ? `calc(${leftPct}% + ${gapPx}px)` : `${gapPx}px`,
+                        width: target ? `calc(${widthPct}% - ${gapPx * 2}px)` : `calc(100% - ${gapPx * 2}px)`,
+                      }}
+                    >
+                      <div
+                        data-booking-block
+                        className={`absolute inset-0 rounded-lg border-2 border-rose-300/80 bg-rose-500/20 shadow-[0_0_0_1px_rgba(244,63,94,0.35)] ${
+                          canDrag ? "cursor-grab active:cursor-grabbing" : ""
+                        }`}
+                        style={{ zIndex: 4 }}
+                        title={`Venue booking · ${item.title} · ${timeLabel}`}
+                        onPointerDown={(e) => {
+                          if ((e.target as HTMLElement).closest("[data-handle]")) return;
+                          if (canDrag) startMoveDrag(item, dayIndex, "move", e);
+                        }}
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).closest("[data-handle]")) return;
+                          if (canDrag) return;
+                          e.stopPropagation();
+                          onItemClick(item);
+                        }}
+                      />
+
+                      <button
+                        type="button"
+                        data-handle="edit"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onItemClick(item);
+                        }}
+                        className="absolute top-0.5 right-0.5 z-[30] w-5 h-5 flex items-center justify-center rounded text-white/90 bg-rose-950/70 hover:bg-rose-800 hover:text-white transition-colors"
+                        title="Edit venue booking"
+                      >
+                        <Pencil size={11} />
+                      </button>
+                      {onToggleLock ? (
+                        <button
+                          type="button"
+                          data-handle="lock"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleLock(item, !isLocked);
+                          }}
+                          className={`absolute top-[26px] right-0.5 z-[30] w-5 h-5 flex items-center justify-center rounded text-white/90 ${
+                            isLocked ? "bg-amber-700/80 hover:bg-amber-700" : "bg-rose-950/70 hover:bg-rose-800"
+                          } hover:text-white transition-colors`}
+                          title={isLocked ? "Unlock venue booking" : "Lock venue booking"}
+                        >
+                          {isLocked ? <Lock size={11} /> : <LockOpen size={11} />}
+                        </button>
+                      ) : null}
+                      {!isLocked ? (
+                        <button
+                          type="button"
+                          data-handle="delete"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteItem(item);
+                          }}
+                          className="absolute bottom-0.5 right-0.5 z-[30] w-5 h-5 flex items-center justify-center rounded text-white/90 bg-rose-950/70 hover:bg-red-700 hover:text-white transition-colors"
+                          title="Delete venue booking"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      ) : (
+                        <span
+                          className="absolute bottom-0.5 left-0.5 z-[30] inline-flex items-center gap-1 rounded bg-black/45 px-1 py-0.5 text-[9px] text-white/85"
+                          title="Locked. Unlock to edit, move or delete."
+                        >
+                          <Lock className="h-2.5 w-2.5" />
+                          Locked
+                        </span>
+                      )}
+
+                      {canDrag && height >= 14 ? (
+                        <>
+                          {start.getTime() === clippedStart.getTime() ? (
+                            <div
+                              data-handle="resize-top"
+                              onPointerDown={(e) => startMoveDrag(item, dayIndex, "resize-start", e)}
+                              className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize z-[30] hover:bg-rose-200/20"
+                              title="Drag to change venue booking start time"
+                            />
+                          ) : null}
+                          {end.getTime() === clippedEnd.getTime() ? (
+                            <div
+                              data-handle="resize-bottom"
+                              onPointerDown={(e) => startMoveDrag(item, dayIndex, "resize-end", e)}
+                              className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize z-[30] hover:bg-rose-200/20"
+                              title="Drag to change venue booking end time"
+                            />
+                          ) : null}
+                        </>
+                      ) : null}
+                    </div>
+                  );
+                })}
 
                 {/* Timed blocks with overlap columns */}
                 {laidOut.map(({ item, start, end, colIndex, totalCols }) => {

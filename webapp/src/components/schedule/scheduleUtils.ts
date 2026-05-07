@@ -15,6 +15,8 @@ export interface CalendarItem {
   venueLabel?: string;
   /** When true, render greyed/faded and ignore interactions (used for conflict awareness). */
   disabled?: boolean;
+  /** Render behind foreground event/show blocks without taking an overlap column. */
+  renderBehind?: boolean;
 }
 
 function toLocalDatetime(datePart: string, timePart: string): string {

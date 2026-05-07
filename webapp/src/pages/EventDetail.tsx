@@ -2353,6 +2353,7 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
         startDate: booking.startDate,
         endDate: booking.endDate,
         raw: booking,
+        renderBehind: true,
       });
     }
 
