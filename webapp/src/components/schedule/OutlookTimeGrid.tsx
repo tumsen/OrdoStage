@@ -166,19 +166,26 @@ export function OutlookTimeGrid({
                         : item.kind === "event"
                           ? (item.raw as EventDetail).venue?.name
                           : undefined;
+                    const isDisabled = item.disabled === true;
                     return (
                       <div key={item.id} className="group/all relative flex items-center">
                         <button
                           data-booking-block
-                          onClick={() => onItemClick(item)}
-                          className={`flex-1 text-left text-[10px] px-1.5 py-0.5 rounded font-medium truncate ${itemColor(item)}`}
-                          title={[item.title, eventVenueName && `@ ${eventVenueName}`].filter(Boolean).join(" ")}
+                          onClick={() => { if (!isDisabled) onItemClick(item); }}
+                          className={`flex-1 text-left text-[10px] px-1.5 py-0.5 rounded font-medium truncate ${itemColor(item)} ${
+                            isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
+                          }`}
+                          title={[
+                            isDisabled ? "Occupied:" : null,
+                            item.title,
+                            eventVenueName && `@ ${eventVenueName}`,
+                          ].filter(Boolean).join(" ")}
                         >
                           {item.title}
                           {eventVenueName ? <span className="opacity-70"> @ {eventVenueName}</span> : null}
                           {" "}<StatusLabel status={item.status} />
                         </button>
-                        {item.kind === "job" ? null : (
+                        {item.kind === "job" || isDisabled ? null : (
                           <button
                             data-booking-block
                             onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
@@ -272,6 +279,7 @@ export function OutlookTimeGrid({
                   const layout = layoutTimedBlockInDay(day, start, end, HOUR_HEIGHT);
                   if (!layout) return null;
                   const { top, height, clippedStart, clippedEnd } = layout;
+                  const isDisabled = item.disabled === true;
 
                   const venueName =
                     item.kind === "job"
@@ -317,9 +325,14 @@ export function OutlookTimeGrid({
                       <button
                         type="button"
                         data-booking-block
-                        onClick={(e) => { e.stopPropagation(); onItemClick(item); }}
-                        className={`w-full h-full rounded-md text-left overflow-hidden flex flex-col shadow-sm ${itemColor(item)}`}
-                        title={tooltipText}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isDisabled) onItemClick(item);
+                        }}
+                        className={`w-full h-full rounded-md text-left overflow-hidden flex flex-col shadow-sm ${itemColor(item)} ${
+                          isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
+                        }`}
+                        title={isDisabled ? `Occupied · ${tooltipText}` : tooltipText}
                       >
                         {isThin ? (
                           /* Very short block: single rotated line */
@@ -354,7 +367,7 @@ export function OutlookTimeGrid({
                       </button>
 
                       {/* Delete — hidden for per-show jobs (edit the event instead) */}
-                      {item.kind === "job" ? null : (
+                      {item.kind === "job" || isDisabled ? null : (
                         <button
                           type="button"
                           data-booking-block

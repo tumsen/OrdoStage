@@ -590,6 +590,7 @@ export const InternalBookingSchema = z.object({
   endDate: z.string().nullable(),
   type: z.string(),
   venueId: z.string().nullable(),
+  eventId: z.string().nullable().optional(),
   createdById: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -615,6 +616,7 @@ export const CreateInternalBookingSchema = z.object({
   endDate: z.string().optional(),
   type: z.enum(["rehearsal", "maintenance", "private", "venue_booking", "other"]).default("other"),
   venueId: z.string().optional(),
+  eventId: z.string().nullable().optional(),
   personIds: z
     .array(z.object({ personId: z.string(), role: z.string().optional() }))
     .optional(),

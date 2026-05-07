@@ -413,6 +413,7 @@ model Event {
   teamDocuments  EventTeamDocument[]
   timeProjects   TimeProject[]
   timeEntries    TimeEntry[]
+  bookings       InternalBooking[]
 
   @@index([ownerTeamId])
 }
@@ -608,9 +609,12 @@ model InternalBooking {
   description    String?
   startDate      DateTime
   endDate        DateTime?
-  type           String                  @default("other") // rehearsal | maintenance | private | other
+  type           String                  @default("other") // rehearsal | maintenance | private | venue_booking | other
   venueId        String?
   venue          Venue?                  @relation(fields: [venueId], references: [id])
+  /** Optional event link: when set, this booking is part of the event's venue occupation. */
+  eventId        String?
+  event          Event?                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
   organizationId String
   organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdById    String?
@@ -618,6 +622,9 @@ model InternalBooking {
   people         InternalBookingPerson[]
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
+
+  @@index([eventId])
+  @@index([venueId, startDate])
 }
 
 model InternalBookingPerson {

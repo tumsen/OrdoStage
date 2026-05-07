@@ -17,6 +17,7 @@ function serializeBooking(booking: {
   endDate: Date | null;
   type: string;
   venueId: string | null;
+  eventId: string | null;
   organizationId: string;
   createdById: string | null;
   createdAt: Date;
@@ -30,6 +31,7 @@ function serializeBooking(booking: {
     endDate: booking.endDate ? booking.endDate.toISOString() : null,
     type: booking.type,
     venueId: booking.venueId,
+    eventId: booking.eventId,
     organizationId: booking.organizationId,
     createdById: booking.createdById,
     createdAt: booking.createdAt.toISOString(),
@@ -98,6 +100,7 @@ function serializeFullBooking(booking: {
   endDate: Date | null;
   type: string;
   venueId: string | null;
+  eventId: string | null;
   organizationId: string;
   createdById: string | null;
   createdAt: Date;
@@ -154,8 +157,27 @@ bookingsRouter.get("/bookings", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
+  const eventIdFilter = c.req.query("eventId");
+  const venueIdFilter = c.req.query("venueId");
+  const fromQ = c.req.query("from");
+  const toQ = c.req.query("to");
+
+  const where: Record<string, unknown> = { organizationId: user.organizationId };
+  if (eventIdFilter) where.eventId = eventIdFilter;
+  if (venueIdFilter) where.venueId = venueIdFilter;
+  if (fromQ || toQ) {
+    const fromDate = fromQ ? new Date(`${fromQ}T00:00:00.000Z`) : null;
+    const toDateExclusive = toQ
+      ? new Date(new Date(`${toQ}T00:00:00.000Z`).getTime() + 86_400_000)
+      : null;
+    where.startDate = {
+      ...(fromDate ? { gte: fromDate } : {}),
+      ...(toDateExclusive ? { lt: toDateExclusive } : {}),
+    };
+  }
+
   const bookings = await prisma.internalBooking.findMany({
-    where: { organizationId: user.organizationId },
+    where,
     orderBy: { startDate: "asc" },
     include: bookingInclude,
   });
@@ -175,6 +197,14 @@ bookingsRouter.post("/bookings", zValidator("json", CreateInternalBookingSchema)
 
   const body = c.req.valid("json");
 
+  if (body.eventId) {
+    const ev = await prisma.event.findFirst({
+      where: { id: body.eventId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!ev) return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
+  }
+
   const booking = await prisma.internalBooking.create({
     data: {
       title: body.title,
@@ -183,6 +213,7 @@ bookingsRouter.post("/bookings", zValidator("json", CreateInternalBookingSchema)
       endDate: body.endDate ? new Date(body.endDate) : null,
       type: body.type ?? "other",
       venueId: body.venueId ?? null,
+      eventId: body.eventId ?? null,
       organizationId: user.organizationId,
       createdById: user.id,
       people: body.personIds
@@ -262,6 +293,7 @@ bookingsRouter.put("/bookings/:id", zValidator("json", UpdateInternalBookingSche
       }),
       ...(body.type !== undefined && { type: body.type }),
       ...(body.venueId !== undefined && { venueId: body.venueId }),
+      ...(body.eventId !== undefined && { eventId: body.eventId }),
     },
     include: bookingInclude,
   });

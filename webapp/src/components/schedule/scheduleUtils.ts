@@ -13,6 +13,8 @@ export interface CalendarItem {
   raw: EventDetail | InternalBookingDetail;
   /** Venue label for job rows (job or show venue). */
   venueLabel?: string;
+  /** When true, render greyed/faded and ignore interactions (used for conflict awareness). */
+  disabled?: boolean;
 }
 
 function toLocalDatetime(datePart: string, timePart: string): string {

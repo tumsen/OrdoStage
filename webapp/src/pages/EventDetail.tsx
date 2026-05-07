@@ -30,6 +30,7 @@ import type {
   EventShow,
   Venue,
 } from "@/lib/types";
+import type { InternalBookingDetail } from "../../../backend/src/types";
 import {
   decodeToFormFields,
   formDimsToStageSize,
@@ -44,6 +45,9 @@ import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
+import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
+import { EditItemSheet } from "@/components/schedule/EditItemSheet";
+import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
 import { computeEventWorkTotals, computeShowStaffingStats, parseStaffingOkMap } from "@/lib/eventShowStaffing";
 import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
@@ -2235,6 +2239,324 @@ function ShowEventCard({
   );
 }
 
+// ── Venue Booking tab helpers ────────────────────────────────────────────────
+
+function startOfWeekMonday(date: Date): Date {
+  const d = new Date(date);
+  const dow = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - dow);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function addDaysLocal(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function toISODateLocal(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function toLocalDatetimeInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+type ScheduleResponse = {
+  events: EventDetail[];
+  bookings: InternalBookingDetail[];
+};
+
+function VenueBookingTab({ event }: { event: EventDetail }) {
+  const queryClient = useQueryClient();
+  const { data: venues } = useQuery({
+    queryKey: ["venues"],
+    queryFn: () => api.get<Venue[]>("/api/venues"),
+  });
+  const { data: people = [] } = useQuery({
+    queryKey: ["people"],
+    queryFn: () => api.get<Person[]>("/api/people"),
+  });
+
+  const initialAnchor = useMemo(() => {
+    const showWithDate = (event.shows ?? []).find((s) => s.showDate);
+    if (showWithDate) return startOfWeekMonday(new Date(showWithDate.showDate));
+    if (event.startDate) return startOfWeekMonday(new Date(event.startDate));
+    return startOfWeekMonday(new Date());
+  }, [event]);
+
+  const [weekStart, setWeekStart] = useState<Date>(initialAnchor);
+  const eventVenueDefault = useMemo(() => {
+    if (event.venueId) return event.venueId;
+    const firstShow = (event.shows ?? []).find((s) => s.venueId);
+    return firstShow?.venueId ?? "";
+  }, [event]);
+  const [venueId, setVenueId] = useState<string>(eventVenueDefault);
+  const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
+
+  useEffect(() => {
+    if (!venueId && eventVenueDefault) setVenueId(eventVenueDefault);
+  }, [eventVenueDefault, venueId]);
+
+  const days = useMemo(
+    () => Array.from({ length: 7 }).map((_, i) => addDaysLocal(weekStart, i)),
+    [weekStart]
+  );
+  const fromISO = toISODateLocal(weekStart);
+  const toISO = toISODateLocal(addDaysLocal(weekStart, 6));
+
+  const scheduleQuery = useQuery({
+    queryKey: ["event-venue-schedule", event.id, venueId, fromISO, toISO],
+    enabled: Boolean(venueId),
+    queryFn: () =>
+      api.get<ScheduleResponse>(
+        `/api/schedule?venueId=${encodeURIComponent(venueId)}&from=${fromISO}&to=${toISO}`
+      ),
+  });
+
+  const bookingsQuery = useQuery({
+    queryKey: ["event-venue-bookings", event.id, fromISO, toISO],
+    queryFn: () =>
+      api.get<InternalBookingDetail[]>(
+        `/api/bookings?eventId=${encodeURIComponent(event.id)}&from=${fromISO}&to=${toISO}`
+      ),
+  });
+
+  const items: CalendarItem[] = useMemo(() => {
+    const out: CalendarItem[] = [];
+
+    // This event's bookings (editable)
+    for (const booking of bookingsQuery.data ?? []) {
+      out.push({
+        id: booking.id,
+        title: booking.title,
+        kind: "booking",
+        type: (booking.type as CalendarItem["type"]) ?? "venue_booking",
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+        raw: booking,
+      });
+    }
+
+    if (scheduleQuery.data) {
+      // Other items on the same venue → faded conflict awareness.
+      for (const otherEvent of scheduleQuery.data.events) {
+        if (otherEvent.id === event.id) {
+          // This event's own shows → display only (treat as disabled to avoid editing here).
+          for (const show of otherEvent.shows ?? []) {
+            if (!show.showDate) continue;
+            const day = show.showDate.slice(0, 10);
+            const start = `${day}T${show.showTime}`;
+            const end = endTimeFromStartAndDuration(show.showTime, show.durationMinutes);
+            const endIso = `${day}T${end}`;
+            out.push({
+              id: `${otherEvent.id}:show:${show.id}`,
+              title: `${otherEvent.title} (show)`,
+              kind: "event",
+              status: show.status ?? otherEvent.status,
+              startDate: start,
+              endDate: endIso,
+              raw: otherEvent,
+              disabled: true,
+            });
+          }
+          continue;
+        }
+        for (const show of otherEvent.shows ?? []) {
+          if (!show.showDate) continue;
+          if (show.venueId && show.venueId !== venueId) continue;
+          const day = show.showDate.slice(0, 10);
+          const start = `${day}T${show.showTime}`;
+          const end = endTimeFromStartAndDuration(show.showTime, show.durationMinutes);
+          out.push({
+            id: `${otherEvent.id}:show:${show.id}`,
+            title: otherEvent.title,
+            kind: "event",
+            status: show.status ?? otherEvent.status,
+            startDate: start,
+            endDate: `${day}T${end}`,
+            raw: otherEvent,
+            disabled: true,
+          });
+        }
+      }
+      const ownBookingIds = new Set((bookingsQuery.data ?? []).map((b) => b.id));
+      for (const booking of scheduleQuery.data.bookings) {
+        if (ownBookingIds.has(booking.id)) continue;
+        out.push({
+          id: booking.id,
+          title: booking.title,
+          kind: "booking",
+          type: (booking.type as CalendarItem["type"]) ?? "other",
+          startDate: booking.startDate,
+          endDate: booking.endDate,
+          raw: booking,
+          disabled: true,
+        });
+      }
+    }
+    return out;
+  }, [scheduleQuery.data, bookingsQuery.data, event.id, venueId]);
+
+  const createBooking = useMutation({
+    mutationFn: (body: {
+      title: string;
+      startDate: string;
+      endDate: string;
+      venueId: string;
+    }) =>
+      api.post<InternalBookingDetail>("/api/bookings", {
+        title: body.title,
+        startDate: body.startDate,
+        endDate: body.endDate,
+        type: "venue_booking",
+        venueId: body.venueId,
+        eventId: event.id,
+      }),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ["event-venue-bookings", event.id] });
+      queryClient.invalidateQueries({ queryKey: ["event-venue-schedule", event.id] });
+      queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      void invalidateWorkAnnouncementBar(queryClient);
+      toast({ title: "Venue booking created" });
+      setSelectedItem({
+        id: created.id,
+        title: created.title,
+        kind: "booking",
+        type: "venue_booking",
+        startDate: created.startDate,
+        endDate: created.endDate,
+        raw: created,
+      });
+    },
+    onError: () => toast({ title: "Failed to create venue booking", variant: "destructive" }),
+  });
+
+  const deleteBooking = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/bookings/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event-venue-bookings", event.id] });
+      queryClient.invalidateQueries({ queryKey: ["event-venue-schedule", event.id] });
+      queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      void invalidateWorkAnnouncementBar(queryClient);
+      toast({ title: "Venue booking deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete venue booking", variant: "destructive" }),
+  });
+
+  const handleSelectTimeRange = (start: Date, end: Date) => {
+    if (!venueId) {
+      toast({
+        title: "Pick a venue first",
+        description: "Select which venue this booking is for.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createBooking.mutate({
+      title: `${event.title} venue`,
+      startDate: toLocalDatetimeInput(start),
+      endDate: toLocalDatetimeInput(end),
+      venueId,
+    });
+  };
+
+  const handleItemClick = (item: CalendarItem) => {
+    if (item.disabled) return;
+    setSelectedItem(item);
+  };
+
+  const handleDeleteItem = (item: CalendarItem) => {
+    if (item.disabled || item.kind !== "booking") return;
+    if (!confirmDeleteAction(`venue booking "${item.title}"`)) return;
+    deleteBooking.mutate(item.id);
+  };
+
+  const venueOptions = venues ?? [];
+  const weekLabel = `${weekStart.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+  })} – ${addDaysLocal(weekStart, 6).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })}`;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-white/10 bg-transparent text-white/85 h-8 px-2"
+          onClick={() => setWeekStart((d) => addDaysLocal(d, -7))}
+        >
+          ‹ Week
+        </Button>
+        <span className="text-sm text-white/80 font-medium tabular-nums px-1 min-w-[180px] text-center">
+          {weekLabel}
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-white/10 bg-transparent text-white/85 h-8 px-2"
+          onClick={() => setWeekStart((d) => addDaysLocal(d, 7))}
+        >
+          Week ›
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-white/55 hover:text-white hover:bg-white/5 h-8"
+          onClick={() => setWeekStart(initialAnchor)}
+        >
+          Reset
+        </Button>
+        <div className="flex-1 min-w-[12rem]">
+          <Select value={venueId} onValueChange={setVenueId}>
+            <SelectTrigger className="bg-white/5 border-white/10 text-white text-sm h-8 max-w-xs">
+              <SelectValue placeholder="Choose a venue" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#16161f] border-white/10 text-white">
+              {venueOptions.length === 0 ? (
+                <div className="px-2 py-1.5 text-xs text-white/40">No venues</div>
+              ) : null}
+              {venueOptions.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {v.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-white/45 leading-snug">
+        Drag in the grid to add a venue booking for this event (15 min steps). This event&apos;s shows are shown for reference.
+        Other shows and bookings on the same venue are faded out — they&apos;re occupied.
+      </p>
+
+      <OutlookTimeGrid
+        days={days}
+        items={items}
+        onItemClick={handleItemClick}
+        onDeleteItem={handleDeleteItem}
+        onSelectTimeRange={handleSelectTimeRange}
+      />
+
+      <EditItemSheet
+        item={selectedItem}
+        onClose={() => setSelectedItem(null)}
+        venues={venueOptions}
+        people={people}
+      />
+    </div>
+  );
+}
+
 function ShowsTab({ event }: { event: EventDetail }) {
   const queryClient = useQueryClient();
   const { data: venues } = useQuery({
@@ -3002,6 +3324,12 @@ export default function EventDetailPage() {
                 Shows ({ev?.shows?.length ?? 0})
               </TabsTrigger>
               <TabsTrigger
+                value="venue-booking"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+              >
+                Venue booking
+              </TabsTrigger>
+              <TabsTrigger
                 value="teams"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
               >
@@ -3031,6 +3359,13 @@ export default function EventDetailPage() {
                 <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then add shows here.</div>
               ) : (
                 <ShowsTab event={ev!} />
+              )}
+            </TabsContent>
+            <TabsContent value="venue-booking" className="mt-0">
+              {isNew ? (
+                <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then plan venue bookings here.</div>
+              ) : (
+                <VenueBookingTab event={ev!} />
               )}
             </TabsContent>
             <TabsContent value="people" className="mt-0">
