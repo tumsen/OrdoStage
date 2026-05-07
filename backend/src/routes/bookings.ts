@@ -18,6 +18,7 @@ function serializeBooking(booking: {
   type: string;
   venueId: string | null;
   eventId: string | null;
+  isLocked: boolean;
   organizationId: string;
   createdById: string | null;
   createdAt: Date;
@@ -32,6 +33,7 @@ function serializeBooking(booking: {
     type: booking.type,
     venueId: booking.venueId,
     eventId: booking.eventId,
+    isLocked: booking.isLocked,
     organizationId: booking.organizationId,
     createdById: booking.createdById,
     createdAt: booking.createdAt.toISOString(),
@@ -101,6 +103,7 @@ function serializeFullBooking(booking: {
   type: string;
   venueId: string | null;
   eventId: string | null;
+  isLocked: boolean;
   organizationId: string;
   createdById: string | null;
   createdAt: Date;
@@ -214,6 +217,7 @@ bookingsRouter.post("/bookings", zValidator("json", CreateInternalBookingSchema)
       type: body.type ?? "other",
       venueId: body.venueId ?? null,
       eventId: body.eventId ?? null,
+      isLocked: body.isLocked === true,
       organizationId: user.organizationId,
       createdById: user.id,
       people: body.personIds
@@ -268,6 +272,31 @@ bookingsRouter.put("/bookings/:id", zValidator("json", UpdateInternalBookingSche
   if (!existing)
     return c.json({ error: { message: "Booking not found", code: "NOT_FOUND" } }, 404);
 
+  // Locked bookings can only be unlocked. Reject any other change.
+  if (existing.isLocked) {
+    const onlyUnlocking =
+      body.isLocked === false &&
+      body.title === undefined &&
+      body.description === undefined &&
+      body.startDate === undefined &&
+      body.endDate === undefined &&
+      body.type === undefined &&
+      body.venueId === undefined &&
+      body.eventId === undefined &&
+      body.personIds === undefined;
+    if (!onlyUnlocking) {
+      return c.json(
+        {
+          error: {
+            message: "Booking is locked. Unlock it first to make changes.",
+            code: "LOCKED",
+          },
+        },
+        409
+      );
+    }
+  }
+
   // Replace people list if provided
   if (body.personIds !== undefined) {
     await prisma.internalBookingPerson.deleteMany({ where: { bookingId: id } });
@@ -294,6 +323,7 @@ bookingsRouter.put("/bookings/:id", zValidator("json", UpdateInternalBookingSche
       ...(body.type !== undefined && { type: body.type }),
       ...(body.venueId !== undefined && { venueId: body.venueId }),
       ...(body.eventId !== undefined && { eventId: body.eventId }),
+      ...(body.isLocked !== undefined && { isLocked: body.isLocked }),
     },
     include: bookingInclude,
   });
@@ -317,6 +347,18 @@ bookingsRouter.delete("/bookings/:id", async (c) => {
   });
   if (!existing)
     return c.json({ error: { message: "Booking not found", code: "NOT_FOUND" } }, 404);
+
+  if (existing.isLocked) {
+    return c.json(
+      {
+        error: {
+          message: "Booking is locked. Unlock it first to delete.",
+          code: "LOCKED",
+        },
+      },
+      409
+    );
+  }
 
   await prisma.internalBooking.delete({ where: { id } });
   return new Response(null, { status: 204 });

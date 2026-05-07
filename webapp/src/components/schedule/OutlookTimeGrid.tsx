@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Lock, LockOpen, Pencil, Trash2 } from "lucide-react";
 import type { EventDetail, InternalBookingDetail } from "../../../../backend/src/types";
 import type { CalendarItem } from "./scheduleUtils";
 import {
@@ -14,6 +14,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 const HOUR_HEIGHT = 48;
 const SNAP_MINUTES = 15;
 const MIN_DRAG_PX = 8;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface OutlookTimeGridProps {
   days: Date[];
@@ -21,6 +22,10 @@ interface OutlookTimeGridProps {
   onItemClick: (item: CalendarItem) => void;
   onDeleteItem: (item: CalendarItem) => void;
   onSelectTimeRange: (start: Date, end: Date) => void;
+  /** Called when a booking block is dragged to a new position. */
+  onUpdateItemTime?: (item: CalendarItem, start: Date, end: Date) => void;
+  /** Called when a booking's lock button is toggled. */
+  onToggleLock?: (item: CalendarItem, locked: boolean) => void;
 }
 
 function yToMinutesFromMidnight(clientY: number, columnTop: number): number {
@@ -30,18 +35,17 @@ function yToMinutesFromMidnight(clientY: number, columnTop: number): number {
   return Math.max(0, Math.min(24 * 60 - SNAP_MINUTES, snapped));
 }
 
+function rawMinutesFromY(clientY: number, columnTop: number): number {
+  return ((clientY - columnTop) / HOUR_HEIGHT) * 60;
+}
+
+function snapMin(value: number): number {
+  return Math.round(value / SNAP_MINUTES) * SNAP_MINUTES;
+}
+
 function formatDragTime(d: Date, hour12: boolean): string {
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12 });
 }
-
-type DragPayload = {
-  day: Date;
-  dayIndex: number;
-  startY: number;
-  currentY: number;
-  /** Day index the pointer is currently over (may differ from start day for cross-day drag). */
-  currentDayIndex: number;
-};
 
 function startOfDay(d: Date): Date {
   const x = new Date(d);
@@ -53,6 +57,34 @@ function dateFromDayAndMinutes(day: Date, minutes: number): Date {
   const d = startOfDay(day);
   d.setTime(d.getTime() + minutes * 60 * 1000);
   return d;
+}
+
+type CreateDragPayload = {
+  day: Date;
+  dayIndex: number;
+  startY: number;
+  currentY: number;
+  /** Day index the pointer is currently over (may differ from start day). */
+  currentDayIndex: number;
+};
+
+type MoveDragPayload = {
+  item: CalendarItem;
+  origStartMs: number;
+  origEndMs: number;
+  startDayIndex: number;
+  startY: number;
+  currentY: number;
+  currentDayIndex: number;
+  passed: boolean;
+};
+
+function isBookingItem(item: CalendarItem): item is CalendarItem & { raw: InternalBookingDetail } {
+  return item.kind === "booking";
+}
+
+function isItemLocked(item: CalendarItem): boolean {
+  return isBookingItem(item) && (item.raw as InternalBookingDetail & { isLocked?: boolean }).isLocked === true;
 }
 
 function StatusLabel({ status }: { status?: string }) {
@@ -83,13 +115,17 @@ export function OutlookTimeGrid({
   onItemClick,
   onDeleteItem,
   onSelectTimeRange,
+  onUpdateItemTime,
+  onToggleLock,
 }: OutlookTimeGridProps) {
   const { effective } = usePreferences();
   const totalHeight = 24 * HOUR_HEIGHT;
   const hours = Array.from({ length: 24 }).map((_, h) => h);
 
-  const [drag, setDrag] = useState<DragPayload | null>(null);
-  const dragRef = useRef<DragPayload | null>(null);
+  const [createDrag, setCreateDrag] = useState<CreateDragPayload | null>(null);
+  const createDragRef = useRef<CreateDragPayload | null>(null);
+  const [moveDrag, setMoveDrag] = useState<MoveDragPayload | null>(null);
+  const moveDragRef = useRef<MoveDragPayload | null>(null);
   const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const findDayIndexAtX = useCallback((clientX: number, fallback: number): number => {
@@ -99,7 +135,6 @@ export function OutlookTimeGrid({
       const r = el.getBoundingClientRect();
       if (clientX >= r.left && clientX < r.right) return i;
     }
-    // Pointer is outside columns: clamp to nearest end.
     if (columnRefs.current.length === 0) return fallback;
     const firstEl = columnRefs.current[0];
     const lastEl = columnRefs.current[columnRefs.current.length - 1];
@@ -114,23 +149,21 @@ export function OutlookTimeGrid({
     return fallback;
   }, []);
 
-  const endDrag = useCallback(() => {
-    const d = dragRef.current;
-    dragRef.current = null;
-    setDrag(null);
+  // ── Create drag (drag empty space to make a new booking) ────────────────
+  const endCreateDrag = useCallback(() => {
+    const d = createDragRef.current;
+    createDragRef.current = null;
+    setCreateDrag(null);
     if (!d) return;
     const startCol = columnRefs.current[d.dayIndex];
     if (!startCol) return;
-    const startRect = startCol.getBoundingClientRect();
-    const startMin = yToMinutesFromMidnight(d.startY, startRect.top);
+    const startMin = yToMinutesFromMidnight(d.startY, startCol.getBoundingClientRect().top);
 
     const endIdx = Math.max(0, Math.min(days.length - 1, d.currentDayIndex));
     const endCol = columnRefs.current[endIdx];
     if (!endCol) return;
-    const endRect = endCol.getBoundingClientRect();
-    const endMin = yToMinutesFromMidnight(d.currentY, endRect.top);
+    const endMin = yToMinutesFromMidnight(d.currentY, endCol.getBoundingClientRect().top);
 
-    // Total displacement (across days + minutes) determines the drag threshold.
     const dxDays = endIdx - d.dayIndex;
     const dyMin = endMin - startMin;
     const totalMin = dxDays * 24 * 60 + dyMin;
@@ -147,7 +180,6 @@ export function OutlookTimeGrid({
     let endDayIdx = endIdx;
     let endMinutes = endMin;
     if (totalMin < 0) {
-      // Drag went backward — swap.
       startDayIdx = endIdx;
       startMinutes = endMin;
       endDayIdx = d.dayIndex;
@@ -172,29 +204,114 @@ export function OutlookTimeGrid({
     const col = columnRefs.current[dayIndex];
     if (!col) return;
     e.preventDefault();
-    const payload: DragPayload = {
+    const payload: CreateDragPayload = {
       day,
       dayIndex,
       startY: e.clientY,
       currentY: e.clientY,
       currentDayIndex: dayIndex,
     };
-    dragRef.current = payload;
-    setDrag(payload);
+    createDragRef.current = payload;
+    setCreateDrag(payload);
     const onMove = (ev: PointerEvent) => {
-      if (!dragRef.current) return;
-      const nextIdx = findDayIndexAtX(ev.clientX, dragRef.current.dayIndex);
-      dragRef.current = {
-        ...dragRef.current,
+      if (!createDragRef.current) return;
+      const nextIdx = findDayIndexAtX(ev.clientX, createDragRef.current.dayIndex);
+      createDragRef.current = {
+        ...createDragRef.current,
         currentY: ev.clientY,
         currentDayIndex: nextIdx,
       };
-      setDrag({ ...dragRef.current });
+      setCreateDrag({ ...createDragRef.current });
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      endDrag();
+      endCreateDrag();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  // ── Move drag (drag a booking block to reposition it) ───────────────────
+  const computeMovedRange = useCallback((m: MoveDragPayload): { start: Date; end: Date } | null => {
+    const startCol = columnRefs.current[m.startDayIndex];
+    const curCol = columnRefs.current[m.currentDayIndex];
+    if (!startCol || !curCol) return null;
+    const rawStart = rawMinutesFromY(m.startY, startCol.getBoundingClientRect().top);
+    const rawCur = rawMinutesFromY(m.currentY, curCol.getBoundingClientRect().top);
+    const dxDays = m.currentDayIndex - m.startDayIndex;
+    const totalDeltaMin = dxDays * 24 * 60 + (rawCur - rawStart);
+    const snappedDeltaMs = snapMin(totalDeltaMin) * 60 * 1000;
+    return {
+      start: new Date(m.origStartMs + snappedDeltaMs),
+      end: new Date(m.origEndMs + snappedDeltaMs),
+    };
+  }, []);
+
+  const endMoveDrag = useCallback(() => {
+    const m = moveDragRef.current;
+    moveDragRef.current = null;
+    setMoveDrag(null);
+    if (!m) return;
+    if (!m.passed) {
+      // Treat as a click — open the editor.
+      onItemClick(m.item);
+      return;
+    }
+    const next = computeMovedRange(m);
+    if (!next) return;
+    if (next.start.getTime() === m.origStartMs && next.end.getTime() === m.origEndMs) return;
+    onUpdateItemTime?.(m.item, next.start, next.end);
+  }, [onItemClick, onUpdateItemTime, computeMovedRange]);
+
+  const startMoveDrag = (item: CalendarItem, dayIndex: number, e: React.PointerEvent) => {
+    if (!isBookingItem(item)) {
+      onItemClick(item);
+      return;
+    }
+    if (item.disabled) return;
+    if (isItemLocked(item) || !onUpdateItemTime) {
+      onItemClick(item);
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const range = getItemTimeRange(item);
+    if (!range.start || !range.end) {
+      onItemClick(item);
+      return;
+    }
+    const payload: MoveDragPayload = {
+      item,
+      origStartMs: range.start.getTime(),
+      origEndMs: range.end.getTime(),
+      startDayIndex: dayIndex,
+      startY: e.clientY,
+      currentY: e.clientY,
+      currentDayIndex: dayIndex,
+      passed: false,
+    };
+    moveDragRef.current = payload;
+    setMoveDrag(payload);
+    const onMove = (ev: PointerEvent) => {
+      if (!moveDragRef.current) return;
+      const dx = ev.clientX - (e.clientX);
+      const dy = ev.clientY - moveDragRef.current.startY;
+      const passed =
+        moveDragRef.current.passed || Math.hypot(dx, dy) >= MIN_DRAG_PX;
+      const nextIdx = findDayIndexAtX(ev.clientX, moveDragRef.current.startDayIndex);
+      moveDragRef.current = {
+        ...moveDragRef.current,
+        currentY: ev.clientY,
+        currentDayIndex: nextIdx,
+        passed,
+      };
+      setMoveDrag({ ...moveDragRef.current });
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      endMoveDrag();
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -297,25 +414,25 @@ export function OutlookTimeGrid({
 
             const laidOut = computeOverlapLayout(timedRaw);
 
+            // Create-drag selection overlay (faded red rectangle).
             let selectionOverlay: React.ReactNode = null;
-            if (drag) {
-              // Compute the absolute selection range across days so the overlay can span columns.
-              const startCol = columnRefs.current[drag.dayIndex];
-              const endIdxRaw = Math.max(0, Math.min(days.length - 1, drag.currentDayIndex));
+            if (createDrag) {
+              const startCol = columnRefs.current[createDrag.dayIndex];
+              const endIdxRaw = Math.max(0, Math.min(days.length - 1, createDrag.currentDayIndex));
               const endCol = columnRefs.current[endIdxRaw];
               if (startCol && endCol) {
-                const startMin0 = yToMinutesFromMidnight(drag.startY, startCol.getBoundingClientRect().top);
-                const endMin0 = yToMinutesFromMidnight(drag.currentY, endCol.getBoundingClientRect().top);
-                const dxDays = endIdxRaw - drag.dayIndex;
+                const startMin0 = yToMinutesFromMidnight(createDrag.startY, startCol.getBoundingClientRect().top);
+                const endMin0 = yToMinutesFromMidnight(createDrag.currentY, endCol.getBoundingClientRect().top);
+                const dxDays = endIdxRaw - createDrag.dayIndex;
                 const totalMin = dxDays * 24 * 60 + (endMin0 - startMin0);
-                let startDayIdx = drag.dayIndex;
+                let startDayIdx = createDrag.dayIndex;
                 let startMinutes = startMin0;
                 let endDayIdx = endIdxRaw;
                 let endMinutes = endMin0;
                 if (totalMin < 0) {
                   startDayIdx = endIdxRaw;
                   startMinutes = endMin0;
-                  endDayIdx = drag.dayIndex;
+                  endDayIdx = createDrag.dayIndex;
                   endMinutes = startMin0;
                 }
 
@@ -365,6 +482,40 @@ export function OutlookTimeGrid({
               }
             }
 
+            // Move-drag preview overlay for the dragged booking.
+            let moveOverlay: React.ReactNode = null;
+            if (moveDrag && moveDrag.passed) {
+              const next = computeMovedRange(moveDrag);
+              if (next) {
+                const layout = layoutTimedBlockInDay(day, next.start, next.end, HOUR_HEIGHT);
+                if (layout) {
+                  const { top, height, clippedStart, clippedEnd } = layout;
+                  const isFirst =
+                    next.start.getTime() >= startOfDay(day).getTime() &&
+                    next.start.getTime() < startOfDay(day).getTime() + DAY_MS;
+                  moveOverlay = (
+                    <div
+                      key="move-preview"
+                      className="absolute left-1 right-1 rounded-md border-2 border-rose-400/80 bg-rose-500/30 z-[6] pointer-events-none flex flex-col justify-start px-1.5 py-1 overflow-hidden"
+                      style={{ top, height: Math.max(height, 18) }}
+                    >
+                      {isFirst ? (
+                        <>
+                          <div className="text-[10px] font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] truncate">
+                            {moveDrag.item.title}
+                          </div>
+                          <div className="text-[9px] text-white/90 leading-tight mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
+                            {formatDragTime(clippedStart, effective?.timeFormat === "12h")} –{" "}
+                            {formatDragTime(clippedEnd, effective?.timeFormat === "12h")}
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  );
+                }
+              }
+            }
+
             return (
               <div
                 key={day.toISOString()}
@@ -383,6 +534,7 @@ export function OutlookTimeGrid({
                 ))}
 
                 {selectionOverlay}
+                {moveOverlay}
 
                 {/* Timed blocks with overlap columns */}
                 {laidOut.map(({ item, start, end, colIndex, totalCols }) => {
@@ -390,6 +542,10 @@ export function OutlookTimeGrid({
                   if (!layout) return null;
                   const { top, height, clippedStart, clippedEnd } = layout;
                   const isDisabled = item.disabled === true;
+                  const isBooking = isBookingItem(item);
+                  const isLocked = isItemLocked(item);
+                  const canDrag = isBooking && !isDisabled && !isLocked && Boolean(onUpdateItemTime);
+                  const isBeingDragged = moveDrag?.item.id === item.id && moveDrag.passed;
 
                   const venueName =
                     item.kind === "job"
@@ -400,12 +556,10 @@ export function OutlookTimeGrid({
                   const creatorName =
                     item.kind === "booking" ? (item.raw as InternalBookingDetail).createdBy?.name : undefined;
 
-                  // Width / left position for overlap columns (with small gap)
                   const gapPx = 2;
                   const leftPct = (colIndex / totalCols) * 100;
                   const widthPct = (1 / totalCols) * 100;
 
-                  // Very thin block → rotate text
                   const isThin = height < 28 || totalCols >= 4;
 
                   const timeLabel = `${clippedStart.toLocaleTimeString([], {
@@ -419,10 +573,12 @@ export function OutlookTimeGrid({
                   })}`;
                   const tooltipText = [item.title, venueName && `@ ${venueName}`, timeLabel, item.status].filter(Boolean).join(" · ");
 
+                  const showInlineActions = isBooking && !isDisabled && Boolean(onToggleLock || onUpdateItemTime);
+
                   return (
                     <div
                       key={`${item.id}-${colIndex}`}
-                      className="absolute group/block"
+                      className={`absolute group/block ${isBeingDragged ? "opacity-30" : ""}`}
                       style={{
                         top,
                         height: Math.max(height, 16),
@@ -431,21 +587,29 @@ export function OutlookTimeGrid({
                         zIndex: 10 + colIndex,
                       }}
                     >
-                      {/* Main block button */}
-                      <button
-                        type="button"
+                      <div
                         data-booking-block
+                        role="button"
+                        tabIndex={0}
+                        onPointerDown={(e) => {
+                          if ((e.target as HTMLElement).closest("[data-handle]")) return;
+                          if (canDrag) {
+                            startMoveDrag(item, dayIndex, e);
+                          }
+                        }}
                         onClick={(e) => {
+                          if ((e.target as HTMLElement).closest("[data-handle]")) return;
+                          // For non-draggable items we still want a plain click → open editor.
+                          if (canDrag) return;
                           e.stopPropagation();
                           if (!isDisabled) onItemClick(item);
                         }}
                         className={`w-full h-full rounded-md text-left overflow-hidden flex flex-col shadow-sm ${itemColor(item)} ${
                           isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
-                        }`}
+                        } ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
                         title={isDisabled ? `Occupied · ${tooltipText}` : tooltipText}
                       >
                         {isThin ? (
-                          /* Very short block: single rotated line */
                           <div
                             className="w-full h-full flex items-center px-1 overflow-hidden"
                             style={{ writingMode: height < 22 ? "vertical-rl" : undefined }}
@@ -456,15 +620,13 @@ export function OutlookTimeGrid({
                           </div>
                         ) : (
                           <div className="flex flex-col h-full px-1.5 py-1 overflow-hidden">
-                            {/* Title line */}
-                            <div className="truncate font-semibold text-[11px] leading-tight shrink-0">
+                            <div className="truncate font-semibold text-[11px] leading-tight shrink-0 pr-9">
                               {item.title}
                               {venueName && (item.kind === "event" || item.kind === "job") ? (
                                 <span className="font-normal opacity-75"> @ {venueName}</span>
                               ) : null}
                             </div>
-                            {/* Time + status line */}
-                            <div className="flex items-center gap-1 text-[10px] leading-tight mt-0.5 opacity-90 flex-1 min-h-0 overflow-hidden">
+                            <div className="flex items-center gap-1 text-[10px] leading-tight mt-0.5 opacity-90 flex-1 min-h-0 overflow-hidden pr-9">
                               <span className="truncate shrink-0">
                                 {timeLabel}
                                 {item.kind === "booking" && venueName ? ` · ${venueName}` : ""}
@@ -474,13 +636,75 @@ export function OutlookTimeGrid({
                             </div>
                           </div>
                         )}
-                      </button>
+                      </div>
 
-                      {/* Delete — hidden for per-show jobs (edit the event instead) */}
-                      {item.kind === "job" || isDisabled ? null : (
+                      {/* Locked badge (bottom-left) */}
+                      {isBooking && isLocked && !isThin ? (
+                        <span
+                          className="absolute bottom-0.5 left-0.5 z-[3] inline-flex items-center gap-1 rounded bg-black/40 px-1 py-0.5 text-[9px] text-white/85"
+                          title="Locked. Unlock to edit, move or delete."
+                        >
+                          <Lock className="h-2.5 w-2.5" />
+                          Locked
+                        </span>
+                      ) : null}
+
+                      {/* Inline action buttons for bookings (edit / lock / delete). */}
+                      {showInlineActions ? (
+                        <>
+                          {onUpdateItemTime ? (
+                            <button
+                              type="button"
+                              data-handle="edit"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onItemClick(item);
+                              }}
+                              className="absolute top-0.5 right-0.5 w-5 h-5 flex items-center justify-center rounded text-white/85 bg-black/35 hover:bg-black/55 hover:text-white transition-colors z-20"
+                              title="Edit"
+                            >
+                              <Pencil size={11} />
+                            </button>
+                          ) : null}
+                          {onToggleLock ? (
+                            <button
+                              type="button"
+                              data-handle="lock"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleLock(item, !isLocked);
+                              }}
+                              className={`absolute top-[26px] right-0.5 w-5 h-5 flex items-center justify-center rounded text-white/85 ${
+                                isLocked ? "bg-amber-700/70 hover:bg-amber-700" : "bg-black/35 hover:bg-black/55"
+                              } hover:text-white transition-colors z-20`}
+                              title={isLocked ? "Unlock" : "Lock"}
+                            >
+                              {isLocked ? <Lock size={11} /> : <LockOpen size={11} />}
+                            </button>
+                          ) : null}
+                          {!isLocked ? (
+                            <button
+                              type="button"
+                              data-handle="delete"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteItem(item);
+                              }}
+                              className="absolute bottom-0.5 right-0.5 w-5 h-5 flex items-center justify-center rounded text-white/85 bg-black/35 hover:bg-red-700 hover:text-white transition-colors z-20"
+                              title="Delete"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          ) : null}
+                        </>
+                      ) : item.kind === "job" || isDisabled || isBooking ? null : (
                         <button
                           type="button"
-                          data-booking-block
+                          data-handle="delete"
+                          onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
                           className="absolute top-0.5 right-0.5 opacity-0 group-hover/block:opacity-100 w-4 h-4 flex items-center justify-center rounded bg-black/60 text-white/80 hover:bg-red-700 hover:text-white transition-opacity z-20"
                           title="Delete"

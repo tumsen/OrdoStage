@@ -615,6 +615,8 @@ model InternalBooking {
   /** Optional event link: when set, this booking is part of the event's venue occupation. */
   eventId        String?
   event          Event?                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /** When true the booking can't be moved/edited/deleted until unlocked. */
+  isLocked       Boolean                 @default(false)
   organizationId String
   organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdById    String?

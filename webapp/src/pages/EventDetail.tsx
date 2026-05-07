@@ -2462,6 +2462,33 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
     onError: () => toast({ title: "Failed to delete venue booking", variant: "destructive" }),
   });
 
+  const updateBookingTime = useMutation({
+    mutationFn: (body: { id: string; startDate: string; endDate: string }) =>
+      api.put<InternalBookingDetail>(`/api/bookings/${body.id}`, {
+        startDate: body.startDate,
+        endDate: body.endDate,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event-venue-bookings", event.id] });
+      queryClient.invalidateQueries({ queryKey: ["event-venue-schedule", event.id] });
+      queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      void invalidateWorkAnnouncementBar(queryClient);
+    },
+    onError: () => toast({ title: "Failed to move venue booking", variant: "destructive" }),
+  });
+
+  const toggleLock = useMutation({
+    mutationFn: (body: { id: string; locked: boolean }) =>
+      api.put<InternalBookingDetail>(`/api/bookings/${body.id}`, { isLocked: body.locked }),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["event-venue-bookings", event.id] });
+      queryClient.invalidateQueries({ queryKey: ["event-venue-schedule", event.id] });
+      queryClient.invalidateQueries({ queryKey: ["schedule"] });
+      toast({ title: vars.locked ? "Venue booking locked" : "Venue booking unlocked" });
+    },
+    onError: () => toast({ title: "Failed to update lock state", variant: "destructive" }),
+  });
+
   const handleSelectTimeRange = (start: Date, end: Date) => {
     if (!venueId) {
       toast({
@@ -2486,8 +2513,31 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
 
   const handleDeleteItem = (item: CalendarItem) => {
     if (item.disabled || item.kind !== "booking") return;
+    const raw = item.raw as InternalBookingDetail & { isLocked?: boolean };
+    if (raw.isLocked) {
+      toast({
+        title: "Booking is locked",
+        description: "Unlock it before deleting.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!confirmDeleteAction(`venue booking "${item.title}"`)) return;
     deleteBooking.mutate(item.id);
+  };
+
+  const handleUpdateItemTime = (item: CalendarItem, start: Date, end: Date) => {
+    if (item.kind !== "booking") return;
+    updateBookingTime.mutate({
+      id: item.id,
+      startDate: toLocalDatetimeInput(start),
+      endDate: toLocalDatetimeInput(end),
+    });
+  };
+
+  const handleToggleLock = (item: CalendarItem, locked: boolean) => {
+    if (item.kind !== "booking") return;
+    toggleLock.mutate({ id: item.id, locked });
   };
 
   const venueOptions = venues ?? [];
@@ -2560,6 +2610,8 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
         onItemClick={handleItemClick}
         onDeleteItem={handleDeleteItem}
         onSelectTimeRange={handleSelectTimeRange}
+        onUpdateItemTime={handleUpdateItemTime}
+        onToggleLock={handleToggleLock}
       />
 
       <EditItemSheet
