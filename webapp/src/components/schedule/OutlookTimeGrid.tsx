@@ -30,21 +30,8 @@ function yToMinutesFromMidnight(clientY: number, columnTop: number): number {
   return Math.max(0, Math.min(24 * 60 - SNAP_MINUTES, snapped));
 }
 
-function getSnappedRangeMinutes(startY: number, currentY: number, columnTop: number): { lo: number; hi: number } {
-  const m0 = yToMinutesFromMidnight(startY, columnTop);
-  const m1 = yToMinutesFromMidnight(currentY, columnTop);
-  return { lo: Math.min(m0, m1), hi: Math.max(m0, m1) };
-}
-
 function formatDragTime(d: Date, hour12: boolean): string {
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12 });
-}
-
-function minutesToDate(day: Date, minutesFromMidnight: number): Date {
-  const d = new Date(day);
-  d.setHours(0, 0, 0, 0);
-  d.setTime(d.getTime() + minutesFromMidnight * 60 * 1000);
-  return d;
 }
 
 type DragPayload = {
@@ -52,7 +39,21 @@ type DragPayload = {
   dayIndex: number;
   startY: number;
   currentY: number;
+  /** Day index the pointer is currently over (may differ from start day for cross-day drag). */
+  currentDayIndex: number;
 };
+
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function dateFromDayAndMinutes(day: Date, minutes: number): Date {
+  const d = startOfDay(day);
+  d.setTime(d.getTime() + minutes * 60 * 1000);
+  return d;
+}
 
 function StatusLabel({ status }: { status?: string }) {
   if (status === "confirmed")
@@ -91,22 +92,79 @@ export function OutlookTimeGrid({
   const dragRef = useRef<DragPayload | null>(null);
   const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  const findDayIndexAtX = useCallback((clientX: number, fallback: number): number => {
+    for (let i = 0; i < columnRefs.current.length; i += 1) {
+      const el = columnRefs.current[i];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (clientX >= r.left && clientX < r.right) return i;
+    }
+    // Pointer is outside columns: clamp to nearest end.
+    if (columnRefs.current.length === 0) return fallback;
+    const firstEl = columnRefs.current[0];
+    const lastEl = columnRefs.current[columnRefs.current.length - 1];
+    if (firstEl) {
+      const r0 = firstEl.getBoundingClientRect();
+      if (clientX < r0.left) return 0;
+    }
+    if (lastEl) {
+      const rN = lastEl.getBoundingClientRect();
+      if (clientX >= rN.right) return columnRefs.current.length - 1;
+    }
+    return fallback;
+  }, []);
+
   const endDrag = useCallback(() => {
     const d = dragRef.current;
     dragRef.current = null;
     setDrag(null);
     if (!d) return;
-    const col = columnRefs.current[d.dayIndex];
-    if (!col) return;
-    const rect = col.getBoundingClientRect();
-    const { lo, hi } = getSnappedRangeMinutes(d.startY, d.currentY, rect.top);
-    if (Math.abs(d.currentY - d.startY) < MIN_DRAG_PX) return;
-    if (hi - lo < SNAP_MINUTES) return;
-    const start = minutesToDate(d.day, lo);
-    let end = minutesToDate(d.day, hi);
-    if (end <= start) end = new Date(start.getTime() + SNAP_MINUTES * 60 * 1000);
-    onSelectTimeRange(start, end);
-  }, [onSelectTimeRange]);
+    const startCol = columnRefs.current[d.dayIndex];
+    if (!startCol) return;
+    const startRect = startCol.getBoundingClientRect();
+    const startMin = yToMinutesFromMidnight(d.startY, startRect.top);
+
+    const endIdx = Math.max(0, Math.min(days.length - 1, d.currentDayIndex));
+    const endCol = columnRefs.current[endIdx];
+    if (!endCol) return;
+    const endRect = endCol.getBoundingClientRect();
+    const endMin = yToMinutesFromMidnight(d.currentY, endRect.top);
+
+    // Total displacement (across days + minutes) determines the drag threshold.
+    const dxDays = endIdx - d.dayIndex;
+    const dyMin = endMin - startMin;
+    const totalMin = dxDays * 24 * 60 + dyMin;
+    if (
+      Math.abs(d.currentY - d.startY) < MIN_DRAG_PX &&
+      Math.abs(totalMin) < SNAP_MINUTES &&
+      dxDays === 0
+    ) {
+      return;
+    }
+
+    let startDayIdx = d.dayIndex;
+    let startMinutes = startMin;
+    let endDayIdx = endIdx;
+    let endMinutes = endMin;
+    if (totalMin < 0) {
+      // Drag went backward — swap.
+      startDayIdx = endIdx;
+      startMinutes = endMin;
+      endDayIdx = d.dayIndex;
+      endMinutes = startMin;
+    }
+
+    const startDay = days[startDayIdx];
+    const endDay = days[endDayIdx];
+    if (!startDay || !endDay) return;
+    const startDate = dateFromDayAndMinutes(startDay, startMinutes);
+    let endDate = dateFromDayAndMinutes(endDay, endMinutes);
+    if (endDate <= startDate) {
+      endDate = new Date(startDate.getTime() + SNAP_MINUTES * 60 * 1000);
+    }
+    if (endDate.getTime() - startDate.getTime() < SNAP_MINUTES * 60 * 1000) return;
+    onSelectTimeRange(startDate, endDate);
+  }, [onSelectTimeRange, days]);
 
   const handleColumnPointerDown = (day: Date, dayIndex: number, e: React.PointerEvent) => {
     const t = e.target as HTMLElement;
@@ -114,12 +172,23 @@ export function OutlookTimeGrid({
     const col = columnRefs.current[dayIndex];
     if (!col) return;
     e.preventDefault();
-    const payload: DragPayload = { day, dayIndex, startY: e.clientY, currentY: e.clientY };
+    const payload: DragPayload = {
+      day,
+      dayIndex,
+      startY: e.clientY,
+      currentY: e.clientY,
+      currentDayIndex: dayIndex,
+    };
     dragRef.current = payload;
     setDrag(payload);
     const onMove = (ev: PointerEvent) => {
       if (!dragRef.current) return;
-      dragRef.current = { ...dragRef.current, currentY: ev.clientY };
+      const nextIdx = findDayIndexAtX(ev.clientX, dragRef.current.dayIndex);
+      dragRef.current = {
+        ...dragRef.current,
+        currentY: ev.clientY,
+        currentDayIndex: nextIdx,
+      };
       setDrag({ ...dragRef.current });
     };
     const onUp = () => {
@@ -229,29 +298,70 @@ export function OutlookTimeGrid({
             const laidOut = computeOverlapLayout(timedRaw);
 
             let selectionOverlay: React.ReactNode = null;
-            if (drag && drag.dayIndex === dayIndex) {
-              const col = columnRefs.current[dayIndex];
-              if (col) {
-                const rect = col.getBoundingClientRect();
-                const { lo, hi } = getSnappedRangeMinutes(drag.startY, drag.currentY, rect.top);
-                const durMin = Math.max(hi - lo, SNAP_MINUTES);
-                const topPx = (lo / 60) * HOUR_HEIGHT;
-                const hPx = Math.max((durMin / 60) * HOUR_HEIGHT, 36);
-                const startAt = minutesToDate(day, lo);
-                const endAt = minutesToDate(day, lo === hi ? lo + SNAP_MINUTES : hi);
-                selectionOverlay = (
-                  <div
-                    className="absolute left-1 right-1 rounded-md border-2 border-rose-400/80 bg-rose-500/25 z-[5] pointer-events-none flex flex-col justify-start px-1.5 py-1 overflow-hidden"
-                    style={{ top: topPx, height: hPx }}
-                  >
-                    <div className="text-[10px] font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
-                      {formatDragTime(startAt, effective?.timeFormat === "12h")} – {formatDragTime(endAt, effective?.timeFormat === "12h")}
+            if (drag) {
+              // Compute the absolute selection range across days so the overlay can span columns.
+              const startCol = columnRefs.current[drag.dayIndex];
+              const endIdxRaw = Math.max(0, Math.min(days.length - 1, drag.currentDayIndex));
+              const endCol = columnRefs.current[endIdxRaw];
+              if (startCol && endCol) {
+                const startMin0 = yToMinutesFromMidnight(drag.startY, startCol.getBoundingClientRect().top);
+                const endMin0 = yToMinutesFromMidnight(drag.currentY, endCol.getBoundingClientRect().top);
+                const dxDays = endIdxRaw - drag.dayIndex;
+                const totalMin = dxDays * 24 * 60 + (endMin0 - startMin0);
+                let startDayIdx = drag.dayIndex;
+                let startMinutes = startMin0;
+                let endDayIdx = endIdxRaw;
+                let endMinutes = endMin0;
+                if (totalMin < 0) {
+                  startDayIdx = endIdxRaw;
+                  startMinutes = endMin0;
+                  endDayIdx = drag.dayIndex;
+                  endMinutes = startMin0;
+                }
+
+                if (dayIndex >= startDayIdx && dayIndex <= endDayIdx) {
+                  const segStart = dayIndex === startDayIdx ? startMinutes : 0;
+                  let segEnd = dayIndex === endDayIdx ? endMinutes : 24 * 60;
+                  if (dayIndex === startDayIdx && dayIndex === endDayIdx && segEnd === segStart) {
+                    segEnd = segStart + SNAP_MINUTES;
+                  }
+                  const topPx = (segStart / 60) * HOUR_HEIGHT;
+                  const hPx = Math.max(((segEnd - segStart) / 60) * HOUR_HEIGHT, 18);
+                  const showLabel = dayIndex === startDayIdx;
+                  const startDay = days[startDayIdx];
+                  const endDay = days[endDayIdx];
+                  const startAt = startDay ? dateFromDayAndMinutes(startDay, startMinutes) : null;
+                  const endAtRaw = endDay
+                    ? dateFromDayAndMinutes(
+                        endDay,
+                        endMinutes === startMinutes && startDayIdx === endDayIdx
+                          ? endMinutes + SNAP_MINUTES
+                          : endMinutes
+                      )
+                    : null;
+                  const totalDurMin = startAt && endAtRaw
+                    ? Math.max(SNAP_MINUTES, Math.round((endAtRaw.getTime() - startAt.getTime()) / 60000))
+                    : SNAP_MINUTES;
+                  selectionOverlay = (
+                    <div
+                      className="absolute left-1 right-1 rounded-md border-2 border-rose-400/80 bg-rose-500/25 z-[5] pointer-events-none flex flex-col justify-start px-1.5 py-1 overflow-hidden"
+                      style={{ top: topPx, height: hPx }}
+                    >
+                      {showLabel && startAt && endAtRaw ? (
+                        <>
+                          <div className="text-[10px] font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
+                            {formatDragTime(startAt, effective?.timeFormat === "12h")} – {formatDragTime(endAtRaw, effective?.timeFormat === "12h")}
+                          </div>
+                          <div className="text-[9px] text-white/85 leading-tight mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
+                            {endDayIdx > startDayIdx
+                              ? `${endDayIdx - startDayIdx + 1} days · ${Math.round(totalDurMin / 60)}h ${totalDurMin % 60}m`
+                              : `${totalDurMin} min`}
+                          </div>
+                        </>
+                      ) : null}
                     </div>
-                    <div className="text-[9px] text-white/85 leading-tight mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
-                      {durMin} min
-                    </div>
-                  </div>
-                );
+                  );
+                }
               }
             }
 

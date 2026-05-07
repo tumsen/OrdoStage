@@ -2281,14 +2281,29 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
     queryFn: () => api.get<Person[]>("/api/people"),
   });
 
-  const initialAnchor = useMemo(() => {
-    const showWithDate = (event.shows ?? []).find((s) => s.showDate);
-    if (showWithDate) return startOfWeekMonday(new Date(showWithDate.showDate));
-    if (event.startDate) return startOfWeekMonday(new Date(event.startDate));
-    return startOfWeekMonday(new Date());
+  const firstShowDate = useMemo(() => {
+    const dated = (event.shows ?? [])
+      .filter((s) => Boolean(s.showDate))
+      .map((s) => new Date(s.showDate as string).getTime())
+      .filter((t) => Number.isFinite(t))
+      .sort((a, b) => a - b);
+    return dated.length > 0 ? new Date(dated[0]!) : null;
   }, [event]);
 
+  const initialAnchor = useMemo(() => {
+    if (firstShowDate) return startOfWeekMonday(firstShowDate);
+    if (event.startDate) return startOfWeekMonday(new Date(event.startDate));
+    return startOfWeekMonday(new Date());
+  }, [firstShowDate, event.startDate]);
+
   const [weekStart, setWeekStart] = useState<Date>(initialAnchor);
+  // If the underlying event's first show shifts (e.g. user added the first dated show),
+  // re-anchor the calendar so it always opens on the first show by default.
+  useEffect(() => {
+    setWeekStart(initialAnchor);
+    // We intentionally only re-run when the resolved first-show week changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAnchor.getTime()]);
   const eventVenueDefault = useMemo(() => {
     if (event.venueId) return event.venueId;
     const firstShow = (event.shows ?? []).find((s) => s.venueId);
