@@ -68,11 +68,15 @@ type CreateDragPayload = {
   currentDayIndex: number;
 };
 
+type MoveMode = "move" | "resize-start" | "resize-end";
+
 type MoveDragPayload = {
   item: CalendarItem;
+  mode: MoveMode;
   origStartMs: number;
   origEndMs: number;
   startDayIndex: number;
+  startX: number;
   startY: number;
   currentY: number;
   currentDayIndex: number;
@@ -233,20 +237,43 @@ export function OutlookTimeGrid({
   };
 
   // ── Move drag (drag a booking block to reposition it) ───────────────────
-  const computeMovedRange = useCallback((m: MoveDragPayload): { start: Date; end: Date } | null => {
-    const startCol = columnRefs.current[m.startDayIndex];
-    const curCol = columnRefs.current[m.currentDayIndex];
-    if (!startCol || !curCol) return null;
-    const rawStart = rawMinutesFromY(m.startY, startCol.getBoundingClientRect().top);
-    const rawCur = rawMinutesFromY(m.currentY, curCol.getBoundingClientRect().top);
-    const dxDays = m.currentDayIndex - m.startDayIndex;
-    const totalDeltaMin = dxDays * 24 * 60 + (rawCur - rawStart);
-    const snappedDeltaMs = snapMin(totalDeltaMin) * 60 * 1000;
-    return {
-      start: new Date(m.origStartMs + snappedDeltaMs),
-      end: new Date(m.origEndMs + snappedDeltaMs),
-    };
-  }, []);
+  const computeMovedRange = useCallback(
+    (m: MoveDragPayload): { start: Date; end: Date } | null => {
+      const startCol = columnRefs.current[m.startDayIndex];
+      const curCol = columnRefs.current[m.currentDayIndex];
+      if (!startCol || !curCol) return null;
+
+      if (m.mode === "move") {
+        const rawStart = rawMinutesFromY(m.startY, startCol.getBoundingClientRect().top);
+        const rawCur = rawMinutesFromY(m.currentY, curCol.getBoundingClientRect().top);
+        const dxDays = m.currentDayIndex - m.startDayIndex;
+        const totalDeltaMin = dxDays * 24 * 60 + (rawCur - rawStart);
+        const snappedDeltaMs = snapMin(totalDeltaMin) * 60 * 1000;
+        return {
+          start: new Date(m.origStartMs + snappedDeltaMs),
+          end: new Date(m.origEndMs + snappedDeltaMs),
+        };
+      }
+
+      // Resize uses the absolute pointer position so the edge follows the pointer.
+      const day = days[m.currentDayIndex];
+      if (!day) return null;
+      const rawMin = rawMinutesFromY(m.currentY, curCol.getBoundingClientRect().top);
+      const ptMs = startOfDay(day).getTime() + snapMin(rawMin) * 60 * 1000;
+
+      if (m.mode === "resize-start") {
+        const maxStart = m.origEndMs - SNAP_MINUTES * 60 * 1000;
+        const newStart = Math.min(ptMs, maxStart);
+        return { start: new Date(newStart), end: new Date(m.origEndMs) };
+      }
+
+      // resize-end
+      const minEnd = m.origStartMs + SNAP_MINUTES * 60 * 1000;
+      const newEnd = Math.max(ptMs, minEnd);
+      return { start: new Date(m.origStartMs), end: new Date(newEnd) };
+    },
+    [days]
+  );
 
   const endMoveDrag = useCallback(() => {
     const m = moveDragRef.current;
@@ -264,14 +291,19 @@ export function OutlookTimeGrid({
     onUpdateItemTime?.(m.item, next.start, next.end);
   }, [onItemClick, onUpdateItemTime, computeMovedRange]);
 
-  const startMoveDrag = (item: CalendarItem, dayIndex: number, e: React.PointerEvent) => {
+  const startMoveDrag = (
+    item: CalendarItem,
+    dayIndex: number,
+    mode: MoveMode,
+    e: React.PointerEvent
+  ) => {
     if (!isBookingItem(item)) {
       onItemClick(item);
       return;
     }
     if (item.disabled) return;
     if (isItemLocked(item) || !onUpdateItemTime) {
-      onItemClick(item);
+      if (mode === "move") onItemClick(item);
       return;
     }
     e.preventDefault();
@@ -283,19 +315,23 @@ export function OutlookTimeGrid({
     }
     const payload: MoveDragPayload = {
       item,
+      mode,
       origStartMs: range.start.getTime(),
       origEndMs: range.end.getTime(),
       startDayIndex: dayIndex,
+      startX: e.clientX,
       startY: e.clientY,
       currentY: e.clientY,
       currentDayIndex: dayIndex,
-      passed: false,
+      // Resize feedback should be immediate; "move" still requires a small
+      // displacement so a plain click stays a click.
+      passed: mode !== "move",
     };
     moveDragRef.current = payload;
     setMoveDrag(payload);
     const onMove = (ev: PointerEvent) => {
       if (!moveDragRef.current) return;
-      const dx = ev.clientX - (e.clientX);
+      const dx = ev.clientX - moveDragRef.current.startX;
       const dy = ev.clientY - moveDragRef.current.startY;
       const passed =
         moveDragRef.current.passed || Math.hypot(dx, dy) >= MIN_DRAG_PX;
@@ -594,12 +630,11 @@ export function OutlookTimeGrid({
                         onPointerDown={(e) => {
                           if ((e.target as HTMLElement).closest("[data-handle]")) return;
                           if (canDrag) {
-                            startMoveDrag(item, dayIndex, e);
+                            startMoveDrag(item, dayIndex, "move", e);
                           }
                         }}
                         onClick={(e) => {
                           if ((e.target as HTMLElement).closest("[data-handle]")) return;
-                          // For non-draggable items we still want a plain click → open editor.
                           if (canDrag) return;
                           e.stopPropagation();
                           if (!isDisabled) onItemClick(item);
@@ -647,6 +682,30 @@ export function OutlookTimeGrid({
                           <Lock className="h-2.5 w-2.5" />
                           Locked
                         </span>
+                      ) : null}
+
+                      {/* Resize handles — only on the segment that contains the actual edge.
+                          Bookings spanning multiple day columns get the top handle on the
+                          first segment and the bottom handle on the last. */}
+                      {canDrag && height >= 14 ? (
+                        <>
+                          {start.getTime() === clippedStart.getTime() ? (
+                            <div
+                              data-handle="resize-top"
+                              onPointerDown={(e) => startMoveDrag(item, dayIndex, "resize-start", e)}
+                              className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize z-[15] hover:bg-white/15"
+                              title="Drag to change start time"
+                            />
+                          ) : null}
+                          {end.getTime() === clippedEnd.getTime() ? (
+                            <div
+                              data-handle="resize-bottom"
+                              onPointerDown={(e) => startMoveDrag(item, dayIndex, "resize-end", e)}
+                              className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize z-[15] hover:bg-white/15"
+                              title="Drag to change end time"
+                            />
+                          ) : null}
+                        </>
                       ) : null}
 
                       {/* Inline action buttons for bookings (edit / lock / delete). */}
