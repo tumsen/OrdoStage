@@ -349,7 +349,7 @@ export default function Schedule() {
         : "en-US";
   const today = new Date();
   const [anchorDate, setAnchorDate] = useState(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
-  const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
+  const [viewMode, setViewMode] = useState<ScheduleViewMode>("week");
   const [venueId, setVenueId] = useState("all");
   const [personId, setPersonId] = useState("all");
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
@@ -450,9 +450,9 @@ export default function Schedule() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
       {/* Top bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between shrink-0">
         <ScheduleFilters
           venues={venues ?? []}
           people={people ?? []}
@@ -478,7 +478,7 @@ export default function Schedule() {
       </div>
 
       {/* Calendar navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -515,9 +515,9 @@ export default function Schedule() {
       </div>
 
       {/* Calendar */}
-      <div className="bg-white/[0.02] border border-white/[0.07] rounded-xl p-3 md:p-4">
+      <div className="min-h-0 flex-1 overflow-hidden bg-white/[0.02] border border-white/[0.07] rounded-xl p-3 md:p-4">
         {isLoading ? (
-          <div className="space-y-2">
+          <div className="h-full overflow-auto space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-20 w-full rounded-lg bg-white/5" />
             ))}
@@ -525,7 +525,7 @@ export default function Schedule() {
         ) : (
           <>
             {viewMode === "year" ? (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="h-full overflow-auto grid grid-cols-1 xl:grid-cols-2 gap-4 pr-1">
                 {Array.from({ length: 12 }).map((_, m) => (
                   <div key={m} className="rounded-lg border border-white/10 p-2">
                     <div className="text-xs text-white/40 mb-2 px-1">
@@ -541,20 +541,25 @@ export default function Schedule() {
                 ))}
               </div>
             ) : viewMode === "yeardisc" ? (
-              <YearDiscView year={anchorDate.getFullYear()} items={visibleItems} />
+              <div className="h-full overflow-auto pr-1">
+                <YearDiscView year={anchorDate.getFullYear()} items={visibleItems} />
+              </div>
             ) : viewMode === "month" ? (
-              <CalendarGrid
-                year={anchorDate.getFullYear()}
-                month={anchorDate.getMonth()}
-                items={visibleItems}
-                onItemClick={handleItemClick}
-              />
+              <div className="h-full overflow-auto pr-1">
+                <CalendarGrid
+                  year={anchorDate.getFullYear()}
+                  month={anchorDate.getMonth()}
+                  items={visibleItems}
+                  onItemClick={handleItemClick}
+                />
+              </div>
             ) : viewMode === "week" || viewMode === "day" ? (
-              <div className="space-y-2">
+              <div className="flex h-full min-h-0 flex-col space-y-2">
                 <p className="text-[11px] text-white/35">
                   Drag across a day column to select a time range (15-minute steps); start and end times show while you drag.
                 </p>
                 <OutlookTimeGrid
+                  className="min-h-0 flex-1"
                   days={getRangeDays(viewMode, anchorDate)}
                   items={visibleItems}
                   onItemClick={handleItemClick}
@@ -569,14 +574,16 @@ export default function Schedule() {
                 />
               </div>
             ) : viewMode === "venueocc" ? (
-              <VenueOccupationView
-                items={visibleItems}
-                venues={venues ?? []}
-                locale={locale}
-                venueFilterId={venueId}
-              />
+              <div className="h-full overflow-auto pr-1">
+                <VenueOccupationView
+                  items={visibleItems}
+                  venues={venues ?? []}
+                  locale={locale}
+                  venueFilterId={venueId}
+                />
+              </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="h-full overflow-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pr-1">
                 {getRangeDays(viewMode, anchorDate).map((date) => {
                   const dayItems = itemsForDay(visibleItems, date);
                   const backingItems = dayItems.filter((item) => item.renderBehind === true);

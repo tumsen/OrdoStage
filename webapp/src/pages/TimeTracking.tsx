@@ -792,8 +792,8 @@ export default function TimeTracking() {
     (upcomingJobs ?? []).some((j) => !entryByJobId.has(j.id));
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden p-6">
+      <div className="shrink-0 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
         </div>
@@ -914,7 +914,7 @@ export default function TimeTracking() {
       </div>
 
       {hasUpcomingUnlogged ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+        <div className="shrink-0 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-white">{t("time.upcomingTitle")}</p>
@@ -984,6 +984,7 @@ export default function TimeTracking() {
         </div>
       ) : null}
 
+      <div className="min-h-0 flex-1 space-y-6 overflow-auto pr-1">
       {mode === "month" ? (
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
           <div className="grid grid-cols-7 gap-px text-[10px] uppercase tracking-wide text-white/40 mb-2">
@@ -1025,7 +1026,7 @@ export default function TimeTracking() {
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-x-auto">
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-auto">
           <div className="flex min-w-[720px]">
             <div className="w-14 shrink-0 flex flex-col">
               <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full border-b-0")} aria-hidden />
@@ -1512,6 +1513,7 @@ export default function TimeTracking() {
       {canEdit && mode === "week" ? (
         <p className="text-xs text-white/40">{t("time.dragHint")}</p>
       ) : null}
+      </div>
 
       <TimeEntryEditSheet
         entry={editingEntry}

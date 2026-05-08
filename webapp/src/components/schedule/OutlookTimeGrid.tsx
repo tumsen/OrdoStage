@@ -22,6 +22,7 @@ interface OutlookTimeGridProps {
   onItemClick: (item: CalendarItem) => void;
   onDeleteItem: (item: CalendarItem) => void;
   onSelectTimeRange: (start: Date, end: Date) => void;
+  className?: string;
   /** Called when a booking block is dragged to a new position. */
   onUpdateItemTime?: (item: CalendarItem, start: Date, end: Date) => void;
   /** Called when a booking's lock button is toggled. */
@@ -57,6 +58,14 @@ function dateFromDayAndMinutes(day: Date, minutes: number): Date {
   const d = startOfDay(day);
   d.setTime(d.getTime() + minutes * 60 * 1000);
   return d;
+}
+
+function getIsoWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / DAY_MS + 1) / 7);
 }
 
 type CreateDragPayload = {
@@ -123,6 +132,7 @@ export function OutlookTimeGrid({
   onItemClick,
   onDeleteItem,
   onSelectTimeRange,
+  className = "",
   onUpdateItemTime,
   onToggleLock,
 }: OutlookTimeGridProps) {
@@ -358,18 +368,21 @@ export function OutlookTimeGrid({
   };
 
   return (
-    <div className="rounded-lg border border-white/10 overflow-auto">
+    <div className={`rounded-lg border border-white/10 overflow-auto ${className}`}>
       <div className="min-w-[600px]">
         {/* ── Day header row ──────────────────────────────────────────────── */}
         <div className="grid sticky top-0 z-30 bg-[#0d0d14]" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
           <div className="border-b border-white/10 bg-white/[0.02]" />
           {days.map((d) => (
             <div key={d.toISOString()} className="border-b border-l border-white/10 bg-white/[0.02] px-2 py-2">
-              <div className="text-xs text-white/80 font-medium">
-                {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { weekday: "short" })}
+              <div className="text-[11px] text-white font-semibold leading-tight">
+                {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { weekday: "long" })}
               </div>
-              <div className="text-[11px] text-white/40">
-                {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { month: "short", day: "numeric" })}
+              <div className="mt-1 text-[10px] text-white/60 leading-snug">
+                {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { day: "numeric", month: "long", year: "numeric" })}
+              </div>
+              <div className="text-[10px] text-white/45 leading-snug tabular-nums">
+                W{getIsoWeek(d)}
               </div>
             </div>
           ))}
