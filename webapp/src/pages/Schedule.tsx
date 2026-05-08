@@ -17,6 +17,7 @@ import { ItemDetailSheet as _ItemDetailSheet } from "@/components/schedule/ItemD
 import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { ScheduleLegend } from "@/components/schedule/ScheduleLegend";
+import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import {
   toCalendarItems,
   formatMonthLabel,
@@ -38,6 +39,12 @@ function toISODate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
     date.getDate()
   ).padStart(2, "0")}`;
+}
+
+function dateFromISODate(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}T00:00:00`);
+  return Number.isFinite(d.getTime()) ? d : null;
 }
 
 function startOfWeek(date: Date): Date {
@@ -509,6 +516,15 @@ export default function Schedule() {
           >
             Today
           </Button>
+          <DateInputWithWeekday
+            value={toISODate(anchorDate)}
+            onChange={(value) => {
+              const next = dateFromISODate(value);
+              if (next) setAnchorDate(next);
+            }}
+            className="h-8 min-h-8 border-white/15 bg-white/[0.04]"
+            weekdayClassName="text-xs text-white/45"
+          />
         </div>
 
         <ScheduleLegend />

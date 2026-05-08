@@ -45,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
+import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import type { TimeEntry, TimeProject, TimeTag, TimeTrackingJob } from "@/contracts/backendTypes";
 import type { Language, TimeFormat } from "@/lib/preferences";
 import {
@@ -71,6 +72,12 @@ function dateFnsLocale(language: Language): Locale {
   if (language === "da") return localeDa;
   if (language === "de") return localeDe;
   return localeEnGB;
+}
+
+function dateFromISODate(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}T00:00:00`);
+  return Number.isFinite(d.getTime()) ? d : null;
 }
 
 const DISPLAY_START_STORAGE_KEY = "timeGrid.displayStartHour";
@@ -869,6 +876,15 @@ export default function TimeTracking() {
               ? `${format(weekStart, "d MMM")} – ${format(weekEnd, "d MMM yyyy")}`
               : format(anchor, "MMMM yyyy")}
           </span>
+          <DateInputWithWeekday
+            value={format(anchor, "yyyy-MM-dd")}
+            onChange={(value) => {
+              const next = dateFromISODate(value);
+              if (next) setAnchor(next);
+            }}
+            className="h-8 min-h-8 border-white/15 bg-white/[0.04]"
+            weekdayClassName="text-xs text-white/45"
+          />
           <span className="text-xs text-white/50 tabular-nums whitespace-nowrap">
             W{periodWeek} · {periodMonth} · {periodYear}
           </span>
