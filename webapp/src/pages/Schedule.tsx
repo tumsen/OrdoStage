@@ -103,33 +103,6 @@ function getRange(mode: ScheduleViewMode, anchorDate: Date): { from: string; to:
   return { from: toISODate(fromDate), to: toISODate(toDate) };
 }
 
-function rangeLabel(mode: ScheduleViewMode, date: Date, locale: string): string {
-  if (mode === "year") return String(date.getFullYear());
-  if (mode === "yeardisc") return `Year Disc ${date.getFullYear()}`;
-  if (mode === "month") return formatMonthLabel(date.getFullYear(), date.getMonth());
-  if (mode === "week") {
-    const fromDate = startOfWeek(date);
-    const toDate = addDays(fromDate, 6);
-    return `${fromDate.toLocaleDateString(locale, { month: "short", day: "numeric" })} - ${toDate.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })}`;
-  }
-  if (mode === "day") {
-    return date.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-  }
-  if (mode === "venueocc") {
-    const fromDate = startOfWeek(date);
-    const toDate = addDays(fromDate, 6);
-    return `Venue occupation (${fromDate.toLocaleDateString(locale, {
-      month: "short",
-      day: "numeric",
-    })} - ${toDate.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })})`;
-  }
-  const toDate = addDays(date, 6);
-  return `Next 7 days (${date.toLocaleDateString(locale, {
-    month: "short",
-    day: "numeric",
-  })} - ${toDate.toLocaleDateString(locale, { month: "short", day: "numeric" })})`;
-}
-
 function getRangeDays(mode: ScheduleViewMode, anchorDate: Date): Date[] {
   if (mode === "week") {
     const start = startOfWeek(anchorDate);
@@ -492,17 +465,25 @@ export default function Schedule() {
             size="icon"
             className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/5"
             onClick={moveBackward}
+            aria-label="Previous"
           >
             <ChevronLeft size={16} />
           </Button>
-          <h2 className="text-base font-semibold text-white/90 min-w-[160px] text-center">
-            {rangeLabel(viewMode, anchorDate, locale)}
-          </h2>
+          <DateInputWithWeekday
+            value={toISODate(anchorDate)}
+            onChange={(value) => {
+              const next = dateFromISODate(value);
+              if (next) setAnchorDate(next);
+            }}
+            className="h-8 min-h-8 border-white/15 bg-white/[0.04]"
+            weekdayClassName="text-xs text-white/45"
+          />
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/5"
             onClick={moveForward}
+            aria-label="Next"
           >
             <ChevronRight size={16} />
           </Button>
@@ -516,15 +497,6 @@ export default function Schedule() {
           >
             Today
           </Button>
-          <DateInputWithWeekday
-            value={toISODate(anchorDate)}
-            onChange={(value) => {
-              const next = dateFromISODate(value);
-              if (next) setAnchorDate(next);
-            }}
-            className="h-8 min-h-8 border-white/15 bg-white/[0.04]"
-            weekdayClassName="text-xs text-white/45"
-          />
         </div>
 
         <ScheduleLegend />

@@ -859,6 +859,15 @@ export default function TimeTracking() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
+          <DateInputWithWeekday
+            value={format(anchor, "yyyy-MM-dd")}
+            onChange={(value) => {
+              const next = dateFromISODate(value);
+              if (next) setAnchor(next);
+            }}
+            className="h-8 min-h-8 border-white/15 bg-white/[0.04]"
+            weekdayClassName="text-xs text-white/45"
+          />
           <Button
             type="button"
             variant="outline"
@@ -871,20 +880,6 @@ export default function TimeTracking() {
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <span className="text-sm text-white/70 tabular-nums min-w-[11rem]">
-            {mode === "week"
-              ? `${format(weekStart, "d MMM")} – ${format(weekEnd, "d MMM yyyy")}`
-              : format(anchor, "MMMM yyyy")}
-          </span>
-          <DateInputWithWeekday
-            value={format(anchor, "yyyy-MM-dd")}
-            onChange={(value) => {
-              const next = dateFromISODate(value);
-              if (next) setAnchor(next);
-            }}
-            className="h-8 min-h-8 border-white/15 bg-white/[0.04]"
-            weekdayClassName="text-xs text-white/45"
-          />
           <span className="text-xs text-white/50 tabular-nums whitespace-nowrap">
             W{periodWeek} · {periodMonth} · {periodYear}
           </span>
