@@ -586,11 +586,19 @@ export function OutlookTimeGrid({
                   if (!layout) return null;
                   const { top, height, clippedStart, clippedEnd } = layout;
                   const booking = item.raw as InternalBookingDetail & { eventId?: string | null };
-                  const target = laidOut.find((fg) => {
+                  const eventTargets = laidOut.filter((fg) => {
                     if (fg.item.kind !== "event") return false;
                     const ev = fg.item.raw as EventDetail;
-                    return ev.id === booking.eventId && blocksOverlap(start, end, fg.start, fg.end);
+                    return ev.id === booking.eventId;
                   });
+                  const target =
+                    eventTargets.find((fg) => blocksOverlap(start, end, fg.start, fg.end)) ??
+                    eventTargets.find((fg) => {
+                      const fgDayStart = startOfDay(fg.start).getTime();
+                      const fgDayEnd = fgDayStart + DAY_MS;
+                      return start.getTime() < fgDayEnd && end.getTime() > fgDayStart;
+                    }) ??
+                    eventTargets[0];
 
                   const gapPx = 2;
                   const leftPct = target ? (target.colIndex / target.totalCols) * 100 : 0;
