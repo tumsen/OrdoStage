@@ -11,10 +11,12 @@ import {
 } from "./scheduleUtils";
 import { usePreferences } from "@/hooks/usePreferences";
 
-const HOUR_HEIGHT = 48;
+const HOUR_HEIGHT = 36;
 const SNAP_MINUTES = 15;
 const MIN_DRAG_PX = 8;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_GRID_HEADER_CLASS =
+  "min-h-[6.75rem] shrink-0 border-b border-white/10 box-border flex flex-col items-stretch justify-center gap-0.5 px-1.5 py-2";
 
 interface OutlookTimeGridProps {
   days: Date[];
@@ -368,21 +370,25 @@ export function OutlookTimeGrid({
   };
 
   return (
-    <div className={`rounded-lg border border-white/10 overflow-auto ${className}`}>
-      <div className="min-w-[600px]">
+    <div className={`rounded-xl border border-white/10 bg-white/[0.02] overflow-auto ${className}`}>
+      <div className="min-w-[720px]">
         {/* ── Day header row ──────────────────────────────────────────────── */}
-        <div className="grid sticky top-0 z-30 bg-[#0d0d14]" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
-          <div className="border-b border-white/10 bg-white/[0.02]" />
+        <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
+          <div className={`${WEEK_GRID_HEADER_CLASS} w-full border-b-0`} aria-hidden />
           {days.map((d) => (
-            <div key={d.toISOString()} className="border-b border-l border-white/10 bg-white/[0.02] px-2 py-2">
-              <div className="text-[11px] text-white font-semibold leading-tight">
-                {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { weekday: "long" })}
-              </div>
-              <div className="mt-1 text-[10px] text-white/60 leading-snug">
-                {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { day: "numeric", month: "long", year: "numeric" })}
-              </div>
-              <div className="text-[10px] text-white/45 leading-snug tabular-nums">
-                W{getIsoWeek(d)}
+            <div key={d.toISOString()} className={`${WEEK_GRID_HEADER_CLASS} border-l border-white/10 text-xs text-white/70`}>
+              <div className="flex items-start justify-between gap-1">
+                <div className="min-w-0 flex-1 text-left">
+                  <div className="text-[11px] text-white font-semibold leading-tight">
+                    {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { weekday: "long" })}
+                  </div>
+                  <div className="mt-1 text-[10px] text-white/60 leading-snug">
+                    {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { day: "numeric", month: "long", year: "numeric" })}
+                  </div>
+                  <div className="text-[10px] text-white/45 leading-snug mt-0.5 tabular-nums">
+                    W{getIsoWeek(d)}
+                  </div>
+                </div>
               </div>
             </div>
           ))}
@@ -450,12 +456,15 @@ export function OutlookTimeGrid({
             {hours.map((h) => (
               <div
                 key={h}
-                className="absolute w-full text-[10px] text-white/35 pr-2 text-right pointer-events-none"
-                style={{ top: h * HOUR_HEIGHT - 6 }}
+                className="absolute left-0 right-1 z-[1] -translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none"
+                style={{ top: h * HOUR_HEIGHT }}
               >
                 {`${String(h).padStart(2, "0")}:00`}
               </div>
             ))}
+            <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
+              24:00
+            </span>
           </div>
 
           {/* Day columns */}
@@ -583,10 +592,11 @@ export function OutlookTimeGrid({
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="absolute left-0 right-0 border-t border-white/5 pointer-events-none z-0"
+                    className="absolute left-0 right-0 border-t border-white/[0.1] pointer-events-none z-0"
                     style={{ top: h * HOUR_HEIGHT }}
                   />
                 ))}
+                <div className="absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1] pointer-events-none" />
 
                 {selectionOverlay}
                 {moveOverlay}
@@ -942,6 +952,12 @@ export function OutlookTimeGrid({
               </div>
             );
           })}
+        </div>
+        <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
+          <div className="h-6 border-b border-white/15" />
+          {days.map((day) => (
+            <div key={`pad-${day.toISOString()}`} className="h-6 border-l border-b border-white/15" />
+          ))}
         </div>
       </div>
     </div>

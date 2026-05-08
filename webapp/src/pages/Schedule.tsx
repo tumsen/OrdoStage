@@ -554,10 +554,7 @@ export default function Schedule() {
                 />
               </div>
             ) : viewMode === "week" || viewMode === "day" ? (
-              <div className="flex h-full min-h-0 flex-col space-y-2">
-                <p className="text-[11px] text-white/35">
-                  Drag across a day column to select a time range (15-minute steps); start and end times show while you drag.
-                </p>
+              <div className="flex h-full min-h-0 flex-col">
                 <OutlookTimeGrid
                   className="min-h-0 flex-1"
                   days={getRangeDays(viewMode, anchorDate)}
