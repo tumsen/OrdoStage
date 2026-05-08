@@ -7,9 +7,10 @@ interface CalendarGridProps {
   month: number;
   items: CalendarItem[];
   onItemClick: (item: CalendarItem) => void;
+  onDateClick?: (date: Date) => void;
 }
 
-export function CalendarGrid({ year, month, items, onItemClick }: CalendarGridProps) {
+export function CalendarGrid({ year, month, items, onItemClick, onDateClick }: CalendarGridProps) {
   const cells = getMonthDays(year, month);
   const todayStr = toDateStr(new Date());
 
@@ -36,6 +37,7 @@ export function CalendarGrid({ year, month, items, onItemClick }: CalendarGridPr
             items={items}
             isToday={date !== null && toDateStr(date) === todayStr}
             onItemClick={onItemClick}
+            onDateClick={onDateClick}
           />
         ))}
       </div>

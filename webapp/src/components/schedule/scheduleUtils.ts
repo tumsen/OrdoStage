@@ -5,7 +5,7 @@ export type BookingType = "rehearsal" | "maintenance" | "private" | "venue_booki
 export interface CalendarItem {
   id: string;
   title: string;
-  kind: "event" | "booking" | "job";
+  kind: "event" | "booking" | "job" | "summary";
   type?: BookingType;
   status?: string;
   startDate: string;
@@ -259,6 +259,7 @@ export const ITEM_COLORS: Record<string, string> = {
 export function itemColor(item: CalendarItem): string {
   if (item.kind === "job") return ITEM_COLORS.job;
   if (item.kind === "event") return ITEM_COLORS.event;
+  if (item.kind === "summary") return "bg-sky-600/80 text-sky-100 border border-sky-500/40";
   return ITEM_COLORS[item.type ?? "other"] ?? ITEM_COLORS.other;
 }
 

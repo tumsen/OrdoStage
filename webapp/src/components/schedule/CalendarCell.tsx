@@ -10,9 +10,10 @@ interface CalendarCellProps {
   items: CalendarItem[];
   isToday: boolean;
   onItemClick: (item: CalendarItem) => void;
+  onDateClick?: (date: Date) => void;
 }
 
-export function CalendarCell({ date, items, isToday, onItemClick }: CalendarCellProps) {
+export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }: CalendarCellProps) {
   if (!date) {
     return (
       <div className="min-h-[100px] bg-white/[0.01] border border-white/5 rounded-lg" />
@@ -45,6 +46,16 @@ export function CalendarCell({ date, items, isToday, onItemClick }: CalendarCell
 
   return (
     <div
+      role={onDateClick ? "button" : undefined}
+      tabIndex={onDateClick ? 0 : undefined}
+      onClick={() => onDateClick?.(date)}
+      onKeyDown={(e) => {
+        if (!onDateClick) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onDateClick(date);
+        }
+      }}
       className={cn(
         "min-h-[100px] p-1.5 border rounded-lg flex flex-col gap-1 transition-colors",
         isToday
@@ -83,7 +94,10 @@ export function CalendarCell({ date, items, isToday, onItemClick }: CalendarCell
           return (
             <button
               key={item.id}
-              onClick={() => onItemClick(item)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onItemClick(item);
+              }}
               className={cn(
                 "relative w-full text-left text-[11px] px-1.5 py-0.5 rounded font-medium transition-opacity hover:opacity-80 overflow-hidden",
                 itemColor(item),

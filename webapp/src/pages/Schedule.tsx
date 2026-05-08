@@ -125,6 +125,7 @@ type OccupancyEntry = {
 
 function resolveItemVenue(item: CalendarItem): { id: string; name: string } | null {
   if (item.id.startsWith("tour:")) return null;
+  if (item.kind === "summary") return null;
   if (item.kind === "booking") {
     const booking = item.raw as InternalBookingDetail;
     if (!booking.venueId || !booking.venue?.name) return null;
@@ -190,6 +191,7 @@ function VenueOccupationView({
 
   for (const item of items) {
     if (!item.startDate) continue;
+    if (item.kind === "summary") continue;
     const venue = resolveItemVenue(item);
     if (!venue) continue;
     if (venueFilterId !== "all" && venue.id !== venueFilterId) continue;

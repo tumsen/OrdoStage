@@ -46,6 +46,8 @@ import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
+import { CalendarGrid } from "@/components/schedule/CalendarGrid";
+import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import type { TimeEntry, TimeProject, TimeTag, TimeTrackingJob } from "@/contracts/backendTypes";
 import type { Language, TimeFormat } from "@/lib/preferences";
 import {
@@ -688,15 +690,6 @@ export default function TimeTracking() {
     return m;
   }, [entries]);
 
-  const monthCells = useMemo(() => {
-    if (mode !== "month") return [];
-    const monthStart = startOfMonth(anchor);
-    const monthEnd = endOfMonth(anchor);
-    const calStart = startOfWeek(monthStart, { weekStartsOn: WEEK_STARTS_ON });
-    const calEnd = endOfWeek(monthEnd, { weekStartsOn: WEEK_STARTS_ON });
-    return eachDayOfInterval({ start: calStart, end: calEnd });
-  }, [mode, anchor]);
-
   const totalsByDay = useMemo(() => {
     const acc = new Map<string, number>();
     for (const e of entries ?? []) {
@@ -707,6 +700,20 @@ export default function TimeTracking() {
     }
     return acc;
   }, [entries]);
+
+  const monthCalendarItems = useMemo<CalendarItem[]>(() => {
+    if (mode !== "month") return [];
+    return Array.from(totalsByDay.entries())
+      .filter(([, mins]) => mins > 0)
+      .map(([day, mins]) => ({
+        id: `time-total:${day}`,
+        title: `${Math.round((mins / 60) * 10) / 10}h`,
+        kind: "summary",
+        startDate: day,
+        endDate: null,
+        raw: {} as CalendarItem["raw"],
+      }));
+  }, [mode, totalsByDay]);
 
   const totalsByColumnDay = useMemo(() => {
     const acc = new Map<string, number>();
@@ -880,6 +887,18 @@ export default function TimeTracking() {
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-white/40 hover:text-white/70 hover:bg-white/5"
+            onClick={() => {
+              const today = new Date();
+              setAnchor(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+            }}
+          >
+            Today
+          </Button>
           <span className="text-xs text-white/50 tabular-nums whitespace-nowrap">
             W{periodWeek} · {periodMonth} · {periodYear}
           </span>
@@ -998,43 +1017,21 @@ export default function TimeTracking() {
       <div className="min-h-0 flex-1 space-y-6 overflow-auto pr-1">
       {mode === "month" ? (
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-          <div className="grid grid-cols-7 gap-px text-[10px] uppercase tracking-wide text-white/40 mb-2">
-            {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((x) => (
-              <div key={x} className="text-center py-1">
-                {x}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {monthCells.map((day) => {
-              const k = format(day, "yyyy-MM-dd");
-              const mins = totalsByDay.get(k) ?? 0;
-              const h = Math.round((mins / 60) * 10) / 10;
-              const inMonth = day.getMonth() === anchor.getMonth();
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  disabled={!inMonth}
-                  onClick={() => {
-                    setAnchor(day);
-                    setMode("week");
-                  }}
-                  className={cn(
-                    "min-h-[4rem] rounded-lg border border-white/10 p-2 text-left transition",
-                    inMonth ? "bg-white/[0.04] hover:bg-white/[0.07]" : "opacity-25"
-                  )}
-                >
-                  <div className="text-xs text-white/50">{format(day, "d")}</div>
-                  {mins > 0 ? (
-                    <div className="text-sm font-medium text-ordo-yellow mt-1">{h}h</div>
-                  ) : (
-                    <div className="text-xs text-white/25 mt-1">—</div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <CalendarGrid
+            year={anchor.getFullYear()}
+            month={anchor.getMonth()}
+            items={monthCalendarItems}
+            onItemClick={(item) => {
+              const day = dateFromISODate(item.startDate);
+              if (!day) return;
+              setAnchor(day);
+              setMode("week");
+            }}
+            onDateClick={(day) => {
+              setAnchor(day);
+              setMode("week");
+            }}
+          />
         </div>
       ) : (
         <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-auto">
