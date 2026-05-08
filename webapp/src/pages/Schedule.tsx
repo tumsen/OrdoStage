@@ -444,7 +444,13 @@ export default function Schedule() {
           personId={personId}
           onVenueChange={setVenueId}
           onPersonChange={setPersonId}
-          onViewModeChange={setViewMode}
+          onViewModeChange={(nextMode) => {
+            setViewMode(nextMode);
+            if (nextMode === "next7") {
+              const now = new Date();
+              setAnchorDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+            }
+          }}
           onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
         />
         <Button
@@ -543,7 +549,7 @@ export default function Schedule() {
                   onItemClick={handleItemClick}
                 />
               </div>
-            ) : viewMode === "week" || viewMode === "day" ? (
+            ) : viewMode === "week" || viewMode === "day" || viewMode === "next7" ? (
               <div className="flex h-full min-h-0 flex-col">
                 <OutlookTimeGrid
                   className="min-h-0 flex-1"
