@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useNavigate, useMatch } from "react-router-dom";
+import { useParams, useNavigate, useMatch, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -1888,6 +1888,7 @@ function ShowStaffingSections({
   venues,
   people,
   onPatchShow,
+  highlightJobId,
 }: {
   eventId: string;
   show: EventShow;
@@ -1895,6 +1896,7 @@ function ShowStaffingSections({
   venues: { id: string; name: string }[] | undefined;
   people: Person[];
   onPatchShow: (body: Record<string, unknown>) => void;
+  highlightJobId?: string | null;
 }) {
   const queryClient = useQueryClient();
   const [openDeptIds, setOpenDeptIds] = useState<Record<string, boolean>>({});
@@ -2009,6 +2011,7 @@ function ShowStaffingSections({
                       people={people}
                       departmentId={dept.id}
                       title={`${dept.name} jobs`}
+                      highlightJobId={highlightJobId}
                     />
                   </>
                 ) : null}
@@ -2031,6 +2034,8 @@ function ShowEventCard({
   updateShow,
   deleteShow,
   onCreateVenueBooking,
+  preferOpen,
+  scrollToJobId,
 }: {
   eventId: string;
   show: EventShow;
@@ -2041,9 +2046,18 @@ function ShowEventCard({
   updateShow: { mutate: (a: { showId: string; body: Record<string, unknown> }) => void };
   deleteShow: { mutate: (id: string) => void };
   onCreateVenueBooking: (show: EventShow) => void;
+  preferOpen?: boolean;
+  scrollToJobId?: string | null;
 }) {
   const patch = (body: Record<string, unknown>) => updateShow.mutate({ showId: show.id, body });
-  const [cardOpen, setCardOpen] = useState(showIndex === 0);
+  const jobInThisShow = Boolean(
+    scrollToJobId && (show.jobs ?? []).some((j) => j.id === scrollToJobId)
+  );
+  const [cardOpen, setCardOpen] = useState(showIndex === 0 || Boolean(preferOpen) || jobInThisShow);
+
+  useEffect(() => {
+    if (preferOpen || jobInThisShow) setCardOpen(true);
+  }, [preferOpen, jobInThisShow, show.id]);
   const stats = useMemo(() => computeShowStaffingStats(show, eventTeams), [show, eventTeams]);
 
   /** Local note text: controlled value must not track the query on every keystroke or saves race and drop characters. */
@@ -2066,6 +2080,25 @@ function ShowEventCard({
     setSoldTicketsInput(show.soldTickets != null ? String(show.soldTickets) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- notes stay local until save; reset only on show row change
   }, [show.id]);
+
+  useEffect(() => {
+    if (!scrollToJobId || !jobInThisShow || !cardOpen) return;
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      const el = document.getElementById(`show-job-${scrollToJobId}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    const t0 = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(run);
+    });
+    const t1 = window.setTimeout(run, 250);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(t0);
+      window.clearTimeout(t1);
+    };
+  }, [scrollToJobId, jobInThisShow, cardOpen, show.id]);
 
   useEffect(
     () => () => {
@@ -2233,6 +2266,7 @@ function ShowEventCard({
         venues={venues}
         people={people}
         onPatchShow={patch}
+        highlightJobId={scrollToJobId}
       />
       </CollapsibleContent>
     </Collapsible>
@@ -2625,7 +2659,15 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
   );
 }
 
-function ShowsTab({ event }: { event: EventDetail }) {
+function ShowsTab({
+  event,
+  focusShowId,
+  focusJobId,
+}: {
+  event: EventDetail;
+  focusShowId?: string | null;
+  focusJobId?: string | null;
+}) {
   const queryClient = useQueryClient();
   const { data: venues } = useQuery({
     queryKey: ["venues"],
@@ -2690,6 +2732,13 @@ function ShowsTab({ event }: { event: EventDetail }) {
       }),
     [event.shows]
   );
+
+  const resolvedFocusShowId = useMemo(() => {
+    if (focusShowId) return focusShowId;
+    if (!focusJobId) return null;
+    const found = event.shows.find((s) => (s.jobs ?? []).some((j) => j.id === focusJobId));
+    return found?.id ?? null;
+  }, [event.shows, focusShowId, focusJobId]);
 
   useEffect(() => {
     setNewShow((prev) =>
@@ -2828,6 +2877,10 @@ function ShowsTab({ event }: { event: EventDetail }) {
               updateShow={updateShow}
               deleteShow={deleteShow}
               onCreateVenueBooking={(targetShow) => setBookingShowId(targetShow.id)}
+              preferOpen={resolvedFocusShowId === show.id}
+              scrollToJobId={
+                resolvedFocusShowId === show.id && focusJobId ? focusJobId : null
+              }
             />
           ))}
         </div>
@@ -3333,6 +3386,31 @@ export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = useMatch({ path: "/events/new", end: true }) !== null;
+  const [searchParams] = useSearchParams();
+
+  const tabFromUrl = useMemo(() => {
+    const t = searchParams.get("tab");
+    if (
+      t === "details" ||
+      t === "shows" ||
+      t === "venue-booking" ||
+      t === "teams" ||
+      t === "people"
+    ) {
+      return t;
+    }
+    if (searchParams.get("show") || searchParams.get("job")) return "shows";
+    return "details";
+  }, [searchParams]);
+
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
+
+  useEffect(() => {
+    setActiveTab(tabFromUrl);
+  }, [tabFromUrl, id]);
+
+  const focusShowId = searchParams.get("show");
+  const focusJobId = searchParams.get("job");
 
   const { data: event, isLoading, error } = useQuery({
     queryKey: ["event", id],
@@ -3376,7 +3454,7 @@ export default function EventDetailPage() {
       </Button>
 
       <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
-        <Tabs defaultValue="details">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="border-b border-white/10 px-6">
             <TabsList className="bg-transparent h-12 gap-1 p-0">
               <TabsTrigger
@@ -3426,7 +3504,11 @@ export default function EventDetailPage() {
               {isNew ? (
                 <div className="py-10 text-center text-white/35 text-sm">Create the event on the Details tab, then add shows here.</div>
               ) : (
-                <ShowsTab event={ev!} />
+                <ShowsTab
+                  event={ev!}
+                  focusShowId={focusShowId}
+                  focusJobId={focusJobId}
+                />
               )}
             </TabsContent>
             <TabsContent value="venue-booking" className="mt-0">

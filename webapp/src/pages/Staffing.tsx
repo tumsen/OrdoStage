@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { addDays, format, parseISO } from "date-fns";
 import { AlertTriangle, CheckCircle2, Clock, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -65,6 +66,7 @@ function hours(minutes: number): string {
 }
 
 export default function Staffing() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [anchor, setAnchor] = useState(() => {
@@ -240,8 +242,23 @@ export default function Staffing() {
               {requirements.map((req) => (
                 <div
                   key={req.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    navigate(
+                      `/events/${req.eventId}?tab=shows&show=${encodeURIComponent(req.showId)}&job=${encodeURIComponent(req.id)}`
+                    )
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(
+                        `/events/${req.eventId}?tab=shows&show=${encodeURIComponent(req.showId)}&job=${encodeURIComponent(req.id)}`
+                      );
+                    }
+                  }}
                   className={cn(
-                    "rounded-lg border bg-white/[0.03] p-3",
+                    "rounded-lg border bg-white/[0.03] p-3 cursor-pointer transition hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500/80",
                     req.hasConflict
                       ? "border-red-400/40 shadow-[0_0_0_1px_rgba(248,113,113,0.15)]"
                       : req.personId
@@ -282,6 +299,11 @@ export default function Staffing() {
                         Planned {hours(req.durationMinutes)} · Actual {hours(req.actualMinutes)}
                       </p>
                     </div>
+                    <div
+                      className="shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
                     <Select
                       value={req.personId ?? "__unassigned__"}
                       onValueChange={(value) =>
@@ -302,6 +324,7 @@ export default function Staffing() {
                         ))}
                       </SelectContent>
                     </Select>
+                    </div>
                   </div>
                 </div>
               ))}

@@ -51,6 +51,7 @@ export function ShowJobsEditor({
   departmentId,
   title,
   canEdit = true,
+  highlightJobId,
 }: {
   eventId: string;
   show: EventShow;
@@ -59,6 +60,7 @@ export function ShowJobsEditor({
   departmentId?: string | null;
   title?: string;
   canEdit?: boolean;
+  highlightJobId?: string | null;
 }) {
   const queryClient = useQueryClient();
   const jobs = (show.jobs ?? []).filter((j) =>
@@ -154,8 +156,16 @@ export function ShowJobsEditor({
 
       {jobs.map((j) => {
         const w = jobWindow(j, show);
+        const isHighlight = Boolean(highlightJobId && j.id === highlightJobId);
         return (
-          <div key={j.id} className={jobRowClass}>
+          <div
+            key={j.id}
+            id={`show-job-${j.id}`}
+            className={cn(
+              jobRowClass,
+              isHighlight && "ring-2 ring-red-500/55 ring-offset-2 ring-offset-[#0c0c12]"
+            )}
+          >
             <div className="shrink-0 w-28 min-w-28 sm:w-36 sm:min-w-36">
               <Label className={scheduleFieldLabelClass}>Title</Label>
               <Input
