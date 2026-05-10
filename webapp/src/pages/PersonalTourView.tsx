@@ -5,6 +5,13 @@ import { Loader2, BedDouble, Truck, Coffee, CheckCircle2, StickyNote } from "luc
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import type { TourScheduleEvent } from "../../../backend/src/types";
+import {
+  formatScheduleEventTimes,
+  scheduleEventLabel,
+  sortedTourScheduleEvents,
+  tourShowHasScheduleTimeline,
+} from "@/lib/tourScheduleDisplay";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +29,7 @@ type PersonalShow = {
   rehearsalTime: string | null;
   soundcheckTime: string | null;
   doorsTime: string | null;
+  scheduleEvents?: TourScheduleEvent[];
   venueName:    string | null;
   venueStreet:  string | null;
   venueNumber:  string | null;
@@ -120,7 +128,14 @@ function ShowNoteCard({
       ? [show.fromLocation, show.toLocation].filter(Boolean).join(" → ")
       : show.venueName || show.venueCity || "";
 
-  const hasSchedule = show.getInTime || show.rehearsalTime || show.soundcheckTime || show.showTime;
+  const scheduleEvs = sortedTourScheduleEvents(show);
+
+  const hasSchedule =
+    tourShowHasScheduleTimeline(show) ||
+    show.getInTime ||
+    show.rehearsalTime ||
+    show.soundcheckTime ||
+    show.showTime;
 
   return (
     <div className={cn(
@@ -151,18 +166,31 @@ function ShowNoteCard({
       {/* Show schedule */}
       {hasSchedule ? (
         <div className="px-4 pb-2 flex flex-wrap gap-3">
-          {show.getInTime ? (
-            <div><span className="text-xs text-gray-400">Get-in </span><span className="text-xs font-semibold text-gray-700">{show.getInTime}</span></div>
-          ) : null}
-          {show.rehearsalTime ? (
-            <div><span className="text-xs text-gray-400">Rehearsal </span><span className="text-xs font-semibold text-gray-700">{show.rehearsalTime}</span></div>
-          ) : null}
-          {show.soundcheckTime ? (
-            <div><span className="text-xs text-gray-400">Soundcheck </span><span className="text-xs font-semibold text-gray-700">{show.soundcheckTime}</span></div>
-          ) : null}
-          {show.showTime ? (
-            <div><span className="text-xs text-gray-400">Show </span><span className="text-xs font-semibold text-gray-900">{show.showTime}</span></div>
-          ) : null}
+          {scheduleEvs.length > 0
+            ? scheduleEvs.map((ev) => (
+                <div key={ev.id}>
+                  <span className="text-xs text-gray-400">{scheduleEventLabel(ev)} </span>
+                  <span className="text-xs font-semibold text-gray-700 tabular-nums">
+                    {formatScheduleEventTimes(ev)}
+                  </span>
+                </div>
+              ))
+            : (
+              <>
+                {show.getInTime ? (
+                  <div><span className="text-xs text-gray-400">Get-in </span><span className="text-xs font-semibold text-gray-700">{show.getInTime}</span></div>
+                ) : null}
+                {show.rehearsalTime ? (
+                  <div><span className="text-xs text-gray-400">Rehearsal </span><span className="text-xs font-semibold text-gray-700">{show.rehearsalTime}</span></div>
+                ) : null}
+                {show.soundcheckTime ? (
+                  <div><span className="text-xs text-gray-400">Soundcheck </span><span className="text-xs font-semibold text-gray-700">{show.soundcheckTime}</span></div>
+                ) : null}
+                {show.showTime ? (
+                  <div><span className="text-xs text-gray-400">Show </span><span className="text-xs font-semibold text-gray-900">{show.showTime}</span></div>
+                ) : null}
+              </>
+            )}
         </div>
       ) : null}
 

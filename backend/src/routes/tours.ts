@@ -9,8 +9,11 @@ import {
   CreateTourShowSchema,
   UpdateTourShowSchema,
   AssignTourTeamSchema,
+  ReplaceTourScheduleEventsSchema,
 } from "../types";
 import { canAction } from "../requestRole";
+import { dayKeyFromDateInput, normalizeTimeHHMM } from "../lib/timeHHMM";
+import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -70,11 +73,19 @@ function parseRiderVisibility(value: string | null | undefined) {
   }
 }
 
+function isoDate(d: unknown): string {
+  return d instanceof Date ? d.toISOString() : String(d);
+}
+
 function serializeTourShow(show: any) {
+  const dk =
+    show.dayKey ??
+    dayKeyFromDateInput(show.date instanceof Date ? show.date.toISOString() : String(show.date));
   return {
     id: show.id,
     tourId: show.tourId,
     date: show.date instanceof Date ? show.date.toISOString() : show.date,
+    dayKey: dk,
     type: show.type ?? "show",
     fromLocation: show.fromLocation,
     toLocation: show.toLocation,
@@ -124,6 +135,7 @@ function serializeTourShow(show: any) {
       role: sp.role,
       person: serializePerson(sp.person),
     })),
+    scheduleEvents: mergedScheduleEvents(show),
     createdAt: show.createdAt instanceof Date ? show.createdAt.toISOString() : show.createdAt,
     updatedAt: show.updatedAt instanceof Date ? show.updatedAt.toISOString() : show.updatedAt,
   };
@@ -255,6 +267,7 @@ toursRouter.get("/tours/:id", async (c) => {
       shows: {
         orderBy: [{ date: "asc" }, { order: "asc" }],
         include: {
+          scheduleEvents: { orderBy: { sortOrder: "asc" } },
           showPeople: {
             include: {
               person: {
@@ -422,19 +435,34 @@ toursRouter.post("/tours/:id/shows", zValidator("json", CreateTourShowSchema), a
   }
 
   const dateParsed = new Date(body.date);
-  const dateKey = dateParsed.toISOString().slice(0, 10);
-  const siblings = await prisma.tourShow.findMany({
-    where: { tourId: id },
-    select: { date: true, order: true },
-  });
-  const maxOrderSameDay = siblings
-    .filter((s) => s.date.toISOString().slice(0, 10) === dateKey)
-    .reduce((m, s) => Math.max(m, s.order), -1);
-  const nextOrder = body.order ?? maxOrderSameDay + 1;
+  const dayKey = body.dayKey ?? dayKeyFromDateInput(body.date);
 
-  const show = await prisma.tourShow.create({
+  const duplicate = await prisma.tourShow.findFirst({
+    where: { tourId: id, dayKey },
+  });
+  if (duplicate) {
+    return c.json(
+      {
+        error: {
+          message:
+            "A tour day already exists for this calendar date. Open that day and add schedule events instead.",
+          code: "DUPLICATE_TOUR_DAY",
+        },
+      },
+      409
+    );
+  }
+
+  const orderAgg = await prisma.tourShow.aggregate({
+    where: { tourId: id },
+    _max: { order: true },
+  });
+  const nextOrder = body.order ?? (orderAgg._max.order ?? -1) + 1;
+
+  const created = await prisma.tourShow.create({
     data: {
       tourId: id,
+      dayKey,
       date: dateParsed,
       type: body.type ?? "show",
       fromLocation: body.fromLocation ?? null,
@@ -474,6 +502,22 @@ toursRouter.post("/tours/:id/shows", zValidator("json", CreateTourShowSchema), a
     },
   });
 
+  const show = await prisma.tourShow.findUnique({
+    where: { id: created.id },
+    include: {
+      scheduleEvents: { orderBy: { sortOrder: "asc" } },
+      showPeople: {
+        include: {
+          person: {
+            include: {
+              teamMemberships: { include: { department: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
   return c.json({ data: serializeTourShow(show) }, 201);
 });
 
@@ -508,10 +552,13 @@ toursRouter.put(
       return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
     }
 
-    const show = await prisma.tourShow.update({
+    await prisma.tourShow.update({
       where: { id: showId },
       data: {
-        ...(body.date !== undefined && { date: new Date(body.date) }),
+        ...(body.date !== undefined && {
+          date: new Date(body.date),
+          dayKey: dayKeyFromDateInput(body.date),
+        }),
         ...(body.type !== undefined && { type: body.type }),
         ...(body.fromLocation !== undefined && { fromLocation: body.fromLocation }),
         ...(body.toLocation !== undefined && { toLocation: body.toLocation }),
@@ -550,7 +597,118 @@ toursRouter.put(
       },
     });
 
-    return c.json({ data: serializeTourShow(show) });
+    const refreshed = await prisma.tourShow.findUnique({
+      where: { id: showId },
+      include: {
+        scheduleEvents: { orderBy: { sortOrder: "asc" } },
+        showPeople: {
+          include: {
+            person: {
+              include: {
+                teamMemberships: { include: { department: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return c.json({ data: serializeTourShow(refreshed) });
+  }
+);
+
+// PUT /api/tours/:id/shows/:showId/schedule-events — replace timed events for one tour day
+toursRouter.put(
+  "/tours/:id/shows/:showId/schedule-events",
+  zValidator("json", ReplaceTourScheduleEventsSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId)
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+    if (!canAction(c, "write.tours")) {
+      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+    }
+
+    const { id, showId } = c.req.param();
+    const body = c.req.valid("json");
+
+    const tour = await prisma.tour.findUnique({
+      where: { id, organizationId: user.organizationId },
+    });
+    if (!tour) {
+      return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+    }
+
+    const existingShow = await prisma.tourShow.findUnique({
+      where: { id: showId, tourId: id },
+    });
+    if (!existingShow) {
+      return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
+    }
+
+    const TIME_RE = /^\d{2}:\d{2}$/;
+    for (const [i, ev] of body.events.entries()) {
+      const st = normalizeTimeHHMM(ev.startTime);
+      const en = normalizeTimeHHMM(ev.endTime);
+      if (!TIME_RE.test(st) || !TIME_RE.test(en)) {
+        return c.json(
+          { error: { message: "All times must use HH:mm (e.g. 09:30).", code: "BAD_REQUEST" } },
+          400
+        );
+      }
+      if (ev.kind === "custom" && !(ev.customLabel && ev.customLabel.trim())) {
+        return c.json(
+          { error: { message: "Custom events need a label.", code: "BAD_REQUEST" } },
+          400
+        );
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.tourScheduleEvent.deleteMany({ where: { tourShowId: showId } });
+      for (const [i, ev] of body.events.entries()) {
+        await tx.tourScheduleEvent.create({
+          data: {
+            tourShowId: showId,
+            kind: ev.kind,
+            customLabel:
+              ev.kind === "custom" ? (ev.customLabel ?? "").trim() || null : ev.customLabel ?? null,
+            startTime: normalizeTimeHHMM(ev.startTime),
+            endTime: normalizeTimeHHMM(ev.endTime),
+            sortOrder: ev.sortOrder ?? i,
+          },
+        });
+      }
+      await tx.tourShow.update({
+        where: { id: showId },
+        data: {
+          showTime: null,
+          getInTime: null,
+          rehearsalTime: null,
+          soundcheckTime: null,
+          doorsTime: null,
+        },
+      });
+    });
+
+    const refreshed = await prisma.tourShow.findUnique({
+      where: { id: showId },
+      include: {
+        scheduleEvents: { orderBy: { sortOrder: "asc" } },
+        showPeople: {
+          include: {
+            person: {
+              include: {
+                teamMemberships: { include: { department: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return c.json({ data: serializeTourShow(refreshed) });
   }
 );
 

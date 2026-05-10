@@ -4,6 +4,7 @@ import { CalendarDays, MapPin, CheckCircle2, Plus, ArrowRight, TrendingUp, Route
 import { api } from "@/lib/api";
 import type { EventDetail, Venue } from "@/lib/types";
 import type { TourDetail } from "../../../backend/src/types";
+import { tourShowPrimaryTime } from "@/lib/tourScheduleDisplay";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, eventStartsOnOrAfterToday } from "@/lib/dateUtils";
 import { Button } from "@/components/ui/button";
@@ -71,12 +72,19 @@ function MonthCalendar({ events, tourDetails }: { events: EventDetail[]; tourDet
   }
   for (const tour of tourDetails) {
     for (const show of tour.shows ?? []) {
-      addEntry(show.date, {
-        label: show.type === "travel"
+      const primaryTime = tourShowPrimaryTime(show);
+      const baseTitle =
+        show.type === "travel"
           ? `Travel${show.fromLocation && show.toLocation ? `: ${show.fromLocation}→${show.toLocation}` : ""}`
           : show.type === "day_off"
           ? "Day Off"
-          : show.venueName || show.venueCity || tour.name,
+          : show.venueName || show.venueCity || tour.name;
+      const title =
+        primaryTime && show.type !== "travel" && show.type !== "day_off"
+          ? `${baseTitle} · ${primaryTime}`
+          : baseTitle;
+      addEntry(show.date, {
+        label: title,
         color: show.type === "travel" ? "travel" : show.type === "day_off" ? "day_off" : "show",
         href: `/tours/${tour.id}`,
       });

@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { prisma } from "../prisma";
+import { dayKeyFromDateInput } from "../lib/timeHHMM";
+import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
 import { env, isDeployedRuntime } from "../env";
 import { ensureCurrencyPriceMonthRollover, SUPPORTED_BILLING_CURRENCIES } from "../postpaidBilling";
 
@@ -123,7 +125,10 @@ publicRouter.get("/tours/:token", async (c) => {
     include: {
       shows: {
         orderBy: [{ order: "asc" }, { date: "asc" }],
-        include: { showPeople: { include: { person: true } } },
+        include: {
+          showPeople: { include: { person: true } },
+          scheduleEvents: { orderBy: { sortOrder: "asc" } },
+        },
       },
       people: { include: { person: true } },
     },
@@ -158,6 +163,9 @@ publicRouter.get("/tours/:token", async (c) => {
         id: show.id,
         tourId: show.tourId,
         date: show.date.toISOString(),
+        dayKey:
+          show.dayKey ??
+          dayKeyFromDateInput(show.date instanceof Date ? show.date.toISOString() : String(show.date)),
         type: show.type ?? "show",
         fromLocation: show.fromLocation,
         toLocation: show.toLocation,
@@ -166,6 +174,7 @@ publicRouter.get("/tours/:token", async (c) => {
         rehearsalTime: show.rehearsalTime,
         soundcheckTime: show.soundcheckTime,
         doorsTime: show.doorsTime,
+        scheduleEvents: mergedScheduleEvents(show),
         venueName: show.venueName,
         venueAddress: show.venueAddress,
         venueCity: show.venueCity,
@@ -217,6 +226,9 @@ publicRouter.get("/person/:personalToken", async (c) => {
         include: {
           shows: {
             orderBy: [{ order: "asc" }, { date: "asc" }],
+            include: {
+              scheduleEvents: { orderBy: { sortOrder: "asc" } },
+            },
           },
           people: {
             include: { person: true },
@@ -257,6 +269,11 @@ publicRouter.get("/person/:personalToken", async (c) => {
           id: show.id,
           tourId: show.tourId,
           date: show.date instanceof Date ? show.date.toISOString() : show.date,
+          dayKey:
+            show.dayKey ??
+            dayKeyFromDateInput(
+              show.date instanceof Date ? show.date.toISOString() : String(show.date)
+            ),
           type: show.type ?? "show",
           fromLocation: show.fromLocation,
           toLocation: show.toLocation,
@@ -265,6 +282,7 @@ publicRouter.get("/person/:personalToken", async (c) => {
           rehearsalTime: show.rehearsalTime,
           soundcheckTime: show.soundcheckTime,
           doorsTime: show.doorsTime,
+          scheduleEvents: mergedScheduleEvents(show),
           venueName: show.venueName,
           venueAddress: show.venueAddress,
           venueCity: show.venueCity,

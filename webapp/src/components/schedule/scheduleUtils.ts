@@ -1,4 +1,8 @@
 import type { EventDetail, InternalBookingDetail, TourDetail } from "../../../../backend/src/types";
+import {
+  tourShowCalendarDurationMinutes,
+  tourShowCalendarStartTime,
+} from "@/lib/tourScheduleDisplay";
 
 export type BookingType = "rehearsal" | "maintenance" | "private" | "venue_booking" | "other";
 
@@ -154,12 +158,12 @@ export function toCalendarItems(
       .filter((show) => Boolean(show.date))
       .map((show) => {
         const day = show.date.slice(0, 10);
-        const hasTime = typeof show.showTime === "string" && /^\d{2}:\d{2}$/.test(show.showTime);
-        const startDate = hasTime ? toLocalDatetime(day, show.showTime!) : day;
+        const startHHMM = tourShowCalendarStartTime(show);
+        const hasTime = typeof startHHMM === "string" && /^\d{2}:\d{2}$/.test(startHHMM);
+        const startDate = hasTime ? toLocalDatetime(day, startHHMM) : day;
+        const dur = tourShowCalendarDurationMinutes(show);
         const endDate: string | null =
-          hasTime && show.travelTimeMinutes && show.travelTimeMinutes > 0
-            ? addMinutesLocal(startDate, show.travelTimeMinutes)
-            : null;
+          hasTime && dur !== null && dur > 0 ? addMinutesLocal(startDate, dur) : null;
         const typeLabel = show.type === "travel" ? "Travel" : show.type === "day_off" ? "Day off" : "Show";
         return {
           id: `tour:${tour.id}:show:${show.id}`,

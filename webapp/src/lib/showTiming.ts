@@ -1,3 +1,16 @@
+/** Wall-clock time stored as strict `HH:mm` (24h) everywhere in schedules. */
+export function normalizeTimeHHMM(raw: string): string {
+  const t = raw.trim();
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+  if (!m) return "";
+  let hh = Number.parseInt(m[1], 10);
+  let mm = Number.parseInt(m[2], 10);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm) || mm > 59) return "";
+  hh = Math.min(23, Math.max(0, hh));
+  mm = Math.min(59, Math.max(0, mm));
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
 /** Parse "HH:mm" to minutes from midnight. */
 export function timeToMinutes(t: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim());

@@ -6,6 +6,13 @@ import type { TourDetail, TourShow } from "../../../backend/src/types";
 import { Loader2, FileDown, Truck, Coffee, MapPin, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
+import {
+  formatScheduleEventTimes,
+  scheduleEventLabel,
+  sortedTourScheduleEvents,
+  tourShowHasScheduleTimeline,
+  tourShowPrimaryTime,
+} from "@/lib/tourScheduleDisplay";
 
 export default function PublicTourSchedule() {
   const { token } = useParams<{ token: string }>();
@@ -162,6 +169,7 @@ export default function PublicTourSchedule() {
 
 function PublicShowCard({ show, dayNumber }: { show: TourShow; dayNumber: number }) {
   const [expanded, setExpanded] = useState(false);
+  const scheduleEvs = sortedTourScheduleEvents(show);
 
   const isTravel = show.type === "travel";
   const isDayOff = show.type === "day_off";
@@ -197,8 +205,8 @@ function PublicShowCard({ show, dayNumber }: { show: TourShow; dayNumber: number
               [show.venueCity, show.venueName].filter(Boolean).join(", ")}
           </div>
         </div>
-        {show.showTime ? (
-          <span className="text-sm font-bold text-gray-700 flex-shrink-0">{show.showTime}</span>
+        {tourShowPrimaryTime(show) ? (
+          <span className="text-sm font-bold text-gray-700 flex-shrink-0">{tourShowPrimaryTime(show)}</span>
         ) : null}
         <button
           onClick={() => setExpanded(!expanded)}
@@ -234,23 +242,41 @@ function PublicShowCard({ show, dayNumber }: { show: TourShow; dayNumber: number
             );
           })() : null}
 
-          {(show.getInTime || show.rehearsalTime || show.soundcheckTime || show.doorsTime || show.showTime) ? (
+          {(tourShowHasScheduleTimeline(show) ||
+            show.getInTime ||
+            show.rehearsalTime ||
+            show.soundcheckTime ||
+            show.doorsTime ||
+            show.showTime) ? (
             <div>
               <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Schedule</div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {([
-                  ["Get-in", show.getInTime],
-                  ["Rehearsal", show.rehearsalTime],
-                  ["Soundcheck", show.soundcheckTime],
-                  ["Doors", show.doorsTime],
-                  ["Show", show.showTime],
-                ] as [string, string | null][]).filter(([, v]) => v).map(([label, value]) => (
-                  <div key={label} className="bg-gray-50 rounded-lg px-3 py-2">
-                    <div className="text-xs text-gray-400">{label}</div>
-                    <div className="text-sm font-medium text-gray-800">{value}</div>
-                  </div>
-                ))}
-              </div>
+              {scheduleEvs.length > 0 ? (
+                <div className="space-y-2">
+                  {scheduleEvs.map((ev) => (
+                    <div key={ev.id} className="flex justify-between gap-3 bg-gray-50 rounded-lg px-3 py-2">
+                      <div className="text-xs text-gray-400">{scheduleEventLabel(ev)}</div>
+                      <div className="text-sm font-medium text-gray-800 tabular-nums">
+                        {formatScheduleEventTimes(ev)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {([
+                    ["Get-in", show.getInTime],
+                    ["Rehearsal", show.rehearsalTime],
+                    ["Soundcheck", show.soundcheckTime],
+                    ["Doors", show.doorsTime],
+                    ["Show", show.showTime],
+                  ] as [string, string | null][]).filter(([, v]) => v).map(([label, value]) => (
+                    <div key={label} className="bg-gray-50 rounded-lg px-3 py-2">
+                      <div className="text-xs text-gray-400">{label}</div>
+                      <div className="text-sm font-medium text-gray-800">{value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : null}
 

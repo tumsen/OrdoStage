@@ -8,6 +8,15 @@ import {
   Link,
 } from "@react-pdf/renderer";
 import type { TourDetail, TourShow } from "../../../backend/src/types";
+import {
+  formatScheduleEventTimes,
+  scheduleEventLabel,
+  sortedTourScheduleEvents,
+  tourShowGetInTimeHHMM,
+  tourShowHasScheduleTimeline,
+  tourShowPrimaryTime,
+  tourShowScheduleSummaryCompact,
+} from "@/lib/tourScheduleDisplay";
 
 const styles = StyleSheet.create({
   page: {
@@ -465,8 +474,8 @@ function InfoCell({ label, value }: { label: string; value: string | null | unde
 }
 
 function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number }) {
-  const hasTimeline =
-    show.getInTime || show.rehearsalTime || show.soundcheckTime || show.doorsTime || show.showTime;
+  const evs = sortedTourScheduleEvents(show);
+  const hasTimeline = tourShowHasScheduleTimeline(show);
   const hasContact = show.contactName || show.contactPhone || show.contactEmail;
   const hasHotel = show.hotelName || show.hotelStreet || show.hotelCity || show.hotelPhone || show.hotelCheckIn || show.hotelCheckOut;
   const hasTravelOrCatering = show.travelInfo || show.cateringInfo;
@@ -511,11 +520,13 @@ function ShowSection({ show, dayNumber }: { show: TourShow; dayNumber: number })
         {hasTimeline ? (
           <View style={styles.showBlock} wrap={false}>
             <Text style={styles.showBlockTitle}>Schedule</Text>
-            <TimeRow label="Get-in" value={show.getInTime} />
-            <TimeRow label="Rehearsal" value={show.rehearsalTime} />
-            <TimeRow label="Soundcheck" value={show.soundcheckTime} />
-            <TimeRow label="Doors" value={show.doorsTime} />
-            <TimeRow label="Show time" value={show.showTime} />
+            {evs.map((ev) => (
+              <TimeRow
+                key={ev.id}
+                label={scheduleEventLabel(ev)}
+                value={formatScheduleEventTimes(ev)}
+              />
+            ))}
           </View>
         ) : null}
 
@@ -611,9 +622,10 @@ function TravelToNext({ currentShow, nextShow }: { currentShow: TourShow; nextSh
     ? `https://www.google.com/maps/dir/${encodeURIComponent(currentAddr)}/${encodeURIComponent(nextAddr)}`
     : null;
 
-  const etd = (currentShow.travelTimeMinutes && nextShow.getInTime)
+  const etd = (currentShow.travelTimeMinutes && tourShowGetInTimeHHMM(nextShow))
     ? (() => {
-        const match = nextShow.getInTime!.match(/^(\d{1,2}):(\d{2})$/);
+        const nextGetIn = tourShowGetInTimeHHMM(nextShow)!;
+        const match = nextGetIn.match(/^(\d{1,2}):(\d{2})$/);
         if (!match) return null;
         let total = parseInt(match[1]) * 60 + parseInt(match[2]) - currentShow.travelTimeMinutes!;
         if (total < 0) total += 1440;
@@ -742,7 +754,7 @@ function PDFCalendarSidebar({ shows, startDate, highlightDate }: { shows: TourSh
               {dayShows.map((show) => {
                 const isTravel = show.type === "travel";
                 const isDayOff = show.type === "day_off";
-                const time = show.showTime ?? show.getInTime;
+                const time = tourShowPrimaryTime(show);
                 const label = isTravel
                   ? "Travel"
                   : isDayOff
@@ -869,10 +881,7 @@ export function TourSchedulePDF({ tour }: { tour: TourDetail }) {
                 : isDayOff
                 ? "Day off"
                 : [show.venueCity, show.venueName].filter(Boolean).join(" · ") || "—";
-              const times = [
-                show.getInTime ? `Get-in ${show.getInTime}` : null,
-                show.showTime ? `Show ${show.showTime}` : null,
-              ].filter(Boolean).join("  ");
+              const times = tourShowScheduleSummaryCompact(show);
               return (
                 <View key={show.id} style={styles.personRow}>
                   <Text style={[styles.personName, { width: "8%" }]}>Day {i + 1}</Text>

@@ -82,9 +82,12 @@ import { AddressFields, type Address } from "@/components/AddressFields";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { downloadVenueTechRider, printVenueTechRider, uploadVenueTechRiderForSharing } from "@/lib/downloadVenueTechRider";
 import { TourCalendarView } from "@/components/TourCalendarView";
+import { TourDayScheduleEditor } from "@/components/tour/TourDayScheduleEditor";
 import { useToast } from "@/hooks/use-toast";
 import { usePreferences } from "@/hooks/usePreferences";
 import { formatDistanceKm } from "@/lib/preferences";
+import { SplitTimeInput } from "@/components/SplitTimeField";
+import { normalizeTimeHHMM } from "@/lib/showTiming";
 
 // ── Google Maps helpers ───────────────────────────────────────────────────────
 
@@ -94,6 +97,20 @@ function mapsUrl(address: string): string {
 
 function mapsDirectionsUrl(from: string, to: string): string {
   return `https://www.google.com/maps/dir/${encodeURIComponent(from)}/${encodeURIComponent(to)}`;
+}
+
+function scheduleKindShort(kind: string, customLabel: string | null): string {
+  if (kind === "custom" && customLabel?.trim()) return customLabel.trim();
+  const map: Record<string, string> = {
+    get_in: "Get-in",
+    get_out: "Get-out",
+    show: "Show",
+    rehearsal: "Rehearsal",
+    soundcheck: "Soundcheck",
+    travel: "Travel",
+    custom: "Custom",
+  };
+  return map[kind] ?? kind;
 }
 
 // Computes latest ETD: nextGetInTime minus travelTimeMinutes
@@ -617,6 +634,7 @@ function showToForm(show: TourShow): ShowFormState {
 function tourShowToCreateBody(show: TourShow, newDateYmd: string): CreateTourShow {
   const body: CreateTourShow = {
     date: newDateYmd,
+    dayKey: newDateYmd,
     type: show.type,
     order: show.order,
   };
@@ -815,11 +833,10 @@ function ShowFormDialog({
             {form.type === "show" ? (
               <div className="space-y-2">
                 <Label className="text-white/60 text-xs uppercase tracking-wide">Show Time</Label>
-                <Input
-                  value={form.showTime}
-                  onChange={(e) => setField("showTime", e.target.value)}
-                  placeholder="e.g. 20:00"
-                  className={fieldCls}
+                <SplitTimeInput
+                  value={normalizeTimeHHMM(form.showTime) || ""}
+                  onChange={(v) => setField("showTime", normalizeTimeHHMM(v))}
+                  aria-label="Show time"
                 />
               </div>
             ) : null}
@@ -1430,6 +1447,14 @@ function ShowCard({
   const hasContact = show.contactName || show.contactPhone || show.contactEmail;
   const hasLogistics = show.travelInfo || show.cateringInfo || show.notes;
 
+  const sortedSchedulePreview = useMemo(
+    () => [...(show.scheduleEvents ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    [show.scheduleEvents]
+  );
+  const schedulePreviewLines = sortedSchedulePreview
+    .slice(0, 4)
+    .map((e) => `${scheduleKindShort(e.kind, e.customLabel)} ${e.startTime}–${e.endTime}`);
+
   return (
     <>
       <div className={cn(
@@ -1497,20 +1522,28 @@ function ShowCard({
                 </>
               ) : (
                 <>
-                  {show.showTime ? (
-                    <span className="text-xs text-white/40">
-                      Show: <span className="text-white/60 font-medium">{show.showTime}</span>
+                  {schedulePreviewLines.length > 0 ? (
+                    <span className="text-xs text-white/40 line-clamp-2">
+                      {schedulePreviewLines.join(" · ")}
                     </span>
-                  ) : null}
-                  {show.getInTime ? (
-                    <span className="text-xs text-white/35">Get-in: {show.getInTime}</span>
-                  ) : null}
-                  {show.soundcheckTime ? (
-                    <span className="text-xs text-white/35">Soundcheck: {show.soundcheckTime}</span>
-                  ) : null}
-                  {show.hotelName ? (
-                    <span className="text-xs text-white/30">Hotel: {show.hotelName}</span>
-                  ) : null}
+                  ) : (
+                    <>
+                      {show.showTime ? (
+                        <span className="text-xs text-white/40">
+                          Show: <span className="text-white/60 font-medium">{show.showTime}</span>
+                        </span>
+                      ) : null}
+                      {show.getInTime ? (
+                        <span className="text-xs text-white/35">Get-in: {show.getInTime}</span>
+                      ) : null}
+                      {show.soundcheckTime ? (
+                        <span className="text-xs text-white/35">Soundcheck: {show.soundcheckTime}</span>
+                      ) : null}
+                      {show.hotelName ? (
+                        <span className="text-xs text-white/30">Hotel: {show.hotelName}</span>
+                      ) : null}
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -1580,6 +1613,7 @@ function ShowCard({
         {/* Expanded details */}
         {expanded ? (
           <div className="border-t border-white/[0.06] px-4 py-4 space-y-4">
+            <TourDayScheduleEditor tourId={tourId} show={show} />
             {show.type === "travel" && (show.fromLocation || show.toLocation) ? (
               <div>
                 <div className="text-xs text-white/35 uppercase tracking-wide mb-2">Route</div>
@@ -2031,40 +2065,34 @@ function ShowsTab({ tour }: { tour: TourDetail }) {
 
   const sortedShows = useMemo(() => {
     return [...tour.shows].sort((a, b) => {
-      const ak = a.date.slice(0, 10);
-      const bk = b.date.slice(0, 10);
+      const ak = a.dayKey || a.date.slice(0, 10);
+      const bk = b.dayKey || b.date.slice(0, 10);
       const d = ak.localeCompare(bk);
       if (d !== 0) return d;
       return a.order - b.order;
     });
   }, [tour.shows]);
 
-  const flatIndexByShowId = useMemo(() => {
-    const m = new Map<string, number>();
-    sortedShows.forEach((s, i) => m.set(s.id, i));
-    return m;
-  }, [sortedShows]);
-
-  const dayGroups = useMemo(() => {
-    const map = new Map<string, TourShow[]>();
-    for (const s of sortedShows) {
-      const k = s.date.slice(0, 10);
-      if (!map.has(k)) map.set(k, []);
-      map.get(k)!.push(s);
-    }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [sortedShows]);
-
-  const uniqueDayCount = dayGroups.length;
-
   const copyPreviousDay = useMutation({
     mutationFn: async () => {
-      if (dayGroups.length === 0) return;
-      const [lastDayKey, lastShows] = dayGroups[dayGroups.length - 1]!;
-      const nextKey = format(addDays(parseISO(`${lastDayKey}T12:00:00`), 1), "yyyy-MM-dd");
-      for (const s of lastShows) {
-        await api.post(`/api/tours/${tour.id}/shows`, tourShowToCreateBody(s, nextKey));
-      }
+      if (sortedShows.length === 0) return;
+      const last = sortedShows[sortedShows.length - 1]!;
+      const lastDay = last.dayKey?.slice(0, 10) ?? last.date.slice(0, 10);
+      const nextKey = format(addDays(parseISO(`${lastDay}T12:00:00`), 1), "yyyy-MM-dd");
+      const body = tourShowToCreateBody(last, nextKey);
+      const created = await api.post<TourShow>(`/api/tours/${tour.id}/shows`, body);
+      const events = last.scheduleEvents ?? [];
+      if (events.length === 0) return;
+      const payload = events.map((e, i) => ({
+        kind: e.kind,
+        customLabel: e.customLabel ?? null,
+        startTime: e.startTime,
+        endTime: e.endTime,
+        sortOrder: i,
+      }));
+      await api.put(`/api/tours/${tour.id}/shows/${created.id}/schedule-events`, {
+        events: payload,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
@@ -2080,17 +2108,11 @@ function ShowsTab({ tour }: { tour: TourDetail }) {
     setAddDialogOpen(true);
   }
 
-  function openAddShowForDay(dateKey: string) {
-    setAddDialogPreset({ defaultDate: dateKey, defaultType: "show" });
-    setAddDialogOpen(true);
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-xs text-white/40">
-          {uniqueDayCount} tour {uniqueDayCount === 1 ? "day" : "days"} · {sortedShows.length}{" "}
-          {sortedShows.length === 1 ? "entry" : "entries"}
+          {sortedShows.length} tour {sortedShows.length === 1 ? "day" : "days"}
         </span>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -2128,75 +2150,49 @@ function ShowsTab({ tour }: { tour: TourDetail }) {
         </div>
       ) : (
         <div className="space-y-6">
-          {dayGroups.map(([dayKey, dayShows], groupIdx) => {
-            const showTypeCount = dayShows.filter((s) => s.type === "show").length;
-            const travelCount = dayShows.filter((s) => s.type === "travel").length;
-            const dayOffCount = dayShows.filter((s) => s.type === "day_off").length;
-            const dayNum = groupIdx + 1;
+          {sortedShows.map((show, idx) => {
+            const nextFlat = idx < sortedShows.length - 1 ? sortedShows[idx + 1] : undefined;
+            const dayNum = idx + 1;
+            const dk = show.dayKey?.slice(0, 10) ?? show.date.slice(0, 10);
+            const evs = [...(show.scheduleEvents ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+            const showKindCount = evs.filter((e) => e.kind === "show").length;
 
             return (
-              <div key={dayKey} className="space-y-2">
+              <div key={show.id} className="space-y-2">
                 <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <span className="text-xs font-semibold uppercase tracking-wide text-white/45">
                       Day {dayNum}
                     </span>
                     <span className="text-sm font-medium text-white/90">
-                      {format(parseISO(`${dayKey}T12:00:00`), "EEEE d MMM yyyy")}
+                      {format(parseISO(`${dk}T12:00:00`), "EEEE d MMM yyyy")}
                     </span>
-                    {showTypeCount > 0 ? (
+                    {showKindCount > 0 ? (
                       <Badge className="border border-emerald-500/35 bg-emerald-600/20 text-emerald-200 hover:bg-emerald-600/25">
-                        {showTypeCount} show{showTypeCount === 1 ? "" : "s"}
+                        {showKindCount} show{showKindCount === 1 ? "" : "s"}
                       </Badge>
                     ) : null}
-                    {travelCount > 0 ? (
+                    {show.type === "travel" ? (
                       <Badge
                         variant="outline"
                         className="border-blue-500/40 bg-blue-950/30 text-blue-200"
                       >
-                        Travel
+                        Travel day
                       </Badge>
                     ) : null}
-                    {dayOffCount > 0 ? (
+                    {show.type === "day_off" ? (
                       <Badge variant="outline" className="border-zinc-600/50 bg-zinc-900/40 text-zinc-300">
                         Day off
                       </Badge>
                     ) : null}
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 border-emerald-500/35 bg-emerald-950/20 text-emerald-200 hover:bg-emerald-950/35 hover:text-emerald-100"
-                    onClick={() => openAddShowForDay(dayKey)}
-                  >
-                    <Plus size={13} className="mr-1" /> Add show
-                  </Button>
+                  <p className="text-[11px] text-white/35 sm:text-right max-w-lg">
+                    Expand the card to edit timed events (get-in, show, rehearsal, …) using the same start/end/duration fields as event shows.
+                  </p>
                 </div>
 
-                <div className="space-y-3">
-                  {dayShows.map((show, idxInDay) => {
-                    const flatIdx = flatIndexByShowId.get(show.id) ?? -1;
-                    const nextFlat =
-                      flatIdx >= 0 && flatIdx < sortedShows.length - 1
-                        ? sortedShows[flatIdx + 1]
-                        : undefined;
-                    const isLastOnDay = idxInDay === dayShows.length - 1;
-                    const nextDifferentDay =
-                      isLastOnDay &&
-                      nextFlat &&
-                      nextFlat.date.slice(0, 10) !== dayKey;
-
-                    return (
-                      <div key={show.id}>
-                        <ShowCard show={show} dayNumber={dayNum} tourId={tour.id} tour={tour} />
-                        {nextDifferentDay && nextFlat ? (
-                          <TravelConnector currentShow={show} nextShow={nextFlat} />
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
+                <ShowCard show={show} dayNumber={dayNum} tourId={tour.id} tour={tour} />
+                {nextFlat ? <TravelConnector currentShow={show} nextShow={nextFlat} /> : null}
               </div>
             );
           })}

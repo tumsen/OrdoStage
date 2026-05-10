@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { tourShowPrimaryTime } from "@/lib/tourScheduleDisplay";
 import type { TourDetail, TourShow } from "../../../backend/src/types";
 
 // ISO week number (Mon = first day of week)
@@ -142,7 +143,7 @@ export function TourCalendarView({ tour }: { tour: TourDetail }) {
                         : show.type === "day_off"
                         ? "Day off"
                         : show.venueName || show.venueCity || "Show";
-                    const time = show.showTime || show.getInTime;
+                    const time = tourShowPrimaryTime(show);
                     return (
                       <div
                         key={show.id}

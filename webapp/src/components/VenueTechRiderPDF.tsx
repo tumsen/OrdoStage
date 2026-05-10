@@ -1,6 +1,12 @@
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { TourDetail, TourShow } from "../../../backend/src/types";
 import type { OrgCompanyProfile } from "@/lib/orgCompanyProfile";
+import {
+  formatScheduleEventTimes,
+  scheduleEventLabel,
+  sortedTourScheduleEvents,
+  tourShowHasScheduleTimeline,
+} from "@/lib/tourScheduleDisplay";
 
 const S = StyleSheet.create({
   page: {
@@ -154,12 +160,14 @@ export function VenueTechRiderCoverDoc({
   );
   const handsNeeded = show.handsNeeded ?? tour.handsNeeded;
   const showDuration = tour.showDuration;
-  const hasSchedule =
+  const scheduleEvs = sortedTourScheduleEvents(show);
+  const hasLegacySchedule =
     show.getInTime ||
     show.rehearsalTime ||
     show.soundcheckTime ||
     show.doorsTime ||
     show.showTime;
+  const hasSchedule = tourShowHasScheduleTimeline(show) || hasLegacySchedule;
   const hasContact = show.contactName || show.contactPhone || show.contactEmail;
   const venueAddress = formatAddress({
     street: show.venueStreet,
@@ -205,11 +213,23 @@ export function VenueTechRiderCoverDoc({
             {visibility.schedule && (hasSchedule || showDuration) ? (
               <View style={S.col}>
                 <Text style={S.sectionTitle}>Schedule</Text>
-                <Row label="Arrival / Get-in" value={show.getInTime} />
-                <Row label="Rehearsal" value={show.rehearsalTime} />
-                <Row label="Soundcheck" value={show.soundcheckTime} />
-                <Row label="Doors open" value={show.doorsTime} />
-                <Row label="Show time" value={show.showTime} />
+                {scheduleEvs.length > 0 ? (
+                  scheduleEvs.map((ev) => (
+                    <Row
+                      key={ev.id}
+                      label={scheduleEventLabel(ev)}
+                      value={formatScheduleEventTimes(ev)}
+                    />
+                  ))
+                ) : (
+                  <>
+                    <Row label="Arrival / Get-in" value={show.getInTime} />
+                    <Row label="Rehearsal" value={show.rehearsalTime} />
+                    <Row label="Soundcheck" value={show.soundcheckTime} />
+                    <Row label="Doors open" value={show.doorsTime} />
+                    <Row label="Show time" value={show.showTime} />
+                  </>
+                )}
                 <Row label="Duration" value={showDuration} />
               </View>
             ) : null}

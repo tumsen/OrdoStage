@@ -721,6 +721,8 @@ model TourShow {
   tour           Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
   timeProjects   TimeProject[]
   date           DateTime
+  /// Calendar day key YYYY-MM-DD (UTC) — one TourShow row per tour per day.
+  dayKey         String
   type           String   @default("show")  // show | travel | day_off
   fromLocation   String?
   toLocation     String?
@@ -767,8 +769,26 @@ model TourShow {
   venueTechRiderPdfName   String?
   showPeople     TourShowPerson[]
   personNotes    TourPersonNote[]
+  scheduleEvents TourScheduleEvent[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@unique([tourId, dayKey])
+}
+
+model TourScheduleEvent {
+  id          String   @id @default(cuid())
+  tourShowId  String
+  tourShow    TourShow @relation(fields: [tourShowId], references: [id], onDelete: Cascade)
+  kind        String
+  customLabel String?
+  startTime   String
+  endTime     String
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tourShowId, sortOrder])
 }
 
 model TourPerson {

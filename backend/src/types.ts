@@ -685,6 +685,40 @@ export type UpdateInternalBooking = z.infer<typeof UpdateInternalBookingSchema>;
 export type TeamMember = z.infer<typeof TeamMemberSchema>;
 export type UpdateRole = z.infer<typeof UpdateRoleSchema>;
 
+export const TourScheduleEventKindSchema = z.enum([
+  "get_in",
+  "get_out",
+  "show",
+  "rehearsal",
+  "soundcheck",
+  "travel",
+  "custom",
+]);
+
+export const TourScheduleEventSchema = z.object({
+  id: z.string(),
+  tourShowId: z.string(),
+  kind: TourScheduleEventKindSchema,
+  customLabel: z.string().nullable(),
+  startTime: z.string(),
+  endTime: z.string(),
+  sortOrder: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const TourScheduleEventInputSchema = z.object({
+  kind: TourScheduleEventKindSchema,
+  customLabel: z.string().nullable().optional(),
+  startTime: z.string(),
+  endTime: z.string(),
+  sortOrder: z.number().optional(),
+});
+
+export const ReplaceTourScheduleEventsSchema = z.object({
+  events: z.array(TourScheduleEventInputSchema),
+});
+
 // TourShowPerson (defined before TourShowSchema because TourShowSchema references it)
 export const TourShowPersonSchema = z.object({
   id: z.string(),
@@ -699,6 +733,7 @@ export const TourShowSchema = z.object({
   id: z.string(),
   tourId: z.string(),
   date: z.string(),
+  dayKey: z.string(),
   type: z.enum(["show", "travel", "day_off"]),
   fromLocation: z.string().nullable(),
   toLocation: z.string().nullable(),
@@ -742,12 +777,14 @@ export const TourShowSchema = z.object({
   techRiderPdfUrl: z.string().nullable(),
   hasVenueTechRiderPdf: z.boolean(),
   showPeople: z.array(TourShowPersonSchema),
+  scheduleEvents: z.array(TourScheduleEventSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 
 export const CreateTourShowSchema = z.object({
   date: z.string(),
+  dayKey: z.string().optional(),
   type: z.enum(["show", "travel", "day_off"]).optional(),
   fromLocation: z.string().optional(),
   toLocation: z.string().optional(),
@@ -1230,6 +1267,8 @@ export type TimesheetApproval = z.infer<typeof TimesheetApprovalSchema>;
 
 // Tour type exports
 export type TourShow = z.infer<typeof TourShowSchema>;
+export type TourScheduleEvent = z.infer<typeof TourScheduleEventSchema>;
+export type TourScheduleEventKind = z.infer<typeof TourScheduleEventKindSchema>;
 export type CreateTourShow = z.infer<typeof CreateTourShowSchema>;
 export type UpdateTourShow = z.infer<typeof UpdateTourShowSchema>;
 export type TourPerson = z.infer<typeof TourPersonSchema>;
