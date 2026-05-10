@@ -52,7 +52,7 @@ const en = {
     addBlock: "Add custom time",
     logJob: "Log",
     dragHint:
-      "Drag on empty space to create a block (snaps to 5 minutes). Drag a block to move; drag the top or bottom edge to adjust. Pencil: project, times, tags, note.",
+      "Drag on empty space to create a block (snaps to 5 minutes). Drag a block to move; drag the top or bottom edge to adjust. Pencil: project, times, category (e.g. Rejsegodtgørsel), tags, note.",
     calendarWeekIso: "Week {{week}}",
     gridStartsAt: "Day starts",
     upcomingTitle: "Upcoming assigned jobs",
@@ -124,6 +124,7 @@ const en = {
     categoryVacation: "Vacation",
     categorySick: "Sick leave",
     categoryHoliday: "Holiday",
+    categoryTravelAllowance: "Travel allowance (rejsegodtgørsel)",
     reportsLink: "Reports",
     reportsTitle: "Time reports",
     reportsSubtitle: "Analyse hours, projects, overtime, and leave across your team.",
@@ -268,6 +269,9 @@ const da: DeepPartial<typeof en> = {
     addBlock: "Tilføj tidsblok",
     logJob: "Log",
     planned: "Planlagt",
+    categoryTravelAllowance: "Rejsegodtgørsel",
+    dragHint:
+      "Træk på tom plads for at oprette en blok (snapper til 5 min). Træk blokke for at flytte; træk top eller bund for at ændre længde. Blyant: projekt, tidspunkter, kategori (fx rejsegodtgørsel), tags, note.",
   },
   account: {
     title: "Konto",

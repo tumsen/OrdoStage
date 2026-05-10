@@ -19,6 +19,7 @@ import {
   ApproveTimesheetSchema,
   SetPersonContractSchema,
   TIME_CATEGORIES,
+  type TimeCategory,
 } from "../types";
 
 const timeRouter = new Hono<{
@@ -370,7 +371,7 @@ function serializeEntry(row: {
     startsAt: iso(row.startsAt),
     endsAt: iso(row.endsAt),
     kind: row.kind,
-    category: (row.category || "work") as "work" | "vacation" | "sick" | "holiday",
+    category: (row.category || "work") as TimeCategory,
     eventShowJobId: row.eventShowJobId,
     eventId: row.eventId,
     timeProjectId: row.timeProjectId,
@@ -641,6 +642,7 @@ timeRouter.get("/time/report", async (c) => {
     vacationMinutes: number;
     sickMinutes: number;
     holidayMinutes: number;
+    travelAllowanceMinutes: number;
     weeklyContractHours: number | null;
     vacationDaysPerYear: number | null;
   };
@@ -650,6 +652,7 @@ timeRouter.get("/time/report", async (c) => {
     vacationMinutes: number;
     sickMinutes: number;
     holidayMinutes: number;
+    travelAllowanceMinutes: number;
   };
 
   const byPerson = new Map<string, PersonAgg>();
@@ -669,6 +672,7 @@ timeRouter.get("/time/report", async (c) => {
         vacationMinutes: 0,
         sickMinutes: 0,
         holidayMinutes: 0,
+        travelAllowanceMinutes: 0,
         weeklyContractHours: row.person.weeklyContractHours ?? null,
         vacationDaysPerYear: row.person.vacationDaysPerYear ?? null,
       });
@@ -678,6 +682,7 @@ timeRouter.get("/time/report", async (c) => {
     else if (cat === "vacation") pa.vacationMinutes += durMin;
     else if (cat === "sick") pa.sickMinutes += durMin;
     else if (cat === "holiday") pa.holidayMinutes += durMin;
+    else if (cat === "travel_allowance") pa.travelAllowanceMinutes += durMin;
 
     // byProject
     const projKey = row.timeProjectId ?? null;
@@ -694,17 +699,29 @@ timeRouter.get("/time/report", async (c) => {
 
     // byDay
     if (!byDay.has(dateKey)) {
-      byDay.set(dateKey, { workMinutes: 0, vacationMinutes: 0, sickMinutes: 0, holidayMinutes: 0 });
+      byDay.set(dateKey, {
+        workMinutes: 0,
+        vacationMinutes: 0,
+        sickMinutes: 0,
+        holidayMinutes: 0,
+        travelAllowanceMinutes: 0,
+      });
     }
     const dp = byDay.get(dateKey)!;
     if (cat === "work") dp.workMinutes += durMin;
     else if (cat === "vacation") dp.vacationMinutes += durMin;
     else if (cat === "sick") dp.sickMinutes += durMin;
     else if (cat === "holiday") dp.holidayMinutes += durMin;
+    else if (cat === "travel_allowance") dp.travelAllowanceMinutes += durMin;
   }
 
   const byPersonArr = [...byPerson.entries()].map(([personId, pa]) => {
-    const total = pa.workMinutes + pa.vacationMinutes + pa.sickMinutes + pa.holidayMinutes;
+    const total =
+      pa.workMinutes +
+      pa.vacationMinutes +
+      pa.sickMinutes +
+      pa.holidayMinutes +
+      pa.travelAllowanceMinutes;
     const contractMinutes =
       pa.weeklyContractHours != null ? (rangeDays / 7) * pa.weeklyContractHours * 60 : null;
     // Vacation days: use hoursPerWorkDay = weeklyContractHours / 5; fall back to 8h
@@ -720,6 +737,7 @@ timeRouter.get("/time/report", async (c) => {
       vacationMinutes: pa.vacationMinutes,
       sickMinutes: pa.sickMinutes,
       holidayMinutes: pa.holidayMinutes,
+      travelAllowanceMinutes: pa.travelAllowanceMinutes,
       weeklyContractHours: pa.weeklyContractHours,
       contractMinutes,
       overtimeMinutes: contractMinutes != null ? pa.workMinutes - contractMinutes : null,
@@ -740,17 +758,24 @@ timeRouter.get("/time/report", async (c) => {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, dp]) => ({
       date,
-      totalMinutes: dp.workMinutes + dp.vacationMinutes + dp.sickMinutes + dp.holidayMinutes,
+      totalMinutes:
+        dp.workMinutes +
+        dp.vacationMinutes +
+        dp.sickMinutes +
+        dp.holidayMinutes +
+        dp.travelAllowanceMinutes,
       workMinutes: dp.workMinutes,
       vacationMinutes: dp.vacationMinutes,
       sickMinutes: dp.sickMinutes,
       holidayMinutes: dp.holidayMinutes,
+      travelAllowanceMinutes: dp.travelAllowanceMinutes,
     }));
 
   const summaryWork = byPersonArr.reduce((s, p) => s + p.workMinutes, 0);
   const summaryVac = byPersonArr.reduce((s, p) => s + p.vacationMinutes, 0);
   const summarySick = byPersonArr.reduce((s, p) => s + p.sickMinutes, 0);
   const summaryHoliday = byPersonArr.reduce((s, p) => s + p.holidayMinutes, 0);
+  const summaryTravelAllowance = byPersonArr.reduce((s, p) => s + p.travelAllowanceMinutes, 0);
 
   const entries = rows.map((row) => ({
     id: row.id,
@@ -760,7 +785,7 @@ timeRouter.get("/time/report", async (c) => {
     endsAt: iso(row.endsAt),
     durationMinutes: Math.round((row.endsAt.getTime() - row.startsAt.getTime()) / 60_000),
     kind: row.kind,
-    category: (row.category || "work") as "work" | "vacation" | "sick" | "holiday",
+    category: (row.category || "work") as TimeCategory,
     note: row.note,
     projectId: row.timeProjectId,
     projectName: row.timeProject?.name ?? null,
@@ -771,11 +796,13 @@ timeRouter.get("/time/report", async (c) => {
   return c.json({
     data: {
       summary: {
-        totalMinutes: summaryWork + summaryVac + summarySick + summaryHoliday,
+        totalMinutes:
+          summaryWork + summaryVac + summarySick + summaryHoliday + summaryTravelAllowance,
         workMinutes: summaryWork,
         vacationMinutes: summaryVac,
         sickMinutes: summarySick,
         holidayMinutes: summaryHoliday,
+        travelAllowanceMinutes: summaryTravelAllowance,
         entryCount: rows.length,
         rangeDays,
       },

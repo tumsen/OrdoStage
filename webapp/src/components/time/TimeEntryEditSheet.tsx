@@ -215,6 +215,7 @@ export function TimeEntryEditSheet(props: {
     { value: "vacation", label: t("time.categoryVacation"), color: "text-emerald-300" },
     { value: "sick", label: t("time.categorySick"), color: "text-orange-300" },
     { value: "holiday", label: t("time.categoryHoliday"), color: "text-purple-300" },
+    { value: "travel_allowance", label: t("time.categoryTravelAllowance"), color: "text-amber-300" },
   ];
 
   return (
@@ -274,9 +275,7 @@ export function TimeEntryEditSheet(props: {
                       : "border-white/10 bg-white/[0.03] text-white/60 hover:bg-white/[0.07]"
                   )}
                 >
-                  <span className={cn("block text-xs mb-0.5", opt.color)}>
-                    {opt.value === "work" ? "●" : opt.value === "vacation" ? "●" : opt.value === "sick" ? "●" : "●"}
-                  </span>
+                  <span className={cn("block text-xs mb-0.5", opt.color)}>●</span>
                   {opt.label}
                 </button>
               ))}

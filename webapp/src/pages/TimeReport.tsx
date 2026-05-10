@@ -49,10 +49,12 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type {
+  TimeCategory,
   TimeReport,
   TimeReportPerson,
   TimeReportEntry,
 } from "@/contracts/backendTypes";
+import { timeCategoryMessageId } from "@/lib/timeCategoryI18n";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -77,6 +79,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   vacation: "#10b981",
   sick: "#f97316",
   holiday: "#a855f7",
+  travelAllowance: "#d97706",
 };
 
 const CATEGORY_BG: Record<string, string> = {
@@ -84,6 +87,7 @@ const CATEGORY_BG: Record<string, string> = {
   vacation: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
   sick: "bg-orange-500/20 text-orange-300 border-orange-500/30",
   holiday: "bg-purple-500/20 text-purple-300 border-purple-500/30",
+  travel_allowance: "bg-amber-500/20 text-amber-300 border-amber-500/30",
 };
 
 function today(): Date {
@@ -286,7 +290,14 @@ function ContractHoursCell({
 function groupChartData(
   byDay: TimeReport["byDay"],
   rangeDays: number
-): { key: string; work: number; vacation: number; sick: number; holiday: number }[] {
+): {
+  key: string;
+  work: number;
+  vacation: number;
+  sick: number;
+  holiday: number;
+  travelAllowance: number;
+}[] {
   if (rangeDays <= 31) {
     return byDay.map((d) => ({
       key: format(parseISO(d.date), "d MMM"),
@@ -294,21 +305,24 @@ function groupChartData(
       vacation: +(d.vacationMinutes / 60).toFixed(2),
       sick: +(d.sickMinutes / 60).toFixed(2),
       holiday: +(d.holidayMinutes / 60).toFixed(2),
+      travelAllowance: +(d.travelAllowanceMinutes / 60).toFixed(2),
     }));
   }
   // group by week
   const weeks = new Map<
     string,
-    { work: number; vacation: number; sick: number; holiday: number }
+    { work: number; vacation: number; sick: number; holiday: number; travelAllowance: number }
   >();
   for (const d of byDay) {
     const wk = format(startOfWeek(parseISO(d.date), { weekStartsOn: 1 }), "d MMM");
-    if (!weeks.has(wk)) weeks.set(wk, { work: 0, vacation: 0, sick: 0, holiday: 0 });
+    if (!weeks.has(wk))
+      weeks.set(wk, { work: 0, vacation: 0, sick: 0, holiday: 0, travelAllowance: 0 });
     const w = weeks.get(wk)!;
     w.work += d.workMinutes;
     w.vacation += d.vacationMinutes;
     w.sick += d.sickMinutes;
     w.holiday += d.holidayMinutes;
+    w.travelAllowance += d.travelAllowanceMinutes;
   }
   return [...weeks.entries()].map(([key, w]) => ({
     key,
@@ -316,6 +330,7 @@ function groupChartData(
     vacation: +(w.vacation / 60).toFixed(2),
     sick: +(w.sick / 60).toFixed(2),
     holiday: +(w.holiday / 60).toFixed(2),
+    travelAllowance: +(w.travelAllowance / 60).toFixed(2),
   }));
 }
 
@@ -406,6 +421,7 @@ export default function TimeReport() {
     { id: "vacation", label: t("time.categoryVacation") },
     { id: "sick", label: t("time.categorySick") },
     { id: "holiday", label: t("time.categoryHoliday") },
+    { id: "travel_allowance", label: t("time.categoryTravelAllowance") },
   ];
 
   const qs = useMemo(() => {
@@ -431,6 +447,7 @@ export default function TimeReport() {
   const hasVacation = (report?.summary.vacationMinutes ?? 0) > 0;
   const hasSick = (report?.summary.sickMinutes ?? 0) > 0;
   const hasHoliday = (report?.summary.holidayMinutes ?? 0) > 0;
+  const hasTravelAllowance = (report?.summary.travelAllowanceMinutes ?? 0) > 0;
 
   const sortedPersons = useMemo((): TimeReportPerson[] => {
     if (!report) return [];
@@ -641,6 +658,13 @@ export default function TimeReport() {
               color="text-purple-300"
             />
           )}
+          {hasTravelAllowance && (
+            <SummaryCard
+              label={t("time.categoryTravelAllowance")}
+              value={fmtMins(report.summary.travelAllowanceMinutes)}
+              color="text-amber-300"
+            />
+          )}
           <SummaryCard
             label={t("time.reportPersonCount")}
             value={String(report.byPerson.length)}
@@ -677,18 +701,34 @@ export default function TimeReport() {
                   color: "#fff",
                   fontSize: 12,
                 }}
-                formatter={(value: number, name: string) => [
-                  `${value}h`,
-                  name.charAt(0).toUpperCase() + name.slice(1),
-                ]}
+                formatter={(value: number, name: string) => {
+                  const map: Record<string, string> = {
+                    work: t("time.categoryWork"),
+                    vacation: t("time.categoryVacation"),
+                    sick: t("time.categorySick"),
+                    holiday: t("time.categoryHoliday"),
+                    travelAllowance: t("time.categoryTravelAllowance"),
+                  };
+                  return [`${value}h`, map[name] ?? name];
+                }}
               />
               <Legend
                 wrapperStyle={{ fontSize: 12, color: "rgba(255,255,255,0.5)", paddingTop: 8 }}
-                formatter={(v) => v.charAt(0).toUpperCase() + v.slice(1)}
+                formatter={(v) => {
+                  const map: Record<string, string> = {
+                    work: t("time.categoryWork"),
+                    vacation: t("time.categoryVacation"),
+                    sick: t("time.categorySick"),
+                    holiday: t("time.categoryHoliday"),
+                    travelAllowance: t("time.categoryTravelAllowance"),
+                  };
+                  return map[v] ?? v;
+                }}
               />
               <Bar dataKey="work" stackId="a" fill={CATEGORY_COLORS.work} radius={[0, 0, 0, 0]} />
               <Bar dataKey="vacation" stackId="a" fill={CATEGORY_COLORS.vacation} />
               <Bar dataKey="sick" stackId="a" fill={CATEGORY_COLORS.sick} />
+              <Bar dataKey="travelAllowance" stackId="a" fill={CATEGORY_COLORS.travelAllowance} />
               <Bar dataKey="holiday" stackId="a" fill={CATEGORY_COLORS.holiday} radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -744,6 +784,11 @@ export default function TimeReport() {
                             {t("time.categoryHoliday")}
                           </th>
                         )}
+                        {hasTravelAllowance && (
+                          <th className="text-right px-4 py-3 font-medium text-amber-400/70">
+                            {t("time.categoryTravelAllowance")}
+                          </th>
+                        )}
                         <th
                           className="text-right px-4 py-3 font-medium text-white/50 cursor-pointer hover:text-white/70 select-none"
                           onClick={() => togglePersonSort("total")}
@@ -793,6 +838,11 @@ export default function TimeReport() {
                           {hasHoliday && (
                             <td className="px-4 py-3 text-right tabular-nums text-purple-300/80">
                               {p.holidayMinutes > 0 ? fmtMins(p.holidayMinutes) : "—"}
+                            </td>
+                          )}
+                          {hasTravelAllowance && (
+                            <td className="px-4 py-3 text-right tabular-nums text-amber-300/80">
+                              {p.travelAllowanceMinutes > 0 ? fmtMins(p.travelAllowanceMinutes) : "—"}
                             </td>
                           )}
                           <td className="px-4 py-3 text-right tabular-nums font-semibold text-white">
@@ -989,10 +1039,10 @@ export default function TimeReport() {
                               <span
                                 className={cn(
                                   "inline-flex items-center rounded px-1.5 py-0.5 text-xs border",
-                                  CATEGORY_BG[e.category] ?? "bg-white/5 text-white/50"
-                                )}
+                                CATEGORY_BG[e.category] ?? "bg-white/5 text-white/50"
+                              )}
                               >
-                                {t(`time.category${e.category.charAt(0).toUpperCase()}${e.category.slice(1)}` as never)}
+                                {t(timeCategoryMessageId(e.category as TimeCategory) as never)}
                               </span>
                             </td>
                             <td className="px-4 py-2.5">

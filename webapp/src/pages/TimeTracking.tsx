@@ -43,6 +43,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { timeCategoryMessageId } from "@/lib/timeCategoryI18n";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
@@ -50,7 +51,14 @@ import { TravelClaimsPanel } from "@/components/time/TravelClaimsPanel";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { CalendarGrid } from "@/components/schedule/CalendarGrid";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
-import type { TimeEntry, TimeProject, TimeTag, TimeTrackingJob, TimesheetApproval } from "@/contracts/backendTypes";
+import type {
+  TimeCategory,
+  TimeEntry,
+  TimeProject,
+  TimeTag,
+  TimeTrackingJob,
+  TimesheetApproval,
+} from "@/contracts/backendTypes";
 import type { Language, TimeFormat } from "@/lib/preferences";
 import {
   MINUTES_PER_DAY,
@@ -1258,7 +1266,7 @@ export default function TimeTracking() {
                     </div>
                     {dayOffEntry ? (
                       <div className={cn("text-[9px] font-medium mt-1 capitalize", col?.text)}>
-                        {t(`time.category${dayOffEntry.category.charAt(0).toUpperCase()}${dayOffEntry.category.slice(1)}` as never)}
+                        {t(timeCategoryMessageId(dayOffEntry.category as TimeCategory) as never)}
                       </div>
                     ) : null}
                   </div>
@@ -1362,11 +1370,11 @@ export default function TimeTracking() {
                         const durMin = (end.getTime() - start.getTime()) / 60000;
                         const isJob = e.kind === "job";
                         const isLocked = e.isLocked === true;
-                        const cat = e.category ?? "work";
+                        const cat = (e.category ?? "work") as TimeCategory;
                         const isDayOff = cat === "vacation" || cat === "sick" || cat === "holiday";
                         const label =
-                          isDayOff
-                            ? t(`time.category${cat.charAt(0).toUpperCase()}${cat.slice(1)}` as never)
+                          isDayOff || cat === "travel_allowance"
+                            ? t(timeCategoryMessageId(cat) as never)
                             : isJob && e.eventShowJobId
                             ? (jobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
                               (upcomingJobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
@@ -1430,6 +1438,8 @@ export default function TimeTracking() {
                                 ? "border-orange-400/60 bg-orange-500/30 text-orange-50"
                                 : cat === "holiday"
                                 ? "border-purple-400/60 bg-purple-500/30 text-purple-50"
+                                : cat === "travel_allowance"
+                                ? "border-amber-400/60 bg-amber-500/25 text-amber-50"
                                 : isJob
                                 ? "border-emerald-400/50 bg-emerald-500/25 text-emerald-50"
                                 : "border-sky-400/50 bg-sky-500/25 text-sky-50",

@@ -935,7 +935,7 @@ export const TimeProjectSchema = z.object({
   updatedAt: z.string(),
 });
 
-export const TIME_CATEGORIES = ["work", "vacation", "sick", "holiday"] as const;
+export const TIME_CATEGORIES = ["work", "vacation", "sick", "holiday", "travel_allowance"] as const;
 export type TimeCategory = (typeof TIME_CATEGORIES)[number];
 
 export const TimeEntrySchema = z.object({
@@ -1156,6 +1156,7 @@ export const TimeReportPersonSchema = z.object({
   vacationMinutes: z.number(),
   sickMinutes: z.number(),
   holidayMinutes: z.number(),
+  travelAllowanceMinutes: z.number(),
   weeklyContractHours: z.number().nullable(),
   contractMinutes: z.number().nullable(),
   overtimeMinutes: z.number().nullable(),
@@ -1178,6 +1179,7 @@ export const TimeReportDaySchema = z.object({
   vacationMinutes: z.number(),
   sickMinutes: z.number(),
   holidayMinutes: z.number(),
+  travelAllowanceMinutes: z.number(),
 });
 
 export const TimeReportEntrySchema = z.object({
@@ -1203,6 +1205,7 @@ export const TimeReportSchema = z.object({
     vacationMinutes: z.number(),
     sickMinutes: z.number(),
     holidayMinutes: z.number(),
+    travelAllowanceMinutes: z.number(),
     entryCount: z.number(),
     rangeDays: z.number(),
   }),
