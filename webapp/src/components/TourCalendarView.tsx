@@ -149,8 +149,8 @@ export function TourCalendarView({ tour }: { tour: TourDetail }) {
                         className={cn(
                           "flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] leading-tight flex-shrink-0 max-w-[110px]",
                           show.type === "travel" ? "bg-blue-900/50 text-blue-300" :
-                          show.type === "day_off" ? "bg-green-900/50 text-green-300" :
-                          "bg-red-900/50 text-red-300"
+                          show.type === "day_off" ? "bg-zinc-800/55 text-zinc-300" :
+                          "bg-emerald-900/50 text-emerald-300"
                         )}
                         title={`${time ? time + " " : ""}${label}`}
                       >

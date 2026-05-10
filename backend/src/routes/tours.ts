@@ -253,7 +253,7 @@ toursRouter.get("/tours/:id", async (c) => {
     where: { id, organizationId: user.organizationId },
     include: {
       shows: {
-        orderBy: [{ order: "asc" }, { date: "asc" }],
+        orderBy: [{ date: "asc" }, { order: "asc" }],
         include: {
           showPeople: {
             include: {
@@ -421,10 +421,21 @@ toursRouter.post("/tours/:id/shows", zValidator("json", CreateTourShowSchema), a
     return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
   }
 
+  const dateParsed = new Date(body.date);
+  const dateKey = dateParsed.toISOString().slice(0, 10);
+  const siblings = await prisma.tourShow.findMany({
+    where: { tourId: id },
+    select: { date: true, order: true },
+  });
+  const maxOrderSameDay = siblings
+    .filter((s) => s.date.toISOString().slice(0, 10) === dateKey)
+    .reduce((m, s) => Math.max(m, s.order), -1);
+  const nextOrder = body.order ?? maxOrderSameDay + 1;
+
   const show = await prisma.tourShow.create({
     data: {
       tourId: id,
-      date: new Date(body.date),
+      date: dateParsed,
       type: body.type ?? "show",
       fromLocation: body.fromLocation ?? null,
       toLocation: body.toLocation ?? null,
@@ -456,7 +467,7 @@ toursRouter.post("/tours/:id/shows", zValidator("json", CreateTourShowSchema), a
       travelInfo: body.travelInfo ?? null,
       cateringInfo: body.cateringInfo ?? null,
       notes: body.notes ?? null,
-      order: body.order ?? 0,
+      order: nextOrder,
       handsNeeded: body.handsNeeded ?? null,
       travelTimeMinutes: body.travelTimeMinutes ?? null,
       distanceKm: body.distanceKm ?? null,

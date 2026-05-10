@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { addDays, format, parseISO } from "date-fns";
 import {
   ArrowLeft,
   Edit2,
@@ -529,6 +530,9 @@ interface ShowFormDialogProps {
   show?: TourShow;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Pre-fill when adding a new block (not edit) */
+  defaultDate?: string | null;
+  defaultType?: "show" | "travel" | "day_off";
 }
 
 const emptyShowForm = {
@@ -609,6 +613,49 @@ function showToForm(show: TourShow): ShowFormState {
   };
 }
 
+/** Duplicate a tour row onto another calendar day (copy previous day). */
+function tourShowToCreateBody(show: TourShow, newDateYmd: string): CreateTourShow {
+  const body: CreateTourShow = {
+    date: newDateYmd,
+    type: show.type,
+    order: show.order,
+  };
+  if (show.fromLocation) body.fromLocation = show.fromLocation;
+  if (show.toLocation) body.toLocation = show.toLocation;
+  if (show.showTime) body.showTime = show.showTime;
+  if (show.getInTime) body.getInTime = show.getInTime;
+  if (show.rehearsalTime) body.rehearsalTime = show.rehearsalTime;
+  if (show.soundcheckTime) body.soundcheckTime = show.soundcheckTime;
+  if (show.doorsTime) body.doorsTime = show.doorsTime;
+  if (show.venueName) body.venueName = show.venueName;
+  if (show.venueStreet) body.venueStreet = show.venueStreet;
+  if (show.venueNumber) body.venueNumber = show.venueNumber;
+  if (show.venueZip) body.venueZip = show.venueZip;
+  if (show.venueCity) body.venueCity = show.venueCity;
+  if (show.venueState) body.venueState = show.venueState;
+  if (show.venueCountry) body.venueCountry = show.venueCountry;
+  if (show.contactName) body.contactName = show.contactName;
+  if (show.contactPhone) body.contactPhone = show.contactPhone;
+  if (show.contactEmail) body.contactEmail = show.contactEmail;
+  if (show.hotelName) body.hotelName = show.hotelName;
+  if (show.hotelStreet) body.hotelStreet = show.hotelStreet;
+  if (show.hotelNumber) body.hotelNumber = show.hotelNumber;
+  if (show.hotelZip) body.hotelZip = show.hotelZip;
+  if (show.hotelCity) body.hotelCity = show.hotelCity;
+  if (show.hotelState) body.hotelState = show.hotelState;
+  if (show.hotelCountry) body.hotelCountry = show.hotelCountry;
+  if (show.hotelPhone) body.hotelPhone = show.hotelPhone;
+  if (show.hotelCheckIn) body.hotelCheckIn = show.hotelCheckIn;
+  if (show.hotelCheckOut) body.hotelCheckOut = show.hotelCheckOut;
+  if (show.travelInfo) body.travelInfo = show.travelInfo;
+  if (show.cateringInfo) body.cateringInfo = show.cateringInfo;
+  if (show.notes) body.notes = show.notes;
+  if (show.handsNeeded != null) body.handsNeeded = show.handsNeeded;
+  if (show.travelTimeMinutes != null) body.travelTimeMinutes = show.travelTimeMinutes;
+  if (show.distanceKm != null) body.distanceKm = show.distanceKm;
+  return body;
+}
+
 function formToPayload(form: ShowFormState): CreateTourShow {
   const payload: CreateTourShow = { date: form.date };
   payload.type = form.type;
@@ -647,7 +694,14 @@ function formToPayload(form: ShowFormState): CreateTourShow {
   return payload;
 }
 
-function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProps) {
+function ShowFormDialog({
+  tourId,
+  show,
+  open,
+  onOpenChange,
+  defaultDate,
+  defaultType,
+}: ShowFormDialogProps) {
   const queryClient = useQueryClient();
   const isEdit = !!show;
   const [form, setForm] = useState<ShowFormState>(show ? showToForm(show) : emptyShowForm);
@@ -655,6 +709,20 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
   function setField(key: keyof ShowFormState, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  useEffect(() => {
+    if (!open) return;
+    if (show) {
+      setForm(showToForm(show));
+    } else {
+      setForm({
+        ...emptyShowForm,
+        ...(defaultDate ? { date: defaultDate } : {}),
+        ...(defaultType ? { type: defaultType } : {}),
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- sync form on dialog open / row identity; omit full `show` to avoid overwrite loops
+  }, [open, show?.id, show?.updatedAt, defaultDate, defaultType]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateTourShow) =>
@@ -696,7 +764,13 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Day" : "Add Day"}</DialogTitle>
+          <DialogTitle>
+            {isEdit
+              ? "Edit Tour Day"
+              : defaultDate && defaultType === "show"
+                ? "Add show"
+                : "Add Tour Day"}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 py-2">
           {/* Type selector */}
@@ -712,10 +786,10 @@ function ShowFormDialog({ tourId, show, open, onOpenChange }: ShowFormDialogProp
                     "flex-1 py-2 px-3 rounded-lg text-xs font-medium border transition-colors",
                     form.type === t
                       ? t === "show"
-                        ? "bg-red-900/40 border-red-700/50 text-red-300"
+                        ? "bg-emerald-900/40 border-emerald-700/50 text-emerald-300"
                         : t === "travel"
                         ? "bg-blue-900/40 border-blue-700/50 text-blue-300"
-                        : "bg-green-900/40 border-green-700/50 text-green-300"
+                        : "bg-zinc-800/50 border-zinc-600/50 text-zinc-300"
                       : "bg-white/[0.03] border-white/10 text-white/40 hover:text-white/60"
                   )}
                 >
@@ -1363,7 +1437,7 @@ function ShowCard({
         show.type === "travel"
           ? "bg-blue-950/20 border-blue-900/30"
           : show.type === "day_off"
-          ? "bg-green-950/20 border-green-900/30"
+          ? "bg-zinc-950/25 border-zinc-800/35"
           : "bg-white/[0.03] border-white/8"
       )}>
         {/* Card header - always visible */}
@@ -1373,24 +1447,30 @@ function ShowCard({
             show.type === "travel"
               ? "bg-blue-900/30 border-blue-700/30"
               : show.type === "day_off"
-              ? "bg-green-900/30 border-green-700/30"
-              : "bg-white/5 border-white/8"
+              ? "bg-zinc-800/40 border-zinc-700/35"
+              : "bg-emerald-950/35 border-emerald-800/35"
           )}>
             {show.type === "travel" ? (
               <Truck size={14} className="text-blue-400/70" />
             ) : show.type === "day_off" ? (
-              <Coffee size={14} className="text-green-400/70" />
+              <Coffee size={14} className="text-zinc-400/80" />
             ) : (
-              <span className="text-xs font-bold text-white/50">{dayNumber}</span>
+              <span className="text-xs font-bold text-emerald-400/90">{dayNumber}</span>
             )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              {show.type === "travel" ? (
+              {show.type === "show" ? (
+                <Badge className="border border-emerald-500/35 bg-emerald-600/20 text-emerald-200 hover:bg-emerald-600/25">
+                  Show
+                </Badge>
+              ) : show.type === "travel" ? (
                 <span className="text-xs font-semibold text-blue-400/80 uppercase tracking-wide">Travel Day</span>
-              ) : show.type === "day_off" ? (
-                <span className="text-xs font-semibold text-green-400/80 uppercase tracking-wide">Day Off</span>
-              ) : null}
+              ) : (
+                <Badge variant="outline" className="border-zinc-600/50 bg-zinc-800/40 text-zinc-300">
+                  Day off
+                </Badge>
+              )}
               <span className="text-sm font-medium text-white/90">{formatShowDate(show.date)}</span>
               {show.type === "travel" && (show.fromLocation || show.toLocation) ? (
                 <span className="text-xs text-white/50">
@@ -1941,48 +2021,182 @@ function TravelConnector({ currentShow, nextShow }: TravelConnectorProps) {
 }
 
 function ShowsTab({ tour }: { tour: TourDetail }) {
-  const [addOpen, setAddOpen] = useState(false);
-  const sortedShows = [...tour.shows].sort((a, b) => a.date.localeCompare(b.date));
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addDialogPreset, setAddDialogPreset] = useState<{
+    defaultDate?: string;
+    defaultType?: "show" | "travel" | "day_off";
+  }>({});
+
+  const sortedShows = useMemo(() => {
+    return [...tour.shows].sort((a, b) => {
+      const ak = a.date.slice(0, 10);
+      const bk = b.date.slice(0, 10);
+      const d = ak.localeCompare(bk);
+      if (d !== 0) return d;
+      return a.order - b.order;
+    });
+  }, [tour.shows]);
+
+  const flatIndexByShowId = useMemo(() => {
+    const m = new Map<string, number>();
+    sortedShows.forEach((s, i) => m.set(s.id, i));
+    return m;
+  }, [sortedShows]);
+
+  const dayGroups = useMemo(() => {
+    const map = new Map<string, TourShow[]>();
+    for (const s of sortedShows) {
+      const k = s.date.slice(0, 10);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(s);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [sortedShows]);
+
+  const uniqueDayCount = dayGroups.length;
+
+  const copyPreviousDay = useMutation({
+    mutationFn: async () => {
+      if (dayGroups.length === 0) return;
+      const [lastDayKey, lastShows] = dayGroups[dayGroups.length - 1]!;
+      const nextKey = format(addDays(parseISO(`${lastDayKey}T12:00:00`), 1), "yyyy-MM-dd");
+      for (const s of lastShows) {
+        await api.post(`/api/tours/${tour.id}/shows`, tourShowToCreateBody(s, nextKey));
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+      toast({ title: "Copied day", description: "Schedule blocks were added for the next calendar day." });
+    },
+    onError: () => {
+      toast({ title: "Could not copy day", variant: "destructive" });
+    },
+  });
+
+  function openAddTourDay() {
+    setAddDialogPreset({});
+    setAddDialogOpen(true);
+  }
+
+  function openAddShowForDay(dateKey: string) {
+    setAddDialogPreset({ defaultDate: dateKey, defaultType: "show" });
+    setAddDialogOpen(true);
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-xs text-white/40">
-          {sortedShows.length} {sortedShows.length === 1 ? "show" : "shows"}
+          {uniqueDayCount} tour {uniqueDayCount === 1 ? "day" : "days"} · {sortedShows.length}{" "}
+          {sortedShows.length === 1 ? "entry" : "entries"}
         </span>
-        <Button
-          size="sm"
-          onClick={() => setAddOpen(true)}
-          className="bg-white/5 hover:bg-white/10 text-white border border-white/10 gap-2 h-8"
-        >
-          <Plus size={13} /> Add Day
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            onClick={openAddTourDay}
+            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 gap-2 h-8"
+          >
+            <Plus size={13} /> Add Tour Day
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={sortedShows.length === 0 || copyPreviousDay.isPending}
+            onClick={() => copyPreviousDay.mutate()}
+            className="border-white/10 text-white/80 bg-transparent gap-2 h-8"
+          >
+            {copyPreviousDay.isPending ? <Loader2 size={13} className="animate-spin" /> : null}
+            Copy previous +1 day
+          </Button>
+        </div>
       </div>
 
       {sortedShows.length === 0 ? (
         <div className="py-12 text-center">
           <CalendarDays size={24} className="text-white/15 mx-auto mb-3" />
-          <p className="text-white/30 text-sm">No shows added yet.</p>
+          <p className="text-white/30 text-sm">No tour days yet.</p>
           <Button
             size="sm"
-            onClick={() => setAddOpen(true)}
+            onClick={openAddTourDay}
             variant="outline"
             className="mt-3 border-white/10 text-white/50 hover:text-white bg-transparent gap-2"
           >
-            <Plus size={12} /> Add First Day
+            <Plus size={12} /> Add first Tour Day
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
-          {sortedShows.map((show, i) => {
-            const nextShow = sortedShows[i + 1];
-            const isDifferentDate = nextShow && show.date.slice(0, 10) !== nextShow.date.slice(0, 10);
+        <div className="space-y-6">
+          {dayGroups.map(([dayKey, dayShows], groupIdx) => {
+            const showTypeCount = dayShows.filter((s) => s.type === "show").length;
+            const travelCount = dayShows.filter((s) => s.type === "travel").length;
+            const dayOffCount = dayShows.filter((s) => s.type === "day_off").length;
+            const dayNum = groupIdx + 1;
+
             return (
-              <div key={show.id}>
-                <ShowCard show={show} dayNumber={i + 1} tourId={tour.id} tour={tour} />
-                {isDifferentDate ? (
-                  <TravelConnector currentShow={show} nextShow={nextShow} />
-                ) : null}
+              <div key={dayKey} className="space-y-2">
+                <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-white/45">
+                      Day {dayNum}
+                    </span>
+                    <span className="text-sm font-medium text-white/90">
+                      {format(parseISO(`${dayKey}T12:00:00`), "EEEE d MMM yyyy")}
+                    </span>
+                    {showTypeCount > 0 ? (
+                      <Badge className="border border-emerald-500/35 bg-emerald-600/20 text-emerald-200 hover:bg-emerald-600/25">
+                        {showTypeCount} show{showTypeCount === 1 ? "" : "s"}
+                      </Badge>
+                    ) : null}
+                    {travelCount > 0 ? (
+                      <Badge
+                        variant="outline"
+                        className="border-blue-500/40 bg-blue-950/30 text-blue-200"
+                      >
+                        Travel
+                      </Badge>
+                    ) : null}
+                    {dayOffCount > 0 ? (
+                      <Badge variant="outline" className="border-zinc-600/50 bg-zinc-900/40 text-zinc-300">
+                        Day off
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 border-emerald-500/35 bg-emerald-950/20 text-emerald-200 hover:bg-emerald-950/35 hover:text-emerald-100"
+                    onClick={() => openAddShowForDay(dayKey)}
+                  >
+                    <Plus size={13} className="mr-1" /> Add show
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  {dayShows.map((show, idxInDay) => {
+                    const flatIdx = flatIndexByShowId.get(show.id) ?? -1;
+                    const nextFlat =
+                      flatIdx >= 0 && flatIdx < sortedShows.length - 1
+                        ? sortedShows[flatIdx + 1]
+                        : undefined;
+                    const isLastOnDay = idxInDay === dayShows.length - 1;
+                    const nextDifferentDay =
+                      isLastOnDay &&
+                      nextFlat &&
+                      nextFlat.date.slice(0, 10) !== dayKey;
+
+                    return (
+                      <div key={show.id}>
+                        <ShowCard show={show} dayNumber={dayNum} tourId={tour.id} tour={tour} />
+                        {nextDifferentDay && nextFlat ? (
+                          <TravelConnector currentShow={show} nextShow={nextFlat} />
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
@@ -1991,8 +2205,13 @@ function ShowsTab({ tour }: { tour: TourDetail }) {
 
       <ShowFormDialog
         tourId={tour.id}
-        open={addOpen}
-        onOpenChange={setAddOpen}
+        open={addDialogOpen}
+        onOpenChange={(open) => {
+          setAddDialogOpen(open);
+          if (!open) setAddDialogPreset({});
+        }}
+        defaultDate={addDialogPreset.defaultDate}
+        defaultType={addDialogPreset.defaultType}
       />
     </div>
   );
