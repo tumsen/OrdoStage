@@ -1027,6 +1027,82 @@ export const PatchTimeEntrySchema = z.object({
   tagIds: z.array(z.string()).optional(),
 });
 
+export const TimeTravelClaimSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  personId: z.string(),
+  createdByUserId: z.string().nullable(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+  destination: z.string(),
+  purpose: z.string(),
+  country: z.string(),
+  allowanceType: z.enum(["standard", "tour_driver_denmark", "tour_driver_abroad"]),
+  rateYear: z.number().int(),
+  foodRateCents: z.number().int(),
+  lodgingRateCents: z.number().int(),
+  breakfastProvided: z.boolean(),
+  lunchProvided: z.boolean(),
+  dinnerProvided: z.boolean(),
+  lodgingAllowance: z.boolean(),
+  lodgingCovered: z.boolean(),
+  foodCoveredByReceipts: z.boolean(),
+  eventId: z.string().nullable(),
+  eventShowJobId: z.string().nullable(),
+  timeProjectId: z.string().nullable(),
+  notes: z.string().nullable(),
+  foodAmountCents: z.number().int(),
+  lodgingAmountCents: z.number().int(),
+  totalAmountCents: z.number().int(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const CreateTimeTravelClaimSchema = z.object({
+  startsAt: z.string().min(1),
+  endsAt: z.string().min(1),
+  destination: z.string().min(1),
+  purpose: z.string().min(1),
+  country: z.string().min(1).default("DK"),
+  allowanceType: z.enum(["standard", "tour_driver_denmark", "tour_driver_abroad"]).default("standard"),
+  rateYear: z.number().int().optional(),
+  breakfastProvided: z.boolean().optional(),
+  lunchProvided: z.boolean().optional(),
+  dinnerProvided: z.boolean().optional(),
+  lodgingAllowance: z.boolean().optional(),
+  lodgingCovered: z.boolean().optional(),
+  foodCoveredByReceipts: z.boolean().optional(),
+  eventId: z.string().nullable().optional(),
+  eventShowJobId: z.string().nullable().optional(),
+  timeProjectId: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export const PatchTimeTravelClaimSchema = CreateTimeTravelClaimSchema.partial();
+
+export const TimesheetApprovalSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  personId: z.string(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  status: z.enum(["approved", "reopened"]),
+  approvedAt: z.string().nullable(),
+  approvedByUserId: z.string().nullable(),
+  reopenedAt: z.string().nullable(),
+  reopenedByUserId: z.string().nullable(),
+  note: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const ApproveTimesheetSchema = z.object({
+  personId: z.string().optional(),
+  periodStart: z.string().min(1),
+  periodEnd: z.string().min(1),
+  note: z.string().nullable().optional(),
+});
+
 export const SetPersonContractSchema = z.object({
   weeklyContractHours: z.number().min(0).max(168).nullable().optional(),
   vacationDaysPerYear: z.number().min(0).max(365).nullable().optional(),
@@ -1106,6 +1182,8 @@ export type TimeTag = z.infer<typeof TimeTagSchema>;
 export type TimeProject = z.infer<typeof TimeProjectSchema>;
 export type TimeEntry = z.infer<typeof TimeEntrySchema>;
 export type TimeTrackingJob = z.infer<typeof TimeTrackingJobSchema>;
+export type TimeTravelClaim = z.infer<typeof TimeTravelClaimSchema>;
+export type TimesheetApproval = z.infer<typeof TimesheetApprovalSchema>;
 
 // Tour type exports
 export type TourShow = z.infer<typeof TourShowSchema>;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  addDays,
   addMonths,
   addWeeks,
   eachDayOfInterval,
@@ -45,10 +46,11 @@ import { cn } from "@/lib/utils";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
+import { TravelClaimsPanel } from "@/components/time/TravelClaimsPanel";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { CalendarGrid } from "@/components/schedule/CalendarGrid";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
-import type { TimeEntry, TimeProject, TimeTag, TimeTrackingJob } from "@/contracts/backendTypes";
+import type { TimeEntry, TimeProject, TimeTag, TimeTrackingJob, TimesheetApproval } from "@/contracts/backendTypes";
 import type { Language, TimeFormat } from "@/lib/preferences";
 import {
   MINUTES_PER_DAY,
@@ -157,6 +159,7 @@ export default function TimeTracking() {
   const canManageTimeCatalog = canAction("time.manage_catalog");
 
   const [mode, setMode] = useState<"week" | "month">("week");
+  const [section, setSection] = useState<"time" | "travel">("time");
   const [anchor, setAnchor] = useState(() => new Date());
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [upcomingCollapsed, setUpcomingCollapsed] = useState(true);
@@ -179,6 +182,12 @@ export default function TimeTracking() {
 
   const rangeFrom = format(mode === "week" ? weekStart : startOfMonth(anchor), "yyyy-MM-dd");
   const rangeTo = format(mode === "week" ? weekEnd : endOfMonth(anchor), "yyyy-MM-dd");
+  const approvalPeriodStart = useMemo(() => {
+    const d = new Date(weekStart);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [weekStart]);
+  const approvalPeriodEnd = useMemo(() => addDays(approvalPeriodStart, 7), [approvalPeriodStart]);
 
   const { data: peopleForFilter } = useQuery({
     queryKey: ["time-people"],
@@ -223,6 +232,13 @@ export default function TimeTracking() {
     enabled: canUsePage && Boolean(mePerson?.id),
   });
 
+  const { data: approvals } = useQuery({
+    queryKey: ["time-approvals", rangeFrom, rangeTo, readAll, selectedPersonId],
+    queryFn: () =>
+      api.get<TimesheetApproval[]>(`/api/time/approvals?from=${rangeFrom}&to=${rangeTo}${personQs}`),
+    enabled: canUsePage && Boolean(mePerson?.id),
+  });
+
   const { data: tags } = useQuery({
     queryKey: ["time-tags"],
     queryFn: () => api.get<TimeTag[]>("/api/time/tags"),
@@ -237,6 +253,19 @@ export default function TimeTracking() {
 
   const tagById = useMemo(() => new Map((tags ?? []).map((x) => [x.id, x])), [tags]);
   const projectById = useMemo(() => new Map((projects ?? []).map((x) => [x.id, x])), [projects]);
+
+  const approvedTimesheet = useMemo(
+    () =>
+      (approvals ?? []).find(
+        (a) =>
+          a.status === "approved" &&
+          new Date(a.periodStart).getTime() < approvalPeriodEnd.getTime() &&
+          new Date(a.periodEnd).getTime() > approvalPeriodStart.getTime()
+      ) ?? null,
+    [approvals, approvalPeriodStart, approvalPeriodEnd]
+  );
+  const isApprovedWeek = mode === "week" && Boolean(approvedTimesheet);
+  const canEditVisiblePeriod = canEdit && !isApprovedWeek;
 
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
@@ -350,6 +379,29 @@ export default function TimeTracking() {
       setEditingEntryId(null);
     },
     onError: () => toast({ title: t("time.deleteError"), variant: "destructive" }),
+  });
+
+  const approveTimesheet = useMutation({
+    mutationFn: () =>
+      api.post<TimesheetApproval>("/api/time/approvals", {
+        personId: readAll && selectedPersonId ? selectedPersonId : undefined,
+        periodStart: approvalPeriodStart.toISOString(),
+        periodEnd: approvalPeriodEnd.toISOString(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["time-approvals"] });
+      toast({ title: "Timesheet approved" });
+    },
+    onError: () => toast({ title: "Could not approve timesheet", variant: "destructive" }),
+  });
+
+  const reopenTimesheet = useMutation({
+    mutationFn: (id: string) => api.post<TimesheetApproval>(`/api/time/approvals/${id}/reopen`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["time-approvals"] });
+      toast({ title: "Timesheet reopened" });
+    },
+    onError: () => toast({ title: "Could not reopen timesheet", variant: "destructive" }),
   });
 
   /** Live position + window minutes while dragging (labels follow pointer; snap on release). */
@@ -815,7 +867,35 @@ export default function TimeTracking() {
           <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
             <button
               type="button"
-              onClick={() => setMode("week")}
+              onClick={() => setSection("time")}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                section === "time" ? "bg-white/10 text-white" : "text-white/55"
+              )}
+            >
+              Time
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSection("travel");
+                setMode("week");
+              }}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                section === "travel" ? "bg-white/10 text-white" : "text-white/55"
+              )}
+            >
+              Travel
+            </button>
+          </div>
+          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("week");
+                setSection("time");
+              }}
               className={cn(
                 "px-3 py-1.5 rounded-md text-sm",
                 mode === "week" ? "bg-white/10 text-white" : "text-white/55"
@@ -825,7 +905,10 @@ export default function TimeTracking() {
             </button>
             <button
               type="button"
-              onClick={() => setMode("month")}
+              onClick={() => {
+                setMode("month");
+                setSection("time");
+              }}
               className={cn(
                 "px-3 py-1.5 rounded-md text-sm",
                 mode === "month" ? "bg-white/10 text-white" : "text-white/55"
@@ -907,6 +990,41 @@ export default function TimeTracking() {
               Week total {Math.round((weekTotalMinutes / 60) * 10) / 10}h
             </span>
           ) : null}
+          {mode === "week" ? (
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">
+              {approvedTimesheet ? (
+                <>
+                  <span className="inline-flex items-center gap-1 text-xs text-emerald-300">
+                    <Lock className="h-3 w-3" />
+                    Approved
+                  </span>
+                  {readAll ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-white/55 hover:text-white"
+                      onClick={() => reopenTimesheet.mutate(approvedTimesheet.id)}
+                      disabled={reopenTimesheet.isPending}
+                    >
+                      Reopen
+                    </Button>
+                  ) : null}
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-white/65 hover:text-white"
+                  onClick={() => approveTimesheet.mutate()}
+                  disabled={!canEdit || approveTimesheet.isPending}
+                >
+                  Approve week
+                </Button>
+              )}
+            </div>
+          ) : null}
           {readAll && peopleForFilter && peopleForFilter.length > 0 ? (
             <Select
               value={selectedPersonId ?? mePerson.id}
@@ -943,7 +1061,7 @@ export default function TimeTracking() {
         </div>
       </div>
 
-      {hasUpcomingUnlogged ? (
+      {section === "time" && hasUpcomingUnlogged ? (
         <div className="shrink-0 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -995,7 +1113,7 @@ export default function TimeTracking() {
                       >
                         {t("time.showWeek")}
                       </Button>
-                      {canEdit ? (
+                      {canEditVisiblePeriod ? (
                         <Button
                           type="button"
                           size="sm"
@@ -1015,7 +1133,15 @@ export default function TimeTracking() {
       ) : null}
 
       <div className="min-h-0 flex-1 space-y-6 overflow-auto pr-1">
-      {mode === "month" ? (
+      {section === "travel" ? (
+        <TravelClaimsPanel
+          rangeFrom={rangeFrom}
+          rangeTo={rangeTo}
+          personQuery={personQs}
+          canEdit={canEditVisiblePeriod}
+          projects={projects ?? []}
+        />
+      ) : mode === "month" ? (
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
           <CalendarGrid
             year={anchor.getFullYear()}
@@ -1073,7 +1199,7 @@ export default function TimeTracking() {
               const col = dayOffCategory ? dayOffColors[dayOffCategory] : null;
 
               const addDayOff = (category: "vacation" | "sick") => {
-                if (!canEdit) return;
+                if (!canEditVisiblePeriod) return;
                 // Start at 09:00 UTC for the day, span hoursPerWorkDay
                 const [y, m, d] = dayYmd.split("-").map(Number);
                 const startsAt = new Date(Date.UTC(y!, m! - 1, d!, 8, 0, 0));
@@ -1109,7 +1235,7 @@ export default function TimeTracking() {
                           {Math.round((dayTotalMinutes / 60) * 10) / 10}h
                         </div>
                       </div>
-                      {canEdit && !dayOffEntry ? (
+                      {canEditVisiblePeriod && !dayOffEntry ? (
                         <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             type="button"
@@ -1150,7 +1276,7 @@ export default function TimeTracking() {
                       ))}
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1] pointer-events-none" />
-                    {canEdit ? (
+                    {canEditVisiblePeriod ? (
                       <>
                         <div
                           className="absolute inset-0 z-[1] cursor-crosshair touch-none"
@@ -1205,7 +1331,7 @@ export default function TimeTracking() {
                                 <span className="block text-[9px] text-white/35">{t("time.planned")}</span>
                               )}
                             </div>
-                            {canEdit && !logged ? (
+                            {canEditVisiblePeriod && !logged ? (
                               <button
                                 type="button"
                                 className="mt-0.5 w-full shrink-0 rounded border border-emerald-400/40 bg-emerald-500/20 px-0.5 py-0.5 text-[9px] font-semibold leading-tight text-emerald-100 hover:bg-emerald-500/35"
@@ -1319,7 +1445,7 @@ export default function TimeTracking() {
                                 : {}),
                             }}
                             onPointerDown={(ev) => {
-                              if (!canEdit) return;
+                              if (!canEditVisiblePeriod) return;
                               if (isLocked) return;
                               if ((ev.target as HTMLElement).closest("[data-handle]")) return;
                               const col = (ev.currentTarget as HTMLElement).closest("[data-day-col]");
@@ -1339,7 +1465,7 @@ export default function TimeTracking() {
                               attachEntryDragListeners();
                             }}
                           >
-                            {canEdit ? (
+                            {canEditVisiblePeriod ? (
                               <>
                                 <button
                                   type="button"
@@ -1448,7 +1574,7 @@ export default function TimeTracking() {
                                 {e.note}
                               </div>
                             ) : null}
-                            {canEdit ? (
+                            {canEditVisiblePeriod ? (
                               <>
                                 <button
                                   type="button"
@@ -1512,13 +1638,13 @@ export default function TimeTracking() {
         </div>
       )}
 
-      {canManageTimeCatalog && mode === "week" ? (
+      {canManageTimeCatalog && mode === "week" && section === "time" ? (
         <div className="mt-8 space-y-3">
           <TimeCatalogSettings />
         </div>
       ) : null}
 
-      {canEdit && mode === "week" ? (
+      {canEditVisiblePeriod && mode === "week" && section === "time" ? (
         <p className="text-xs text-white/40">{t("time.dragHint")}</p>
       ) : null}
       </div>

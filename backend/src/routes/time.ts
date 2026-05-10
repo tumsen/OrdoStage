@@ -13,6 +13,9 @@ import {
   PatchTimeProjectSchema,
   CreateTimeEntrySchema,
   PatchTimeEntrySchema,
+  CreateTimeTravelClaimSchema,
+  PatchTimeTravelClaimSchema,
+  ApproveTimesheetSchema,
   SetPersonContractSchema,
   TIME_CATEGORIES,
 } from "../types";
@@ -376,6 +379,181 @@ function serializeEntry(row: {
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
   };
+}
+
+type TravelAllowanceType = "standard" | "tour_driver_denmark" | "tour_driver_abroad";
+
+function ratesForTravelClaim(rateYear: number, allowanceType: TravelAllowanceType) {
+  const year = rateYear === 2025 ? 2025 : 2026;
+  const lodgingRateCents = year === 2025 ? 25_600 : 26_800;
+  if (allowanceType === "tour_driver_denmark") {
+    return { rateYear: year, foodRateCents: 7_500, lodgingRateCents };
+  }
+  if (allowanceType === "tour_driver_abroad") {
+    return { rateYear: year, foodRateCents: 15_000, lodgingRateCents };
+  }
+  return {
+    rateYear: year,
+    foodRateCents: year === 2025 ? 59_700 : 62_500,
+    lodgingRateCents,
+  };
+}
+
+function calculateTravelAllowance(args: {
+  startsAt: Date;
+  endsAt: Date;
+  allowanceType: TravelAllowanceType;
+  rateYear?: number;
+  breakfastProvided?: boolean;
+  lunchProvided?: boolean;
+  dinnerProvided?: boolean;
+  lodgingAllowance?: boolean;
+  lodgingCovered?: boolean;
+  foodCoveredByReceipts?: boolean;
+}) {
+  const rates = ratesForTravelClaim(args.rateYear ?? 2026, args.allowanceType);
+  const durationMs = args.endsAt.getTime() - args.startsAt.getTime();
+  const startedHours = Math.ceil(durationMs / 3_600_000);
+  const fullDays = Math.floor(durationMs / 86_400_000);
+  const eligibleFoodHours = startedHours >= 24 ? startedHours : 0;
+
+  let foodAmountCents = eligibleFoodHours > 0
+    ? Math.round((rates.foodRateCents * eligibleFoodHours) / 24)
+    : 0;
+
+  if (args.foodCoveredByReceipts) {
+    foodAmountCents = Math.round(foodAmountCents * 0.25);
+  } else if (args.allowanceType === "standard") {
+    const reductionPct =
+      (args.breakfastProvided ? 0.15 : 0) +
+      (args.lunchProvided ? 0.30 : 0) +
+      (args.dinnerProvided ? 0.30 : 0);
+    foodAmountCents = Math.round(foodAmountCents * Math.max(0, 1 - Math.min(0.75, reductionPct)));
+  }
+
+  const lodgingAmountCents =
+    args.lodgingAllowance && !args.lodgingCovered && fullDays > 0
+      ? fullDays * rates.lodgingRateCents
+      : 0;
+
+  return {
+    ...rates,
+    foodAmountCents,
+    lodgingAmountCents,
+    totalAmountCents: foodAmountCents + lodgingAmountCents,
+  };
+}
+
+function serializeTravelClaim(row: {
+  id: string;
+  organizationId: string;
+  personId: string;
+  createdByUserId: string | null;
+  startsAt: Date;
+  endsAt: Date;
+  destination: string;
+  purpose: string;
+  country: string;
+  allowanceType: string;
+  rateYear: number;
+  foodRateCents: number;
+  lodgingRateCents: number;
+  breakfastProvided: boolean;
+  lunchProvided: boolean;
+  dinnerProvided: boolean;
+  lodgingAllowance: boolean;
+  lodgingCovered: boolean;
+  foodCoveredByReceipts: boolean;
+  eventId: string | null;
+  eventShowJobId: string | null;
+  timeProjectId: string | null;
+  notes: string | null;
+  foodAmountCents: number;
+  lodgingAmountCents: number;
+  totalAmountCents: number;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    personId: row.personId,
+    createdByUserId: row.createdByUserId,
+    startsAt: iso(row.startsAt),
+    endsAt: iso(row.endsAt),
+    destination: row.destination,
+    purpose: row.purpose,
+    country: row.country,
+    allowanceType: row.allowanceType as TravelAllowanceType,
+    rateYear: row.rateYear,
+    foodRateCents: row.foodRateCents,
+    lodgingRateCents: row.lodgingRateCents,
+    breakfastProvided: row.breakfastProvided,
+    lunchProvided: row.lunchProvided,
+    dinnerProvided: row.dinnerProvided,
+    lodgingAllowance: row.lodgingAllowance,
+    lodgingCovered: row.lodgingCovered,
+    foodCoveredByReceipts: row.foodCoveredByReceipts,
+    eventId: row.eventId,
+    eventShowJobId: row.eventShowJobId,
+    timeProjectId: row.timeProjectId,
+    notes: row.notes,
+    foodAmountCents: row.foodAmountCents,
+    lodgingAmountCents: row.lodgingAmountCents,
+    totalAmountCents: row.totalAmountCents,
+    createdAt: iso(row.createdAt),
+    updatedAt: iso(row.updatedAt),
+  };
+}
+
+function serializeTimesheetApproval(row: {
+  id: string;
+  organizationId: string;
+  personId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  status: string;
+  approvedAt: Date | null;
+  approvedByUserId: string | null;
+  reopenedAt: Date | null;
+  reopenedByUserId: string | null;
+  note: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    personId: row.personId,
+    periodStart: iso(row.periodStart),
+    periodEnd: iso(row.periodEnd),
+    status: row.status as "approved" | "reopened",
+    approvedAt: row.approvedAt ? iso(row.approvedAt) : null,
+    approvedByUserId: row.approvedByUserId,
+    reopenedAt: row.reopenedAt ? iso(row.reopenedAt) : null,
+    reopenedByUserId: row.reopenedByUserId,
+    note: row.note,
+    createdAt: iso(row.createdAt),
+    updatedAt: iso(row.updatedAt),
+  };
+}
+
+async function findApprovedTimesheet(args: {
+  organizationId: string;
+  personId: string;
+  startsAt: Date;
+  endsAt: Date;
+}) {
+  return prisma.timesheetApproval.findFirst({
+    where: {
+      organizationId: args.organizationId,
+      personId: args.personId,
+      status: "approved",
+      periodStart: { lt: args.endsAt },
+      periodEnd: { gt: args.startsAt },
+    },
+    orderBy: { periodStart: "desc" },
+  });
 }
 
 // GET /api/time/people — directory for admin filter / reports
@@ -1092,6 +1270,17 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
   if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt) {
     return c.json({ error: { message: "Invalid time range", code: "BAD_REQUEST" } }, 400);
   }
+  if (await findApprovedTimesheet({
+    organizationId: user.organizationId,
+    personId: myPersonId,
+    startsAt,
+    endsAt,
+  })) {
+    return c.json(
+      { error: { message: "Timesheet is approved. Ask an admin to reopen it before editing.", code: "TIMESHEET_APPROVED" } },
+      423
+    );
+  }
 
   let eventShowJobId: string | null = body.eventShowJobId ?? null;
   let eventId: string | null = body.eventId ?? null;
@@ -1386,6 +1575,17 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
   if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt) {
     return c.json({ error: { message: "Invalid time range", code: "BAD_REQUEST" } }, 400);
   }
+  if (await findApprovedTimesheet({
+    organizationId: user.organizationId,
+    personId: existing.personId,
+    startsAt: existing.startsAt < startsAt ? existing.startsAt : startsAt,
+    endsAt: existing.endsAt > endsAt ? existing.endsAt : endsAt,
+  })) {
+    return c.json(
+      { error: { message: "Timesheet is approved. Ask an admin to reopen it before editing.", code: "TIMESHEET_APPROVED" } },
+      423
+    );
+  }
 
   if (body.timeProjectId !== undefined && body.timeProjectId !== null) {
     const p = await prisma.timeProject.findFirst({
@@ -1505,6 +1705,17 @@ timeRouter.delete("/time/entries/:id", async (c) => {
   if (!canDelOwn && !canDelAny) {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
+  if (await findApprovedTimesheet({
+    organizationId: user.organizationId,
+    personId: existing.personId,
+    startsAt: existing.startsAt,
+    endsAt: existing.endsAt,
+  })) {
+    return c.json(
+      { error: { message: "Timesheet is approved. Ask an admin to reopen it before deleting.", code: "TIMESHEET_APPROVED" } },
+      423
+    );
+  }
   if (existing.isLocked) {
     return c.json(
       {
@@ -1518,6 +1729,303 @@ timeRouter.delete("/time/entries/:id", async (c) => {
   }
   await prisma.timeEntry.delete({ where: { id } });
   return c.json({ ok: true });
+});
+
+timeRouter.get("/time/travel-claims", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const r = parseRange(c);
+  if ("error" in r) return c.json({ error: { message: r.error, code: "BAD_REQUEST" } }, 400);
+  const qPerson = c.req.query("personId");
+  const target = await resolveTargetPersonId(c, user.organizationId, qPerson);
+  if ("error" in target) {
+    return c.json({ error: { message: target.error, code: "BAD_REQUEST" } }, target.status);
+  }
+  const rows = await prisma.timeTravelClaim.findMany({
+    where: {
+      organizationId: user.organizationId,
+      personId: target.personId,
+      startsAt: { lt: r.rangeEndExclusive },
+      endsAt: { gt: r.rangeStart },
+    },
+    orderBy: { startsAt: "asc" },
+  });
+  return c.json({ data: rows.map(serializeTravelClaim) });
+});
+
+timeRouter.post("/time/travel-claims", zValidator("json", CreateTimeTravelClaimSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId || !user.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time") || !canAction(c, "time.write")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const personId = await resolvePersonIdForUser(user.organizationId, user.email);
+  if (!personId) {
+    return c.json({ error: { message: "No linked person profile.", code: "BAD_REQUEST" } }, 400);
+  }
+  const body = c.req.valid("json");
+  const startsAt = new Date(body.startsAt);
+  const endsAt = new Date(body.endsAt);
+  if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt) {
+    return c.json({ error: { message: "Invalid travel range", code: "BAD_REQUEST" } }, 400);
+  }
+  if (await findApprovedTimesheet({ organizationId: user.organizationId, personId, startsAt, endsAt })) {
+    return c.json(
+      { error: { message: "Timesheet is approved. Ask an admin to reopen it before editing travel.", code: "TIMESHEET_APPROVED" } },
+      423
+    );
+  }
+  const calc = calculateTravelAllowance({
+    startsAt,
+    endsAt,
+    allowanceType: body.allowanceType,
+    rateYear: body.rateYear,
+    breakfastProvided: body.breakfastProvided,
+    lunchProvided: body.lunchProvided,
+    dinnerProvided: body.dinnerProvided,
+    lodgingAllowance: body.lodgingAllowance,
+    lodgingCovered: body.lodgingCovered,
+    foodCoveredByReceipts: body.foodCoveredByReceipts,
+  });
+  const row = await prisma.timeTravelClaim.create({
+    data: {
+      organizationId: user.organizationId,
+      personId,
+      createdByUserId: user.id,
+      startsAt,
+      endsAt,
+      destination: body.destination.trim(),
+      purpose: body.purpose.trim(),
+      country: body.country.trim().toUpperCase(),
+      allowanceType: body.allowanceType,
+      ...calc,
+      breakfastProvided: body.breakfastProvided ?? false,
+      lunchProvided: body.lunchProvided ?? false,
+      dinnerProvided: body.dinnerProvided ?? false,
+      lodgingAllowance: body.lodgingAllowance ?? false,
+      lodgingCovered: body.lodgingCovered ?? false,
+      foodCoveredByReceipts: body.foodCoveredByReceipts ?? false,
+      eventId: body.eventId ?? null,
+      eventShowJobId: body.eventShowJobId ?? null,
+      timeProjectId: body.timeProjectId ?? null,
+      notes: body.notes ?? null,
+    },
+  });
+  return c.json({ data: serializeTravelClaim(row) }, 201);
+});
+
+timeRouter.patch("/time/travel-claims/:id", zValidator("json", PatchTimeTravelClaimSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId || !user.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const existing = await prisma.timeTravelClaim.findFirst({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  const myPersonId = await resolvePersonIdForUser(user.organizationId, user.email);
+  const canEditOwn = Boolean(myPersonId && existing.personId === myPersonId && canAction(c, "time.write"));
+  const canEditAny = canAction(c, "time.read_all");
+  if (!canEditOwn && !canEditAny) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const body = c.req.valid("json");
+  const startsAt = body.startsAt !== undefined ? new Date(body.startsAt) : existing.startsAt;
+  const endsAt = body.endsAt !== undefined ? new Date(body.endsAt) : existing.endsAt;
+  if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt) {
+    return c.json({ error: { message: "Invalid travel range", code: "BAD_REQUEST" } }, 400);
+  }
+  if (await findApprovedTimesheet({
+    organizationId: user.organizationId,
+    personId: existing.personId,
+    startsAt: existing.startsAt < startsAt ? existing.startsAt : startsAt,
+    endsAt: existing.endsAt > endsAt ? existing.endsAt : endsAt,
+  })) {
+    return c.json(
+      { error: { message: "Timesheet is approved. Ask an admin to reopen it before editing travel.", code: "TIMESHEET_APPROVED" } },
+      423
+    );
+  }
+  const allowanceType = body.allowanceType ?? (existing.allowanceType as TravelAllowanceType);
+  const calc = calculateTravelAllowance({
+    startsAt,
+    endsAt,
+    allowanceType,
+    rateYear: body.rateYear ?? existing.rateYear,
+    breakfastProvided: body.breakfastProvided ?? existing.breakfastProvided,
+    lunchProvided: body.lunchProvided ?? existing.lunchProvided,
+    dinnerProvided: body.dinnerProvided ?? existing.dinnerProvided,
+    lodgingAllowance: body.lodgingAllowance ?? existing.lodgingAllowance,
+    lodgingCovered: body.lodgingCovered ?? existing.lodgingCovered,
+    foodCoveredByReceipts: body.foodCoveredByReceipts ?? existing.foodCoveredByReceipts,
+  });
+  const updated = await prisma.timeTravelClaim.update({
+    where: { id },
+    data: {
+      startsAt,
+      endsAt,
+      ...(body.destination !== undefined ? { destination: body.destination.trim() } : {}),
+      ...(body.purpose !== undefined ? { purpose: body.purpose.trim() } : {}),
+      ...(body.country !== undefined ? { country: body.country.trim().toUpperCase() } : {}),
+      allowanceType,
+      ...calc,
+      ...(body.breakfastProvided !== undefined ? { breakfastProvided: body.breakfastProvided } : {}),
+      ...(body.lunchProvided !== undefined ? { lunchProvided: body.lunchProvided } : {}),
+      ...(body.dinnerProvided !== undefined ? { dinnerProvided: body.dinnerProvided } : {}),
+      ...(body.lodgingAllowance !== undefined ? { lodgingAllowance: body.lodgingAllowance } : {}),
+      ...(body.lodgingCovered !== undefined ? { lodgingCovered: body.lodgingCovered } : {}),
+      ...(body.foodCoveredByReceipts !== undefined ? { foodCoveredByReceipts: body.foodCoveredByReceipts } : {}),
+      ...(body.eventId !== undefined ? { eventId: body.eventId } : {}),
+      ...(body.eventShowJobId !== undefined ? { eventShowJobId: body.eventShowJobId } : {}),
+      ...(body.timeProjectId !== undefined ? { timeProjectId: body.timeProjectId } : {}),
+      ...(body.notes !== undefined ? { notes: body.notes } : {}),
+    },
+  });
+  return c.json({ data: serializeTravelClaim(updated) });
+});
+
+timeRouter.delete("/time/travel-claims/:id", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const existing = await prisma.timeTravelClaim.findFirst({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  const myPersonId = await resolvePersonIdForUser(user.organizationId, user.email);
+  const canDelOwn = Boolean(myPersonId && existing.personId === myPersonId && canAction(c, "time.write"));
+  const canDelAny = canAction(c, "time.read_all");
+  if (!canDelOwn && !canDelAny) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  if (await findApprovedTimesheet({
+    organizationId: user.organizationId,
+    personId: existing.personId,
+    startsAt: existing.startsAt,
+    endsAt: existing.endsAt,
+  })) {
+    return c.json(
+      { error: { message: "Timesheet is approved. Ask an admin to reopen it before deleting travel.", code: "TIMESHEET_APPROVED" } },
+      423
+    );
+  }
+  await prisma.timeTravelClaim.delete({ where: { id } });
+  return c.json({ ok: true });
+});
+
+timeRouter.get("/time/approvals", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const r = parseRange(c);
+  if ("error" in r) return c.json({ error: { message: r.error, code: "BAD_REQUEST" } }, 400);
+  const target = await resolveTargetPersonId(c, user.organizationId, c.req.query("personId"));
+  if ("error" in target) {
+    return c.json({ error: { message: target.error, code: "BAD_REQUEST" } }, target.status);
+  }
+  const rows = await prisma.timesheetApproval.findMany({
+    where: {
+      organizationId: user.organizationId,
+      personId: target.personId,
+      periodStart: { lt: r.rangeEndExclusive },
+      periodEnd: { gt: r.rangeStart },
+    },
+    orderBy: { periodStart: "asc" },
+  });
+  return c.json({ data: rows.map(serializeTimesheetApproval) });
+});
+
+timeRouter.post("/time/approvals", zValidator("json", ApproveTimesheetSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId || !user.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time") || !canAction(c, "time.write")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const body = c.req.valid("json");
+  const target = await resolveTargetPersonId(c, user.organizationId, body.personId);
+  if ("error" in target) {
+    return c.json({ error: { message: target.error, code: "BAD_REQUEST" } }, target.status);
+  }
+  const periodStart = new Date(body.periodStart);
+  const periodEnd = new Date(body.periodEnd);
+  if (!Number.isFinite(periodStart.getTime()) || !Number.isFinite(periodEnd.getTime()) || periodEnd <= periodStart) {
+    return c.json({ error: { message: "Invalid approval period", code: "BAD_REQUEST" } }, 400);
+  }
+  const row = await prisma.timesheetApproval.upsert({
+    where: {
+      organizationId_personId_periodStart_periodEnd: {
+        organizationId: user.organizationId,
+        personId: target.personId,
+        periodStart,
+        periodEnd,
+      },
+    },
+    create: {
+      organizationId: user.organizationId,
+      personId: target.personId,
+      periodStart,
+      periodEnd,
+      status: "approved",
+      approvedAt: new Date(),
+      approvedByUserId: user.id,
+      note: body.note ?? null,
+    },
+    update: {
+      status: "approved",
+      approvedAt: new Date(),
+      approvedByUserId: user.id,
+      reopenedAt: null,
+      reopenedByUserId: null,
+      note: body.note ?? null,
+    },
+  });
+  return c.json({ data: serializeTimesheetApproval(row) });
+});
+
+timeRouter.post("/time/approvals/:id/reopen", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId || !user.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time") || !canAction(c, "time.read_all")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const existing = await prisma.timesheetApproval.findFirst({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  const row = await prisma.timesheetApproval.update({
+    where: { id },
+    data: {
+      status: "reopened",
+      reopenedAt: new Date(),
+      reopenedByUserId: user.id,
+    },
+  });
+  return c.json({ data: serializeTimesheetApproval(row) });
 });
 
 export default timeRouter;

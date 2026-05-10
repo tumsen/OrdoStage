@@ -119,6 +119,8 @@ model Organization {
   timeTags         TimeTag[]
   timeProjects     TimeProject[]
   timeEntries      TimeEntry[]
+  timeTravelClaims TimeTravelClaim[]
+  timesheetApprovals TimesheetApproval[]
 }
 
 model BillingConfig {
@@ -337,6 +339,8 @@ model Person {
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
   timeEntries      TimeEntry[]
+  timeTravelClaims TimeTravelClaim[]
+  timesheetApprovals TimesheetApproval[]
 }
 
 model PersonDocument {
@@ -891,4 +895,63 @@ model TimeEntryTag {
 
   @@id([timeEntryId, timeTagId])
   @@index([timeTagId])
+}
+
+model TimeTravelClaim {
+  id                    String       @id @default(cuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  personId              String
+  person                Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+  createdByUserId       String?
+  startsAt              DateTime
+  endsAt                DateTime
+  destination           String
+  purpose               String
+  country               String       @default("DK")
+  allowanceType         String       @default("standard")
+  rateYear              Int          @default(2026)
+  foodRateCents         Int          @default(62500)
+  lodgingRateCents      Int          @default(26800)
+  breakfastProvided     Boolean      @default(false)
+  lunchProvided         Boolean      @default(false)
+  dinnerProvided        Boolean      @default(false)
+  lodgingAllowance      Boolean      @default(false)
+  lodgingCovered        Boolean      @default(false)
+  foodCoveredByReceipts Boolean      @default(false)
+  eventId               String?
+  eventShowJobId        String?
+  timeProjectId         String?
+  notes                 String?
+  foodAmountCents       Int          @default(0)
+  lodgingAmountCents    Int          @default(0)
+  totalAmountCents      Int          @default(0)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@index([organizationId, personId, startsAt])
+  @@index([eventId])
+  @@index([eventShowJobId])
+  @@index([timeProjectId])
+}
+
+model TimesheetApproval {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  personId         String
+  person           Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+  periodStart      DateTime
+  periodEnd        DateTime
+  status           String       @default("approved")
+  approvedAt       DateTime?
+  approvedByUserId String?
+  reopenedAt       DateTime?
+  reopenedByUserId String?
+  note             String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([organizationId, personId, periodStart, periodEnd])
+  @@index([organizationId, personId, status])
 }
