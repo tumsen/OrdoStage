@@ -98,6 +98,28 @@ async function retrofitTimeWithSchedule(prisma: PrismaClient, organizationId: st
       UPDATE "RoleDefinition"
       SET
         views = CASE
+          WHEN NOT ('staffing' = ANY(
+            CASE
+              WHEN NOT ('time' = ANY(views))
+                AND ('schedule' = ANY(views) OR 'events' = ANY(views))
+              THEN array_append(views, 'time')
+              ELSE views
+            END
+          ))
+            AND (
+              'schedule' = ANY(views)
+              OR 'events' = ANY(views)
+              OR 'time' = ANY(views)
+            )
+          THEN array_append(
+            CASE
+              WHEN NOT ('time' = ANY(views))
+                AND ('schedule' = ANY(views) OR 'events' = ANY(views))
+              THEN array_append(views, 'time')
+              ELSE views
+            END,
+            'staffing'
+          )
           WHEN NOT ('time' = ANY(views))
             AND ('schedule' = ANY(views) OR 'events' = ANY(views))
           THEN array_append(views, 'time')
@@ -112,6 +134,10 @@ async function retrofitTimeWithSchedule(prisma: PrismaClient, organizationId: st
       WHERE "organizationId" = ${organizationId}
         AND (
           (NOT ('time' = ANY(views)) AND ('schedule' = ANY(views) OR 'events' = ANY(views)))
+          OR (
+            NOT ('staffing' = ANY(views))
+            AND ('schedule' = ANY(views) OR 'events' = ANY(views) OR 'time' = ANY(views))
+          )
           OR (
             NOT ('time.write' = ANY(actions))
             AND ('write.schedule' = ANY(actions) OR 'write.events' = ANY(actions))
