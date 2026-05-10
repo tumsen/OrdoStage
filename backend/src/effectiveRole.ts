@@ -134,6 +134,13 @@ async function retrofitTimeWithSchedule(prisma: PrismaClient, organizationId: st
       changed = true;
     }
     if (
+      !views.includes("staffing") &&
+      (views.includes("schedule") || views.includes("events") || views.includes("time"))
+    ) {
+      views.push("staffing");
+      changed = true;
+    }
+    if (
       !actions.includes("time.write") &&
       (actions.includes("write.schedule") || actions.includes("write.events"))
     ) {

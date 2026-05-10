@@ -18,6 +18,7 @@ import People from "./pages/People";
 import Team from "./pages/Team";
 import Calendars from "./pages/Calendars";
 import Schedule from "./pages/Schedule";
+import Staffing from "./pages/Staffing";
 import TimeTracking from "./pages/TimeTracking";
 import TimeReport from "./pages/TimeReport";
 import Login from "./pages/Login";
@@ -247,6 +248,16 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <TimeTracking />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staffing"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Staffing />
                 </Layout>
               </ProtectedRoute>
             }
