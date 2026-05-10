@@ -106,13 +106,20 @@ staffingRouter.get("/staffing", async (c) => {
 
   const today = new Date();
   const todayStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const mode = c.req.query("mode") === "upcoming" ? "upcoming" : "range";
+  const limitRaw = Number.parseInt(c.req.query("limit") ?? "200", 10);
+  const limit = Math.max(25, Math.min(500, Number.isFinite(limitRaw) ? limitRaw : 200));
   const fromDate = parseYmd(c.req.query("from"), todayStart);
-  const toDateExclusive = addDays(parseYmd(c.req.query("to"), addDays(todayStart, 13)), 1);
+  const toDateExclusive =
+    mode === "upcoming" ? null : addDays(parseYmd(c.req.query("to"), addDays(todayStart, 13)), 1);
 
   const [jobs, people] = await Promise.all([
     prisma.eventShowJob.findMany({
       where: {
-        jobDate: { gte: fromDate, lt: toDateExclusive },
+        jobDate: {
+          gte: fromDate,
+          ...(toDateExclusive ? { lt: toDateExclusive } : {}),
+        },
         show: { event: { organizationId: user.organizationId } },
       },
       include: {
@@ -130,6 +137,7 @@ staffingRouter.get("/staffing", async (c) => {
         },
       },
       orderBy: [{ jobDate: "asc" }, { startTime: "asc" }, { sortOrder: "asc" }],
+      ...(mode === "upcoming" ? { take: limit } : {}),
     }),
     prisma.person.findMany({
       where: { organizationId: user.organizationId, isActive: true },
@@ -142,6 +150,12 @@ staffingRouter.get("/staffing", async (c) => {
     where: {
       organizationId: user.organizationId,
       eventShowJobId: { in: jobs.map((j) => j.id) },
+      ...(toDateExclusive
+        ? {
+            startsAt: { lt: toDateExclusive },
+            endsAt: { gt: fromDate },
+          }
+        : {}),
     },
     select: { eventShowJobId: true, startsAt: true, endsAt: true },
   });

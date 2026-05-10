@@ -72,13 +72,17 @@ export default function Staffing() {
     d.setHours(0, 0, 0, 0);
     return d;
   });
+  const [listMode, setListMode] = useState<"upcoming" | "range">("upcoming");
   const [personFilter, setPersonFilter] = useState("all");
   const rangeFrom = toIsoDate(anchor);
   const rangeTo = toIsoDate(addDays(anchor, 13));
 
   const { data, isLoading } = useQuery({
-    queryKey: ["staffing", rangeFrom, rangeTo],
-    queryFn: () => api.get<StaffingResponse>(`/api/staffing?from=${rangeFrom}&to=${rangeTo}`),
+    queryKey: ["staffing", listMode, rangeFrom, rangeTo],
+    queryFn: () =>
+      listMode === "upcoming"
+        ? api.get<StaffingResponse>(`/api/staffing?mode=upcoming&from=${rangeFrom}&limit=250`)
+        : api.get<StaffingResponse>(`/api/staffing?from=${rangeFrom}&to=${rangeTo}`),
   });
 
   const assignPerson = useMutation({
@@ -122,12 +126,35 @@ export default function Staffing() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+            <button
+              type="button"
+              onClick={() => setListMode("upcoming")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm",
+                listMode === "upcoming" ? "bg-white/10 text-white" : "text-white/55"
+              )}
+            >
+              Upcoming list
+            </button>
+            <button
+              type="button"
+              onClick={() => setListMode("range")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm",
+                listMode === "range" ? "bg-white/10 text-white" : "text-white/55"
+              )}
+            >
+              Date range
+            </button>
+          </div>
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="border-white/15 text-white"
             onClick={() => setAnchor((d) => addDays(d, -14))}
+            disabled={listMode === "upcoming"}
           >
             Previous
           </Button>
@@ -146,6 +173,7 @@ export default function Staffing() {
             size="sm"
             className="border-white/15 text-white"
             onClick={() => setAnchor((d) => addDays(d, 14))}
+            disabled={listMode === "upcoming"}
           >
             Next
           </Button>
@@ -197,9 +225,18 @@ export default function Staffing() {
           {isLoading ? (
             <div className="p-6 text-sm text-white/45">Loading staffing...</div>
           ) : requirements.length === 0 ? (
-            <div className="p-6 text-sm text-white/45">No staffing requirements in this range.</div>
+            <div className="p-6 text-sm text-white/45">
+              {listMode === "upcoming"
+                ? "No upcoming staffing requirements."
+                : "No staffing requirements in this range."}
+            </div>
           ) : (
             <div className="space-y-2">
+              {listMode === "upcoming" ? (
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/45">
+                  Showing the next {requirements.length} job assignments from {format(anchor, "d MMM yyyy")} onward.
+                </div>
+              ) : null}
               {requirements.map((req) => (
                 <div
                   key={req.id}
