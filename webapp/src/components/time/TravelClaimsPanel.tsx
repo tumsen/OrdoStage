@@ -27,6 +27,7 @@ type TravelDraft = {
   endsAt: string;
   destination: string;
   purpose: string;
+  country: "DK";
   allowanceType: "standard" | "tour_driver_denmark" | "tour_driver_abroad";
   timeProjectId: string;
   breakfastProvided: boolean;
@@ -91,6 +92,7 @@ export function TravelClaimsPanel({
       endsAt: toDatetimeLocalValue(end),
       destination: "",
       purpose: "",
+      country: "DK",
       allowanceType: "standard",
       timeProjectId: "__none__",
       breakfastProvided: false,
@@ -147,6 +149,7 @@ export function TravelClaimsPanel({
       endsAt: new Date(draft.endsAt).toISOString(),
       destination: draft.destination.trim(),
       purpose: draft.purpose.trim(),
+      country: draft.country,
       allowanceType: draft.allowanceType,
       timeProjectId: draft.timeProjectId === "__none__" ? null : draft.timeProjectId,
       breakfastProvided: draft.breakfastProvided,
@@ -237,6 +240,23 @@ export function TravelClaimsPanel({
                     <SelectItem value="tour_driver_abroad">Tour driver abroad</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="sm:col-span-2">
+                <Label className="text-xs text-white/50">Rule set</Label>
+                <Select
+                  value={draft.country}
+                  onValueChange={(country) => setDraft((d) => ({ ...d, country: country as TravelDraft["country"] }))}
+                >
+                  <SelectTrigger className="mt-1 border-white/10 bg-white/5 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                    <SelectItem value="DK">Denmark - SKAT travel allowance rules</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-[11px] text-white/40">
+                  Denmark is the first country rule set. Other country-specific travel and vacation rules can be added here later.
+                </p>
               </div>
               <div className="sm:col-span-2">
                 <Label className="text-xs text-white/50">Project / event</Label>

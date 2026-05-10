@@ -6,6 +6,7 @@ import { auth } from "../auth";
 import { canAction, canView } from "../requestRole";
 import type { EffectiveRole } from "../effectiveRole";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
+import { getCountryRuleSet, type TravelAllowanceType } from "../rules/countryRuleSets";
 import {
   CreateTimeTagSchema,
   PatchTimeTagSchema,
@@ -378,94 +379,6 @@ function serializeEntry(row: {
     tagIds: row.tagLinks.map((t) => t.timeTagId),
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
-  };
-}
-
-type TravelAllowanceType = "standard" | "tour_driver_denmark" | "tour_driver_abroad";
-
-function ratesForTravelClaim(rateYear: number, allowanceType: TravelAllowanceType) {
-  const year = rateYear === 2025 ? 2025 : 2026;
-  const lodgingRateCents = year === 2025 ? 25_600 : 26_800;
-  if (allowanceType === "tour_driver_denmark") {
-    return { rateYear: year, foodRateCents: 7_500, lodgingRateCents };
-  }
-  if (allowanceType === "tour_driver_abroad") {
-    return { rateYear: year, foodRateCents: 15_000, lodgingRateCents };
-  }
-  return {
-    rateYear: year,
-    foodRateCents: year === 2025 ? 59_700 : 62_500,
-    lodgingRateCents,
-  };
-}
-
-function calculateTravelAllowance(args: {
-  startsAt: Date;
-  endsAt: Date;
-  allowanceType: TravelAllowanceType;
-  rateYear?: number;
-  breakfastProvided?: boolean;
-  lunchProvided?: boolean;
-  dinnerProvided?: boolean;
-  lodgingAllowance?: boolean;
-  lodgingCovered?: boolean;
-  foodCoveredByReceipts?: boolean;
-  isTemporaryWorkplace?: boolean;
-  hasUsualResidence?: boolean;
-  overnightAwayFromHome?: boolean;
-  cannotReturnHome?: boolean;
-  twelveMonthRuleOk?: boolean;
-  salaryReductionAgreement?: boolean;
-  receivesBIncome?: boolean;
-  excludedWorkerType?: boolean;
-  transportsPeopleOrGoods?: boolean;
-  lodgingByReceipt?: boolean;
-}) {
-  const rates = ratesForTravelClaim(args.rateYear ?? 2026, args.allowanceType);
-  const durationMs = args.endsAt.getTime() - args.startsAt.getTime();
-  const startedHours = Math.ceil(durationMs / 3_600_000);
-  const fullDays = Math.floor(durationMs / 86_400_000);
-  const baseEligible =
-    durationMs >= 86_400_000 &&
-    args.isTemporaryWorkplace === true &&
-    args.hasUsualResidence === true &&
-    args.overnightAwayFromHome === true &&
-    args.cannotReturnHome === true &&
-    args.twelveMonthRuleOk !== false &&
-    args.salaryReductionAgreement !== true &&
-    args.receivesBIncome !== true &&
-    args.excludedWorkerType !== true;
-  const eligibleFoodHours = baseEligible ? startedHours : 0;
-
-  let foodAmountCents = eligibleFoodHours > 0
-    ? Math.round((rates.foodRateCents * eligibleFoodHours) / 24)
-    : 0;
-
-  if (args.foodCoveredByReceipts) {
-    foodAmountCents = Math.round(foodAmountCents * 0.25);
-  } else if (args.allowanceType === "standard") {
-    const reductionPct =
-      (args.breakfastProvided ? 0.15 : 0) +
-      (args.lunchProvided ? 0.30 : 0) +
-      (args.dinnerProvided ? 0.30 : 0);
-    foodAmountCents = Math.round(foodAmountCents * Math.max(0, 1 - Math.min(0.75, reductionPct)));
-  }
-
-  const lodgingEligible =
-    baseEligible &&
-    args.allowanceType === "standard" &&
-    args.transportsPeopleOrGoods !== true &&
-    args.lodgingByReceipt !== true;
-  const lodgingAmountCents =
-    lodgingEligible && args.lodgingAllowance && !args.lodgingCovered && fullDays > 0
-      ? fullDays * rates.lodgingRateCents
-      : 0;
-
-  return {
-    ...rates,
-    foodAmountCents,
-    lodgingAmountCents,
-    totalAmountCents: foodAmountCents + lodgingAmountCents,
   };
 }
 
@@ -1827,7 +1740,12 @@ timeRouter.post("/time/travel-claims", zValidator("json", CreateTimeTravelClaimS
       423
     );
   }
-  const calc = calculateTravelAllowance({
+  const country = body.country.trim().toUpperCase();
+  const ruleSet = getCountryRuleSet(country);
+  if (!ruleSet) {
+    return c.json({ error: { message: "Country rule set is not supported yet.", code: "UNSUPPORTED_RULE_SET" } }, 400);
+  }
+  const calc = ruleSet.travel.calculateAllowance({
     startsAt,
     endsAt,
     allowanceType: body.allowanceType,
@@ -1858,7 +1776,7 @@ timeRouter.post("/time/travel-claims", zValidator("json", CreateTimeTravelClaimS
       endsAt,
       destination: body.destination.trim(),
       purpose: body.purpose.trim(),
-      country: body.country.trim().toUpperCase(),
+      country,
       allowanceType: body.allowanceType,
       ...calc,
       breakfastProvided: body.breakfastProvided ?? false,
@@ -1923,7 +1841,12 @@ timeRouter.patch("/time/travel-claims/:id", zValidator("json", PatchTimeTravelCl
     );
   }
   const allowanceType = body.allowanceType ?? (existing.allowanceType as TravelAllowanceType);
-  const calc = calculateTravelAllowance({
+  const country = body.country !== undefined ? body.country.trim().toUpperCase() : existing.country;
+  const ruleSet = getCountryRuleSet(country);
+  if (!ruleSet) {
+    return c.json({ error: { message: "Country rule set is not supported yet.", code: "UNSUPPORTED_RULE_SET" } }, 400);
+  }
+  const calc = ruleSet.travel.calculateAllowance({
     startsAt,
     endsAt,
     allowanceType,
@@ -1952,7 +1875,7 @@ timeRouter.patch("/time/travel-claims/:id", zValidator("json", PatchTimeTravelCl
       endsAt,
       ...(body.destination !== undefined ? { destination: body.destination.trim() } : {}),
       ...(body.purpose !== undefined ? { purpose: body.purpose.trim() } : {}),
-      ...(body.country !== undefined ? { country: body.country.trim().toUpperCase() } : {}),
+      country,
       allowanceType,
       ...calc,
       ...(body.breakfastProvided !== undefined ? { breakfastProvided: body.breakfastProvided } : {}),
