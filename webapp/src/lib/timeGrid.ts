@@ -73,3 +73,35 @@ export function bottomBoundaryLabel(startHour: number, timeFormat: "12h" | "24h"
   }
   return formatHourLabel(startHour, timeFormat);
 }
+
+/** Whether [startsAt, endsAt) overlaps the rolling 24h window for this column. */
+export function rangeOverlapsColumnWindow(
+  startsAt: Date,
+  endsAt: Date,
+  columnDayYmd: string,
+  startHour: number
+): boolean {
+  const ws = windowStartForColumnDay(columnDayYmd, startHour).getTime();
+  const we = ws + MINUTES_PER_DAY * 60 * 1000;
+  return startsAt.getTime() < we && endsAt.getTime() > ws;
+}
+
+/**
+ * Visible segment of a time range inside one column (percentage top + height).
+ * Used by time tracking week blocks and create-drag previews across multiple days.
+ */
+export function rangeMetricsInColumn(
+  startsAt: Date,
+  endsAt: Date,
+  columnDayYmd: string,
+  startHour: number
+): { topPct: number; heightPct: number } | null {
+  const startWin = minutesFromWindowStart(startsAt, columnDayYmd, startHour);
+  let endWin = minutesFromWindowStart(endsAt, columnDayYmd, startHour);
+  if (endWin < startWin) endWin += MINUTES_PER_DAY;
+  const visibleEnd = Math.min(endWin, MINUTES_PER_DAY);
+  const topPct = (Math.max(0, startWin) / MINUTES_PER_DAY) * 100;
+  const heightPct = ((visibleEnd - Math.max(0, startWin)) / MINUTES_PER_DAY) * 100;
+  if (heightPct <= 0.01) return null;
+  return { topPct, heightPct };
+}

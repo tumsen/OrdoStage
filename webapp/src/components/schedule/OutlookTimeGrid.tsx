@@ -10,10 +10,10 @@ import {
   computeOverlapLayout,
 } from "./scheduleUtils";
 import { usePreferences } from "@/hooks/usePreferences";
+import { findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
 
 const HOUR_HEIGHT = 36;
 const SNAP_MINUTES = 15;
-const MIN_DRAG_PX = 8;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_GRID_HEADER_CLASS =
   "min-h-[6.75rem] shrink-0 border-b border-white/10 box-border flex flex-col items-stretch justify-center gap-0.5 px-1.5 py-2";
@@ -148,27 +148,6 @@ export function OutlookTimeGrid({
   const moveDragRef = useRef<MoveDragPayload | null>(null);
   const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const findDayIndexAtX = useCallback((clientX: number, fallback: number): number => {
-    for (let i = 0; i < columnRefs.current.length; i += 1) {
-      const el = columnRefs.current[i];
-      if (!el) continue;
-      const r = el.getBoundingClientRect();
-      if (clientX >= r.left && clientX < r.right) return i;
-    }
-    if (columnRefs.current.length === 0) return fallback;
-    const firstEl = columnRefs.current[0];
-    const lastEl = columnRefs.current[columnRefs.current.length - 1];
-    if (firstEl) {
-      const r0 = firstEl.getBoundingClientRect();
-      if (clientX < r0.left) return 0;
-    }
-    if (lastEl) {
-      const rN = lastEl.getBoundingClientRect();
-      if (clientX >= rN.right) return columnRefs.current.length - 1;
-    }
-    return fallback;
-  }, []);
-
   // ── Create drag (drag empty space to make a new booking) ────────────────
   const endCreateDrag = useCallback(() => {
     const d = createDragRef.current;
@@ -188,7 +167,7 @@ export function OutlookTimeGrid({
     const dyMin = endMin - startMin;
     const totalMin = dxDays * 24 * 60 + dyMin;
     if (
-      Math.abs(d.currentY - d.startY) < MIN_DRAG_PX &&
+      Math.abs(d.currentY - d.startY) < WEEK_GRID_MIN_DRAG_PX &&
       Math.abs(totalMin) < SNAP_MINUTES &&
       dxDays === 0
     ) {
@@ -235,7 +214,7 @@ export function OutlookTimeGrid({
     setCreateDrag(payload);
     const onMove = (ev: PointerEvent) => {
       if (!createDragRef.current) return;
-      const nextIdx = findDayIndexAtX(ev.clientX, createDragRef.current.dayIndex);
+      const nextIdx = findColumnIndexAtX(columnRefs.current, ev.clientX, createDragRef.current.dayIndex);
       createDragRef.current = {
         ...createDragRef.current,
         currentY: ev.clientY,
@@ -350,8 +329,8 @@ export function OutlookTimeGrid({
       const dx = ev.clientX - moveDragRef.current.startX;
       const dy = ev.clientY - moveDragRef.current.startY;
       const passed =
-        moveDragRef.current.passed || Math.hypot(dx, dy) >= MIN_DRAG_PX;
-      const nextIdx = findDayIndexAtX(ev.clientX, moveDragRef.current.startDayIndex);
+        moveDragRef.current.passed || Math.hypot(dx, dy) >= WEEK_GRID_MIN_DRAG_PX;
+      const nextIdx = findColumnIndexAtX(columnRefs.current, ev.clientX, moveDragRef.current.startDayIndex);
       moveDragRef.current = {
         ...moveDragRef.current,
         currentY: ev.clientY,

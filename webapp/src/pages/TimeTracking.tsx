@@ -69,9 +69,12 @@ import {
   dateFromColumnAndWindowMinutes,
   formatHourLabel,
   minutesFromWindowStart,
+  rangeMetricsInColumn,
+  rangeOverlapsColumnWindow,
   rawWindowMinutesFromY,
   snapWindowMinutes,
 } from "@/lib/timeGrid";
+import { findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
 
 const WEEK_STARTS_ON = 1 as const;
 const PX_PER_HOUR = 36;
@@ -102,38 +105,30 @@ function readDisplayStartHour(): number {
   return n;
 }
 
-/** Same idea as schedule booking: ignore plain clicks; require real drag distance. */
-const MIN_CREATE_DRAG_PX = 8;
-const MIN_ENTRY_MOVE_DRAG_PX = 8;
-
 type EntryDragRef = {
   entryId: string;
   kind: "move" | "resizeEnd" | "resizeStart";
   origStartWinMin: number;
   origEndWinMin: number;
   dayYmd: string;
+  startDayIndex: number;
+  origStartsAtIso: string;
+  origEndsAtIso: string;
   durationMin: number;
-  /** Move only: set until pointer moves past MIN_ENTRY_MOVE_DRAG_PX (plain click → edit). */
   moveStartClientX?: number;
   moveStartClientY?: number;
   moveThresholdPassed?: boolean;
 };
 
 type CreateDragRef = {
-  dayYmd: string;
-  startY: number;
-  currentY: number;
-  /** True once pointer moved far enough to show selection (not a bare click). */
+  startDayIndex: number;
+  startClientX: number;
+  startClientY: number;
+  currentClientX: number;
+  currentClientY: number;
+  currentDayIndex: number;
   thresholdPassed: boolean;
 };
-
-function pctRangeFromWindowMinutes(lo: number, hi: number): { topPct: number; heightPct: number } {
-  const a = Math.min(lo, hi);
-  const b = Math.max(lo, hi);
-  const topPct = (clampMinutesToDay(a) / MINUTES_PER_DAY) * 100;
-  const heightPct = Math.max(((b - a) / MINUTES_PER_DAY) * 100, 0.35);
-  return { topPct, heightPct };
-}
 
 function formatDurationShort(totalMin: number): string {
   const m = Math.round(totalMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
@@ -172,6 +167,7 @@ export default function TimeTracking() {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [upcomingCollapsed, setUpcomingCollapsed] = useState(true);
   const [displayStartHour, setDisplayStartHour] = useState(readDisplayStartHour);
+  const displayStartHourRef = useRef(displayStartHour);
 
   useEffect(() => {
     window.localStorage.setItem(DISPLAY_START_STORAGE_KEY, String(displayStartHour));
@@ -187,7 +183,10 @@ export default function TimeTracking() {
     () => eachDayOfInterval({ start: weekStart, end: weekEnd }),
     [weekStart, weekEnd]
   );
-
+  const weekDayYmds = useMemo(
+    () => weekDays.map((d) => format(d, "yyyy-MM-dd")),
+    [weekDays]
+  );
   const rangeFrom = format(mode === "week" ? weekStart : startOfMonth(anchor), "yyyy-MM-dd");
   const rangeTo = format(mode === "week" ? weekEnd : endOfMonth(anchor), "yyyy-MM-dd");
   const approvalPeriodStart = useMemo(() => {
@@ -412,21 +411,19 @@ export default function TimeTracking() {
     onError: () => toast({ title: "Could not reopen timesheet", variant: "destructive" }),
   });
 
-  /** Live position + window minutes while dragging (labels follow pointer; snap on release). */
+  /** Live drag preview: absolute range (same shape as booking grid drag updates). */
   const [dragOverride, setDragOverride] = useState<{
     entryId: string;
-    dayYmd: string;
-    topPct: number;
-    heightPct: number;
-    startWinMin: number;
-    endWinMin: number;
+    startsAt: string;
+    endsAt: string;
   } | null>(null);
 
   const entryDragRef = useRef<EntryDragRef | null>(null);
   const createDragRef = useRef<CreateDragRef | null>(null);
   const activeColElRef = useRef<HTMLElement | null>(null);
   const createOverlayEls = useRef<Record<string, HTMLDivElement | null>>({});
-  const displayStartHourRef = useRef(displayStartHour);
+  /** One HTMLElement per week column — same pattern as `OutlookTimeGrid` column refs. */
+  const weekColumnRefs = useRef<(HTMLElement | null)[]>([]);
 
   const editingEntry = useMemo(
     () => (entries ?? []).find((x) => x.id === editingEntryId) ?? null,
@@ -445,20 +442,11 @@ export default function TimeTracking() {
   /** Live ISO range while dragging the entry open in the sheet (matches grid labels). */
   const entryLiveDragRange = useMemo(() => {
     if (!dragOverride || !editingEntryId || dragOverride.entryId !== editingEntryId) return null;
-    const sh = displayStartHour;
     return {
-      startsAt: dateFromColumnAndWindowMinutes(
-        dragOverride.dayYmd,
-        dragOverride.startWinMin,
-        sh
-      ).toISOString(),
-      endsAt: dateFromColumnAndWindowMinutes(
-        dragOverride.dayYmd,
-        dragOverride.endWinMin,
-        sh
-      ).toISOString(),
+      startsAt: dragOverride.startsAt,
+      endsAt: dragOverride.endsAt,
     };
-  }, [dragOverride, editingEntryId, displayStartHour]);
+  }, [dragOverride, editingEntryId]);
 
   const minutesFromY = useCallback((clientY: number, colEl: HTMLElement | null) => {
     if (!colEl) return null;
@@ -475,30 +463,51 @@ export default function TimeTracking() {
     }
   }, []);
 
-  const updateCreateOverlayDom = useCallback(
-    (dayYmd: string, loRaw: number, hiRaw: number) => {
-      const el = createOverlayEls.current[dayYmd];
-      if (!el) return;
-      const lo = Math.min(loRaw, hiRaw);
-      const hi = Math.max(loRaw, hiRaw);
-      const { topPct, heightPct } = pctRangeFromWindowMinutes(lo, hi);
-      el.style.opacity = "1";
-      el.style.top = `${topPct}%`;
-      el.style.height = `${heightPct}%`;
-      const lineEl = el.querySelector("[data-create-line]");
-      const durEl = el.querySelector("[data-create-dur]");
-      const startAt = dateFromColumnAndWindowMinutes(
-        dayYmd,
-        lo,
-        displayStartHourRef.current
-      );
-      const endAt = dateFromColumnAndWindowMinutes(dayYmd, hi, displayStartHourRef.current);
+  const hideAllCreateOverlays = useCallback(() => {
+    for (const ymd of weekDayYmds) {
+      hideCreateOverlay(ymd);
+    }
+  }, [weekDayYmds, hideCreateOverlay]);
+
+  const syncCreateDragPreview = useCallback(
+    (absLo: Date, absHi: Date) => {
+      const lo = absLo.getTime() <= absHi.getTime() ? absLo : absHi;
+      const hi = absLo.getTime() <= absHi.getTime() ? absHi : absLo;
+      const durMin = Math.max((hi.getTime() - lo.getTime()) / 60000, TIME_SNAP_MINUTES);
+      const sh = displayStartHourRef.current;
       const tf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
-      if (lineEl)
-        lineEl.textContent = `${format(startAt, tf)} – ${format(endAt, tf)}`;
-      if (durEl) durEl.textContent = formatDurationShort(hi - lo);
+      let labelIdx = -1;
+      for (let i = 0; i < weekDayYmds.length; i += 1) {
+        const ymd = weekDayYmds[i]!;
+        if (rangeMetricsInColumn(lo, hi, ymd, sh)) {
+          labelIdx = i;
+          break;
+        }
+      }
+      weekDayYmds.forEach((ymd, i) => {
+        const el = createOverlayEls.current[ymd];
+        if (!el) return;
+        const metrics = rangeMetricsInColumn(lo, hi, ymd, sh);
+        if (!metrics) {
+          el.style.opacity = "0";
+          el.style.pointerEvents = "none";
+          return;
+        }
+        el.style.opacity = "1";
+        el.style.top = `${metrics.topPct}%`;
+        el.style.height = `${Math.max(metrics.heightPct, 0.35)}%`;
+        const lineEl = el.querySelector("[data-create-line]");
+        const durEl = el.querySelector("[data-create-dur]");
+        if (i === labelIdx) {
+          if (lineEl) lineEl.textContent = `${format(lo, tf)} – ${format(hi, tf)}`;
+          if (durEl) durEl.textContent = formatDurationShort(durMin);
+        } else {
+          if (lineEl) lineEl.textContent = "";
+          if (durEl) durEl.textContent = "";
+        }
+      });
     },
-    [timeFormat]
+    [weekDayYmds, timeFormat]
   );
 
   useEffect(() => {
@@ -506,38 +515,68 @@ export default function TimeTracking() {
   }, [editingEntryId, editingEntry]);
 
   const attachCreateDragListeners = useCallback(
-    (dayYmd: string, startClientY: number) => {
-      const col = document.querySelector(`[data-day-col="${dayYmd}"]`) as HTMLElement | null;
-      if (!col) return;
+    (dayYmd: string, startClientX: number, startClientY: number) => {
+      const startDayIndex = weekDayYmds.indexOf(dayYmd);
+      if (startDayIndex === -1) return;
+
       createDragRef.current = {
-        dayYmd,
-        startY: startClientY,
-        currentY: startClientY,
+        startDayIndex,
+        startClientX,
+        startClientY,
+        currentClientX: startClientX,
+        currentClientY: startClientY,
+        currentDayIndex: startDayIndex,
         thresholdPassed: false,
       };
 
       let createRafPending = false;
-      let latestClientY = startClientY;
+
+      const applyPreviewFromRefs = () => {
+        const c = createDragRef.current;
+        if (!c) return;
+        const startCol = weekColumnRefs.current[c.startDayIndex];
+        const endCol = weekColumnRefs.current[c.currentDayIndex];
+        if (!startCol || !endCol) return;
+        const winA = snapWindowMinutes(
+          rawWindowMinutesFromY(
+            c.startClientY,
+            startCol.getBoundingClientRect().top,
+            COLUMN_HEIGHT_PX
+          )
+        );
+        const winB = snapWindowMinutes(
+          rawWindowMinutesFromY(
+            c.currentClientY,
+            endCol.getBoundingClientRect().top,
+            COLUMN_HEIGHT_PX
+          )
+        );
+        const dayA = weekDayYmds[c.startDayIndex];
+        const dayB = weekDayYmds[c.currentDayIndex];
+        if (!dayA || !dayB) return;
+        const sh = displayStartHourRef.current;
+        const dtA = dateFromColumnAndWindowMinutes(dayA, winA, sh);
+        const dtB = dateFromColumnAndWindowMinutes(dayB, winB, sh);
+        const lo = dtA < dtB ? dtA : dtB;
+        const hi = dtA < dtB ? dtB : dtA;
+        syncCreateDragPreview(lo, hi);
+      };
 
       const onMove = (ev: PointerEvent) => {
         const c = createDragRef.current;
-        if (!c || c.dayYmd !== dayYmd) return;
-        c.currentY = ev.clientY;
-        if (!c.thresholdPassed) {
-          if (Math.abs(ev.clientY - c.startY) < MIN_CREATE_DRAG_PX) return;
-          c.thresholdPassed = true;
-        }
-        latestClientY = ev.clientY;
+        if (!c) return;
+        c.currentClientX = ev.clientX;
+        c.currentClientY = ev.clientY;
+        c.currentDayIndex = findColumnIndexAtX(weekColumnRefs.current, ev.clientX, c.currentDayIndex);
+        const dx = ev.clientX - c.startClientX;
+        const dy = ev.clientY - c.startClientY;
+        if (!c.thresholdPassed && Math.hypot(dx, dy) < WEEK_GRID_MIN_DRAG_PX) return;
+        c.thresholdPassed = true;
         if (createRafPending) return;
         createRafPending = true;
         requestAnimationFrame(() => {
           createRafPending = false;
-          const c2 = createDragRef.current;
-          if (!c2 || c2.dayYmd !== dayYmd) return;
-          const r = col.getBoundingClientRect();
-          const curRaw = rawWindowMinutesFromY(latestClientY, r.top, COLUMN_HEIGHT_PX);
-          const startRaw2 = rawWindowMinutesFromY(c2.startY, r.top, COLUMN_HEIGHT_PX);
-          updateCreateOverlayDom(dayYmd, snapWindowMinutes(curRaw), snapWindowMinutes(startRaw2));
+          applyPreviewFromRefs();
         });
       };
 
@@ -547,42 +586,62 @@ export default function TimeTracking() {
         window.removeEventListener("pointercancel", finish);
         const c = createDragRef.current;
         createDragRef.current = null;
-        if (!c || c.dayYmd !== dayYmd) return;
-        const r = col.getBoundingClientRect();
-        const dy = Math.abs(ev.clientY - c.startY);
+        if (!c) return;
 
-        if (dy < MIN_CREATE_DRAG_PX || !c.thresholdPassed) {
-          if (c.thresholdPassed) hideCreateOverlay(c.dayYmd);
+        c.currentClientX = ev.clientX;
+        c.currentClientY = ev.clientY;
+        c.currentDayIndex = findColumnIndexAtX(weekColumnRefs.current, ev.clientX, c.currentDayIndex);
+
+        const startCol = weekColumnRefs.current[c.startDayIndex];
+        const endCol = weekColumnRefs.current[c.currentDayIndex];
+        const dx = ev.clientX - c.startClientX;
+        const dy = ev.clientY - c.startClientY;
+        if (!c.thresholdPassed || Math.hypot(dx, dy) < WEEK_GRID_MIN_DRAG_PX) {
+          if (c.thresholdPassed) hideAllCreateOverlays();
+          return;
+        }
+        if (!startCol || !endCol) {
+          hideAllCreateOverlays();
           return;
         }
 
-        const startRaw = rawWindowMinutesFromY(c.startY, r.top, COLUMN_HEIGHT_PX);
-        const endRaw = rawWindowMinutesFromY(ev.clientY, r.top, COLUMN_HEIGHT_PX);
-        const lo = Math.min(startRaw, endRaw);
-        const hi = Math.max(startRaw, endRaw);
-
-        let startWin = snapWindowMinutes(lo);
-        let endWin = snapWindowMinutes(hi);
-        if (endWin - startWin < TIME_SNAP_MINUTES) {
-          endWin = Math.min(startWin + TIME_SNAP_MINUTES, MINUTES_PER_DAY);
-          if (endWin - startWin < TIME_SNAP_MINUTES) {
-            startWin = Math.max(0, endWin - TIME_SNAP_MINUTES);
-          }
+        const winA = snapWindowMinutes(
+          rawWindowMinutesFromY(
+            c.startClientY,
+            startCol.getBoundingClientRect().top,
+            COLUMN_HEIGHT_PX
+          )
+        );
+        const winB = snapWindowMinutes(
+          rawWindowMinutesFromY(
+            c.currentClientY,
+            endCol.getBoundingClientRect().top,
+            COLUMN_HEIGHT_PX
+          )
+        );
+        const dayA = weekDayYmds[c.startDayIndex];
+        const dayB = weekDayYmds[c.currentDayIndex];
+        if (!dayA || !dayB) {
+          hideAllCreateOverlays();
+          return;
         }
-        if (endWin <= startWin) {
-          hideCreateOverlay(dayYmd);
+        const sh = displayStartHourRef.current;
+        const dtA = dateFromColumnAndWindowMinutes(dayA, winA, sh);
+        const dtB = dateFromColumnAndWindowMinutes(dayB, winB, sh);
+        const absStart = dtA < dtB ? dtA : dtB;
+        const absEnd = dtA < dtB ? dtB : dtA;
+
+        const minMs = TIME_SNAP_MINUTES * 60 * 1000;
+        if (absEnd.getTime() - absStart.getTime() < minMs) {
+          hideAllCreateOverlays();
           return;
         }
 
         createEntry.mutate(
           {
             kind: "custom",
-            startsAt: dateFromColumnAndWindowMinutes(
-              dayYmd,
-              startWin,
-              displayStartHourRef.current
-            ).toISOString(),
-            endsAt: dateFromColumnAndWindowMinutes(dayYmd, endWin, displayStartHourRef.current).toISOString(),
+            startsAt: absStart.toISOString(),
+            endsAt: absEnd.toISOString(),
           },
           {
             onSuccess: (created) => {
@@ -590,7 +649,7 @@ export default function TimeTracking() {
             },
             onSettled: () => {
               requestAnimationFrame(() => {
-                requestAnimationFrame(() => hideCreateOverlay(dayYmd));
+                requestAnimationFrame(() => hideAllCreateOverlays());
               });
             },
           }
@@ -601,16 +660,28 @@ export default function TimeTracking() {
       window.addEventListener("pointerup", finish);
       window.addEventListener("pointercancel", finish);
     },
-    [createEntry, hideCreateOverlay, updateCreateOverlayDom, setEditingEntryId]
+    [
+      createEntry,
+      hideAllCreateOverlays,
+      setEditingEntryId,
+      syncCreateDragPreview,
+      weekDayYmds,
+    ]
   );
 
   const attachEntryDragListeners = useCallback(() => {
     const onMove = (ev: PointerEvent) => {
-      const col = activeColElRef.current;
       const cur = entryDragRef.current;
-      if (!cur || !col) return;
-      const r = col.getBoundingClientRect();
-      const mSnap = snapWindowMinutes(rawWindowMinutesFromY(ev.clientY, r.top, COLUMN_HEIGHT_PX));
+      if (!cur) return;
+      const idx = findColumnIndexAtX(weekColumnRefs.current, ev.clientX, cur.startDayIndex);
+      const col = weekColumnRefs.current[idx];
+      if (!col) return;
+      activeColElRef.current = col;
+      const mSnap = minutesFromY(ev.clientY, col);
+      if (mSnap === null) return;
+      const sh = displayStartHourRef.current;
+      const ymd = weekDayYmds[idx];
+      if (!ymd) return;
 
       if (cur.kind === "move") {
         if (!cur.moveThresholdPassed) {
@@ -618,53 +689,44 @@ export default function TimeTracking() {
           const sy = cur.moveStartClientY ?? ev.clientY;
           const dx = ev.clientX - sx;
           const dy = ev.clientY - sy;
-          if (dx * dx + dy * dy < MIN_ENTRY_MOVE_DRAG_PX * MIN_ENTRY_MOVE_DRAG_PX) return;
+          if (dx * dx + dy * dy < WEEK_GRID_MIN_DRAG_PX * WEEK_GRID_MIN_DRAG_PX) return;
           cur.moveThresholdPassed = true;
         }
         const dur =
           Math.max(TIME_SNAP_MINUTES, Math.round(cur.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES);
-        const newStart = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, mSnap)));
-        const newEnd = newStart + dur;
-        const { topPct, heightPct } = pctRangeFromWindowMinutes(newStart, newEnd);
+        const newStartWin = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, mSnap)));
+        const newStart = dateFromColumnAndWindowMinutes(ymd, newStartWin, sh);
+        const newEnd = new Date(newStart.getTime() + dur * 60000);
         setDragOverride({
           entryId: cur.entryId,
-          dayYmd: cur.dayYmd,
-          topPct,
-          heightPct,
-          startWinMin: newStart,
-          endWinMin: newEnd,
+          startsAt: newStart.toISOString(),
+          endsAt: newEnd.toISOString(),
         });
         return;
       }
 
       if (cur.kind === "resizeEnd") {
-        const newEnd = clampMinutesToDay(
-          Math.max(cur.origStartWinMin + TIME_SNAP_MINUTES, mSnap)
-        );
-        const { topPct, heightPct } = pctRangeFromWindowMinutes(cur.origStartWinMin, newEnd);
+        const newEnd = dateFromColumnAndWindowMinutes(ymd, mSnap, sh);
+        const start = parseISO(cur.origStartsAtIso);
+        const minEnd = new Date(start.getTime() + TIME_SNAP_MINUTES * 60000);
+        const endsAt = newEnd.getTime() < minEnd.getTime() ? minEnd : newEnd;
         setDragOverride({
           entryId: cur.entryId,
-          dayYmd: cur.dayYmd,
-          topPct,
-          heightPct,
-          startWinMin: cur.origStartWinMin,
-          endWinMin: newEnd,
+          startsAt: cur.origStartsAtIso,
+          endsAt: endsAt.toISOString(),
         });
         return;
       }
 
       if (cur.kind === "resizeStart") {
-        const newStart = clampMinutesToDay(
-          Math.min(mSnap, cur.origEndWinMin - TIME_SNAP_MINUTES)
-        );
-        const { topPct, heightPct } = pctRangeFromWindowMinutes(newStart, cur.origEndWinMin);
+        const newStart = dateFromColumnAndWindowMinutes(ymd, mSnap, sh);
+        const end = parseISO(cur.origEndsAtIso);
+        const maxStart = new Date(end.getTime() - TIME_SNAP_MINUTES * 60000);
+        const startsAt = newStart.getTime() > maxStart.getTime() ? maxStart : newStart;
         setDragOverride({
           entryId: cur.entryId,
-          dayYmd: cur.dayYmd,
-          topPct,
-          heightPct,
-          startWinMin: newStart,
-          endWinMin: cur.origEndWinMin,
+          startsAt: startsAt.toISOString(),
+          endsAt: cur.origEndsAtIso,
         });
       }
     };
@@ -674,17 +736,19 @@ export default function TimeTracking() {
       window.removeEventListener("pointerup", finish);
       window.removeEventListener("pointercancel", finish);
       const d = entryDragRef.current;
-      const col = activeColElRef.current;
-      if (!d || !col) {
-        entryDragRef.current = null;
-        activeColElRef.current = null;
-        setDragOverride(null);
-        return;
-      }
-      const m = minutesFromY(ev.clientY, col);
       entryDragRef.current = null;
       activeColElRef.current = null;
       const sh = displayStartHourRef.current;
+
+      if (!d) {
+        setDragOverride(null);
+        return;
+      }
+
+      const idx = findColumnIndexAtX(weekColumnRefs.current, ev.clientX, d.startDayIndex);
+      const col = weekColumnRefs.current[idx];
+      const ymd = weekDayYmds[idx];
+      const m = col ? minutesFromY(ev.clientY, col) : null;
 
       if (d.kind === "move" && !d.moveThresholdPassed) {
         setEditingEntryId(d.entryId);
@@ -692,18 +756,21 @@ export default function TimeTracking() {
         return;
       }
 
-      if (m === null) {
+      if (m === null || !ymd) {
         setDragOverride(null);
         return;
       }
 
       if (d.kind === "resizeEnd") {
-        const newEndWin = clampMinutesToDay(Math.max(d.origStartWinMin + TIME_SNAP_MINUTES, m));
+        const newEnd = dateFromColumnAndWindowMinutes(ymd, m, sh);
+        const start = parseISO(d.origStartsAtIso);
+        const minEnd = new Date(start.getTime() + TIME_SNAP_MINUTES * 60000);
+        const endsAt = newEnd.getTime() < minEnd.getTime() ? minEnd : newEnd;
         updateEntry.mutate({
           id: d.entryId,
           body: {
-            startsAt: dateFromColumnAndWindowMinutes(d.dayYmd, d.origStartWinMin, sh).toISOString(),
-            endsAt: dateFromColumnAndWindowMinutes(d.dayYmd, newEndWin, sh).toISOString(),
+            startsAt: d.origStartsAtIso,
+            endsAt: endsAt.toISOString(),
           },
         });
         setDragOverride(null);
@@ -711,12 +778,15 @@ export default function TimeTracking() {
       }
 
       if (d.kind === "resizeStart") {
-        const newStartWin = clampMinutesToDay(Math.min(m, d.origEndWinMin - TIME_SNAP_MINUTES));
+        const newStart = dateFromColumnAndWindowMinutes(ymd, m, sh);
+        const end = parseISO(d.origEndsAtIso);
+        const maxStart = new Date(end.getTime() - TIME_SNAP_MINUTES * 60000);
+        const startsAt = newStart.getTime() > maxStart.getTime() ? maxStart : newStart;
         updateEntry.mutate({
           id: d.entryId,
           body: {
-            startsAt: dateFromColumnAndWindowMinutes(d.dayYmd, newStartWin, sh).toISOString(),
-            endsAt: dateFromColumnAndWindowMinutes(d.dayYmd, d.origEndWinMin, sh).toISOString(),
+            startsAt: startsAt.toISOString(),
+            endsAt: d.origEndsAtIso,
           },
         });
         setDragOverride(null);
@@ -726,12 +796,13 @@ export default function TimeTracking() {
       const dur =
         Math.max(TIME_SNAP_MINUTES, Math.round(d.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES);
       const newStartWin = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, m)));
-      const newEndWin = clampMinutesToDay(newStartWin + dur);
+      const newStart = dateFromColumnAndWindowMinutes(ymd, newStartWin, sh);
+      const newEnd = new Date(newStart.getTime() + dur * 60000);
       updateEntry.mutate({
         id: d.entryId,
         body: {
-          startsAt: dateFromColumnAndWindowMinutes(d.dayYmd, newStartWin, sh).toISOString(),
-          endsAt: dateFromColumnAndWindowMinutes(d.dayYmd, newEndWin, sh).toISOString(),
+          startsAt: newStart.toISOString(),
+          endsAt: newEnd.toISOString(),
         },
       });
       setDragOverride(null);
@@ -740,7 +811,7 @@ export default function TimeTracking() {
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", finish);
-  }, [minutesFromY, updateEntry, setEditingEntryId]);
+  }, [minutesFromY, updateEntry, setEditingEntryId, weekDayYmds]);
 
   const entryByJobId = useMemo(() => {
     const m = new Map<string, TimeEntry>();
@@ -815,28 +886,12 @@ export default function TimeTracking() {
     jumpToJobWeek(job);
   }
 
-  function entryWindowMetrics(e: TimeEntry, columnDayYmd: string) {
-    const start = parseISO(e.startsAt);
-    const end = parseISO(e.endsAt);
-    const startWin = minutesFromWindowStart(start, columnDayYmd, displayStartHour);
-    let endWin = minutesFromWindowStart(end, columnDayYmd, displayStartHour);
-    if (endWin < startWin) endWin += MINUTES_PER_DAY;
-    const visibleEnd = Math.min(endWin, MINUTES_PER_DAY);
-    const topPct = (Math.max(0, startWin) / MINUTES_PER_DAY) * 100;
-    const heightPct = ((visibleEnd - Math.max(0, startWin)) / MINUTES_PER_DAY) * 100;
-    return { topPct, heightPct };
-  }
-
   function jobWindowMetrics(job: TimeTrackingJob, columnDayYmd: string) {
     const start = parseISO(job.plannedStartsAt);
     const end = parseISO(job.plannedEndsAt);
-    const startWin = minutesFromWindowStart(start, columnDayYmd, displayStartHour);
-    let endWin = minutesFromWindowStart(end, columnDayYmd, displayStartHour);
-    if (endWin < startWin) endWin += MINUTES_PER_DAY;
-    const visibleEnd = Math.min(endWin, MINUTES_PER_DAY);
-    const topPct = (Math.max(0, startWin) / MINUTES_PER_DAY) * 100;
-    const heightPct = ((visibleEnd - Math.max(0, startWin)) / MINUTES_PER_DAY) * 100;
-    return { topPct, heightPct };
+    const m = rangeMetricsInColumn(start, end, columnDayYmd, displayStartHour);
+    if (!m) return { topPct: 0, heightPct: 0 };
+    return { topPct: m.topPct, heightPct: Math.max(m.heightPct, 3) };
   }
 
   if (!canUsePage) {
@@ -1190,7 +1245,7 @@ export default function TimeTracking() {
               </div>
               <div className="h-6 border-b border-white/15" />
             </div>
-            {weekDays.map((day) => {
+            {weekDays.map((day, dayIndex) => {
               const dayYmd = format(day, "yyyy-MM-dd");
               const dayTotalMinutes = totalsByColumnDay.get(dayYmd) ?? 0;
               const dayOffEntry = (entries ?? []).find(
@@ -1271,6 +1326,9 @@ export default function TimeTracking() {
                     ) : null}
                   </div>
                   <div
+                    ref={(el) => {
+                      weekColumnRefs.current[dayIndex] = el;
+                    }}
                     data-day-col={dayYmd}
                     className={cn("relative flex flex-col", col?.bg)}
                     style={{ height: COLUMN_HEIGHT_PX }}
@@ -1290,7 +1348,7 @@ export default function TimeTracking() {
                           className="absolute inset-0 z-[1] cursor-crosshair touch-none"
                           onPointerDown={(ev) => {
                             ev.preventDefault();
-                            attachCreateDragListeners(dayYmd, ev.clientY);
+                            attachCreateDragListeners(dayYmd, ev.clientX, ev.clientY);
                           }}
                         />
                         <div
@@ -1359,15 +1417,37 @@ export default function TimeTracking() {
                         );
                       })}
                     {(entries ?? [])
-                      .filter(
-                        (e) =>
-                          columnDayYmdForInstant(parseISO(e.startsAt), displayStartHour) === dayYmd
+                      .filter((e) =>
+                        rangeOverlapsColumnWindow(
+                          parseISO(e.startsAt),
+                          parseISO(e.endsAt),
+                          dayYmd,
+                          displayStartHour
+                        )
                       )
                       .map((e) => {
-                        const { topPct, heightPct } = entryWindowMetrics(e, dayYmd);
+                        const preview =
+                          dragOverride?.entryId === e.id
+                            ? {
+                                start: parseISO(dragOverride.startsAt),
+                                end: parseISO(dragOverride.endsAt),
+                              }
+                            : null;
+                        const spanStart = preview?.start ?? parseISO(e.startsAt);
+                        const spanEnd = preview?.end ?? parseISO(e.endsAt);
+                        const segment = rangeMetricsInColumn(
+                          spanStart,
+                          spanEnd,
+                          dayYmd,
+                          displayStartHour
+                        );
+                        if (!segment) return null;
+                        const topPct = segment.topPct;
+                        const heightPct = Math.max(segment.heightPct, 0.35);
                         const start = parseISO(e.startsAt);
                         const end = parseISO(e.endsAt);
-                        const durMin = (end.getTime() - start.getTime()) / 60000;
+                        const entryDurMin = (end.getTime() - start.getTime()) / 60000;
+                        const durMin = (spanEnd.getTime() - spanStart.getTime()) / 60000;
                         const isJob = e.kind === "job";
                         const isLocked = e.isLocked === true;
                         const cat = (e.category ?? "work") as TimeCategory;
@@ -1388,48 +1468,18 @@ export default function TimeTracking() {
                           : null;
                         const proj = projEntity?.name ?? null;
                         const timeTf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
-                        const override =
-                          dragOverride?.entryId === e.id ? dragOverride : null;
-                        const colYmd = override?.dayYmd ?? dayYmd;
-                        const liveStart =
-                          override &&
-                          dateFromColumnAndWindowMinutes(
-                            colYmd,
-                            override.startWinMin,
-                            displayStartHour
-                          );
-                        const liveEnd =
-                          override &&
-                          dateFromColumnAndWindowMinutes(
-                            colYmd,
-                            override.endWinMin,
-                            displayStartHour
-                          );
-                        const startDisp = override && liveStart && liveEnd
-                          ? snapLocalClockToGrid(liveStart)
-                          : snapLocalClockToGrid(start);
-                        const endDisp = override && liveStart && liveEnd
-                          ? snapLocalClockToGrid(liveEnd)
-                          : snapLocalClockToGrid(end);
+                        const startDisp = snapLocalClockToGrid(spanStart);
+                        const endDisp = snapLocalClockToGrid(spanEnd);
                         const startTimeLabel = format(startDisp, timeTf);
                         const endTimeLabel = format(endDisp, timeTf);
-                        const durForLabel = override && liveStart && liveEnd
-                          ? Math.max(
-                              TIME_SNAP_MINUTES,
-                              Math.round(
-                                (liveEnd.getTime() - liveStart.getTime()) /
-                                  60000 /
-                                  TIME_SNAP_MINUTES
-                              ) * TIME_SNAP_MINUTES
-                            )
-                          : Math.max(
-                              TIME_SNAP_MINUTES,
-                              Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
-                            );
+                        const durForLabel = Math.max(
+                          TIME_SNAP_MINUTES,
+                          Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
+                        );
                         const durationLabel = formatDurationShort(durForLabel);
                         return (
                           <div
-                            key={e.id}
+                            key={`${e.id}-${dayYmd}`}
                             className={cn(
                               "absolute left-0.5 right-0.5 rounded border px-1 pt-1 pb-2 text-[10px] overflow-hidden shadow-sm select-none",
                               cat === "vacation"
@@ -1447,8 +1497,8 @@ export default function TimeTracking() {
                             )}
                             data-entry-block={e.id}
                             style={{
-                              top: `${override?.topPct ?? Math.max(0, topPct)}%`,
-                              height: `${override?.heightPct ?? Math.max(4, heightPct)}%`,
+                              top: `${Math.max(0, topPct)}%`,
+                              height: `${Math.max(4, heightPct)}%`,
                               zIndex: 2,
                               ...(projStripe
                                 ? { boxShadow: `inset 4px 0 0 0 ${projStripe}` }
@@ -1465,9 +1515,12 @@ export default function TimeTracking() {
                                 entryId: e.id,
                                 kind: "move",
                                 origStartWinMin: sWin,
-                                origEndWinMin: sWin + durMin,
+                                origEndWinMin: sWin + entryDurMin,
                                 dayYmd,
-                                durationMin: durMin,
+                                startDayIndex: weekDayYmds.indexOf(dayYmd),
+                                origStartsAtIso: e.startsAt,
+                                origEndsAtIso: e.endsAt,
+                                durationMin: entryDurMin,
                                 moveStartClientX: ev.clientX,
                                 moveStartClientY: ev.clientY,
                                 moveThresholdPassed: false,
@@ -1603,9 +1656,12 @@ export default function TimeTracking() {
                                       entryId: e.id,
                                       kind: "resizeStart",
                                       origStartWinMin: sWin,
-                                      origEndWinMin: sWin + durMin,
+                                      origEndWinMin: sWin + entryDurMin,
                                       dayYmd,
-                                      durationMin: durMin,
+                                      startDayIndex: weekDayYmds.indexOf(dayYmd),
+                                      origStartsAtIso: e.startsAt,
+                                      origEndsAtIso: e.endsAt,
+                                      durationMin: entryDurMin,
                                     };
                                     attachEntryDragListeners();
                                   }}
@@ -1627,9 +1683,12 @@ export default function TimeTracking() {
                                       entryId: e.id,
                                       kind: "resizeEnd",
                                       origStartWinMin: sWin,
-                                      origEndWinMin: sWin + durMin,
+                                      origEndWinMin: sWin + entryDurMin,
                                       dayYmd,
-                                      durationMin: durMin,
+                                      startDayIndex: weekDayYmds.indexOf(dayYmd),
+                                      origStartsAtIso: e.startsAt,
+                                      origEndsAtIso: e.endsAt,
+                                      durationMin: entryDurMin,
                                     };
                                     attachEntryDragListeners();
                                   }}
