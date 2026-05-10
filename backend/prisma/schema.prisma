@@ -919,6 +919,16 @@ model TimeTravelClaim {
   lodgingAllowance      Boolean      @default(false)
   lodgingCovered        Boolean      @default(false)
   foodCoveredByReceipts Boolean      @default(false)
+  isTemporaryWorkplace  Boolean      @default(false)
+  hasUsualResidence     Boolean      @default(false)
+  overnightAwayFromHome Boolean      @default(false)
+  cannotReturnHome      Boolean      @default(false)
+  twelveMonthRuleOk     Boolean      @default(true)
+  salaryReductionAgreement Boolean   @default(false)
+  receivesBIncome       Boolean      @default(false)
+  excludedWorkerType    Boolean      @default(false)
+  transportsPeopleOrGoods Boolean    @default(false)
+  lodgingByReceipt      Boolean      @default(false)
   eventId               String?
   eventShowJobId        String?
   timeProjectId         String?

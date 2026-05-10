@@ -1,0 +1,10 @@
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "isTemporaryWorkplace" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "hasUsualResidence" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "overnightAwayFromHome" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "cannotReturnHome" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "twelveMonthRuleOk" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "salaryReductionAgreement" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "receivesBIncome" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "excludedWorkerType" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "transportsPeopleOrGoods" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "lodgingByReceipt" BOOLEAN NOT NULL DEFAULT false;

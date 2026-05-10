@@ -410,12 +410,32 @@ function calculateTravelAllowance(args: {
   lodgingAllowance?: boolean;
   lodgingCovered?: boolean;
   foodCoveredByReceipts?: boolean;
+  isTemporaryWorkplace?: boolean;
+  hasUsualResidence?: boolean;
+  overnightAwayFromHome?: boolean;
+  cannotReturnHome?: boolean;
+  twelveMonthRuleOk?: boolean;
+  salaryReductionAgreement?: boolean;
+  receivesBIncome?: boolean;
+  excludedWorkerType?: boolean;
+  transportsPeopleOrGoods?: boolean;
+  lodgingByReceipt?: boolean;
 }) {
   const rates = ratesForTravelClaim(args.rateYear ?? 2026, args.allowanceType);
   const durationMs = args.endsAt.getTime() - args.startsAt.getTime();
   const startedHours = Math.ceil(durationMs / 3_600_000);
   const fullDays = Math.floor(durationMs / 86_400_000);
-  const eligibleFoodHours = startedHours >= 24 ? startedHours : 0;
+  const baseEligible =
+    durationMs >= 86_400_000 &&
+    args.isTemporaryWorkplace === true &&
+    args.hasUsualResidence === true &&
+    args.overnightAwayFromHome === true &&
+    args.cannotReturnHome === true &&
+    args.twelveMonthRuleOk !== false &&
+    args.salaryReductionAgreement !== true &&
+    args.receivesBIncome !== true &&
+    args.excludedWorkerType !== true;
+  const eligibleFoodHours = baseEligible ? startedHours : 0;
 
   let foodAmountCents = eligibleFoodHours > 0
     ? Math.round((rates.foodRateCents * eligibleFoodHours) / 24)
@@ -431,8 +451,13 @@ function calculateTravelAllowance(args: {
     foodAmountCents = Math.round(foodAmountCents * Math.max(0, 1 - Math.min(0.75, reductionPct)));
   }
 
+  const lodgingEligible =
+    baseEligible &&
+    args.allowanceType === "standard" &&
+    args.transportsPeopleOrGoods !== true &&
+    args.lodgingByReceipt !== true;
   const lodgingAmountCents =
-    args.lodgingAllowance && !args.lodgingCovered && fullDays > 0
+    lodgingEligible && args.lodgingAllowance && !args.lodgingCovered && fullDays > 0
       ? fullDays * rates.lodgingRateCents
       : 0;
 
@@ -464,6 +489,16 @@ function serializeTravelClaim(row: {
   lodgingAllowance: boolean;
   lodgingCovered: boolean;
   foodCoveredByReceipts: boolean;
+  isTemporaryWorkplace: boolean;
+  hasUsualResidence: boolean;
+  overnightAwayFromHome: boolean;
+  cannotReturnHome: boolean;
+  twelveMonthRuleOk: boolean;
+  salaryReductionAgreement: boolean;
+  receivesBIncome: boolean;
+  excludedWorkerType: boolean;
+  transportsPeopleOrGoods: boolean;
+  lodgingByReceipt: boolean;
   eventId: string | null;
   eventShowJobId: string | null;
   timeProjectId: string | null;
@@ -494,6 +529,16 @@ function serializeTravelClaim(row: {
     lodgingAllowance: row.lodgingAllowance,
     lodgingCovered: row.lodgingCovered,
     foodCoveredByReceipts: row.foodCoveredByReceipts,
+    isTemporaryWorkplace: row.isTemporaryWorkplace,
+    hasUsualResidence: row.hasUsualResidence,
+    overnightAwayFromHome: row.overnightAwayFromHome,
+    cannotReturnHome: row.cannotReturnHome,
+    twelveMonthRuleOk: row.twelveMonthRuleOk,
+    salaryReductionAgreement: row.salaryReductionAgreement,
+    receivesBIncome: row.receivesBIncome,
+    excludedWorkerType: row.excludedWorkerType,
+    transportsPeopleOrGoods: row.transportsPeopleOrGoods,
+    lodgingByReceipt: row.lodgingByReceipt,
     eventId: row.eventId,
     eventShowJobId: row.eventShowJobId,
     timeProjectId: row.timeProjectId,
@@ -1793,6 +1838,16 @@ timeRouter.post("/time/travel-claims", zValidator("json", CreateTimeTravelClaimS
     lodgingAllowance: body.lodgingAllowance,
     lodgingCovered: body.lodgingCovered,
     foodCoveredByReceipts: body.foodCoveredByReceipts,
+    isTemporaryWorkplace: body.isTemporaryWorkplace,
+    hasUsualResidence: body.hasUsualResidence,
+    overnightAwayFromHome: body.overnightAwayFromHome,
+    cannotReturnHome: body.cannotReturnHome,
+    twelveMonthRuleOk: body.twelveMonthRuleOk,
+    salaryReductionAgreement: body.salaryReductionAgreement,
+    receivesBIncome: body.receivesBIncome,
+    excludedWorkerType: body.excludedWorkerType,
+    transportsPeopleOrGoods: body.transportsPeopleOrGoods,
+    lodgingByReceipt: body.lodgingByReceipt,
   });
   const row = await prisma.timeTravelClaim.create({
     data: {
@@ -1812,6 +1867,16 @@ timeRouter.post("/time/travel-claims", zValidator("json", CreateTimeTravelClaimS
       lodgingAllowance: body.lodgingAllowance ?? false,
       lodgingCovered: body.lodgingCovered ?? false,
       foodCoveredByReceipts: body.foodCoveredByReceipts ?? false,
+      isTemporaryWorkplace: body.isTemporaryWorkplace ?? false,
+      hasUsualResidence: body.hasUsualResidence ?? false,
+      overnightAwayFromHome: body.overnightAwayFromHome ?? false,
+      cannotReturnHome: body.cannotReturnHome ?? false,
+      twelveMonthRuleOk: body.twelveMonthRuleOk ?? true,
+      salaryReductionAgreement: body.salaryReductionAgreement ?? false,
+      receivesBIncome: body.receivesBIncome ?? false,
+      excludedWorkerType: body.excludedWorkerType ?? false,
+      transportsPeopleOrGoods: body.transportsPeopleOrGoods ?? false,
+      lodgingByReceipt: body.lodgingByReceipt ?? false,
       eventId: body.eventId ?? null,
       eventShowJobId: body.eventShowJobId ?? null,
       timeProjectId: body.timeProjectId ?? null,
@@ -1869,6 +1934,16 @@ timeRouter.patch("/time/travel-claims/:id", zValidator("json", PatchTimeTravelCl
     lodgingAllowance: body.lodgingAllowance ?? existing.lodgingAllowance,
     lodgingCovered: body.lodgingCovered ?? existing.lodgingCovered,
     foodCoveredByReceipts: body.foodCoveredByReceipts ?? existing.foodCoveredByReceipts,
+    isTemporaryWorkplace: body.isTemporaryWorkplace ?? existing.isTemporaryWorkplace,
+    hasUsualResidence: body.hasUsualResidence ?? existing.hasUsualResidence,
+    overnightAwayFromHome: body.overnightAwayFromHome ?? existing.overnightAwayFromHome,
+    cannotReturnHome: body.cannotReturnHome ?? existing.cannotReturnHome,
+    twelveMonthRuleOk: body.twelveMonthRuleOk ?? existing.twelveMonthRuleOk,
+    salaryReductionAgreement: body.salaryReductionAgreement ?? existing.salaryReductionAgreement,
+    receivesBIncome: body.receivesBIncome ?? existing.receivesBIncome,
+    excludedWorkerType: body.excludedWorkerType ?? existing.excludedWorkerType,
+    transportsPeopleOrGoods: body.transportsPeopleOrGoods ?? existing.transportsPeopleOrGoods,
+    lodgingByReceipt: body.lodgingByReceipt ?? existing.lodgingByReceipt,
   });
   const updated = await prisma.timeTravelClaim.update({
     where: { id },
@@ -1886,6 +1961,16 @@ timeRouter.patch("/time/travel-claims/:id", zValidator("json", PatchTimeTravelCl
       ...(body.lodgingAllowance !== undefined ? { lodgingAllowance: body.lodgingAllowance } : {}),
       ...(body.lodgingCovered !== undefined ? { lodgingCovered: body.lodgingCovered } : {}),
       ...(body.foodCoveredByReceipts !== undefined ? { foodCoveredByReceipts: body.foodCoveredByReceipts } : {}),
+      ...(body.isTemporaryWorkplace !== undefined ? { isTemporaryWorkplace: body.isTemporaryWorkplace } : {}),
+      ...(body.hasUsualResidence !== undefined ? { hasUsualResidence: body.hasUsualResidence } : {}),
+      ...(body.overnightAwayFromHome !== undefined ? { overnightAwayFromHome: body.overnightAwayFromHome } : {}),
+      ...(body.cannotReturnHome !== undefined ? { cannotReturnHome: body.cannotReturnHome } : {}),
+      ...(body.twelveMonthRuleOk !== undefined ? { twelveMonthRuleOk: body.twelveMonthRuleOk } : {}),
+      ...(body.salaryReductionAgreement !== undefined ? { salaryReductionAgreement: body.salaryReductionAgreement } : {}),
+      ...(body.receivesBIncome !== undefined ? { receivesBIncome: body.receivesBIncome } : {}),
+      ...(body.excludedWorkerType !== undefined ? { excludedWorkerType: body.excludedWorkerType } : {}),
+      ...(body.transportsPeopleOrGoods !== undefined ? { transportsPeopleOrGoods: body.transportsPeopleOrGoods } : {}),
+      ...(body.lodgingByReceipt !== undefined ? { lodgingByReceipt: body.lodgingByReceipt } : {}),
       ...(body.eventId !== undefined ? { eventId: body.eventId } : {}),
       ...(body.eventShowJobId !== undefined ? { eventShowJobId: body.eventShowJobId } : {}),
       ...(body.timeProjectId !== undefined ? { timeProjectId: body.timeProjectId } : {}),

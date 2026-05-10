@@ -35,8 +35,36 @@ type TravelDraft = {
   lodgingAllowance: boolean;
   lodgingCovered: boolean;
   foodCoveredByReceipts: boolean;
+  isTemporaryWorkplace: boolean;
+  hasUsualResidence: boolean;
+  overnightAwayFromHome: boolean;
+  cannotReturnHome: boolean;
+  twelveMonthRuleOk: boolean;
+  salaryReductionAgreement: boolean;
+  receivesBIncome: boolean;
+  excludedWorkerType: boolean;
+  transportsPeopleOrGoods: boolean;
+  lodgingByReceipt: boolean;
   notes: string;
 };
+
+function skatEligibility(draft: TravelDraft): { ok: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  const start = new Date(draft.startsAt).getTime();
+  const end = new Date(draft.endsAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end - start < 24 * 60 * 60_000) {
+    reasons.push("Travel must last at least 24 hours.");
+  }
+  if (!draft.isTemporaryWorkplace) reasons.push("Workplace must be temporary.");
+  if (!draft.hasUsualResidence) reasons.push("Employee must have a usual residence.");
+  if (!draft.overnightAwayFromHome) reasons.push("Employee must sleep away from home.");
+  if (!draft.cannotReturnHome) reasons.push("Distance/work must make overnighting at home impossible.");
+  if (!draft.twelveMonthRuleOk) reasons.push("12-month rule must still allow standard rates.");
+  if (draft.salaryReductionAgreement) reasons.push("Allowance cannot replace reduced salary.");
+  if (draft.receivesBIncome) reasons.push("B-income cannot receive tax-free allowance.");
+  if (draft.excludedWorkerType) reasons.push("Worker type is excluded by SKAT rules.");
+  return { ok: reasons.length === 0, reasons };
+}
 
 export function TravelClaimsPanel({
   rangeFrom,
@@ -71,6 +99,16 @@ export function TravelClaimsPanel({
       lodgingAllowance: false,
       lodgingCovered: false,
       foodCoveredByReceipts: false,
+      isTemporaryWorkplace: true,
+      hasUsualResidence: true,
+      overnightAwayFromHome: true,
+      cannotReturnHome: true,
+      twelveMonthRuleOk: true,
+      salaryReductionAgreement: false,
+      receivesBIncome: false,
+      excludedWorkerType: false,
+      transportsPeopleOrGoods: false,
+      lodgingByReceipt: false,
       notes: "",
     };
   });
@@ -117,11 +155,24 @@ export function TravelClaimsPanel({
       lodgingAllowance: draft.lodgingAllowance,
       lodgingCovered: draft.lodgingCovered,
       foodCoveredByReceipts: draft.foodCoveredByReceipts,
+      isTemporaryWorkplace: draft.isTemporaryWorkplace,
+      hasUsualResidence: draft.hasUsualResidence,
+      overnightAwayFromHome: draft.overnightAwayFromHome,
+      cannotReturnHome: draft.cannotReturnHome,
+      twelveMonthRuleOk: draft.twelveMonthRuleOk,
+      salaryReductionAgreement: draft.salaryReductionAgreement,
+      receivesBIncome: draft.receivesBIncome,
+      excludedWorkerType: draft.excludedWorkerType,
+      transportsPeopleOrGoods: draft.transportsPeopleOrGoods,
+      lodgingByReceipt: draft.lodgingByReceipt,
       notes: draft.notes.trim() || null,
     });
   }
 
   const total = (claims ?? []).reduce((sum, claim) => sum + claim.totalAmountCents, 0);
+  const eligibility = skatEligibility(draft);
+  const canClaimLodging =
+    draft.allowanceType === "standard" && !draft.transportsPeopleOrGoods && !draft.lodgingByReceipt;
 
   return (
     <div className="space-y-4">
@@ -130,7 +181,7 @@ export function TravelClaimsPanel({
           <div>
             <h3 className="text-sm font-semibold text-white">Travel allowance</h3>
             <p className="mt-1 text-xs text-white/45">
-              Danish tax-free travel allowance for trips of at least 24 hours. Time tracking remains the source for actual worked hours.
+              Danish tax-free travel allowance using SKAT's 2025/2026 rates, 24-hour rule, meal reductions, 25% receipt rule, and lodging exclusions.
             </p>
           </div>
           <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
@@ -217,6 +268,48 @@ export function TravelClaimsPanel({
                   className="mt-1 min-h-20 border-white/10 bg-white/5 text-white"
                 />
               </div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-xs font-semibold text-white">SKAT eligibility</p>
+                <p className="mt-1 text-[11px] text-white/45">
+                  All positive conditions must be true. If one fails, the tax-free amount calculates to 0.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {[
+                    ["isTemporaryWorkplace", "Temporary workplace"],
+                    ["hasUsualResidence", "Usual residence"],
+                    ["overnightAwayFromHome", "Overnight away from home"],
+                    ["cannotReturnHome", "Cannot reasonably sleep at home"],
+                    ["twelveMonthRuleOk", "Within 12-month rule"],
+                  ].map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2 text-xs text-white/65">
+                      <Checkbox
+                        checked={Boolean(draft[key as keyof TravelDraft])}
+                        onCheckedChange={(checked) => setDraft((d) => ({ ...d, [key]: checked === true }))}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                  {[
+                    ["salaryReductionAgreement", "Salary reduced for allowance"],
+                    ["receivesBIncome", "B-income / honorar"],
+                    ["excludedWorkerType", "Excluded worker type"],
+                  ].map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2 text-xs text-white/65">
+                      <Checkbox
+                        checked={Boolean(draft[key as keyof TravelDraft])}
+                        onCheckedChange={(checked) => setDraft((d) => ({ ...d, [key]: checked === true }))}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {!eligibility.ok ? (
+                  <p className="mt-3 rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
+                    Not tax-free under SKAT rules: {eligibility.reasons[0]}
+                  </p>
+                ) : null}
+              </div>
+
               <div className="grid gap-2 sm:grid-cols-2">
                 {[
                   ["breakfastProvided", "Breakfast provided"],
@@ -225,6 +318,8 @@ export function TravelClaimsPanel({
                   ["foodCoveredByReceipts", "Meals by receipts"],
                   ["lodgingAllowance", "Claim lodging allowance"],
                   ["lodgingCovered", "Lodging covered/free"],
+                  ["lodgingByReceipt", "Lodging by receipt"],
+                  ["transportsPeopleOrGoods", "Transports people/goods"],
                 ].map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 text-xs text-white/65">
                     <Checkbox
@@ -237,6 +332,11 @@ export function TravelClaimsPanel({
                   </label>
                 ))}
               </div>
+              {!canClaimLodging && draft.lodgingAllowance ? (
+                <p className="rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
+                  SKAT does not allow tax-free lodging allowance for tourist drivers/transport of people or goods, or when lodging is covered by receipts.
+                </p>
+              ) : null}
               <Textarea
                 value={draft.notes}
                 onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
@@ -271,6 +371,14 @@ export function TravelClaimsPanel({
                   </p>
                   <p className="mt-2 text-sm text-white/70">{claim.purpose}</p>
                   {claim.notes ? <p className="mt-1 text-xs text-white/45">{claim.notes}</p> : null}
+                  <p className="mt-2 text-[11px] text-white/40">
+                    Rate year {claim.rateYear} · Meals rate {money(claim.foodRateCents)}/day · Lodging rate {money(claim.lodgingRateCents)}/day
+                  </p>
+                  {claim.totalAmountCents === 0 ? (
+                    <p className="mt-1 text-[11px] text-amber-200/80">
+                      Calculated as 0 because the trip does not meet all tax-free SKAT conditions or selected allowances are excluded.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex items-start gap-2">
                   <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
