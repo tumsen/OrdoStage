@@ -31,6 +31,12 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
+import {
+  formatScheduleEventTimes,
+  scheduleEventLabel,
+  sortedTourScheduleEvents,
+  tourShowGetInTimeHHMM,
+} from "@/lib/tourScheduleDisplay";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import type {
   TourDetail,
@@ -97,20 +103,6 @@ function mapsUrl(address: string): string {
 
 function mapsDirectionsUrl(from: string, to: string): string {
   return `https://www.google.com/maps/dir/${encodeURIComponent(from)}/${encodeURIComponent(to)}`;
-}
-
-function scheduleKindShort(kind: string, customLabel: string | null): string {
-  if (kind === "custom" && customLabel?.trim()) return customLabel.trim();
-  const map: Record<string, string> = {
-    get_in: "Get-in",
-    get_out: "Get-out",
-    show: "Show",
-    rehearsal: "Rehearsal",
-    soundcheck: "Soundcheck",
-    travel: "Travel",
-    custom: "Custom",
-  };
-  return map[kind] ?? kind;
 }
 
 // Computes latest ETD: nextGetInTime minus travelTimeMinutes
@@ -1442,18 +1434,14 @@ function ShowCard({
     },
   });
 
-  const hasTimes = show.getInTime || show.rehearsalTime || show.soundcheckTime || show.doorsTime;
   const hasHotel = show.hotelName || show.hotelStreet || show.hotelCity;
   const hasContact = show.contactName || show.contactPhone || show.contactEmail;
   const hasLogistics = show.travelInfo || show.cateringInfo || show.notes;
 
-  const sortedSchedulePreview = useMemo(
-    () => [...(show.scheduleEvents ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
-    [show.scheduleEvents]
-  );
+  const sortedSchedulePreview = useMemo(() => sortedTourScheduleEvents(show), [show]);
   const schedulePreviewLines = sortedSchedulePreview
     .slice(0, 4)
-    .map((e) => `${scheduleKindShort(e.kind, e.customLabel)} ${e.startTime}–${e.endTime}`);
+    .map((e) => `${scheduleEventLabel(e)} ${formatScheduleEventTimes(e)}`.trim());
 
   return (
     <>
@@ -1646,44 +1634,6 @@ function ShowCard({
               );
             })() : null}
 
-            {hasTimes ? (
-              <div>
-                <div className="text-xs text-white/35 uppercase tracking-wide mb-2">Schedule</div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {show.getInTime ? (
-                    <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                      <div className="text-xs text-white/30 mb-0.5">Get-in</div>
-                      <div className="text-sm font-medium text-white/80">{show.getInTime}</div>
-                    </div>
-                  ) : null}
-                  {show.rehearsalTime ? (
-                    <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                      <div className="text-xs text-white/30 mb-0.5">Rehearsal</div>
-                      <div className="text-sm font-medium text-white/80">{show.rehearsalTime}</div>
-                    </div>
-                  ) : null}
-                  {show.soundcheckTime ? (
-                    <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                      <div className="text-xs text-white/30 mb-0.5">Soundcheck</div>
-                      <div className="text-sm font-medium text-white/80">{show.soundcheckTime}</div>
-                    </div>
-                  ) : null}
-                  {show.doorsTime ? (
-                    <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                      <div className="text-xs text-white/30 mb-0.5">Doors</div>
-                      <div className="text-sm font-medium text-white/80">{show.doorsTime}</div>
-                    </div>
-                  ) : null}
-                  {show.showTime ? (
-                    <div className="bg-white/[0.02] rounded-lg px-3 py-2">
-                      <div className="text-xs text-white/30 mb-0.5">Show</div>
-                      <div className="text-sm font-medium text-white/80">{show.showTime}</div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-
             {hasContact ? (
               <div>
                 <div className="text-xs text-white/35 uppercase tracking-wide mb-2">Venue Contact</div>
@@ -1751,7 +1701,7 @@ function ShowCard({
               </div>
             ) : null}
 
-            {!show.venueStreet && !show.venueCity && !hasTimes && !hasContact && !hasHotel && !hasLogistics ? (
+            {!show.venueStreet && !show.venueCity && !hasContact && !hasHotel && !hasLogistics ? (
               <div className="text-sm text-white/25 text-center py-2">No additional details.</div>
             ) : null}
 
@@ -2004,9 +1954,11 @@ function TravelConnector({ currentShow, nextShow }: TravelConnectorProps) {
   const nextAddress = nextShow.venueStreet || nextShow.venueName || nextShow.venueCity;
   const currentAddress = currentShow.venueStreet || currentShow.venueName || currentShow.venueCity;
 
-  const etd = (currentShow.travelTimeMinutes && nextShow.getInTime)
-    ? computeLatestETD(currentShow.travelTimeMinutes, nextShow.getInTime)
-    : null;
+  const nextGetIn = tourShowGetInTimeHHMM(nextShow);
+  const etd =
+    currentShow.travelTimeMinutes && nextGetIn
+      ? computeLatestETD(currentShow.travelTimeMinutes, nextGetIn)
+      : null;
 
   return (
     <div className="flex items-stretch gap-3 my-1 pl-4">
