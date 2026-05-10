@@ -2,6 +2,17 @@ export type CountryRuleSetId = "DK";
 
 export type TravelAllowanceType = "standard" | "tour_driver_denmark" | "tour_driver_abroad";
 
+export type TravelClaimDayLine = {
+  date: string;
+  city?: string;
+  hotel?: string;
+  breakfastProvided?: boolean;
+  lunchProvided?: boolean;
+  dinnerProvided?: boolean;
+  lodgingCovered?: boolean;
+  lodgingByReceipt?: boolean;
+};
+
 export type TravelAllowanceInput = {
   startsAt: Date;
   endsAt: Date;
@@ -23,6 +34,7 @@ export type TravelAllowanceInput = {
   excludedWorkerType?: boolean;
   transportsPeopleOrGoods?: boolean;
   lodgingByReceipt?: boolean;
+  dayLines?: TravelClaimDayLine[];
 };
 
 export type TravelAllowanceResult = {
@@ -81,18 +93,30 @@ function calculateDanishTravelAllowance(input: TravelAllowanceInput): TravelAllo
     input.excludedWorkerType !== true;
   const eligibleFoodHours = baseEligible ? startedHours : 0;
 
+  const dayLines = input.dayLines?.length
+    ? input.dayLines
+    : Array.from({ length: Math.max(1, Math.ceil(eligibleFoodHours / 24)) }, (_, idx) => ({
+      date: new Date(input.startsAt.getTime() + idx * 86_400_000).toISOString().slice(0, 10),
+      breakfastProvided: input.breakfastProvided,
+      lunchProvided: input.lunchProvided,
+      dinnerProvided: input.dinnerProvided,
+      lodgingCovered: input.lodgingCovered,
+      lodgingByReceipt: input.lodgingByReceipt,
+    }));
   let foodAmountCents = eligibleFoodHours > 0
     ? Math.round((rates.foodRateCents * eligibleFoodHours) / 24)
     : 0;
-
   if (input.foodCoveredByReceipts) {
     foodAmountCents = Math.round(foodAmountCents * 0.25);
   } else if (input.allowanceType === "standard") {
-    const reductionPct =
-      (input.breakfastProvided ? 0.15 : 0) +
-      (input.lunchProvided ? 0.30 : 0) +
-      (input.dinnerProvided ? 0.30 : 0);
-    foodAmountCents = Math.round(foodAmountCents * Math.max(0, 1 - Math.min(0.75, reductionPct)));
+    const mealReductionCents = dayLines.reduce((sum, line) => {
+      const reductionPct =
+        (line.breakfastProvided ? 0.15 : 0) +
+        (line.lunchProvided ? 0.30 : 0) +
+        (line.dinnerProvided ? 0.30 : 0);
+      return sum + Math.round(rates.foodRateCents * Math.min(0.75, reductionPct));
+    }, 0);
+    foodAmountCents = Math.max(0, foodAmountCents - mealReductionCents);
   }
 
   const lodgingEligible =
@@ -101,8 +125,11 @@ function calculateDanishTravelAllowance(input: TravelAllowanceInput): TravelAllo
     input.transportsPeopleOrGoods !== true &&
     input.lodgingByReceipt !== true;
   const lodgingAmountCents =
-    lodgingEligible && input.lodgingAllowance && !input.lodgingCovered && fullDays > 0
-      ? fullDays * rates.lodgingRateCents
+    lodgingEligible && input.lodgingAllowance && fullDays > 0
+      ? dayLines
+        .slice(0, fullDays)
+        .filter((line) => !line.lodgingCovered && !line.lodgingByReceipt)
+        .length * rates.lodgingRateCents
       : 0;
 
   return {

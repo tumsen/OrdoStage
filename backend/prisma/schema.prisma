@@ -929,6 +929,7 @@ model TimeTravelClaim {
   excludedWorkerType    Boolean      @default(false)
   transportsPeopleOrGoods Boolean    @default(false)
   lodgingByReceipt      Boolean      @default(false)
+  dayLines              Json         @default("[]")
   eventId               String?
   eventShowJobId        String?
   timeProjectId         String?

@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
+import { addDays, format, parseISO } from "date-fns";
 import { Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -46,8 +46,54 @@ type TravelDraft = {
   excludedWorkerType: boolean;
   transportsPeopleOrGoods: boolean;
   lodgingByReceipt: boolean;
+  dayLines: TravelDayLine[];
   notes: string;
 };
+
+type TravelDayLine = {
+  date: string;
+  city: string;
+  hotel: string;
+  breakfastProvided: boolean;
+  lunchProvided: boolean;
+  dinnerProvided: boolean;
+  lodgingCovered: boolean;
+  lodgingByReceipt: boolean;
+};
+
+function isoDateLocal(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function travelDates(startsAt: string, endsAt: string): string[] {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end < start) return [];
+  const cursor = new Date(start);
+  cursor.setHours(0, 0, 0, 0);
+  const endDay = new Date(end);
+  endDay.setHours(0, 0, 0, 0);
+  const dates: string[] = [];
+  while (cursor <= endDay && dates.length < 370) {
+    dates.push(isoDateLocal(cursor));
+    cursor.setTime(addDays(cursor, 1).getTime());
+  }
+  return dates;
+}
+
+function makeDayLine(date: string, existing?: TravelDayLine): TravelDayLine {
+  return {
+    date,
+    city: existing?.city ?? "",
+    hotel: existing?.hotel ?? "",
+    breakfastProvided: existing?.breakfastProvided ?? false,
+    lunchProvided: existing?.lunchProvided ?? false,
+    dinnerProvided: existing?.dinnerProvided ?? false,
+    lodgingCovered: existing?.lodgingCovered ?? false,
+    lodgingByReceipt: existing?.lodgingByReceipt ?? false,
+  };
+}
 
 function skatEligibility(draft: TravelDraft): { ok: boolean; reasons: string[] } {
   const reasons: string[] = [];
@@ -87,9 +133,11 @@ export function TravelClaimsPanel({
     const start = new Date(now);
     start.setHours(8, 0, 0, 0);
     const end = new Date(start.getTime() + 26 * 60 * 60_000);
+    const startsAt = toDatetimeLocalValue(start);
+    const endsAt = toDatetimeLocalValue(end);
     return {
-      startsAt: toDatetimeLocalValue(start),
-      endsAt: toDatetimeLocalValue(end),
+      startsAt,
+      endsAt,
       destination: "",
       purpose: "",
       country: "DK",
@@ -111,9 +159,22 @@ export function TravelClaimsPanel({
       excludedWorkerType: false,
       transportsPeopleOrGoods: false,
       lodgingByReceipt: false,
+      dayLines: travelDates(startsAt, endsAt).map((date) => makeDayLine(date)),
       notes: "",
     };
   });
+
+  useEffect(() => {
+    setDraft((current) => {
+      const dates = travelDates(current.startsAt, current.endsAt);
+      const byDate = new Map(current.dayLines.map((line) => [line.date, line]));
+      const nextLines = dates.map((date) => makeDayLine(date, byDate.get(date)));
+      const unchanged =
+        nextLines.length === current.dayLines.length &&
+        nextLines.every((line, idx) => line.date === current.dayLines[idx]?.date);
+      return unchanged ? current : { ...current, dayLines: nextLines };
+    });
+  }, [draft.startsAt, draft.endsAt]);
 
   const { data: claims } = useQuery({
     queryKey,
@@ -168,6 +229,7 @@ export function TravelClaimsPanel({
       excludedWorkerType: draft.excludedWorkerType,
       transportsPeopleOrGoods: draft.transportsPeopleOrGoods,
       lodgingByReceipt: draft.lodgingByReceipt,
+      dayLines: draft.dayLines,
       notes: draft.notes.trim() || null,
     });
   }
@@ -176,6 +238,11 @@ export function TravelClaimsPanel({
   const eligibility = skatEligibility(draft);
   const canClaimLodging =
     draft.allowanceType === "standard" && !draft.transportsPeopleOrGoods && !draft.lodgingByReceipt;
+  const updateDayLine = (date: string, patch: Partial<TravelDayLine>) =>
+    setDraft((d) => ({
+      ...d,
+      dayLines: d.dayLines.map((line) => (line.date === date ? { ...line, ...patch } : line)),
+    }));
 
   return (
     <div className="space-y-4">
@@ -330,15 +397,63 @@ export function TravelClaimsPanel({
                 ) : null}
               </div>
 
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-white">Day by day tour details</p>
+                    <p className="mt-1 text-[11px] text-white/45">
+                      Add the city, hotel, and covered meals for each travel day. These rows drive the meal and lodging calculation.
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-[11px] text-white/35">{draft.dayLines.length} days</p>
+                </div>
+                <div className="mt-3 space-y-3">
+                  {draft.dayLines.map((line) => (
+                    <div key={line.date} className="rounded-lg border border-white/10 bg-black/10 p-3">
+                      <p className="text-xs font-medium text-white">{format(parseISO(line.date), "EEE d MMM yyyy")}</p>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        <Input
+                          value={line.city}
+                          onChange={(e) => updateDayLine(line.date, { city: e.target.value })}
+                          placeholder="City"
+                          className="border-white/10 bg-white/5 text-white"
+                        />
+                        <Input
+                          value={line.hotel}
+                          onChange={(e) => updateDayLine(line.date, { hotel: e.target.value })}
+                          placeholder="Hotel / lodging"
+                          className="border-white/10 bg-white/5 text-white"
+                        />
+                      </div>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        {[
+                          ["breakfastProvided", "Breakfast covered"],
+                          ["lunchProvided", "Lunch covered"],
+                          ["dinnerProvided", "Dinner covered"],
+                          ["lodgingCovered", "Free lodging"],
+                          ["lodgingByReceipt", "Lodging by receipt"],
+                        ].map(([key, label]) => (
+                          <label key={key} className="flex items-center gap-2 text-xs text-white/65">
+                            <Checkbox
+                              checked={Boolean(line[key as keyof TravelDayLine])}
+                              onCheckedChange={(checked) =>
+                                updateDayLine(line.date, { [key]: checked === true } as Partial<TravelDayLine>)
+                              }
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid gap-2 sm:grid-cols-2">
                 {[
-                  ["breakfastProvided", "Breakfast provided"],
-                  ["lunchProvided", "Lunch provided"],
-                  ["dinnerProvided", "Dinner provided"],
                   ["foodCoveredByReceipts", "Meals by receipts"],
                   ["lodgingAllowance", "Claim lodging allowance"],
-                  ["lodgingCovered", "Lodging covered/free"],
-                  ["lodgingByReceipt", "Lodging by receipt"],
+                  ["lodgingByReceipt", "All lodging by receipt"],
                   ["transportsPeopleOrGoods", "Transports people/goods"],
                 ].map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 text-xs text-white/65">
@@ -398,6 +513,36 @@ export function TravelClaimsPanel({
                     <p className="mt-1 text-[11px] text-amber-200/80">
                       Calculated as 0 because the trip does not meet all tax-free SKAT conditions or selected allowances are excluded.
                     </p>
+                  ) : null}
+                  {claim.dayLines.length > 0 ? (
+                    <div className="mt-3 overflow-hidden rounded-lg border border-white/10">
+                      <div className="grid grid-cols-[6rem_1fr_1fr_8rem] gap-2 bg-white/[0.03] px-2 py-1.5 text-[10px] uppercase tracking-wide text-white/35">
+                        <span>Date</span>
+                        <span>City</span>
+                        <span>Hotel</span>
+                        <span>Covered</span>
+                      </div>
+                      {claim.dayLines.map((line) => {
+                        const covered = [
+                          line.breakfastProvided ? "B" : null,
+                          line.lunchProvided ? "L" : null,
+                          line.dinnerProvided ? "D" : null,
+                          line.lodgingCovered ? "free hotel" : null,
+                          line.lodgingByReceipt ? "hotel receipt" : null,
+                        ].filter(Boolean);
+                        return (
+                          <div
+                            key={line.date}
+                            className="grid grid-cols-[6rem_1fr_1fr_8rem] gap-2 border-t border-white/10 px-2 py-1.5 text-[11px] text-white/60"
+                          >
+                            <span>{format(parseISO(line.date), "d MMM")}</span>
+                            <span>{line.city || "-"}</span>
+                            <span>{line.hotel || "-"}</span>
+                            <span>{covered.length > 0 ? covered.join(", ") : "None"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : null}
                 </div>
                 <div className="flex items-start gap-2">

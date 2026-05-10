@@ -6,7 +6,7 @@ import { auth } from "../auth";
 import { canAction, canView } from "../requestRole";
 import type { EffectiveRole } from "../effectiveRole";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
-import { getCountryRuleSet, type TravelAllowanceType } from "../rules/countryRuleSets";
+import { getCountryRuleSet, type TravelAllowanceType, type TravelClaimDayLine } from "../rules/countryRuleSets";
 import {
   CreateTimeTagSchema,
   PatchTimeTagSchema,
@@ -382,6 +382,23 @@ function serializeEntry(row: {
   };
 }
 
+function normalizeTravelDayLines(value: unknown): TravelClaimDayLine[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((line): line is Record<string, unknown> => Boolean(line) && typeof line === "object")
+    .map((line) => ({
+      date: typeof line.date === "string" ? line.date : "",
+      city: typeof line.city === "string" ? line.city : "",
+      hotel: typeof line.hotel === "string" ? line.hotel : "",
+      breakfastProvided: line.breakfastProvided === true,
+      lunchProvided: line.lunchProvided === true,
+      dinnerProvided: line.dinnerProvided === true,
+      lodgingCovered: line.lodgingCovered === true,
+      lodgingByReceipt: line.lodgingByReceipt === true,
+    }))
+    .filter((line) => line.date.length > 0);
+}
+
 function serializeTravelClaim(row: {
   id: string;
   organizationId: string;
@@ -412,6 +429,7 @@ function serializeTravelClaim(row: {
   excludedWorkerType: boolean;
   transportsPeopleOrGoods: boolean;
   lodgingByReceipt: boolean;
+  dayLines: unknown;
   eventId: string | null;
   eventShowJobId: string | null;
   timeProjectId: string | null;
@@ -452,6 +470,7 @@ function serializeTravelClaim(row: {
     excludedWorkerType: row.excludedWorkerType,
     transportsPeopleOrGoods: row.transportsPeopleOrGoods,
     lodgingByReceipt: row.lodgingByReceipt,
+    dayLines: normalizeTravelDayLines(row.dayLines),
     eventId: row.eventId,
     eventShowJobId: row.eventShowJobId,
     timeProjectId: row.timeProjectId,
@@ -1766,6 +1785,7 @@ timeRouter.post("/time/travel-claims", zValidator("json", CreateTimeTravelClaimS
     excludedWorkerType: body.excludedWorkerType,
     transportsPeopleOrGoods: body.transportsPeopleOrGoods,
     lodgingByReceipt: body.lodgingByReceipt,
+    dayLines: body.dayLines,
   });
   const row = await prisma.timeTravelClaim.create({
     data: {
@@ -1795,6 +1815,7 @@ timeRouter.post("/time/travel-claims", zValidator("json", CreateTimeTravelClaimS
       excludedWorkerType: body.excludedWorkerType ?? false,
       transportsPeopleOrGoods: body.transportsPeopleOrGoods ?? false,
       lodgingByReceipt: body.lodgingByReceipt ?? false,
+      dayLines: body.dayLines ?? [],
       eventId: body.eventId ?? null,
       eventShowJobId: body.eventShowJobId ?? null,
       timeProjectId: body.timeProjectId ?? null,
@@ -1867,6 +1888,7 @@ timeRouter.patch("/time/travel-claims/:id", zValidator("json", PatchTimeTravelCl
     excludedWorkerType: body.excludedWorkerType ?? existing.excludedWorkerType,
     transportsPeopleOrGoods: body.transportsPeopleOrGoods ?? existing.transportsPeopleOrGoods,
     lodgingByReceipt: body.lodgingByReceipt ?? existing.lodgingByReceipt,
+    dayLines: body.dayLines ?? normalizeTravelDayLines(existing.dayLines),
   });
   const updated = await prisma.timeTravelClaim.update({
     where: { id },
@@ -1894,6 +1916,7 @@ timeRouter.patch("/time/travel-claims/:id", zValidator("json", PatchTimeTravelCl
       ...(body.excludedWorkerType !== undefined ? { excludedWorkerType: body.excludedWorkerType } : {}),
       ...(body.transportsPeopleOrGoods !== undefined ? { transportsPeopleOrGoods: body.transportsPeopleOrGoods } : {}),
       ...(body.lodgingByReceipt !== undefined ? { lodgingByReceipt: body.lodgingByReceipt } : {}),
+      ...(body.dayLines !== undefined ? { dayLines: body.dayLines } : {}),
       ...(body.eventId !== undefined ? { eventId: body.eventId } : {}),
       ...(body.eventShowJobId !== undefined ? { eventShowJobId: body.eventShowJobId } : {}),
       ...(body.timeProjectId !== undefined ? { timeProjectId: body.timeProjectId } : {}),

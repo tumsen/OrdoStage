@@ -1,0 +1,1 @@
+ALTER TABLE "TimeTravelClaim" ADD COLUMN "dayLines" JSONB NOT NULL DEFAULT '[]';
