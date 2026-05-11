@@ -570,6 +570,7 @@ model EventShowStaffing {
   notes                  String?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
+  timeEntries            TimeEntry[] @relation("TimeEntryEventShowStaffing")
 
   @@unique([showId, personId])
   @@index([personId])
@@ -640,6 +641,7 @@ model InternalBookingPerson {
   role      String?
   booking   InternalBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   person    Person          @relation(fields: [personId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
 
   @@unique([bookingId, personId])
 }
@@ -895,6 +897,12 @@ model TimeEntry {
   event          Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   tourShowId     String?
   tourShow       TourShow?    @relation(fields: [tourShowId], references: [id], onDelete: SetNull)
+  eventShowStaffingId String?
+  eventShowStaffing   EventShowStaffing? @relation("TimeEntryEventShowStaffing", fields: [eventShowStaffingId], references: [id], onDelete: SetNull)
+  internalBookingPersonId String?
+  internalBookingPerson   InternalBookingPerson? @relation(fields: [internalBookingPersonId], references: [id], onDelete: SetNull)
+  /** UTC calendar day (YYYY-MM-DD) for internal-booking planned slots when `internalBookingPersonId` is set. */
+  internalBookingDayKey   String?
   timeProjectId  String?
   timeProject    TimeProject? @relation(fields: [timeProjectId], references: [id], onDelete: SetNull)
   note           String?
@@ -908,6 +916,8 @@ model TimeEntry {
   @@index([personId, startsAt])
   @@index([eventShowJobId])
   @@index([tourShowId])
+  @@index([eventShowStaffingId])
+  @@index([internalBookingPersonId])
   @@index([organizationId, category])
 }
 

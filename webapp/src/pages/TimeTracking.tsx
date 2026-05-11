@@ -80,10 +80,16 @@ const WEEK_STARTS_ON = 1 as const;
 const PX_PER_HOUR = 36;
 /** Matches backend `tourPlanJobId` / `TimeTrackingJob.id` for tour roster rows. */
 const TOUR_PLAN_JOB_PREFIX = "tourshow:";
+const EVT_STAFF_PREFIX = "evtstaff:";
+const IBOOKP_PREFIX = "ibookp:";
 
 function plannedJobKeyFromEntry(e: TimeEntry): string | null {
   if (e.eventShowJobId) return e.eventShowJobId;
   if (e.tourShowId) return `${TOUR_PLAN_JOB_PREFIX}${e.tourShowId}`;
+  if (e.eventShowStaffingId) return `${EVT_STAFF_PREFIX}${e.eventShowStaffingId}`;
+  if (e.internalBookingPersonId && e.internalBookingDayKey) {
+    return `${IBOOKP_PREFIX}${e.internalBookingPersonId}:${e.internalBookingDayKey}`;
+  }
   return null;
 }
 const COLUMN_HEIGHT_PX = (MINUTES_PER_DAY / 60) * PX_PER_HOUR;
@@ -351,6 +357,11 @@ export default function TimeTracking() {
         category: "work",
         eventShowJobId: kind === "job" ? (body.eventShowJobId as string | null) ?? null : null,
         tourShowId: kind === "job" ? (body.tourShowId as string | null) ?? null : null,
+        eventShowStaffingId: kind === "job" ? (body.eventShowStaffingId as string | null) ?? null : null,
+        internalBookingPersonId:
+          kind === "job" ? (body.internalBookingPersonId as string | null) ?? null : null,
+        internalBookingDayKey:
+          kind === "job" ? (body.internalBookingDayKey as string | null) ?? null : null,
         eventId: body.eventId != null ? (body.eventId as string) : null,
         timeProjectId: body.timeProjectId != null ? (body.timeProjectId as string) : null,
         note: body.note != null ? (body.note as string) : null,
@@ -893,12 +904,52 @@ export default function TimeTracking() {
       (job.id.startsWith(TOUR_PLAN_JOB_PREFIX) ? job.id.slice(TOUR_PLAN_JOB_PREFIX.length) : null);
     const isTourJob = job.source === "tour" || (tourShowId != null && job.id.startsWith(TOUR_PLAN_JOB_PREFIX));
 
+    const eventStaffingId =
+      job.eventShowStaffingId ??
+      (job.id.startsWith(EVT_STAFF_PREFIX) ? job.id.slice(EVT_STAFF_PREFIX.length) : null);
+
+    let internalPersonId = job.internalBookingPersonId ?? null;
+    let internalDayKey = job.internalBookingDayKey ?? null;
+    if (!internalPersonId && job.id.startsWith(IBOOKP_PREFIX)) {
+      const rest = job.id.slice(IBOOKP_PREFIX.length);
+      const c = rest.indexOf(":");
+      if (c !== -1) {
+        internalPersonId = rest.slice(0, c);
+        internalDayKey = rest.slice(c + 1);
+      }
+    }
+
     if (isTourJob && tourShowId) {
       createEntry.mutate({
         startsAt: job.plannedStartsAt,
         endsAt: job.plannedEndsAt,
         kind: "job",
         tourShowId,
+        ...(job.timeProjectId ? { timeProjectId: job.timeProjectId } : {}),
+      });
+    } else if (
+      eventStaffingId &&
+      (job.source === "event_staffing" || job.id.startsWith(EVT_STAFF_PREFIX))
+    ) {
+      createEntry.mutate({
+        startsAt: job.plannedStartsAt,
+        endsAt: job.plannedEndsAt,
+        kind: "job",
+        eventShowStaffingId: eventStaffingId,
+        eventId: job.eventId,
+        ...(job.timeProjectId ? { timeProjectId: job.timeProjectId } : {}),
+      });
+    } else if (
+      internalPersonId &&
+      internalDayKey &&
+      (job.source === "internal_booking" || job.id.startsWith(IBOOKP_PREFIX))
+    ) {
+      createEntry.mutate({
+        startsAt: job.plannedStartsAt,
+        endsAt: job.plannedEndsAt,
+        kind: "job",
+        internalBookingPersonId: internalPersonId,
+        internalBookingDayKey: internalDayKey,
         ...(job.timeProjectId ? { timeProjectId: job.timeProjectId } : {}),
       });
     } else {

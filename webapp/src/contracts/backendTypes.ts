@@ -987,6 +987,9 @@ export const TimeEntrySchema = z.object({
   eventShowJobId: z.string().nullable(),
   eventId: z.string().nullable(),
   tourShowId: z.string().nullable(),
+  eventShowStaffingId: z.string().nullable(),
+  internalBookingPersonId: z.string().nullable(),
+  internalBookingDayKey: z.string().nullable(),
   timeProjectId: z.string().nullable(),
   note: z.string().nullable(),
   isLocked: z.boolean(),
@@ -997,8 +1000,8 @@ export const TimeEntrySchema = z.object({
 
 export const TimeTrackingJobSchema = z.object({
   id: z.string(),
-  /** event = staffing job on an event show; tour = roster on a tour show day */
-  source: z.enum(["event", "tour"]).default("event"),
+  /** Planned work slot source (event job, show staffing without a job row, tour day, internal booking). */
+  source: z.enum(["event", "event_staffing", "tour", "internal_booking"]).default("event"),
   title: z.string(),
   jobDate: z.string(),
   startTime: z.string(),
@@ -1010,10 +1013,11 @@ export const TimeTrackingJobSchema = z.object({
   showId: z.string(),
   showDate: z.string(),
   venueName: z.string(),
-  /** Tour show day — set when source is tour (for logging time against the right project). */
   timeProjectId: z.string().nullable().optional(),
-  /** Present when source is tour — the `TourShow` id (also encoded in `id` as `tourshow:<id>`). */
   tourShowId: z.string().nullable().optional(),
+  eventShowStaffingId: z.string().nullable().optional(),
+  internalBookingPersonId: z.string().nullable().optional(),
+  internalBookingDayKey: z.string().nullable().optional(),
 });
 
 export const CreateTimeTagSchema = z.object({
@@ -1053,6 +1057,9 @@ export const CreateTimeEntrySchema = z.object({
   eventShowJobId: z.string().nullable().optional(),
   eventId: z.string().nullable().optional(),
   tourShowId: z.string().nullable().optional(),
+  eventShowStaffingId: z.string().nullable().optional(),
+  internalBookingPersonId: z.string().nullable().optional(),
+  internalBookingDayKey: z.string().nullable().optional(),
   timeProjectId: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   isLocked: z.boolean().optional(),
@@ -1067,6 +1074,9 @@ export const PatchTimeEntrySchema = z.object({
   eventShowJobId: z.string().nullable().optional(),
   eventId: z.string().nullable().optional(),
   tourShowId: z.string().nullable().optional(),
+  eventShowStaffingId: z.string().nullable().optional(),
+  internalBookingPersonId: z.string().nullable().optional(),
+  internalBookingDayKey: z.string().nullable().optional(),
   timeProjectId: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   isLocked: z.boolean().optional(),
