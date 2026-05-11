@@ -17,6 +17,7 @@ import {
   buildDatetimeLocal,
   normalizeTimeHHMM,
   parseDatetimeLocal,
+  timeToMinutes,
 } from "@/lib/showTiming";
 import type {
   TourScheduleEvent,
@@ -38,6 +39,8 @@ const KIND_OPTIONS: { value: TourScheduleEventKind; label: string }[] = [
 ];
 
 type DraftEvent = {
+  /** Stable key for list reconciliation when rows reorder by time */
+  rowKey: string;
   kind: TourScheduleEventKind;
   customLabel: string;
   startValue: string;
@@ -45,10 +48,43 @@ type DraftEvent = {
   sortOrder: number;
 };
 
+function newDraftRowKey(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `row-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+/** Parse start wall time to minutes from midnight for same-day ordering; invalid → end of list. */
+function draftStartMinutes(d: DraftEvent): number {
+  const t = normalizeTimeHHMM(parseDatetimeLocal(d.startValue).time || "");
+  return timeToMinutes(t) ?? 24 * 60 + 1;
+}
+
+function draftEndMinutes(d: DraftEvent): number {
+  const t = normalizeTimeHHMM(parseDatetimeLocal(d.endValue).time || "");
+  return timeToMinutes(t) ?? 24 * 60 + 1;
+}
+
+/** Earliest start first; ties broken by end time, then kind label for stability */
+function compareDraftsByTime(a: DraftEvent, b: DraftEvent): number {
+  const sa = draftStartMinutes(a);
+  const sb = draftStartMinutes(b);
+  if (sa !== sb) return sa - sb;
+  const ea = draftEndMinutes(a);
+  const eb = draftEndMinutes(b);
+  if (ea !== eb) return ea - eb;
+  return a.kind.localeCompare(b.kind);
+}
+
+function sortDraftsByTime(drafts: DraftEvent[]): DraftEvent[] {
+  return [...drafts].sort(compareDraftsByTime);
+}
+
 function toDraft(dayKey: string, e: TourScheduleEvent): DraftEvent {
   const st = normalizeTimeHHMM(e.startTime);
   const en = normalizeTimeHHMM(e.endTime);
   return {
+    rowKey: e.id,
     kind: e.kind as TourScheduleEventKind,
     customLabel: e.customLabel ?? "",
     startValue: buildDatetimeLocal(dayKey, st || "09:00"),
@@ -86,17 +122,20 @@ export function TourDayScheduleEditor({
   const initialDrafts = useMemo(() => {
     const list = show.scheduleEvents ?? [];
     if (list.length === 0) {
-      return [
+      return sortDraftsByTime([
         {
+          rowKey: newDraftRowKey(),
           kind: "get_in" as const,
           customLabel: "",
           startValue: buildDatetimeLocal(dayKey, "10:00"),
           endValue: buildDatetimeLocal(dayKey, "11:00"),
           sortOrder: 0,
         },
-      ];
+      ]);
     }
-    return [...list].sort((a, b) => a.sortOrder - b.sortOrder).map((e) => toDraft(dayKey, e));
+    return sortDraftsByTime(
+      [...list].sort((a, b) => a.sortOrder - b.sortOrder).map((e) => toDraft(dayKey, e))
+    );
   }, [show.scheduleEvents, dayKey]);
 
   const [drafts, setDrafts] = useState<DraftEvent[]>(initialDrafts);
@@ -122,21 +161,24 @@ export function TourDayScheduleEditor({
     setDrafts((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], ...patch };
-      return next;
+      return sortDraftsByTime(next);
     });
   };
 
   const addRow = () => {
-    setDrafts((prev) => [
-      ...prev,
-      {
-        kind: "custom",
-        customLabel: "",
-        startValue: buildDatetimeLocal(dayKey, "12:00"),
-        endValue: buildDatetimeLocal(dayKey, "13:00"),
-        sortOrder: prev.length,
-      },
-    ]);
+    setDrafts((prev) =>
+      sortDraftsByTime([
+        ...prev,
+        {
+          rowKey: newDraftRowKey(),
+          kind: "custom",
+          customLabel: "",
+          startValue: buildDatetimeLocal(dayKey, "12:00"),
+          endValue: buildDatetimeLocal(dayKey, "13:00"),
+          sortOrder: prev.length,
+        },
+      ])
+    );
   };
 
   const removeRow = (index: number) => {
@@ -175,7 +217,7 @@ export function TourDayScheduleEditor({
       <div className="divide-y divide-white/[0.06] space-y-0">
         {drafts.map((row, idx) => (
           <div
-            key={`${idx}-${row.kind}-${row.sortOrder}`}
+            key={row.rowKey}
             className="flex flex-wrap items-end gap-x-3 gap-y-3 py-2 first:pt-0 last:pb-0 min-w-0"
           >
             <div className="hidden sm:flex flex-col gap-1.5 shrink-0 justify-end">
@@ -186,7 +228,7 @@ export function TourDayScheduleEditor({
             </div>
             <div className="flex flex-wrap items-end gap-x-3 gap-y-3 flex-1 min-w-0">
               <div className="flex flex-col gap-1.5 w-[8.25rem] sm:w-[9rem] shrink-0">
-                <Label htmlFor={`tour-day-sched-type-${idx}`} className={scheduleFieldLabelClass}>
+                <Label htmlFor={`tour-day-sched-type-${row.rowKey}`} className={scheduleFieldLabelClass}>
                   Type
                 </Label>
                 <Select
@@ -196,7 +238,7 @@ export function TourDayScheduleEditor({
                   }
                 >
                   <SelectTrigger
-                    id={`tour-day-sched-type-${idx}`}
+                    id={`tour-day-sched-type-${row.rowKey}`}
                     className="bg-white/5 border-white/10 text-white h-10 text-sm"
                   >
                     <SelectValue />
@@ -212,11 +254,11 @@ export function TourDayScheduleEditor({
               </div>
               {row.kind === "custom" ? (
                 <div className="flex flex-col gap-1.5 min-w-[6rem] flex-1 max-w-[12rem] shrink">
-                  <Label htmlFor={`tour-day-sched-custom-${idx}`} className={scheduleFieldLabelClass}>
+                  <Label htmlFor={`tour-day-sched-custom-${row.rowKey}`} className={scheduleFieldLabelClass}>
                     Custom label
                   </Label>
                   <Input
-                    id={`tour-day-sched-custom-${idx}`}
+                    id={`tour-day-sched-custom-${row.rowKey}`}
                     value={row.customLabel}
                     onChange={(e) => updateRow(idx, { customLabel: e.target.value })}
                     placeholder="e.g. Production meeting"
