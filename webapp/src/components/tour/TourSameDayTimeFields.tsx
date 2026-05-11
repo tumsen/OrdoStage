@@ -4,9 +4,11 @@ import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } fro
 import { Label } from "@/components/ui/label";
 import {
   buildDatetimeLocal,
+  durationMinutesBetween,
   durationMinutesForwardBetweenDatetimes,
+  minutesToTime,
   parseDatetimeLocal,
-  toDatetimeLocalString,
+  timeToMinutes,
 } from "@/lib/showTiming";
 import { ScheduleTimeRow, scheduleFieldLabelClass } from "@/components/ScheduleTimeRow";
 
@@ -39,9 +41,11 @@ export function TourSameDayTimeFields({
   const hasStartTime = /^\d{2}:\d{2}$/.test(startT);
 
   const durationMin = useMemo(() => {
-    if (!startValue || !endValue) return 0;
+    if (!startValue || !endValue || !startT || !endT) return 0;
+    const wall = durationMinutesBetween(startT, endT);
+    if (wall !== null) return wall;
     return durationMinutesForwardBetweenDatetimes(startValue, endValue) ?? 0;
-  }, [startValue, endValue]);
+  }, [startValue, endValue, startT, endT]);
 
   const onStartT = (v: string) => {
     if (!dayKey) return;
@@ -50,26 +54,36 @@ export function TourSameDayTimeFields({
 
   const onEndT = (v: string) => {
     if (!hasStartTime || !dayKey) return;
-    const d0 = ed.date || sd.date || dayKey;
-    let end = new Date(buildDatetimeLocal(d0, v));
-    const start = new Date(startValue);
-    if (!Number.isFinite(end.getTime()) || !Number.isFinite(start.getTime())) return;
-    if (end <= start) {
-      end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+    const sm = timeToMinutes(parseDatetimeLocal(startValue).time || "");
+    const em = timeToMinutes(v);
+    if (sm === null || em === null) return;
+    if (em <= sm) {
+      const anchor = new Date(`${dayKey}T12:00:00`);
+      if (!Number.isFinite(anchor.getTime())) return;
+      anchor.setDate(anchor.getDate() + 1);
+      const nk = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}-${String(anchor.getDate()).padStart(2, "0")}`;
+      onEndChange(buildDatetimeLocal(nk, v));
+      return;
     }
-    onEndChange(toDatetimeLocalString(end));
+    onEndChange(buildDatetimeLocal(dayKey, v));
   };
 
   const onDur = (m: number) => {
-    if (!hasStartTime) return;
-    if (!startValue) return;
-    const s = new Date(startValue);
-    if (!Number.isFinite(s.getTime())) return;
+    if (!hasStartTime || !dayKey) return;
+    const sm = timeToMinutes(startT);
+    if (sm === null || !Number.isFinite(m)) return;
     if (m <= 0) {
-      onEndChange(startValue);
+      onEndChange(buildDatetimeLocal(dayKey, startT));
       return;
     }
-    onEndChange(toDatetimeLocalString(new Date(s.getTime() + m * 60000)));
+    const total = sm + Math.floor(m);
+    const daysForward = Math.floor(total / (24 * 60));
+    const rem = total % (24 * 60);
+    const anchor = new Date(`${dayKey}T12:00:00`);
+    if (!Number.isFinite(anchor.getTime())) return;
+    anchor.setDate(anchor.getDate() + daysForward);
+    const nk = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}-${String(anchor.getDate()).padStart(2, "0")}`;
+    onEndChange(buildDatetimeLocal(nk, minutesToTime(rem)));
   };
 
   return (
