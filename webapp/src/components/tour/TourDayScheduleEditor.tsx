@@ -94,7 +94,8 @@ function toDraft(dayKey: string, e: TourScheduleEvent): DraftEvent {
 }
 
 function draftsToPayload(drafts: DraftEvent[]) {
-  return drafts.map((d, i) => {
+  const ordered = sortDraftsByTime(drafts);
+  return ordered.map((d, i) => {
     const st = normalizeTimeHHMM(parseDatetimeLocal(d.startValue).time || "");
     const en = normalizeTimeHHMM(parseDatetimeLocal(d.endValue).time || "");
     return {
@@ -161,24 +162,22 @@ export function TourDayScheduleEditor({
     setDrafts((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], ...patch };
-      return sortDraftsByTime(next);
+      return next;
     });
   };
 
   const addRow = () => {
-    setDrafts((prev) =>
-      sortDraftsByTime([
-        ...prev,
-        {
-          rowKey: newDraftRowKey(),
-          kind: "custom",
-          customLabel: "",
-          startValue: buildDatetimeLocal(dayKey, "12:00"),
-          endValue: buildDatetimeLocal(dayKey, "13:00"),
-          sortOrder: prev.length,
-        },
-      ])
-    );
+    setDrafts((prev) => [
+      ...prev,
+      {
+        rowKey: newDraftRowKey(),
+        kind: "custom",
+        customLabel: "",
+        startValue: buildDatetimeLocal(dayKey, "12:00"),
+        endValue: buildDatetimeLocal(dayKey, "13:00"),
+        sortOrder: prev.length,
+      },
+    ]);
   };
 
   const removeRow = (index: number) => {
