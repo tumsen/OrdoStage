@@ -13,9 +13,9 @@ import {
   type VisibilityFilters,
 } from "@/components/schedule/ScheduleFilters";
 import { CalendarGrid } from "@/components/schedule/CalendarGrid";
-import { ItemDetailSheet as _ItemDetailSheet } from "@/components/schedule/ItemDetailSheet"; // unused, kept for reference
 import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
+import { ScheduleItemDetailSheet } from "@/components/schedule/ScheduleItemDetailSheet";
 import { ScheduleLegend } from "@/components/schedule/ScheduleLegend";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import {
@@ -335,6 +335,7 @@ export default function Schedule() {
   const [venueId, setVenueId] = useState("all");
   const [personId, setPersonId] = useState("all");
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
+  const [detailItem, setDetailItem] = useState<CalendarItem | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [bookingSlot, setBookingSlot] = useState<{ startDate: string; endDate: string } | null>(null);
   const [visibility, setVisibility] = useState<VisibilityFilters>({
@@ -358,8 +359,7 @@ export default function Schedule() {
   });
 
   function handleItemClick(item: CalendarItem) {
-    if (item.id.startsWith("tour:")) return;
-    setSelectedItem(item);
+    setDetailItem(item);
   }
 
   function handleDeleteItem(item: CalendarItem) {
@@ -603,8 +603,7 @@ export default function Schedule() {
                               <button
                                 key={item.id}
                                 onClick={() => {
-                                  if (item.kind === "tour") return;
-                                  setSelectedItem(item);
+                                  setDetailItem(item);
                                 }}
                                 className={`relative w-full overflow-hidden text-left text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 ${
                                   backing ? "ring-2 ring-rose-300/70 shadow-[0_0_0_2px_rgba(244,63,94,0.22)]" : ""
@@ -629,7 +628,15 @@ export default function Schedule() {
         )}
       </div>
 
-      {/* Edit sheet — slides in from right for events and bookings */}
+      {/* Entry detail — read-only overview for any calendar block */}
+      <ScheduleItemDetailSheet
+        item={detailItem}
+        locale={locale}
+        onClose={() => setDetailItem(null)}
+        onEdit={(item) => setSelectedItem(item)}
+      />
+
+      {/* Edit sheet — events and bookings (from detail “Edit”) */}
       <EditItemSheet
         item={selectedItem}
         onClose={() => setSelectedItem(null)}
