@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
+import { serializeTourShow } from "./tours";
 
 const scheduleRouter = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -249,19 +250,9 @@ scheduleRouter.get("/schedule", async (c) => {
                 },
               }
             : {}),
-          orderBy: [{ date: "asc" }, { showTime: "asc" }],
-          select: {
-            id: true,
-            tourId: true,
-            type: true,
-            date: true,
-            showTime: true,
-            travelTimeMinutes: true,
-            techRiderSentAt: true,
-            techRiderOpenedAt: true,
-            techRiderLastOpenedAt: true,
-            createdAt: true,
-            updatedAt: true,
+          orderBy: [{ date: "asc" }, { order: "asc" }],
+          include: {
+            scheduleEvents: { orderBy: { sortOrder: "asc" } },
           },
         },
       },
@@ -333,13 +324,7 @@ scheduleRouter.get("/schedule", async (c) => {
     createdAt: serializeDate(tour.createdAt),
     updatedAt: serializeDate(tour.updatedAt),
     shows: tour.shows.map((show) => ({
-      ...show,
-      date: serializeDate(show.date),
-      techRiderSentAt: show.techRiderSentAt ? serializeDate(show.techRiderSentAt) : null,
-      techRiderOpenedAt: show.techRiderOpenedAt ? serializeDate(show.techRiderOpenedAt) : null,
-      techRiderLastOpenedAt: show.techRiderLastOpenedAt ? serializeDate(show.techRiderLastOpenedAt) : null,
-      createdAt: serializeDate(show.createdAt),
-      updatedAt: serializeDate(show.updatedAt),
+      ...serializeTourShow(show),
       showPeople: [],
     })),
     people: [],

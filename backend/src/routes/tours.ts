@@ -77,7 +77,7 @@ function isoDate(d: unknown): string {
   return d instanceof Date ? d.toISOString() : String(d);
 }
 
-function serializeTourShow(show: any) {
+export function serializeTourShow(show: any) {
   const dk =
     show.dayKey ??
     dayKeyFromDateInput(show.date instanceof Date ? show.date.toISOString() : String(show.date));
