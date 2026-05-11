@@ -120,6 +120,20 @@ export function TourDayScheduleEditor({
   const queryClient = useQueryClient();
   const dayKey = (show.dayKey ?? show.date.slice(0, 10)).slice(0, 10);
 
+  /** Stable while server payload is unchanged — avoids resetting drafts when React Query returns a new array reference for the same events. */
+  const scheduleEventsContentKey = JSON.stringify({
+    sid: show.id,
+    dk: dayKey,
+    ev: (show.scheduleEvents ?? []).map((e) => ({
+      id: e.id,
+      startTime: e.startTime,
+      endTime: e.endTime,
+      kind: e.kind,
+      sortOrder: e.sortOrder,
+      customLabel: e.customLabel ?? null,
+    })),
+  });
+
   const initialDrafts = useMemo(() => {
     const list = show.scheduleEvents ?? [];
     if (list.length === 0) {
@@ -137,9 +151,10 @@ export function TourDayScheduleEditor({
     return sortDraftsByTime(
       [...list].sort((a, b) => a.sortOrder - b.sortOrder).map((e) => toDraft(dayKey, e))
     );
-  }, [show.scheduleEvents, dayKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable via scheduleEventsContentKey; omit unstable `show.scheduleEvents` ref from React Query.
+  }, [dayKey, scheduleEventsContentKey]);
 
-  const [drafts, setDrafts] = useState<DraftEvent[]>(initialDrafts);
+  const [drafts, setDrafts] = useState<DraftEvent[]>(() => initialDrafts);
 
   useEffect(() => {
     setDrafts(initialDrafts);
