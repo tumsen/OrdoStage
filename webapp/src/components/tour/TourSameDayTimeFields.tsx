@@ -20,6 +20,8 @@ export function TourSameDayTimeFields({
   onStartChange,
   onEndChange,
   className,
+  /** Hide visible labels (inputs keep aria-labels) — use inline rows with type selector. */
+  compact = false,
 }: {
   dayKey: string;
   startValue: string;
@@ -27,6 +29,7 @@ export function TourSameDayTimeFields({
   onStartChange: (v: string) => void;
   onEndChange: (v: string) => void;
   className?: string;
+  compact?: boolean;
 }) {
   const refSt = useRef<SplitTimeFieldHandle>(null);
   const refEn = useRef<SplitTimeFieldHandle>(null);
@@ -72,10 +75,12 @@ export function TourSameDayTimeFields({
     onEndChange(toDatetimeLocalString(new Date(s.getTime() + m * 60000)));
   };
 
+  const labelCls = compact ? "sr-only" : scheduleFieldLabelClass;
+
   return (
     <ScheduleTimeRow className={className}>
       <div className="shrink-0">
-        <Label className={scheduleFieldLabelClass}>Start</Label>
+        <Label className={labelCls}>Start</Label>
         <SplitTimeInput
           ref={refSt}
           value={startT}
@@ -85,7 +90,7 @@ export function TourSameDayTimeFields({
         />
       </div>
       <div className="shrink-0">
-        <Label className={scheduleFieldLabelClass}>End</Label>
+        <Label className={labelCls}>End</Label>
         <SplitTimeInput
           ref={refEn}
           value={endT}
@@ -96,7 +101,7 @@ export function TourSameDayTimeFields({
         />
       </div>
       <div className="shrink-0">
-        <Label className={scheduleFieldLabelClass}>Duration</Label>
+        <Label className={labelCls}>Duration</Label>
         <SplitDurationHhMmInput
           ref={refDur}
           valueMinutes={durationMin}

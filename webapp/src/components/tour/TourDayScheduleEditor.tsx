@@ -143,15 +143,10 @@ export function TourDayScheduleEditor({
   };
 
   return (
-    <div className={cn("space-y-3 rounded-lg border border-white/10 bg-white/[0.02] p-3", className)}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-white/45">Day schedule</p>
-          <p className="text-[11px] text-white/30 mt-0.5">
-            Start, end, and duration use the same controls as event show jobs (24h HH:mm).
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+    <div className={cn("rounded-lg border border-white/10 bg-white/[0.02] px-2 py-2 sm:p-2.5", className)}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <p className="text-xs uppercase tracking-wide text-white/45 shrink-0">Day schedule</p>
+        <div className="flex flex-wrap gap-1.5 justify-end">
           <Button
             type="button"
             size="sm"
@@ -172,68 +167,69 @@ export function TourDayScheduleEditor({
           </Button>
         </div>
       </div>
+      <p className="text-[10px] text-white/30 mt-1 mb-2 hidden sm:block">
+        Start, end, and duration use the same controls as event show jobs (24h HH:mm).
+      </p>
 
-      <div className="space-y-4">
+      <div className="divide-y divide-white/[0.06] space-y-0">
         {drafts.map((row, idx) => (
           <div
             key={`${idx}-${row.kind}-${row.sortOrder}`}
-            className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 space-y-3"
+            className="flex flex-wrap items-end gap-x-2 gap-y-2 py-2 first:pt-0 last:pb-0 min-w-0"
           >
-            <div className="flex flex-wrap items-end gap-2">
-              <GripVertical className="h-4 w-4 text-white/15 shrink-0 mb-2" aria-hidden />
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,10rem)_1fr] flex-1 min-w-0">
-                <div className="space-y-1.5">
-                  <Label className="text-white/50 text-[10px] uppercase tracking-wide">Type</Label>
-                  <Select
-                    value={row.kind}
-                    onValueChange={(v) =>
-                      updateRow(idx, { kind: v as TourScheduleEventKind })
-                    }
-                  >
-                    <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                      {KIND_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {row.kind === "custom" ? (
-                  <div className="space-y-1.5 min-w-0">
-                    <Label className="text-white/50 text-[10px] uppercase tracking-wide">Label</Label>
-                    <Input
-                      value={row.customLabel}
-                      onChange={(e) => updateRow(idx, { customLabel: e.target.value })}
-                      placeholder="e.g. Production meeting"
-                      className="bg-white/5 border-white/10 text-white h-10"
-                    />
-                  </div>
-                ) : (
-                  <div />
-                )}
+            <GripVertical className="h-4 w-4 text-white/15 shrink-0 hidden sm:block mb-1" aria-hidden />
+            <div className="flex flex-wrap items-end gap-2 flex-1 min-w-0">
+              <div className="w-[8.25rem] sm:w-[9rem] shrink-0">
+                <Label className="sr-only">Event type</Label>
+                <Select
+                  value={row.kind}
+                  onValueChange={(v) =>
+                    updateRow(idx, { kind: v as TourScheduleEventKind })
+                  }
+                >
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                    {KIND_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 text-white/25 hover:text-red-400 shrink-0"
-                onClick={() => removeRow(idx)}
-                aria-label="Remove event"
-              >
-                <Trash2 size={15} />
-              </Button>
+              {row.kind === "custom" ? (
+                <div className="min-w-[6rem] flex-1 max-w-[12rem] shrink">
+                  <Label className="sr-only">Custom label</Label>
+                  <Input
+                    value={row.customLabel}
+                    onChange={(e) => updateRow(idx, { customLabel: e.target.value })}
+                    placeholder="Label"
+                    className="bg-white/5 border-white/10 text-white h-9 text-sm"
+                  />
+                </div>
+              ) : null}
+              <TourSameDayTimeFields
+                compact
+                className="flex-1 min-w-[min(100%,18rem)]"
+                dayKey={dayKey}
+                startValue={row.startValue}
+                endValue={row.endValue}
+                onStartChange={(v) => updateRow(idx, { startValue: v })}
+                onEndChange={(v) => updateRow(idx, { endValue: v })}
+              />
             </div>
-            <TourSameDayTimeFields
-              dayKey={dayKey}
-              startValue={row.startValue}
-              endValue={row.endValue}
-              onStartChange={(v) => updateRow(idx, { startValue: v })}
-              onEndChange={(v) => updateRow(idx, { endValue: v })}
-            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-white/25 hover:text-red-400 shrink-0"
+              onClick={() => removeRow(idx)}
+              aria-label="Remove event"
+            >
+              <Trash2 size={15} />
+            </Button>
           </div>
         ))}
       </div>
