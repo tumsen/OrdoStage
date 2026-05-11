@@ -387,9 +387,11 @@ export function OutlookTimeGrid({
                     const eventVenueName =
                       item.kind === "job"
                         ? item.venueLabel
-                        : item.kind === "event"
-                          ? (item.raw as EventDetail).venue?.name
-                          : undefined;
+                        : item.kind === "tour"
+                          ? item.venueLabel
+                          : item.kind === "event"
+                            ? (item.raw as EventDetail).venue?.name
+                            : undefined;
                     const isDisabled = item.disabled === true;
                     return (
                       <div key={item.id} className="group/all relative flex items-center">
@@ -409,7 +411,7 @@ export function OutlookTimeGrid({
                           {eventVenueName ? <span className="opacity-70"> @ {eventVenueName}</span> : null}
                           {" "}<StatusLabel status={item.status} />
                         </button>
-                        {item.kind === "job" || isDisabled ? null : (
+                        {item.kind === "job" || item.kind === "tour" || isDisabled ? null : (
                           <button
                             data-booking-block
                             onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
@@ -740,9 +742,11 @@ export function OutlookTimeGrid({
                   const venueName =
                     item.kind === "job"
                       ? item.venueLabel
-                      : item.kind === "event"
-                        ? (item.raw as EventDetail).venue?.name
-                        : (item.raw as InternalBookingDetail).venue?.name;
+                      : item.kind === "tour"
+                        ? item.venueLabel
+                        : item.kind === "event"
+                          ? (item.raw as EventDetail).venue?.name
+                          : (item.raw as InternalBookingDetail).venue?.name;
                   const creatorName =
                     item.kind === "booking" ? (item.raw as InternalBookingDetail).createdBy?.name : undefined;
 
@@ -811,7 +815,7 @@ export function OutlookTimeGrid({
                           <div className="flex flex-col h-full px-1.5 py-1 overflow-hidden">
                             <div className="truncate font-semibold text-[11px] leading-tight shrink-0 pr-9">
                               {item.title}
-                              {venueName && (item.kind === "event" || item.kind === "job") ? (
+                              {venueName && (item.kind === "event" || item.kind === "job" || item.kind === "tour") ? (
                                 <span className="font-normal opacity-75"> @ {venueName}</span>
                               ) : null}
                             </div>
@@ -913,7 +917,7 @@ export function OutlookTimeGrid({
                             </button>
                           ) : null}
                         </>
-                      ) : item.kind === "job" || isDisabled || isBooking ? null : (
+                      ) : item.kind === "job" || item.kind === "tour" || isDisabled || isBooking ? null : (
                         <button
                           type="button"
                           data-handle="delete"

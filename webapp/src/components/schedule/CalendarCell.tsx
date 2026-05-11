@@ -88,9 +88,11 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
           const venueName =
             item.kind === "job"
               ? item.venueLabel
-              : item.kind === "event"
-                ? (item.raw as EventDetail).venue?.name
-                : undefined;
+              : item.kind === "tour"
+                ? item.venueLabel
+                : item.kind === "event"
+                  ? (item.raw as EventDetail).venue?.name
+                  : undefined;
           return (
             <button
               key={item.id}

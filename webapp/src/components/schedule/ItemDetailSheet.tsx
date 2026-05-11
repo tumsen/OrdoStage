@@ -49,12 +49,12 @@ function formatAddress(parts: {
 }
 
 export function ItemDetailSheet({ item, onClose }: ItemDetailSheetProps) {
-  const raw = item?.raw;
+  const detailRaw = item && item.kind !== "tour" ? (item.raw as EventDetail | InternalBookingDetail) : null;
 
   return (
     <Sheet open={item !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <SheetContent className="bg-[#0d0d14] border-white/10 text-white w-full sm:max-w-md">
-        {item && raw ? (
+      <SheetContent className="bg-[#0d0d14] border border-white/10 text-white w-full sm:max-w-md">
+        {item && detailRaw ? (
           <>
             <SheetHeader className="pb-4 border-b border-white/10 space-y-3">
               {/* Kind pill */}
@@ -67,11 +67,13 @@ export function ItemDetailSheet({ item, onClose }: ItemDetailSheetProps) {
                 >
                   {item.kind === "event"
                     ? "Event"
-                    : BOOKING_TYPE_LABELS[item.type ?? "other"]}
+                    : item.kind === "job"
+                      ? "Job"
+                      : BOOKING_TYPE_LABELS[item.type ?? "other"]}
                 </span>
-                {isEventDetail(raw) ? (
-                  <span className={cn("text-[11px] px-2 py-0.5 rounded font-medium", STATUS_COLORS[raw.status])}>
-                    {raw.status}
+                {isEventDetail(detailRaw) ? (
+                  <span className={cn("text-[11px] px-2 py-0.5 rounded font-medium", STATUS_COLORS[detailRaw.status])}>
+                    {detailRaw.status}
                   </span>
                 ) : null}
               </div>
@@ -82,8 +84,8 @@ export function ItemDetailSheet({ item, onClose }: ItemDetailSheetProps) {
 
             <div className="mt-5 space-y-4">
               {/* Description */}
-              {raw.description ? (
-                <p className="text-sm text-white/60 leading-relaxed">{raw.description}</p>
+              {detailRaw.description ? (
+                <p className="text-sm text-white/60 leading-relaxed">{detailRaw.description}</p>
               ) : null}
 
               {/* Time */}
@@ -98,55 +100,55 @@ export function ItemDetailSheet({ item, onClose }: ItemDetailSheetProps) {
               </div>
 
               {/* Booked by (internal bookings only) */}
-              {!isEventDetail(raw) && raw.createdBy ? (
+              {!isEventDetail(detailRaw) && detailRaw.createdBy ? (
                 <div className="flex items-start gap-2.5">
                   <UserCircle size={14} className="text-white/30 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="text-[11px] text-white/35 uppercase tracking-wide">Booked by</div>
-                    <div className="text-sm text-white/80 font-medium">{raw.createdBy.name}</div>
-                    <div className="text-xs text-white/40">{raw.createdBy.email}</div>
+                    <div className="text-sm text-white/80 font-medium">{detailRaw.createdBy.name}</div>
+                    <div className="text-xs text-white/40">{detailRaw.createdBy.email}</div>
                   </div>
                 </div>
               ) : null}
 
               {/* Venue */}
-              {raw.venue ? (
+              {isEventDetail(detailRaw) && detailRaw.venue ? (
                 <div className="flex items-start gap-2.5">
                   <MapPin size={14} className="text-white/30 mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="text-sm text-white/70 font-medium">{raw.venue.name}</div>
+                    <div className="text-sm text-white/70 font-medium">{detailRaw.venue.name}</div>
                     {formatAddress({
-                      street: raw.venue.addressStreet,
-                      number: raw.venue.addressNumber,
-                      zip: raw.venue.addressZip,
-                      city: raw.venue.addressCity,
-                      state: raw.venue.addressState,
-                      country: raw.venue.addressCountry,
+                      street: detailRaw.venue.addressStreet,
+                      number: detailRaw.venue.addressNumber,
+                      zip: detailRaw.venue.addressZip,
+                      city: detailRaw.venue.addressCity,
+                      state: detailRaw.venue.addressState,
+                      country: detailRaw.venue.addressCountry,
                     }) ? (
                       <div className="text-xs text-white/40 mt-0.5">
                         {formatAddress({
-                          street: raw.venue.addressStreet,
-                          number: raw.venue.addressNumber,
-                          zip: raw.venue.addressZip,
-                          city: raw.venue.addressCity,
-                          state: raw.venue.addressState,
-                          country: raw.venue.addressCountry,
+                          street: detailRaw.venue.addressStreet,
+                          number: detailRaw.venue.addressNumber,
+                          zip: detailRaw.venue.addressZip,
+                          city: detailRaw.venue.addressCity,
+                          state: detailRaw.venue.addressState,
+                          country: detailRaw.venue.addressCountry,
                         })}
                       </div>
                     ) : null}
-                    {raw.venue.capacity ? (
-                      <div className="text-xs text-white/30 mt-0.5">Capacity: {raw.venue.capacity}</div>
+                    {detailRaw.venue.capacity ? (
+                      <div className="text-xs text-white/30 mt-0.5">Capacity: {detailRaw.venue.capacity}</div>
                     ) : null}
                   </div>
                 </div>
               ) : null}
 
               {/* People */}
-              {raw.people && raw.people.length > 0 ? (
+              {isEventDetail(detailRaw) && detailRaw.people && detailRaw.people.length > 0 ? (
                 <div className="flex items-start gap-2.5">
                   <Users size={14} className="text-white/30 mt-0.5 flex-shrink-0" />
                   <div className="flex flex-col gap-1.5">
-                    {raw.people.map((p) => (
+                    {detailRaw.people.map((p) => (
                       <div key={p.id} className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-purple-700/50 flex items-center justify-center flex-shrink-0">
                           <span className="text-[10px] text-purple-200 font-semibold">

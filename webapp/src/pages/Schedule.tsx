@@ -117,7 +117,7 @@ function getRangeDays(mode: ScheduleViewMode, anchorDate: Date): Date[] {
 type OccupancyEntry = {
   itemId: string;
   title: string;
-  kind: "event" | "booking" | "job";
+  kind: "event" | "booking" | "job" | "tour";
   status?: string;
   start: Date;
   end: Date;
@@ -339,6 +339,7 @@ export default function Schedule() {
   const [bookingSlot, setBookingSlot] = useState<{ startDate: string; endDate: string } | null>(null);
   const [visibility, setVisibility] = useState<VisibilityFilters>({
     event: true,
+    tour: true,
     rehearsal: true,
     maintenance: true,
     private: true,
@@ -408,6 +409,7 @@ export default function Schedule() {
     : [];
 
   const visibleItems = items.filter((item) => {
+    if (item.kind === "tour") return visibility.tour;
     if (item.kind === "event") return visibility.event;
     if (item.kind === "job") return visibility.event;
     if (item.type === "rehearsal") return visibility.rehearsal;
@@ -600,7 +602,10 @@ export default function Schedule() {
                             return (
                               <button
                                 key={item.id}
-                                onClick={() => setSelectedItem(item)}
+                                onClick={() => {
+                                  if (item.kind === "tour") return;
+                                  setSelectedItem(item);
+                                }}
                                 className={`relative w-full overflow-hidden text-left text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 ${
                                   backing ? "ring-2 ring-rose-300/70 shadow-[0_0_0_2px_rgba(244,63,94,0.22)]" : ""
                                 }`}

@@ -1,21 +1,24 @@
-import type { EventDetail, InternalBookingDetail, TourDetail } from "../../../../backend/src/types";
+import type { EventDetail, InternalBookingDetail, TourDetail, TourShow } from "../../../../backend/src/types";
 import {
+  scheduleEventLabel,
+  sortedTourScheduleEvents,
   tourShowCalendarDurationMinutes,
   tourShowCalendarStartTime,
 } from "@/lib/tourScheduleDisplay";
+import { durationMinutesBetween, normalizeTimeHHMM } from "@/lib/showTiming";
 
 export type BookingType = "rehearsal" | "maintenance" | "private" | "venue_booking" | "other";
 
 export interface CalendarItem {
   id: string;
   title: string;
-  kind: "event" | "booking" | "job" | "summary";
+  kind: "event" | "booking" | "job" | "summary" | "tour";
   type?: BookingType;
   status?: string;
   startDate: string;
   endDate: string | null;
-  raw: EventDetail | InternalBookingDetail;
-  /** Venue label for job rows (job or show venue). */
+  raw: EventDetail | InternalBookingDetail | TourDetail;
+  /** Venue label for job rows and tour day rows (when known). */
   venueLabel?: string;
   /** When true, render greyed/faded and ignore interactions (used for conflict awareness). */
   disabled?: boolean;
@@ -33,6 +36,70 @@ function addMinutesLocal(startLocal: string, minutes: number): string | null {
   const end = new Date(d.getTime() + minutes * 60_000);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`;
+}
+
+function tourShowVenueLabel(show: TourShow): string | undefined {
+  const name = show.venueName?.trim();
+  if (name) return name;
+  const city = show.venueCity?.trim();
+  if (city) return city;
+  return undefined;
+}
+
+/** Duration for one schedule row; defaults to 60m when end missing or invalid. */
+function tourScheduleRowDurationMinutes(startHHMM: string, endHHMM: string | null): number {
+  if (!endHHMM || endHHMM === startHHMM) return 60;
+  const d = durationMinutesBetween(startHHMM, endHHMM);
+  if (d === null || d <= 0) return 60;
+  if (d >= 24 * 60) return 60;
+  return d;
+}
+
+function calendarItemsForTourShow(tour: TourDetail, show: TourShow): CalendarItem[] {
+  const day = show.date.slice(0, 10);
+  const venueLabel = tourShowVenueLabel(show);
+  const evs = sortedTourScheduleEvents(show).filter((ev) => normalizeTimeHHMM(ev.startTime));
+
+  if (evs.length > 0) {
+    return evs.map((ev) => {
+      const s = normalizeTimeHHMM(ev.startTime)!;
+      const e = normalizeTimeHHMM(ev.endTime);
+      const durMin = tourScheduleRowDurationMinutes(s, e);
+      const startDate = toLocalDatetime(day, s);
+      const endDate = addMinutesLocal(startDate, durMin);
+      return {
+        id: `tour:${tour.id}:show:${show.id}:ev:${ev.id}`,
+        title: `${tour.name} · ${scheduleEventLabel(ev)}`,
+        kind: "tour" as const,
+        status: tour.status,
+        startDate,
+        endDate,
+        raw: tour,
+        venueLabel,
+      } satisfies CalendarItem;
+    });
+  }
+
+  const startHHMM = tourShowCalendarStartTime(show);
+  const hasTime = typeof startHHMM === "string" && /^\d{2}:\d{2}$/.test(startHHMM);
+  const startDate = hasTime ? toLocalDatetime(day, startHHMM) : day;
+  const dur = tourShowCalendarDurationMinutes(show);
+  const endDate: string | null =
+    hasTime && dur !== null && dur > 0 ? addMinutesLocal(startDate, dur) : null;
+  const typeLabel =
+    show.type === "travel" ? "Travel" : show.type === "day_off" ? "Day off" : "Show";
+  return [
+    {
+      id: `tour:${tour.id}:show:${show.id}`,
+      title: `${tour.name} · ${typeLabel}`,
+      kind: "tour",
+      status: tour.status,
+      startDate,
+      endDate,
+      raw: tour,
+      venueLabel,
+    } satisfies CalendarItem,
+  ];
 }
 
 /** Date anchor for the schedule grid: event window, or earliest show date when window is unset. */
@@ -156,25 +223,7 @@ export function toCalendarItems(
   const tourItems: CalendarItem[] = tours.flatMap((tour) =>
     (tour.shows ?? [])
       .filter((show) => Boolean(show.date))
-      .map((show) => {
-        const day = show.date.slice(0, 10);
-        const startHHMM = tourShowCalendarStartTime(show);
-        const hasTime = typeof startHHMM === "string" && /^\d{2}:\d{2}$/.test(startHHMM);
-        const startDate = hasTime ? toLocalDatetime(day, startHHMM) : day;
-        const dur = tourShowCalendarDurationMinutes(show);
-        const endDate: string | null =
-          hasTime && dur !== null && dur > 0 ? addMinutesLocal(startDate, dur) : null;
-        const typeLabel = show.type === "travel" ? "Travel" : show.type === "day_off" ? "Day off" : "Show";
-        return {
-          id: `tour:${tour.id}:show:${show.id}`,
-          title: `${tour.name} · ${typeLabel}`,
-          kind: "event",
-          status: tour.status,
-          startDate,
-          endDate,
-          raw: tour as unknown as EventDetail,
-        } satisfies CalendarItem;
-      })
+      .flatMap((show) => calendarItemsForTourShow(tour, show))
   );
 
   return [...eventItems, ...tourItems, ...jobItems, ...bookingItems];
@@ -252,6 +301,7 @@ export function formatTime(dateStr: string): string {
 
 export const ITEM_COLORS: Record<string, string> = {
   event: "bg-indigo-600/80 text-indigo-100 border border-indigo-500/40",
+  tour: "bg-fuchsia-700/85 text-fuchsia-100 border border-fuchsia-500/45",
   job: "bg-teal-600/80 text-teal-100 border border-teal-500/40",
   rehearsal: "bg-amber-600/80 text-amber-100 border border-amber-500/40",
   maintenance: "bg-slate-600/80 text-slate-100 border border-slate-500/40",
@@ -262,6 +312,7 @@ export const ITEM_COLORS: Record<string, string> = {
 
 export function itemColor(item: CalendarItem): string {
   if (item.kind === "job") return ITEM_COLORS.job;
+  if (item.kind === "tour") return ITEM_COLORS.tour;
   if (item.kind === "event") return ITEM_COLORS.event;
   if (item.kind === "summary") return "bg-sky-600/80 text-sky-100 border border-sky-500/40";
   return ITEM_COLORS[item.type ?? "other"] ?? ITEM_COLORS.other;

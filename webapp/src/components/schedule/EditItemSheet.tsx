@@ -218,10 +218,6 @@ function EventScheduleSummary({
   );
 }
 
-function isEvent(raw: EventDetail | InternalBookingDetail): raw is EventDetail {
-  return "status" in raw;
-}
-
 function toLocal(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -464,9 +460,10 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
 export function EditItemSheet({ item, onClose, venues, people }: EditItemSheetProps) {
   const navigate = useNavigate();
   if (!item) return null;
+  if (item.kind === "tour") return null;
 
   const raw = item.raw;
-  const isEv = isEvent(raw);
+  const isEv = item.kind === "event" || item.kind === "job";
   const showMatch = /^[^:]+:show:([^:]+)/.exec(item.id);
   const selectedShowId = showMatch?.[1] ?? null;
   const jobMatch = /:job:([^:]+)$/.exec(item.id);
