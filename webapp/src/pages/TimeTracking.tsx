@@ -76,7 +76,7 @@ import {
   rawWindowMinutesFromY,
   snapWindowMinutes,
 } from "@/lib/timeGrid";
-import { CALENDAR_PX_PER_HOUR, CALENDAR_STICKY_HEADER_CHROME, findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
+import { CALENDAR_PX_PER_HOUR, CALENDAR_STICKY_HEADER_CHROME, CALENDAR_TIME_GRID_TOP_PAD_PX, findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
 
 const WEEK_STARTS_ON = 1 as const;
 const PX_PER_HOUR = CALENDAR_PX_PER_HOUR;
@@ -159,6 +159,7 @@ function plannedJobIsLogged(
   return entryByJobId.has(job.id);
 }
 const COLUMN_HEIGHT_PX = (MINUTES_PER_DAY / 60) * PX_PER_HOUR;
+const COLUMN_FRAME_HEIGHT_PX = COLUMN_HEIGHT_PX + CALENDAR_TIME_GRID_TOP_PAD_PX;
 /** Same height for corner spacer and day headers so the hour grid lines up with columns. */
 const WEEK_GRID_HEADER_CLASS =
   "min-h-[6.75rem] shrink-0 border-b border-white/10 box-border flex flex-col items-stretch justify-center gap-0.5 px-1.5 py-2";
@@ -1386,7 +1387,14 @@ export default function TimeTracking() {
                 className={cn(WEEK_GRID_HEADER_CLASS, CALENDAR_STICKY_HEADER_CHROME, "w-full border-b-0")}
                 aria-hidden
               />
-              <div className="relative flex flex-col" style={{ height: COLUMN_HEIGHT_PX }}>
+              <div className="relative box-border shrink-0" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
+                <div
+                  className="absolute inset-x-0 flex flex-col"
+                  style={{
+                    top: CALENDAR_TIME_GRID_TOP_PAD_PX,
+                    height: COLUMN_HEIGHT_PX,
+                  }}
+                >
                 {Array.from({ length: 24 }).map((_, i) => {
                   const hour24 = (displayStartHour + i) % 24;
                   const label = formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h");
@@ -1401,8 +1409,9 @@ export default function TimeTracking() {
                 <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
                   {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
                 </span>
+                </div>
               </div>
-              <div className="h-6 border-b border-white/15" />
+              <div className="h-6 shrink-0" />
             </div>
             {weekDays.map((day, dayIndex) => {
               const dayYmd = format(day, "yyyy-MM-dd");
@@ -1493,13 +1502,17 @@ export default function TimeTracking() {
                       </div>
                     ) : null}
                   </div>
+                  <div className="relative box-border" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
                   <div
                     ref={(el) => {
                       weekColumnRefs.current[dayIndex] = el;
                     }}
                     data-day-col={dayYmd}
-                    className={cn("relative flex flex-col", col?.bg)}
-                    style={{ height: COLUMN_HEIGHT_PX }}
+                    className={cn("absolute inset-x-0 flex flex-col", col?.bg)}
+                    style={{
+                      top: CALENDAR_TIME_GRID_TOP_PAD_PX,
+                      height: COLUMN_HEIGHT_PX,
+                    }}
                   >
                     {col && (
                       <div className={cn("absolute inset-0 z-0 pointer-events-none", col.bg)} />
@@ -1509,7 +1522,6 @@ export default function TimeTracking() {
                         <div key={i} className="flex-1 min-h-0 border-t border-white/[0.1]" />
                       ))}
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1] pointer-events-none" />
                     {canEditVisiblePeriod ? (
                       <>
                         <div
@@ -1880,7 +1892,8 @@ export default function TimeTracking() {
                       })}
                   </div>
                   </div>
-                  <div className="h-6 shrink-0 border-b border-white/15" />
+                  <div className="h-6 shrink-0" />
+                  </div>
                 </div>
               );
             })}

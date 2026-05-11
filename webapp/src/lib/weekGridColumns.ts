@@ -9,6 +9,9 @@ export const WEEK_GRID_MIN_DRAG_PX = 8;
 /** Pixel height per hour in week/day time grids — keep in sync across Schedule and Time. */
 export const CALENDAR_PX_PER_HOUR = 36;
 
+/** Space above the midnight grid line (matches `h-6` footer strip under 24:00). */
+export const CALENDAR_TIME_GRID_TOP_PAD_PX = 24;
+
 /** Opaque sticky header chrome so timed events / cells do not show through while scrolling. */
 export const CALENDAR_STICKY_HEADER_CHROME =
   "sticky top-0 z-30 bg-[#0d0d14] shadow-[0_4px_12px_rgba(0,0,0,0.35)]";

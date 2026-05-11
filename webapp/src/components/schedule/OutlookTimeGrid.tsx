@@ -10,7 +10,13 @@ import {
   computeOverlapLayout,
 } from "./scheduleUtils";
 import { usePreferences } from "@/hooks/usePreferences";
-import { CALENDAR_PX_PER_HOUR, CALENDAR_STICKY_HEADER_CHROME, findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
+import {
+  CALENDAR_PX_PER_HOUR,
+  CALENDAR_STICKY_HEADER_CHROME,
+  CALENDAR_TIME_GRID_TOP_PAD_PX,
+  findColumnIndexAtX,
+  WEEK_GRID_MIN_DRAG_PX,
+} from "@/lib/weekGridColumns";
 
 const HOUR_HEIGHT = CALENDAR_PX_PER_HOUR;
 const SNAP_MINUTES = 15;
@@ -145,6 +151,8 @@ export function OutlookTimeGrid({
 }: OutlookTimeGridProps) {
   const { effective } = usePreferences();
   const totalHeight = 24 * HOUR_HEIGHT;
+  /** Outer column height: grid body + top inset (mirrors breathing room above bottom pad row). */
+  const columnFrameHeight = totalHeight + CALENDAR_TIME_GRID_TOP_PAD_PX;
   const hours = Array.from({ length: 24 }).map((_, h) => h);
 
   const [createDrag, setCreateDrag] = useState<CreateDragPayload | null>(null);
@@ -439,20 +447,28 @@ export function OutlookTimeGrid({
 
         {/* ── Time grid ──────────────────────────────────────────────────── */}
         <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
-          {/* Hour labels */}
-          <div className="relative border-r border-white/10" style={{ height: totalHeight }}>
-            {hours.map((h) => (
-              <div
-                key={h}
-                className="absolute left-0 right-1 z-[1] -translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none"
-                style={{ top: h * HOUR_HEIGHT }}
-              >
-                {`${String(h).padStart(2, "0")}:00`}
-              </div>
-            ))}
-            <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
-              24:00
-            </span>
+          {/* Hour labels (top pad matches bottom h-6 strip so 00:00 clears the sticky header seam). */}
+          <div className="relative box-border border-r border-white/10" style={{ height: columnFrameHeight }}>
+            <div
+              className="pointer-events-none absolute left-0 right-0"
+              style={{
+                top: CALENDAR_TIME_GRID_TOP_PAD_PX,
+                height: totalHeight,
+              }}
+            >
+              {hours.map((h) => (
+                <div
+                  key={h}
+                  className="absolute left-0 right-1 z-[1] -translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums"
+                  style={{ top: h * HOUR_HEIGHT }}
+                >
+                  {`${String(h).padStart(2, "0")}:00`}
+                </div>
+              ))}
+              <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1 text-right text-[10px] leading-[10px] text-white/50 tabular-nums">
+                24:00
+              </span>
+            </div>
           </div>
 
           {/* Day columns */}
@@ -571,23 +587,31 @@ export function OutlookTimeGrid({
             return (
               <div
                 key={day.toISOString()}
-                ref={(el) => { columnRefs.current[dayIndex] = el; }}
-                className="relative border-l border-white/10 touch-none select-none"
-                style={{ height: totalHeight }}
-                onPointerDown={(e) => handleColumnPointerDown(day, dayIndex, e)}
+                className="relative box-border border-l border-white/10"
+                style={{ height: columnFrameHeight }}
               >
-                {/* Hour lines */}
-                {hours.map((h) => (
-                  <div
-                    key={h}
-                    className="absolute left-0 right-0 border-t border-white/[0.1] pointer-events-none z-0"
-                    style={{ top: h * HOUR_HEIGHT }}
-                  />
-                ))}
-                <div className="absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1] pointer-events-none" />
+                <div
+                  ref={(el) => {
+                    columnRefs.current[dayIndex] = el;
+                  }}
+                  className="absolute inset-x-0 touch-none select-none"
+                  style={{
+                    top: CALENDAR_TIME_GRID_TOP_PAD_PX,
+                    height: totalHeight,
+                  }}
+                  onPointerDown={(e) => handleColumnPointerDown(day, dayIndex, e)}
+                >
+                  {/* Hour lines (no extra border at bottom — avoids a double seam with the pad row when scrolling). */}
+                  {hours.map((h) => (
+                    <div
+                      key={h}
+                      className="pointer-events-none absolute left-0 right-0 z-0 border-t border-white/[0.1]"
+                      style={{ top: h * HOUR_HEIGHT }}
+                    />
+                  ))}
 
-                {selectionOverlay}
-                {moveOverlay}
+                  {selectionOverlay}
+                  {moveOverlay}
 
                 {/* Event-linked venue bookings render as a backing layer, not an
                     overlap column. If they overlap this event/show, use the
@@ -940,13 +964,14 @@ export function OutlookTimeGrid({
                   );
                 })}
               </div>
+              </div>
             );
           })}
         </div>
         <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
-          <div className="h-6 border-b border-white/15" />
+          <div className="h-6 shrink-0" />
           {days.map((day) => (
-            <div key={`pad-${day.toISOString()}`} className="h-6 border-b border-white/15" />
+            <div key={`pad-${day.toISOString()}`} className="h-6 shrink-0" />
           ))}
         </div>
       </div>
