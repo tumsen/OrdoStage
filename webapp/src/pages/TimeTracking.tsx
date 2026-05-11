@@ -1389,7 +1389,7 @@ export default function TimeTracking() {
               />
               <div className="relative box-border shrink-0" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
                 <div
-                  className="absolute inset-x-0 flex flex-col"
+                  className="absolute inset-x-0 flex flex-col border-r border-white/10"
                   style={{
                     top: CALENDAR_TIME_GRID_TOP_PAD_PX,
                     height: COLUMN_HEIGHT_PX,
@@ -1411,7 +1411,7 @@ export default function TimeTracking() {
                 </span>
                 </div>
               </div>
-              <div className="h-6 shrink-0" />
+              <div className="h-6 shrink-0 border-b border-white/15" />
             </div>
             {weekDays.map((day, dayIndex) => {
               const dayYmd = format(day, "yyyy-MM-dd");
@@ -1445,12 +1445,12 @@ export default function TimeTracking() {
 
               return (
                 <div key={dayYmd} className="flex-1 min-w-[100px] flex flex-col group">
-                  <div className="flex min-h-0 flex-1 flex-col border-l border-white/10">
+                  <div className="flex min-h-0 flex-1 flex-col">
                   <div
                     className={cn(
                       WEEK_GRID_HEADER_CLASS,
                       CALENDAR_STICKY_HEADER_CHROME,
-                      "text-xs text-white/70",
+                      "border-l border-white/10 text-xs text-white/70",
                       col?.bg,
                       col ? `border-b ${col.border}` : "border-b border-white/10"
                     )}
@@ -1508,7 +1508,10 @@ export default function TimeTracking() {
                       weekColumnRefs.current[dayIndex] = el;
                     }}
                     data-day-col={dayYmd}
-                    className={cn("absolute inset-x-0 flex flex-col", col?.bg)}
+                    className={cn(
+                      "absolute inset-x-0 flex flex-col border-l border-white/10",
+                      col?.bg
+                    )}
                     style={{
                       top: CALENDAR_TIME_GRID_TOP_PAD_PX,
                       height: COLUMN_HEIGHT_PX,
@@ -1522,6 +1525,7 @@ export default function TimeTracking() {
                         <div key={i} className="flex-1 min-h-0 border-t border-white/[0.1]" />
                       ))}
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1] pointer-events-none" />
                     {canEditVisiblePeriod ? (
                       <>
                         <div
@@ -1892,7 +1896,7 @@ export default function TimeTracking() {
                       })}
                   </div>
                   </div>
-                  <div className="h-6 shrink-0" />
+                  <div className="h-6 shrink-0 border-b border-white/15" />
                   </div>
                 </div>
               );

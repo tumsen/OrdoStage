@@ -447,10 +447,10 @@ export function OutlookTimeGrid({
 
         {/* ── Time grid ──────────────────────────────────────────────────── */}
         <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
-          {/* Hour labels (top pad matches bottom h-6 strip so 00:00 clears the sticky header seam). */}
-          <div className="relative box-border border-r border-white/10" style={{ height: columnFrameHeight }}>
+          {/* Hour labels — border-r only on the grid band (not through top inset above 00:00). */}
+          <div className="relative box-border" style={{ height: columnFrameHeight }}>
             <div
-              className="pointer-events-none absolute left-0 right-0"
+              className="pointer-events-none absolute inset-x-0 border-r border-white/10"
               style={{
                 top: CALENDAR_TIME_GRID_TOP_PAD_PX,
                 height: totalHeight,
@@ -587,21 +587,21 @@ export function OutlookTimeGrid({
             return (
               <div
                 key={day.toISOString()}
-                className="relative box-border border-l border-white/10"
+                className="relative box-border"
                 style={{ height: columnFrameHeight }}
               >
                 <div
                   ref={(el) => {
                     columnRefs.current[dayIndex] = el;
                   }}
-                  className="absolute inset-x-0 touch-none select-none"
+                  className="absolute inset-x-0 touch-none select-none border-l border-white/10"
                   style={{
                     top: CALENDAR_TIME_GRID_TOP_PAD_PX,
                     height: totalHeight,
                   }}
                   onPointerDown={(e) => handleColumnPointerDown(day, dayIndex, e)}
                 >
-                  {/* Hour lines (no extra border at bottom — avoids a double seam with the pad row when scrolling). */}
+                  {/* Hour lines + explicit line at end of day (24:00). */}
                   {hours.map((h) => (
                     <div
                       key={h}
@@ -609,6 +609,7 @@ export function OutlookTimeGrid({
                       style={{ top: h * HOUR_HEIGHT }}
                     />
                   ))}
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1]" />
 
                   {selectionOverlay}
                   {moveOverlay}
@@ -969,9 +970,9 @@ export function OutlookTimeGrid({
           })}
         </div>
         <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
-          <div className="h-6 shrink-0" />
+          <div className="h-6 shrink-0 border-b border-white/15" />
           {days.map((day) => (
-            <div key={`pad-${day.toISOString()}`} className="h-6 shrink-0" />
+            <div key={`pad-${day.toISOString()}`} className="h-6 shrink-0 border-b border-white/15" />
           ))}
         </div>
       </div>
