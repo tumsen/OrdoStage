@@ -218,10 +218,10 @@ export function TourDayScheduleEditor({
         {drafts.map((row, idx) => (
           <div
             key={row.rowKey}
-            className="flex flex-wrap items-start gap-x-3 gap-y-3 py-2 first:pt-0 last:pb-0 min-w-0"
+            className="flex flex-nowrap items-end gap-x-3 py-2 first:pt-0 last:pb-0 min-w-0 overflow-x-auto"
           >
-            <div className="flex flex-wrap items-start gap-x-3 gap-y-3 flex-1 min-w-0">
-              <div className="flex flex-col gap-1.5 w-[8.25rem] sm:w-[9rem] shrink-0">
+            <div className="flex flex-nowrap items-end gap-x-3 flex-1 min-w-0">
+              <div className="flex flex-col w-[8.25rem] sm:w-[9rem] shrink-0">
                 <Label htmlFor={`tour-day-sched-type-${row.rowKey}`} className={scheduleFieldLabelClass}>
                   Type
                 </Label>
@@ -233,7 +233,7 @@ export function TourDayScheduleEditor({
                 >
                   <SelectTrigger
                     id={`tour-day-sched-type-${row.rowKey}`}
-                    className="bg-white/5 border-white/10 text-white h-10 min-h-10 py-0 px-3 text-sm leading-none box-border shrink-0"
+                    className="w-full bg-white/5 border-white/10 text-white h-10 min-h-10 py-0 px-3 text-sm leading-none box-border"
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -247,7 +247,7 @@ export function TourDayScheduleEditor({
                 </Select>
               </div>
               {row.kind === "custom" ? (
-                <div className="flex flex-col gap-1.5 min-w-[6rem] flex-1 max-w-[12rem] shrink">
+                <div className="flex flex-col min-w-[6rem] max-w-[12rem] shrink-0">
                   <Label htmlFor={`tour-day-sched-custom-${row.rowKey}`} className={scheduleFieldLabelClass}>
                     Custom label
                   </Label>
@@ -261,7 +261,7 @@ export function TourDayScheduleEditor({
                 </div>
               ) : null}
               <TourSameDayTimeFields
-                className="flex-1 min-w-[min(100%,18rem)] items-start"
+                className="flex-1 min-w-0 pb-0 items-end"
                 dayKey={dayKey}
                 startValue={row.startValue}
                 endValue={row.endValue}
@@ -269,7 +269,7 @@ export function TourDayScheduleEditor({
                 onEndChange={(v) => updateRow(idx, { endValue: v })}
               />
             </div>
-            <div className="flex flex-col gap-1.5 shrink-0">
+            <div className="flex flex-col shrink-0">
               <span className={`${scheduleFieldLabelClass} invisible select-none`} aria-hidden>
                 ·
               </span>
