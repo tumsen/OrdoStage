@@ -78,6 +78,14 @@ import { findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns
 
 const WEEK_STARTS_ON = 1 as const;
 const PX_PER_HOUR = 36;
+/** Matches backend `tourPlanJobId` / `TimeTrackingJob.id` for tour roster rows. */
+const TOUR_PLAN_JOB_PREFIX = "tourshow:";
+
+function plannedJobKeyFromEntry(e: TimeEntry): string | null {
+  if (e.eventShowJobId) return e.eventShowJobId;
+  if (e.tourShowId) return `${TOUR_PLAN_JOB_PREFIX}${e.tourShowId}`;
+  return null;
+}
 const COLUMN_HEIGHT_PX = (MINUTES_PER_DAY / 60) * PX_PER_HOUR;
 /** Same height for corner spacer and day headers so the hour grid lines up with columns. */
 const WEEK_GRID_HEADER_CLASS =
@@ -342,6 +350,7 @@ export default function TimeTracking() {
         kind,
         category: "work",
         eventShowJobId: kind === "job" ? (body.eventShowJobId as string | null) ?? null : null,
+        tourShowId: kind === "job" ? (body.tourShowId as string | null) ?? null : null,
         eventId: body.eventId != null ? (body.eventId as string) : null,
         timeProjectId: body.timeProjectId != null ? (body.timeProjectId as string) : null,
         note: body.note != null ? (body.note as string) : null,
@@ -431,10 +440,12 @@ export default function TimeTracking() {
   );
 
   const editingEntryJobSummary = useMemo(() => {
-    if (!editingEntry || editingEntry.kind !== "job" || !editingEntry.eventShowJobId) return null;
+    if (!editingEntry || editingEntry.kind !== "job") return null;
+    const jk = plannedJobKeyFromEntry(editingEntry);
+    if (!jk) return null;
     return (
-      (jobs ?? []).find((j) => j.id === editingEntry.eventShowJobId)?.title ??
-      (upcomingJobs ?? []).find((j) => j.id === editingEntry.eventShowJobId)?.title ??
+      (jobs ?? []).find((j) => j.id === jk)?.title ??
+      (upcomingJobs ?? []).find((j) => j.id === jk)?.title ??
       null
     );
   }, [editingEntry, jobs, upcomingJobs]);
@@ -816,7 +827,8 @@ export default function TimeTracking() {
   const entryByJobId = useMemo(() => {
     const m = new Map<string, TimeEntry>();
     for (const e of entries ?? []) {
-      if (e.eventShowJobId) m.set(e.eventShowJobId, e);
+      const k = plannedJobKeyFromEntry(e);
+      if (k) m.set(k, e);
     }
     return m;
   }, [entries]);
@@ -876,13 +888,28 @@ export default function TimeTracking() {
   }
 
   function addJobToTime(job: TimeTrackingJob) {
-    createEntry.mutate({
-      startsAt: job.plannedStartsAt,
-      endsAt: job.plannedEndsAt,
-      kind: "job",
-      eventShowJobId: job.id,
-      eventId: job.eventId,
-    });
+    const tourShowId =
+      job.tourShowId ??
+      (job.id.startsWith(TOUR_PLAN_JOB_PREFIX) ? job.id.slice(TOUR_PLAN_JOB_PREFIX.length) : null);
+    const isTourJob = job.source === "tour" || (tourShowId != null && job.id.startsWith(TOUR_PLAN_JOB_PREFIX));
+
+    if (isTourJob && tourShowId) {
+      createEntry.mutate({
+        startsAt: job.plannedStartsAt,
+        endsAt: job.plannedEndsAt,
+        kind: "job",
+        tourShowId,
+        ...(job.timeProjectId ? { timeProjectId: job.timeProjectId } : {}),
+      });
+    } else {
+      createEntry.mutate({
+        startsAt: job.plannedStartsAt,
+        endsAt: job.plannedEndsAt,
+        kind: "job",
+        eventShowJobId: job.id,
+        eventId: job.eventId,
+      });
+    }
     jumpToJobWeek(job);
   }
 
@@ -1386,7 +1413,7 @@ export default function TimeTracking() {
                               top: `${Math.max(0, topPct)}%`,
                               height: `${Math.max(3, heightPct)}%`,
                             }}
-                            title={j.eventTitle}
+                            title={j.source === "tour" ? `${j.eventTitle} (tour)` : j.eventTitle}
                             onPointerDown={(ev) => {
                               ev.stopPropagation();
                             }}
@@ -1452,12 +1479,13 @@ export default function TimeTracking() {
                         const isLocked = e.isLocked === true;
                         const cat = (e.category ?? "work") as TimeCategory;
                         const isDayOff = cat === "vacation" || cat === "sick" || cat === "holiday";
+                        const jobKey = plannedJobKeyFromEntry(e);
                         const label =
                           isDayOff || cat === "travel_allowance"
                             ? t(timeCategoryMessageId(cat) as never)
-                            : isJob && e.eventShowJobId
-                            ? (jobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
-                              (upcomingJobs ?? []).find((j) => j.id === e.eventShowJobId)?.title ??
+                            : isJob && jobKey
+                            ? (jobs ?? []).find((j) => j.id === jobKey)?.title ??
+                              (upcomingJobs ?? []).find((j) => j.id === jobKey)?.title ??
                               t("time.job")
                             : "";
                         const projEntity = e.timeProjectId

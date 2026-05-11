@@ -205,6 +205,182 @@ function toDateTimeFromDateAndTime(dateIso: string, hhmm: string): Date | null {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mm, 0, 0));
 }
 
+const TOUR_TIME_JOB_PREFIX = "tourshow:";
+const DEFAULT_TOUR_JOB_DURATION_MIN = 180;
+
+function tourPlanJobId(tourShowId: string) {
+  return `${TOUR_TIME_JOB_PREFIX}${tourShowId}`;
+}
+
+async function fetchTourPlanJobsForPerson(args: {
+  organizationId: string;
+  personId: string;
+  rangeStart: Date;
+  rangeEndExclusive: Date;
+}) {
+  await syncEventShowTimeProjects(args.organizationId);
+
+  const shows = await prisma.tourShow.findMany({
+    where: {
+      tour: { organizationId: args.organizationId },
+      type: "show",
+      date: { gte: args.rangeStart, lt: args.rangeEndExclusive },
+      OR: [
+        { showPeople: { some: { personId: args.personId } } },
+        {
+          AND: [
+            { showPeople: { none: {} } },
+            { tour: { people: { some: { personId: args.personId } } } },
+          ],
+        },
+      ],
+    },
+    include: {
+      tour: { select: { id: true, name: true } },
+    },
+    orderBy: [{ date: "asc" }, { order: "asc" }],
+  });
+
+  const showIds = shows.map((s) => s.id);
+  const projects =
+    showIds.length === 0
+      ? []
+      : await prisma.timeProject.findMany({
+          where: { organizationId: args.organizationId, tourShowId: { in: showIds } },
+          select: { id: true, tourShowId: true },
+        });
+  const projectIdByShow = new Map(projects.map((p) => [p.tourShowId!, p.id]));
+
+  const missing = shows.filter((s) => !projectIdByShow.has(s.id));
+  if (missing.length) {
+    await syncEventShowTimeProjects(args.organizationId);
+    const again = await prisma.timeProject.findMany({
+      where: { organizationId: args.organizationId, tourShowId: { in: missing.map((m) => m.id) } },
+      select: { id: true, tourShowId: true },
+    });
+    for (const p of again) projectIdByShow.set(p.tourShowId!, p.id);
+  }
+
+  return shows.map((show) => {
+    const tourTitle = show.tour.name.trim() || "Tour";
+    const venue = show.venueName?.trim() || show.venueCity?.trim() || "Venue TBC";
+    const title = `${tourTitle} · ${venue}`;
+    const startHHMM =
+      show.showTime?.trim() && /^\d{2}:\d{2}$/.test(show.showTime.trim())
+        ? show.showTime.trim()
+        : "19:00";
+    const jobDateIso = show.date.toISOString();
+    const plannedStart = toDateTimeFromDateAndTime(jobDateIso, startHHMM);
+    const plannedEnd =
+      plannedStart != null
+        ? new Date(plannedStart.getTime() + DEFAULT_TOUR_JOB_DURATION_MIN * 60_000)
+        : null;
+
+    return {
+      id: tourPlanJobId(show.id),
+      source: "tour" as const,
+      title,
+      jobDate: jobDateIso,
+      startTime: startHHMM,
+      durationMinutes: DEFAULT_TOUR_JOB_DURATION_MIN,
+      plannedStartsAt: plannedStart ? iso(plannedStart) : jobDateIso,
+      plannedEndsAt: plannedEnd ? iso(plannedEnd) : jobDateIso,
+      eventId: show.tour.id,
+      eventTitle: tourTitle,
+      showId: show.id,
+      showDate: jobDateIso,
+      venueName: venue,
+      timeProjectId: projectIdByShow.get(show.id) ?? null,
+      tourShowId: show.id,
+    };
+  });
+}
+
+async function fetchTourPlanJobsFromDate(args: {
+  organizationId: string;
+  personId: string;
+  fromDate: Date;
+  take: number;
+}) {
+  await syncEventShowTimeProjects(args.organizationId);
+
+  const shows = await prisma.tourShow.findMany({
+    where: {
+      tour: { organizationId: args.organizationId },
+      type: "show",
+      date: { gte: args.fromDate },
+      OR: [
+        { showPeople: { some: { personId: args.personId } } },
+        {
+          AND: [
+            { showPeople: { none: {} } },
+            { tour: { people: { some: { personId: args.personId } } } },
+          ],
+        },
+      ],
+    },
+    include: {
+      tour: { select: { id: true, name: true } },
+    },
+    orderBy: [{ date: "asc" }, { order: "asc" }],
+    take: args.take,
+  });
+
+  const showIds = shows.map((s) => s.id);
+  const projects =
+    showIds.length === 0
+      ? []
+      : await prisma.timeProject.findMany({
+          where: { organizationId: args.organizationId, tourShowId: { in: showIds } },
+          select: { id: true, tourShowId: true },
+        });
+  const projectIdByShow = new Map(projects.map((p) => [p.tourShowId!, p.id]));
+
+  const missing = shows.filter((s) => !projectIdByShow.has(s.id));
+  if (missing.length) {
+    await syncEventShowTimeProjects(args.organizationId);
+    const again = await prisma.timeProject.findMany({
+      where: { organizationId: args.organizationId, tourShowId: { in: missing.map((m) => m.id) } },
+      select: { id: true, tourShowId: true },
+    });
+    for (const p of again) projectIdByShow.set(p.tourShowId!, p.id);
+  }
+
+  return shows.map((show) => {
+    const tourTitle = show.tour.name.trim() || "Tour";
+    const venue = show.venueName?.trim() || show.venueCity?.trim() || "Venue TBC";
+    const title = `${tourTitle} · ${venue}`;
+    const startHHMM =
+      show.showTime?.trim() && /^\d{2}:\d{2}$/.test(show.showTime.trim())
+        ? show.showTime.trim()
+        : "19:00";
+    const jobDateIso = show.date.toISOString();
+    const plannedStart = toDateTimeFromDateAndTime(jobDateIso, startHHMM);
+    const plannedEnd =
+      plannedStart != null
+        ? new Date(plannedStart.getTime() + DEFAULT_TOUR_JOB_DURATION_MIN * 60_000)
+        : null;
+
+    return {
+      id: tourPlanJobId(show.id),
+      source: "tour" as const,
+      title,
+      jobDate: jobDateIso,
+      startTime: startHHMM,
+      durationMinutes: DEFAULT_TOUR_JOB_DURATION_MIN,
+      plannedStartsAt: plannedStart ? iso(plannedStart) : jobDateIso,
+      plannedEndsAt: plannedEnd ? iso(plannedEnd) : jobDateIso,
+      eventId: show.tour.id,
+      eventTitle: tourTitle,
+      showId: show.id,
+      showDate: jobDateIso,
+      venueName: venue,
+      timeProjectId: projectIdByShow.get(show.id) ?? null,
+      tourShowId: show.id,
+    };
+  });
+}
+
 async function resolvePersonIdForUser(organizationId: string, email: string | null | undefined) {
   if (!email?.trim()) return null;
   let person = await prisma.person.findFirst({
@@ -356,6 +532,7 @@ function serializeEntry(row: {
   category: string;
   eventShowJobId: string | null;
   eventId: string | null;
+  tourShowId: string | null;
   timeProjectId: string | null;
   note: string | null;
   isLocked: boolean;
@@ -374,6 +551,7 @@ function serializeEntry(row: {
     category: (row.category || "work") as TimeCategory,
     eventShowJobId: row.eventShowJobId,
     eventId: row.eventId,
+    tourShowId: row.tourShowId,
     timeProjectId: row.timeProjectId,
     note: row.note,
     isLocked: row.isLocked,
@@ -1144,7 +1322,7 @@ timeRouter.get("/time/jobs", async (c) => {
     orderBy: [{ jobDate: "asc" }, { sortOrder: "asc" }],
   });
 
-  const data = jobs.map((j) => {
+  const eventRows = jobs.map((j) => {
     const plannedStart = toDateTimeFromDateAndTime(j.jobDate.toISOString(), j.startTime);
     const plannedEnd =
       plannedStart != null
@@ -1152,6 +1330,7 @@ timeRouter.get("/time/jobs", async (c) => {
         : null;
     return {
       id: j.id,
+      source: "event" as const,
       title: j.title,
       jobDate: iso(j.jobDate),
       startTime: j.startTime,
@@ -1163,7 +1342,22 @@ timeRouter.get("/time/jobs", async (c) => {
       showId: j.show.id,
       showDate: iso(j.show.showDate),
       venueName: j.venue.name,
+      timeProjectId: null as string | null,
+      tourShowId: null as string | null,
     };
+  });
+
+  const tourRows = await fetchTourPlanJobsForPerson({
+    organizationId: user.organizationId,
+    personId: target.personId,
+    rangeStart,
+    rangeEndExclusive,
+  });
+
+  const data = [...eventRows, ...tourRows].sort((a, b) => {
+    const da = a.jobDate.localeCompare(b.jobDate);
+    if (da !== 0) return da;
+    return a.startTime.localeCompare(b.startTime);
   });
   return c.json({ data });
 });
@@ -1187,6 +1381,8 @@ timeRouter.get("/time/jobs/upcoming", async (c) => {
   const now = new Date();
   const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
+  const fetchCap = Math.min(200, Math.max(limit * 4, limit));
+
   const jobs = await prisma.eventShowJob.findMany({
     where: {
       personId: target.personId,
@@ -1198,10 +1394,10 @@ timeRouter.get("/time/jobs/upcoming", async (c) => {
       show: { select: { id: true, showDate: true, event: { select: { id: true, title: true } } } },
     },
     orderBy: [{ jobDate: "asc" }, { sortOrder: "asc" }],
-    take: limit,
+    take: fetchCap,
   });
 
-  const data = jobs.map((j) => {
+  const eventRows = jobs.map((j) => {
     const plannedStart = toDateTimeFromDateAndTime(j.jobDate.toISOString(), j.startTime);
     const plannedEnd =
       plannedStart != null
@@ -1209,6 +1405,7 @@ timeRouter.get("/time/jobs/upcoming", async (c) => {
         : null;
     return {
       id: j.id,
+      source: "event" as const,
       title: j.title,
       jobDate: iso(j.jobDate),
       startTime: j.startTime,
@@ -1220,8 +1417,24 @@ timeRouter.get("/time/jobs/upcoming", async (c) => {
       showId: j.show.id,
       showDate: iso(j.show.showDate),
       venueName: j.venue.name,
+      timeProjectId: null as string | null,
+      tourShowId: null as string | null,
     };
   });
+
+  const tourRows = await fetchTourPlanJobsFromDate({
+    organizationId: user.organizationId,
+    personId: target.personId,
+    fromDate: todayStart,
+    take: fetchCap,
+  });
+
+  const merged = [...eventRows, ...tourRows].sort((a, b) => {
+    const da = a.jobDate.localeCompare(b.jobDate);
+    if (da !== 0) return da;
+    return a.startTime.localeCompare(b.startTime);
+  });
+  const data = merged.slice(0, limit);
   return c.json({ data });
 });
 
@@ -1288,27 +1501,22 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
 
   let eventShowJobId: string | null = body.eventShowJobId ?? null;
   let eventId: string | null = body.eventId ?? null;
+  let tourShowId: string | null = body.tourShowId ?? null;
 
   if (body.kind === "job") {
-    if (!eventShowJobId) {
-      return c.json({ error: { message: "Job entries require eventShowJobId", code: "BAD_REQUEST" } }, 400);
+    if (eventShowJobId && tourShowId) {
+      return c.json(
+        { error: { message: "Use either eventShowJobId or tourShowId, not both.", code: "BAD_REQUEST" } },
+        400
+      );
     }
-    const job = await prisma.eventShowJob.findFirst({
-      where: {
-        id: eventShowJobId,
-        personId: myPersonId,
-        show: { event: { organizationId: user.organizationId } },
-      },
-      include: { show: { select: { eventId: true } } },
-    });
-    if (!job) {
-      return c.json({ error: { message: "Job not found or not assigned to you", code: "NOT_FOUND" } }, 404);
+    if (!eventShowJobId && !tourShowId) {
+      return c.json(
+        { error: { message: "Job entries require eventShowJobId or tourShowId.", code: "BAD_REQUEST" } },
+        400
+      );
     }
-    eventId = job.show.eventId;
-    const existing = await prisma.timeEntry.findFirst({
-      where: { personId: myPersonId, eventShowJobId },
-      include: { tagLinks: { select: { timeTagId: true } } },
-    });
+
     const tagIds = body.tagIds ?? [];
     if (tagIds.length) {
       const count = await prisma.timeTag.count({
@@ -1318,6 +1526,210 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         return c.json({ error: { message: "Invalid tag id", code: "BAD_REQUEST" } }, 400);
       }
     }
+
+    if (tourShowId) {
+      await syncEventShowTimeProjects(user.organizationId);
+      const show = await prisma.tourShow.findFirst({
+        where: {
+          id: tourShowId,
+          tour: { organizationId: user.organizationId },
+          type: "show",
+          OR: [
+            { showPeople: { some: { personId: myPersonId } } },
+            {
+              AND: [
+                { showPeople: { none: {} } },
+                { tour: { people: { some: { personId: myPersonId } } } },
+              ],
+            },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!show) {
+        return c.json(
+          { error: { message: "Tour show not found or you are not on the roster.", code: "NOT_FOUND" } }, 404
+        );
+      }
+
+      let resolvedProjectId: string | null = body.timeProjectId ?? null;
+      if (resolvedProjectId) {
+        const p = await prisma.timeProject.findFirst({
+          where: { id: resolvedProjectId, organizationId: user.organizationId },
+        });
+        if (!p) return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
+      } else {
+        const p = await prisma.timeProject.findFirst({
+          where: { organizationId: user.organizationId, tourShowId: show.id },
+          select: { id: true },
+        });
+        resolvedProjectId = p?.id ?? null;
+      }
+      if (!resolvedProjectId) {
+        await syncEventShowTimeProjects(user.organizationId);
+        const p2 = await prisma.timeProject.findFirst({
+          where: { organizationId: user.organizationId, tourShowId: show.id },
+          select: { id: true },
+        });
+        resolvedProjectId = p2?.id ?? null;
+      }
+      if (!resolvedProjectId) {
+        return c.json(
+          { error: { message: "No time project for this tour date. Contact an admin.", code: "BAD_REQUEST" } },
+          400
+        );
+      }
+
+      eventShowJobId = null;
+      eventId = null;
+
+      const existingTour = await prisma.timeEntry.findFirst({
+        where: { personId: myPersonId, tourShowId },
+        include: { tagLinks: { select: { timeTagId: true } } },
+      });
+
+      if (existingTour) {
+        const spans = await computeNonOverlappingSpans({
+          organizationId: user.organizationId,
+          personId: myPersonId,
+          startsAt,
+          endsAt,
+          excludeEntryId: existingTour.id,
+        });
+        if (spans.length === 0) {
+          return c.json(
+            { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+            409
+          );
+        }
+        const primary = spans[0];
+        if (!primary) {
+          return c.json(
+            { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+            409
+          );
+        }
+        const updated = await prisma.timeEntry.update({
+          where: { id: existingTour.id },
+          data: {
+            startsAt: primary.startsAt,
+            endsAt: primary.endsAt,
+            category: body.category ?? "work",
+            timeProjectId: resolvedProjectId,
+            note: body.note ?? null,
+            isLocked: body.isLocked ?? false,
+            tagLinks: {
+              deleteMany: {},
+              createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) },
+            },
+          },
+          include: { tagLinks: { select: { timeTagId: true } } },
+        });
+        if (spans.length > 1) {
+          for (const s of spans.slice(1)) {
+            await prisma.timeEntry.create({
+              data: {
+                organizationId: user.organizationId,
+                userId: user.id,
+                personId: myPersonId,
+                startsAt: s.startsAt,
+                endsAt: s.endsAt,
+                kind: "custom",
+                category: body.category ?? "work",
+                eventShowJobId: null,
+                eventId: null,
+                tourShowId: null,
+                timeProjectId: resolvedProjectId,
+                note: body.note ?? null,
+                isLocked: body.isLocked ?? false,
+                tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
+              },
+            });
+          }
+        }
+        return c.json({ data: serializeEntry(updated) });
+      }
+
+      const spans = await computeNonOverlappingSpans({
+        organizationId: user.organizationId,
+        personId: myPersonId,
+        startsAt,
+        endsAt,
+      });
+      if (spans.length === 0) {
+        return c.json(
+          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          409
+        );
+      }
+      const primary = spans[0];
+      if (!primary) {
+        return c.json(
+          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          409
+        );
+      }
+      const created = await prisma.timeEntry.create({
+        data: {
+          organizationId: user.organizationId,
+          userId: user.id,
+          personId: myPersonId,
+          startsAt: primary.startsAt,
+          endsAt: primary.endsAt,
+          kind: "job",
+          category: body.category ?? "work",
+          eventShowJobId: null,
+          eventId: null,
+          tourShowId,
+          timeProjectId: resolvedProjectId,
+          note: body.note ?? null,
+          isLocked: body.isLocked ?? false,
+          tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
+        },
+        include: { tagLinks: { select: { timeTagId: true } } },
+      });
+      if (spans.length > 1) {
+        for (const s of spans.slice(1)) {
+          await prisma.timeEntry.create({
+            data: {
+              organizationId: user.organizationId,
+              userId: user.id,
+              personId: myPersonId,
+              startsAt: s.startsAt,
+              endsAt: s.endsAt,
+              kind: "custom",
+              category: body.category ?? "work",
+              eventShowJobId: null,
+              eventId: null,
+              tourShowId: null,
+              timeProjectId: resolvedProjectId,
+              note: body.note ?? null,
+              isLocked: body.isLocked ?? false,
+              tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
+            },
+          });
+        }
+      }
+      return c.json({ data: serializeEntry(created) });
+    }
+
+    const job = await prisma.eventShowJob.findFirst({
+      where: {
+        id: eventShowJobId!,
+        personId: myPersonId,
+        show: { event: { organizationId: user.organizationId } },
+      },
+      include: { show: { select: { eventId: true } } },
+    });
+    if (!job) {
+      return c.json({ error: { message: "Job not found or not assigned to you", code: "NOT_FOUND" } }, 404);
+    }
+    eventId = job.show.eventId;
+    tourShowId = null;
+    const existing = await prisma.timeEntry.findFirst({
+      where: { personId: myPersonId, eventShowJobId },
+      include: { tagLinks: { select: { timeTagId: true } } },
+    });
     if (body.timeProjectId) {
       const p = await prisma.timeProject.findFirst({
         where: { id: body.timeProjectId, organizationId: user.organizationId },
@@ -1375,6 +1787,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
               category: body.category ?? "work",
               eventShowJobId: null,
               eventId,
+              tourShowId: null,
               timeProjectId: body.timeProjectId ?? null,
               note: body.note ?? null,
               isLocked: body.isLocked ?? false,
@@ -1416,6 +1829,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         category: body.category ?? "work",
         eventShowJobId,
         eventId,
+        tourShowId: null,
         timeProjectId: body.timeProjectId ?? null,
         note: body.note ?? null,
         isLocked: body.isLocked ?? false,
@@ -1436,6 +1850,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             category: body.category ?? "work",
             eventShowJobId: null,
             eventId,
+            tourShowId: null,
             timeProjectId: body.timeProjectId ?? null,
             note: body.note ?? null,
             isLocked: body.isLocked ?? false,
@@ -1448,8 +1863,11 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
   }
 
   // custom
-  if (eventShowJobId) {
-    return c.json({ error: { message: "Custom entries cannot reference a job", code: "BAD_REQUEST" } }, 400);
+  if (eventShowJobId || tourShowId) {
+    return c.json(
+      { error: { message: "Custom entries cannot reference a job or tour show.", code: "BAD_REQUEST" } },
+      400
+    );
   }
   if (eventId) {
     const ev = await prisma.event.findFirst({
@@ -1504,6 +1922,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       category: body.category ?? "work",
       eventShowJobId: null,
       eventId,
+      tourShowId: null,
       timeProjectId: body.timeProjectId ?? null,
       note: body.note ?? null,
       isLocked: body.isLocked ?? false,
@@ -1524,6 +1943,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           category: body.category ?? "work",
           eventShowJobId: null,
           eventId,
+          tourShowId: null,
           timeProjectId: body.timeProjectId ?? null,
           note: body.note ?? null,
           isLocked: body.isLocked ?? false,
@@ -1603,6 +2023,24 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
     });
     if (!ev) return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
+  if (body.tourShowId !== undefined && body.tourShowId !== null) {
+    const ts = await prisma.tourShow.findFirst({
+      where: { id: body.tourShowId, tour: { organizationId: user.organizationId } },
+      select: { id: true },
+    });
+    if (!ts) return c.json({ error: { message: "Tour show not found", code: "NOT_FOUND" } }, 404);
+  }
+  if (
+    body.eventShowJobId !== undefined &&
+    body.eventShowJobId !== null &&
+    body.tourShowId !== undefined &&
+    body.tourShowId !== null
+  ) {
+    return c.json(
+      { error: { message: "Use either eventShowJobId or tourShowId, not both.", code: "BAD_REQUEST" } },
+      400
+    );
+  }
 
   if (body.tagIds !== undefined) {
     const tagIds = body.tagIds;
@@ -1641,6 +2079,7 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
   const finalCategory = body.category ?? existing.category;
   const finalEventShowJobId =
     body.eventShowJobId !== undefined ? body.eventShowJobId : existing.eventShowJobId;
+  const finalTourShowId = body.tourShowId !== undefined ? body.tourShowId : existing.tourShowId;
   const finalEventId = body.eventId !== undefined ? body.eventId : existing.eventId;
   const finalProjectId = body.timeProjectId !== undefined ? body.timeProjectId : existing.timeProjectId;
   const finalNote = body.note !== undefined ? body.note : existing.note;
@@ -1656,6 +2095,7 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
       category: finalCategory,
       eventShowJobId: finalEventShowJobId,
       eventId: finalEventId,
+      tourShowId: finalTourShowId,
       timeProjectId: finalProjectId,
       note: finalNote,
       isLocked: finalIsLocked,
@@ -1675,10 +2115,11 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
           personId: existing.personId,
           startsAt: s.startsAt,
           endsAt: s.endsAt,
-          kind: finalEventShowJobId ? "custom" : finalKind,
+          kind: "custom",
           category: finalCategory,
-          eventShowJobId: finalEventShowJobId ? null : finalEventShowJobId,
+          eventShowJobId: null,
           eventId: finalEventId,
+          tourShowId: null,
           timeProjectId: finalProjectId,
           note: finalNote,
           isLocked: finalIsLocked,
