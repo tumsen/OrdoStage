@@ -512,8 +512,8 @@ export default function Schedule() {
         <ScheduleLegend />
       </div>
 
-      {/* Calendar */}
-      <div className="min-h-0 flex-1 overflow-hidden bg-white/[0.02] border border-white/[0.07] rounded-xl p-3 md:p-4">
+      {/* Calendar (inner views like OutlookTimeGrid bring their own rounded border). */}
+      <div className="min-h-0 flex-1 overflow-hidden bg-white/[0.02] rounded-xl p-3 md:p-4">
         {isLoading ? (
           <div className="h-full overflow-auto space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
