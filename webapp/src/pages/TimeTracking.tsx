@@ -1411,7 +1411,7 @@ export default function TimeTracking() {
                 </span>
                 </div>
               </div>
-              <div className="h-6 shrink-0 border-b border-white/15" />
+              <div className="h-6 shrink-0" />
             </div>
             {weekDays.map((day, dayIndex) => {
               const dayYmd = format(day, "yyyy-MM-dd");
@@ -1896,7 +1896,7 @@ export default function TimeTracking() {
                       })}
                   </div>
                   </div>
-                  <div className="h-6 shrink-0 border-b border-white/15" />
+                  <div className="h-6 shrink-0" />
                   </div>
                 </div>
               );
