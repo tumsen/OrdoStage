@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { GripVertical, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -218,15 +218,9 @@ export function TourDayScheduleEditor({
         {drafts.map((row, idx) => (
           <div
             key={row.rowKey}
-            className="flex flex-wrap items-end gap-x-3 gap-y-3 py-2 first:pt-0 last:pb-0 min-w-0"
+            className="flex flex-wrap items-start gap-x-3 gap-y-3 py-2 first:pt-0 last:pb-0 min-w-0"
           >
-            <div className="hidden sm:flex flex-col gap-1.5 shrink-0 justify-end">
-              <span className={`${scheduleFieldLabelClass} invisible select-none`} aria-hidden>
-                ·
-              </span>
-              <GripVertical className="h-4 w-4 text-white/15 shrink-0" aria-hidden />
-            </div>
-            <div className="flex flex-wrap items-end gap-x-3 gap-y-3 flex-1 min-w-0">
+            <div className="flex flex-wrap items-start gap-x-3 gap-y-3 flex-1 min-w-0">
               <div className="flex flex-col gap-1.5 w-[8.25rem] sm:w-[9rem] shrink-0">
                 <Label htmlFor={`tour-day-sched-type-${row.rowKey}`} className={scheduleFieldLabelClass}>
                   Type
@@ -239,7 +233,7 @@ export function TourDayScheduleEditor({
                 >
                   <SelectTrigger
                     id={`tour-day-sched-type-${row.rowKey}`}
-                    className="bg-white/5 border-white/10 text-white h-10 text-sm"
+                    className="bg-white/5 border-white/10 text-white h-10 min-h-10 py-0 px-3 text-sm leading-none box-border shrink-0"
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -267,7 +261,7 @@ export function TourDayScheduleEditor({
                 </div>
               ) : null}
               <TourSameDayTimeFields
-                className="flex-1 min-w-[min(100%,18rem)]"
+                className="flex-1 min-w-[min(100%,18rem)] items-start"
                 dayKey={dayKey}
                 startValue={row.startValue}
                 endValue={row.endValue}
