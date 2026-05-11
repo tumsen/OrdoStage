@@ -10,6 +10,7 @@ import { formatDate, eventStartsOnOrAfterToday } from "@/lib/dateUtils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { CALENDAR_STICKY_HEADER_CHROME } from "@/lib/weekGridColumns";
 import { useMemo, useState } from "react";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -134,7 +135,7 @@ function MonthCalendar({ events, tourDetails }: { events: EventDetail[]; tourDet
 
       <div className="p-4">
         {/* Day name headers */}
-        <div className="grid grid-cols-7 mb-2">
+        <div className={`grid grid-cols-7 mb-2 border-b border-white/10 ${CALENDAR_STICKY_HEADER_CHROME}`}>
           {DAY_NAMES.map((d) => (
             <div key={d} className="text-center text-[10px] text-white/25 font-medium py-1">{d}</div>
           ))}

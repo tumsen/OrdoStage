@@ -10,7 +10,7 @@ import {
   computeOverlapLayout,
 } from "./scheduleUtils";
 import { usePreferences } from "@/hooks/usePreferences";
-import { findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
+import { CALENDAR_STICKY_HEADER_CHROME, findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
 
 const HOUR_HEIGHT = 36;
 const SNAP_MINUTES = 15;
@@ -351,84 +351,86 @@ export function OutlookTimeGrid({
   return (
     <div className={`rounded-xl border border-white/10 bg-white/[0.02] overflow-auto ${className}`}>
       <div className="min-w-[720px]">
-        {/* ── Day header row ──────────────────────────────────────────────── */}
-        <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
-          <div className={`${WEEK_GRID_HEADER_CLASS} w-full border-b-0`} aria-hidden />
-          {days.map((d) => (
-            <div key={d.toISOString()} className={`${WEEK_GRID_HEADER_CLASS} border-l border-white/10 text-xs text-white/70`}>
-              <div className="flex items-start justify-between gap-1">
-                <div className="min-w-0 flex-1 text-left">
-                  <div className="text-[11px] text-white font-semibold leading-tight">
-                    {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { weekday: "long" })}
-                  </div>
-                  <div className="mt-1 text-[10px] text-white/60 leading-snug">
-                    {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { day: "numeric", month: "long", year: "numeric" })}
-                  </div>
-                  <div className="text-[10px] text-white/45 leading-snug mt-0.5 tabular-nums">
-                    W{getIsoWeek(d)}
+        <div className={`${CALENDAR_STICKY_HEADER_CHROME} border-b border-white/10`}>
+          {/* ── Day header row ──────────────────────────────────────────────── */}
+          <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
+            <div className={`${WEEK_GRID_HEADER_CLASS} w-full border-b-0`} aria-hidden />
+            {days.map((d) => (
+              <div key={d.toISOString()} className={`${WEEK_GRID_HEADER_CLASS} border-l border-white/10 text-xs text-white/70`}>
+                <div className="flex items-start justify-between gap-1">
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="text-[11px] text-white font-semibold leading-tight">
+                      {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { weekday: "long" })}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/60 leading-snug">
+                      {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { day: "numeric", month: "long", year: "numeric" })}
+                    </div>
+                    <div className="text-[10px] text-white/45 leading-snug mt-0.5 tabular-nums">
+                      W{getIsoWeek(d)}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        {/* ── All-day strip ──────────────────────────────────────────────── */}
-        {days.some((d) => itemsForDay(items, d).some((i) => !getItemTimeRange(i).hasExplicitTime)) && (
-          <div className="grid border-b border-white/10" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
-            <div className="bg-white/[0.01] border-r border-white/10 flex items-center justify-end pr-1.5 py-1">
-              <span className="text-[9px] text-white/25 uppercase tracking-wide">All day</span>
-            </div>
-            {days.map((day) => {
-              const allDay = itemsForDay(items, day).filter((i) => !getItemTimeRange(i).hasExplicitTime);
-              return (
-                <div key={day.toISOString()} className="border-l border-white/10 bg-white/[0.01] p-0.5 min-h-[28px] flex flex-col gap-0.5">
-                  {allDay.map((item) => {
-                    const eventVenueName =
-                      item.kind === "job"
-                        ? item.venueLabel
-                        : item.kind === "tour"
+          {/* ── All-day strip ──────────────────────────────────────────────── */}
+          {days.some((d) => itemsForDay(items, d).some((i) => !getItemTimeRange(i).hasExplicitTime)) && (
+            <div className="grid border-b border-white/10" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
+              <div className="bg-white/[0.01] border-r border-white/10 flex items-center justify-end pr-1.5 py-1">
+                <span className="text-[9px] text-white/25 uppercase tracking-wide">All day</span>
+              </div>
+              {days.map((day) => {
+                const allDay = itemsForDay(items, day).filter((i) => !getItemTimeRange(i).hasExplicitTime);
+                return (
+                  <div key={day.toISOString()} className="border-l border-white/10 bg-white/[0.01] p-0.5 min-h-[28px] flex flex-col gap-0.5">
+                    {allDay.map((item) => {
+                      const eventVenueName =
+                        item.kind === "job"
                           ? item.venueLabel
-                          : item.kind === "event"
-                            ? (item.raw as EventDetail).venue?.name
-                            : undefined;
-                    const isDisabled = item.disabled === true;
-                    return (
-                      <div key={item.id} className="group/all relative flex items-center">
-                        <button
-                          data-booking-block
-                          onClick={() => { if (!isDisabled) onItemClick(item); }}
-                          className={`flex-1 text-left text-[10px] px-1.5 py-0.5 rounded font-medium truncate ${itemColor(item)} ${
-                            isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
-                          }`}
-                          title={[
-                            isDisabled ? "Occupied:" : null,
-                            item.title,
-                            eventVenueName && `@ ${eventVenueName}`,
-                          ].filter(Boolean).join(" ")}
-                        >
-                          {item.title}
-                          {eventVenueName ? <span className="opacity-70"> @ {eventVenueName}</span> : null}
-                          {" "}<StatusLabel status={item.status} />
-                        </button>
-                        {item.kind === "job" || item.kind === "tour" || isDisabled ? null : (
+                          : item.kind === "tour"
+                            ? item.venueLabel
+                            : item.kind === "event"
+                              ? (item.raw as EventDetail).venue?.name
+                              : undefined;
+                      const isDisabled = item.disabled === true;
+                      return (
+                        <div key={item.id} className="group/all relative flex items-center">
                           <button
                             data-booking-block
-                            onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
-                            className="absolute right-0.5 top-0.5 opacity-0 group-hover/all:opacity-100 w-4 h-4 flex items-center justify-center rounded bg-red-900/80 text-red-300 hover:bg-red-700 transition-opacity z-10"
-                            title="Delete"
+                            onClick={() => { if (!isDisabled) onItemClick(item); }}
+                            className={`flex-1 text-left text-[10px] px-1.5 py-0.5 rounded font-medium truncate ${itemColor(item)} ${
+                              isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
+                            }`}
+                            title={[
+                              isDisabled ? "Occupied:" : null,
+                              item.title,
+                              eventVenueName && `@ ${eventVenueName}`,
+                            ].filter(Boolean).join(" ")}
                           >
-                            <Trash2 size={9} />
+                            {item.title}
+                            {eventVenueName ? <span className="opacity-70"> @ {eventVenueName}</span> : null}
+                            {" "}<StatusLabel status={item.status} />
                           </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                          {item.kind === "job" || item.kind === "tour" || isDisabled ? null : (
+                            <button
+                              data-booking-block
+                              onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
+                              className="absolute right-0.5 top-0.5 opacity-0 group-hover/all:opacity-100 w-4 h-4 flex items-center justify-center rounded bg-red-900/80 text-red-300 hover:bg-red-700 transition-opacity z-10"
+                              title="Delete"
+                            >
+                              <Trash2 size={9} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* ── Time grid ──────────────────────────────────────────────────── */}
         <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>

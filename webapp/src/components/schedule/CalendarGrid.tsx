@@ -1,6 +1,8 @@
 import { getMonthDays, DOW_LABELS, toDateStr } from "./scheduleUtils";
 import { CalendarCell } from "./CalendarCell";
 import type { CalendarItem } from "./scheduleUtils";
+import { CALENDAR_STICKY_HEADER_CHROME } from "@/lib/weekGridColumns";
+import { cn } from "@/lib/utils";
 
 interface CalendarGridProps {
   year: number;
@@ -8,16 +10,32 @@ interface CalendarGridProps {
   items: CalendarItem[];
   onItemClick: (item: CalendarItem) => void;
   onDateClick?: (date: Date) => void;
+  /**
+   * When many month grids share one vertical scroller (e.g. year view), turn off so only one sticky row is not fighting others.
+   */
+  stickyDowHeader?: boolean;
 }
 
-export function CalendarGrid({ year, month, items, onItemClick, onDateClick }: CalendarGridProps) {
+export function CalendarGrid({
+  year,
+  month,
+  items,
+  onItemClick,
+  onDateClick,
+  stickyDowHeader = true,
+}: CalendarGridProps) {
   const cells = getMonthDays(year, month);
   const todayStr = toDateStr(new Date());
 
   return (
     <div className="flex flex-col gap-1">
       {/* Day-of-week headers */}
-      <div className="grid grid-cols-7 gap-1">
+      <div
+        className={cn(
+          "grid grid-cols-7 gap-1",
+          stickyDowHeader && `${CALENDAR_STICKY_HEADER_CHROME} border-b border-white/10`
+        )}
+      >
         {DOW_LABELS.map((d) => (
           <div
             key={d}

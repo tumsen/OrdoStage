@@ -76,7 +76,7 @@ import {
   rawWindowMinutesFromY,
   snapWindowMinutes,
 } from "@/lib/timeGrid";
-import { findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
+import { CALENDAR_STICKY_HEADER_CHROME, findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
 
 const WEEK_STARTS_ON = 1 as const;
 const PX_PER_HOUR = 36;
@@ -1382,7 +1382,10 @@ export default function TimeTracking() {
         <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-auto">
           <div className="flex min-w-[720px]">
             <div className="w-14 shrink-0 flex flex-col">
-              <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full border-b-0")} aria-hidden />
+              <div
+                className={cn(WEEK_GRID_HEADER_CLASS, CALENDAR_STICKY_HEADER_CHROME, "w-full border-b-0")}
+                aria-hidden
+              />
               <div className="relative flex flex-col" style={{ height: COLUMN_HEIGHT_PX }}>
                 {Array.from({ length: 24 }).map((_, i) => {
                   const hour24 = (displayStartHour + i) % 24;
@@ -1433,7 +1436,15 @@ export default function TimeTracking() {
 
               return (
                 <div key={dayYmd} className="flex-1 min-w-[100px] border-l border-white/10 flex flex-col group">
-                  <div className={cn(WEEK_GRID_HEADER_CLASS, "text-xs text-white/70", col?.bg, col ? `border-b ${col.border}` : "")}>
+                  <div
+                    className={cn(
+                      WEEK_GRID_HEADER_CLASS,
+                      CALENDAR_STICKY_HEADER_CHROME,
+                      "text-xs text-white/70",
+                      col?.bg,
+                      col ? `border-b ${col.border}` : "border-b border-white/10"
+                    )}
+                  >
                     <div className="flex items-start justify-between gap-1">
                       <div className="min-w-0 flex-1 text-left">
                         <div

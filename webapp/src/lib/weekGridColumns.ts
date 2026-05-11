@@ -6,6 +6,10 @@
 /** Minimum pointer movement before a create/move gesture counts as a drag (not a click). */
 export const WEEK_GRID_MIN_DRAG_PX = 8;
 
+/** Opaque sticky header chrome so timed events / cells do not show through while scrolling. */
+export const CALENDAR_STICKY_HEADER_CHROME =
+  "sticky top-0 z-30 bg-[#0d0d14] shadow-[0_4px_12px_rgba(0,0,0,0.35)]";
+
 /**
  * Which day column index contains `clientX` (based on each column’s bounding rect).
  * Falls back to `fallbackIndex` when the pointer is between columns or columns are missing.

@@ -534,6 +534,7 @@ export default function Schedule() {
                       month={m}
                       items={visibleItems}
                       onItemClick={handleItemClick}
+                      stickyDowHeader={false}
                     />
                   </div>
                 ))}
