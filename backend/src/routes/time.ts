@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
+import { excludeMirroredEventInternalBookings } from "../internalBookingMirrorFilter";
 import { auth } from "../auth";
 import { canAction, canView } from "../requestRole";
 import type { EffectiveRole } from "../effectiveRole";
@@ -583,7 +584,10 @@ async function fetchInternalBookingPlanJobsForRange(args: {
   const links = await prisma.internalBookingPerson.findMany({
     where: {
       personId: args.personId,
-      booking: { organizationId: args.organizationId },
+      booking: {
+        organizationId: args.organizationId,
+        ...excludeMirroredEventInternalBookings,
+      },
     },
     include: {
       booking: {

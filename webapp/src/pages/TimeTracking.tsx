@@ -51,6 +51,7 @@ import { TravelClaimsPanel } from "@/components/time/TravelClaimsPanel";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { CalendarGrid } from "@/components/schedule/CalendarGrid";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
+import { internalBookingDisplayTitle } from "@/components/schedule/scheduleUtils";
 import type {
   TimeCategory,
   TimeEntry,
@@ -1313,9 +1314,11 @@ export default function TimeTracking() {
                     className="flex flex-wrap items-center gap-2 justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="text-white/90 font-medium truncate">{job.title}</div>
+                      <div className="text-white/90 font-medium truncate">
+                        {internalBookingDisplayTitle(job.title)}
+                      </div>
                       <div className="text-[11px] text-white/45 truncate">
-                        {job.eventTitle} · {dayLabel} {timeLabel}
+                        {internalBookingDisplayTitle(job.eventTitle)} · {dayLabel} {timeLabel}
                         {inCurrentWeek ? ` · ${t("time.inThisWeek")}` : null}
                       </div>
                     </div>
@@ -1538,13 +1541,19 @@ export default function TimeTracking() {
                               top: `${Math.max(0, topPct)}%`,
                               height: `${Math.max(3, heightPct)}%`,
                             }}
-                            title={j.source === "tour" ? `${j.eventTitle} (tour)` : j.eventTitle}
+                            title={
+                              j.source === "tour"
+                                ? `${internalBookingDisplayTitle(j.eventTitle)} (tour)`
+                                : internalBookingDisplayTitle(j.eventTitle)
+                            }
                             onPointerDown={(ev) => {
                               ev.stopPropagation();
                             }}
                           >
                             <div className="min-h-0 flex-1 overflow-hidden leading-tight">
-                              <div className="font-medium text-white/65 truncate">{j.title}</div>
+                              <div className="font-medium text-white/65 truncate">
+                                {internalBookingDisplayTitle(j.title)}
+                              </div>
                               <span className="block text-[9px] text-white/35">{t("time.planned")}</span>
                             </div>
                             {canEditVisiblePeriod ? (
