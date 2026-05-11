@@ -92,6 +92,31 @@ function plannedJobKeyFromEntry(e: TimeEntry): string | null {
   }
   return null;
 }
+
+/** Tour schedule-event planned rows (`tourScheduleEventId`): hide dashed slot when a tour entry overlaps this window. */
+function tourPlannedSlotOverlapsTourEntry(job: TimeTrackingJob, entries: TimeEntry[] | undefined): boolean {
+  if (!job.tourShowId) return false;
+  const js = parseISO(job.plannedStartsAt);
+  const je = parseISO(job.plannedEndsAt);
+  for (const e of entries ?? []) {
+    if (e.tourShowId !== job.tourShowId) continue;
+    const es = parseISO(e.startsAt);
+    const en = parseISO(e.endsAt);
+    if (es < je && en > js) return true;
+  }
+  return false;
+}
+
+function plannedJobIsLogged(
+  job: TimeTrackingJob,
+  entryByJobId: Map<string, TimeEntry>,
+  entries: TimeEntry[] | undefined
+): boolean {
+  if (job.source === "tour" && job.tourShowId && job.tourScheduleEventId) {
+    return tourPlannedSlotOverlapsTourEntry(job, entries);
+  }
+  return entryByJobId.has(job.id);
+}
 const COLUMN_HEIGHT_PX = (MINUTES_PER_DAY / 60) * PX_PER_HOUR;
 /** Same height for corner spacer and day headers so the hour grid lines up with columns. */
 const WEEK_GRID_HEADER_CLASS =
@@ -453,12 +478,12 @@ export default function TimeTracking() {
   const editingEntryJobSummary = useMemo(() => {
     if (!editingEntry || editingEntry.kind !== "job") return null;
     const jk = plannedJobKeyFromEntry(editingEntry);
-    if (!jk) return null;
-    return (
-      (jobs ?? []).find((j) => j.id === jk)?.title ??
-      (upcomingJobs ?? []).find((j) => j.id === jk)?.title ??
-      null
-    );
+    const fromId = jk ? (jobs ?? []).find((j) => j.id === jk)?.title : undefined;
+    const fromUp = jk ? (upcomingJobs ?? []).find((j) => j.id === jk)?.title : undefined;
+    const fromTourShow =
+      editingEntry.tourShowId &&
+      (jobs ?? []).find((j) => j.source === "tour" && j.tourShowId === editingEntry.tourShowId)?.title;
+    return fromId ?? fromUp ?? fromTourShow ?? null;
   }, [editingEntry, jobs, upcomingJobs]);
 
   /** Live ISO range while dragging the entry open in the sheet (matches grid labels). */
@@ -996,7 +1021,7 @@ export default function TimeTracking() {
   const weekJobIds = new Set((jobs ?? []).map((j) => j.id));
   const hasUpcomingUnlogged =
     mode === "week" &&
-    (upcomingJobs ?? []).some((j) => !entryByJobId.has(j.id));
+    (upcomingJobs ?? []).some((j) => !plannedJobIsLogged(j, entryByJobId, entries));
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden p-6">
@@ -1227,7 +1252,7 @@ export default function TimeTracking() {
           {upcomingCollapsed ? null : (
             <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
               {(upcomingJobs ?? [])
-                .filter((job) => !entryByJobId.has(job.id))
+                .filter((job) => !plannedJobIsLogged(job, entryByJobId, entries))
                 .map((job) => {
                 const inCurrentWeek = weekJobIds.has(job.id);
                 const dayLabel = format(parseISO(job.plannedStartsAt), "EEE d MMM");
@@ -1453,8 +1478,8 @@ export default function TimeTracking() {
                           columnDayYmdForInstant(parseISO(j.plannedStartsAt), displayStartHour) ===
                           dayYmd
                       )
+                      .filter((j) => !plannedJobIsLogged(j, entryByJobId, entries))
                       .map((j) => {
-                        const logged = entryByJobId.get(j.id);
                         const { topPct, heightPct } = jobWindowMetrics(j, dayYmd);
                         return (
                           <div
@@ -1471,11 +1496,9 @@ export default function TimeTracking() {
                           >
                             <div className="min-h-0 flex-1 overflow-hidden leading-tight">
                               <div className="font-medium text-white/65 truncate">{j.title}</div>
-                              {logged ? null : (
-                                <span className="block text-[9px] text-white/35">{t("time.planned")}</span>
-                              )}
+                              <span className="block text-[9px] text-white/35">{t("time.planned")}</span>
                             </div>
-                            {canEditVisiblePeriod && !logged ? (
+                            {canEditVisiblePeriod ? (
                               <button
                                 type="button"
                                 className="mt-0.5 w-full shrink-0 rounded border border-emerald-400/40 bg-emerald-500/20 px-0.5 py-0.5 text-[9px] font-semibold leading-tight text-emerald-100 hover:bg-emerald-500/35"
@@ -1531,14 +1554,22 @@ export default function TimeTracking() {
                         const cat = (e.category ?? "work") as TimeCategory;
                         const isDayOff = cat === "vacation" || cat === "sick" || cat === "holiday";
                         const jobKey = plannedJobKeyFromEntry(e);
+                        const tourJobTitle =
+                          isJob && e.tourShowId
+                            ? (jobs ?? []).find((j) => j.source === "tour" && j.tourShowId === e.tourShowId)
+                                ?.title
+                            : undefined;
                         const label =
                           isDayOff || cat === "travel_allowance"
                             ? t(timeCategoryMessageId(cat) as never)
-                            : isJob && jobKey
-                            ? (jobs ?? []).find((j) => j.id === jobKey)?.title ??
-                              (upcomingJobs ?? []).find((j) => j.id === jobKey)?.title ??
-                              t("time.job")
-                            : "";
+                            : isJob && (jobKey || e.tourShowId)
+                              ? (jobKey
+                                  ? (jobs ?? []).find((j) => j.id === jobKey)?.title ??
+                                    (upcomingJobs ?? []).find((j) => j.id === jobKey)?.title
+                                  : undefined) ??
+                                tourJobTitle ??
+                                t("time.job")
+                              : "";
                         const projEntity = e.timeProjectId
                           ? projectById.get(e.timeProjectId)
                           : undefined;

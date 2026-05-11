@@ -206,10 +206,49 @@ function toDateTimeFromDateAndTime(dateIso: string, hhmm: string): Date | null {
 }
 
 const TOUR_TIME_JOB_PREFIX = "tourshow:";
+const TOUR_EVENT_JOB_PREFIX = "tourevent:";
 const DEFAULT_TOUR_JOB_DURATION_MIN = 180;
 
 function tourPlanJobId(tourShowId: string) {
   return `${TOUR_TIME_JOB_PREFIX}${tourShowId}`;
+}
+
+function tourEventPlanJobId(scheduleEventId: string) {
+  return `${TOUR_EVENT_JOB_PREFIX}${scheduleEventId}`;
+}
+
+/** Parse strict HH:mm; return minutes from midnight, or NaN. */
+function minutesFromMidnightHHMM(raw: string): number {
+  const t = raw.trim();
+  const m = /^(\d{2}):(\d{2})$/.exec(t);
+  if (!m) return NaN;
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return NaN;
+  return hh * 60 + mm;
+}
+
+function durationMinutesFromHHMM(startHHMM: string, endHHMM: string): number {
+  const a = minutesFromMidnightHHMM(startHHMM);
+  let b = minutesFromMidnightHHMM(endHHMM);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 60;
+  if (b <= a) b += 24 * 60;
+  return Math.max(15, b - a);
+}
+
+const SCHED_KIND_LABEL: Record<string, string> = {
+  get_in: "Get-in",
+  get_out: "Get-out",
+  show: "Show",
+  rehearsal: "Rehearsal",
+  soundcheck: "Soundcheck",
+  travel: "Travel",
+  custom: "Custom",
+};
+
+function scheduleEventPlanTitle(ev: { kind: string; customLabel: string | null }): string {
+  if (ev.kind === "custom" && ev.customLabel?.trim()) return ev.customLabel.trim();
+  return SCHED_KIND_LABEL[ev.kind] ?? ev.kind;
 }
 
 function utcDayKeyFromDate(d: Date): string {
@@ -262,7 +301,7 @@ function tourDayDurationMin(show: { type: string }): number {
 
 type PlanJobRow = {
   id: string;
-  source: "event_staffing" | "tour" | "internal_booking";
+  source: "event" | "event_staffing" | "tour" | "internal_booking";
   title: string;
   jobDate: string;
   startTime: string;
@@ -276,6 +315,7 @@ type PlanJobRow = {
   venueName: string;
   timeProjectId: string | null;
   tourShowId: string | null;
+  tourScheduleEventId: string | null;
   eventShowStaffingId: string | null;
   internalBookingPersonId: string | null;
   internalBookingDayKey: string | null;
@@ -325,10 +365,106 @@ function buildTourPlanJobRow(
     venueName: venueLabel,
     timeProjectId: projectIdByShow.get(show.id) ?? null,
     tourShowId: show.id,
+    tourScheduleEventId: null as string | null,
     eventShowStaffingId: null as string | null,
     internalBookingPersonId: null as string | null,
     internalBookingDayKey: null as string | null,
   };
+}
+
+function buildTourScheduleEventPlanRow(
+  show: {
+    id: string;
+    type: string;
+    date: Date;
+    showTime: string | null;
+    venueName: string | null;
+    venueCity: string | null;
+    fromLocation: string | null;
+    toLocation: string | null;
+    tour: { id: string; name: string };
+  },
+  ev: { id: string; kind: string; customLabel: string | null; startTime: string; endTime: string },
+  projectIdByShow: Map<string, string>
+): PlanJobRow {
+  const startHHMM = ev.startTime.trim();
+  const endHHMM = ev.endTime.trim();
+  const durationMinutes = durationMinutesFromHHMM(startHHMM, endHHMM);
+  const jobDateIso = show.date.toISOString();
+  const plannedStart = toDateTimeFromDateAndTime(jobDateIso, startHHMM);
+  const plannedEnd =
+    plannedStart != null ? new Date(plannedStart.getTime() + durationMinutes * 60_000) : null;
+  const dayLine = tourDayTitle(show);
+  const title = `${dayLine} · ${scheduleEventPlanTitle(ev)}`;
+  const tourTitle = show.tour.name.trim() || "Tour";
+  const venueLabel =
+    show.type === "travel"
+      ? [show.fromLocation, show.toLocation].filter(Boolean).join(" → ") || "Travel"
+      : show.type === "day_off"
+        ? "—"
+        : show.venueName?.trim() || show.venueCity?.trim() || "Venue TBC";
+  return {
+    id: tourEventPlanJobId(ev.id),
+    source: "tour" as const,
+    title,
+    jobDate: jobDateIso,
+    startTime: startHHMM,
+    durationMinutes,
+    plannedStartsAt: plannedStart ? iso(plannedStart) : jobDateIso,
+    plannedEndsAt: plannedEnd ? iso(plannedEnd) : jobDateIso,
+    eventId: show.tour.id,
+    eventTitle: tourTitle,
+    showId: show.id,
+    showDate: jobDateIso,
+    venueName: venueLabel,
+    timeProjectId: projectIdByShow.get(show.id) ?? null,
+    tourShowId: show.id,
+    tourScheduleEventId: ev.id,
+    eventShowStaffingId: null as string | null,
+    internalBookingPersonId: null as string | null,
+    internalBookingDayKey: null as string | null,
+  };
+}
+
+function expandTourShowsToPlanJobRows(
+  shows: {
+    id: string;
+    type: string;
+    date: Date;
+    showTime: string | null;
+    venueName: string | null;
+    venueCity: string | null;
+    fromLocation: string | null;
+    toLocation: string | null;
+    tour: { id: string; name: string };
+    scheduleEvents: {
+      id: string;
+      kind: string;
+      customLabel: string | null;
+      startTime: string;
+      endTime: string;
+      sortOrder: number;
+    }[];
+  }[],
+  projectIdByShow: Map<string, string>
+): PlanJobRow[] {
+  const rows: PlanJobRow[] = [];
+  for (const show of shows) {
+    const evs = (show.scheduleEvents ?? []).filter(
+      (e) =>
+        /^\d{2}:\d{2}$/.test((e.startTime ?? "").trim()) &&
+        /^\d{2}:\d{2}$/.test((e.endTime ?? "").trim())
+    );
+    evs.sort((a, b) => a.sortOrder - b.sortOrder || a.startTime.localeCompare(b.startTime));
+    if (evs.length > 0) {
+      for (const ev of evs) {
+        rows.push(buildTourScheduleEventPlanRow(show, ev, projectIdByShow));
+      }
+    } else {
+      rows.push(buildTourPlanJobRow(show, projectIdByShow));
+    }
+  }
+  return rows;
 }
 
 async function fetchEventStaffingPlanJobs(args: {
@@ -418,6 +554,7 @@ async function fetchEventStaffingPlanJobs(args: {
       venueName: s.show.venue.name,
       timeProjectId: proj?.id ?? null,
       tourShowId: null,
+      tourScheduleEventId: null,
       eventShowStaffingId: s.id,
       internalBookingPersonId: null,
       internalBookingDayKey: null,
@@ -488,6 +625,7 @@ async function fetchInternalBookingPlanJobsForRange(args: {
         venueName: b.venue?.name ?? "—",
         timeProjectId: null,
         tourShowId: null,
+        tourScheduleEventId: null,
         eventShowStaffingId: null,
         internalBookingPersonId: link.id,
         internalBookingDayKey: dayKey,
@@ -521,6 +659,17 @@ async function fetchTourPlanJobsForPerson(args: {
     },
     include: {
       tour: { select: { id: true, name: true } },
+      scheduleEvents: {
+        select: {
+          id: true,
+          kind: true,
+          customLabel: true,
+          startTime: true,
+          endTime: true,
+          sortOrder: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      },
     },
     orderBy: [{ date: "asc" }, { order: "asc" }],
   });
@@ -545,7 +694,7 @@ async function fetchTourPlanJobsForPerson(args: {
     for (const p of again) projectIdByShow.set(p.tourShowId!, p.id);
   }
 
-  return shows.map((show) => buildTourPlanJobRow(show, projectIdByShow));
+  return expandTourShowsToPlanJobRows(shows, projectIdByShow);
 }
 
 async function fetchTourPlanJobsFromDate(args: {
@@ -572,6 +721,17 @@ async function fetchTourPlanJobsFromDate(args: {
     },
     include: {
       tour: { select: { id: true, name: true } },
+      scheduleEvents: {
+        select: {
+          id: true,
+          kind: true,
+          customLabel: true,
+          startTime: true,
+          endTime: true,
+          sortOrder: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      },
     },
     orderBy: [{ date: "asc" }, { order: "asc" }],
     take: args.take,
@@ -597,7 +757,7 @@ async function fetchTourPlanJobsFromDate(args: {
     for (const p of again) projectIdByShow.set(p.tourShowId!, p.id);
   }
 
-  return shows.map((show) => buildTourPlanJobRow(show, projectIdByShow));
+  return expandTourShowsToPlanJobRows(shows, projectIdByShow);
 }
 
 async function resolvePersonIdForUser(organizationId: string, email: string | null | undefined) {
@@ -1569,6 +1729,7 @@ timeRouter.get("/time/jobs", async (c) => {
       venueName: j.venue.name,
       timeProjectId: null as string | null,
       tourShowId: null as string | null,
+      tourScheduleEventId: null as string | null,
       eventShowStaffingId: null as string | null,
       internalBookingPersonId: null as string | null,
       internalBookingDayKey: null as string | null,
@@ -1662,6 +1823,7 @@ timeRouter.get("/time/jobs/upcoming", async (c) => {
       venueName: j.venue.name,
       timeProjectId: null as string | null,
       tourShowId: null as string | null,
+      tourScheduleEventId: null as string | null,
       eventShowStaffingId: null as string | null,
       internalBookingPersonId: null as string | null,
       internalBookingDayKey: null as string | null,

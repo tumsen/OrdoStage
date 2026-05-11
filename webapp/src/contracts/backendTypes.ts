@@ -1015,6 +1015,8 @@ export const TimeTrackingJobSchema = z.object({
   venueName: z.string(),
   timeProjectId: z.string().nullable().optional(),
   tourShowId: z.string().nullable().optional(),
+  /** Present when the row is built from a tour day schedule event (`tourevent:<id>`). */
+  tourScheduleEventId: z.string().nullable().optional(),
   eventShowStaffingId: z.string().nullable().optional(),
   internalBookingPersonId: z.string().nullable().optional(),
   internalBookingDayKey: z.string().nullable().optional(),
