@@ -76,10 +76,10 @@ import {
   rawWindowMinutesFromY,
   snapWindowMinutes,
 } from "@/lib/timeGrid";
-import { CALENDAR_STICKY_HEADER_CHROME, findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
+import { CALENDAR_PX_PER_HOUR, CALENDAR_STICKY_HEADER_CHROME, findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
 
 const WEEK_STARTS_ON = 1 as const;
-const PX_PER_HOUR = 36;
+const PX_PER_HOUR = CALENDAR_PX_PER_HOUR;
 /** Matches backend `tourPlanJobId` / `TimeTrackingJob.id` for tour roster rows. */
 const TOUR_PLAN_JOB_PREFIX = "tourshow:";
 const TOUR_EVENT_PREFIX = "tourevent:";
@@ -224,7 +224,7 @@ function snapLocalClockToGrid(d: Date): Date {
   const x = new Date(d.getTime());
   let mins = x.getHours() * 60 + x.getMinutes();
   mins = Math.round(mins / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
-  mins = Math.min(mins, MINUTES_PER_DAY - TIME_SNAP_MINUTES);
+  mins = Math.min(mins, MINUTES_PER_DAY);
   x.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
   return x;
 }
@@ -1392,13 +1392,18 @@ export default function TimeTracking() {
                   const label = formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h");
                   return (
                     <div key={i} className="relative flex-1 min-h-0">
-                      <span className="absolute left-0 right-1 top-0 z-[1] -translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
+                      <span
+                        className={cn(
+                          "absolute left-0 right-1 top-0 z-[1] text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none",
+                          i === 0 ? "translate-y-2" : "-translate-y-1/2"
+                        )}
+                      >
                         {label}
                       </span>
                     </div>
                   );
                 })}
-                <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
+                <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
                   {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
                 </span>
               </div>

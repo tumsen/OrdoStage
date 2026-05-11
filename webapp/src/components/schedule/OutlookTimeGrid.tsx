@@ -10,9 +10,9 @@ import {
   computeOverlapLayout,
 } from "./scheduleUtils";
 import { usePreferences } from "@/hooks/usePreferences";
-import { CALENDAR_STICKY_HEADER_CHROME, findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
+import { CALENDAR_PX_PER_HOUR, CALENDAR_STICKY_HEADER_CHROME, findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
 
-const HOUR_HEIGHT = 36;
+const HOUR_HEIGHT = CALENDAR_PX_PER_HOUR;
 const SNAP_MINUTES = 15;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_GRID_HEADER_CLASS =
@@ -31,11 +31,16 @@ interface OutlookTimeGridProps {
   onToggleLock?: (item: CalendarItem, locked: boolean) => void;
 }
 
+/** Snap wall-clock minutes within a calendar day; 1440 = end of day (midnight), same as `dateFromDayAndMinutes`. */
+function snapMinutesFromMidnight(rawMinutes: number): number {
+  const snapped = Math.round(rawMinutes / SNAP_MINUTES) * SNAP_MINUTES;
+  return Math.max(0, Math.min(24 * 60, snapped));
+}
+
 function yToMinutesFromMidnight(clientY: number, columnTop: number): number {
   const y = clientY - columnTop;
   const minuteFloat = (y / HOUR_HEIGHT) * 60;
-  const snapped = Math.round(minuteFloat / SNAP_MINUTES) * SNAP_MINUTES;
-  return Math.max(0, Math.min(24 * 60 - SNAP_MINUTES, snapped));
+  return snapMinutesFromMidnight(minuteFloat);
 }
 
 function rawMinutesFromY(clientY: number, columnTop: number): number {
@@ -254,7 +259,7 @@ export function OutlookTimeGrid({
       const day = days[m.currentDayIndex];
       if (!day) return null;
       const rawMin = rawMinutesFromY(m.currentY, curCol.getBoundingClientRect().top);
-      const ptMs = startOfDay(day).getTime() + snapMin(rawMin) * 60 * 1000;
+      const ptMs = startOfDay(day).getTime() + snapMinutesFromMidnight(rawMin) * 60 * 1000;
 
       if (m.mode === "resize-start") {
         const maxStart = m.origEndMs - SNAP_MINUTES * 60 * 1000;
@@ -434,18 +439,20 @@ export function OutlookTimeGrid({
 
         {/* ── Time grid ──────────────────────────────────────────────────── */}
         <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
-          {/* Hour labels */}
+          {/* Hour labels — first tick sits fully below the sticky header seam (no -50% into the header). */}
           <div className="relative border-r border-white/10" style={{ height: totalHeight }}>
             {hours.map((h) => (
               <div
                 key={h}
-                className="absolute left-0 right-1 z-[1] -translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none"
+                className={`absolute left-0 right-1 z-[1] text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none ${
+                  h === 0 ? "translate-y-2" : "-translate-y-1/2"
+                }`}
                 style={{ top: h * HOUR_HEIGHT }}
               >
                 {`${String(h).padStart(2, "0")}:00`}
               </div>
             ))}
-            <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
+            <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
               24:00
             </span>
           </div>
