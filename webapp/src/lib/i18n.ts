@@ -81,7 +81,8 @@ const en = {
     notePlaceholder: "Optional details…",
     startTimeLabel: "Start",
     endTimeLabel: "End",
-    fiveMinuteGridHint: "Times use a 5-minute grid (e.g. 09:00, 09:05, 09:10).",
+    editTimePreciseHint:
+      "Use any minute (HH:MM), e.g. 07:24 for 7h 24m. Dragging on the week grid still snaps to 5 minutes.",
     searchProjects: "Search projects…",
     noProjectMatches: "No matching projects.",
     saveEntry: "Save",
@@ -272,6 +273,8 @@ const da: DeepPartial<typeof en> = {
     categoryTravelAllowance: "Rejsegodtgørsel",
     dragHint:
       "Træk på tom plads for at oprette en blok (snapper til 5 min). Træk blokke for at flytte; træk top eller bund for at ændre længde. Blyant: projekt, tidspunkter, kategori (fx rejsegodtgørsel), tags, note.",
+    editTimePreciseHint:
+      "Brug præcis tid (TT:MM), fx 07:24 for 7 t. 24 min. Træk på ugen snupper stadig til 5 minutter.",
   },
   account: {
     title: "Konto",
@@ -348,6 +351,10 @@ const de: DeepPartial<typeof en> = {
     workspace: "Arbeitsbereich",
     switchOrganization: "Organisation wechseln",
     current: "aktuell",
+  },
+  time: {
+    editTimePreciseHint:
+      "Beliebige Minute (HH:MM), z. B. 07:24 für 7h 24m. Ziehen in der Wochenansicht bleibt auf 5 Minuten gerastert.",
   },
   account: {
     title: "Konto",

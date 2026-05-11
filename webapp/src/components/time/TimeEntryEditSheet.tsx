@@ -6,7 +6,6 @@ import { usePreferences } from "@/hooks/usePreferences";
 import type { TimeEntry, TimeProject, TimeTag } from "@/contracts/backendTypes";
 import type { TimeCategory } from "@/contracts/backendTypes";
 import type { TimeFormat } from "@/lib/preferences";
-import { TIME_SNAP_MINUTES } from "@/lib/timeGrid";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -45,17 +44,17 @@ function hmFromDate(d: Date): string {
   return format(d, "HH:mm");
 }
 
-/** Snap minutes-within-day and apply to the calendar day of `base`. */
-function applySnappedHm(base: Date, hm: string): Date {
+/** Apply wall-clock HH:mm to the calendar day of `base` (no grid snapping — edit sheet allows any minute). */
+function applyExactHm(base: Date, hm: string): Date {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
   if (!m) return base;
-  let mins = Number(m[1]) * 60 + Number(m[2]);
-  if (!Number.isFinite(mins)) return base;
-  mins = Math.round(mins / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
-  const cap = 24 * 60 - TIME_SNAP_MINUTES;
-  mins = Math.min(Math.max(0, mins), cap);
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return base;
+  const h = Math.min(23, Math.max(0, hh));
+  const min = Math.min(59, Math.max(0, mm));
   const out = new Date(base.getTime());
-  out.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+  out.setHours(h, min, 0, 0);
   return out;
 }
 
@@ -154,24 +153,23 @@ export function TimeEntryEditSheet(props: {
 
   const timeRangeLabel = useMemo(() => {
     if (!entry) return "";
-    const start = parseISO(liveRange?.startsAt ?? entry.startsAt);
-    const end = parseISO(liveRange?.endsAt ?? entry.endsAt);
-    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return "";
-    const dateLabel = format(start, "EEE d MMM");
+    const startBase = parseISO(liveRange?.startsAt ?? entry.startsAt);
+    const endBase = parseISO(liveRange?.endsAt ?? entry.endsAt);
+    if (!Number.isFinite(startBase.getTime()) || !Number.isFinite(endBase.getTime())) return "";
+    const dateLabel = format(startBase, "EEE d MMM");
     const tf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
-    const sSnap = applySnappedHm(start, hmFromDate(start));
-    const eSnap = applySnappedHm(end, hmFromDate(end));
-    const rawDur = (end.getTime() - start.getTime()) / 60000;
-    const durMin = Math.max(
-      TIME_SNAP_MINUTES,
-      Math.round(rawDur / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
-    );
+    const sExact = applyExactHm(startBase, startHm);
+    let eExact = applyExactHm(endBase, endHm);
+    if (eExact.getTime() <= sExact.getTime()) {
+      eExact = new Date(eExact.getTime() + 24 * 60 * 60 * 1000);
+    }
+    const durMin = Math.max(1, Math.round((eExact.getTime() - sExact.getTime()) / 60000));
     const durH = Math.floor(durMin / 60);
     const durM = durMin % 60;
     const durStr =
       durMin < 60 ? `${durMin} min` : durM > 0 ? `${durH}h ${durM}m` : `${durH}h`;
-    return `${dateLabel} · ${format(sSnap, tf)} – ${format(eSnap, tf)} · ${durStr}`;
-  }, [entry, timeFormat, liveRange]);
+    return `${dateLabel} · ${format(sExact, tf)} – ${format(eExact, tf)} · ${durStr}`;
+  }, [entry, timeFormat, liveRange, startHm, endHm]);
 
   function toggleTag(id: string) {
     setSelectedTags((prev) => {
@@ -186,8 +184,8 @@ export function TimeEntryEditSheet(props: {
     if (!entry) return;
     const startBase = parseISO(entry.startsAt);
     const endBase = parseISO(entry.endsAt);
-    const newStart = applySnappedHm(startBase, startHm);
-    let newEnd = applySnappedHm(endBase, endHm);
+    const newStart = applyExactHm(startBase, startHm);
+    let newEnd = applyExactHm(endBase, endHm);
     if (newEnd.getTime() <= newStart.getTime()) {
       newEnd = new Date(newEnd.getTime() + 24 * 60 * 60 * 1000);
     }
@@ -287,7 +285,7 @@ export function TimeEntryEditSheet(props: {
               <Label className="text-white/80">{t("time.startTimeLabel")}</Label>
               <input
                 type="time"
-                step={300}
+                step={60}
                 value={startHm}
                 onChange={(e) => setStartHm(e.target.value)}
                 disabled={entry?.isLocked}
@@ -298,7 +296,7 @@ export function TimeEntryEditSheet(props: {
               <Label className="text-white/80">{t("time.endTimeLabel")}</Label>
               <input
                 type="time"
-                step={300}
+                step={60}
                 value={endHm}
                 onChange={(e) => setEndHm(e.target.value)}
                 disabled={entry?.isLocked}
@@ -306,7 +304,7 @@ export function TimeEntryEditSheet(props: {
               />
             </div>
           </div>
-          <p className="text-[11px] text-white/40 -mt-1">{t("time.fiveMinuteGridHint")}</p>
+          <p className="text-[11px] text-white/40 -mt-1">{t("time.editTimePreciseHint")}</p>
 
           <div className="grid gap-2">
             <Label className="text-white/80">{t("time.projectLabel")}</Label>
