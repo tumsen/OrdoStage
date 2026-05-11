@@ -1392,12 +1392,7 @@ export default function TimeTracking() {
                   const label = formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h");
                   return (
                     <div key={i} className="relative flex-1 min-h-0">
-                      <span
-                        className={cn(
-                          "absolute left-0 right-1 top-0 z-[1] text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none",
-                          i === 0 ? "translate-y-2" : "-translate-y-1/2"
-                        )}
-                      >
+                      <span className="absolute left-0 right-1 top-0 z-[1] -translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
                         {label}
                       </span>
                     </div>

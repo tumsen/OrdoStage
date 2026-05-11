@@ -439,14 +439,12 @@ export function OutlookTimeGrid({
 
         {/* ── Time grid ──────────────────────────────────────────────────── */}
         <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
-          {/* Hour labels — first tick sits fully below the sticky header seam (no -50% into the header). */}
+          {/* Hour labels */}
           <div className="relative border-r border-white/10" style={{ height: totalHeight }}>
             {hours.map((h) => (
               <div
                 key={h}
-                className={`absolute left-0 right-1 z-[1] text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none ${
-                  h === 0 ? "translate-y-2" : "-translate-y-1/2"
-                }`}
+                className="absolute left-0 right-1 z-[1] -translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none"
                 style={{ top: h * HOUR_HEIGHT }}
               >
                 {`${String(h).padStart(2, "0")}:00`}
