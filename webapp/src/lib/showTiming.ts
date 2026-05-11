@@ -1,7 +1,8 @@
 /** Wall-clock time stored as strict `HH:mm` (24h) everywhere in schedules. */
 export function normalizeTimeHHMM(raw: string): string {
   const t = raw.trim();
-  const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+  /** Allow `HH:mm`, `H:mm`, optional `:ss` / fractional seconds (DB, paste). */
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/.exec(t);
   if (!m) return "";
   let hh = Number.parseInt(m[1], 10);
   let mm = Number.parseInt(m[2], 10);
@@ -13,12 +14,11 @@ export function normalizeTimeHHMM(raw: string): string {
 
 /** Parse "HH:mm" to minutes from midnight. */
 export function timeToMinutes(t: string): number | null {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
+  const n = normalizeTimeHHMM(t);
+  if (!n) return null;
+  const m = /^(\d{2}):(\d{2})$/.exec(n);
   if (!m) return null;
-  const hh = Number(m[1]);
-  const mm = Number(m[2]);
-  if (!Number.isFinite(hh) || !Number.isFinite(mm) || mm > 59) return null;
-  return hh * 60 + mm;
+  return Number.parseInt(m[1], 10) * 60 + Number.parseInt(m[2], 10);
 }
 
 export function minutesToTime(totalMins: number): string {
@@ -95,11 +95,20 @@ export function parseDatetimeLocal(s: string): { date: string; time: string } {
   if (!s || !s.trim()) return { date: "", time: "" };
   const t = s.trim();
   if (!t.includes("T")) return { date: t.slice(0, 10), time: "" };
-  const [d, rest] = t.split("T");
+  const [d, restRaw] = t.split("T");
   if (!d) return { date: "", time: "" };
-  const timePart = (rest || "").slice(0, 5);
-  if (!timePart || timePart.length < 4) return { date: d, time: "" };
-  return { date: d, time: timePart.length === 5 ? timePart : `${timePart.slice(0, 2).padStart(2, "0")}:${timePart.slice(3, 5).padStart(2, "0")}` };
+  const rest = (restRaw || "").trim();
+  const tm = /^(\d{1,2}):(\d{2})/.exec(rest);
+  if (!tm) return { date: d, time: "" };
+  const hh = Number.parseInt(tm[1], 10);
+  const mm = Number.parseInt(tm[2], 10);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm) || mm > 59) return { date: d, time: "" };
+  const hhC = Math.min(23, Math.max(0, hh));
+  const mmC = Math.min(59, Math.max(0, mm));
+  return {
+    date: d,
+    time: `${String(hhC).padStart(2, "0")}:${String(mmC).padStart(2, "0")}`,
+  };
 }
 
 /** Upper bound for a single job span when counting forward (23 h 59 m). */

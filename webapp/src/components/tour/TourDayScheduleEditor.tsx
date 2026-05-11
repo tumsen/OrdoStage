@@ -108,6 +108,19 @@ function draftsToPayload(drafts: DraftEvent[]) {
   });
 }
 
+const WALL_HHMM = /^\d{2}:\d{2}$/;
+
+function assertPayloadTimesValid(payload: ReturnType<typeof draftsToPayload>) {
+  for (let i = 0; i < payload.length; i++) {
+    const p = payload[i]!;
+    if (!WALL_HHMM.test(p.startTime) || !WALL_HHMM.test(p.endTime)) {
+      throw new Error(
+        `Row ${i + 1}: set both start and end to a full time (hours and minutes, 24h, e.g. 09:30).`
+      );
+    }
+  }
+}
+
 export function TourDayScheduleEditor({
   tourId,
   show,
@@ -163,6 +176,7 @@ export function TourDayScheduleEditor({
   const saveMutation = useMutation({
     mutationFn: async (events: DraftEvent[]) => {
       const payload = draftsToPayload(events);
+      assertPayloadTimesValid(payload);
       return api.put<TourShow>(
         `/api/tours/${tourId}/shows/${show.id}/schedule-events`,
         { events: payload }
@@ -303,7 +317,9 @@ export function TourDayScheduleEditor({
         </div>
       </div>
       {saveMutation.isError ? (
-        <p className="text-xs text-red-400">Could not save schedule. Check times are HH:mm.</p>
+        <p className="text-xs text-red-400">
+          {saveMutation.error instanceof Error ? saveMutation.error.message : "Could not save schedule."}
+        </p>
       ) : null}
     </div>
   );

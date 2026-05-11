@@ -1,7 +1,8 @@
 /** Strict `HH:mm` (24h) normalization — align with webapp `normalizeTimeHHMM`. */
 export function normalizeTimeHHMM(raw: string): string {
   const t = raw.trim();
-  const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+  /** Allow `HH:mm`, `H:mm`, optional `:ss` / fractional seconds. */
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/.exec(t);
   if (!m) return "";
   let hh = Number.parseInt(m[1]!, 10);
   let mm = Number.parseInt(m[2]!, 10);

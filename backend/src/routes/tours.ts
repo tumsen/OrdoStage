@@ -651,9 +651,15 @@ toursRouter.put(
     for (const [i, ev] of body.events.entries()) {
       const st = normalizeTimeHHMM(ev.startTime);
       const en = normalizeTimeHHMM(ev.endTime);
-      if (!TIME_RE.test(st) || !TIME_RE.test(en)) {
+      if (!st || !en || !TIME_RE.test(st) || !TIME_RE.test(en)) {
         return c.json(
-          { error: { message: "All times must use HH:mm (e.g. 09:30).", code: "BAD_REQUEST" } },
+          {
+            error: {
+              message:
+                "Each row needs a valid start and end time (24h, two digits each, e.g. 09:30). Check for empty or partial times.",
+              code: "BAD_REQUEST",
+            },
+          },
           400
         );
       }
