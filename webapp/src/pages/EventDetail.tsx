@@ -47,7 +47,11 @@ import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
 import { EditItemSheet } from "@/components/schedule/EditItemSheet";
-import { internalBookingDisplayTitle, type CalendarItem } from "@/components/schedule/scheduleUtils";
+import {
+  internalBookingDisplayTitle,
+  isMirroredSystemInternalBookingTitle,
+  type CalendarItem,
+} from "@/components/schedule/scheduleUtils";
 import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
 import { computeEventWorkTotals, computeShowStaffingStats, parseStaffingOkMap } from "@/lib/eventShowStaffing";
 import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
@@ -2379,6 +2383,7 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
 
     // This event's bookings (editable)
     for (const booking of bookingsQuery.data ?? []) {
+      if (isMirroredSystemInternalBookingTitle(booking.title)) continue;
       out.push({
         id: booking.id,
         title: internalBookingDisplayTitle(booking.title),
@@ -2436,6 +2441,7 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
       const ownBookingIds = new Set((bookingsQuery.data ?? []).map((b) => b.id));
       for (const booking of scheduleQuery.data.bookings) {
         if (ownBookingIds.has(booking.id)) continue;
+        if (isMirroredSystemInternalBookingTitle(booking.title)) continue;
         out.push({
           id: booking.id,
           title: internalBookingDisplayTitle(booking.title),

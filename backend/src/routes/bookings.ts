@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
+import { excludeMirroredEventInternalBookings } from "../internalBookingMirrorFilter";
 import { CreateInternalBookingSchema, UpdateInternalBookingSchema } from "../types";
 import { canAction } from "../requestRole";
 
@@ -180,7 +181,7 @@ bookingsRouter.get("/bookings", async (c) => {
   }
 
   const bookings = await prisma.internalBooking.findMany({
-    where,
+    where: { ...where, ...excludeMirroredEventInternalBookings },
     orderBy: { startDate: "asc" },
     include: bookingInclude,
   });

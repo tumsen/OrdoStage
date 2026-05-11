@@ -28,6 +28,13 @@ export function internalBookingDisplayTitle(title: string): string {
   return splitInternalBookingSyncMarker(title).displayTitle;
 }
 
+/** True when this booking row is auto-mirrored from an event show job or staffing (not a user booking). */
+export function isMirroredSystemInternalBookingTitle(title: string): boolean {
+  return (
+    title.startsWith("[event-show-job:") || title.startsWith("[event-show-staffing:")
+  );
+}
+
 export interface CalendarItem {
   id: string;
   title: string;
@@ -228,7 +235,9 @@ export function toCalendarItems(
     ];
   });
 
-  const bookingItems: CalendarItem[] = bookings.map((b) => ({
+  const bookingItems: CalendarItem[] = bookings
+    .filter((b) => !isMirroredSystemInternalBookingTitle(b.title))
+    .map((b) => ({
     id: b.id,
     title: internalBookingDisplayTitle(b.title),
     kind: "booking",

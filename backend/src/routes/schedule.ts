@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
+import { excludeMirroredEventInternalBookings } from "../internalBookingMirrorFilter";
 import { serializeTourShow } from "./tours";
 
 const scheduleRouter = new Hono<{
@@ -120,14 +121,11 @@ scheduleRouter.get("/schedule", async (c) => {
     ];
   }
 
-  // Build booking where clause
+  // Build booking where clause (omit mirrored event job/staffing rows — same slots as show jobs)
   const bookingWhere: Record<string, unknown> = {
     organizationId: user.organizationId,
     ...dateFilter,
-    NOT: [
-      { title: { startsWith: "[event-show-job:" } },
-      { title: { startsWith: "[event-show-staffing:" } },
-    ],
+    ...excludeMirroredEventInternalBookings,
   };
   if (venueId) bookingWhere.venueId = venueId;
   if (personId) {
