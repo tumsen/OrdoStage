@@ -81,11 +81,13 @@ const WEEK_STARTS_ON = 1 as const;
 const PX_PER_HOUR = 36;
 /** Matches backend `tourPlanJobId` / `TimeTrackingJob.id` for tour roster rows. */
 const TOUR_PLAN_JOB_PREFIX = "tourshow:";
+const TOUR_EVENT_PREFIX = "tourevent:";
 const EVT_STAFF_PREFIX = "evtstaff:";
 const IBOOKP_PREFIX = "ibookp:";
 
 function plannedJobKeyFromEntry(e: TimeEntry): string | null {
   if (e.eventShowJobId) return e.eventShowJobId;
+  if (e.tourScheduleEventId) return `${TOUR_EVENT_PREFIX}${e.tourScheduleEventId}`;
   if (e.tourShowId) return `${TOUR_PLAN_JOB_PREFIX}${e.tourShowId}`;
   if (e.eventShowStaffingId) return `${EVT_STAFF_PREFIX}${e.eventShowStaffingId}`;
   if (e.internalBookingPersonId && e.internalBookingDayKey) {
@@ -124,7 +126,7 @@ function plannedJobDisplayRange(job: TimeTrackingJob): { start: Date; end: Date 
   return { start: parseISO(job.plannedStartsAt), end: parseISO(job.plannedEndsAt) };
 }
 
-/** Tour schedule-event planned rows (`tourScheduleEventId`): hide dashed slot when a tour entry overlaps this window. */
+/** Tour schedule-event planned rows (`tourScheduleEventId`): hide dashed slot when a tour entry overlaps this window (legacy rows without `tourScheduleEventId`). */
 function tourPlannedSlotOverlapsTourEntry(job: TimeTrackingJob, entries: TimeEntry[] | undefined): boolean {
   if (!job.tourShowId) return false;
   const range = tourPlannedRangeLocal(job);
@@ -145,7 +147,12 @@ function plannedJobIsLogged(
   entryByJobId: Map<string, TimeEntry>,
   entries: TimeEntry[] | undefined
 ): boolean {
-  if (job.source === "tour" && job.tourShowId && job.tourScheduleEventId) {
+  const isTourScheduleRow =
+    job.source === "tour" &&
+    job.tourShowId &&
+    (Boolean(job.tourScheduleEventId) || job.id.startsWith(TOUR_EVENT_PREFIX));
+  if (isTourScheduleRow) {
+    if (entryByJobId.has(job.id)) return true;
     return tourPlannedSlotOverlapsTourEntry(job, entries);
   }
   return entryByJobId.has(job.id);
@@ -415,6 +422,8 @@ export default function TimeTracking() {
         category: "work",
         eventShowJobId: kind === "job" ? (body.eventShowJobId as string | null) ?? null : null,
         tourShowId: kind === "job" ? (body.tourShowId as string | null) ?? null : null,
+        tourScheduleEventId:
+          kind === "job" ? (body.tourScheduleEventId as string | null) ?? null : null,
         eventShowStaffingId: kind === "job" ? (body.eventShowStaffingId as string | null) ?? null : null,
         internalBookingPersonId:
           kind === "job" ? (body.internalBookingPersonId as string | null) ?? null : null,
@@ -960,7 +969,10 @@ export default function TimeTracking() {
     const tourShowId =
       job.tourShowId ??
       (job.id.startsWith(TOUR_PLAN_JOB_PREFIX) ? job.id.slice(TOUR_PLAN_JOB_PREFIX.length) : null);
-    const isTourJob = job.source === "tour" || (tourShowId != null && job.id.startsWith(TOUR_PLAN_JOB_PREFIX));
+    const isTourJob =
+      job.source === "tour" ||
+      (tourShowId != null &&
+        (job.id.startsWith(TOUR_PLAN_JOB_PREFIX) || job.id.startsWith(TOUR_EVENT_PREFIX)));
 
     const eventStaffingId =
       job.eventShowStaffingId ??
@@ -979,11 +991,15 @@ export default function TimeTracking() {
 
     if (isTourJob && tourShowId) {
       const tr = tourPlannedRangeLocal(job);
+      const tourScheduleEventId =
+        job.tourScheduleEventId ??
+        (job.id.startsWith(TOUR_EVENT_PREFIX) ? job.id.slice(TOUR_EVENT_PREFIX.length) : null);
       createEntry.mutate({
         startsAt: tr ? tr.start.toISOString() : job.plannedStartsAt,
         endsAt: tr ? tr.end.toISOString() : job.plannedEndsAt,
         kind: "job",
         tourShowId,
+        ...(tourScheduleEventId ? { tourScheduleEventId } : {}),
         ...(job.timeProjectId ? { timeProjectId: job.timeProjectId } : {}),
       });
     } else if (

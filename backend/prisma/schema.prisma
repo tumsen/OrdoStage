@@ -790,6 +790,7 @@ model TourScheduleEvent {
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  timeEntries TimeEntry[]
 
   @@index([tourShowId, sortOrder])
 }
@@ -897,6 +898,8 @@ model TimeEntry {
   event          Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   tourShowId     String?
   tourShow       TourShow?    @relation(fields: [tourShowId], references: [id], onDelete: SetNull)
+  tourScheduleEventId String?
+  tourScheduleEvent   TourScheduleEvent? @relation(fields: [tourScheduleEventId], references: [id], onDelete: SetNull)
   eventShowStaffingId String?
   eventShowStaffing   EventShowStaffing? @relation("TimeEntryEventShowStaffing", fields: [eventShowStaffingId], references: [id], onDelete: SetNull)
   internalBookingPersonId String?
@@ -916,6 +919,7 @@ model TimeEntry {
   @@index([personId, startsAt])
   @@index([eventShowJobId])
   @@index([tourShowId])
+  @@index([tourScheduleEventId])
   @@index([eventShowStaffingId])
   @@index([internalBookingPersonId])
   @@index([organizationId, category])

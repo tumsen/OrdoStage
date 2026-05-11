@@ -923,6 +923,7 @@ function serializeEntry(row: {
   eventShowJobId: string | null;
   eventId: string | null;
   tourShowId: string | null;
+  tourScheduleEventId: string | null;
   eventShowStaffingId: string | null;
   internalBookingPersonId: string | null;
   internalBookingDayKey: string | null;
@@ -945,6 +946,7 @@ function serializeEntry(row: {
     eventShowJobId: row.eventShowJobId,
     eventId: row.eventId,
     tourShowId: row.tourShowId,
+    tourScheduleEventId: row.tourScheduleEventId,
     eventShowStaffingId: row.eventShowStaffingId,
     internalBookingPersonId: row.internalBookingPersonId,
     internalBookingDayKey: row.internalBookingDayKey,
@@ -1938,6 +1940,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
   let eventShowJobId: string | null = body.eventShowJobId ?? null;
   let eventId: string | null = body.eventId ?? null;
   let tourShowId: string | null = body.tourShowId ?? null;
+  let tourScheduleEventId: string | null = body.tourScheduleEventId ?? null;
   let eventShowStaffingId: string | null = body.eventShowStaffingId ?? null;
   let internalBookingPersonId: string | null = body.internalBookingPersonId ?? null;
   let internalBookingDayKey: string | null = body.internalBookingDayKey ?? null;
@@ -1963,6 +1966,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
     if (nAssign === 0) {
       return c.json(
         { error: { message: "Job entries require an assignment reference.", code: "BAD_REQUEST" } },
+        400
+      );
+    }
+    if (tourScheduleEventId && !tourShowId) {
+      return c.json(
+        {
+          error: { message: "tourScheduleEventId requires tourShowId.", code: "BAD_REQUEST" },
+        },
         400
       );
     }
@@ -2019,6 +2030,20 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         );
       }
 
+      if (tourScheduleEventId) {
+        const schedEv = await prisma.tourScheduleEvent.findFirst({
+          where: { id: tourScheduleEventId, tourShowId: show.id },
+          select: { id: true },
+        });
+        if (!schedEv) {
+          return c.json(
+            {
+              error: { message: "Tour schedule event not found for this tour day.", code: "NOT_FOUND" } },
+            404
+          );
+        }
+      }
+
       let resolvedProjectId: string | null = body.timeProjectId ?? null;
       if (resolvedProjectId) {
         const p = await prisma.timeProject.findFirst({
@@ -2054,7 +2079,11 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       internalBookingDayKey = null;
 
       const existingTour = await prisma.timeEntry.findFirst({
-        where: { personId: myPersonId, tourShowId },
+        where: {
+          personId: myPersonId,
+          tourShowId,
+          tourScheduleEventId: tourScheduleEventId ?? null,
+        },
         include: { tagLinks: { select: { timeTagId: true } } },
       });
 
@@ -2084,7 +2113,12 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           data: {
             startsAt: primary.startsAt,
             endsAt: primary.endsAt,
+            kind: "job",
             category: body.category ?? "work",
+            eventShowJobId: null,
+            eventId: null,
+            tourShowId,
+            tourScheduleEventId: tourScheduleEventId ?? null,
             timeProjectId: resolvedProjectId,
             note: body.note ?? null,
             isLocked: body.isLocked ?? false,
@@ -2112,6 +2146,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
                 eventShowJobId: null,
                 eventId: null,
                 tourShowId: null,
+                tourScheduleEventId: null,
                 eventShowStaffingId: null,
                 internalBookingPersonId: null,
                 internalBookingDayKey: null,
@@ -2157,6 +2192,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           eventShowJobId: null,
           eventId: null,
           tourShowId,
+          tourScheduleEventId: tourScheduleEventId ?? null,
           eventShowStaffingId: null,
           internalBookingPersonId: null,
           internalBookingDayKey: null,
@@ -2181,6 +2217,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
               eventShowJobId: null,
               eventId: null,
               tourShowId: null,
+              tourScheduleEventId: null,
               eventShowStaffingId: null,
               internalBookingPersonId: null,
               internalBookingDayKey: null,
@@ -2263,6 +2300,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         eventShowJobId: null as string | null,
         eventId: staffing.show.eventId,
         tourShowId: null as string | null,
+        tourScheduleEventId: null as string | null,
         eventShowStaffingId: null as string | null,
         internalBookingPersonId: null as string | null,
         internalBookingDayKey: null as string | null,
@@ -2301,6 +2339,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             timeProjectId: resolvedProjectId,
             note: body.note ?? null,
             isLocked: body.isLocked ?? false,
+            tourScheduleEventId: null,
             tagLinks: {
               deleteMany: {},
               createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) },
@@ -2354,6 +2393,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           eventShowJobId: null,
           eventId: staffing.show.eventId,
           tourShowId: null,
+          tourScheduleEventId: null,
           eventShowStaffingId,
           internalBookingPersonId: null,
           internalBookingDayKey: null,
@@ -2441,6 +2481,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         eventShowJobId: null as string | null,
         eventId: null as string | null,
         tourShowId: null as string | null,
+        tourScheduleEventId: null as string | null,
         eventShowStaffingId: null as string | null,
         internalBookingPersonId: null as string | null,
         internalBookingDayKey: null as string | null,
@@ -2479,6 +2520,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             timeProjectId: resolvedProjectId,
             note: body.note ?? null,
             isLocked: body.isLocked ?? false,
+            tourScheduleEventId: null,
             tagLinks: {
               deleteMany: {},
               createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) },
@@ -2532,6 +2574,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           eventShowJobId: null,
           eventId: null,
           tourShowId: null,
+          tourScheduleEventId: null,
           eventShowStaffingId: null,
           internalBookingPersonId,
           internalBookingDayKey,
@@ -2618,6 +2661,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           eventShowStaffingId: null,
           internalBookingPersonId: null,
           internalBookingDayKey: null,
+          tourScheduleEventId: null,
           tagLinks: {
             deleteMany: {},
             createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) },
@@ -2639,6 +2683,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
               eventShowJobId: null,
               eventId,
               tourShowId: null,
+              tourScheduleEventId: null,
               eventShowStaffingId: null,
               internalBookingPersonId: null,
               internalBookingDayKey: null,
@@ -2684,6 +2729,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         eventShowJobId,
         eventId,
         tourShowId: null,
+        tourScheduleEventId: null,
         eventShowStaffingId: null,
         internalBookingPersonId: null,
         internalBookingDayKey: null,
@@ -2708,6 +2754,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             eventShowJobId: null,
             eventId,
             tourShowId: null,
+            tourScheduleEventId: null,
             eventShowStaffingId: null,
             internalBookingPersonId: null,
             internalBookingDayKey: null,
@@ -2720,6 +2767,18 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       }
     }
     return c.json({ data: serializeEntry(created) });
+  }
+
+  if (body.tourScheduleEventId) {
+    return c.json(
+      {
+        error: {
+          message: "Custom entries cannot reference a tour schedule event.",
+          code: "BAD_REQUEST",
+        },
+      },
+      400
+    );
   }
 
   // custom
@@ -2795,6 +2854,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       eventShowJobId: null,
       eventId,
       tourShowId: null,
+      tourScheduleEventId: null,
       eventShowStaffingId: null,
       internalBookingPersonId: null,
       internalBookingDayKey: null,
@@ -2819,6 +2879,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           eventShowJobId: null,
           eventId,
           tourShowId: null,
+          tourScheduleEventId: null,
           eventShowStaffingId: null,
           internalBookingPersonId: null,
           internalBookingDayKey: null,
@@ -2917,6 +2978,8 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
   let finalEventShowJobId =
     body.eventShowJobId !== undefined ? body.eventShowJobId : existing.eventShowJobId;
   let finalTourShowId = body.tourShowId !== undefined ? body.tourShowId : existing.tourShowId;
+  let finalTourScheduleEventId: string | null =
+    body.tourScheduleEventId !== undefined ? body.tourScheduleEventId : existing.tourScheduleEventId;
   let finalEventShowStaffingId =
     body.eventShowStaffingId !== undefined ? body.eventShowStaffingId : existing.eventShowStaffingId;
   let finalInternalBookingPersonId =
@@ -2931,9 +2994,14 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
   if (finalKind === "custom") {
     finalEventShowJobId = null;
     finalTourShowId = null;
+    finalTourScheduleEventId = null;
     finalEventShowStaffingId = null;
     finalInternalBookingPersonId = null;
     finalInternalBookingDayKey = null;
+  }
+
+  if (!finalTourShowId) {
+    finalTourScheduleEventId = null;
   }
 
   if (finalInternalBookingPersonId && !finalInternalBookingDayKey) {
@@ -3012,6 +3080,19 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
           { error: { message: "Tour show not found or person is not on roster.", code: "NOT_FOUND" } },
           404
         );
+      }
+      if (finalTourScheduleEventId) {
+        const schedEv = await prisma.tourScheduleEvent.findFirst({
+          where: { id: finalTourScheduleEventId, tourShowId: finalTourShowId },
+          select: { id: true },
+        });
+        if (!schedEv) {
+          return c.json(
+            {
+              error: { message: "Tour schedule event not found for this tour day.", code: "NOT_FOUND" } },
+            404
+          );
+        }
       }
     } else if (finalEventShowJobId) {
       const jobRow = await prisma.eventShowJob.findFirst({
@@ -3119,6 +3200,7 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
       eventShowJobId: finalEventShowJobId,
       eventId: finalEventId,
       tourShowId: finalTourShowId,
+      tourScheduleEventId: finalTourScheduleEventId,
       eventShowStaffingId: finalEventShowStaffingId,
       internalBookingPersonId: finalInternalBookingPersonId,
       internalBookingDayKey: finalInternalBookingDayKey,
@@ -3146,6 +3228,7 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
           eventShowJobId: null,
           eventId: finalEventId,
           tourShowId: null,
+          tourScheduleEventId: null,
           eventShowStaffingId: null,
           internalBookingPersonId: null,
           internalBookingDayKey: null,
