@@ -2288,6 +2288,12 @@ function ShowPeopleSection({ show, tour }: { show: TourShow; tour: TourDetail })
         </div>
       </div>
 
+      <p className="text-[10px] text-white/25 mb-2 leading-snug max-w-xl">
+        {isOverridden
+          ? "This day has its own roster. New people added under Tour → People are added here automatically; you can still change this list."
+          : "Uses the tour roster from the People tab. Choose Customize to edit only this day; then new tour-level people are added to this day automatically."}
+      </p>
+
       {effectivePeople.length === 0 ? (
         <div className="text-xs text-white/20 italic py-1">No people assigned to this tour yet.</div>
       ) : (
@@ -2386,8 +2392,11 @@ function ShowPeopleSection({ show, tour }: { show: TourShow; tour: TourDetail })
 
 function PeopleTab({ tour }: { tour: TourDetail }) {
   const queryClient = useQueryClient();
-  const [addOpen, setAddOpen] = useState(false);
+  const [addTeamOpen, setAddTeamOpen] = useState(false);
+  const [addPersonOpen, setAddPersonOpen] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [selectedPersonId, setSelectedPersonId] = useState("");
+  const [personRole, setPersonRole] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const { data: allTeams } = useQuery({
@@ -2395,19 +2404,44 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
     queryFn: () => api.get<Department[]>("/api/departments"),
   });
 
-  const assignMutation = useMutation({
+  const { data: allPeople } = useQuery({
+    queryKey: ["people"],
+    queryFn: () => api.get<Person[]>("/api/people"),
+  });
+
+  const assignTeamMutation = useMutation({
     mutationFn: (teamId: string) =>
       api.post<TourTeam>(`/api/tours/${tour.id}/teams`, { teamId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
-      setAddOpen(false);
+      setAddTeamOpen(false);
       setSelectedTeamId("");
     },
   });
 
-  const removeMutation = useMutation({
-    mutationFn: (teamId: string) =>
-      api.delete(`/api/tours/${tour.id}/teams/${teamId}`),
+  const addPersonMutation = useMutation({
+    mutationFn: ({ personId, role }: { personId: string; role?: string }) =>
+      api.post<TourPerson>(`/api/tours/${tour.id}/people`, {
+        personId,
+        role: role?.trim() || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+      setAddPersonOpen(false);
+      setSelectedPersonId("");
+      setPersonRole("");
+    },
+  });
+
+  const removeTeamMutation = useMutation({
+    mutationFn: (teamId: string) => api.delete(`/api/tours/${tour.id}/teams/${teamId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+    },
+  });
+
+  const removePersonMutation = useMutation({
+    mutationFn: (personId: string) => api.delete(`/api/tours/${tour.id}/people/${personId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
     },
@@ -2416,38 +2450,35 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
   const assignedTeamIds = new Set(tour.teams.map((tt) => tt.teamId));
   const availableTeams = (allTeams ?? []).filter((team) => !assignedTeamIds.has(team.id));
 
-  return (
-    <div className="space-y-4">
-      <p className="text-xs text-white/30 mb-4">Default roster for all shows. Override individual shows below.</p>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-white/40">
-          {tour.teams.length} {tour.teams.length === 1 ? "team" : "teams"} ·{" "}
-          {tour.people.length} {tour.people.length === 1 ? "person" : "people"}
-        </span>
-        <Button
-          size="sm"
-          onClick={() => setAddOpen(true)}
-          className="bg-white/5 hover:bg-white/10 text-white border border-white/10 gap-2 h-8"
-        >
-          <Plus size={13} /> Add Team
-        </Button>
-      </div>
+  const onTourPersonIds = new Set(tour.people.map((tp) => tp.personId));
+  const availablePeople = (allPeople ?? []).filter((p) => !onTourPersonIds.has(p.id));
 
-      {tour.teams.length === 0 ? (
-        <div className="py-12 text-center">
-          <Users size={24} className="text-white/15 mx-auto mb-3" />
-          <p className="text-white/30 text-sm">No teams assigned yet.</p>
+  return (
+    <div className="space-y-6">
+      <p className="text-xs text-white/35 leading-relaxed max-w-2xl">
+        Teams and individuals you add here form the default roster for every show day. Days without their own list
+        inherit this roster. If you customize people on a specific show, new tour-level additions are added to that
+        show automatically; you can still change each show under Shows.
+      </p>
+
+      {/* Teams */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-white/50 uppercase tracking-wide">Teams</span>
           <Button
             size="sm"
-            onClick={() => setAddOpen(true)}
-            variant="outline"
-            className="mt-3 border-white/10 text-white/50 hover:text-white bg-transparent gap-2"
+            onClick={() => setAddTeamOpen(true)}
+            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 gap-2 h-8"
           >
-            <Plus size={12} /> Add Team
+            <Plus size={13} /> Add team
           </Button>
         </div>
-      ) : (
-        <div className="space-y-2">
+        {tour.teams.length === 0 ? (
+          <div className="rounded-lg border border-white/10 border-dashed bg-white/[0.02] px-4 py-8 text-center">
+            <Users size={22} className="text-white/15 mx-auto mb-2" />
+            <p className="text-white/35 text-sm">No teams yet. Add a team to pull in everyone on that team.</p>
+          </div>
+        ) : (
           <div className="flex flex-wrap gap-2">
             {tour.teams.map((tt: TourTeam) => (
               <div
@@ -2460,75 +2491,104 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
                 />
                 <span className="text-xs text-white/80">{tt.team.name}</span>
                 <button
+                  type="button"
                   onClick={() => {
                     if (!confirmDeleteAction(`team assignment "${tt.team.name}"`)) return;
-                    removeMutation.mutate(tt.teamId);
+                    removeTeamMutation.mutate(tt.teamId);
                   }}
                   className="text-white/25 hover:text-red-400"
-                  disabled={removeMutation.isPending}
+                  disabled={removeTeamMutation.isPending}
+                  aria-label={`Remove ${tt.team.name}`}
                 >
                   <X size={11} />
                 </button>
               </div>
             ))}
           </div>
+        )}
+      </div>
 
-          {tour.people.map((tp: TourPerson) => (
-            <div
-              key={tp.id}
-              className="flex items-center justify-between bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3"
-            >
-              <div>
-                <div className="text-sm font-medium text-white/90">{tp.person.name}</div>
-                <div className="text-xs text-white/40 mt-0.5">
-                  {tp.role ? tp.role : tp.person.role ? tp.person.role : "No role"}
-                </div>
-                {(tp.person.phone || tp.person.email) ? (
-                  <div className="text-xs text-white/30 mt-0.5">
-                    {[tp.person.phone, tp.person.email].filter(Boolean).join(" · ")}
-                  </div>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(`${window.location.origin}/p/${tp.personalToken}`);
-                    setCopiedId(tp.id);
-                    setTimeout(() => setCopiedId(null), 2000);
-                  }}
-                  className="h-7 w-7 text-white/25 hover:text-blue-400"
-                  title="Copy personal link"
-                >
-                  {copiedId === tp.id ? <Check size={13} className="text-green-400" /> : <Link2 size={13} />}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-white/10"
-                  disabled
-                  title="People are managed via team assignments"
-                >
-                  <X size={13} />
-                </Button>
-              </div>
-            </div>
-          ))}
+      {/* People */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-white/50 uppercase tracking-wide">
+            People ({tour.people.length})
+          </span>
+          <Button
+            size="sm"
+            onClick={() => setAddPersonOpen(true)}
+            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 gap-2 h-8"
+          >
+            <Plus size={13} /> Add person
+          </Button>
         </div>
-      )}
+        {tour.people.length === 0 ? (
+          <div className="rounded-lg border border-white/10 border-dashed bg-white/[0.02] px-4 py-8 text-center">
+            <p className="text-white/35 text-sm">No people on this tour yet. Add teams above or individuals here.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {tour.people.map((tp: TourPerson) => (
+              <div
+                key={tp.id}
+                className="flex items-center justify-between bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3"
+              >
+                <div>
+                  <div className="text-sm font-medium text-white/90">{tp.person.name}</div>
+                  <div className="text-xs text-white/40 mt-0.5">
+                    {tp.role ? tp.role : tp.person.role ? tp.person.role : "No role"}
+                  </div>
+                  {tp.person.phone || tp.person.email ? (
+                    <div className="text-xs text-white/30 mt-0.5">
+                      {[tp.person.phone, tp.person.email].filter(Boolean).join(" · ")}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(`${window.location.origin}/p/${tp.personalToken}`);
+                      setCopiedId(tp.id);
+                      setTimeout(() => setCopiedId(null), 2000);
+                    }}
+                    className="h-7 w-7 text-white/25 hover:text-blue-400"
+                    title="Copy personal link"
+                  >
+                    {copiedId === tp.id ? <Check size={13} className="text-green-400" /> : <Link2 size={13} />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-white/25 hover:text-red-400"
+                    title="Remove from tour"
+                    onClick={() => {
+                      if (!confirmDeleteAction(`"${tp.person.name}" from this tour`)) return;
+                      removePersonMutation.mutate(tp.personId);
+                    }}
+                    disabled={removePersonMutation.isPending}
+                  >
+                    <X size={13} />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={addTeamOpen} onOpenChange={setAddTeamOpen}>
         <DialogContent className="bg-[#16161f] border-white/10 text-white">
           <DialogHeader>
-            <DialogTitle>Add Team to Tour</DialogTitle>
+            <DialogTitle>Add team to tour</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label className="text-white/60 text-xs uppercase tracking-wide">Team</Label>
               <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                 <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                  <SelectValue placeholder="Select a team..." />
+                  <SelectValue placeholder="Select a team…" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#16161f] border-white/10 text-white">
                   {availableTeams.length === 0 ? (
@@ -2549,17 +2609,76 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setAddOpen(false)}
+              onClick={() => setAddTeamOpen(false)}
               className="border-white/10 text-white/60 hover:text-white bg-transparent"
             >
               Cancel
             </Button>
             <Button
-              disabled={!selectedTeamId || assignMutation.isPending}
-              onClick={() => assignMutation.mutate(selectedTeamId)}
+              disabled={!selectedTeamId || assignTeamMutation.isPending}
+              onClick={() => assignTeamMutation.mutate(selectedTeamId)}
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
             >
-              {assignMutation.isPending ? "Adding..." : "Add"}
+              {assignTeamMutation.isPending ? "Adding…" : "Add team"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addPersonOpen} onOpenChange={setAddPersonOpen}>
+        <DialogContent className="bg-[#16161f] border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle>Add person to tour</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-white/60 text-xs uppercase tracking-wide">Person</Label>
+              <Select value={selectedPersonId} onValueChange={setSelectedPersonId}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder="Select a person…" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                  {availablePeople.length === 0 ? (
+                    <SelectItem value="__empty__" disabled>
+                      Everyone is already on this tour
+                    </SelectItem>
+                  ) : (
+                    availablePeople.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                        {p.role ? ` — ${p.role}` : ""}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white/60 text-xs uppercase tracking-wide">Role (optional)</Label>
+              <Input
+                value={personRole}
+                onChange={(e) => setPersonRole(e.target.value)}
+                placeholder="e.g. Tour manager, Merch…"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAddPersonOpen(false)}
+              className="border-white/10 text-white/60 hover:text-white bg-transparent"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!selectedPersonId || addPersonMutation.isPending}
+              onClick={() =>
+                addPersonMutation.mutate({ personId: selectedPersonId, role: personRole.trim() || undefined })
+              }
+              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+            >
+              {addPersonMutation.isPending ? "Adding…" : "Add person"}
             </Button>
           </DialogFooter>
         </DialogContent>

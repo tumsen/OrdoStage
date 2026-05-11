@@ -17,6 +17,30 @@ import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
+/**
+ * When tour-level people are added, any show that already has its own roster
+ * (showPeople rows) should get the new person too so they stay in sync with the tour.
+ * Shows with no rows keep inheriting tour.people virtually.
+ */
+async function appendTourPeopleToCustomizedShows(tourId: string, personIds: string[]): Promise<void> {
+  const ids = [...new Set(personIds)].filter(Boolean);
+  if (ids.length === 0) return;
+  const shows = await prisma.tourShow.findMany({
+    where: { tourId },
+    select: { id: true, _count: { select: { showPeople: true } } },
+  });
+  for (const show of shows) {
+    if (show._count.showPeople === 0) continue;
+    for (const personId of ids) {
+      await prisma.tourShowPerson.upsert({
+        where: { showId_personId: { showId: show.id, personId } },
+        update: {},
+        create: { showId: show.id, personId, role: null },
+      });
+    }
+  }
+}
+
 const MAX_VENUE_TECH_RIDER_BYTES = 25 * 1024 * 1024;
 
 function hasVenueTechRiderPdfStored(show: {
@@ -749,7 +773,7 @@ toursRouter.delete("/tours/:id/shows/:showId", async (c) => {
   return new Response(null, { status: 204 });
 });
 
-// POST /api/tours/:id/people — add person to tour
+// POST /api/tours/:id/teams — assign team; members become tour people
 toursRouter.post(
   "/tours/:id/teams",
   zValidator("json", AssignTourTeamSchema),
@@ -796,13 +820,16 @@ toursRouter.post(
     });
 
     if (members.length > 0) {
+      const memberIds: string[] = [];
       for (const member of members) {
         await prisma.tourPerson.upsert({
           where: { tourId_personId: { tourId: id, personId: member.personId } },
           update: {},
           create: { tourId: id, personId: member.personId },
         });
+        memberIds.push(member.personId);
       }
+      await appendTourPeopleToCustomizedShows(id, memberIds);
     }
 
     return c.json(
@@ -936,6 +963,8 @@ toursRouter.post(
       },
     });
 
+    await appendTourPeopleToCustomizedShows(id, [body.personId]);
+
     return c.json(
       {
         data: {
@@ -978,6 +1007,13 @@ toursRouter.delete("/tours/:id/people/:personId", async (c) => {
   if (!tourPerson) {
     return c.json({ error: { message: "Person assignment not found", code: "NOT_FOUND" } }, 404);
   }
+
+  await prisma.tourShowPerson.deleteMany({
+    where: {
+      personId,
+      show: { tourId: id },
+    },
+  });
 
   await prisma.tourPerson.delete({
     where: { tourId_personId: { tourId: id, personId } },
