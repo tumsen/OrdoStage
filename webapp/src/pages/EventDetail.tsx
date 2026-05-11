@@ -47,7 +47,7 @@ import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
 import { EditItemSheet } from "@/components/schedule/EditItemSheet";
-import type { CalendarItem } from "@/components/schedule/scheduleUtils";
+import { internalBookingDisplayTitle, type CalendarItem } from "@/components/schedule/scheduleUtils";
 import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
 import { computeEventWorkTotals, computeShowStaffingStats, parseStaffingOkMap } from "@/lib/eventShowStaffing";
 import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
@@ -2381,7 +2381,7 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
     for (const booking of bookingsQuery.data ?? []) {
       out.push({
         id: booking.id,
-        title: booking.title,
+        title: internalBookingDisplayTitle(booking.title),
         kind: "booking",
         type: (booking.type as CalendarItem["type"]) ?? "venue_booking",
         startDate: booking.startDate,
@@ -2438,7 +2438,7 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
         if (ownBookingIds.has(booking.id)) continue;
         out.push({
           id: booking.id,
-          title: booking.title,
+          title: internalBookingDisplayTitle(booking.title),
           kind: "booking",
           type: (booking.type as CalendarItem["type"]) ?? "other",
           startDate: booking.startDate,

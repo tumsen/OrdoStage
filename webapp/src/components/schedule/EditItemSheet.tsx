@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -26,6 +26,7 @@ import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
 import { migrateContactRowFields } from "@/lib/eventContactRow";
 import { parseEventCustomFieldsJson } from "@/lib/eventCustomFields";
 import type { CalendarItem } from "./scheduleUtils";
+import { internalBookingDisplayTitle, splitInternalBookingSyncMarker } from "./scheduleUtils";
 import type {
   EventDetail,
   InternalBookingDetail,
@@ -283,7 +284,9 @@ interface BookingFormProps {
 function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormProps) {
   const queryClient = useQueryClient();
 
-  const [title, setTitle] = useState(booking.title);
+  const { marker, displayTitle: titleInitial } = splitInternalBookingSyncMarker(booking.title);
+  const titleSyncMarkerRef = useRef(marker);
+  const [title, setTitle] = useState(titleInitial);
   const [description, setDescription] = useState(booking.description ?? "");
   const [startDate, setStartDate] = useState(toLocal(booking.startDate));
   const [endDate, setEndDate] = useState(toLocal(booking.endDate));
@@ -310,7 +313,7 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
   const saveMutation = useMutation({
     mutationFn: () =>
       api.put(`/api/bookings/${booking.id}`, {
-        title: title.trim(),
+        title: `${titleSyncMarkerRef.current}${title.trim()}`,
         description: description.trim() || undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
@@ -431,7 +434,7 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
       <div className="space-y-3 pt-3 border-t border-white/10">
         {showDelete ? (
           <DeleteConfirmInline
-            label={`"${booking.title}"`}
+            label={`"${internalBookingDisplayTitle(booking.title)}"`}
             onConfirm={() => deleteMutation.mutate()}
             onCancel={() => setShowDelete(false)}
           />
@@ -515,6 +518,7 @@ export function EditItemSheet({ item, onClose, venues, people }: EditItemSheetPr
           />
         ) : (
           <BookingForm
+            key={(raw as InternalBookingDetail).id}
             booking={raw as InternalBookingDetail}
             venues={venues}
             people={people}

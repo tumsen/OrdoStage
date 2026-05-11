@@ -9,6 +9,25 @@ import { durationMinutesBetween, normalizeTimeHHMM } from "@/lib/showTiming";
 
 export type BookingType = "rehearsal" | "maintenance" | "private" | "venue_booking" | "other";
 
+/** Prefix on mirrored internal bookings (`events.ts` / `staffing.ts`) so the API can find rows with `title startsWith`. */
+const INTERNAL_BOOKING_SYNC_TITLE_MARKER_RE =
+  /^\[(event-show-job|event-show-staffing):[^\]]+\]\s*/;
+
+/**
+ * Split the machine-readable sync prefix from the human-readable title. The prefix must stay in
+ * the stored `title` when updating mirrored rows so sync continues to match.
+ */
+export function splitInternalBookingSyncMarker(title: string): { marker: string; displayTitle: string } {
+  const m = title.match(INTERNAL_BOOKING_SYNC_TITLE_MARKER_RE);
+  if (!m?.[0]) return { marker: "", displayTitle: title };
+  return { marker: m[0], displayTitle: title.slice(m[0].length) };
+}
+
+/** Title for UI lists and calendar chips (hides `[event-show-job:…]` / `[event-show-staffing:…]`). */
+export function internalBookingDisplayTitle(title: string): string {
+  return splitInternalBookingSyncMarker(title).displayTitle;
+}
+
 export interface CalendarItem {
   id: string;
   title: string;
@@ -211,7 +230,7 @@ export function toCalendarItems(
 
   const bookingItems: CalendarItem[] = bookings.map((b) => ({
     id: b.id,
-    title: b.title,
+    title: internalBookingDisplayTitle(b.title),
     kind: "booking",
     type: b.type as BookingType,
     startDate: b.startDate,
