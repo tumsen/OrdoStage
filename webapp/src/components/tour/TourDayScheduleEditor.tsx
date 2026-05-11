@@ -189,26 +189,15 @@ export function TourDayScheduleEditor({
     <div className={cn("rounded-lg border border-white/10 bg-white/[0.02] px-2 py-2 sm:p-2.5", className)}>
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <p className="text-xs uppercase tracking-wide text-white/45 shrink-0">Day schedule</p>
-        <div className="flex flex-wrap gap-1.5 justify-end">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="border-white/10 text-white/80 h-8"
-            onClick={addRow}
-          >
-            <Plus size={13} className="mr-1" /> Add event
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="bg-emerald-900/50 hover:bg-emerald-800/60 text-emerald-100 border border-emerald-700/40 h-8"
-            disabled={saveMutation.isPending || drafts.length === 0}
-            onClick={() => saveMutation.mutate(drafts)}
-          >
-            {saveMutation.isPending ? "Saving…" : "Save schedule"}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          size="sm"
+          className="bg-emerald-900/50 hover:bg-emerald-800/60 text-emerald-100 border border-emerald-700/40 h-8 shrink-0"
+          disabled={saveMutation.isPending || drafts.length === 0}
+          onClick={() => saveMutation.mutate(drafts)}
+        >
+          {saveMutation.isPending ? "Saving…" : "Save schedule"}
+        </Button>
       </div>
       <p className="text-[10px] text-white/30 mt-1 mb-2 hidden sm:block">
         Start, end, and duration use the same controls as event show jobs (24h HH:mm).
@@ -286,6 +275,18 @@ export function TourDayScheduleEditor({
             </div>
           </div>
         ))}
+        <div className="flex flex-wrap items-center gap-2 py-2.5 min-w-0">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="border-white/10 text-white/80 h-8"
+            disabled={saveMutation.isPending}
+            onClick={addRow}
+          >
+            <Plus size={13} className="mr-1" /> Add event
+          </Button>
+        </div>
       </div>
       {saveMutation.isError ? (
         <p className="text-xs text-red-400">Could not save schedule. Check times are HH:mm.</p>
