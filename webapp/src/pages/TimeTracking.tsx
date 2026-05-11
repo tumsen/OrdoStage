@@ -1435,7 +1435,8 @@ export default function TimeTracking() {
               };
 
               return (
-                <div key={dayYmd} className="flex-1 min-w-[100px] border-l border-white/10 flex flex-col group">
+                <div key={dayYmd} className="flex-1 min-w-[100px] flex flex-col group">
+                  <div className="flex min-h-0 flex-1 flex-col border-l border-white/10">
                   <div
                     className={cn(
                       WEEK_GRID_HEADER_CLASS,
@@ -1878,7 +1879,8 @@ export default function TimeTracking() {
                         );
                       })}
                   </div>
-                  <div className="h-6 border-b border-white/15" />
+                  </div>
+                  <div className="h-6 shrink-0 border-b border-white/15" />
                 </div>
               );
             })}

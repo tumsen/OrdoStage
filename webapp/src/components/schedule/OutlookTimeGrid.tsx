@@ -946,7 +946,7 @@ export function OutlookTimeGrid({
         <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
           <div className="h-6 border-b border-white/15" />
           {days.map((day) => (
-            <div key={`pad-${day.toISOString()}`} className="h-6 border-l border-b border-white/15" />
+            <div key={`pad-${day.toISOString()}`} className="h-6 border-b border-white/15" />
           ))}
         </div>
       </div>
