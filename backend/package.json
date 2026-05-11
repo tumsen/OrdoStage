@@ -14,7 +14,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:prepare": "docker compose up -d && sleep 3 && prisma migrate deploy",
-    "db:migrate:railway": "bunx @railway/cli run -- bunx prisma migrate deploy"
+    "db:migrate:railway": "bunx @railway/cli ssh -s Backend -- sh -c 'cd /app && bunx prisma migrate deploy'"
   },
   "devDependencies": {
     "@types/bun": "latest",
