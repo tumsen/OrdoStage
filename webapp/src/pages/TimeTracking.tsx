@@ -60,6 +60,7 @@ import type {
   TimesheetApproval,
 } from "@/contracts/backendTypes";
 import type { Language, TimeFormat } from "@/lib/preferences";
+import { calendarDateKeyFromJobDate } from "@/lib/showTiming";
 import {
   MINUTES_PER_DAY,
   TIME_SNAP_MINUTES,
@@ -93,11 +94,43 @@ function plannedJobKeyFromEntry(e: TimeEntry): string | null {
   return null;
 }
 
+/**
+ * Tour jobs from the API encode `startTime` as wall-clock on the tour calendar day; the grid uses
+ * local `windowStartForColumnDay`. Rebuild start/end as local Date (same idea as tour calendar items).
+ */
+function tourPlannedRangeLocal(job: TimeTrackingJob): { start: Date; end: Date } | null {
+  if (job.source !== "tour") return null;
+  const dayKey = calendarDateKeyFromJobDate(
+    job.jobDate,
+    typeof job.showDate === "string" ? job.showDate.slice(0, 10) : ""
+  );
+  const [y, mo, d] = dayKey.split("-").map((x) => Number.parseInt(x, 10));
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
+  const tm = /^(\d{1,2}):(\d{2})/.exec(job.startTime.trim());
+  if (!tm) return null;
+  let hh = Number.parseInt(tm[1], 10);
+  let mm = Number.parseInt(tm[2], 10);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  hh = Math.min(23, Math.max(0, hh));
+  mm = Math.min(59, Math.max(0, mm));
+  const start = new Date(y, mo - 1, d, hh, mm, 0, 0);
+  const end = new Date(start.getTime() + Math.max(1, job.durationMinutes) * 60_000);
+  return { start, end };
+}
+
+function plannedJobDisplayRange(job: TimeTrackingJob): { start: Date; end: Date } {
+  const t = tourPlannedRangeLocal(job);
+  if (t) return t;
+  return { start: parseISO(job.plannedStartsAt), end: parseISO(job.plannedEndsAt) };
+}
+
 /** Tour schedule-event planned rows (`tourScheduleEventId`): hide dashed slot when a tour entry overlaps this window. */
 function tourPlannedSlotOverlapsTourEntry(job: TimeTrackingJob, entries: TimeEntry[] | undefined): boolean {
   if (!job.tourShowId) return false;
-  const js = parseISO(job.plannedStartsAt);
-  const je = parseISO(job.plannedEndsAt);
+  const range = tourPlannedRangeLocal(job);
+  if (!range) return false;
+  const js = range.start;
+  const je = range.end;
   for (const e of entries ?? []) {
     if (e.tourShowId !== job.tourShowId) continue;
     const es = parseISO(e.startsAt);
@@ -918,8 +951,8 @@ export default function TimeTracking() {
   const periodYear = format(anchor, "yyyy");
 
   function jumpToJobWeek(job: TimeTrackingJob) {
-    const d = parseISO(job.plannedStartsAt);
-    if (Number.isFinite(d.getTime())) setAnchor(d);
+    const { start } = plannedJobDisplayRange(job);
+    if (Number.isFinite(start.getTime())) setAnchor(start);
     setMode("week");
   }
 
@@ -945,9 +978,10 @@ export default function TimeTracking() {
     }
 
     if (isTourJob && tourShowId) {
+      const tr = tourPlannedRangeLocal(job);
       createEntry.mutate({
-        startsAt: job.plannedStartsAt,
-        endsAt: job.plannedEndsAt,
+        startsAt: tr ? tr.start.toISOString() : job.plannedStartsAt,
+        endsAt: tr ? tr.end.toISOString() : job.plannedEndsAt,
         kind: "job",
         tourShowId,
         ...(job.timeProjectId ? { timeProjectId: job.timeProjectId } : {}),
@@ -990,8 +1024,7 @@ export default function TimeTracking() {
   }
 
   function jobWindowMetrics(job: TimeTrackingJob, columnDayYmd: string) {
-    const start = parseISO(job.plannedStartsAt);
-    const end = parseISO(job.plannedEndsAt);
+    const { start, end } = plannedJobDisplayRange(job);
     const m = rangeMetricsInColumn(start, end, columnDayYmd, displayStartHour);
     if (!m) return { topPct: 0, heightPct: 0 };
     return { topPct: m.topPct, heightPct: Math.max(m.heightPct, 3) };
@@ -1255,8 +1288,9 @@ export default function TimeTracking() {
                 .filter((job) => !plannedJobIsLogged(job, entryByJobId, entries))
                 .map((job) => {
                 const inCurrentWeek = weekJobIds.has(job.id);
-                const dayLabel = format(parseISO(job.plannedStartsAt), "EEE d MMM");
-                const timeLabel = format(parseISO(job.plannedStartsAt), "HH:mm");
+                const disp = plannedJobDisplayRange(job);
+                const dayLabel = format(disp.start, "EEE d MMM");
+                const timeLabel = format(disp.start, "HH:mm");
                 return (
                   <li
                     key={`up-${job.id}`}
@@ -1473,11 +1507,10 @@ export default function TimeTracking() {
                       </>
                     ) : null}
                     {(jobs ?? [])
-                      .filter(
-                        (j) =>
-                          columnDayYmdForInstant(parseISO(j.plannedStartsAt), displayStartHour) ===
-                          dayYmd
-                      )
+                      .filter((j) => {
+                        const { start, end } = plannedJobDisplayRange(j);
+                        return rangeOverlapsColumnWindow(start, end, dayYmd, displayStartHour);
+                      })
                       .filter((j) => !plannedJobIsLogged(j, entryByJobId, entries))
                       .map((j) => {
                         const { topPct, heightPct } = jobWindowMetrics(j, dayYmd);

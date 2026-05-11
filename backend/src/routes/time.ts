@@ -299,6 +299,14 @@ function tourDayDurationMin(show: { type: string }): number {
   return DEFAULT_TOUR_JOB_DURATION_MIN;
 }
 
+/** Stable calendar anchor for API `jobDate` / `showDate` (matches tour `dayKey` semantics). */
+function tourJobDateIsoAnchor(show: { dayKey: string; date: Date }): string {
+  if (show.dayKey && /^\d{4}-\d{2}-\d{2}$/.test(show.dayKey.trim())) {
+    return `${show.dayKey.trim()}T12:00:00.000Z`;
+  }
+  return show.date.toISOString();
+}
+
 type PlanJobRow = {
   id: string;
   source: "event" | "event_staffing" | "tour" | "internal_booking";
@@ -324,6 +332,7 @@ type PlanJobRow = {
 function buildTourPlanJobRow(
   show: {
     id: string;
+    dayKey: string;
     type: string;
     date: Date;
     showTime: string | null;
@@ -338,7 +347,7 @@ function buildTourPlanJobRow(
   const title = tourDayTitle(show);
   const startHHMM = tourDayStartHHMM(show);
   const durationMinutes = tourDayDurationMin(show);
-  const jobDateIso = show.date.toISOString();
+  const jobDateIso = tourJobDateIsoAnchor(show);
   const plannedStart = toDateTimeFromDateAndTime(jobDateIso, startHHMM);
   const plannedEnd =
     plannedStart != null ? new Date(plannedStart.getTime() + durationMinutes * 60_000) : null;
@@ -375,6 +384,7 @@ function buildTourPlanJobRow(
 function buildTourScheduleEventPlanRow(
   show: {
     id: string;
+    dayKey: string;
     type: string;
     date: Date;
     showTime: string | null;
@@ -390,7 +400,7 @@ function buildTourScheduleEventPlanRow(
   const startHHMM = ev.startTime.trim();
   const endHHMM = ev.endTime.trim();
   const durationMinutes = durationMinutesFromHHMM(startHHMM, endHHMM);
-  const jobDateIso = show.date.toISOString();
+  const jobDateIso = tourJobDateIsoAnchor(show);
   const plannedStart = toDateTimeFromDateAndTime(jobDateIso, startHHMM);
   const plannedEnd =
     plannedStart != null ? new Date(plannedStart.getTime() + durationMinutes * 60_000) : null;
@@ -429,6 +439,7 @@ function buildTourScheduleEventPlanRow(
 function expandTourShowsToPlanJobRows(
   shows: {
     id: string;
+    dayKey: string;
     type: string;
     date: Date;
     showTime: string | null;
