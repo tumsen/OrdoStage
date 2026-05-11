@@ -44,6 +44,12 @@ export function tourShowHasScheduleTimeline(show: TourShowScheduleSource): boole
   return sortedTourScheduleEvents(show).length > 0;
 }
 
+/** True when the day lists an actual Show performance (kind `show`, or legacy show time column). */
+export function tourDayHasShowScheduleEntry(show: TourShowScheduleSource): boolean {
+  if ((show.scheduleEvents ?? []).some((e) => e.kind === "show")) return true;
+  return Boolean(normalizeTimeHHMM(show.showTime ?? ""));
+}
+
 /** Pill / sidebar time: show slot first, else earliest scheduled start. */
 export function tourShowPrimaryTime(show: TourShowScheduleSource): string | null {
   const evs = sortedTourScheduleEvents(show);

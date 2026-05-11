@@ -35,6 +35,7 @@ import {
   formatScheduleEventTimes,
   scheduleEventLabel,
   sortedTourScheduleEvents,
+  tourDayHasShowScheduleEntry,
   tourShowGetInTimeHHMM,
 } from "@/lib/tourScheduleDisplay";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
@@ -1474,9 +1475,11 @@ function ShowCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {show.type === "show" ? (
-                <Badge className="border border-emerald-500/35 bg-emerald-600/20 text-emerald-200 hover:bg-emerald-600/25">
-                  Show
-                </Badge>
+                tourDayHasShowScheduleEntry(show) ? (
+                  <Badge className="border border-emerald-500/35 bg-emerald-600/20 text-emerald-200 hover:bg-emerald-600/25">
+                    Show
+                  </Badge>
+                ) : null
               ) : show.type === "travel" ? (
                 <span className="text-xs font-semibold text-blue-400/80 uppercase tracking-wide">Travel Day</span>
               ) : (
