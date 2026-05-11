@@ -24,6 +24,7 @@ import type {
   TourShow,
 } from "../../../../backend/src/types";
 import { TourSameDayTimeFields } from "@/components/tour/TourSameDayTimeFields";
+import { scheduleFieldLabelClass } from "@/components/ScheduleTimeRow";
 import { cn } from "@/lib/utils";
 
 const KIND_OPTIONS: { value: TourScheduleEventKind; label: string }[] = [
@@ -175,19 +176,29 @@ export function TourDayScheduleEditor({
         {drafts.map((row, idx) => (
           <div
             key={`${idx}-${row.kind}-${row.sortOrder}`}
-            className="flex flex-wrap items-end gap-x-2 gap-y-2 py-2 first:pt-0 last:pb-0 min-w-0"
+            className="flex flex-wrap items-end gap-x-3 gap-y-3 py-2 first:pt-0 last:pb-0 min-w-0"
           >
-            <GripVertical className="h-4 w-4 text-white/15 shrink-0 hidden sm:block mb-1" aria-hidden />
-            <div className="flex flex-wrap items-end gap-2 flex-1 min-w-0">
-              <div className="w-[8.25rem] sm:w-[9rem] shrink-0">
-                <Label className="sr-only">Event type</Label>
+            <div className="hidden sm:flex flex-col gap-1.5 shrink-0 justify-end">
+              <span className={`${scheduleFieldLabelClass} invisible select-none`} aria-hidden>
+                ·
+              </span>
+              <GripVertical className="h-4 w-4 text-white/15 shrink-0" aria-hidden />
+            </div>
+            <div className="flex flex-wrap items-end gap-x-3 gap-y-3 flex-1 min-w-0">
+              <div className="flex flex-col gap-1.5 w-[8.25rem] sm:w-[9rem] shrink-0">
+                <Label htmlFor={`tour-day-sched-type-${idx}`} className={scheduleFieldLabelClass}>
+                  Type
+                </Label>
                 <Select
                   value={row.kind}
                   onValueChange={(v) =>
                     updateRow(idx, { kind: v as TourScheduleEventKind })
                   }
                 >
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white h-9 text-sm">
+                  <SelectTrigger
+                    id={`tour-day-sched-type-${idx}`}
+                    className="bg-white/5 border-white/10 text-white h-10 text-sm"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-[#16161f] border-white/10 text-white">
@@ -200,18 +211,20 @@ export function TourDayScheduleEditor({
                 </Select>
               </div>
               {row.kind === "custom" ? (
-                <div className="min-w-[6rem] flex-1 max-w-[12rem] shrink">
-                  <Label className="sr-only">Custom label</Label>
+                <div className="flex flex-col gap-1.5 min-w-[6rem] flex-1 max-w-[12rem] shrink">
+                  <Label htmlFor={`tour-day-sched-custom-${idx}`} className={scheduleFieldLabelClass}>
+                    Custom label
+                  </Label>
                   <Input
+                    id={`tour-day-sched-custom-${idx}`}
                     value={row.customLabel}
                     onChange={(e) => updateRow(idx, { customLabel: e.target.value })}
-                    placeholder="Label"
-                    className="bg-white/5 border-white/10 text-white h-9 text-sm"
+                    placeholder="e.g. Production meeting"
+                    className="bg-white/5 border-white/10 text-white h-10 text-sm"
                   />
                 </div>
               ) : null}
               <TourSameDayTimeFields
-                compact
                 className="flex-1 min-w-[min(100%,18rem)]"
                 dayKey={dayKey}
                 startValue={row.startValue}
@@ -220,16 +233,21 @@ export function TourDayScheduleEditor({
                 onEndChange={(v) => updateRow(idx, { endValue: v })}
               />
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-white/25 hover:text-red-400 shrink-0"
-              onClick={() => removeRow(idx)}
-              aria-label="Remove event"
-            >
-              <Trash2 size={15} />
-            </Button>
+            <div className="flex flex-col gap-1.5 shrink-0">
+              <span className={`${scheduleFieldLabelClass} invisible select-none`} aria-hidden>
+                ·
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 text-white/25 hover:text-red-400 shrink-0"
+                onClick={() => removeRow(idx)}
+                aria-label="Remove event"
+              >
+                <Trash2 size={15} />
+              </Button>
+            </div>
           </div>
         ))}
       </div>
