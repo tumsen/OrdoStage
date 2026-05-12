@@ -342,7 +342,11 @@ export function Layout({ children }: LayoutProps) {
         <WorkAnnouncementBar />
 
         {/* Page content */}
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15"
+        >
           {children}
         </main>
       </div>

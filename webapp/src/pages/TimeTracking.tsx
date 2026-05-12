@@ -1081,7 +1081,7 @@ export default function TimeTracking() {
     (upcomingJobs ?? []).some((j) => !plannedJobIsLogged(j, entryByJobId, entries));
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden p-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden p-6">
       <div className="shrink-0 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
