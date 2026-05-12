@@ -12,9 +12,9 @@ export const CALENDAR_PX_PER_HOUR = 36;
 /** Space above the midnight grid line (matches `h-6` footer strip under 24:00). */
 export const CALENDAR_TIME_GRID_TOP_PAD_PX = 24;
 
-/** Sticky header matches calendar card (`bg-white/[0.02]`); light blur limits bleed-through when scrolling. */
+/** Sticky header matches calendar card surface; avoid backdrop-blur (sticky + nested scroll can paint blank in WebKit). */
 export const CALENDAR_STICKY_HEADER_CHROME =
-  "sticky top-0 z-30 bg-white/[0.02] backdrop-blur-sm";
+  "sticky top-0 z-30 bg-white/[0.04]";
 
 /**
  * Which day column index contains `clientX` (based on each column’s bounding rect).

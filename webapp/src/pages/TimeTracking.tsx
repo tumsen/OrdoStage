@@ -1081,7 +1081,7 @@ export default function TimeTracking() {
     (upcomingJobs ?? []).some((j) => !plannedJobIsLogged(j, entryByJobId, entries));
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden p-6">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden p-6">
       <div className="shrink-0 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
@@ -1390,10 +1390,10 @@ export default function TimeTracking() {
           </div>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden pr-1">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
-            <div className="min-h-0 flex-1 overflow-auto">
-              <div className="min-w-[720px]">
+        <div className="flex min-h-0 flex-1 flex-col gap-6 pr-1">
+          {/* Single overflow-auto scroller like OutlookTimeGrid — nested overflow-hidden breaks sticky + can clip the grid. */}
+          <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-white/10 bg-white/[0.02]">
+            <div className="min-w-[720px]">
                 {/* One sticky band for the whole header row (same pattern as OutlookTimeGrid). */}
                 <div className={cn(CALENDAR_STICKY_HEADER_CHROME, "border-b border-white/10")}>
                   <div className="flex min-w-0">
@@ -1973,7 +1973,6 @@ export default function TimeTracking() {
                 </div>
               </div>
             </div>
-          </div>
 
           {canManageTimeCatalog && mode === "week" && section === "time" ? (
             <div className="mt-2 space-y-3">
