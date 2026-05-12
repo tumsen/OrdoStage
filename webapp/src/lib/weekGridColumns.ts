@@ -12,9 +12,9 @@ export const CALENDAR_PX_PER_HOUR = 36;
 /** Space above the midnight grid line (matches `h-6` footer strip under 24:00). */
 export const CALENDAR_TIME_GRID_TOP_PAD_PX = 24;
 
-/** Sticky header matches calendar card surface; avoid backdrop-blur (sticky + nested scroll can paint blank in WebKit). */
+/** Sticky day header: frosted blur over grid content scrolling underneath (Schedule + Time week). */
 export const CALENDAR_STICKY_HEADER_CHROME =
-  "sticky top-0 z-30 bg-white/[0.04]";
+  "sticky top-0 z-30 bg-white/[0.07] backdrop-blur-md backdrop-saturate-150";
 
 /**
  * Padded shell around the week/day grid — same panel as `Schedule.tsx` uses around
