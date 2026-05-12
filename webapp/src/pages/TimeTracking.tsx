@@ -96,6 +96,24 @@ const TOUR_PLAN_JOB_PREFIX = "tourshow:";
 const TOUR_EVENT_PREFIX = "tourevent:";
 const EVT_STAFF_PREFIX = "evtstaff:";
 const IBOOKP_PREFIX = "ibookp:";
+/** Same-origin path proxied in vite `server` + `preview` — works when `import.meta.env.DEV` is false (e.g. `vite preview`). */
+const DEBUG_AGENT_INGEST_PATH = "/__debug-agent-ingest/ingest/596710ac-b248-4cf9-9521-d29ec88abe8b";
+
+function shouldPostDebugAgentIngest(): boolean {
+  if (import.meta.env.DEV) return true;
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname;
+  return h === "localhost" || h === "127.0.0.1" || h === "[::1]";
+}
+
+function postDebugAgentIngest(payload: Record<string, unknown>) {
+  if (!shouldPostDebugAgentIngest()) return;
+  fetch(DEBUG_AGENT_INGEST_PATH, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "b39c79" },
+    body: JSON.stringify({ sessionId: "b39c79", timestamp: Date.now(), ...payload }),
+  }).catch(() => {});
+}
 
 function plannedJobKeyFromEntry(e: TimeEntry): string | null {
   if (e.eventShowJobId) return e.eventShowJobId;
@@ -1061,6 +1079,15 @@ export default function TimeTracking() {
   }
 
   if (!canUsePage) {
+    // #region agent log
+    postDebugAgentIngest({
+      location: "TimeTracking.tsx:earlyReturn",
+      message: "time page early exit",
+      data: { reason: "canUsePage_false" },
+      hypothesisId: "E",
+      runId: "pre-fix",
+    });
+    // #endregion
     return (
       <div className="p-6">
         <p className="text-white/60">{t("time.noAccess")}</p>
@@ -1069,6 +1096,15 @@ export default function TimeTracking() {
   }
 
   if (!mePerson?.id) {
+    // #region agent log
+    postDebugAgentIngest({
+      location: "TimeTracking.tsx:earlyReturn",
+      message: "time page early exit",
+      data: { reason: "no_mePerson_id" },
+      hypothesisId: "E",
+      runId: "pre-fix",
+    });
+    // #endregion
     return (
       <div className="p-6 max-w-lg">
         <h2 className="text-lg font-semibold text-white">{t("time.title")}</h2>
@@ -1085,6 +1121,24 @@ export default function TimeTracking() {
   const hasUpcomingUnlogged =
     mode === "week" &&
     (upcomingJobs ?? []).some((j) => !plannedJobIsLogged(j, entryByJobId, entries));
+
+  // #region agent log
+  {
+    const __b = section === "travel" ? "travel" : mode === "month" ? "month" : "week";
+    postDebugAgentIngest({
+      location: "TimeTracking.tsx:renderBranch",
+      message: "time main render branch",
+      data: {
+        branch: __b,
+        section,
+        mode,
+        hasUpcomingUnlogged,
+      },
+      hypothesisId: "A",
+      runId: "pre-fix",
+    });
+  }
+  // #endregion
 
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-4 p-4 md:p-6">
@@ -1328,6 +1382,19 @@ export default function TimeTracking() {
               <div
                 className={CALENDAR_GRID_SCROLLER_CLASS}
                 style={{ minHeight: "min(65dvh, 1200px)" }}
+                ref={(el) => {
+                  // #region agent log
+                  if (!el) return;
+                  const r = el.getBoundingClientRect();
+                  postDebugAgentIngest({
+                    location: "TimeTracking.tsx:weekScrollerRef",
+                    message: "week scroller mounted / layout",
+                    data: { w: r.width, h: r.height, top: r.top, left: r.left },
+                    hypothesisId: "C",
+                    runId: "pre-fix",
+                  });
+                  // #endregion
+                }}
               >
             <div className="min-w-[720px]">
                 <div className="shrink-0 border-b border-white/10 bg-white/[0.04]">

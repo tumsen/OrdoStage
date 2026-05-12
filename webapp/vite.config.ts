@@ -8,6 +8,14 @@ import path from "path";
  */
 const backendTypesEntry = path.resolve(__dirname, "./src/contracts/backendTypes.ts");
 
+const debugAgentIngestProxy = {
+  "/__debug-agent-ingest": {
+    target: "http://127.0.0.1:7311",
+    changeOrigin: true,
+    rewrite: (p: string) => p.replace(/^\/__debug-agent-ingest/, ""),
+  },
+} as const;
+
 // https://vitejs.dev/config/
 export default defineConfig({
   server: {
@@ -17,6 +25,11 @@ export default defineConfig({
     fs: {
       allow: [path.resolve(__dirname, "..")],
     },
+    // Dev: browser cannot always POST to http://127.0.0.1:7311 (mixed content / CORS). Proxy same-origin path.
+    proxy: { ...debugAgentIngestProxy },
+  },
+  preview: {
+    proxy: { ...debugAgentIngestProxy },
   },
   plugins: [react()],
   resolve: {
