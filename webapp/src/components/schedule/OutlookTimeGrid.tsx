@@ -11,13 +11,15 @@ import {
 } from "./scheduleUtils";
 import { usePreferences } from "@/hooks/usePreferences";
 import {
+  CALENDAR_GRID_SCROLLER_CLASS,
   CALENDAR_PX_PER_HOUR,
   CALENDAR_STICKY_HEADER_CHROME,
   CALENDAR_TIME_GRID_TOP_PAD_PX,
   findColumnIndexAtX,
   WEEK_GRID_MIN_DRAG_PX,
 } from "@/lib/weekGridColumns";
-import { formatGridBottomDecimalHours, formatWholeClockHourDecimal } from "@/lib/timeGrid";
+import { bottomBoundaryLabel, formatHourLabel } from "@/lib/timeGrid";
+import { cn } from "@/lib/utils";
 
 const HOUR_HEIGHT = CALENDAR_PX_PER_HOUR;
 const SNAP_MINUTES = 15;
@@ -151,7 +153,7 @@ export function OutlookTimeGrid({
   onToggleLock,
 }: OutlookTimeGridProps) {
   const { effective } = usePreferences();
-  const commaDec = effective?.language === "da" || effective?.language === "de";
+  const timeFormat = effective?.timeFormat === "12h" ? "12h" : "24h";
   const totalHeight = 24 * HOUR_HEIGHT;
   /** Outer column height: grid body + top inset (mirrors breathing room above bottom pad row). */
   const columnFrameHeight = totalHeight + CALENDAR_TIME_GRID_TOP_PAD_PX;
@@ -364,7 +366,7 @@ export function OutlookTimeGrid({
   };
 
   return (
-    <div className={`rounded-xl border border-white/10 bg-white/[0.02] overflow-auto ${className}`}>
+    <div className={cn(CALENDAR_GRID_SCROLLER_CLASS, className)}>
       <div className="min-w-[720px]">
         <div className={`${CALENDAR_STICKY_HEADER_CHROME} border-b border-white/10`}>
           {/* ── Day header row ──────────────────────────────────────────────── */}
@@ -461,16 +463,14 @@ export function OutlookTimeGrid({
               {hours.map((h) => (
                 <div
                   key={h}
-                  className="pointer-events-none absolute left-0 right-1 z-[1] flex -translate-y-1/2 flex-col items-end gap-0 text-right text-[9px] leading-[10px] text-white/50 tabular-nums"
+                  className="pointer-events-none absolute left-0 right-1 z-[1] flex -translate-y-1/2 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums"
                   style={{ top: h * HOUR_HEIGHT }}
                 >
-                  <span className="text-white/40">{formatWholeClockHourDecimal(h, commaDec)}</span>
-                  <span>{`${String(h).padStart(2, "0")}:00`}</span>
+                  {formatHourLabel(h, timeFormat)}
                 </div>
               ))}
-              <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 flex-col items-end gap-0 text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
-                <span className="text-white/40">{formatGridBottomDecimalHours(0, "24h", commaDec)}</span>
-                <span>24:00</span>
+              <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
+                {bottomBoundaryLabel(0, timeFormat)}
               </span>
             </div>
           </div>

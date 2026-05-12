@@ -79,7 +79,16 @@ import {
   rawWindowMinutesFromY,
   snapWindowMinutes,
 } from "@/lib/timeGrid";
-import { CALENDAR_PX_PER_HOUR, CALENDAR_TIME_GRID_TOP_PAD_PX, findColumnIndexAtX, WEEK_GRID_MIN_DRAG_PX } from "@/lib/weekGridColumns";
+import {
+  CALENDAR_GRID_SCROLLER_CLASS,
+  CALENDAR_PANEL_FLEX_COLUMN_CLASS,
+  CALENDAR_PANEL_SHELL_CLASS,
+  CALENDAR_PX_PER_HOUR,
+  CALENDAR_STICKY_HEADER_CHROME,
+  CALENDAR_TIME_GRID_TOP_PAD_PX,
+  findColumnIndexAtX,
+  WEEK_GRID_MIN_DRAG_PX,
+} from "@/lib/weekGridColumns";
 
 const WEEK_STARTS_ON = 1 as const;
 const PX_PER_HOUR = CALENDAR_PX_PER_HOUR;
@@ -1079,7 +1088,7 @@ export default function TimeTracking() {
     (upcomingJobs ?? []).some((j) => !plannedJobIsLogged(j, entryByJobId, entries));
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col gap-6 p-6">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-4 overflow-hidden p-4 md:p-6">
       <div className="shrink-0 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
@@ -1314,14 +1323,12 @@ export default function TimeTracking() {
           </div>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-6 pr-1">
-          {/* Non-sticky header: sticky + nested flex/overflow was collapsing the grid in production builds. */}
-          <div
-            className="min-h-0 flex-1 overflow-auto rounded-xl border border-white/10 bg-white/[0.02]"
-            style={{ minHeight: "clamp(320px, 56dvh, 1400px)" }}
-          >
+        <div className="flex min-h-0 flex-1 flex-col gap-4 pr-1">
+          <div className={CALENDAR_PANEL_SHELL_CLASS}>
+            <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
+              <div className={CALENDAR_GRID_SCROLLER_CLASS}>
             <div className="min-w-[720px]">
-                <div className="shrink-0 border-b border-white/10 bg-white/[0.04]">
+                <div className={cn(CALENDAR_STICKY_HEADER_CHROME, "border-b border-white/10")}>
                   <div className="flex min-w-0">
                     <div className={cn(WEEK_GRID_HEADER_CLASS, "w-14 shrink-0 border-b-0")} aria-hidden />
                     {weekDays.map((day) => {
@@ -1887,6 +1894,8 @@ export default function TimeTracking() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
           {hasUpcomingUnlogged ? (
             <div className="mt-2 shrink-0 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">

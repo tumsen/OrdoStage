@@ -17,6 +17,24 @@ export const CALENDAR_STICKY_HEADER_CHROME =
   "sticky top-0 z-30 bg-white/[0.04]";
 
 /**
+ * Padded shell around the week/day grid — same panel as `Schedule.tsx` uses around
+ * `OutlookTimeGrid` / other calendar views (single design with Time).
+ */
+export const CALENDAR_PANEL_SHELL_CLASS =
+  "min-h-0 flex-1 overflow-hidden rounded-xl p-3 md:p-4";
+
+/**
+ * Fills the shell so the bordered scroller can use `min-h-0 flex-1` (matches schedule week wrapper).
+ */
+export const CALENDAR_PANEL_FLEX_COLUMN_CLASS = "flex h-full min-h-0 flex-col";
+
+/**
+ * Bordered week/day scroller — same surface as `OutlookTimeGrid` root (`overflow-auto` + card chrome).
+ */
+export const CALENDAR_GRID_SCROLLER_CLASS =
+  "min-h-0 flex-1 overflow-auto rounded-xl border border-white/10 bg-white/[0.02]";
+
+/**
  * Which day column index contains `clientX` (based on each column’s bounding rect).
  * Falls back to `fallbackIndex` when the pointer is between columns or columns are missing.
  */

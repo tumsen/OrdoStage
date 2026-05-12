@@ -26,6 +26,7 @@ import {
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
+import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
 import { toast } from "@/hooks/use-toast";
 import { usePreferences } from "@/hooks/usePreferences";
 
@@ -513,7 +514,7 @@ export default function Schedule() {
       </div>
 
       {/* Calendar (inner views supply their own surface; no wrapper bg — avoids a lighter ring in the padding). */}
-      <div className="min-h-0 flex-1 overflow-hidden rounded-xl p-3 md:p-4">
+      <div className={CALENDAR_PANEL_SHELL_CLASS}>
         {isLoading ? (
           <div className="h-full overflow-auto space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -553,7 +554,7 @@ export default function Schedule() {
                 />
               </div>
             ) : viewMode === "week" || viewMode === "day" || viewMode === "next7" ? (
-              <div className="flex h-full min-h-0 flex-col">
+              <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
                 <OutlookTimeGrid
                   className="min-h-0 flex-1"
                   days={getRangeDays(viewMode, anchorDate)}
