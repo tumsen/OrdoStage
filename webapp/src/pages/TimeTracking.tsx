@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -84,6 +85,7 @@ import {
   CALENDAR_PANEL_FLEX_COLUMN_CLASS,
   CALENDAR_PANEL_SHELL_CLASS,
   CALENDAR_PX_PER_HOUR,
+  CALENDAR_STICKY_HEADER_CHROME,
   CALENDAR_TIME_GRID_TOP_PAD_PX,
   findColumnIndexAtX,
   WEEK_GRID_MIN_DRAG_PX,
@@ -259,6 +261,8 @@ export default function TimeTracking() {
   const [anchor, setAnchor] = useState(() => new Date());
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [upcomingCollapsed, setUpcomingCollapsed] = useState(true);
+  /** Collapsed by default so the week grid matches Schedule height (upcoming + catalog live here). */
+  const [weekBottomOpen, setWeekBottomOpen] = useState(false);
   const [displayStartHour, setDisplayStartHour] = useState(readDisplayStartHour);
   const displayStartHourRef = useRef(displayStartHour);
 
@@ -279,6 +283,10 @@ export default function TimeTracking() {
   const weekDayYmds = useMemo(
     () => weekDays.map((d) => format(d, "yyyy-MM-dd")),
     [weekDays]
+  );
+  const weekGridTemplateColumns = useMemo(
+    () => `56px repeat(${weekDays.length}, minmax(0, 1fr))`,
+    [weekDays.length]
   );
   const rangeFrom = format(mode === "week" ? weekStart : startOfMonth(anchor), "yyyy-MM-dd");
   const rangeTo = format(mode === "week" ? weekEnd : endOfMonth(anchor), "yyyy-MM-dd");
@@ -1087,7 +1095,14 @@ export default function TimeTracking() {
     (upcomingJobs ?? []).some((j) => !plannedJobIsLogged(j, entryByJobId, entries));
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-4 overflow-hidden p-4 md:p-6">
+    <div
+      className={cn(
+        "flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden",
+        mode === "week" && section === "time"
+          ? "gap-2 p-2 sm:p-3 md:p-4"
+          : "gap-4 p-4 md:p-6"
+      )}
+    >
       <div className="relative z-20 shrink-0 flex flex-col gap-4 bg-[#0a0a0f] pb-0 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
@@ -1322,17 +1337,17 @@ export default function TimeTracking() {
           </div>
         </div>
       ) : (
-        <div className="relative z-0 flex min-h-0 flex-1 flex-col gap-4 pr-1">
-          <div className={cn(CALENDAR_PANEL_SHELL_CLASS, "relative z-10 min-h-0")}>
+        <div className="relative z-0 flex min-h-0 flex-1 flex-col gap-2 pr-0.5">
+          <div className={CALENDAR_PANEL_SHELL_CLASS}>
             <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
-              <div
-                className={CALENDAR_GRID_SCROLLER_CLASS}
-                style={{ minHeight: "max(280px, min(58dvh, 1200px))" }}
-              >
+              <div className={CALENDAR_GRID_SCROLLER_CLASS}>
             <div className="min-w-[720px]">
-                <div className="shrink-0 border-b border-white/10 bg-white/[0.04]">
-                  <div className="flex min-w-0">
-                    <div className={cn(WEEK_GRID_HEADER_CLASS, "w-14 shrink-0 border-b-0")} aria-hidden />
+                <div className={cn(CALENDAR_STICKY_HEADER_CHROME, "border-b border-white/10")}>
+                  <div
+                    className="grid min-w-0"
+                    style={{ gridTemplateColumns: weekGridTemplateColumns }}
+                  >
+                    <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full border-b-0")} aria-hidden />
                     {weekDays.map((day) => {
                       const dayYmd = format(day, "yyyy-MM-dd");
                       const dayTotalMinutes = totalsByColumnDay.get(dayYmd) ?? 0;
@@ -1380,7 +1395,7 @@ export default function TimeTracking() {
                           className={cn(
                             "group",
                             WEEK_GRID_HEADER_CLASS,
-                            "min-w-0 flex-1 min-w-[100px] border-l border-white/10 text-xs text-white/70",
+                            "min-w-0 border-l border-white/10 text-xs text-white/70",
                             col?.bg,
                             col ? `border-b ${col.border}` : "border-b border-white/10"
                           )}
@@ -1439,32 +1454,34 @@ export default function TimeTracking() {
                   </div>
                 </div>
 
-                <div className="flex min-w-0">
-                  <div className="flex w-14 shrink-0 flex-col">
-                    <div className="relative box-border shrink-0" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
-                      <div
-                        className="absolute inset-x-0 flex flex-col border-r border-white/10"
-                        style={{
-                          top: CALENDAR_TIME_GRID_TOP_PAD_PX,
-                          height: COLUMN_HEIGHT_PX,
-                        }}
-                      >
-                {Array.from({ length: 24 }).map((_, i) => {
-                  const hour24 = (displayStartHour + i) % 24;
-                  return (
-                    <div key={i} className="relative flex-1 min-h-0">
-                      <span className="pointer-events-none absolute left-0 right-1 top-0 z-[1] flex -translate-y-1/2 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
-                        {formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h")}
+                <div
+                  className="grid min-w-0"
+                  style={{ gridTemplateColumns: weekGridTemplateColumns }}
+                >
+                  <div className="relative box-border" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
+                    <div
+                      className="pointer-events-none absolute inset-x-0 border-r border-white/10"
+                      style={{
+                        top: CALENDAR_TIME_GRID_TOP_PAD_PX,
+                        height: COLUMN_HEIGHT_PX,
+                      }}
+                    >
+                      {Array.from({ length: 24 }).map((_, h) => {
+                        const hour24 = (displayStartHour + h) % 24;
+                        return (
+                          <div
+                            key={h}
+                            className="pointer-events-none absolute left-0 right-1 z-[1] flex -translate-y-1/2 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums"
+                            style={{ top: h * PX_PER_HOUR }}
+                          >
+                            {formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h")}
+                          </div>
+                        );
+                      })}
+                      <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
+                        {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
                       </span>
                     </div>
-                  );
-                })}
-                <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
-                  {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
-                </span>
-                      </div>
-                    </div>
-                    <div className="h-6 shrink-0" />
                   </div>
             {weekDays.map((day, dayIndex) => {
               const dayYmd = format(day, "yyyy-MM-dd");
@@ -1484,7 +1501,7 @@ export default function TimeTracking() {
               return (
                 <div
                   key={dayYmd}
-                  className="group flex min-h-0 min-w-[100px] flex-1 flex-col border-l border-white/10"
+                  className="group relative min-h-0 min-w-0"
                 >
                   <div className="relative box-border" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
                   <div
@@ -1493,7 +1510,7 @@ export default function TimeTracking() {
                     }}
                     data-day-col={dayYmd}
                     className={cn(
-                      "absolute inset-x-0 flex flex-col border-l border-white/10",
+                      "absolute inset-x-0 touch-none select-none border-l border-white/10",
                       col?.bg
                     )}
                     style={{
@@ -1504,12 +1521,14 @@ export default function TimeTracking() {
                     {col && (
                       <div className={cn("absolute inset-0 z-0 pointer-events-none", col.bg)} />
                     )}
-                    <div className="absolute inset-0 z-0 flex flex-col pointer-events-none">
-                      {Array.from({ length: 24 }).map((_, i) => (
-                        <div key={i} className="flex-1 min-h-0 border-t border-white/[0.1]" />
-                      ))}
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1] pointer-events-none" />
+                    {Array.from({ length: 24 }).map((_, h) => (
+                      <div
+                        key={h}
+                        className="pointer-events-none absolute left-0 right-0 z-0 border-t border-white/[0.1]"
+                        style={{ top: h * PX_PER_HOUR }}
+                      />
+                    ))}
+                    <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1]" />
                     {canEditVisiblePeriod ? (
                       <>
                         <div
@@ -1885,12 +1904,15 @@ export default function TimeTracking() {
             })}
                 </div>
 
-                <div className="flex min-w-0">
-                  <div className="h-6 w-14 shrink-0" />
+                <div
+                  className="grid min-w-0"
+                  style={{ gridTemplateColumns: weekGridTemplateColumns }}
+                >
+                  <div className="h-6 shrink-0" />
                   {weekDays.map((day) => (
                     <div
                       key={`pad-${format(day, "yyyy-MM-dd")}`}
-                      className="h-6 min-w-[100px] flex-1 border-l border-white/10"
+                      className="h-6 shrink-0 border-l border-white/10"
                     />
                   ))}
                 </div>
@@ -1902,7 +1924,24 @@ export default function TimeTracking() {
           {(hasUpcomingUnlogged ||
             (canManageTimeCatalog && mode === "week" && section === "time") ||
             (canEditVisiblePeriod && mode === "week" && section === "time")) ? (
-            <div className="relative z-0 flex shrink-0 flex-col gap-3 max-h-[min(44vh,28rem)] overflow-y-auto overscroll-contain">
+            <Collapsible open={weekBottomOpen} onOpenChange={setWeekBottomOpen} className="shrink-0">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03]">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-white/85 hover:bg-white/[0.06]"
+                  >
+                    <span>{t("time.weekToolsExpand")}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 shrink-0 text-white/50 transition-transform",
+                        weekBottomOpen ? "rotate-180" : "rotate-0"
+                      )}
+                    />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="border-t border-white/10 px-3 pb-3 pt-2 data-[state=closed]:animate-out">
+                  <div className="max-h-[min(50dvh,32rem)] space-y-3 overflow-y-auto overscroll-contain pr-0.5">
           {hasUpcomingUnlogged ? (
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
@@ -1986,7 +2025,10 @@ export default function TimeTracking() {
           {canEditVisiblePeriod && mode === "week" && section === "time" ? (
             <p className="text-xs text-white/40">{t("time.dragHint")}</p>
           ) : null}
-            </div>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
           ) : null}
         </div>
       )}

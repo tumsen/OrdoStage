@@ -56,6 +56,7 @@ const en = {
     calendarWeekIso: "Week {{week}}",
     gridStartsAt: "Day starts",
     upcomingTitle: "Upcoming assigned jobs",
+    weekToolsExpand: "Upcoming jobs & catalog",
     upcomingHint: "Show jobs from today onward. Add one to your grid as a movable time block.",
     addToTime: "Add to Time",
     showWeek: "Go to week",
@@ -275,6 +276,7 @@ const da: DeepPartial<typeof en> = {
       "Træk på tom plads for at oprette en blok (snapper til 5 min). Træk blokke for at flytte; træk top eller bund for at ændre længde. Blyant: projekt, tidspunkter, kategori (fx rejsegodtgørsel), tags, note.",
     editTimePreciseHint:
       "Brug præcis tid (TT:MM), fx 07:24 for 7 t. 24 min. Træk på ugen snupper stadig til 5 minutter.",
+    weekToolsExpand: "Kommende jobs & katalog",
   },
   account: {
     title: "Konto",
@@ -355,6 +357,7 @@ const de: DeepPartial<typeof en> = {
   time: {
     editTimePreciseHint:
       "Beliebige Minute (HH:MM), z. B. 07:24 für 7h 24m. Ziehen in der Wochenansicht bleibt auf 5 Minuten gerastert.",
+    weekToolsExpand: "Anstehende Jobs & Katalog",
   },
   account: {
     title: "Konto",
