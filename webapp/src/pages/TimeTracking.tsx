@@ -68,8 +68,13 @@ import {
   bottomBoundaryLabel,
   clampMinutesToDay,
   columnDayYmdForInstant,
+  commaDecimalForLanguage,
   dateFromColumnAndWindowMinutes,
+  formatGridBottomDecimalHours,
   formatHourLabel,
+  formatOneDecimalHour,
+  formatTotalMinutesAsHHMM,
+  formatWholeClockHourDecimal,
   minutesFromWindowStart,
   rangeMetricsInColumn,
   rangeOverlapsColumnWindow,
@@ -233,6 +238,7 @@ function snapLocalClockToGrid(d: Date): Date {
 export default function TimeTracking() {
   const { t, language } = useI18n();
   const dfLocale = useMemo(() => dateFnsLocale(language), [language]);
+  const commaDec = useMemo(() => commaDecimalForLanguage(language), [language]);
   const queryClient = useQueryClient();
   const { effective } = usePreferences();
   const timeFormat: TimeFormat = effective?.timeFormat ?? "24h";
@@ -1352,70 +1358,192 @@ export default function TimeTracking() {
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 space-y-6 overflow-auto pr-1">
       {section === "travel" ? (
-        <TravelClaimsPanel
-          rangeFrom={rangeFrom}
-          rangeTo={rangeTo}
-          personQuery={personQs}
-          canEdit={canEditVisiblePeriod}
-          projects={projects ?? []}
-        />
-      ) : mode === "month" ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-          <CalendarGrid
-            year={anchor.getFullYear()}
-            month={anchor.getMonth()}
-            items={monthCalendarItems}
-            onItemClick={(item) => {
-              const day = dateFromISODate(item.startDate);
-              if (!day) return;
-              setAnchor(day);
-              setMode("week");
-            }}
-            onDateClick={(day) => {
-              setAnchor(day);
-              setMode("week");
-            }}
+        <div className="min-h-0 flex-1 overflow-auto pr-1">
+          <TravelClaimsPanel
+            rangeFrom={rangeFrom}
+            rangeTo={rangeTo}
+            personQuery={personQs}
+            canEdit={canEditVisiblePeriod}
+            projects={projects ?? []}
           />
         </div>
+      ) : mode === "month" ? (
+        <div className="min-h-0 flex-1 overflow-auto pr-1">
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+            <CalendarGrid
+              year={anchor.getFullYear()}
+              month={anchor.getMonth()}
+              items={monthCalendarItems}
+              onItemClick={(item) => {
+                const day = dateFromISODate(item.startDate);
+                if (!day) return;
+                setAnchor(day);
+                setMode("week");
+              }}
+              onDateClick={(day) => {
+                setAnchor(day);
+                setMode("week");
+              }}
+            />
+          </div>
+        </div>
       ) : (
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-auto">
-          <div className="flex min-w-[720px]">
-            <div className="w-14 shrink-0 flex flex-col">
-              <div
-                className={cn(WEEK_GRID_HEADER_CLASS, CALENDAR_STICKY_HEADER_CHROME, "w-full border-b-0")}
-                aria-hidden
-              />
-              <div className="relative box-border shrink-0" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
-                <div
-                  className="absolute inset-x-0 flex flex-col border-r border-white/10"
-                  style={{
-                    top: CALENDAR_TIME_GRID_TOP_PAD_PX,
-                    height: COLUMN_HEIGHT_PX,
-                  }}
-                >
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden pr-1">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
+            <div className="min-h-0 flex-1 overflow-auto">
+              <div className="min-w-[720px]">
+                {/* One sticky band for the whole header row (same pattern as OutlookTimeGrid). */}
+                <div className={cn(CALENDAR_STICKY_HEADER_CHROME, "border-b border-white/10")}>
+                  <div className="flex min-w-0">
+                    <div className={cn(WEEK_GRID_HEADER_CLASS, "w-14 shrink-0 border-b-0")} aria-hidden />
+                    {weekDays.map((day) => {
+                      const dayYmd = format(day, "yyyy-MM-dd");
+                      const dayTotalMinutes = totalsByColumnDay.get(dayYmd) ?? 0;
+                      const dayOffEntry = (entries ?? []).find(
+                        (e) =>
+                          (e.category === "vacation" || e.category === "sick" || e.category === "holiday") &&
+                          columnDayYmdForInstant(parseISO(e.startsAt), displayStartHour) === dayYmd
+                      );
+                      const dayOffCategory = dayOffEntry?.category ?? null;
+                      const dayOffColors: Record<string, { bg: string; text: string; border: string }> = {
+                        vacation: {
+                          bg: "bg-emerald-500/8",
+                          text: "text-emerald-300",
+                          border: "border-emerald-500/25",
+                        },
+                        sick: {
+                          bg: "bg-orange-500/8",
+                          text: "text-orange-300",
+                          border: "border-orange-500/25",
+                        },
+                        holiday: {
+                          bg: "bg-purple-500/8",
+                          text: "text-purple-300",
+                          border: "border-purple-500/25",
+                        },
+                      };
+                      const col = dayOffCategory ? dayOffColors[dayOffCategory] : null;
+
+                      const addDayOff = (category: "vacation" | "sick") => {
+                        if (!canEditVisiblePeriod) return;
+                        const [y, m, d] = dayYmd.split("-").map(Number);
+                        const startsAt = new Date(Date.UTC(y!, m! - 1, d!, 8, 0, 0));
+                        const endsAt = new Date(startsAt.getTime() + hoursPerWorkDay * 60 * 60 * 1000);
+                        createEntry.mutate({
+                          startsAt: startsAt.toISOString(),
+                          endsAt: endsAt.toISOString(),
+                          kind: "custom",
+                          category,
+                        });
+                      };
+
+                      return (
+                        <div
+                          key={dayYmd}
+                          className={cn(
+                            "group",
+                            WEEK_GRID_HEADER_CLASS,
+                            "min-w-0 flex-1 min-w-[100px] border-l border-white/10 text-xs text-white/70",
+                            col?.bg,
+                            col ? `border-b ${col.border}` : "border-b border-white/10"
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <div className="min-w-0 flex-1 text-left">
+                              <div
+                                className={cn(
+                                  "text-[11px] font-semibold leading-tight",
+                                  col ? col.text : "text-white"
+                                )}
+                              >
+                                {format(day, "EEEE", { locale: dfLocale })}
+                              </div>
+                              <div className="mt-1 text-[10px] text-white/60 leading-snug">
+                                {format(day, "d MMMM yyyy", { locale: dfLocale })}
+                              </div>
+                              <div className="mt-0.5 text-[10px] text-white/45 leading-snug tabular-nums">
+                                {t("time.calendarWeekIso", { week: getISOWeek(day) })}
+                              </div>
+                              <div className="text-[10px] text-white/40 leading-snug tabular-nums">
+                                {formatOneDecimalHour(dayTotalMinutes / 60, commaDec)}
+                                <span className="text-white/25"> · </span>
+                                {formatTotalMinutesAsHHMM(dayTotalMinutes)}
+                              </div>
+                            </div>
+                            {canEditVisiblePeriod && !dayOffEntry ? (
+                              <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                <button
+                                  type="button"
+                                  title={t("time.addVacationDay")}
+                                  onClick={() => addDayOff("vacation")}
+                                  className="rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-emerald-300/70 hover:bg-emerald-500/30 hover:text-emerald-200"
+                                >
+                                  V
+                                </button>
+                                <button
+                                  type="button"
+                                  title={t("time.addSickDay")}
+                                  onClick={() => addDayOff("sick")}
+                                  className="rounded bg-orange-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-orange-300/70 hover:bg-orange-500/30 hover:text-orange-200"
+                                >
+                                  S
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                          {dayOffEntry ? (
+                            <div className={cn("mt-1 text-[9px] font-medium capitalize", col?.text)}>
+                              {t(timeCategoryMessageId(dayOffEntry.category as TimeCategory) as never)}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex min-w-0">
+                  <div className="flex w-14 shrink-0 flex-col">
+                    <div className="relative box-border shrink-0" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
+                      <div
+                        className="absolute inset-x-0 flex flex-col border-r border-white/10"
+                        style={{
+                          top: CALENDAR_TIME_GRID_TOP_PAD_PX,
+                          height: COLUMN_HEIGHT_PX,
+                        }}
+                      >
                 {Array.from({ length: 24 }).map((_, i) => {
                   const hour24 = (displayStartHour + i) % 24;
-                  const label = formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h");
                   return (
                     <div key={i} className="relative flex-1 min-h-0">
-                      <span className="absolute left-0 right-1 top-0 z-[1] -translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
-                        {label}
+                      <span className="pointer-events-none absolute left-0 right-1 top-0 z-[1] flex -translate-y-1/2 flex-col items-end gap-0 text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
+                        <span className="text-white/40">
+                          {formatWholeClockHourDecimal(hour24, commaDec)}
+                        </span>
+                        <span>{formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h")}</span>
                       </span>
                     </div>
                   );
                 })}
-                <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1 text-right text-[10px] leading-[10px] text-white/50 tabular-nums pointer-events-none">
-                  {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
+                <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 flex-col items-end gap-0 text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
+                  <span className="text-white/40">
+                    {formatGridBottomDecimalHours(
+                      displayStartHour,
+                      timeFormat === "24h" ? "24h" : "12h",
+                      commaDec
+                    )}
+                  </span>
+                  <span>
+                    {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
+                  </span>
                 </span>
-                </div>
-              </div>
-              <div className="h-6 shrink-0" />
-            </div>
+                      </div>
+                    </div>
+                    <div className="h-6 shrink-0" />
+                  </div>
             {weekDays.map((day, dayIndex) => {
               const dayYmd = format(day, "yyyy-MM-dd");
-              const dayTotalMinutes = totalsByColumnDay.get(dayYmd) ?? 0;
               const dayOffEntry = (entries ?? []).find(
                 (e) =>
                   (e.category === "vacation" || e.category === "sick" || e.category === "holiday") &&
@@ -1429,79 +1557,11 @@ export default function TimeTracking() {
               };
               const col = dayOffCategory ? dayOffColors[dayOffCategory] : null;
 
-              const addDayOff = (category: "vacation" | "sick") => {
-                if (!canEditVisiblePeriod) return;
-                // Start at 09:00 UTC for the day, span hoursPerWorkDay
-                const [y, m, d] = dayYmd.split("-").map(Number);
-                const startsAt = new Date(Date.UTC(y!, m! - 1, d!, 8, 0, 0));
-                const endsAt = new Date(startsAt.getTime() + hoursPerWorkDay * 60 * 60 * 1000);
-                createEntry.mutate({
-                  startsAt: startsAt.toISOString(),
-                  endsAt: endsAt.toISOString(),
-                  kind: "custom",
-                  category,
-                });
-              };
-
               return (
-                <div key={dayYmd} className="flex-1 min-w-[100px] flex flex-col group">
-                  <div className="flex min-h-0 flex-1 flex-col">
-                  <div
-                    className={cn(
-                      WEEK_GRID_HEADER_CLASS,
-                      CALENDAR_STICKY_HEADER_CHROME,
-                      "border-l border-white/10 text-xs text-white/70",
-                      col?.bg,
-                      col ? `border-b ${col.border}` : "border-b border-white/10"
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-1">
-                      <div className="min-w-0 flex-1 text-left">
-                        <div
-                          className={cn(
-                            "text-[11px] font-semibold leading-tight",
-                            col ? col.text : "text-white"
-                          )}
-                        >
-                          {format(day, "EEEE", { locale: dfLocale })}
-                        </div>
-                        <div className="text-[10px] text-white/60 leading-snug mt-1">
-                          {format(day, "d MMMM yyyy", { locale: dfLocale })}
-                        </div>
-                        <div className="text-[10px] text-white/45 leading-snug mt-0.5 tabular-nums">
-                          {t("time.calendarWeekIso", { week: getISOWeek(day) })}
-                        </div>
-                        <div className="text-[10px] text-white/40 leading-snug tabular-nums">
-                          {Math.round((dayTotalMinutes / 60) * 10) / 10}h
-                        </div>
-                      </div>
-                      {canEditVisiblePeriod && !dayOffEntry ? (
-                        <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            type="button"
-                            title={t("time.addVacationDay")}
-                            onClick={() => addDayOff("vacation")}
-                            className="text-[9px] font-bold px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-300/70 hover:bg-emerald-500/30 hover:text-emerald-200 leading-none"
-                          >
-                            V
-                          </button>
-                          <button
-                            type="button"
-                            title={t("time.addSickDay")}
-                            onClick={() => addDayOff("sick")}
-                            className="text-[9px] font-bold px-1 py-0.5 rounded bg-orange-500/15 text-orange-300/70 hover:bg-orange-500/30 hover:text-orange-200 leading-none"
-                          >
-                            S
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                    {dayOffEntry ? (
-                      <div className={cn("text-[9px] font-medium mt-1 capitalize", col?.text)}>
-                        {t(timeCategoryMessageId(dayOffEntry.category as TimeCategory) as never)}
-                      </div>
-                    ) : null}
-                  </div>
+                <div
+                  key={dayYmd}
+                  className="group flex min-h-0 min-w-[100px] flex-1 flex-col border-l border-white/10"
+                >
                   <div className="relative box-border" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
                   <div
                     ref={(el) => {
@@ -1896,25 +1956,35 @@ export default function TimeTracking() {
                       })}
                   </div>
                   </div>
-                  <div className="h-6 shrink-0" />
-                  </div>
                 </div>
               );
             })}
+                </div>
+
+                <div className="flex min-w-0">
+                  <div className="h-6 w-14 shrink-0" />
+                  {weekDays.map((day) => (
+                    <div
+                      key={`pad-${format(day, "yyyy-MM-dd")}`}
+                      className="h-6 min-w-[100px] flex-1 border-l border-white/10"
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
+
+          {canManageTimeCatalog && mode === "week" && section === "time" ? (
+            <div className="mt-2 space-y-3">
+              <TimeCatalogSettings />
+            </div>
+          ) : null}
+
+          {canEditVisiblePeriod && mode === "week" && section === "time" ? (
+            <p className="text-xs text-white/40">{t("time.dragHint")}</p>
+          ) : null}
         </div>
       )}
-
-      {canManageTimeCatalog && mode === "week" && section === "time" ? (
-        <div className="mt-8 space-y-3">
-          <TimeCatalogSettings />
-        </div>
-      ) : null}
-
-      {canEditVisiblePeriod && mode === "week" && section === "time" ? (
-        <p className="text-xs text-white/40">{t("time.dragHint")}</p>
-      ) : null}
-      </div>
 
       <TimeEntryEditSheet
         entry={editingEntry}
