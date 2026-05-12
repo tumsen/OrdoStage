@@ -70,11 +70,9 @@ import {
   columnDayYmdForInstant,
   commaDecimalForLanguage,
   dateFromColumnAndWindowMinutes,
-  formatGridBottomDecimalHours,
   formatHourLabel,
   formatOneDecimalHour,
   formatTotalMinutesAsHHMM,
-  formatWholeClockHourDecimal,
   minutesFromWindowStart,
   rangeMetricsInColumn,
   rangeOverlapsColumnWindow,
@@ -1284,80 +1282,6 @@ export default function TimeTracking() {
         </div>
       </div>
 
-      {section === "time" && hasUpcomingUnlogged ? (
-        <div className="shrink-0 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-white">{t("time.upcomingTitle")}</p>
-              <p className="text-xs text-white/45 mt-0.5">{t("time.upcomingHint")}</p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-white/60 hover:text-white"
-              onClick={() => setUpcomingCollapsed((v) => !v)}
-            >
-              <ChevronDown
-                className={cn(
-                  "h-4 w-4 transition-transform",
-                  upcomingCollapsed ? "-rotate-90" : "rotate-0"
-                )}
-              />
-            </Button>
-          </div>
-          {upcomingCollapsed ? null : (
-            <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {(upcomingJobs ?? [])
-                .filter((job) => !plannedJobIsLogged(job, entryByJobId, entries))
-                .map((job) => {
-                const inCurrentWeek = weekJobIds.has(job.id);
-                const disp = plannedJobDisplayRange(job);
-                const dayLabel = format(disp.start, "EEE d MMM");
-                const timeLabel = format(disp.start, "HH:mm");
-                return (
-                  <li
-                    key={`up-${job.id}`}
-                    className="flex flex-wrap items-center gap-2 justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-white/90 font-medium truncate">
-                        {internalBookingDisplayTitle(job.title)}
-                      </div>
-                      <div className="text-[11px] text-white/45 truncate">
-                        {internalBookingDisplayTitle(job.eventTitle)} · {dayLabel} {timeLabel}
-                        {inCurrentWeek ? ` · ${t("time.inThisWeek")}` : null}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 gap-1.5">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="border-white/15 text-white/80 h-8 text-xs"
-                        onClick={() => jumpToJobWeek(job)}
-                      >
-                        {t("time.showWeek")}
-                      </Button>
-                      {canEditVisiblePeriod ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-8 text-xs bg-emerald-700 hover:bg-emerald-600"
-                          onClick={() => addJobToTime(job)}
-                        >
-                          {t("time.addToTime")}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      ) : null}
-
       <div className="flex min-h-0 flex-1 flex-col">
       {section === "travel" ? (
         <div className="min-h-0 flex-1 overflow-auto pr-1">
@@ -1520,26 +1444,14 @@ export default function TimeTracking() {
                   const hour24 = (displayStartHour + i) % 24;
                   return (
                     <div key={i} className="relative flex-1 min-h-0">
-                      <span className="pointer-events-none absolute left-0 right-1 top-0 z-[1] flex -translate-y-1/2 flex-col items-end gap-0 text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
-                        <span className="text-white/40">
-                          {formatWholeClockHourDecimal(hour24, commaDec)}
-                        </span>
-                        <span>{formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h")}</span>
+                      <span className="pointer-events-none absolute left-0 right-1 top-0 z-[1] flex -translate-y-1/2 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
+                        {formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h")}
                       </span>
                     </div>
                   );
                 })}
-                <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 flex-col items-end gap-0 text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
-                  <span className="text-white/40">
-                    {formatGridBottomDecimalHours(
-                      displayStartHour,
-                      timeFormat === "24h" ? "24h" : "12h",
-                      commaDec
-                    )}
-                  </span>
-                  <span>
-                    {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
-                  </span>
+                <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
+                  {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
                 </span>
                       </div>
                     </div>
@@ -1975,6 +1887,80 @@ export default function TimeTracking() {
                 </div>
               </div>
             </div>
+
+          {hasUpcomingUnlogged ? (
+            <div className="mt-2 shrink-0 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-white">{t("time.upcomingTitle")}</p>
+                  <p className="text-xs text-white/45 mt-0.5">{t("time.upcomingHint")}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-white/60 hover:text-white"
+                  onClick={() => setUpcomingCollapsed((v) => !v)}
+                >
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 transition-transform",
+                      upcomingCollapsed ? "-rotate-90" : "rotate-0"
+                    )}
+                  />
+                </Button>
+              </div>
+              {upcomingCollapsed ? null : (
+                <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {(upcomingJobs ?? [])
+                    .filter((job) => !plannedJobIsLogged(job, entryByJobId, entries))
+                    .map((job) => {
+                    const inCurrentWeek = weekJobIds.has(job.id);
+                    const disp = plannedJobDisplayRange(job);
+                    const dayLabel = format(disp.start, "EEE d MMM");
+                    const timeLabel = format(disp.start, "HH:mm");
+                    return (
+                      <li
+                        key={`up-${job.id}`}
+                        className="flex flex-wrap items-center gap-2 justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-white/90 font-medium truncate">
+                            {internalBookingDisplayTitle(job.title)}
+                          </div>
+                          <div className="text-[11px] text-white/45 truncate">
+                            {internalBookingDisplayTitle(job.eventTitle)} · {dayLabel} {timeLabel}
+                            {inCurrentWeek ? ` · ${t("time.inThisWeek")}` : null}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="border-white/15 text-white/80 h-8 text-xs"
+                            onClick={() => jumpToJobWeek(job)}
+                          >
+                            {t("time.showWeek")}
+                          </Button>
+                          {canEditVisiblePeriod ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 text-xs bg-emerald-700 hover:bg-emerald-600"
+                              onClick={() => addJobToTime(job)}
+                            >
+                              {t("time.addToTime")}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          ) : null}
 
           {canManageTimeCatalog && mode === "week" && section === "time" ? (
             <div className="mt-2 space-y-3">
