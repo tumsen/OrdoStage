@@ -1323,11 +1323,11 @@ export default function TimeTracking() {
         </div>
       ) : (
         <div className="relative z-0 flex min-h-0 flex-1 flex-col gap-4 pr-1">
-          <div className={cn(CALENDAR_PANEL_SHELL_CLASS, "relative z-0 min-h-0")}>
+          <div className={cn(CALENDAR_PANEL_SHELL_CLASS, "relative z-10 min-h-0")}>
             <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
               <div
                 className={CALENDAR_GRID_SCROLLER_CLASS}
-                style={{ minHeight: "max(320px, min(70dvh, 1200px))" }}
+                style={{ minHeight: "max(280px, min(58dvh, 1200px))" }}
               >
             <div className="min-w-[720px]">
                 <div className="shrink-0 border-b border-white/10 bg-white/[0.04]">
@@ -1899,8 +1899,12 @@ export default function TimeTracking() {
             </div>
           </div>
 
+          {(hasUpcomingUnlogged ||
+            (canManageTimeCatalog && mode === "week" && section === "time") ||
+            (canEditVisiblePeriod && mode === "week" && section === "time")) ? (
+            <div className="relative z-0 flex shrink-0 flex-col gap-3 max-h-[min(44vh,28rem)] overflow-y-auto overscroll-contain">
           {hasUpcomingUnlogged ? (
-            <div className="mt-2 shrink-0 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-white">{t("time.upcomingTitle")}</p>
@@ -1922,7 +1926,7 @@ export default function TimeTracking() {
                 </Button>
               </div>
               {upcomingCollapsed ? null : (
-                <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                <ul className="space-y-2 pr-1">
                   {(upcomingJobs ?? [])
                     .filter((job) => !plannedJobIsLogged(job, entryByJobId, entries))
                     .map((job) => {
@@ -1974,13 +1978,15 @@ export default function TimeTracking() {
           ) : null}
 
           {canManageTimeCatalog && mode === "week" && section === "time" ? (
-            <div className="mt-2 space-y-3">
+            <div className="space-y-3">
               <TimeCatalogSettings />
             </div>
           ) : null}
 
           {canEditVisiblePeriod && mode === "week" && section === "time" ? (
             <p className="text-xs text-white/40">{t("time.dragHint")}</p>
+          ) : null}
+            </div>
           ) : null}
         </div>
       )}
