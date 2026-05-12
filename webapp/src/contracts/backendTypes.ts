@@ -995,6 +995,8 @@ export const TimeEntrySchema = z.object({
   timeProjectId: z.string().nullable(),
   note: z.string().nullable(),
   isLocked: z.boolean(),
+  /** Shared id for rows carved from one drag; metadata PATCH syncs across the group. */
+  segmentGroupId: z.string().nullable(),
   tagIds: z.array(z.string()),
   createdAt: z.string(),
   updatedAt: z.string(),

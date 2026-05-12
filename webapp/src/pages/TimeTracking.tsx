@@ -455,6 +455,7 @@ export default function TimeTracking() {
         timeProjectId: body.timeProjectId != null ? (body.timeProjectId as string) : null,
         note: body.note != null ? (body.note as string) : null,
         isLocked: body.isLocked === true,
+        segmentGroupId: null,
         tagIds: Array.isArray(body.tagIds) ? (body.tagIds as string[]) : [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

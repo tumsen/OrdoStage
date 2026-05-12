@@ -911,6 +911,8 @@ model TimeEntry {
   note           String?
   /** True when entry is locked from edits/deletes until explicitly unlocked. */
   isLocked       Boolean      @default(false)
+  /** Shared id for segments split from one logical block (overlap carve); metadata PATCH syncs across the group. */
+  segmentGroupId String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   tagLinks       TimeEntryTag[]
@@ -923,6 +925,7 @@ model TimeEntry {
   @@index([eventShowStaffingId])
   @@index([internalBookingPersonId])
   @@index([organizationId, category])
+  @@index([organizationId, personId, segmentGroupId])
 }
 
 model TimeEntryTag {

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
@@ -833,14 +834,20 @@ async function computeNonOverlappingSpans(args: {
   startsAt: Date;
   endsAt: Date;
   excludeEntryId?: string;
+  /** Treat other rows in this group as non-blocking (disjoint segments of one logical entry). */
+  excludeSegmentGroupId?: string | null;
 }): Promise<TimeSpan[]> {
+  const notOr: Array<{ id: string } | { segmentGroupId: string }> = [];
+  if (args.excludeEntryId) notOr.push({ id: args.excludeEntryId });
+  if (args.excludeSegmentGroupId) notOr.push({ segmentGroupId: args.excludeSegmentGroupId });
+
   const overlaps = await prisma.timeEntry.findMany({
     where: {
       organizationId: args.organizationId,
       personId: args.personId,
       startsAt: { lt: args.endsAt },
       endsAt: { gt: args.startsAt },
-      ...(args.excludeEntryId ? { id: { not: args.excludeEntryId } } : {}),
+      ...(notOr.length ? { NOT: { OR: notOr } } : {}),
     },
     select: { startsAt: true, endsAt: true },
     orderBy: { startsAt: "asc" },
@@ -849,6 +856,54 @@ async function computeNonOverlappingSpans(args: {
     { startsAt: args.startsAt, endsAt: args.endsAt },
     overlaps.map((o) => ({ startsAt: o.startsAt, endsAt: o.endsAt }))
   );
+}
+
+function segmentGroupIdAfterSplit(
+  spansLength: number,
+  existingSegmentGroupId: string | null | undefined
+): string | null {
+  if (spansLength <= 1) return existingSegmentGroupId ?? null;
+  return existingSegmentGroupId ?? randomUUID();
+}
+
+async function propagateTimeEntrySegmentMetadata(args: {
+  organizationId: string;
+  personId: string;
+  segmentGroupId: string;
+  excludeEntryId: string;
+  category: string;
+  timeProjectId: string | null;
+  note: string | null;
+  isLocked: boolean;
+  eventId: string | null;
+  tagIds: string[];
+}) {
+  const siblings = await prisma.timeEntry.findMany({
+    where: {
+      organizationId: args.organizationId,
+      personId: args.personId,
+      segmentGroupId: args.segmentGroupId,
+      id: { not: args.excludeEntryId },
+    },
+    select: { id: true, isLocked: true },
+  });
+  for (const s of siblings) {
+    if (s.isLocked) continue;
+    await prisma.timeEntry.update({
+      where: { id: s.id },
+      data: {
+        category: args.category,
+        timeProjectId: args.timeProjectId,
+        note: args.note,
+        isLocked: args.isLocked,
+        eventId: args.eventId,
+        tagLinks: {
+          deleteMany: {},
+          createMany: { data: args.tagIds.map((timeTagId) => ({ timeTagId })) },
+        },
+      },
+    });
+  }
 }
 
 async function resolveTargetPersonId(
@@ -934,6 +989,7 @@ function serializeEntry(row: {
   timeProjectId: string | null;
   note: string | null;
   isLocked: boolean;
+  segmentGroupId: string | null;
   createdAt: Date;
   updatedAt: Date;
   tagLinks: { timeTagId: string }[];
@@ -957,6 +1013,7 @@ function serializeEntry(row: {
     timeProjectId: row.timeProjectId,
     note: row.note,
     isLocked: row.isLocked,
+    segmentGroupId: row.segmentGroupId,
     tagIds: row.tagLinks.map((t) => t.timeTagId),
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
@@ -2098,6 +2155,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           startsAt,
           endsAt,
           excludeEntryId: existingTour.id,
+          excludeSegmentGroupId: existingTour.segmentGroupId,
         });
         if (spans.length === 0) {
           return c.json(
@@ -2112,6 +2170,8 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             409
           );
         }
+        const nextGroupId = segmentGroupIdAfterSplit(spans.length, existingTour.segmentGroupId);
+        const segmentGroupPatch = nextGroupId != null ? { segmentGroupId: nextGroupId } : {};
         const updated = await prisma.timeEntry.update({
           where: { id: existingTour.id },
           data: {
@@ -2129,6 +2189,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             eventShowStaffingId: null,
             internalBookingPersonId: null,
             internalBookingDayKey: null,
+            ...segmentGroupPatch,
             tagLinks: {
               deleteMany: {},
               createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) },
@@ -2157,6 +2218,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
                 timeProjectId: resolvedProjectId,
                 note: body.note ?? null,
                 isLocked: body.isLocked ?? false,
+                ...segmentGroupPatch,
                 tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
               },
             });
@@ -2184,6 +2246,8 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           409
         );
       }
+      const nextGroupIdNewTour = segmentGroupIdAfterSplit(spans.length, undefined);
+      const segmentGroupPatchNewTour = nextGroupIdNewTour != null ? { segmentGroupId: nextGroupIdNewTour } : {};
       const created = await prisma.timeEntry.create({
         data: {
           organizationId: user.organizationId,
@@ -2203,6 +2267,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           timeProjectId: resolvedProjectId,
           note: body.note ?? null,
           isLocked: body.isLocked ?? false,
+          ...segmentGroupPatchNewTour,
           tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
         },
         include: { tagLinks: { select: { timeTagId: true } } },
@@ -2228,6 +2293,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
               timeProjectId: resolvedProjectId,
               note: body.note ?? null,
               isLocked: body.isLocked ?? false,
+              ...segmentGroupPatchNewTour,
               tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
             },
           });
@@ -2320,6 +2386,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           startsAt,
           endsAt,
           excludeEntryId: existingStaff.id,
+          excludeSegmentGroupId: existingStaff.segmentGroupId,
         });
         if (spans.length === 0) {
           return c.json(
@@ -2334,6 +2401,8 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             409
           );
         }
+        const nextGroupIdStaff = segmentGroupIdAfterSplit(spans.length, existingStaff.segmentGroupId);
+        const segmentGroupPatchStaff = nextGroupIdStaff != null ? { segmentGroupId: nextGroupIdStaff } : {};
         const updated = await prisma.timeEntry.update({
           where: { id: existingStaff.id },
           data: {
@@ -2344,6 +2413,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             note: body.note ?? null,
             isLocked: body.isLocked ?? false,
             tourScheduleEventId: null,
+            ...segmentGroupPatchStaff,
             tagLinks: {
               deleteMany: {},
               createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) },
@@ -2358,6 +2428,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
                 ...spillData,
                 startsAt: s.startsAt,
                 endsAt: s.endsAt,
+                ...segmentGroupPatchStaff,
                 tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
               },
             });
@@ -2385,6 +2456,8 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           409
         );
       }
+      const nextGroupIdNewStaff = segmentGroupIdAfterSplit(spans.length, undefined);
+      const segmentGroupPatchNewStaff = nextGroupIdNewStaff != null ? { segmentGroupId: nextGroupIdNewStaff } : {};
       const created = await prisma.timeEntry.create({
         data: {
           organizationId: user.organizationId,
@@ -2404,6 +2477,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           timeProjectId: resolvedProjectId,
           note: body.note ?? null,
           isLocked: body.isLocked ?? false,
+          ...segmentGroupPatchNewStaff,
           tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
         },
         include: { tagLinks: { select: { timeTagId: true } } },
@@ -2415,6 +2489,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
               ...spillData,
               startsAt: s.startsAt,
               endsAt: s.endsAt,
+              ...segmentGroupPatchNewStaff,
               tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
             },
           });
@@ -2501,6 +2576,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           startsAt,
           endsAt,
           excludeEntryId: existingIb.id,
+          excludeSegmentGroupId: existingIb.segmentGroupId,
         });
         if (spans.length === 0) {
           return c.json(
@@ -2515,6 +2591,8 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             409
           );
         }
+        const nextGroupIdIb = segmentGroupIdAfterSplit(spans.length, existingIb.segmentGroupId);
+        const segmentGroupPatchIb = nextGroupIdIb != null ? { segmentGroupId: nextGroupIdIb } : {};
         const updated = await prisma.timeEntry.update({
           where: { id: existingIb.id },
           data: {
@@ -2525,6 +2603,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             note: body.note ?? null,
             isLocked: body.isLocked ?? false,
             tourScheduleEventId: null,
+            ...segmentGroupPatchIb,
             tagLinks: {
               deleteMany: {},
               createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) },
@@ -2539,6 +2618,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
                 ...spillIb,
                 startsAt: s.startsAt,
                 endsAt: s.endsAt,
+                ...segmentGroupPatchIb,
                 tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
               },
             });
@@ -2566,6 +2646,8 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           409
         );
       }
+      const nextGroupIdNewIb = segmentGroupIdAfterSplit(spans.length, undefined);
+      const segmentGroupPatchNewIb = nextGroupIdNewIb != null ? { segmentGroupId: nextGroupIdNewIb } : {};
       const created = await prisma.timeEntry.create({
         data: {
           organizationId: user.organizationId,
@@ -2585,6 +2667,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           timeProjectId: resolvedProjectId,
           note: body.note ?? null,
           isLocked: body.isLocked ?? false,
+          ...segmentGroupPatchNewIb,
           tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
         },
         include: { tagLinks: { select: { timeTagId: true } } },
@@ -2596,6 +2679,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
               ...spillIb,
               startsAt: s.startsAt,
               endsAt: s.endsAt,
+              ...segmentGroupPatchNewIb,
               tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
             },
           });
@@ -2639,6 +2723,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         startsAt,
         endsAt,
         excludeEntryId: existing.id,
+        excludeSegmentGroupId: existing.segmentGroupId,
       });
       if (spans.length === 0) {
         return c.json(
@@ -2653,6 +2738,8 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           409
         );
       }
+      const nextGroupIdJob = segmentGroupIdAfterSplit(spans.length, existing.segmentGroupId);
+      const segmentGroupPatchJob = nextGroupIdJob != null ? { segmentGroupId: nextGroupIdJob } : {};
       const updated = await prisma.timeEntry.update({
         where: { id: existing.id },
         data: {
@@ -2666,6 +2753,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           internalBookingPersonId: null,
           internalBookingDayKey: null,
           tourScheduleEventId: null,
+          ...segmentGroupPatchJob,
           tagLinks: {
             deleteMany: {},
             createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) },
@@ -2694,6 +2782,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
               timeProjectId: body.timeProjectId ?? null,
               note: body.note ?? null,
               isLocked: body.isLocked ?? false,
+              ...segmentGroupPatchJob,
               tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
             },
           });
@@ -2721,6 +2810,8 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         409
       );
     }
+    const nextGroupIdNewJob = segmentGroupIdAfterSplit(spans.length, undefined);
+    const segmentGroupPatchNewJob = nextGroupIdNewJob != null ? { segmentGroupId: nextGroupIdNewJob } : {};
     const created = await prisma.timeEntry.create({
       data: {
         organizationId: user.organizationId,
@@ -2740,6 +2831,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         timeProjectId: body.timeProjectId ?? null,
         note: body.note ?? null,
         isLocked: body.isLocked ?? false,
+        ...segmentGroupPatchNewJob,
         tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
       },
       include: { tagLinks: { select: { timeTagId: true } } },
@@ -2765,6 +2857,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             timeProjectId: body.timeProjectId ?? null,
             note: body.note ?? null,
             isLocked: body.isLocked ?? false,
+            ...segmentGroupPatchNewJob,
             tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
           },
         });
@@ -2846,6 +2939,8 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       409
     );
   }
+  const nextGroupIdCustom = segmentGroupIdAfterSplit(spans.length, undefined);
+  const segmentGroupPatchCustom = nextGroupIdCustom != null ? { segmentGroupId: nextGroupIdCustom } : {};
   const created = await prisma.timeEntry.create({
     data: {
       organizationId: user.organizationId,
@@ -2865,6 +2960,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       timeProjectId: body.timeProjectId ?? null,
       note: body.note ?? null,
       isLocked: body.isLocked ?? false,
+      ...segmentGroupPatchCustom,
       tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
     },
     include: { tagLinks: { select: { timeTagId: true } } },
@@ -2890,6 +2986,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           timeProjectId: body.timeProjectId ?? null,
           note: body.note ?? null,
           isLocked: body.isLocked ?? false,
+          ...segmentGroupPatchCustom,
           tagLinks: { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } },
         },
       });
@@ -3179,6 +3276,7 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
     startsAt,
     endsAt,
     excludeEntryId: existing.id,
+    excludeSegmentGroupId: existing.segmentGroupId,
   });
   if (spans.length === 0) {
     return c.json(
@@ -3193,6 +3291,9 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
       409
     );
   }
+
+  const nextGroupIdPatch = segmentGroupIdAfterSplit(spans.length, existing.segmentGroupId);
+  const segmentGroupPatchPatch = nextGroupIdPatch != null ? { segmentGroupId: nextGroupIdPatch } : {};
 
   const updated = await prisma.timeEntry.update({
     where: { id },
@@ -3211,6 +3312,7 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
       timeProjectId: finalProjectId,
       note: finalNote,
       isLocked: finalIsLocked,
+      ...segmentGroupPatchPatch,
       tagLinks: {
         deleteMany: {},
         createMany: { data: finalTagIds.map((timeTagId) => ({ timeTagId })) },
@@ -3239,11 +3341,36 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
           timeProjectId: finalProjectId,
           note: finalNote,
           isLocked: finalIsLocked,
+          ...segmentGroupPatchPatch,
           tagLinks: { createMany: { data: finalTagIds.map((timeTagId) => ({ timeTagId })) } },
         },
       });
     }
   }
+
+  const touchesLinkedSegmentMetadata =
+    body.category !== undefined ||
+    body.timeProjectId !== undefined ||
+    body.note !== undefined ||
+    body.isLocked !== undefined ||
+    body.tagIds !== undefined ||
+    body.eventId !== undefined;
+
+  if (updated.segmentGroupId && touchesLinkedSegmentMetadata) {
+    await propagateTimeEntrySegmentMetadata({
+      organizationId: user.organizationId,
+      personId: existing.personId,
+      segmentGroupId: updated.segmentGroupId,
+      excludeEntryId: updated.id,
+      category: finalCategory,
+      timeProjectId: finalProjectId,
+      note: finalNote,
+      isLocked: finalIsLocked,
+      eventId: finalEventId,
+      tagIds: finalTagIds,
+    });
+  }
+
   return c.json({ data: serializeEntry(updated) });
 });
 
