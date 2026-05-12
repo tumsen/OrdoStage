@@ -345,9 +345,12 @@ export function Layout({ children }: LayoutProps) {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15"
         >
-          {children}
+          {/* Inner scroll so routed pages can use flex-1 + min-h-0 without fighting overflow-y-auto on main. */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            {children}
+          </div>
         </main>
       </div>
     </div>
