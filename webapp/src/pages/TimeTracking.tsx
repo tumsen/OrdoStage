@@ -1894,10 +1894,10 @@ export default function TimeTracking() {
                     />
                   ))}
                 </div>
+            </div>
               </div>
             </div>
           </div>
-        </div>
 
           {hasUpcomingUnlogged ? (
             <div className="mt-2 shrink-0 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
