@@ -397,20 +397,33 @@ export default function TimeTracking() {
       const previous = queryClient.getQueriesData<TimeEntry[]>({ queryKey: ["time-entries"] });
       queryClient.setQueriesData<TimeEntry[]>({ queryKey: ["time-entries"] }, (old) => {
         if (!old) return old;
+        const target = old.find((x) => x.id === variables.id);
+        const groupId = target?.segmentGroupId ?? null;
+        const b = variables.body;
+        const metaPatch = {
+          ...(b.note !== undefined ? { note: b.note } : {}),
+          ...(b.timeProjectId !== undefined ? { timeProjectId: b.timeProjectId } : {}),
+          ...(b.tagIds !== undefined ? { tagIds: b.tagIds } : {}),
+          ...(b.category !== undefined
+            ? { category: b.category as TimeEntry["category"] }
+            : {}),
+          ...(b.isLocked !== undefined ? { isLocked: b.isLocked } : {}),
+        };
         return old.map((x) => {
+          if (groupId && x.segmentGroupId === groupId) {
+            return {
+              ...x,
+              ...(x.id === variables.id && b.startsAt !== undefined ? { startsAt: b.startsAt } : {}),
+              ...(x.id === variables.id && b.endsAt !== undefined ? { endsAt: b.endsAt } : {}),
+              ...metaPatch,
+            };
+          }
           if (x.id !== variables.id) return x;
-          const b = variables.body;
           return {
             ...x,
             ...(b.startsAt !== undefined ? { startsAt: b.startsAt } : {}),
             ...(b.endsAt !== undefined ? { endsAt: b.endsAt } : {}),
-            ...(b.note !== undefined ? { note: b.note } : {}),
-            ...(b.timeProjectId !== undefined ? { timeProjectId: b.timeProjectId } : {}),
-            ...(b.tagIds !== undefined ? { tagIds: b.tagIds } : {}),
-            ...(b.category !== undefined
-              ? { category: b.category as TimeEntry["category"] }
-              : {}),
-            ...(b.isLocked !== undefined ? { isLocked: b.isLocked } : {}),
+            ...metaPatch,
           };
         });
       });

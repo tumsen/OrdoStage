@@ -887,22 +887,27 @@ async function propagateTimeEntrySegmentMetadata(args: {
     },
     select: { id: true, isLocked: true },
   });
-  for (const s of siblings) {
-    if (s.isLocked) continue;
-    await prisma.timeEntry.update({
-      where: { id: s.id },
-      data: {
-        category: args.category,
-        timeProjectId: args.timeProjectId,
-        note: args.note,
-        isLocked: args.isLocked,
-        eventId: args.eventId,
-        tagLinks: {
-          deleteMany: {},
-          createMany: { data: args.tagIds.map((timeTagId) => ({ timeTagId })) },
+  const tagCreates = args.tagIds.map((timeTagId) => ({ timeTagId }));
+  const updates = siblings
+    .filter((s) => !s.isLocked)
+    .map((s) =>
+      prisma.timeEntry.update({
+        where: { id: s.id },
+        data: {
+          category: args.category,
+          timeProjectId: args.timeProjectId,
+          note: args.note,
+          isLocked: args.isLocked,
+          eventId: args.eventId,
+          tagLinks:
+            tagCreates.length > 0
+              ? { deleteMany: {}, createMany: { data: tagCreates } }
+              : { deleteMany: {} },
         },
-      },
-    });
+      })
+    );
+  if (updates.length > 0) {
+    await prisma.$transaction(updates);
   }
 }
 
@@ -3356,11 +3361,12 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
     body.tagIds !== undefined ||
     body.eventId !== undefined;
 
-  if (updated.segmentGroupId && touchesLinkedSegmentMetadata) {
+  const segmentGroupForPropagate = updated.segmentGroupId ?? existing.segmentGroupId;
+  if (segmentGroupForPropagate && touchesLinkedSegmentMetadata) {
     await propagateTimeEntrySegmentMetadata({
       organizationId: user.organizationId,
       personId: existing.personId,
-      segmentGroupId: updated.segmentGroupId,
+      segmentGroupId: segmentGroupForPropagate,
       excludeEntryId: updated.id,
       category: finalCategory,
       timeProjectId: finalProjectId,
