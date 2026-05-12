@@ -246,7 +246,7 @@ export function TravelClaimsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 sm:p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-white">Travel allowance</h3>
@@ -262,7 +262,7 @@ export function TravelClaimsPanel({
 
         {canEdit ? (
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <div>
                 <Label className="text-xs text-white/50">Start</Label>
                 <Input
@@ -345,7 +345,7 @@ export function TravelClaimsPanel({
                 </Select>
               </div>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div>
                 <Label className="text-xs text-white/50">Purpose</Label>
                 <Textarea
@@ -355,12 +355,12 @@ export function TravelClaimsPanel({
                   className="mt-1 min-h-20 border-white/10 bg-white/5 text-white"
                 />
               </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
                 <p className="text-xs font-semibold text-white">SKAT eligibility</p>
-                <p className="mt-1 text-[11px] text-white/45">
+                <p className="mt-0.5 text-[10px] text-white/45 leading-snug">
                   All positive conditions must be true. If one fails, the tax-free amount calculates to 0.
                 </p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
                   {[
                     ["isTemporaryWorkplace", "Temporary workplace"],
                     ["hasUsualResidence", "Usual residence"],
@@ -397,55 +397,86 @@ export function TravelClaimsPanel({
                 ) : null}
               </div>
 
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                <div className="flex items-start justify-between gap-3">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2 sm:p-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2 px-0.5">
                   <div>
                     <p className="text-xs font-semibold text-white">Day by day tour details</p>
-                    <p className="mt-1 text-[11px] text-white/45">
-                      Add the city, hotel, and covered meals for each travel day. These rows drive the meal and lodging calculation.
+                    <p className="mt-0.5 text-[10px] text-white/45 leading-snug">
+                      One row per travel day — city, hotel, and covered meals drive SKAT meal/lodging reductions.
                     </p>
                   </div>
-                  <p className="shrink-0 text-[11px] text-white/35">{draft.dayLines.length} days</p>
+                  <p className="shrink-0 text-[10px] text-white/35">{draft.dayLines.length} days</p>
                 </div>
-                <div className="mt-3 space-y-3">
-                  {draft.dayLines.map((line) => (
-                    <div key={line.date} className="rounded-lg border border-white/10 bg-black/10 p-3">
-                      <p className="text-xs font-medium text-white">{format(parseISO(line.date), "EEE d MMM yyyy")}</p>
-                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                        <Input
-                          value={line.city}
-                          onChange={(e) => updateDayLine(line.date, { city: e.target.value })}
-                          placeholder="City"
-                          className="border-white/10 bg-white/5 text-white"
-                        />
-                        <Input
-                          value={line.hotel}
-                          onChange={(e) => updateDayLine(line.date, { hotel: e.target.value })}
-                          placeholder="Hotel / lodging"
-                          className="border-white/10 bg-white/5 text-white"
-                        />
-                      </div>
-                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                        {[
-                          ["breakfastProvided", "Breakfast covered"],
-                          ["lunchProvided", "Lunch covered"],
-                          ["dinnerProvided", "Dinner covered"],
-                          ["lodgingCovered", "Free lodging"],
-                          ["lodgingByReceipt", "Lodging by receipt"],
-                        ].map(([key, label]) => (
-                          <label key={key} className="flex items-center gap-2 text-xs text-white/65">
-                            <Checkbox
-                              checked={Boolean(line[key as keyof TravelDayLine])}
-                              onCheckedChange={(checked) =>
-                                updateDayLine(line.date, { [key]: checked === true } as Partial<TravelDayLine>)
-                              }
+                <div className="mt-2 overflow-x-auto rounded-md border border-white/10">
+                  <table className="w-full min-w-[36rem] border-collapse text-left text-[11px]">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-black/25 text-[10px] font-medium uppercase tracking-wide text-white/40">
+                        <th className="whitespace-nowrap px-2 py-1.5">Date</th>
+                        <th className="min-w-[6rem] px-1 py-1.5">City</th>
+                        <th className="min-w-[6rem] px-1 py-1.5">Hotel</th>
+                        <th className="w-8 px-0.5 py-1.5 text-center" title="Breakfast covered">
+                          B
+                        </th>
+                        <th className="w-8 px-0.5 py-1.5 text-center" title="Lunch covered">
+                          L
+                        </th>
+                        <th className="w-8 px-0.5 py-1.5 text-center" title="Dinner covered">
+                          D
+                        </th>
+                        <th className="w-8 px-0.5 py-1.5 text-center" title="Free lodging">
+                          H
+                        </th>
+                        <th className="w-8 px-0.5 py-1.5 text-center" title="Lodging by receipt">
+                          R
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {draft.dayLines.map((line) => (
+                        <tr key={line.date} className="border-t border-white/10 hover:bg-white/[0.02]">
+                          <td className="whitespace-nowrap px-2 py-1 text-white/70 tabular-nums">
+                            {format(parseISO(line.date), "EEE d MMM")}
+                          </td>
+                          <td className="p-1">
+                            <Input
+                              value={line.city}
+                              onChange={(e) => updateDayLine(line.date, { city: e.target.value })}
+                              placeholder="City"
+                              className="h-7 border-white/10 bg-white/5 px-2 py-0 text-[11px] text-white"
                             />
-                            {label}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                          </td>
+                          <td className="p-1">
+                            <Input
+                              value={line.hotel}
+                              onChange={(e) => updateDayLine(line.date, { hotel: e.target.value })}
+                              placeholder="Hotel"
+                              className="h-7 border-white/10 bg-white/5 px-2 py-0 text-[11px] text-white"
+                            />
+                          </td>
+                          {(
+                            [
+                              "breakfastProvided",
+                              "lunchProvided",
+                              "dinnerProvided",
+                              "lodgingCovered",
+                              "lodgingByReceipt",
+                            ] as const
+                          ).map((key) => (
+                            <td key={key} className="p-0.5 text-center align-middle">
+                              <div className="flex justify-center">
+                                <Checkbox
+                                  checked={Boolean(line[key])}
+                                  onCheckedChange={(checked) =>
+                                    updateDayLine(line.date, { [key]: checked === true } as Partial<TravelDayLine>)
+                                  }
+                                />
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
@@ -497,59 +528,71 @@ export function TravelClaimsPanel({
           </div>
         ) : (
           (claims ?? []).map((claim) => (
-            <div key={claim.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-white">{claim.destination}</p>
-                  <p className="mt-0.5 text-xs text-white/45">
-                    {format(parseISO(claim.startsAt), "d MMM yyyy HH:mm")} - {format(parseISO(claim.endsAt), "d MMM yyyy HH:mm")}
+            <div key={claim.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-white">{claim.destination}</p>
+                  <p className="mt-0.5 text-[11px] text-white/45">
+                    {format(parseISO(claim.startsAt), "d MMM yyyy HH:mm")} –{" "}
+                    {format(parseISO(claim.endsAt), "d MMM yyyy HH:mm")}
                   </p>
-                  <p className="mt-2 text-sm text-white/70">{claim.purpose}</p>
-                  {claim.notes ? <p className="mt-1 text-xs text-white/45">{claim.notes}</p> : null}
-                  <p className="mt-2 text-[11px] text-white/40">
-                    Rate year {claim.rateYear} · Meals rate {money(claim.foodRateCents)}/day · Lodging rate {money(claim.lodgingRateCents)}/day
+                  <p className="mt-1 line-clamp-2 text-xs text-white/65">{claim.purpose}</p>
+                  {claim.notes ? (
+                    <p className="mt-1 line-clamp-2 text-[11px] text-white/40">{claim.notes}</p>
+                  ) : null}
+                  <p className="mt-1.5 text-[10px] text-white/35 leading-snug">
+                    Rate year {claim.rateYear} · Meals {money(claim.foodRateCents)}/day · Lodging{" "}
+                    {money(claim.lodgingRateCents)}/day
                   </p>
                   {claim.totalAmountCents === 0 ? (
-                    <p className="mt-1 text-[11px] text-amber-200/80">
-                      Calculated as 0 because the trip does not meet all tax-free SKAT conditions or selected allowances are excluded.
+                    <p className="mt-1 text-[10px] text-amber-200/80 leading-snug">
+                      Calculated as 0 — trip may not meet all tax-free SKAT conditions or selected allowances are
+                      excluded.
                     </p>
                   ) : null}
                   {claim.dayLines.length > 0 ? (
-                    <div className="mt-3 overflow-hidden rounded-lg border border-white/10">
-                      <div className="grid grid-cols-[6rem_1fr_1fr_8rem] gap-2 bg-white/[0.03] px-2 py-1.5 text-[10px] uppercase tracking-wide text-white/35">
-                        <span>Date</span>
-                        <span>City</span>
-                        <span>Hotel</span>
-                        <span>Covered</span>
-                      </div>
-                      {claim.dayLines.map((line) => {
-                        const covered = [
-                          line.breakfastProvided ? "B" : null,
-                          line.lunchProvided ? "L" : null,
-                          line.dinnerProvided ? "D" : null,
-                          line.lodgingCovered ? "free hotel" : null,
-                          line.lodgingByReceipt ? "hotel receipt" : null,
-                        ].filter(Boolean);
-                        return (
-                          <div
-                            key={line.date}
-                            className="grid grid-cols-[6rem_1fr_1fr_8rem] gap-2 border-t border-white/10 px-2 py-1.5 text-[11px] text-white/60"
-                          >
-                            <span>{format(parseISO(line.date), "d MMM")}</span>
-                            <span>{line.city || "-"}</span>
-                            <span>{line.hotel || "-"}</span>
-                            <span>{covered.length > 0 ? covered.join(", ") : "None"}</span>
-                          </div>
-                        );
-                      })}
+                    <div className="mt-2 overflow-x-auto rounded-md border border-white/10">
+                      <table className="w-full min-w-[28rem] border-collapse text-left text-[11px]">
+                        <thead>
+                          <tr className="border-b border-white/10 bg-black/25 text-[10px] font-medium uppercase tracking-wide text-white/40">
+                            <th className="whitespace-nowrap px-2 py-1">Date</th>
+                            <th className="min-w-[5rem] px-1 py-1">City</th>
+                            <th className="min-w-[5rem] px-1 py-1">Hotel</th>
+                            <th className="px-2 py-1">Covered</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {claim.dayLines.map((line) => {
+                            const covered = [
+                              line.breakfastProvided ? "B" : null,
+                              line.lunchProvided ? "L" : null,
+                              line.dinnerProvided ? "D" : null,
+                              line.lodgingCovered ? "H" : null,
+                              line.lodgingByReceipt ? "R" : null,
+                            ].filter(Boolean);
+                            return (
+                              <tr key={line.date} className="border-t border-white/10 text-white/65">
+                                <td className="whitespace-nowrap px-2 py-0.5 tabular-nums">
+                                  {format(parseISO(line.date), "EEE d MMM")}
+                                </td>
+                                <td className="max-w-[10rem] truncate px-1 py-0.5">{line.city || "—"}</td>
+                                <td className="max-w-[10rem] truncate px-1 py-0.5">{line.hotel || "—"}</td>
+                                <td className="px-2 py-0.5 text-white/50">
+                                  {covered.length > 0 ? covered.join(" ") : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   ) : null}
                 </div>
-                <div className="flex items-start gap-2">
-                  <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
-                    <p className="text-[10px] uppercase tracking-wide text-white/35">Total</p>
+                <div className="flex shrink-0 items-start gap-2">
+                  <div className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1.5 text-right">
+                    <p className="text-[9px] uppercase tracking-wide text-white/35">Total</p>
                     <p className="text-sm font-semibold text-white">{money(claim.totalAmountCents)}</p>
-                    <p className="mt-1 text-[10px] text-white/40">
+                    <p className="mt-0.5 text-[9px] text-white/40 leading-tight">
                       Meals {money(claim.foodAmountCents)} · Lodging {money(claim.lodgingAmountCents)}
                     </p>
                   </div>
