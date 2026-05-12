@@ -84,7 +84,6 @@ import {
   CALENDAR_PANEL_FLEX_COLUMN_CLASS,
   CALENDAR_PANEL_SHELL_CLASS,
   CALENDAR_PX_PER_HOUR,
-  CALENDAR_STICKY_HEADER_CHROME,
   CALENDAR_TIME_GRID_TOP_PAD_PX,
   findColumnIndexAtX,
   WEEK_GRID_MIN_DRAG_PX,
@@ -1088,7 +1087,7 @@ export default function TimeTracking() {
     (upcomingJobs ?? []).some((j) => !plannedJobIsLogged(j, entryByJobId, entries));
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-4 overflow-hidden p-4 md:p-6">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-4 p-4 md:p-6">
       <div className="shrink-0 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
@@ -1326,9 +1325,12 @@ export default function TimeTracking() {
         <div className="flex min-h-0 flex-1 flex-col gap-4 pr-1">
           <div className={CALENDAR_PANEL_SHELL_CLASS}>
             <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
-              <div className={CALENDAR_GRID_SCROLLER_CLASS}>
+              <div
+                className={CALENDAR_GRID_SCROLLER_CLASS}
+                style={{ minHeight: "min(65dvh, 1200px)" }}
+              >
             <div className="min-w-[720px]">
-                <div className={cn(CALENDAR_STICKY_HEADER_CHROME, "border-b border-white/10")}>
+                <div className="shrink-0 border-b border-white/10 bg-white/[0.04]">
                   <div className="flex min-w-0">
                     <div className={cn(WEEK_GRID_HEADER_CLASS, "w-14 shrink-0 border-b-0")} aria-hidden />
                     {weekDays.map((day) => {
