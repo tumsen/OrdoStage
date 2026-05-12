@@ -1088,7 +1088,7 @@ export default function TimeTracking() {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-4 overflow-hidden p-4 md:p-6">
-      <div className="shrink-0 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="relative z-20 shrink-0 flex flex-col gap-4 bg-[#0a0a0f] pb-0 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
         </div>
@@ -1290,7 +1290,7 @@ export default function TimeTracking() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col">
       {section === "travel" ? (
         <div className="min-h-0 flex-1 overflow-auto pr-1">
           <TravelClaimsPanel
@@ -1322,12 +1322,12 @@ export default function TimeTracking() {
           </div>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-4 pr-1">
-          <div className={CALENDAR_PANEL_SHELL_CLASS}>
+        <div className="relative z-0 flex min-h-0 flex-1 flex-col gap-4 pr-1">
+          <div className={cn(CALENDAR_PANEL_SHELL_CLASS, "relative z-0 min-h-0")}>
             <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
               <div
                 className={CALENDAR_GRID_SCROLLER_CLASS}
-                style={{ minHeight: "min(65dvh, 1200px)" }}
+                style={{ minHeight: "max(320px, min(70dvh, 1200px))" }}
               >
             <div className="min-w-[720px]">
                 <div className="shrink-0 border-b border-white/10 bg-white/[0.04]">
