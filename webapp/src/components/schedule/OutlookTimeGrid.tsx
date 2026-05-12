@@ -17,6 +17,7 @@ import {
   findColumnIndexAtX,
   WEEK_GRID_MIN_DRAG_PX,
 } from "@/lib/weekGridColumns";
+import { formatGridBottomDecimalHours, formatWholeClockHourDecimal } from "@/lib/timeGrid";
 
 const HOUR_HEIGHT = CALENDAR_PX_PER_HOUR;
 const SNAP_MINUTES = 15;
@@ -150,6 +151,7 @@ export function OutlookTimeGrid({
   onToggleLock,
 }: OutlookTimeGridProps) {
   const { effective } = usePreferences();
+  const commaDec = effective?.language === "da" || effective?.language === "de";
   const totalHeight = 24 * HOUR_HEIGHT;
   /** Outer column height: grid body + top inset (mirrors breathing room above bottom pad row). */
   const columnFrameHeight = totalHeight + CALENDAR_TIME_GRID_TOP_PAD_PX;
@@ -459,14 +461,16 @@ export function OutlookTimeGrid({
               {hours.map((h) => (
                 <div
                   key={h}
-                  className="absolute left-0 right-1 z-[1] -translate-y-1/2 text-right text-[10px] leading-[10px] text-white/50 tabular-nums"
+                  className="pointer-events-none absolute left-0 right-1 z-[1] flex -translate-y-1/2 flex-col items-end gap-0 text-right text-[9px] leading-[10px] text-white/50 tabular-nums"
                   style={{ top: h * HOUR_HEIGHT }}
                 >
-                  {`${String(h).padStart(2, "0")}:00`}
+                  <span className="text-white/40">{formatWholeClockHourDecimal(h, commaDec)}</span>
+                  <span>{`${String(h).padStart(2, "0")}:00`}</span>
                 </div>
               ))}
-              <span className="absolute bottom-0 left-0 right-1 z-[1] translate-y-1 text-right text-[10px] leading-[10px] text-white/50 tabular-nums">
-                24:00
+              <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 flex-col items-end gap-0 text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
+                <span className="text-white/40">{formatGridBottomDecimalHours(0, "24h", commaDec)}</span>
+                <span>24:00</span>
               </span>
             </div>
           </div>

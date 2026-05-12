@@ -74,6 +74,45 @@ export function bottomBoundaryLabel(startHour: number, timeFormat: "12h" | "24h"
   return formatHourLabel(startHour, timeFormat);
 }
 
+/** da/de use comma as decimal separator; en uses dot. */
+export function commaDecimalForLanguage(language: "en" | "da" | "de"): boolean {
+  return language === "da" || language === "de";
+}
+
+/** One decimal place (e.g. 7.4 or 7,4). */
+export function formatOneDecimalHour(hours: number, commaDecimal: boolean): string {
+  const rounded = Math.round(hours * 10) / 10;
+  const s = Number.isFinite(rounded) ? rounded.toFixed(1) : "0.0";
+  return commaDecimal ? s.replace(".", ",") : s;
+}
+
+/** Total minutes as duration: HH:mm (e.g. 07:24, 04:30). */
+export function formatTotalMinutesAsHHMM(totalMinutes: number): string {
+  const m = Math.max(0, Math.round(totalMinutes));
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+/** Whole clock hour 0–23 as decimal hours (e.g. 7,0 next to 07:00). */
+export function formatWholeClockHourDecimal(hour24: number, commaDecimal: boolean): string {
+  const h = ((hour24 % 24) + 24) % 24;
+  return formatOneDecimalHour(h, commaDecimal);
+}
+
+/** Bottom ruler tick: 24,0 for end-of-day 24:00; else whole hour for boundary label. */
+export function formatGridBottomDecimalHours(
+  startHour: number,
+  timeFormat: "12h" | "24h",
+  commaDecimal: boolean
+): string {
+  if (timeFormat === "24h" && startHour === 0) {
+    return commaDecimal ? "24,0" : "24.0";
+  }
+  const h = ((startHour % 24) + 24) % 24;
+  return formatOneDecimalHour(h, commaDecimal);
+}
+
 /** Whether [startsAt, endsAt) overlaps the rolling 24h window for this column. */
 export function rangeOverlapsColumnWindow(
   startsAt: Date,
