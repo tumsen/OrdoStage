@@ -94,21 +94,30 @@ function allSameLocalMonth(days: Date[]): boolean {
   return days.every((d) => d.getFullYear() === y && d.getMonth() === m);
 }
 
-/** Banner text when the first and last day are in different months (e.g. next-31-days strip). */
-function compactMultiMonthStripLabel(first: Date, last: Date, locale: string): string {
-  const y0 = first.getFullYear();
-  const y1 = last.getFullYear();
-  const m0 = first.getMonth();
-  const m1 = last.getMonth();
-  const monthLong0 = first.toLocaleDateString(locale, { month: "long" });
-  const monthLong1 = last.toLocaleDateString(locale, { month: "long" });
-  if (y0 === y1) {
-    if (m0 === m1) {
-      return first.toLocaleDateString(locale, { month: "long", year: "numeric" });
+/** One grid segment for the compact multi-month header row (spans day columns for that month). */
+type CompactMonthRun = { key: string; colStart: number; span: number; label: string };
+
+function compactMonthRunsForStrip(days: Date[], locale: string): CompactMonthRun[] {
+  if (days.length === 0) return [];
+  const runs: CompactMonthRun[] = [];
+  let colStart = 2;
+  let i = 0;
+  while (i < days.length) {
+    const d = days[i]!;
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const label = d.toLocaleDateString(locale, { month: "long", year: "numeric" });
+    let span = 1;
+    let j = i + 1;
+    while (j < days.length && days[j]!.getFullYear() === y && days[j]!.getMonth() === m) {
+      span++;
+      j++;
     }
-    return `${monthLong0} – ${monthLong1} ${y0}`;
+    runs.push({ key: `${y}-${m}-${i}`, colStart, span, label });
+    colStart += span;
+    i = j;
   }
-  return `${monthLong0} ${y0} – ${monthLong1} ${y1}`;
+  return runs;
 }
 
 type CreateDragPayload = {
@@ -237,14 +246,15 @@ export function OutlookTimeGrid({
   const hour12 = timeFormat === "12h";
   const locale = effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
 
-  const compactMonthBannerLabel = useMemo(() => {
+  const compactSingleMonthBannerLabel = useMemo(() => {
     if (!compactDayHeaders || days.length === 0) return null;
-    const first = days[0]!;
-    const last = days[days.length - 1]!;
-    if (allSameLocalMonth(days)) {
-      return first.toLocaleDateString(locale, { month: "long", year: "numeric" });
-    }
-    return compactMultiMonthStripLabel(first, last, locale);
+    if (!allSameLocalMonth(days)) return null;
+    return days[0]!.toLocaleDateString(locale, { month: "long", year: "numeric" });
+  }, [compactDayHeaders, days, locale]);
+
+  const compactMultiMonthRuns = useMemo(() => {
+    if (!compactDayHeaders || days.length === 0 || allSameLocalMonth(days)) return null;
+    return compactMonthRunsForStrip(days, locale);
   }, [compactDayHeaders, days, locale]);
 
   const timeSheetRef = useRef<HTMLDivElement | null>(null);
@@ -497,15 +507,32 @@ export function OutlookTimeGrid({
         }}
       >
         <div className={`${CALENDAR_STICKY_HEADER_CHROME} shrink-0 border-b border-white/10`}>
-          {compactMonthBannerLabel ? (
+          {compactSingleMonthBannerLabel ? (
             <div
               className="grid shrink-0 border-b border-white/10 bg-white/[0.04]"
               style={{ gridTemplateColumns: `56px minmax(0, 1fr)` }}
             >
               <div className="border-r border-white/10 bg-white/[0.02]" aria-hidden />
               <div className="px-2 py-1.5 text-center text-[11px] font-semibold text-white/85 tabular-nums">
-                {compactMonthBannerLabel}
+                {compactSingleMonthBannerLabel}
               </div>
+            </div>
+          ) : null}
+          {compactMultiMonthRuns ? (
+            <div
+              className="grid shrink-0 border-b border-white/10 bg-white/[0.04]"
+              style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}
+            >
+              <div className="border-r border-white/10 bg-white/[0.02]" aria-hidden />
+              {compactMultiMonthRuns.map((run) => (
+                <div
+                  key={run.key}
+                  className="flex min-h-[1.75rem] items-end justify-center border-l border-white/10 px-0.5 py-1 text-center text-[10px] font-semibold text-white/85 tabular-nums"
+                  style={{ gridColumn: `${run.colStart} / span ${run.span}` }}
+                >
+                  <span className="truncate w-full">{run.label}</span>
+                </div>
+              ))}
             </div>
           ) : null}
           {/* ── Day header row ──────────────────────────────────────────────── */}
