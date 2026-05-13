@@ -309,7 +309,9 @@ export default function VenueDetail() {
         onClose={() => setBookingOpen(false)}
         venues={venues ?? []}
         people={people ?? []}
-        initialValues={{ venueId: venue?.id, type: "venue_booking" }}
+        fixedVenueId={venueId}
+        fixedVenueName={venue?.name}
+        fixedBookingType="venue_booking"
       />
     </div>
   );

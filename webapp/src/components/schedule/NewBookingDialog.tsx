@@ -42,6 +42,29 @@ interface NewBookingDialogProps {
   initialSlot?: { startDate: string; endDate: string } | null;
   /** Optional prefilled values (still editable). */
   initialValues?: Partial<Pick<CreateInternalBooking, "title" | "description" | "type" | "venueId" | "personIds">>;
+  /** When set, venue is fixed to this id (no venue picker). */
+  fixedVenueId?: string;
+  /** Shown when venue is fixed; falls back to matching name from `venues`. */
+  fixedVenueName?: string;
+  /** When set, booking type cannot be changed (no type picker). */
+  fixedBookingType?: CreateInternalBooking["type"];
+}
+
+function internalBookingTypeLabel(type: CreateInternalBooking["type"]): string {
+  switch (type) {
+    case "rehearsal":
+      return "Rehearsal";
+    case "maintenance":
+      return "Maintenance";
+    case "private":
+      return "Private";
+    case "venue_booking":
+      return "Venue booking";
+    case "other":
+      return "Other";
+    default:
+      return type;
+  }
 }
 
 const emptyForm: CreateInternalBooking = {
@@ -61,6 +84,9 @@ export function NewBookingDialog({
   people,
   initialSlot,
   initialValues,
+  fixedVenueId,
+  fixedVenueName,
+  fixedBookingType,
 }: NewBookingDialogProps) {
   const queryClient = useQueryClient();
 
@@ -70,17 +96,22 @@ export function NewBookingDialog({
 
   useEffect(() => {
     if (!open) return;
+    const base = {
+      ...emptyForm,
+      ...initialValues,
+      ...(fixedVenueId ? { venueId: fixedVenueId } : {}),
+      ...(fixedBookingType ? { type: fixedBookingType } : {}),
+    };
     if (initialSlot?.startDate && initialSlot?.endDate) {
       form.reset({
-        ...emptyForm,
-        ...initialValues,
+        ...base,
         startDate: initialSlot.startDate,
         endDate: initialSlot.endDate,
       });
     } else {
-      form.reset({ ...emptyForm, ...initialValues });
+      form.reset(base);
     }
-  }, [open, initialSlot, initialValues, form]);
+  }, [open, initialSlot, initialValues, fixedVenueId, fixedBookingType, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -166,30 +197,39 @@ export function NewBookingDialog({
             />
 
             {/* Type */}
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className={labelClass}>Type *</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger className={inputClass}>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                      <SelectItem value="rehearsal">Rehearsal</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="private">Private</SelectItem>
-                      <SelectItem value="venue_booking">Venue booking</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {fixedBookingType ? (
+              <div className="space-y-2">
+                <span className={labelClass}>Type</span>
+                <div className={`${inputClass} flex items-center px-3 text-sm text-white/90`}>
+                  {internalBookingTypeLabel(fixedBookingType)}
+                </div>
+              </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={labelClass}>Type *</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className={inputClass}>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                        <SelectItem value="rehearsal">Rehearsal</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                        <SelectItem value="private">Private</SelectItem>
+                        <SelectItem value="venue_booking">Venue booking</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Start / end (multi-day supported) */}
             <div className="space-y-2">
@@ -225,34 +265,43 @@ export function NewBookingDialog({
             />
 
             {/* Venue */}
-            <FormField
-              control={form.control}
-              name="venueId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className={labelClass}>Venue</FormLabel>
-                  <Select
-                    value={field.value || "__none__"}
-                    onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
-                  >
-                    <FormControl>
-                      <SelectTrigger className={inputClass}>
-                        <SelectValue placeholder="No venue" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                      <SelectItem value="__none__">No venue</SelectItem>
-                      {venues.map((v) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          {v.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {fixedVenueId ? (
+              <div className="space-y-2">
+                <span className={labelClass}>Venue</span>
+                <div className={`${inputClass} flex items-center px-3 text-sm text-white/90`}>
+                  {fixedVenueName ?? venues.find((v) => v.id === fixedVenueId)?.name ?? "Venue"}
+                </div>
+              </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="venueId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={labelClass}>Venue</FormLabel>
+                    <Select
+                      value={field.value || "__none__"}
+                      onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger className={inputClass}>
+                          <SelectValue placeholder="No venue" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                        <SelectItem value="__none__">No venue</SelectItem>
+                        {venues.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* People */}
             <div className="space-y-2">

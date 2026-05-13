@@ -82,6 +82,13 @@ function getIsoWeek(date: Date): number {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / DAY_MS + 1) / 7);
 }
 
+function allSameLocalMonth(days: Date[]): boolean {
+  if (days.length === 0) return false;
+  const y = days[0]!.getFullYear();
+  const m = days[0]!.getMonth();
+  return days.every((d) => d.getFullYear() === y && d.getMonth() === m);
+}
+
 type CreateDragPayload = {
   day: Date;
   dayIndex: number;
@@ -156,6 +163,11 @@ export function OutlookTimeGrid({
   const { effective } = usePreferences();
   const timeFormat = effective?.timeFormat === "12h" ? "12h" : "24h";
   const locale = effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
+
+  const compactMonthBannerLabel = useMemo(() => {
+    if (!compactDayHeaders || days.length === 0 || !allSameLocalMonth(days)) return null;
+    return days[0]!.toLocaleDateString(locale, { month: "long", year: "numeric" });
+  }, [compactDayHeaders, days, locale]);
 
   const timeSheetRef = useRef<HTMLDivElement | null>(null);
   const [timeSheetHeight, setTimeSheetHeight] = useState<number | null>(null);
@@ -424,6 +436,17 @@ export function OutlookTimeGrid({
         }}
       >
         <div className={`${CALENDAR_STICKY_HEADER_CHROME} shrink-0 border-b border-white/10`}>
+          {compactMonthBannerLabel ? (
+            <div
+              className="grid shrink-0 border-b border-white/10 bg-white/[0.04]"
+              style={{ gridTemplateColumns: `56px minmax(0, 1fr)` }}
+            >
+              <div className="border-r border-white/10 bg-white/[0.02]" aria-hidden />
+              <div className="px-2 py-1.5 text-center text-[11px] font-semibold text-white/85 tabular-nums">
+                {compactMonthBannerLabel}
+              </div>
+            </div>
+          ) : null}
           {/* ── Day header row ──────────────────────────────────────────────── */}
           <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
             <div
