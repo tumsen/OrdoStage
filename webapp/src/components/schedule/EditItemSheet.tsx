@@ -22,7 +22,7 @@ import {
 import { api } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { toast } from "@/hooks/use-toast";
-import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
+import { DatetimeRangeFields } from "@/components/DatetimeRangeFields";
 import { migrateContactRowFields } from "@/lib/eventContactRow";
 import { parseEventCustomFieldsJson } from "@/lib/eventCustomFields";
 import type { CalendarItem } from "./scheduleUtils";
@@ -344,7 +344,7 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
       <div>
         <Label className={lbl}>Schedule</Label>
         <div className="mt-1">
-          <DatetimeScheduleFields
+          <DatetimeRangeFields
             startValue={startDate}
             endValue={endDate}
             onStartChange={setStartDate}
@@ -447,7 +447,29 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
             <div className="flex gap-2">
               <Button variant="ghost" className="text-white/50 hover:text-white" onClick={onClose}>Cancel</Button>
               <Button className="bg-amber-700 hover:bg-amber-600 text-white border-0" disabled={saveMutation.isPending || !title.trim()}
-                onClick={() => saveMutation.mutate()}>
+                onClick={() => {
+                  if (type === "venue_booking") {
+                    if (!endDate.trim()) {
+                      toast({
+                        title: "End date and time required",
+                        description: "Venue bookings need a start and end (they can span multiple days).",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    const a = new Date(startDate).getTime();
+                    const b = new Date(endDate).getTime();
+                    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) {
+                      toast({
+                        title: "Invalid time range",
+                        description: "End must be after the start.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                  }
+                  saveMutation.mutate();
+                }}>
                 {saveMutation.isPending ? "Saving…" : "Save booking"}
               </Button>
             </div>

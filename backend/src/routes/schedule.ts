@@ -3,6 +3,7 @@ import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { excludeMirroredEventInternalBookings } from "../internalBookingMirrorFilter";
 import { serializeTourShow } from "./tours";
+import { internalBookingOverlapsRangeWhere } from "../bookingRangeQuery";
 
 const scheduleRouter = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -63,15 +64,7 @@ scheduleRouter.get("/schedule", async (c) => {
   const fromDate = from ? new Date(`${from}T00:00:00.000Z`) : null;
   const toDateExclusive = to ? new Date(new Date(`${to}T00:00:00.000Z`).getTime() + 86_400_000) : null;
 
-  const dateFilter =
-    fromDate || toDateExclusive
-      ? {
-          startDate: {
-            ...(fromDate ? { gte: fromDate } : {}),
-            ...(toDateExclusive ? { lt: toDateExclusive } : {}),
-          },
-        }
-      : {};
+  const bookingDateFilter = internalBookingOverlapsRangeWhere(fromDate, toDateExclusive);
 
   const showDateRange =
     fromDate || toDateExclusive
@@ -124,7 +117,7 @@ scheduleRouter.get("/schedule", async (c) => {
   // Build booking where clause (omit mirrored event job/staffing rows — same slots as show jobs)
   const bookingWhere: Record<string, unknown> = {
     organizationId: user.organizationId,
-    ...dateFilter,
+    ...(bookingDateFilter ?? {}),
     ...excludeMirroredEventInternalBookings,
   };
   if (venueId) bookingWhere.venueId = venueId;

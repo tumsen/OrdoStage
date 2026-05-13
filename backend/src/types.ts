@@ -610,7 +610,7 @@ export const InternalBookingDetailSchema = InternalBookingSchema.extend({
   ),
 });
 
-export const CreateInternalBookingSchema = z.object({
+const CreateInternalBookingBaseSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   startDate: z.string(),
@@ -624,7 +624,29 @@ export const CreateInternalBookingSchema = z.object({
     .optional(),
 });
 
-export const UpdateInternalBookingSchema = CreateInternalBookingSchema.partial();
+export const CreateInternalBookingSchema = CreateInternalBookingBaseSchema.superRefine((data, ctx) => {
+  if (data.type !== "venue_booking") return;
+  const end = data.endDate?.trim();
+  if (!end) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Venue booking requires an end date and time.",
+      path: ["endDate"],
+    });
+    return;
+  }
+  const a = new Date(data.startDate).getTime();
+  const b = new Date(end).getTime();
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "End date and time must be after the start.",
+      path: ["endDate"],
+    });
+  }
+});
+
+export const UpdateInternalBookingSchema = CreateInternalBookingBaseSchema.partial();
 
 // Team management
 export const UpdateRoleSchema = z.object({

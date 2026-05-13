@@ -5,6 +5,7 @@ import { auth } from "../auth";
 import { excludeMirroredEventInternalBookings } from "../internalBookingMirrorFilter";
 import { CreateInternalBookingSchema, UpdateInternalBookingSchema } from "../types";
 import { canAction } from "../requestRole";
+import { internalBookingOverlapsRangeWhere } from "../bookingRangeQuery";
 
 const bookingsRouter = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -169,15 +170,13 @@ bookingsRouter.get("/bookings", async (c) => {
   const where: Record<string, unknown> = { organizationId: user.organizationId };
   if (eventIdFilter) where.eventId = eventIdFilter;
   if (venueIdFilter) where.venueId = venueIdFilter;
-  if (fromQ || toQ) {
-    const fromDate = fromQ ? new Date(`${fromQ}T00:00:00.000Z`) : null;
-    const toDateExclusive = toQ
-      ? new Date(new Date(`${toQ}T00:00:00.000Z`).getTime() + 86_400_000)
-      : null;
-    where.startDate = {
-      ...(fromDate ? { gte: fromDate } : {}),
-      ...(toDateExclusive ? { lt: toDateExclusive } : {}),
-    };
+  const fromDate = fromQ ? new Date(`${fromQ}T00:00:00.000Z`) : null;
+  const toDateExclusive = toQ
+    ? new Date(new Date(`${toQ}T00:00:00.000Z`).getTime() + 86_400_000)
+    : null;
+  const overlap = internalBookingOverlapsRangeWhere(fromDate, toDateExclusive);
+  if (overlap) {
+    Object.assign(where, overlap);
   }
 
   const bookings = await prisma.internalBooking.findMany({
@@ -294,6 +293,29 @@ bookingsRouter.put("/bookings/:id", zValidator("json", UpdateInternalBookingSche
           },
         },
         409
+      );
+    }
+  }
+
+  const mergedType = body.type ?? existing.type;
+  const mergedStart =
+    body.startDate !== undefined ? new Date(body.startDate) : existing.startDate;
+  const mergedEnd =
+    body.endDate !== undefined
+      ? body.endDate
+        ? new Date(body.endDate)
+        : null
+      : existing.endDate;
+  if (mergedType === "venue_booking") {
+    if (!mergedEnd || mergedEnd.getTime() <= mergedStart.getTime()) {
+      return c.json(
+        {
+          error: {
+            message: "Venue booking requires an end date and time after the start (multi-day is allowed).",
+            code: "BAD_REQUEST",
+          },
+        },
+        400
       );
     }
   }

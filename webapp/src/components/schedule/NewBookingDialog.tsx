@@ -30,7 +30,7 @@ import { api } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import type { CreateInternalBooking, Venue, Person } from "../../../../backend/src/types";
 import { toast } from "@/hooks/use-toast";
-import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
+import { DatetimeRangeFields } from "@/components/DatetimeRangeFields";
 
 interface NewBookingDialogProps {
   open: boolean;
@@ -110,6 +110,27 @@ export function NewBookingDialog({
   });
 
   function onSubmit(data: CreateInternalBooking) {
+    if (data.type === "venue_booking") {
+      const end = data.endDate?.trim();
+      if (!end) {
+        toast({
+          title: "End date and time required",
+          description: "Venue bookings need a start and end (they can span multiple days).",
+          variant: "destructive",
+        });
+        return;
+      }
+      const a = new Date(data.startDate).getTime();
+      const b = new Date(end).getTime();
+      if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) {
+        toast({
+          title: "Invalid time range",
+          description: "End must be after the start.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     mutation.mutate(data);
   }
 
@@ -166,16 +187,17 @@ export function NewBookingDialog({
               )}
             />
 
-            {/* Date range */}
+            {/* Start / end (multi-day supported) */}
             <div className="space-y-2">
               <FormLabel className={labelClass}>Schedule *</FormLabel>
-              <DatetimeScheduleFields
+              <DatetimeRangeFields
                 startValue={form.watch("startDate")}
                 endValue={form.watch("endDate") ?? ""}
                 onStartChange={(v) => form.setValue("startDate", v, { shouldDirty: true, shouldValidate: true })}
                 onEndChange={(v) => form.setValue("endDate", v, { shouldDirty: true })}
               />
               <FormMessage>{form.formState.errors.startDate?.message}</FormMessage>
+              <FormMessage>{form.formState.errors.endDate?.message}</FormMessage>
             </div>
 
             {/* Description */}

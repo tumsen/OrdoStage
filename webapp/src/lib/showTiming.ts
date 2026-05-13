@@ -150,6 +150,18 @@ export function durationMinutesForwardBetweenDatetimes(
   return Math.min(maxM, Math.max(1, raw));
 }
 
+/** Full span between two `datetime-local` values (no job-duration cap). */
+export function durationMinutesBetweenDatetimesUncapped(
+  startValue: string,
+  endValue: string
+): number | null {
+  const a = new Date(startValue).getTime();
+  const b = new Date(endValue).getTime();
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  const raw = Math.round((b - a) / 60_000);
+  return raw > 0 ? raw : null;
+}
+
 export function buildDatetimeLocal(date: string, time: string): string {
   if (!date) return "";
   const t = (time && /^\d{1,2}:\d{2}$/.test(time.trim()) ? time.trim() : "00:00").split(":");
