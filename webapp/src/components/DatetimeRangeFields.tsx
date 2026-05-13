@@ -23,8 +23,7 @@ function formatDurationHint(totalMinutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-const dateInputClass =
-  "bg-white/5 border-white/10 text-white [color-scheme:dark] w-full min-w-0";
+const dateInputClass = "bg-white/5 border-white/10 text-white [color-scheme:dark] w-full";
 
 /**
  * Two rows like event **shows** styling: start date + start time, then end date + end time.
@@ -87,43 +86,49 @@ export function DatetimeRangeFields({
 
   return (
     <div className={className}>
-      {/* Column 1 width = max of both date rows so both date boxes match the longest weekday + date. */}
-      <div
-        className={cn(
-          "grid grid-cols-[auto_auto] gap-x-3 gap-y-3 items-end",
-          "min-w-0 max-w-full overflow-x-auto pb-0.5"
-        )}
-      >
-        <div className="min-w-0">
-          <FieldLabel>Start date</FieldLabel>
-          <DateInputWithWeekday
-            value={startDate}
-            onChange={setStartDate}
-            className={dateInputClass}
-            weekdayClassName="text-sm text-white/45"
-          />
-        </div>
-        <div className="shrink-0">
-          <FieldLabel>Start</FieldLabel>
-          <SplitTimeInput value={startT} aria-label="Start time" onChange={setStartTime} />
-        </div>
-        <div className="min-w-0">
-          <FieldLabel>End date</FieldLabel>
-          <DateInputWithWeekday
-            value={endDate}
-            onChange={setEndDate}
-            className={dateInputClass}
-            weekdayClassName="text-sm text-white/45"
-          />
-        </div>
-        <div className="shrink-0">
-          <FieldLabel>End</FieldLabel>
-          <SplitTimeInput
-            value={endT}
-            aria-label="End time"
-            disabled={!hasStartTime}
-            onChange={setEndTime}
-          />
+      {/*
+        Shrink-wrapped grid: column widths are max-content only (no growth from a wide parent).
+        Date column = max(start date intrinsic width, end date intrinsic width); w-full on inputs
+        matches that width so both boxes align without exceeding the longer weekday + date row.
+      */}
+      <div className="max-w-full overflow-x-auto pb-0.5">
+        <div
+          className={cn(
+            "inline-grid grid-cols-[max-content_max-content] gap-x-3 gap-y-3 items-end",
+            "justify-items-stretch"
+          )}
+        >
+          <div className="flex w-full min-w-0 flex-col">
+            <FieldLabel>Start date</FieldLabel>
+            <DateInputWithWeekday
+              value={startDate}
+              onChange={setStartDate}
+              className={dateInputClass}
+              weekdayClassName="text-sm text-white/45"
+            />
+          </div>
+          <div className="shrink-0 justify-self-start">
+            <FieldLabel>Start</FieldLabel>
+            <SplitTimeInput value={startT} aria-label="Start time" onChange={setStartTime} />
+          </div>
+          <div className="flex w-full min-w-0 flex-col">
+            <FieldLabel>End date</FieldLabel>
+            <DateInputWithWeekday
+              value={endDate}
+              onChange={setEndDate}
+              className={dateInputClass}
+              weekdayClassName="text-sm text-white/45"
+            />
+          </div>
+          <div className="shrink-0 justify-self-start">
+            <FieldLabel>End</FieldLabel>
+            <SplitTimeInput
+              value={endT}
+              aria-label="End time"
+              disabled={!hasStartTime}
+              onChange={setEndTime}
+            />
+          </div>
         </div>
       </div>
 
