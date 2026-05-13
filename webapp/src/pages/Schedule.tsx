@@ -28,6 +28,7 @@ import {
   calendarVenueBookingSummaryLine,
   backingVenueBookingForEvent,
   orphanBackingVenueBookings,
+  scheduleVisibilityFilterKey,
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
@@ -392,16 +393,7 @@ export default function Schedule() {
       })
     : [];
 
-  const visibleItems = items.filter((item) => {
-    if (item.kind === "tour") return visibility.tour;
-    if (item.kind === "event") return visibility.event;
-    if (item.kind === "job") return visibility.event;
-    if (item.type === "rehearsal") return visibility.rehearsal;
-    if (item.type === "maintenance") return visibility.maintenance;
-    if (item.type === "private") return visibility.private;
-    if (item.type === "venue_booking") return visibility.venue_booking;
-    return visibility.other;
-  });
+  const visibleItems = items.filter((item) => visibility[scheduleVisibilityFilterKey(item)]);
 
   function moveBackward() {
     if (viewMode === "year" || viewMode === "yeardisc") setAnchorDate((d) => addYears(d, -1));

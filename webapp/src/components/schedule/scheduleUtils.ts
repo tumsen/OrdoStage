@@ -346,6 +346,37 @@ export function itemColor(item: CalendarItem): string {
   return ITEM_COLORS[item.type ?? "other"] ?? ITEM_COLORS.other;
 }
 
+/** Keys aligned with Schedule "Show:" toggles (`ScheduleFilters` visibility). */
+export type ScheduleVisibilityFilterKey =
+  | "event"
+  | "tour"
+  | "rehearsal"
+  | "maintenance"
+  | "private"
+  | "venue_booking"
+  | "other";
+
+/**
+ * Which Schedule visibility checkbox controls this row. Internal bookings use
+ * `InternalBooking.type` from `raw` so `venue_booking` is not misclassified when
+ * `item.type` is missing and the row incorrectly follows "Other bookings".
+ */
+export function scheduleVisibilityFilterKey(item: CalendarItem): ScheduleVisibilityFilterKey {
+  if (item.kind === "tour") return "tour";
+  if (item.kind === "event" || item.kind === "job") return "event";
+  if (item.kind === "summary") return "other";
+  if (item.kind === "booking") {
+    const raw = item.raw as InternalBookingDetail;
+    const t = (raw.type ?? item.type ?? "other").trim().toLowerCase();
+    if (t === "rehearsal") return "rehearsal";
+    if (t === "maintenance") return "maintenance";
+    if (t === "private") return "private";
+    if (t === "venue_booking") return "venue_booking";
+    return "other";
+  }
+  return "other";
+}
+
 /** ISO string includes a time component (not date-only). */
 export function hasTimedStart(item: CalendarItem): boolean {
   if (!item.startDate) return false;
