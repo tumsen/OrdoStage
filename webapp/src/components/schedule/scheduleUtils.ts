@@ -145,7 +145,7 @@ export interface ToCalendarItemsOptions {
 }
 
 /** Per-show confirmation; falls back to event rollup when missing (legacy payloads). */
-function calendarStatusForShow(
+export function calendarStatusForShow(
   show: { status?: string | null },
   event: EventDetail
 ): string {

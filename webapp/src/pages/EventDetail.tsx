@@ -50,6 +50,7 @@ import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import {
   internalBookingDisplayTitle,
   isMirroredSystemInternalBookingTitle,
+  calendarStatusForShow,
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
 import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
@@ -2380,6 +2381,9 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
 
   const items: CalendarItem[] = useMemo(() => {
     const out: CalendarItem[] = [];
+    const weekFrom = fromISO;
+    const weekTo = toISO;
+    const dayYmdInWeek = (dayYmd: string) => dayYmd >= weekFrom && dayYmd <= weekTo;
 
     // This event's bookings (editable)
     for (const booking of bookingsQuery.data ?? []) {
@@ -2396,30 +2400,58 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
       });
     }
 
+    // Always surface this event's performances and show jobs for the selected venue + week.
+    // `/api/schedule?venueId=…` only returns events whose *event* venueId matches, so shows at
+    // this venue would otherwise disappear when the event's primary venue differs.
+    for (const show of event.shows ?? []) {
+      if (!show.showDate) continue;
+      const day = show.showDate.slice(0, 10);
+      if (!dayYmdInWeek(day)) continue;
+      if (venueId && show.venueId !== venueId) continue;
+      if (!/^\d{2}:\d{2}$/.test(show.showTime)) continue;
+      const start = `${day}T${show.showTime}`;
+      const end = endTimeFromStartAndDuration(show.showTime, show.durationMinutes);
+      const endIso = `${day}T${end}`;
+      out.push({
+        id: `${event.id}:show:${show.id}`,
+        title: `${event.title} (show)`,
+        kind: "event",
+        status: calendarStatusForShow(show, event),
+        startDate: start,
+        endDate: endIso,
+        raw: event,
+        disabled: true,
+        venueLabel: show.venue?.name,
+      });
+      for (const job of show.jobs ?? []) {
+        const jobDay = typeof job.jobDate === "string" ? job.jobDate.slice(0, 10) : "";
+        if (!jobDay || !dayYmdInWeek(jobDay)) continue;
+        if (venueId && job.venueId !== venueId) continue;
+        if (!/^\d{2}:\d{2}$/.test(job.startTime)) continue;
+        const jobStart = `${jobDay}T${job.startTime}`;
+        const jobEnd =
+          job.durationMinutes > 0
+            ? `${jobDay}T${endTimeFromStartAndDuration(job.startTime, job.durationMinutes)}`
+            : null;
+        const venueName = job.venue?.name ?? show.venue?.name;
+        out.push({
+          id: `${event.id}:show:${show.id}:job:${job.id}`,
+          title: `${job.title} · ${event.title}`,
+          kind: "job",
+          status: calendarStatusForShow(show, event),
+          startDate: jobStart,
+          endDate: jobEnd,
+          raw: event,
+          disabled: true,
+          venueLabel: venueName,
+        });
+      }
+    }
+
     if (scheduleQuery.data) {
-      // Other items on the same venue → faded conflict awareness.
+      // Other events on the same venue → faded conflict awareness.
       for (const otherEvent of scheduleQuery.data.events) {
-        if (otherEvent.id === event.id) {
-          // This event's own shows → display only (treat as disabled to avoid editing here).
-          for (const show of otherEvent.shows ?? []) {
-            if (!show.showDate) continue;
-            const day = show.showDate.slice(0, 10);
-            const start = `${day}T${show.showTime}`;
-            const end = endTimeFromStartAndDuration(show.showTime, show.durationMinutes);
-            const endIso = `${day}T${end}`;
-            out.push({
-              id: `${otherEvent.id}:show:${show.id}`,
-              title: `${otherEvent.title} (show)`,
-              kind: "event",
-              status: show.status ?? otherEvent.status,
-              startDate: start,
-              endDate: endIso,
-              raw: otherEvent,
-              disabled: true,
-            });
-          }
-          continue;
-        }
+        if (otherEvent.id === event.id) continue;
         for (const show of otherEvent.shows ?? []) {
           if (!show.showDate) continue;
           if (show.venueId && show.venueId !== venueId) continue;
@@ -2435,6 +2467,7 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
             endDate: `${day}T${end}`,
             raw: otherEvent,
             disabled: true,
+            venueLabel: show.venue?.name,
           });
         }
       }
@@ -2455,7 +2488,7 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
       }
     }
     return out;
-  }, [scheduleQuery.data, bookingsQuery.data, event.id, venueId]);
+  }, [scheduleQuery.data, bookingsQuery.data, event, venueId, fromISO, toISO]);
 
   const createBooking = useMutation({
     mutationFn: (body: {
@@ -2641,8 +2674,9 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
       </div>
 
       <p className="text-[11px] text-white/45 leading-snug">
-        Drag in the grid to add a venue booking for this event (15 min steps). This event&apos;s shows are shown for reference.
-        Other shows and bookings on the same venue are faded out — they&apos;re occupied.
+        Drag in the grid to add a venue booking for this event (15 min steps). Performances and show jobs at the
+        selected venue appear for reference (read-only). Other events&apos; shows and bookings on the same venue are
+        faded — occupied time.
       </p>
 
       <OutlookTimeGrid
