@@ -94,6 +94,23 @@ function allSameLocalMonth(days: Date[]): boolean {
   return days.every((d) => d.getFullYear() === y && d.getMonth() === m);
 }
 
+/** Banner text when the first and last day are in different months (e.g. next-31-days strip). */
+function compactMultiMonthStripLabel(first: Date, last: Date, locale: string): string {
+  const y0 = first.getFullYear();
+  const y1 = last.getFullYear();
+  const m0 = first.getMonth();
+  const m1 = last.getMonth();
+  const monthLong0 = first.toLocaleDateString(locale, { month: "long" });
+  const monthLong1 = last.toLocaleDateString(locale, { month: "long" });
+  if (y0 === y1) {
+    if (m0 === m1) {
+      return first.toLocaleDateString(locale, { month: "long", year: "numeric" });
+    }
+    return `${monthLong0} – ${monthLong1} ${y0}`;
+  }
+  return `${monthLong0} ${y0} – ${monthLong1} ${y1}`;
+}
+
 type CreateDragPayload = {
   day: Date;
   dayIndex: number;
@@ -221,8 +238,13 @@ export function OutlookTimeGrid({
   const locale = effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
 
   const compactMonthBannerLabel = useMemo(() => {
-    if (!compactDayHeaders || days.length === 0 || !allSameLocalMonth(days)) return null;
-    return days[0]!.toLocaleDateString(locale, { month: "long", year: "numeric" });
+    if (!compactDayHeaders || days.length === 0) return null;
+    const first = days[0]!;
+    const last = days[days.length - 1]!;
+    if (allSameLocalMonth(days)) {
+      return first.toLocaleDateString(locale, { month: "long", year: "numeric" });
+    }
+    return compactMultiMonthStripLabel(first, last, locale);
   }, [compactDayHeaders, days, locale]);
 
   const timeSheetRef = useRef<HTMLDivElement | null>(null);
