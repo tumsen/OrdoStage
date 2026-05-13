@@ -566,23 +566,48 @@ export function OutlookTimeGrid({
                   const isFirst =
                     next.start.getTime() >= startOfDay(day).getTime() &&
                     next.start.getTime() < startOfDay(day).getTime() + DAY_MS;
+                  const draggedVenue = calendarItemVenueName(moveDrag.item);
+                  const hour12Move = effective?.timeFormat === "12h";
+                  const moveTimePart = `${formatDragTime(clippedStart, hour12Move)} – ${formatDragTime(clippedEnd, hour12Move)}`;
+                  const movePreviewFullTitle = [
+                    moveDrag.item.title,
+                    draggedVenue && `@ ${draggedVenue}`,
+                    moveTimePart,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
                   moveOverlay = (
                     <div
                       key="move-preview"
                       className="absolute left-1 right-1 rounded-md border-2 border-rose-400/80 bg-rose-500/30 z-[6] pointer-events-none flex flex-col justify-start px-1.5 py-1 overflow-hidden"
                       style={{ top, height: Math.max(height, 18) }}
+                      title={movePreviewFullTitle}
                     >
                       {isFirst ? (
                         <>
                           <div className="text-[10px] font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] truncate">
                             {moveDrag.item.title}
+                            {draggedVenue ? (
+                              <span className="font-normal opacity-80"> @ {draggedVenue}</span>
+                            ) : null}
                           </div>
                           <div className="text-[9px] text-white/90 leading-tight mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
-                            {formatDragTime(clippedStart, effective?.timeFormat === "12h")} –{" "}
-                            {formatDragTime(clippedEnd, effective?.timeFormat === "12h")}
+                            {moveTimePart}
                           </div>
                         </>
-                      ) : null}
+                      ) : (
+                        <>
+                          <div className="text-[9px] text-white/90 leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] shrink-0 truncate">
+                            {moveTimePart}
+                          </div>
+                          <div className="text-[9px] font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] truncate mt-0.5">
+                            {moveDrag.item.title}
+                            {draggedVenue ? (
+                              <span className="font-normal opacity-80"> @ {draggedVenue}</span>
+                            ) : null}
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 }
