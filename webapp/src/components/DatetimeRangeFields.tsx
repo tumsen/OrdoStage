@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { SplitTimeInput } from "@/components/SplitTimeField";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   buildDatetimeLocal,
   durationMinutesBetweenDatetimesUncapped,
@@ -22,7 +23,8 @@ function formatDurationHint(totalMinutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-const dateInputClass = "bg-white/5 border-white/10 text-white [color-scheme:dark]";
+const dateInputClass =
+  "bg-white/5 border-white/10 text-white [color-scheme:dark] w-full min-w-0";
 
 /**
  * Two rows like event **shows** styling: start date + start time, then end date + end time.
@@ -85,41 +87,43 @@ export function DatetimeRangeFields({
 
   return (
     <div className={className}>
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-nowrap items-end gap-3 min-w-0 overflow-x-auto pb-0.5">
-          <div className="shrink-0">
-            <FieldLabel>Start date</FieldLabel>
-            <DateInputWithWeekday
-              value={startDate}
-              onChange={setStartDate}
-              className={dateInputClass}
-              weekdayClassName="text-sm text-white/45"
-            />
-          </div>
-          <div className="shrink-0">
-            <FieldLabel>Start</FieldLabel>
-            <SplitTimeInput value={startT} aria-label="Start time" onChange={setStartTime} />
-          </div>
+      {/* Column 1 width = max of both date rows so both date boxes match the longest weekday + date. */}
+      <div
+        className={cn(
+          "grid grid-cols-[auto_auto] gap-x-3 gap-y-3 items-end",
+          "min-w-0 max-w-full overflow-x-auto pb-0.5"
+        )}
+      >
+        <div className="min-w-0">
+          <FieldLabel>Start date</FieldLabel>
+          <DateInputWithWeekday
+            value={startDate}
+            onChange={setStartDate}
+            className={dateInputClass}
+            weekdayClassName="text-sm text-white/45"
+          />
         </div>
-        <div className="flex flex-nowrap items-end gap-3 min-w-0 overflow-x-auto pb-0.5">
-          <div className="shrink-0">
-            <FieldLabel>End date</FieldLabel>
-            <DateInputWithWeekday
-              value={endDate}
-              onChange={setEndDate}
-              className={dateInputClass}
-              weekdayClassName="text-sm text-white/45"
-            />
-          </div>
-          <div className="shrink-0">
-            <FieldLabel>End</FieldLabel>
-            <SplitTimeInput
-              value={endT}
-              aria-label="End time"
-              disabled={!hasStartTime}
-              onChange={setEndTime}
-            />
-          </div>
+        <div className="shrink-0">
+          <FieldLabel>Start</FieldLabel>
+          <SplitTimeInput value={startT} aria-label="Start time" onChange={setStartTime} />
+        </div>
+        <div className="min-w-0">
+          <FieldLabel>End date</FieldLabel>
+          <DateInputWithWeekday
+            value={endDate}
+            onChange={setEndDate}
+            className={dateInputClass}
+            weekdayClassName="text-sm text-white/45"
+          />
+        </div>
+        <div className="shrink-0">
+          <FieldLabel>End</FieldLabel>
+          <SplitTimeInput
+            value={endT}
+            aria-label="End time"
+            disabled={!hasStartTime}
+            onChange={setEndTime}
+          />
         </div>
       </div>
 
