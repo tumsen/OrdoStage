@@ -716,6 +716,21 @@ export function OutlookTimeGrid({
                         }}
                       />
 
+                      <div
+                        className={cn(
+                          "pointer-events-none absolute inset-0 z-[5] flex min-h-0 flex-col justify-end overflow-hidden px-1",
+                          height < 40 ? "justify-center pb-1 pt-1" : "pb-7 pr-7 pt-6"
+                        )}
+                        aria-hidden
+                      >
+                        <div className="truncate text-[10px] font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.92)]">
+                          {item.title}
+                        </div>
+                        <div className="mt-0.5 truncate text-[9px] leading-tight text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.92)]">
+                          {[venueNm && `@ ${venueNm}`, timeLabel].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+
                       <button
                         type="button"
                         data-handle="edit"

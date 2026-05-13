@@ -393,6 +393,48 @@ export function calendarVenueBookingSummaryLine(item: CalendarItem): string {
   return [item.title, v && `@ ${v}`, t].filter(Boolean).join(" · ");
 }
 
+/** Venue booking row linked to this calendar event (same `eventId`, overlapping times). */
+export function backingVenueBookingForEvent(
+  item: CalendarItem,
+  candidates: CalendarItem[]
+): CalendarItem | null {
+  if (item.kind !== "event") return null;
+  const eventId = (item.raw as EventDetail).id;
+  const itemStart = new Date(item.startDate);
+  const itemEnd = item.endDate ? new Date(item.endDate) : new Date(itemStart.getTime() + 60 * 60 * 1000);
+  if (!Number.isFinite(itemStart.getTime()) || !Number.isFinite(itemEnd.getTime())) return null;
+
+  return (
+    candidates.find((candidate) => {
+      if (candidate.renderBehind !== true || candidate.kind !== "booking") return false;
+      const booking = candidate.raw as InternalBookingDetail & { eventId?: string | null };
+      if (booking.eventId !== eventId) return false;
+      const bookingStart = new Date(candidate.startDate);
+      const bookingEnd = candidate.endDate
+        ? new Date(candidate.endDate)
+        : new Date(bookingStart.getTime() + 60 * 60 * 1000);
+      if (!Number.isFinite(bookingStart.getTime()) || !Number.isFinite(bookingEnd.getTime())) return false;
+      return bookingStart.getTime() < itemEnd.getTime() && bookingEnd.getTime() > itemStart.getTime();
+    }) ?? null
+  );
+}
+
+/**
+ * Event-linked venue bookings (`renderBehind`) that do not overlap any foreground **event** pill
+ * this day — they still need their own chip (e.g. booking extends beyond the show date).
+ */
+export function orphanBackingVenueBookings(
+  foregroundItems: CalendarItem[],
+  backingItems: CalendarItem[]
+): CalendarItem[] {
+  const linkedIds = new Set<string>();
+  for (const fg of foregroundItems) {
+    const b = backingVenueBookingForEvent(fg, backingItems);
+    if (b) linkedIds.add(b.id);
+  }
+  return backingItems.filter((b) => !linkedIds.has(b.id));
+}
+
 export function getItemTimeRange(item: CalendarItem): { start: Date; end: Date; hasExplicitTime: boolean } {
   const start = new Date(item.startDate || 0);
   const end = item.endDate ? new Date(item.endDate) : new Date(start.getTime() + 60 * 60 * 1000);

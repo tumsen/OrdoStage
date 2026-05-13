@@ -26,6 +26,8 @@ import {
   calendarItemVenueName,
   calendarItemTimeRangeLabel,
   calendarVenueBookingSummaryLine,
+  backingVenueBookingForEvent,
+  orphanBackingVenueBookings,
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
@@ -156,28 +158,6 @@ function resolveItemVenue(item: CalendarItem): { id: string; name: string } | nu
 
   if (event.venueId && event.venue?.name) return { id: event.venueId, name: event.venue.name };
   return null;
-}
-
-function backingVenueBookingFor(item: CalendarItem, candidates: CalendarItem[]): CalendarItem | null {
-  if (item.kind !== "event") return null;
-  const eventId = (item.raw as EventDetail).id;
-  const itemStart = new Date(item.startDate);
-  const itemEnd = item.endDate ? new Date(item.endDate) : new Date(itemStart.getTime() + 60 * 60 * 1000);
-  if (!Number.isFinite(itemStart.getTime()) || !Number.isFinite(itemEnd.getTime())) return null;
-
-  return (
-    candidates.find((candidate) => {
-      if (candidate.renderBehind !== true || candidate.kind !== "booking") return false;
-      const booking = candidate.raw as InternalBookingDetail & { eventId?: string | null };
-      if (booking.eventId !== eventId) return false;
-      const bookingStart = new Date(candidate.startDate);
-      const bookingEnd = candidate.endDate
-        ? new Date(candidate.endDate)
-        : new Date(bookingStart.getTime() + 60 * 60 * 1000);
-      if (!Number.isFinite(bookingStart.getTime()) || !Number.isFinite(bookingEnd.getTime())) return false;
-      return bookingStart.getTime() < itemEnd.getTime() && bookingEnd.getTime() > itemStart.getTime();
-    }) ?? null
-  );
 }
 
 function VenueOccupationView({
@@ -588,6 +568,8 @@ export default function Schedule() {
                   const dayItems = itemsForDay(visibleItems, date);
                   const backingItems = dayItems.filter((item) => item.renderBehind === true);
                   const foregroundItems = dayItems.filter((item) => item.renderBehind !== true);
+                  const orphanBacking = orphanBackingVenueBookings(foregroundItems, backingItems);
+                  const dayListItems = [...foregroundItems, ...orphanBacking];
                   return (
                     <div key={date.toISOString()} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
                       <div className="text-xs text-white/40 mb-2">
@@ -598,18 +580,24 @@ export default function Schedule() {
                           year: "numeric",
                         })}
                       </div>
-                      {foregroundItems.length === 0 ? (
+                      {dayListItems.length === 0 ? (
                         <div className="text-xs text-white/25 italic">No items</div>
                       ) : (
                         <div className="space-y-1">
-                          {foregroundItems.map((item) => {
-                            const backing = backingVenueBookingFor(item, backingItems);
+                          {dayListItems.map((item) => {
+                            const isOrphanBacking = orphanBacking.some((b) => b.id === item.id);
+                            const backing = isOrphanBacking
+                              ? null
+                              : backingVenueBookingForEvent(item, backingItems);
                             const venueLine = calendarItemVenueName(item);
                             const timeLine = calendarItemTimeRangeLabel(item);
                             const detailLine = [timeLine, venueLine && `@ ${venueLine}`].filter(Boolean).join(" · ");
+                            const backingSummary = backing ? calendarVenueBookingSummaryLine(backing) : "";
                             const titleText = backing
-                              ? `${item.title} · ${calendarVenueBookingSummaryLine(backing)}`
-                              : [item.title, detailLine].filter(Boolean).join(" · ");
+                              ? `${item.title} · Venue booking: ${backingSummary}`
+                              : isOrphanBacking
+                                ? calendarVenueBookingSummaryLine(item)
+                                : [item.title, detailLine].filter(Boolean).join(" · ");
                             return (
                               <button
                                 key={item.id}
@@ -625,6 +613,11 @@ export default function Schedule() {
                                   <span className="absolute inset-0 bg-rose-500/20 pointer-events-none" aria-hidden="true" />
                                 ) : null}
                                 <span className="relative block font-medium truncate">{item.title}</span>
+                                {backing ? (
+                                  <span className="relative block text-[10px] text-rose-100/90 truncate leading-snug">
+                                    Venue booking: {backingSummary}
+                                  </span>
+                                ) : null}
                                 {detailLine ? (
                                   <span className="relative block text-[10px] text-white/55 truncate leading-snug">
                                     {detailLine}

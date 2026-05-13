@@ -1,7 +1,16 @@
 import { cn } from "@/lib/utils";
 import type { CalendarItem } from "./scheduleUtils";
-import type { InternalBookingDetail, EventDetail } from "../../../../backend/src/types";
-import { itemColor, itemsForDay, hasTimedStart, calendarItemVenueName, calendarItemTimeRangeLabel, calendarVenueBookingSummaryLine } from "./scheduleUtils";
+import type { InternalBookingDetail } from "../../../../backend/src/types";
+import {
+  itemColor,
+  itemsForDay,
+  hasTimedStart,
+  calendarItemVenueName,
+  calendarItemTimeRangeLabel,
+  calendarVenueBookingSummaryLine,
+  backingVenueBookingForEvent,
+  orphanBackingVenueBookings,
+} from "./scheduleUtils";
 
 const PILL_LIMIT = 3;
 
@@ -23,26 +32,11 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
   const dayItems = itemsForDay(items, date);
   const backingItems = dayItems.filter((item) => item.renderBehind === true);
   const foregroundItems = dayItems.filter((item) => item.renderBehind !== true);
-  const visible = foregroundItems.slice(0, PILL_LIMIT);
-  const overflow = foregroundItems.length - PILL_LIMIT;
-
-  function backingFor(item: CalendarItem): CalendarItem | null {
-    if (item.kind !== "event") return null;
-    const eventId = (item.raw as EventDetail).id;
-    const itemStart = new Date(item.startDate);
-    const itemEnd = item.endDate ? new Date(item.endDate) : new Date(itemStart.getTime() + 60 * 60 * 1000);
-    return (
-      backingItems.find((booking) => {
-        const raw = booking.raw as InternalBookingDetail & { eventId?: string | null };
-        if (raw.eventId !== eventId) return false;
-        const bookingStart = new Date(booking.startDate);
-        const bookingEnd = booking.endDate
-          ? new Date(booking.endDate)
-          : new Date(bookingStart.getTime() + 60 * 60 * 1000);
-        return bookingStart.getTime() < itemEnd.getTime() && bookingEnd.getTime() > itemStart.getTime();
-      }) ?? null
-    );
-  }
+  const orphanBacking = orphanBackingVenueBookings(foregroundItems, backingItems);
+  const combinedForPills = [...foregroundItems, ...orphanBacking];
+  const visible = combinedForPills.slice(0, PILL_LIMIT);
+  const overflow = combinedForPills.length - PILL_LIMIT;
+  const orphanIds = new Set(orphanBacking.map((b) => b.id));
 
   return (
     <div
@@ -61,7 +55,7 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
         isToday
           ? "border-indigo-500/50 bg-indigo-950/20"
           : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04]",
-        foregroundItems.length > 0 && "ring-1 ring-white/5"
+        (foregroundItems.length > 0 || orphanBacking.length > 0) && "ring-1 ring-white/5"
       )}
     >
       {/* Day number */}
@@ -84,12 +78,14 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
       {/* Pills */}
       <div className="flex flex-col gap-0.5 flex-1">
         {visible.map((item) => {
-          const backing = backingFor(item);
+          const isOrphanBacking = orphanIds.has(item.id);
+          const backing = isOrphanBacking ? null : backingVenueBookingForEvent(item, backingItems);
           const venueName = calendarItemVenueName(item);
           const backingSummary = backing ? calendarVenueBookingSummaryLine(backing) : "";
           const itemSummary = [item.title, venueName && `@ ${venueName}`, calendarItemTimeRangeLabel(item)]
             .filter(Boolean)
             .join(" · ");
+          const orphanSummary = isOrphanBacking ? calendarVenueBookingSummaryLine(item) : "";
           return (
             <button
               key={item.id}
@@ -104,8 +100,10 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
               )}
               title={
                 backing
-                  ? `${itemSummary} · Venue: ${backingSummary}`
-                  : itemSummary
+                  ? `${itemSummary} · Venue booking: ${backingSummary}`
+                  : isOrphanBacking
+                    ? orphanSummary
+                    : itemSummary
               }
             >
               {backing ? (
@@ -117,6 +115,11 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
                   <span className="font-normal opacity-70"> @ {venueName}</span>
                 ) : null}
               </span>
+              {backing ? (
+                <span className="relative block text-[9px] text-rose-100/95 truncate leading-tight mt-0.5">
+                  Venue booking: {backingSummary}
+                </span>
+              ) : null}
               {hasTimedStart(item) ? (
                 <span className="relative flex items-center gap-1 text-[9px] opacity-80 truncate tabular-nums">
                   <span>
