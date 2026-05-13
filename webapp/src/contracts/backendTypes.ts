@@ -610,12 +610,21 @@ export const InternalBookingDetailSchema = InternalBookingSchema.extend({
   ),
 });
 
+const internalBookingTypeSchema = z.enum([
+  "rehearsal",
+  "maintenance",
+  "private",
+  "venue_booking",
+  "other",
+]);
+
 const CreateInternalBookingBaseSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   startDate: z.string(),
   endDate: z.string().optional(),
-  type: z.enum(["rehearsal", "maintenance", "private", "venue_booking", "other"]).default("other"),
+  /** Omitted on PATCH; default applied only on create (see `CreateInternalBookingSchema`). */
+  type: internalBookingTypeSchema.optional(),
   venueId: z.string().optional(),
   eventId: z.string().nullable().optional(),
   isLocked: z.boolean().optional(),
@@ -624,7 +633,11 @@ const CreateInternalBookingBaseSchema = z.object({
     .optional(),
 });
 
-export const CreateInternalBookingSchema = CreateInternalBookingBaseSchema.superRefine((data, ctx) => {
+export const CreateInternalBookingSchema = CreateInternalBookingBaseSchema
+  .extend({
+    type: internalBookingTypeSchema.default("other"),
+  })
+  .superRefine((data, ctx) => {
   if (data.type !== "venue_booking") return;
   const end = data.endDate?.trim();
   if (!end) {
