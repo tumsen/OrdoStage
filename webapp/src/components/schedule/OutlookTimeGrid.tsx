@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Lock, LockOpen, Pencil, Trash2 } from "lucide-react";
 import type { EventDetail, InternalBookingDetail } from "../../../../backend/src/types";
 import type { CalendarItem } from "./scheduleUtils";
@@ -22,7 +22,6 @@ import {
 import { bottomBoundaryLabel, formatHourLabel } from "@/lib/timeGrid";
 import { cn } from "@/lib/utils";
 
-const HOUR_HEIGHT = CALENDAR_PX_PER_HOUR;
 const SNAP_MINUTES = 15;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_GRID_HEADER_CLASS =
@@ -45,22 +44,14 @@ interface OutlookTimeGridProps {
   readOnly?: boolean;
   /** Narrow day headers (weekday + day number) for many columns at once. */
   compactDayHeaders?: boolean;
+  /** Scale hour band height so 00:00–24:00 fills the vertical space (parent must be a flex column with bounded height). */
+  fitHoursVertically?: boolean;
 }
 
 /** Snap wall-clock minutes within a calendar day; 1440 = end of day (midnight), same as `dateFromDayAndMinutes`. */
 function snapMinutesFromMidnight(rawMinutes: number): number {
   const snapped = Math.round(rawMinutes / SNAP_MINUTES) * SNAP_MINUTES;
   return Math.max(0, Math.min(24 * 60, snapped));
-}
-
-function yToMinutesFromMidnight(clientY: number, columnTop: number): number {
-  const y = clientY - columnTop;
-  const minuteFloat = (y / HOUR_HEIGHT) * 60;
-  return snapMinutesFromMidnight(minuteFloat);
-}
-
-function rawMinutesFromY(clientY: number, columnTop: number): number {
-  return ((clientY - columnTop) / HOUR_HEIGHT) * 60;
 }
 
 function snapMin(value: number): number {
@@ -160,11 +151,51 @@ export function OutlookTimeGrid({
   onToggleLock,
   readOnly = false,
   compactDayHeaders = false,
+  fitHoursVertically = false,
 }: OutlookTimeGridProps) {
   const { effective } = usePreferences();
   const timeFormat = effective?.timeFormat === "12h" ? "12h" : "24h";
   const locale = effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
-  const totalHeight = 24 * HOUR_HEIGHT;
+
+  const timeSheetRef = useRef<HTMLDivElement | null>(null);
+  const [timeSheetHeight, setTimeSheetHeight] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (!fitHoursVertically) {
+      setTimeSheetHeight(null);
+      return;
+    }
+    const el = timeSheetRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height ?? 0;
+      if (!Number.isFinite(h) || h < 48) return;
+      setTimeSheetHeight(h);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fitHoursVertically, days.length]);
+
+  const hourHeightPx = useMemo(() => {
+    if (!fitHoursVertically || timeSheetHeight == null) return CALENDAR_PX_PER_HOUR;
+    const inner = timeSheetHeight - CALENDAR_TIME_GRID_TOP_PAD_PX;
+    return Math.max(6, inner / 24);
+  }, [fitHoursVertically, timeSheetHeight]);
+
+  const yToMinutesFromMidnight = useCallback(
+    (clientY: number, columnTop: number) => {
+      const y = clientY - columnTop;
+      return snapMinutesFromMidnight((y / hourHeightPx) * 60);
+    },
+    [hourHeightPx]
+  );
+
+  const rawMinutesFromY = useCallback(
+    (clientY: number, columnTop: number) => ((clientY - columnTop) / hourHeightPx) * 60,
+    [hourHeightPx]
+  );
+
+  const totalHeight = 24 * hourHeightPx;
   /** Outer column height: grid body + top inset (mirrors breathing room above bottom pad row). */
   const columnFrameHeight = totalHeight + CALENDAR_TIME_GRID_TOP_PAD_PX;
   const hours = Array.from({ length: 24 }).map((_, h) => h);
@@ -222,7 +253,7 @@ export function OutlookTimeGrid({
     }
     if (endDate.getTime() - startDate.getTime() < SNAP_MINUTES * 60 * 1000) return;
     onSelectTimeRange?.(startDate, endDate);
-  }, [onSelectTimeRange, days]);
+  }, [onSelectTimeRange, days, yToMinutesFromMidnight]);
 
   const handleColumnPointerDown = (day: Date, dayIndex: number, e: React.PointerEvent) => {
     if (readOnly || !onSelectTimeRange) return;
@@ -295,7 +326,7 @@ export function OutlookTimeGrid({
       const newEnd = Math.max(ptMs, minEnd);
       return { start: new Date(m.origStartMs), end: new Date(newEnd) };
     },
-    [days]
+    [days, rawMinutesFromY]
   );
 
   const endMoveDrag = useCallback(() => {
@@ -378,14 +409,21 @@ export function OutlookTimeGrid({
   };
 
   return (
-    <div className={cn(CALENDAR_GRID_SCROLLER_CLASS, className)}>
+    <div
+      className={cn(
+        fitHoursVertically
+          ? "min-h-0 flex-1 flex flex-col overflow-x-auto overflow-y-visible rounded-xl border border-white/10 bg-white/[0.02]"
+          : CALENDAR_GRID_SCROLLER_CLASS,
+        className
+      )}
+    >
       <div
-        className="min-w-0"
+        className={cn("min-w-0", fitHoursVertically && "flex min-h-0 flex-1 flex-col")}
         style={{
           minWidth: days.length > 10 ? `${Math.max(420, 48 + days.length * 22)}px` : "720px",
         }}
       >
-        <div className={`${CALENDAR_STICKY_HEADER_CHROME} border-b border-white/10`}>
+        <div className={`${CALENDAR_STICKY_HEADER_CHROME} shrink-0 border-b border-white/10`}>
           {/* ── Day header row ──────────────────────────────────────────────── */}
           <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
             <div
@@ -494,7 +532,14 @@ export function OutlookTimeGrid({
         </div>
 
         {/* ── Time grid ──────────────────────────────────────────────────── */}
-        <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
+        <div
+          ref={fitHoursVertically ? timeSheetRef : undefined}
+          className={cn(fitHoursVertically && "flex min-h-0 flex-1 flex-col")}
+        >
+        <div
+          className={cn("grid min-h-0", fitHoursVertically && "h-full min-h-0")}
+          style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}
+        >
           {/* Hour labels — border-r only on the grid band (not through top inset above 00:00). */}
           <div className="relative box-border" style={{ height: columnFrameHeight }}>
             <div
@@ -508,7 +553,7 @@ export function OutlookTimeGrid({
                 <div
                   key={h}
                   className="pointer-events-none absolute left-0 right-1 z-[1] flex -translate-y-1/2 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums"
-                  style={{ top: h * HOUR_HEIGHT }}
+                  style={{ top: h * hourHeightPx }}
                 >
                   {formatHourLabel(h, timeFormat)}
                 </div>
@@ -558,8 +603,8 @@ export function OutlookTimeGrid({
                   if (dayIndex === startDayIdx && dayIndex === endDayIdx && segEnd === segStart) {
                     segEnd = segStart + SNAP_MINUTES;
                   }
-                  const topPx = (segStart / 60) * HOUR_HEIGHT;
-                  const hPx = Math.max(((segEnd - segStart) / 60) * HOUR_HEIGHT, 18);
+                  const topPx = (segStart / 60) * hourHeightPx;
+                  const hPx = Math.max(((segEnd - segStart) / 60) * hourHeightPx, 18);
                   const showLabel = dayIndex === startDayIdx;
                   const startDay = days[startDayIdx];
                   const endDay = days[endDayIdx];
@@ -603,7 +648,7 @@ export function OutlookTimeGrid({
             if (moveDrag && moveDrag.passed) {
               const next = computeMovedRange(moveDrag);
               if (next) {
-                const layout = layoutTimedBlockInDay(day, next.start, next.end, HOUR_HEIGHT);
+                const layout = layoutTimedBlockInDay(day, next.start, next.end, hourHeightPx);
                 if (layout) {
                   const { top, height, clippedStart, clippedEnd } = layout;
                   const isFirst =
@@ -679,7 +724,7 @@ export function OutlookTimeGrid({
                     <div
                       key={h}
                       className="pointer-events-none absolute left-0 right-0 z-0 border-t border-white/[0.1]"
-                      style={{ top: h * HOUR_HEIGHT }}
+                      style={{ top: h * hourHeightPx }}
                     />
                   ))}
                   <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1]" />
@@ -691,7 +736,7 @@ export function OutlookTimeGrid({
                     overlap column. If they overlap this event/show, use the
                     foreground block's width so the booking visually belongs to it. */}
                 {backgroundRaw.map(({ item, start, end }) => {
-                  const layout = layoutTimedBlockInDay(day, start, end, HOUR_HEIGHT);
+                  const layout = layoutTimedBlockInDay(day, start, end, hourHeightPx);
                   if (!layout) return null;
                   const { top, height, clippedStart, clippedEnd } = layout;
                   const booking = item.raw as InternalBookingDetail & { eventId?: string | null };
@@ -858,7 +903,7 @@ export function OutlookTimeGrid({
 
                 {/* Timed blocks with overlap columns */}
                 {laidOut.map(({ item, start, end, colIndex, totalCols }) => {
-                  const layout = layoutTimedBlockInDay(day, start, end, HOUR_HEIGHT);
+                  const layout = layoutTimedBlockInDay(day, start, end, hourHeightPx);
                   if (!layout) return null;
                   const { top, height, clippedStart, clippedEnd } = layout;
                   const isDisabled = item.disabled === true;
@@ -1063,6 +1108,7 @@ export function OutlookTimeGrid({
               </div>
             );
           })}
+        </div>
         </div>
         <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
           <div className="h-6 shrink-0" />

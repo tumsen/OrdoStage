@@ -543,6 +543,7 @@ export default function Schedule() {
                     });
                     setBookingOpen(true);
                   }}
+                  fitHoursVertically
                 />
               </div>
             ) : viewMode === "venueocc" ? (

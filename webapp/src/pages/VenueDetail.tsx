@@ -191,6 +191,7 @@ export default function VenueDetail() {
                   onItemClick={(item) => setDetailItem(item)}
                   readOnly
                   compactDayHeaders
+                  fitHoursVertically
                 />
               )}
             </div>
