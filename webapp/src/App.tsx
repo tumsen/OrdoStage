@@ -14,6 +14,7 @@ import Index from "./pages/Index";
 import Events from "./pages/Events";
 import EventDetail from "./pages/EventDetail";
 import Venues from "./pages/Venues";
+import VenueEdit from "./pages/VenueEdit";
 import VenueDetail from "./pages/VenueDetail";
 import People from "./pages/People";
 import Team from "./pages/Team";
@@ -189,6 +190,16 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <Venues />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/venues/:id/edit"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <VenueEdit />
                 </Layout>
               </ProtectedRoute>
             }

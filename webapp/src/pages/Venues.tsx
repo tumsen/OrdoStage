@@ -1,10 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Edit2, Trash2, Check, X, CalendarDays } from "lucide-react";
+import { Plus, Edit2, Trash2, CalendarDays } from "lucide-react";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Venue } from "@/lib/types";
@@ -12,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { VenueDocumentsSection } from "@/components/VenueDocumentsSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
@@ -27,100 +25,16 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
-
-const VenueFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  addressStreet:  z.string().optional(),
-  addressNumber:  z.string().optional(),
-  addressZip:     z.string().optional(),
-  addressCity:    z.string().optional(),
-  addressState:   z.string().optional(),
-  addressCountry: z.string().optional(),
-  capacity: z.union([z.literal(""), z.coerce.number().int().min(0)]),
-  width: z.string().optional(),
-  length: z.string().optional(),
-  height: z.string().optional(),
-  customFieldsText: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-type VenueFormValues = z.infer<typeof VenueFormSchema>;
-
-function customFieldsToText(fields: Array<{ key: string; value?: string }>): string {
-  return fields.map((field) => `${field.key}: ${field.value ?? ""}`.trim()).join("\n");
-}
-
-function textToCustomFields(value: string | undefined): Array<{ key: string; value: string }> {
-  if (!value) return [];
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [keyPart, ...valueParts] = line.split(":");
-      return {
-        key: keyPart.trim(),
-        value: valueParts.join(":").trim(),
-      };
-    })
-    .filter((field) => field.key.length > 0);
-}
-
-function CustomFieldsEditor({
-  fields,
-  onChange,
-}: {
-  fields: Array<{ key: string; value: string }>;
-  onChange: (fields: Array<{ key: string; value: string }>) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      {fields.map((field, index) => (
-        <div key={`${index}-${field.key}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-          <Input
-            value={field.key}
-            onChange={(e) => {
-              const next = [...fields];
-              next[index] = { ...next[index], key: e.target.value };
-              onChange(next);
-            }}
-            placeholder="Field name"
-            className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-          />
-          <Input
-            value={field.value}
-            onChange={(e) => {
-              const next = [...fields];
-              next[index] = { ...next[index], value: e.target.value };
-              onChange(next);
-            }}
-            placeholder="Value"
-            className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-white/40 hover:text-red-400"
-            onClick={() => onChange(fields.filter((_, i) => i !== index))}
-          >
-            <Trash2 size={12} />
-          </Button>
-        </div>
-      ))}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => onChange([...fields, { key: "", value: "" }])}
-        className="h-8 border-white/10 bg-white/5 text-white/70 hover:text-white"
-      >
-        <Plus size={12} className="mr-1" /> Add custom field
-      </Button>
-    </div>
-  );
-}
-
+import {
+  VenueFormSchema,
+  type VenueFormValues,
+  DEFAULT_VENUE_FORM_VALUES,
+  venueFormValuesToPayload,
+  CustomFieldsEditor,
+  StageSizeFields,
+  textToCustomFields,
+  customFieldsToText,
+} from "@/components/venue/venueFormShared";
 
 function VenueRow({
   venue,
@@ -131,174 +45,6 @@ function VenueRow({
   onDelete: (id: string) => void;
   canWrite: boolean;
 }) {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [editing, setEditing] = useState(false);
-
-  const form = useForm<VenueFormValues>({
-    resolver: zodResolver(VenueFormSchema),
-    values: {
-      name: venue.name,
-      addressStreet:  venue.addressStreet  ?? "",
-      addressNumber:  venue.addressNumber  ?? "",
-      addressZip:     venue.addressZip     ?? "",
-      addressCity:    venue.addressCity    ?? "",
-      addressState:   venue.addressState   ?? "",
-      addressCountry: venue.addressCountry ?? "",
-      capacity: venue.capacity ?? "",
-      width: venue.width ?? "",
-      length: venue.length ?? "",
-      height: venue.height ?? "",
-      customFieldsText: customFieldsToText(venue.customFields ?? []),
-      notes: venue.notes ?? "",
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: (data: VenueFormValues) => {
-      const payload = {
-        name: data.name,
-        addressStreet:  data.addressStreet  || undefined,
-        addressNumber:  data.addressNumber  || undefined,
-        addressZip:     data.addressZip     || undefined,
-        addressCity:    data.addressCity    || undefined,
-        addressState:   data.addressState   || undefined,
-        addressCountry: data.addressCountry || undefined,
-        capacity: data.capacity === "" ? undefined : Number(data.capacity),
-        width: data.width?.trim() || undefined,
-        length: data.length?.trim() || undefined,
-        height: data.height?.trim() || undefined,
-        customFields: textToCustomFields(data.customFieldsText),
-        notes: data.notes || undefined,
-      };
-      return api.put(`/api/venues/${venue.id}`, payload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["venues"] });
-      setEditing(false);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Could not save venue", description: error.message, variant: "destructive" });
-    },
-  });
-
-  if (editing) {
-    return (
-      <tr className="border-b border-white/5">
-        <td className="px-5 py-3">
-          <Input
-            {...form.register("name")}
-            className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-          />
-        </td>
-        <td className="px-5 py-3 hidden sm:table-cell">
-          <AddressFields
-            value={{
-              street:  form.watch("addressStreet")  ?? "",
-              number:  form.watch("addressNumber")  ?? "",
-              zip:     form.watch("addressZip")     ?? "",
-              city:    form.watch("addressCity")    ?? "",
-              state:   form.watch("addressState")   ?? "",
-              country: form.watch("addressCountry") ?? "",
-            }}
-            onChange={(addr: Address) => {
-              form.setValue("addressStreet",  addr.street);
-              form.setValue("addressNumber",  addr.number);
-              form.setValue("addressZip",     addr.zip);
-              form.setValue("addressCity",    addr.city);
-              form.setValue("addressState",   addr.state);
-              form.setValue("addressCountry", addr.country);
-            }}
-          />
-        </td>
-        <td className="px-5 py-3 hidden md:table-cell align-top">
-          <div className="space-y-3 max-w-md">
-            <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Stage &amp; room size</Label>
-              <p className="text-[10px] text-white/35 leading-snug">
-                Interior dimensions; include units if helpful (e.g. 12&nbsp;m).
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-white/45 text-[10px] uppercase tracking-wide">Width</Label>
-                  <Input
-                    {...form.register("width")}
-                    placeholder="e.g. 14 m"
-                    className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-white/45 text-[10px] uppercase tracking-wide">Length</Label>
-                  <Input
-                    {...form.register("length")}
-                    placeholder="e.g. 20 m"
-                    className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-white/45 text-[10px] uppercase tracking-wide">Height</Label>
-                  <Input
-                    {...form.register("height")}
-                    placeholder="e.g. 8 m"
-                    className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-white/45 text-[10px] uppercase tracking-wide">Audience capacity</Label>
-                  <Input
-                    {...form.register("capacity")}
-                    type="number"
-                    min={0}
-                    placeholder="e.g. 500"
-                    className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
-              <Input
-                {...form.register("notes")}
-                placeholder="Access, loading dock, quirks…"
-                className="bg-white/5 border-white/10 text-white h-8 text-sm focus:border-white/30"
-              />
-            </div>
-            <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Custom fields</Label>
-              <Textarea {...form.register("customFieldsText")} className="hidden" />
-              <CustomFieldsEditor
-                fields={textToCustomFields(form.watch("customFieldsText"))}
-                onChange={(fields) => form.setValue("customFieldsText", customFieldsToText(fields))}
-              />
-            </div>
-            <VenueDocumentsSection venueId={venue.id} canWrite={canWrite} />
-          </div>
-        </td>
-        <td className="px-5 py-3">
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-emerald-400 hover:text-emerald-300"
-              onClick={form.handleSubmit((v) => updateMutation.mutate(v))}
-              disabled={updateMutation.isPending || !canWrite}
-            >
-              <Check size={13} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-white/30 hover:text-white"
-              onClick={() => setEditing(false)}
-            >
-              <X size={13} />
-            </Button>
-          </div>
-        </td>
-      </tr>
-    );
-  }
-
   return (
     <tr className="border-b border-white/5 group hover:bg-white/[0.02] transition-colors">
       <td className="px-5 py-3.5 text-sm font-medium">
@@ -378,13 +124,10 @@ function VenueRow({
           </Button>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {canWrite ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-white/30 hover:text-white"
-                onClick={() => setEditing(true)}
-              >
-                <Edit2 size={13} />
+              <Button asChild variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-white" title="Edit venue">
+                <Link to={`/venues/${venue.id}/edit`}>
+                  <Edit2 size={13} />
+                </Link>
               </Button>
             ) : null}
             {canWrite ? (
@@ -407,47 +150,16 @@ function VenueRow({
 function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite: boolean }) {
   const form = useForm<VenueFormValues>({
     resolver: zodResolver(VenueFormSchema),
-    defaultValues: {
-      name: "",
-      addressStreet:  "",
-      addressNumber:  "",
-      addressZip:     "",
-      addressCity:    "",
-      addressState:   "",
-      addressCountry: "",
-      capacity: "",
-      width: "",
-      length: "",
-      height: "",
-      customFieldsText: "",
-      notes: "",
-    },
+    defaultValues: DEFAULT_VENUE_FORM_VALUES,
   });
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const createMutation = useMutation({
-    mutationFn: (data: VenueFormValues) => {
-      const payload = {
-        name: data.name,
-        addressStreet:  data.addressStreet  || undefined,
-        addressNumber:  data.addressNumber  || undefined,
-        addressZip:     data.addressZip     || undefined,
-        addressCity:    data.addressCity    || undefined,
-        addressState:   data.addressState   || undefined,
-        addressCountry: data.addressCountry || undefined,
-        capacity: data.capacity === "" ? undefined : Number(data.capacity),
-        width: data.width?.trim() || undefined,
-        length: data.length?.trim() || undefined,
-        height: data.height?.trim() || undefined,
-        customFields: textToCustomFields(data.customFieldsText),
-        notes: data.notes || undefined,
-      };
-      return api.post<Venue>("/api/venues", payload);
-    },
-    onSuccess: () => {
+    mutationFn: (data: VenueFormValues) => api.post<Venue>("/api/venues", venueFormValuesToPayload(data)),
+      onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["venues"] });
-      form.reset();
+      form.reset(DEFAULT_VENUE_FORM_VALUES);
       onSuccess();
     },
     onError: (error: Error) => {
@@ -489,48 +201,7 @@ function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite
       </td>
       <td className="px-5 py-3 hidden md:table-cell align-top">
         <div className="space-y-3 max-w-md">
-          <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">Stage &amp; room size</Label>
-            <p className="text-[10px] text-white/35 leading-snug">
-              Interior dimensions; include units if helpful (e.g. 12&nbsp;m).
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-white/45 text-[10px] uppercase tracking-wide">Width</Label>
-                <Input
-                  {...form.register("width")}
-                  placeholder="e.g. 14 m"
-                  className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-white/45 text-[10px] uppercase tracking-wide">Length</Label>
-                <Input
-                  {...form.register("length")}
-                  placeholder="e.g. 20 m"
-                  className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-white/45 text-[10px] uppercase tracking-wide">Height</Label>
-                <Input
-                  {...form.register("height")}
-                  placeholder="e.g. 8 m"
-                  className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-white/45 text-[10px] uppercase tracking-wide">Audience capacity</Label>
-                <Input
-                  {...form.register("capacity")}
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 500"
-                  className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-                />
-              </div>
-            </div>
-          </div>
+          <StageSizeFields register={form.register} />
           <div className="space-y-1.5">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
             <Input
