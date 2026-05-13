@@ -1,7 +1,7 @@
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
-import { SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
+import { SplitTimeInput } from "@/components/SplitTimeField";
 import { Label } from "@/components/ui/label";
 import {
   buildDatetimeLocal,
@@ -25,8 +25,7 @@ function formatDurationHint(totalMinutes: number): string {
 const dateInputClass = "bg-white/5 border-white/10 text-white [color-scheme:dark]";
 
 /**
- * Same layout as event **shows**: one horizontal row — start date, start time, end date, end time
- * (`DateInputWithWeekday` + `SplitTimeInput`), so multi-day bookings match the shows UI.
+ * Two rows like event **shows** styling: start date + start time, then end date + end time.
  */
 export function DatetimeRangeFields({
   startValue,
@@ -41,9 +40,6 @@ export function DatetimeRangeFields({
   onEndChange: (v: string) => void;
   className?: string;
 }) {
-  const refStartTime = useRef<SplitTimeFieldHandle>(null);
-  const refEndTime = useRef<SplitTimeFieldHandle>(null);
-
   const sd = parseDatetimeLocal(startValue);
   const ed = parseDatetimeLocal(endValue);
   const startDate = sd.date;
@@ -89,44 +85,41 @@ export function DatetimeRangeFields({
 
   return (
     <div className={className}>
-      <div className="flex flex-nowrap items-end gap-3 min-w-0 overflow-x-auto pb-0.5">
-        <div className="shrink-0">
-          <FieldLabel>Start date</FieldLabel>
-          <DateInputWithWeekday
-            value={startDate}
-            onChange={setStartDate}
-            className={dateInputClass}
-            weekdayClassName="text-sm text-white/45"
-          />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-nowrap items-end gap-3 min-w-0 overflow-x-auto pb-0.5">
+          <div className="shrink-0">
+            <FieldLabel>Start date</FieldLabel>
+            <DateInputWithWeekday
+              value={startDate}
+              onChange={setStartDate}
+              className={dateInputClass}
+              weekdayClassName="text-sm text-white/45"
+            />
+          </div>
+          <div className="shrink-0">
+            <FieldLabel>Start</FieldLabel>
+            <SplitTimeInput value={startT} aria-label="Start time" onChange={setStartTime} />
+          </div>
         </div>
-        <div className="shrink-0">
-          <FieldLabel>Start</FieldLabel>
-          <SplitTimeInput
-            ref={refStartTime}
-            value={startT}
-            nextFieldRef={refEndTime}
-            aria-label="Start time"
-            onChange={setStartTime}
-          />
-        </div>
-        <div className="shrink-0">
-          <FieldLabel>End date</FieldLabel>
-          <DateInputWithWeekday
-            value={endDate}
-            onChange={setEndDate}
-            className={dateInputClass}
-            weekdayClassName="text-sm text-white/45"
-          />
-        </div>
-        <div className="shrink-0">
-          <FieldLabel>End</FieldLabel>
-          <SplitTimeInput
-            ref={refEndTime}
-            value={endT}
-            aria-label="End time"
-            disabled={!hasStartTime}
-            onChange={setEndTime}
-          />
+        <div className="flex flex-nowrap items-end gap-3 min-w-0 overflow-x-auto pb-0.5">
+          <div className="shrink-0">
+            <FieldLabel>End date</FieldLabel>
+            <DateInputWithWeekday
+              value={endDate}
+              onChange={setEndDate}
+              className={dateInputClass}
+              weekdayClassName="text-sm text-white/45"
+            />
+          </div>
+          <div className="shrink-0">
+            <FieldLabel>End</FieldLabel>
+            <SplitTimeInput
+              value={endT}
+              aria-label="End time"
+              disabled={!hasStartTime}
+              onChange={setEndTime}
+            />
+          </div>
         </div>
       </div>
 
