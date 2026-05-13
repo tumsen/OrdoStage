@@ -15,8 +15,6 @@ import {
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
-import { formatAddress, googleMapsUrl, appleMapsUrl } from "@/components/AddressFields";
-import { VenueDocumentsSection } from "@/components/VenueDocumentsSection";
 import { ScheduleItemDetailSheet } from "@/components/schedule/ScheduleItemDetailSheet";
 import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
@@ -47,6 +45,33 @@ function addMonths(d: Date, n: number): Date {
   return x;
 }
 
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function startOfLocalDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function next31DayStrip(from: Date): Date[] {
+  return Array.from({ length: 31 }, (_, i) => addDays(from, i));
+}
+
+function formatDayRangeLabel(start: Date, end: Date, locale: string): string {
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  const optsShort: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
+  const optsWithYear: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+  const a = start.toLocaleDateString(locale, sameMonth ? optsShort : optsWithYear);
+  const b = end.toLocaleDateString(locale, optsWithYear);
+  return `${a} – ${b}`;
+}
+
+type VenueBookingCalendarView = "month" | "next31";
+
 export default function VenueDetail() {
   const { id: venueId = "" } = useParams<{ id: string }>();
   const { canWrite } = usePermissions();
@@ -58,12 +83,22 @@ export default function VenueDetail() {
     const t = new Date();
     return new Date(t.getFullYear(), t.getMonth(), 1);
   });
+  const [calendarView, setCalendarView] = useState<VenueBookingCalendarView>("month");
+  const [next31Start, setNext31Start] = useState(() => startOfLocalDay(new Date()));
   const [detailItem, setDetailItem] = useState<CalendarItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
 
-  const { from, to } = useMemo(() => monthRangeISO(anchorMonth), [anchorMonth]);
-  const monthDays = useMemo(() => getMonthCalendarDays(anchorMonth), [anchorMonth]);
+  const { from, to } = useMemo(() => {
+    if (calendarView === "month") return monthRangeISO(anchorMonth);
+    const start = next31Start;
+    return { from: toISODate(start), to: toISODate(addDays(start, 30)) };
+  }, [calendarView, anchorMonth, next31Start]);
+
+  const gridDays = useMemo(() => {
+    if (calendarView === "month") return getMonthCalendarDays(anchorMonth);
+    return next31DayStrip(next31Start);
+  }, [calendarView, anchorMonth, next31Start]);
 
   const { data: venue, isLoading: venueLoading, isError: venueError } = useQuery({
     queryKey: ["venue", venueId],
@@ -72,7 +107,7 @@ export default function VenueDetail() {
   });
 
   const { data: scheduleData, isLoading: scheduleLoading } = useQuery({
-    queryKey: ["schedule", "venue-detail", venueId, from, to],
+    queryKey: ["schedule", "venue-detail", venueId, calendarView, from, to],
     queryFn: () =>
       api.get<ScheduleData>(`/api/schedule?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&venueId=${encodeURIComponent(venueId)}`),
     enabled: Boolean(venueId),
@@ -138,38 +173,94 @@ export default function VenueDetail() {
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <h2 className="text-sm font-semibold text-white/90 min-w-0">
-              Bookings · {formatMonthLabel(anchorMonth.getFullYear(), anchorMonth.getMonth())}
-            </h2>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-white/10 bg-white/5 text-white"
-                onClick={() => setAnchorMonth((d) => addMonths(d, -1))}
-                aria-label="Previous month"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs text-white/50 tabular-nums min-w-[10rem] text-center">
-                {anchorMonth.toLocaleDateString(locale, { month: "long", year: "numeric" })}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-white/10 bg-white/5 text-white"
-                onClick={() => setAnchorMonth((d) => addMonths(d, 1))}
-                aria-label="Next month"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <h2 className="text-sm font-semibold text-white/90 shrink-0">Bookings</h2>
+              <div className="flex rounded-lg border border-white/10 p-0.5 bg-white/[0.03]">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={`h-7 px-2.5 text-xs ${calendarView === "month" ? "bg-white/10 text-white" : "text-white/60 hover:text-white"}`}
+                  onClick={() => setCalendarView("month")}
+                >
+                  Month
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={`h-7 px-2.5 text-xs ${calendarView === "next31" ? "bg-white/10 text-white" : "text-white/60 hover:text-white"}`}
+                  onClick={() => {
+                    setNext31Start(startOfLocalDay(new Date()));
+                    setCalendarView("next31");
+                  }}
+                >
+                  Next 31 days
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+              {calendarView === "month" ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-white/10 bg-white/5 text-white"
+                    onClick={() => setAnchorMonth((d) => addMonths(d, -1))}
+                    aria-label="Previous month"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-xs text-white/50 tabular-nums min-w-[10rem] text-center">
+                    {formatMonthLabel(anchorMonth.getFullYear(), anchorMonth.getMonth())}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-white/10 bg-white/5 text-white"
+                    onClick={() => setAnchorMonth((d) => addMonths(d, 1))}
+                    aria-label="Next month"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-white/10 bg-white/5 text-white"
+                    onClick={() => setNext31Start((d) => addDays(d, -7))}
+                    aria-label="Previous week"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span
+                    className="text-xs text-white/50 tabular-nums min-w-[11rem] text-center max-w-[min(100%,14rem)] truncate"
+                    title={formatDayRangeLabel(next31Start, addDays(next31Start, 30), locale)}
+                  >
+                    {formatDayRangeLabel(next31Start, addDays(next31Start, 30), locale)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-white/10 bg-white/5 text-white"
+                    onClick={() => setNext31Start((d) => addDays(d, 7))}
+                    aria-label="Next week"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
               {canWrite ? (
                 <Button
                   type="button"
                   size="sm"
-                  className="h-8 bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-1.5 ml-2"
+                  className="h-8 bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-1.5 sm:ml-1"
                   onClick={() => setBookingOpen(true)}
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -186,7 +277,7 @@ export default function VenueDetail() {
               ) : (
                 <OutlookTimeGrid
                   className="min-h-0 flex-1"
-                  days={monthDays}
+                  days={gridDays}
                   items={calendarItems}
                   onItemClick={(item) => setDetailItem(item)}
                   readOnly
@@ -195,68 +286,6 @@ export default function VenueDetail() {
                 />
               )}
             </div>
-          </div>
-
-          <div className="space-y-3 shrink-0 border-t border-white/10 pt-5">
-            <h1 className="text-2xl font-semibold text-white tracking-tight">{venue.name}</h1>
-            {venue.addressStreet || venue.addressCity || venue.addressCountry ? (
-              <div className="text-sm text-white/55 max-w-xl">
-                {formatAddress({
-                  street: venue.addressStreet,
-                  number: venue.addressNumber,
-                  zip: venue.addressZip,
-                  city: venue.addressCity,
-                  state: venue.addressState,
-                  country: venue.addressCountry,
-                })}
-                <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                  <a
-                    href={googleMapsUrl({
-                      street: venue.addressStreet,
-                      number: venue.addressNumber,
-                      zip: venue.addressZip,
-                      city: venue.addressCity,
-                      state: venue.addressState,
-                      country: venue.addressCountry,
-                    })}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-300 hover:text-blue-200"
-                  >
-                    Google Maps
-                  </a>
-                  <a
-                    href={appleMapsUrl({
-                      street: venue.addressStreet,
-                      number: venue.addressNumber,
-                      zip: venue.addressZip,
-                      city: venue.addressCity,
-                      state: venue.addressState,
-                      country: venue.addressCountry,
-                    })}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-300 hover:text-blue-200"
-                  >
-                    Apple Maps
-                  </a>
-                </div>
-              </div>
-            ) : null}
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-white/45">
-              {venue.capacity != null ? <span>Capacity: {venue.capacity.toLocaleString(locale)}</span> : null}
-              {venue.width || venue.length || venue.height ? (
-                <span>
-                  Size: W {venue.width ?? "—"} · L {venue.length ?? "—"} · H {venue.height ?? "—"}
-                </span>
-              ) : null}
-            </div>
-            {venue.notes ? <p className="text-sm text-white/40 max-w-2xl whitespace-pre-wrap">{venue.notes}</p> : null}
-          </div>
-
-          <div className="shrink-0 rounded-xl border border-white/10 bg-white/[0.02] p-3 md:p-4">
-            <h2 className="text-xs font-medium text-white/40 uppercase tracking-wide mb-3">Images &amp; documents</h2>
-            <VenueDocumentsSection venueId={venue.id} canWrite={canWrite} readOnly />
           </div>
         </>
       )}
