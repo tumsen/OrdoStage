@@ -32,13 +32,19 @@ interface OutlookTimeGridProps {
   days: Date[];
   items: CalendarItem[];
   onItemClick: (item: CalendarItem) => void;
-  onDeleteItem: (item: CalendarItem) => void;
-  onSelectTimeRange: (start: Date, end: Date) => void;
+  /** Omitted in read-only views (no delete affordances). */
+  onDeleteItem?: (item: CalendarItem) => void;
+  /** Omitted when drag-to-create new bookings is disabled. */
+  onSelectTimeRange?: (start: Date, end: Date) => void;
   className?: string;
   /** Called when a booking block is dragged to a new position. */
   onUpdateItemTime?: (item: CalendarItem, start: Date, end: Date) => void;
   /** Called when a booking's lock button is toggled. */
   onToggleLock?: (item: CalendarItem, locked: boolean) => void;
+  /** Hide all edit/delete/create gestures (venue detail month view). */
+  readOnly?: boolean;
+  /** Narrow day headers (weekday + day number) for many columns at once. */
+  compactDayHeaders?: boolean;
 }
 
 /** Snap wall-clock minutes within a calendar day; 1440 = end of day (midnight), same as `dateFromDayAndMinutes`. */
@@ -152,9 +158,12 @@ export function OutlookTimeGrid({
   className = "",
   onUpdateItemTime,
   onToggleLock,
+  readOnly = false,
+  compactDayHeaders = false,
 }: OutlookTimeGridProps) {
   const { effective } = usePreferences();
   const timeFormat = effective?.timeFormat === "12h" ? "12h" : "24h";
+  const locale = effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
   const totalHeight = 24 * HOUR_HEIGHT;
   /** Outer column height: grid body + top inset (mirrors breathing room above bottom pad row). */
   const columnFrameHeight = totalHeight + CALENDAR_TIME_GRID_TOP_PAD_PX;
@@ -212,10 +221,11 @@ export function OutlookTimeGrid({
       endDate = new Date(startDate.getTime() + SNAP_MINUTES * 60 * 1000);
     }
     if (endDate.getTime() - startDate.getTime() < SNAP_MINUTES * 60 * 1000) return;
-    onSelectTimeRange(startDate, endDate);
+    onSelectTimeRange?.(startDate, endDate);
   }, [onSelectTimeRange, days]);
 
   const handleColumnPointerDown = (day: Date, dayIndex: number, e: React.PointerEvent) => {
+    if (readOnly || !onSelectTimeRange) return;
     const t = e.target as HTMLElement;
     if (t.closest("[data-booking-block]")) return;
     const col = columnRefs.current[dayIndex];
@@ -310,6 +320,7 @@ export function OutlookTimeGrid({
     mode: MoveMode,
     e: React.PointerEvent
   ) => {
+    if (readOnly) return;
     if (!isBookingItem(item)) {
       onItemClick(item);
       return;
@@ -368,26 +379,58 @@ export function OutlookTimeGrid({
 
   return (
     <div className={cn(CALENDAR_GRID_SCROLLER_CLASS, className)}>
-      <div className="min-w-[720px]">
+      <div
+        className="min-w-0"
+        style={{
+          minWidth: days.length > 10 ? `${Math.max(420, 48 + days.length * 22)}px` : "720px",
+        }}
+      >
         <div className={`${CALENDAR_STICKY_HEADER_CHROME} border-b border-white/10`}>
           {/* ── Day header row ──────────────────────────────────────────────── */}
           <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
-            <div className={`${WEEK_GRID_HEADER_CLASS} w-full border-b-0`} aria-hidden />
+            <div
+              className={cn(
+                "w-full border-b-0",
+                compactDayHeaders
+                  ? "min-h-[3.75rem] shrink-0 border-b border-white/10 box-border flex flex-col items-stretch justify-center px-1 py-1"
+                  : WEEK_GRID_HEADER_CLASS
+              )}
+              aria-hidden
+            />
             {days.map((d) => (
-              <div key={d.toISOString()} className={`${WEEK_GRID_HEADER_CLASS} border-l border-white/10 text-xs text-white/70`}>
-                <div className="flex items-start justify-between gap-1">
-                  <div className="min-w-0 flex-1 text-left">
-                    <div className="text-[11px] text-white font-semibold leading-tight">
-                      {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { weekday: "long" })}
+              <div
+                key={d.toISOString()}
+                className={cn(
+                  "border-l border-white/10",
+                  compactDayHeaders
+                    ? "min-h-[3.75rem] shrink-0 border-b border-white/10 box-border flex flex-col items-stretch justify-center px-0.5 py-1 text-[10px] text-white/75"
+                    : `${WEEK_GRID_HEADER_CLASS} text-xs text-white/70`
+                )}
+              >
+                {compactDayHeaders ? (
+                  <div className="flex flex-col items-center justify-center text-center min-w-0">
+                    <div className="text-[9px] font-semibold uppercase tracking-wide text-white/70 leading-none">
+                      {d.toLocaleDateString(locale, { weekday: "short" })}
                     </div>
-                    <div className="mt-1 text-[10px] text-white/60 leading-snug">
-                      {d.toLocaleDateString(effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US", { day: "numeric", month: "long", year: "numeric" })}
-                    </div>
-                    <div className="text-[10px] text-white/45 leading-snug mt-0.5 tabular-nums">
-                      W{getIsoWeek(d)}
+                    <div className="text-[12px] font-bold text-white tabular-nums leading-none mt-1">
+                      {d.getDate()}
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="min-w-0 flex-1 text-left">
+                      <div className="text-[11px] text-white font-semibold leading-tight">
+                        {d.toLocaleDateString(locale, { weekday: "long" })}
+                      </div>
+                      <div className="mt-1 text-[10px] text-white/60 leading-snug">
+                        {d.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" })}
+                      </div>
+                      <div className="text-[10px] text-white/45 leading-snug mt-0.5 tabular-nums">
+                        W{getIsoWeek(d)}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -430,7 +473,7 @@ export function OutlookTimeGrid({
                             {eventVenueName ? <span className="opacity-70"> @ {eventVenueName}</span> : null}
                             {" "}<StatusLabel status={item.status} />
                           </button>
-                          {item.kind === "job" || item.kind === "tour" || isDisabled ? null : (
+                          {onDeleteItem && !readOnly && (item.kind === "job" || item.kind === "tour" || isDisabled ? null : (
                             <button
                               data-booking-block
                               onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
@@ -439,7 +482,7 @@ export function OutlookTimeGrid({
                             >
                               <Trash2 size={9} />
                             </button>
-                          )}
+                          ))}
                         </div>
                       );
                     })}
@@ -670,7 +713,7 @@ export function OutlookTimeGrid({
                   const leftPct = target ? (target.colIndex / target.totalCols) * 100 : 0;
                   const widthPct = target ? (1 / target.totalCols) * 100 : 100;
                   const isLocked = isItemLocked(item);
-                  const canDrag = isBookingItem(item) && !item.disabled && !isLocked && Boolean(onUpdateItemTime);
+                  const canDrag = !readOnly && isBookingItem(item) && !item.disabled && !isLocked && Boolean(onUpdateItemTime);
                   const isBeingDragged = moveDrag?.item.id === item.id && moveDrag.passed;
                   const timeLabel = `${clippedStart.toLocaleTimeString([], {
                     hour: "2-digit",
@@ -731,61 +774,65 @@ export function OutlookTimeGrid({
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        data-handle="edit"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onItemClick(item);
-                        }}
-                        className="absolute top-0.5 right-0.5 z-[30] w-5 h-5 flex items-center justify-center rounded text-white/90 bg-rose-950/70 hover:bg-rose-800 hover:text-white transition-colors"
-                        title="Edit venue booking"
-                      >
-                        <Pencil size={11} />
-                      </button>
-                      {onToggleLock ? (
-                        <button
-                          type="button"
-                          data-handle="lock"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleLock(item, !isLocked);
-                          }}
-                          className={`absolute top-[26px] right-0.5 z-[30] w-5 h-5 flex items-center justify-center rounded text-white/90 ${
-                            isLocked ? "bg-amber-700/80 hover:bg-amber-700" : "bg-rose-950/70 hover:bg-rose-800"
-                          } hover:text-white transition-colors`}
-                          title={isLocked ? "Unlock venue booking" : "Lock venue booking"}
-                        >
-                          {isLocked ? <Lock size={11} /> : <LockOpen size={11} />}
-                        </button>
+                      {!readOnly ? (
+                        <>
+                          <button
+                            type="button"
+                            data-handle="edit"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onItemClick(item);
+                            }}
+                            className="absolute top-0.5 right-0.5 z-[30] w-5 h-5 flex items-center justify-center rounded text-white/90 bg-rose-950/70 hover:bg-rose-800 hover:text-white transition-colors"
+                            title="Edit venue booking"
+                          >
+                            <Pencil size={11} />
+                          </button>
+                          {onToggleLock ? (
+                            <button
+                              type="button"
+                              data-handle="lock"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleLock(item, !isLocked);
+                              }}
+                              className={`absolute top-[26px] right-0.5 z-[30] w-5 h-5 flex items-center justify-center rounded text-white/90 ${
+                                isLocked ? "bg-amber-700/80 hover:bg-amber-700" : "bg-rose-950/70 hover:bg-rose-800"
+                              } hover:text-white transition-colors`}
+                              title={isLocked ? "Unlock venue booking" : "Lock venue booking"}
+                            >
+                              {isLocked ? <Lock size={11} /> : <LockOpen size={11} />}
+                            </button>
+                          ) : null}
+                          {!isLocked ? (
+                            <button
+                              type="button"
+                              data-handle="delete"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteItem?.(item);
+                              }}
+                              className="absolute bottom-0.5 right-0.5 z-[30] w-5 h-5 flex items-center justify-center rounded text-white/90 bg-rose-950/70 hover:bg-red-700 hover:text-white transition-colors"
+                              title="Delete venue booking"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          ) : (
+                            <span
+                              className="absolute bottom-0.5 left-0.5 z-[30] inline-flex items-center gap-1 rounded bg-black/45 px-1 py-0.5 text-[9px] text-white/85"
+                              title="Locked. Unlock to edit, move or delete."
+                            >
+                              <Lock className="h-2.5 w-2.5" />
+                              Locked
+                            </span>
+                          )}
+                        </>
                       ) : null}
-                      {!isLocked ? (
-                        <button
-                          type="button"
-                          data-handle="delete"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteItem(item);
-                          }}
-                          className="absolute bottom-0.5 right-0.5 z-[30] w-5 h-5 flex items-center justify-center rounded text-white/90 bg-rose-950/70 hover:bg-red-700 hover:text-white transition-colors"
-                          title="Delete venue booking"
-                        >
-                          <Trash2 size={11} />
-                        </button>
-                      ) : (
-                        <span
-                          className="absolute bottom-0.5 left-0.5 z-[30] inline-flex items-center gap-1 rounded bg-black/45 px-1 py-0.5 text-[9px] text-white/85"
-                          title="Locked. Unlock to edit, move or delete."
-                        >
-                          <Lock className="h-2.5 w-2.5" />
-                          Locked
-                        </span>
-                      )}
 
-                      {canDrag && height >= 14 ? (
+                      {canDrag && !readOnly && height >= 14 ? (
                         <>
                           {start.getTime() === clippedStart.getTime() ? (
                             <div
@@ -817,7 +864,7 @@ export function OutlookTimeGrid({
                   const isDisabled = item.disabled === true;
                   const isBooking = isBookingItem(item);
                   const isLocked = isItemLocked(item);
-                  const canDrag = isBooking && !isDisabled && !isLocked && Boolean(onUpdateItemTime);
+                  const canDrag = !readOnly && isBooking && !isDisabled && !isLocked && Boolean(onUpdateItemTime);
                   const isBeingDragged = moveDrag?.item.id === item.id && moveDrag.passed;
 
                   const venueName = calendarItemVenueName(item);
@@ -841,7 +888,7 @@ export function OutlookTimeGrid({
                   })}`;
                   const tooltipText = [item.title, venueName && `@ ${venueName}`, timeLabel, item.status].filter(Boolean).join(" · ");
 
-                  const showInlineActions = isBooking && !isDisabled && Boolean(onToggleLock || onUpdateItemTime);
+                  const showInlineActions = !readOnly && isBooking && !isDisabled && Boolean(onToggleLock || onUpdateItemTime);
 
                   return (
                     <div
@@ -888,11 +935,16 @@ export function OutlookTimeGrid({
                           </div>
                         ) : (
                           <div className="flex flex-col h-full px-1.5 py-1 overflow-hidden">
-                            <div className="truncate font-semibold text-[11px] leading-tight shrink-0 pr-9">
+                            <div className={cn("truncate font-semibold text-[11px] leading-tight shrink-0", readOnly ? "pr-1" : "pr-9")}>
                               {item.title}
                               {venueName ? <span className="font-normal opacity-75"> @ {venueName}</span> : null}
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] leading-tight mt-0.5 opacity-90 flex-1 min-h-0 overflow-hidden pr-9">
+                            <div
+                              className={cn(
+                                "flex items-center gap-1 text-[10px] leading-tight mt-0.5 opacity-90 flex-1 min-h-0 overflow-hidden",
+                                readOnly ? "pr-1" : "pr-9"
+                              )}
+                            >
                               <span className="truncate shrink-0">
                                 {timeLabel}
                                 {creatorName ? ` · ${creatorName}` : ""}
@@ -917,7 +969,7 @@ export function OutlookTimeGrid({
                       {/* Resize handles — only on the segment that contains the actual edge.
                           Bookings spanning multiple day columns get the top handle on the
                           first segment and the bottom handle on the last. */}
-                      {canDrag && height >= 14 ? (
+                      {canDrag && !readOnly && height >= 14 ? (
                         <>
                           {start.getTime() === clippedStart.getTime() ? (
                             <div
@@ -980,7 +1032,7 @@ export function OutlookTimeGrid({
                               onPointerDown={(e) => e.stopPropagation()}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onDeleteItem(item);
+                                onDeleteItem?.(item);
                               }}
                               className="absolute bottom-0.5 right-0.5 w-5 h-5 flex items-center justify-center rounded text-white/85 bg-black/35 hover:bg-red-700 hover:text-white transition-colors z-20"
                               title="Delete"
@@ -989,12 +1041,15 @@ export function OutlookTimeGrid({
                             </button>
                           ) : null}
                         </>
-                      ) : item.kind === "job" || item.kind === "tour" || isDisabled || isBooking ? null : (
+                      ) : readOnly || item.kind === "job" || item.kind === "tour" || isDisabled || isBooking ? null : (
                         <button
                           type="button"
                           data-handle="delete"
                           onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => { e.stopPropagation(); onDeleteItem(item); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteItem?.(item);
+                          }}
                           className="absolute top-0.5 right-0.5 opacity-0 group-hover/block:opacity-100 w-4 h-4 flex items-center justify-center rounded bg-black/60 text-white/80 hover:bg-red-700 hover:text-white transition-opacity z-20"
                           title="Delete"
                         >

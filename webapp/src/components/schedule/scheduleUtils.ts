@@ -301,6 +301,51 @@ export function toDateStr(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Local calendar days for one month (length 28–31). */
+export function getMonthCalendarDays(anchor: Date): Date[] {
+  const y = anchor.getFullYear();
+  const m = anchor.getMonth();
+  const last = new Date(y, m + 1, 0).getDate();
+  const days: Date[] = [];
+  for (let d = 1; d <= last; d += 1) {
+    days.push(new Date(y, m, d));
+  }
+  return days;
+}
+
+/**
+ * Which venue id a schedule row occupies (internal booking, event/show/job).
+ * Tour rows are excluded (no stable venue id in the model).
+ */
+export function calendarItemVenueIdForFilter(item: CalendarItem): string | null {
+  if (item.kind === "summary") return null;
+  if (item.id.startsWith("tour:")) return null;
+  if (item.kind === "booking") {
+    const booking = item.raw as InternalBookingDetail;
+    return booking.venueId ?? null;
+  }
+  if (item.kind === "job") {
+    const event = item.raw as EventDetail;
+    const jm = /:job:([^:]+)$/.exec(item.id);
+    if (!jm) return null;
+    for (const s of event.shows ?? []) {
+      const job = s.jobs?.find((j) => j.id === jm[1]);
+      if (job?.venueId) return job.venueId;
+    }
+    return null;
+  }
+  if (item.kind === "event") {
+    const event = item.raw as EventDetail;
+    const showMatch = /:show:([^:]+)$/.exec(item.id);
+    if (showMatch?.[1]) {
+      const show = (event.shows ?? []).find((s) => s.id === showMatch[1]);
+      if (show?.venueId) return show.venueId;
+    }
+    return event.venueId ?? null;
+  }
+  return null;
+}
+
 export function formatMonthLabel(year: number, month: number): string {
   return new Date(year, month, 1).toLocaleDateString("en-US", {
     month: "long",

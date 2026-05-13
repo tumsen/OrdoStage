@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -300,7 +301,11 @@ function VenueRow({
 
   return (
     <tr className="border-b border-white/5 group hover:bg-white/[0.02] transition-colors">
-      <td className="px-5 py-3.5 text-sm font-medium text-white/90">{venue.name}</td>
+      <td className="px-5 py-3.5 text-sm font-medium">
+        <Link to={`/venues/${venue.id}`} className="text-white/90 hover:text-white hover:underline">
+          {venue.name}
+        </Link>
+      </td>
       <td className="px-5 py-3.5 text-sm text-white/50 hidden sm:table-cell">
         {venue.addressStreet || venue.addressCity || venue.addressCountry
           ? formatAddress({
