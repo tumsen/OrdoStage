@@ -118,23 +118,85 @@ export default function VenueDetail() {
 
   return (
     <div className="flex flex-1 min-h-0 flex-col gap-5 overflow-hidden p-4 md:p-6">
-      <div className="flex flex-wrap items-center gap-3 shrink-0">
-        <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white gap-1 -ml-2">
+      <div className="flex flex-wrap items-center gap-3 shrink-0 min-w-0">
+        <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white gap-1 -ml-2 shrink-0">
           <Link to="/venues">
             <ChevronLeft className="h-4 w-4" />
             Venues
           </Link>
         </Button>
+        {venue && !venueLoading ? (
+          <span className="text-lg font-semibold text-white truncate min-w-0">{venue.name}</span>
+        ) : null}
       </div>
 
       {venueLoading || !venue ? (
         <div className="space-y-3">
           <Skeleton className="h-8 w-64 bg-white/5" />
-          <Skeleton className="h-24 w-full max-w-xl bg-white/5" />
+          <Skeleton className="min-h-[280px] w-full bg-white/5 rounded-xl border border-white/10" />
         </div>
       ) : (
         <>
-          <div className="space-y-2 shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <h2 className="text-sm font-semibold text-white/90 min-w-0">
+              Bookings · {formatMonthLabel(anchorMonth.getFullYear(), anchorMonth.getMonth())}
+            </h2>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 border-white/10 bg-white/5 text-white"
+                onClick={() => setAnchorMonth((d) => addMonths(d, -1))}
+                aria-label="Previous month"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-white/50 tabular-nums min-w-[10rem] text-center">
+                {anchorMonth.toLocaleDateString(locale, { month: "long", year: "numeric" })}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 border-white/10 bg-white/5 text-white"
+                onClick={() => setAnchorMonth((d) => addMonths(d, 1))}
+                aria-label="Next month"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              {canWrite ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-1.5 ml-2"
+                  onClick={() => setBookingOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Booking
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className={`${CALENDAR_PANEL_SHELL_CLASS} flex-1 min-h-0`}>
+            <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
+              {scheduleLoading ? (
+                <Skeleton className="min-h-[320px] w-full bg-white/5 rounded-xl border border-white/10" />
+              ) : (
+                <OutlookTimeGrid
+                  className="min-h-0 flex-1"
+                  days={monthDays}
+                  items={calendarItems}
+                  onItemClick={(item) => setDetailItem(item)}
+                  readOnly
+                  compactDayHeaders
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3 shrink-0 border-t border-white/10 pt-5">
             <h1 className="text-2xl font-semibold text-white tracking-tight">{venue.name}</h1>
             {venue.addressStreet || venue.addressCity || venue.addressCountry ? (
               <div className="text-sm text-white/55 max-w-xl">
@@ -192,65 +254,8 @@ export default function VenueDetail() {
           </div>
 
           <div className="shrink-0 rounded-xl border border-white/10 bg-white/[0.02] p-3 md:p-4">
-            <h2 className="text-xs font-medium text-white/40 uppercase tracking-wide mb-3">Documents &amp; drawings</h2>
-            <VenueDocumentsSection venueId={venue.id} canWrite={canWrite} />
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <h2 className="text-sm font-semibold text-white/90">Bookings · {formatMonthLabel(anchorMonth.getFullYear(), anchorMonth.getMonth())}</h2>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-white/10 bg-white/5 text-white"
-                onClick={() => setAnchorMonth((d) => addMonths(d, -1))}
-                aria-label="Previous month"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs text-white/50 tabular-nums min-w-[10rem] text-center">
-                {anchorMonth.toLocaleDateString(locale, { month: "long", year: "numeric" })}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-white/10 bg-white/5 text-white"
-                onClick={() => setAnchorMonth((d) => addMonths(d, 1))}
-                aria-label="Next month"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              {canWrite ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-1.5 ml-2"
-                  onClick={() => setBookingOpen(true)}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Booking
-                </Button>
-              ) : null}
-            </div>
-          </div>
-
-          <div className={`${CALENDAR_PANEL_SHELL_CLASS} flex-1 min-h-0`}>
-            <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
-              {scheduleLoading ? (
-                <Skeleton className="min-h-[320px] w-full bg-white/5 rounded-xl border border-white/10" />
-              ) : (
-                <OutlookTimeGrid
-                  className="min-h-0 flex-1"
-                  days={monthDays}
-                  items={calendarItems}
-                  onItemClick={(item) => setDetailItem(item)}
-                  readOnly
-                  compactDayHeaders
-                />
-              )}
-            </div>
+            <h2 className="text-xs font-medium text-white/40 uppercase tracking-wide mb-3">Images &amp; documents</h2>
+            <VenueDocumentsSection venueId={venue.id} canWrite={canWrite} readOnly />
           </div>
         </>
       )}

@@ -59,9 +59,12 @@ function kindLabel(kind: VenueDocKind): string {
 export function VenueDocumentsSection({
   venueId,
   canWrite,
+  readOnly = false,
 }: {
   venueId: string;
   canWrite: boolean;
+  /** List and download only — no upload or delete (e.g. venue overview page). */
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -106,7 +109,9 @@ export function VenueDocumentsSection({
     <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
       <Label className="text-white/50 text-xs uppercase tracking-wide">Drawings &amp; photos</Label>
       <p className="text-[10px] text-white/35 leading-snug">
-        Floor plans, plots, rigging drawings, and reference images for this venue.
+        {readOnly
+          ? "Files attached to this venue. Add or remove them when editing the venue from the venues list."
+          : "Floor plans, plots, rigging drawings, and reference images for this venue."}
       </p>
       {isLoading ? (
         <p className="text-[11px] text-white/35 py-1">Loading…</p>
@@ -134,7 +139,7 @@ export function VenueDocumentsSection({
               >
                 Download
               </a>
-              {canWrite ? (
+              {canWrite && !readOnly ? (
                 <button
                   type="button"
                   className="shrink-0 text-red-300/80 hover:text-red-200 disabled:opacity-40 p-0.5"
@@ -152,7 +157,7 @@ export function VenueDocumentsSection({
           ))}
         </ul>
       )}
-      {canWrite ? (
+      {canWrite && !readOnly ? (
         <div className="space-y-2 pt-1 border-t border-white/5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="space-y-1.5">

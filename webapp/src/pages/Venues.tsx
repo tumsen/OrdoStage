@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Edit2, Trash2, Check, X } from "lucide-react";
+import { Plus, Edit2, Trash2, Check, X, CalendarDays } from "lucide-react";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Venue } from "@/lib/types";
@@ -370,27 +370,34 @@ function VenueRow({
         ) : null}
       </td>
       <td className="px-5 py-3.5">
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {canWrite ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-white/30 hover:text-white"
-              onClick={() => setEditing(true)}
-            >
-              <Edit2 size={13} />
-            </Button>
-          ) : null}
-          {canWrite ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-white/30 hover:text-red-400"
-              onClick={() => onDelete(venue.id)}
-            >
-              <Trash2 size={13} />
-            </Button>
-          ) : null}
+        <div className="flex items-center justify-end gap-0.5">
+          <Button asChild variant="ghost" size="icon" className="h-7 w-7 text-sky-400/85 hover:text-sky-300" title="Booking calendar">
+            <Link to={`/venues/${venue.id}`}>
+              <CalendarDays className="h-[15px] w-[15px]" />
+            </Link>
+          </Button>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {canWrite ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-white/30 hover:text-white"
+                onClick={() => setEditing(true)}
+              >
+                <Edit2 size={13} />
+              </Button>
+            ) : null}
+            {canWrite ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-white/30 hover:text-red-400"
+                onClick={() => onDelete(venue.id)}
+              >
+                <Trash2 size={13} />
+              </Button>
+            ) : null}
+          </div>
         </div>
       </td>
     </tr>
