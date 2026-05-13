@@ -25,6 +25,7 @@ import { toast } from "@/hooks/use-toast";
 import { DatetimeRangeFields } from "@/components/DatetimeRangeFields";
 import { migrateContactRowFields } from "@/lib/eventContactRow";
 import { parseEventCustomFieldsJson } from "@/lib/eventCustomFields";
+import { datetimeLocalInputToBookingApiIso } from "@/lib/showTiming";
 import type { CalendarItem } from "./scheduleUtils";
 import { internalBookingDisplayTitle, splitInternalBookingSyncMarker } from "./scheduleUtils";
 import type {
@@ -315,8 +316,8 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
       api.put(`/api/bookings/${booking.id}`, {
         title: `${titleSyncMarkerRef.current}${title.trim()}`,
         description: description.trim() || undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        startDate: datetimeLocalInputToBookingApiIso(startDate),
+        endDate: datetimeLocalInputToBookingApiIso(endDate),
         type,
         venueId: venueId === "none" ? undefined : venueId,
       }),

@@ -180,3 +180,20 @@ export function toDatetimeLocalString(d: Date): string {
   const m = String(d.getMinutes()).padStart(2, "0");
   return `${y}-${mo}-${day}T${h}:${m}`;
 }
+
+/**
+ * Serialize a `Date` for booking API bodies (`startDate` / `endDate`).
+ * Do not send `YYYY-MM-DDTHH:mm` without offset: Node often runs in UTC and parses that as
+ * **UTC** wall time, while the calendar grid uses the user's local zone (e.g. +2h in CEST).
+ */
+export function dateToBookingApiIso(d: Date): string {
+  return d.toISOString();
+}
+
+/** Browser `datetime-local` value (`YYYY-MM-DDTHH:mm`) → UTC ISO for the same instant. */
+export function datetimeLocalInputToBookingApiIso(value: string | null | undefined): string | undefined {
+  if (!value?.trim()) return undefined;
+  const d = new Date(value);
+  if (!Number.isFinite(d.getTime())) return undefined;
+  return d.toISOString();
+}

@@ -31,6 +31,7 @@ import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementB
 import type { CreateInternalBooking, Venue, Person } from "../../../../backend/src/types";
 import { toast } from "@/hooks/use-toast";
 import { DatetimeRangeFields } from "@/components/DatetimeRangeFields";
+import { datetimeLocalInputToBookingApiIso } from "@/lib/showTiming";
 
 interface NewBookingDialogProps {
   open: boolean;
@@ -88,11 +89,14 @@ export function NewBookingDialog({
 
   const mutation = useMutation({
     mutationFn: (data: CreateInternalBooking) => {
+      const startIso = datetimeLocalInputToBookingApiIso(data.startDate);
+      const endIso = datetimeLocalInputToBookingApiIso(data.endDate ?? "");
       const payload = {
         ...data,
+        startDate: startIso ?? data.startDate,
+        endDate: endIso,
         venueId: data.venueId || undefined,
         description: data.description || undefined,
-        endDate: data.endDate || undefined,
         personIds: data.personIds && data.personIds.length > 0 ? data.personIds : undefined,
       };
       return api.post("/api/bookings", payload);

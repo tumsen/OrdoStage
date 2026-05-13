@@ -53,7 +53,11 @@ import {
   calendarStatusForShow,
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
-import { durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
+import {
+  dateToBookingApiIso,
+  durationMinutesBetween,
+  endTimeFromStartAndDuration,
+} from "@/lib/showTiming";
 import { computeEventWorkTotals, computeShowStaffingStats, parseStaffingOkMap } from "@/lib/eventShowStaffing";
 import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
 import { Button } from "@/components/ui/button";
@@ -2299,11 +2303,6 @@ function toISODateLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function toLocalDatetimeInput(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 type ScheduleResponse = {
   events: EventDetail[];
   bookings: InternalBookingDetail[];
@@ -2579,8 +2578,8 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
     }
     createBooking.mutate({
       title: `${event.title} venue`,
-      startDate: toLocalDatetimeInput(start),
-      endDate: toLocalDatetimeInput(end),
+      startDate: dateToBookingApiIso(start),
+      endDate: dateToBookingApiIso(end),
       venueId,
     });
   };
@@ -2609,8 +2608,8 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
     if (item.kind !== "booking") return;
     updateBookingTime.mutate({
       id: item.id,
-      startDate: toLocalDatetimeInput(start),
-      endDate: toLocalDatetimeInput(end),
+      startDate: dateToBookingApiIso(start),
+      endDate: dateToBookingApiIso(end),
     });
   };
 
