@@ -272,19 +272,23 @@ bookingsRouter.put("/bookings/:id", zValidator("json", UpdateInternalBookingSche
   if (!existing)
     return c.json({ error: { message: "Booking not found", code: "NOT_FOUND" } }, 404);
 
-  // Locked bookings can only be unlocked. Reject any other change.
+  const noBookingFieldExceptLock =
+    body.title === undefined &&
+    body.description === undefined &&
+    body.startDate === undefined &&
+    body.endDate === undefined &&
+    body.type === undefined &&
+    body.venueId === undefined &&
+    body.eventId === undefined &&
+    body.personIds === undefined;
+
+  // Locked bookings: allow unlock, or idempotent lock-only (same isLocked as DB). Reject other changes.
   if (existing.isLocked) {
-    const onlyUnlocking =
-      body.isLocked === false &&
-      body.title === undefined &&
-      body.description === undefined &&
-      body.startDate === undefined &&
-      body.endDate === undefined &&
-      body.type === undefined &&
-      body.venueId === undefined &&
-      body.eventId === undefined &&
-      body.personIds === undefined;
-    if (!onlyUnlocking) {
+    const lockOnlyAllowed =
+      noBookingFieldExceptLock &&
+      body.isLocked !== undefined &&
+      (body.isLocked === false || body.isLocked === existing.isLocked);
+    if (!lockOnlyAllowed) {
       return c.json(
         {
           error: {
@@ -306,7 +310,10 @@ bookingsRouter.put("/bookings/:id", zValidator("json", UpdateInternalBookingSche
         ? new Date(body.endDate)
         : null
       : existing.endDate;
-  if (mergedType === "venue_booking") {
+  const shouldValidateVenueWindow =
+    mergedType === "venue_booking" &&
+    (body.startDate !== undefined || body.endDate !== undefined || body.type !== undefined);
+  if (shouldValidateVenueWindow) {
     if (!mergedEnd || mergedEnd.getTime() <= mergedStart.getTime()) {
       return c.json(
         {

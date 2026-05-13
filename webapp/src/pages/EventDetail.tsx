@@ -2560,7 +2560,12 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
       toast({ title: vars.locked ? "Venue booking locked" : "Venue booking unlocked" });
     },
-    onError: () => toast({ title: "Failed to update lock state", variant: "destructive" }),
+    onError: (e) =>
+      toast({
+        title: "Failed to update lock state",
+        description: isApiError(e) ? e.message : undefined,
+        variant: "destructive",
+      }),
   });
 
   const handleSelectTimeRange = (start: Date, end: Date) => {
