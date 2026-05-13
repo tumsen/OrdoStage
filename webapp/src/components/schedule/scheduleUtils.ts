@@ -422,6 +422,24 @@ export function scheduleVisibilityFilterKey(item: CalendarItem): ScheduleVisibil
   return "other";
 }
 
+/**
+ * Whether a calendar row passes the Schedule "Show:" toggles. Internal bookings that occupy a
+ * venue (`venueId`) also match the "Venue bookings" toggle so maintenance/rehearsal/etc. appear
+ * when viewing venue-heavy schedules even if their DB `type` is not `venue_booking`.
+ */
+export function passesScheduleVisibilityFilters(
+  visibility: Record<ScheduleVisibilityFilterKey, boolean>,
+  item: CalendarItem
+): boolean {
+  const key = scheduleVisibilityFilterKey(item);
+  if (visibility[key]) return true;
+  if (!visibility.venue_booking || item.kind !== "booking") return false;
+  const raw = item.raw as InternalBookingDetail;
+  const t = (raw.type ?? "").trim().toLowerCase();
+  if (t === "venue_booking") return false;
+  return Boolean(raw.venueId?.trim());
+}
+
 /** ISO string includes a time component (not date-only). */
 export function hasTimedStart(item: CalendarItem): boolean {
   if (!item.startDate) return false;

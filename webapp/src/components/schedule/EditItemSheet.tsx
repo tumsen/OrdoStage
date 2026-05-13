@@ -320,6 +320,9 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
         endDate: datetimeLocalInputToBookingApiIso(endDate),
         type,
         venueId: venueId === "none" ? undefined : venueId,
+        personIds: assignedPeople
+          .filter((ap) => ap.personId)
+          .map((ap) => ({ personId: ap.personId, role: ap.role.trim() || undefined })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
