@@ -991,6 +991,16 @@ export default function TimeTracking() {
     }, 0);
   }, [weekDays, totalsByColumnDay]);
 
+  /** Cumulative minutes Mon → this column (same order as `weekDays`). */
+  const weekRunningTotalMinutes = useMemo(() => {
+    let sum = 0;
+    return weekDays.map((d) => {
+      const k = format(d, "yyyy-MM-dd");
+      sum += totalsByColumnDay.get(k) ?? 0;
+      return sum;
+    });
+  }, [weekDays, totalsByColumnDay]);
+
   const periodWeek = getISOWeek(anchor);
   const periodMonth = format(anchor, "MMMM", { locale: dfLocale });
   const periodYear = format(anchor, "yyyy");
@@ -1245,7 +1255,9 @@ export default function TimeTracking() {
           </span>
           {mode === "week" ? (
             <span className="text-xs text-white/60 tabular-nums whitespace-nowrap">
-              Week total {Math.round((weekTotalMinutes / 60) * 10) / 10}h
+              Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
+              <span className="text-white/35"> · </span>
+              {formatTotalMinutesAsHHMM(weekTotalMinutes)}
             </span>
           ) : null}
           {mode === "week" ? (
@@ -1362,9 +1374,10 @@ export default function TimeTracking() {
                     style={{ gridTemplateColumns: weekGridTemplateColumns }}
                   >
                     <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full border-b-0")} aria-hidden />
-                    {weekDays.map((day) => {
+                    {weekDays.map((day, dayIdx) => {
                       const dayYmd = format(day, "yyyy-MM-dd");
                       const dayTotalMinutes = totalsByColumnDay.get(dayYmd) ?? 0;
+                      const runningMinutes = weekRunningTotalMinutes[dayIdx] ?? dayTotalMinutes;
                       const dayOffEntry = (entries ?? []).find(
                         (e) =>
                           (e.category === "vacation" || e.category === "sick" || e.category === "holiday") &&
@@ -1430,10 +1443,23 @@ export default function TimeTracking() {
                               <div className="mt-0.5 text-[10px] text-white/45 leading-snug tabular-nums">
                                 {t("time.calendarWeekIso", { week: getISOWeek(day) })}
                               </div>
-                              <div className="text-[10px] text-white/40 leading-snug tabular-nums">
-                                {formatOneDecimalHour(dayTotalMinutes / 60, commaDec)}
-                                <span className="text-white/25"> · </span>
-                                {formatTotalMinutesAsHHMM(dayTotalMinutes)}
+                              <div className="mt-0.5 space-y-0.5 text-[10px] leading-snug tabular-nums">
+                                <div className="text-white/40">
+                                  <span className="text-white/35">{t("time.weekColumnDayHours")}</span>{" "}
+                                  <span className="text-white/55">
+                                    {formatOneDecimalHour(dayTotalMinutes / 60, commaDec)}
+                                    <span className="text-white/25"> · </span>
+                                    {formatTotalMinutesAsHHMM(dayTotalMinutes)}
+                                  </span>
+                                </div>
+                                <div className="text-white/40">
+                                  <span className="text-white/35">{t("time.weekColumnRunningHours")}</span>{" "}
+                                  <span className="text-white/70">
+                                    {formatOneDecimalHour(runningMinutes / 60, commaDec)}
+                                    <span className="text-white/25"> · </span>
+                                    {formatTotalMinutesAsHHMM(runningMinutes)}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                             {canEditVisiblePeriod && !dayOffEntry ? (

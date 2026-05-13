@@ -54,6 +54,8 @@ const en = {
     dragHint:
       "Drag on empty space to create a block (snaps to 5 minutes). Drag a block to move; drag the top or bottom edge to adjust. Pencil: project, times, category (e.g. Rejsegodtgørsel), tags, note.",
     calendarWeekIso: "Week {{week}}",
+    weekColumnDayHours: "Day",
+    weekColumnRunningHours: "Running",
     gridStartsAt: "Day starts",
     upcomingTitle: "Upcoming assigned jobs",
     weekToolsExpand: "Upcoming jobs & catalog",
@@ -277,6 +279,8 @@ const da: DeepPartial<typeof en> = {
     editTimePreciseHint:
       "Brug præcis tid (TT:MM), fx 07:24 for 7 t. 24 min. Træk på ugen snupper stadig til 5 minutter.",
     weekToolsExpand: "Kommende jobs & katalog",
+    weekColumnDayHours: "Dag",
+    weekColumnRunningHours: "Sum",
   },
   account: {
     title: "Konto",
