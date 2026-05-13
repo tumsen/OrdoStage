@@ -6,6 +6,7 @@ import { excludeMirroredEventInternalBookings } from "../internalBookingMirrorFi
 import { CreateInternalBookingSchema, UpdateInternalBookingSchema } from "../types";
 import { canAction } from "../requestRole";
 import { internalBookingOverlapsRangeWhere } from "../bookingRangeQuery";
+import { parseIncomingDateTime, parseIncomingDateTimeOrNull } from "../parseIncomingDateTime";
 
 const bookingsRouter = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -212,8 +213,8 @@ bookingsRouter.post("/bookings", zValidator("json", CreateInternalBookingSchema)
     data: {
       title: body.title,
       description: body.description ?? null,
-      startDate: new Date(body.startDate),
-      endDate: body.endDate ? new Date(body.endDate) : null,
+      startDate: parseIncomingDateTime(body.startDate),
+      endDate: parseIncomingDateTimeOrNull(body.endDate ?? undefined),
       type: body.type ?? "other",
       venueId: body.venueId ?? null,
       eventId: body.eventId ?? null,
@@ -303,11 +304,11 @@ bookingsRouter.put("/bookings/:id", zValidator("json", UpdateInternalBookingSche
 
   const mergedType = body.type ?? existing.type;
   const mergedStart =
-    body.startDate !== undefined ? new Date(body.startDate) : existing.startDate;
+    body.startDate !== undefined ? parseIncomingDateTime(body.startDate) : existing.startDate;
   const mergedEnd =
     body.endDate !== undefined
       ? body.endDate
-        ? new Date(body.endDate)
+        ? parseIncomingDateTime(body.endDate)
         : null
       : existing.endDate;
   const shouldValidateVenueWindow =
@@ -346,9 +347,9 @@ bookingsRouter.put("/bookings/:id", zValidator("json", UpdateInternalBookingSche
     data: {
       ...(body.title !== undefined && { title: body.title }),
       ...(body.description !== undefined && { description: body.description }),
-      ...(body.startDate !== undefined && { startDate: new Date(body.startDate) }),
+      ...(body.startDate !== undefined && { startDate: parseIncomingDateTime(body.startDate) }),
       ...(body.endDate !== undefined && {
-        endDate: body.endDate ? new Date(body.endDate) : null,
+        endDate: body.endDate ? parseIncomingDateTime(body.endDate) : null,
       }),
       ...(body.type !== undefined && { type: body.type }),
       ...(body.venueId !== undefined && { venueId: body.venueId }),

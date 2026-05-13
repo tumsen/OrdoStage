@@ -14,6 +14,7 @@ import {
 import { canAction } from "../requestRole";
 import { dayKeyFromDateInput, normalizeTimeHHMM } from "../lib/timeHHMM";
 import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
+import { parseIncomingDateTime } from "../parseIncomingDateTime";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -458,7 +459,7 @@ toursRouter.post("/tours/:id/shows", zValidator("json", CreateTourShowSchema), a
     return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
   }
 
-  const dateParsed = new Date(body.date);
+  const dateParsed = parseIncomingDateTime(body.date);
   const dayKey = body.dayKey ?? dayKeyFromDateInput(body.date);
 
   const duplicate = await prisma.tourShow.findFirst({
@@ -580,7 +581,7 @@ toursRouter.put(
       where: { id: showId },
       data: {
         ...(body.date !== undefined && {
-          date: new Date(body.date),
+          date: parseIncomingDateTime(body.date),
           dayKey: dayKeyFromDateInput(body.date),
         }),
         ...(body.type !== undefined && { type: body.type }),

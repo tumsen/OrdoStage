@@ -2802,10 +2802,12 @@ function ShowsTab({
   const copyPreviousShow = useMutation({
     mutationFn: () => {
       if (!previousShow) throw new Error("No previous show available");
-      const base = new Date(previousShow.showDate);
-      const shifted = new Date(base.getTime());
-      shifted.setUTCDate(shifted.getUTCDate() + 1);
-      const nextDate = shifted.toISOString().slice(0, 10);
+      const ymd = previousShow.showDate.slice(0, 10);
+      const anchor = new Date(`${ymd}T12:00:00`);
+      const shifted = new Date(anchor.getTime());
+      shifted.setDate(shifted.getDate() + 1);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const nextDate = `${shifted.getFullYear()}-${pad(shifted.getMonth() + 1)}-${pad(shifted.getDate())}`;
       return api.post(`/api/events/${event.id}/shows`, {
         showDate: nextDate,
         showTime: previousShow.showTime,

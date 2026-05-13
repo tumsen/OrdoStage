@@ -16,6 +16,7 @@ import {
   UpdateEventTeamNoteSchema,
 } from "../types";
 import { canAction } from "../requestRole";
+import { parseIncomingDateTime } from "../parseIncomingDateTime";
 
 const eventsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 const prismaAny = prisma as any;
@@ -669,8 +670,8 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
     data: {
       title: body.title,
       description: body.description ?? null,
-      startDate: body.startDate ? new Date(body.startDate) : null,
-      endDate: body.endDate ? new Date(body.endDate) : null,
+      startDate: body.startDate ? parseIncomingDateTime(body.startDate) : null,
+      endDate: body.endDate ? parseIncomingDateTime(body.endDate) : null,
       status: body.status ?? "draft",
       venueId: body.venueId ?? null,
       tags: body.tags ?? null,
@@ -775,9 +776,12 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
       ...(body.title !== undefined && { title: body.title }),
       ...(body.description !== undefined && { description: body.description }),
       ...(body.startDate !== undefined && {
-        startDate: body.startDate === null || body.startDate === "" ? null : new Date(body.startDate),
+        startDate:
+          body.startDate === null || body.startDate === "" ? null : parseIncomingDateTime(body.startDate),
       }),
-      ...(body.endDate !== undefined && { endDate: body.endDate ? new Date(body.endDate) : null }),
+      ...(body.endDate !== undefined && {
+        endDate: body.endDate ? parseIncomingDateTime(body.endDate) : null,
+      }),
       ...(body.venueId !== undefined && { venueId: body.venueId }),
       ...(body.tags !== undefined && { tags: body.tags }),
       ...(body.contactPerson !== undefined && { contactPerson: body.contactPerson }),
@@ -1378,7 +1382,7 @@ eventsRouter.post("/events/:id/shows", zValidator("json", CreateEventShowSchema)
   const show = await prismaAny.eventShow.create({
     data: {
       eventId,
-      showDate: new Date(body.showDate),
+      showDate: parseIncomingDateTime(body.showDate),
       showTime: body.showTime,
       durationMinutes: body.durationMinutes,
       venueId: body.venueId,
@@ -1401,7 +1405,7 @@ eventsRouter.post("/events/:id/shows", zValidator("json", CreateEventShowSchema)
   if (ev && ev.startDate == null) {
     await prismaAny.event.update({
       where: { id: eventId },
-      data: { startDate: new Date(body.showDate) },
+      data: { startDate: parseIncomingDateTime(body.showDate) },
     });
   }
   await syncEventRollupStatus(eventId);
@@ -1457,7 +1461,7 @@ eventsRouter.put("/events/:id/shows/:showId", zValidator("json", UpdateEventShow
   await prismaAny.eventShow.update({
     where: { id: showId },
     data: {
-      ...(body.showDate !== undefined ? { showDate: new Date(body.showDate) } : {}),
+      ...(body.showDate !== undefined ? { showDate: parseIncomingDateTime(body.showDate) } : {}),
       ...(body.showTime !== undefined ? { showTime: body.showTime } : {}),
       ...(body.durationMinutes !== undefined ? { durationMinutes: body.durationMinutes } : {}),
       ...(body.venueId !== undefined ? { venueId: body.venueId } : {}),
@@ -1736,7 +1740,7 @@ eventsRouter.post(
       data: {
         showId,
         title: body.title,
-        jobDate: new Date(body.jobDate),
+        jobDate: parseIncomingDateTime(body.jobDate),
         startTime: body.startTime,
         durationMinutes: body.durationMinutes,
         venueId: body.venueId,
@@ -1813,7 +1817,7 @@ eventsRouter.put(
       where: { id: jobId },
       data: {
         ...(body.title !== undefined && { title: body.title }),
-        ...(body.jobDate !== undefined && { jobDate: new Date(body.jobDate) }),
+        ...(body.jobDate !== undefined && { jobDate: parseIncomingDateTime(body.jobDate) }),
         ...(body.startTime !== undefined && { startTime: body.startTime }),
         ...(body.durationMinutes !== undefined && { durationMinutes: body.durationMinutes }),
         ...(body.venueId !== undefined && { venueId: body.venueId }),

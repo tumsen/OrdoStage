@@ -90,10 +90,20 @@ export function calendarDateKeyFromJobDate(isoOrDay: string, fallback: string): 
   return t.slice(0, 10);
 }
 
-/** Parse `datetime-local` value to YYYY-MM-DD and HH:mm (local). */
+/** Parse `datetime-local` value to YYYY-MM-DD and HH:mm (local wall clock). */
 export function parseDatetimeLocal(s: string): { date: string; time: string } {
   if (!s || !s.trim()) return { date: "", time: "" };
   const t = s.trim();
+  /** Full ISO with offset / Z → interpret as instant, then use **local** calendar + clock (for inputs). */
+  if (/\dT\d/.test(t) && /Z|[+-]\d{2}:?\d{2}$/.test(t)) {
+    const d = new Date(t);
+    if (!Number.isFinite(d.getTime())) return { date: "", time: "" };
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return {
+      date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+    };
+  }
   if (!t.includes("T")) return { date: t.slice(0, 10), time: "" };
   const [d, restRaw] = t.split("T");
   if (!d) return { date: "", time: "" };

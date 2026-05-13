@@ -746,7 +746,7 @@ export function OutlookTimeGrid({
                             <div
                               data-handle="resize-top"
                               onPointerDown={(e) => startMoveDrag(item, dayIndex, "resize-start", e)}
-                              className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize z-[30] hover:bg-rose-200/20"
+                              className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize z-[40] hover:bg-rose-200/20"
                               title="Drag to change venue booking start time"
                             />
                           ) : null}
@@ -754,7 +754,7 @@ export function OutlookTimeGrid({
                             <div
                               data-handle="resize-bottom"
                               onPointerDown={(e) => startMoveDrag(item, dayIndex, "resize-end", e)}
-                              className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize z-[30] hover:bg-rose-200/20"
+                              className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize z-[40] hover:bg-rose-200/20"
                               title="Drag to change venue booking end time"
                             />
                           ) : null}
@@ -887,7 +887,7 @@ export function OutlookTimeGrid({
                             <div
                               data-handle="resize-top"
                               onPointerDown={(e) => startMoveDrag(item, dayIndex, "resize-start", e)}
-                              className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize z-[15] hover:bg-white/15"
+                              className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize z-[40] hover:bg-white/15"
                               title="Drag to change start time"
                             />
                           ) : null}
@@ -895,7 +895,7 @@ export function OutlookTimeGrid({
                             <div
                               data-handle="resize-bottom"
                               onPointerDown={(e) => startMoveDrag(item, dayIndex, "resize-end", e)}
-                              className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize z-[15] hover:bg-white/15"
+                              className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize z-[40] hover:bg-white/15"
                               title="Drag to change end time"
                             />
                           ) : null}
