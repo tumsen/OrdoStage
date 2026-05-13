@@ -200,7 +200,7 @@ export function CalendarItemHoverCard({
       <HoverCardContent
         side={side}
         align={align}
-        className="z-[100] w-[min(22rem,calc(100vw-2rem))] max-h-[min(24rem,70vh)] overflow-y-auto border border-white/10 bg-[#14141c] p-3 text-white shadow-xl"
+        className="w-[min(22rem,calc(100vw-2rem))] max-h-[min(24rem,70vh)] overflow-y-auto border border-white/10 bg-[#14141c] p-3 text-white shadow-xl"
         onPointerDown={(e) => e.stopPropagation()}
       >
         <CalendarItemHoverBody item={item} locale={locale} hour12={hour12} />
