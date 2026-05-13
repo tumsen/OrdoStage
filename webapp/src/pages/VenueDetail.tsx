@@ -12,6 +12,7 @@ import {
   getMonthCalendarDays,
   calendarItemVenueIdForFilter,
   formatMonthLabel,
+  toDatetimeLocalValue,
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
@@ -88,6 +89,7 @@ export default function VenueDetail() {
   const [detailItem, setDetailItem] = useState<CalendarItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingSlot, setBookingSlot] = useState<{ startDate: string; endDate: string } | null>(null);
 
   const { from, to } = useMemo(() => {
     if (calendarView === "month") return monthRangeISO(anchorMonth);
@@ -283,6 +285,18 @@ export default function VenueDetail() {
                   readOnly
                   compactDayHeaders
                   fitHoursVertically
+                  rejectCreateDragWhenOverlapping={canWrite}
+                  onSelectTimeRange={
+                    canWrite
+                      ? (start, end) => {
+                          setBookingSlot({
+                            startDate: toDatetimeLocalValue(start),
+                            endDate: toDatetimeLocalValue(end),
+                          });
+                          setBookingOpen(true);
+                        }
+                      : undefined
+                  }
                 />
               )}
             </div>
@@ -306,7 +320,11 @@ export default function VenueDetail() {
 
       <NewBookingDialog
         open={bookingOpen}
-        onClose={() => setBookingOpen(false)}
+        onClose={() => {
+          setBookingOpen(false);
+          setBookingSlot(null);
+        }}
+        initialSlot={bookingSlot}
         venues={venues ?? []}
         people={people ?? []}
         fixedVenueId={venueId}

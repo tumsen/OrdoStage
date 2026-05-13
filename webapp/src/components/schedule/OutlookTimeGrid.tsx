@@ -9,6 +9,7 @@ import {
   layoutTimedBlockInDay,
   computeOverlapLayout,
   calendarItemVenueName,
+  selectionOverlapsExplicitTimedItems,
 } from "./scheduleUtils";
 import { usePreferences } from "@/hooks/usePreferences";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@/lib/weekGridColumns";
 import { bottomBoundaryLabel, formatHourLabel } from "@/lib/timeGrid";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 const SNAP_MINUTES = 15;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -35,6 +37,8 @@ interface OutlookTimeGridProps {
   onDeleteItem?: (item: CalendarItem) => void;
   /** Omitted when drag-to-create new bookings is disabled. */
   onSelectTimeRange?: (start: Date, end: Date) => void;
+  /** When true, drag-to-create is not committed if the range overlaps any timed item (e.g. venue booking grid). */
+  rejectCreateDragWhenOverlapping?: boolean;
   className?: string;
   /** Called when a booking block is dragged to a new position. */
   onUpdateItemTime?: (item: CalendarItem, start: Date, end: Date) => void;
@@ -98,6 +102,55 @@ type CreateDragPayload = {
   currentDayIndex: number;
 };
 
+function resolveCreateDragTimeRange(
+  d: CreateDragPayload,
+  days: Date[],
+  columns: (HTMLDivElement | null)[],
+  yToMinutesFromMidnight: (clientY: number, columnTop: number) => number
+): { startDate: Date; endDate: Date } | null {
+  const startCol = columns[d.dayIndex];
+  if (!startCol) return null;
+  const startMin = yToMinutesFromMidnight(d.startY, startCol.getBoundingClientRect().top);
+
+  const endIdx = Math.max(0, Math.min(days.length - 1, d.currentDayIndex));
+  const endCol = columns[endIdx];
+  if (!endCol) return null;
+  const endMin = yToMinutesFromMidnight(d.currentY, endCol.getBoundingClientRect().top);
+
+  const dxDays = endIdx - d.dayIndex;
+  const dyMin = endMin - startMin;
+  const totalMin = dxDays * 24 * 60 + dyMin;
+  if (
+    Math.abs(d.currentY - d.startY) < WEEK_GRID_MIN_DRAG_PX &&
+    Math.abs(totalMin) < SNAP_MINUTES &&
+    dxDays === 0
+  ) {
+    return null;
+  }
+
+  let startDayIdx = d.dayIndex;
+  let startMinutes = startMin;
+  let endDayIdx = endIdx;
+  let endMinutes = endMin;
+  if (totalMin < 0) {
+    startDayIdx = endIdx;
+    startMinutes = endMin;
+    endDayIdx = d.dayIndex;
+    endMinutes = startMin;
+  }
+
+  const startDay = days[startDayIdx];
+  const endDay = days[endDayIdx];
+  if (!startDay || !endDay) return null;
+  const startDate = dateFromDayAndMinutes(startDay, startMinutes);
+  let endDate = dateFromDayAndMinutes(endDay, endMinutes);
+  if (endDate <= startDate) {
+    endDate = new Date(startDate.getTime() + SNAP_MINUTES * 60 * 1000);
+  }
+  if (endDate.getTime() - startDate.getTime() < SNAP_MINUTES * 60 * 1000) return null;
+  return { startDate, endDate };
+}
+
 type MoveMode = "move" | "resize-start" | "resize-end";
 
 type MoveDragPayload = {
@@ -159,6 +212,7 @@ export function OutlookTimeGrid({
   readOnly = false,
   compactDayHeaders = false,
   fitHoursVertically = false,
+  rejectCreateDragWhenOverlapping = false,
 }: OutlookTimeGridProps) {
   const { effective } = usePreferences();
   const timeFormat = effective?.timeFormat === "12h" ? "12h" : "24h";
@@ -218,57 +272,40 @@ export function OutlookTimeGrid({
   const moveDragRef = useRef<MoveDragPayload | null>(null);
   const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  const createDragRangePreview = useMemo(() => {
+    if (!createDrag || !rejectCreateDragWhenOverlapping) return null;
+    return resolveCreateDragTimeRange(createDrag, days, columnRefs.current, yToMinutesFromMidnight);
+  }, [createDrag, days, rejectCreateDragWhenOverlapping, yToMinutesFromMidnight]);
+
+  const createDragOverlapsOccupied =
+    createDragRangePreview != null &&
+    selectionOverlapsExplicitTimedItems(
+      items,
+      createDragRangePreview.startDate,
+      createDragRangePreview.endDate
+    );
+
   // ── Create drag (drag empty space to make a new booking) ────────────────
   const endCreateDrag = useCallback(() => {
     const d = createDragRef.current;
     createDragRef.current = null;
     setCreateDrag(null);
     if (!d) return;
-    const startCol = columnRefs.current[d.dayIndex];
-    if (!startCol) return;
-    const startMin = yToMinutesFromMidnight(d.startY, startCol.getBoundingClientRect().top);
-
-    const endIdx = Math.max(0, Math.min(days.length - 1, d.currentDayIndex));
-    const endCol = columnRefs.current[endIdx];
-    if (!endCol) return;
-    const endMin = yToMinutesFromMidnight(d.currentY, endCol.getBoundingClientRect().top);
-
-    const dxDays = endIdx - d.dayIndex;
-    const dyMin = endMin - startMin;
-    const totalMin = dxDays * 24 * 60 + dyMin;
-    if (
-      Math.abs(d.currentY - d.startY) < WEEK_GRID_MIN_DRAG_PX &&
-      Math.abs(totalMin) < SNAP_MINUTES &&
-      dxDays === 0
-    ) {
+    const range = resolveCreateDragTimeRange(d, days, columnRefs.current, yToMinutesFromMidnight);
+    if (!range) return;
+    if (rejectCreateDragWhenOverlapping && selectionOverlapsExplicitTimedItems(items, range.startDate, range.endDate)) {
+      toast({
+        title: "Time not available",
+        description: "That range overlaps an existing booking or event.",
+        variant: "destructive",
+      });
       return;
     }
-
-    let startDayIdx = d.dayIndex;
-    let startMinutes = startMin;
-    let endDayIdx = endIdx;
-    let endMinutes = endMin;
-    if (totalMin < 0) {
-      startDayIdx = endIdx;
-      startMinutes = endMin;
-      endDayIdx = d.dayIndex;
-      endMinutes = startMin;
-    }
-
-    const startDay = days[startDayIdx];
-    const endDay = days[endDayIdx];
-    if (!startDay || !endDay) return;
-    const startDate = dateFromDayAndMinutes(startDay, startMinutes);
-    let endDate = dateFromDayAndMinutes(endDay, endMinutes);
-    if (endDate <= startDate) {
-      endDate = new Date(startDate.getTime() + SNAP_MINUTES * 60 * 1000);
-    }
-    if (endDate.getTime() - startDate.getTime() < SNAP_MINUTES * 60 * 1000) return;
-    onSelectTimeRange?.(startDate, endDate);
-  }, [onSelectTimeRange, days, yToMinutesFromMidnight]);
+    onSelectTimeRange?.(range.startDate, range.endDate);
+  }, [onSelectTimeRange, days, yToMinutesFromMidnight, items, rejectCreateDragWhenOverlapping]);
 
   const handleColumnPointerDown = (day: Date, dayIndex: number, e: React.PointerEvent) => {
-    if (readOnly || !onSelectTimeRange) return;
+    if (!onSelectTimeRange) return;
     const t = e.target as HTMLElement;
     if (t.closest("[data-booking-block]")) return;
     const col = columnRefs.current[dayIndex];
@@ -645,7 +682,12 @@ export function OutlookTimeGrid({
                     : SNAP_MINUTES;
                   selectionOverlay = (
                     <div
-                      className="absolute left-1 right-1 rounded-md border-2 border-rose-400/80 bg-rose-500/25 z-[5] pointer-events-none flex flex-col justify-start px-1.5 py-1 overflow-hidden"
+                      className={cn(
+                        "absolute left-1 right-1 rounded-md border-2 z-[5] pointer-events-none flex flex-col justify-start px-1.5 py-1 overflow-hidden",
+                        createDragOverlapsOccupied
+                          ? "border-amber-400/90 bg-amber-500/25"
+                          : "border-rose-400/80 bg-rose-500/25"
+                      )}
                       style={{ top: topPx, height: hPx }}
                     >
                       {showLabel && startAt && endAtRaw ? (

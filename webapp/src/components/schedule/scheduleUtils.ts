@@ -518,6 +518,21 @@ export function getItemTimeRange(item: CalendarItem): { start: Date; end: Date; 
   return { start, end, hasExplicitTime };
 }
 
+/** True if [rangeStart, rangeEnd] overlaps any timed item (interval overlap; touching endpoints do not count). */
+export function selectionOverlapsExplicitTimedItems(
+  items: CalendarItem[],
+  rangeStart: Date,
+  rangeEnd: Date
+): boolean {
+  for (const item of items) {
+    if (item.kind === "summary") continue;
+    const { start, end, hasExplicitTime } = getItemTimeRange(item);
+    if (!hasExplicitTime) continue;
+    if (rangeStart < end && rangeEnd > start) return true;
+  }
+  return false;
+}
+
 /**
  * Position a timed block inside a single calendar day column (local timezone).
  * Uses millisecond deltas so spans past midnight render correctly up to end of day.
