@@ -258,6 +258,22 @@ export default function VenueDetail() {
                   </Button>
                 </>
               )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-white/50 hover:text-white hover:bg-white/5"
+                onClick={() => {
+                  const t = new Date();
+                  if (calendarView === "month") {
+                    setAnchorMonth(new Date(t.getFullYear(), t.getMonth(), 1));
+                  } else {
+                    setNext31Start(startOfLocalDay(t));
+                  }
+                }}
+              >
+                Today
+              </Button>
               {canWrite ? (
                 <Button
                   type="button"
