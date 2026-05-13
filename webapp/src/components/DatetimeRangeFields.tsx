@@ -4,16 +4,16 @@ import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { Label } from "@/components/ui/label";
 import {
-  ScheduleTimeRow,
-  scheduleDateInputClass,
-  scheduleFieldLabelClass,
-} from "./ScheduleTimeRow";
-import {
   buildDatetimeLocal,
   durationMinutesBetweenDatetimesUncapped,
   parseDatetimeLocal,
   toDatetimeLocalString,
 } from "@/lib/showTiming";
+
+/** Same label style as event show rows (`ShowTimeEditor` / new show form). */
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <Label className="text-white/60 text-xs uppercase tracking-wide block mb-1.5">{children}</Label>;
+}
 
 function formatDurationHint(totalMinutes: number): string {
   if (totalMinutes < 60) return `${totalMinutes} min`;
@@ -22,8 +22,11 @@ function formatDurationHint(totalMinutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+const dateInputClass = "bg-white/5 border-white/10 text-white [color-scheme:dark]";
+
 /**
- * Start and end each with **own date + time** so multi-day spans are obvious in edit mode.
+ * Same layout as event **shows**: one horizontal row — start date, start time, end date, end time
+ * (`DateInputWithWeekday` + `SplitTimeInput`), so multi-day bookings match the shows UI.
  */
 export function DatetimeRangeFields({
   startValue,
@@ -86,64 +89,52 @@ export function DatetimeRangeFields({
 
   return (
     <div className={className}>
-      <div className="space-y-4">
-        <div>
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-white/50">Start</p>
-          <ScheduleTimeRow>
-            <div className="shrink-0">
-              <Label className={scheduleFieldLabelClass}>Start date</Label>
-              <DateInputWithWeekday
-                value={startDate}
-                onChange={setStartDate}
-                className={scheduleDateInputClass}
-                weekdayClassName="text-sm text-white/45"
-              />
-            </div>
-            <div className="shrink-0">
-              <Label className={scheduleFieldLabelClass}>Start time</Label>
-              <SplitTimeInput
-                ref={refStartTime}
-                value={startT}
-                onChange={setStartTime}
-                nextFieldRef={refEndTime}
-                aria-label="Start time"
-              />
-            </div>
-          </ScheduleTimeRow>
+      <div className="flex flex-nowrap items-end gap-3 min-w-0 overflow-x-auto pb-0.5">
+        <div className="shrink-0">
+          <FieldLabel>Start date</FieldLabel>
+          <DateInputWithWeekday
+            value={startDate}
+            onChange={setStartDate}
+            className={dateInputClass}
+            weekdayClassName="text-sm text-white/45"
+          />
         </div>
-
-        <div>
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-white/50">End</p>
-          <ScheduleTimeRow>
-            <div className="shrink-0">
-              <Label className={scheduleFieldLabelClass}>End date</Label>
-              <DateInputWithWeekday
-                value={endDate}
-                onChange={setEndDate}
-                className={scheduleDateInputClass}
-                weekdayClassName="text-sm text-white/45"
-              />
-            </div>
-            <div className="shrink-0">
-              <Label className={scheduleFieldLabelClass}>End time</Label>
-              <SplitTimeInput
-                ref={refEndTime}
-                value={endT}
-                onChange={setEndTime}
-                aria-label="End time"
-                disabled={!hasStartTime}
-              />
-            </div>
-          </ScheduleTimeRow>
+        <div className="shrink-0">
+          <FieldLabel>Start</FieldLabel>
+          <SplitTimeInput
+            ref={refStartTime}
+            value={startT}
+            nextFieldRef={refEndTime}
+            aria-label="Start time"
+            onChange={setStartTime}
+          />
+        </div>
+        <div className="shrink-0">
+          <FieldLabel>End date</FieldLabel>
+          <DateInputWithWeekday
+            value={endDate}
+            onChange={setEndDate}
+            className={dateInputClass}
+            weekdayClassName="text-sm text-white/45"
+          />
+        </div>
+        <div className="shrink-0">
+          <FieldLabel>End</FieldLabel>
+          <SplitTimeInput
+            ref={refEndTime}
+            value={endT}
+            aria-label="End time"
+            disabled={!hasStartTime}
+            onChange={setEndTime}
+          />
         </div>
       </div>
 
       {durationHint ? (
-        <p className="mt-3 text-[11px] text-white/40 tabular-nums">Duration · {durationHint}</p>
+        <p className="mt-2 text-[11px] text-white/40 tabular-nums">Duration · {durationHint}</p>
       ) : (
-        <p className="mt-3 text-[11px] text-white/35">
-          Set start date/time and end date/time so the end is after the start (different end dates are
-          allowed).
+        <p className="mt-2 text-[11px] text-white/35">
+          Set start and end so the end is after the start (end date can differ from start date).
         </p>
       )}
     </div>
