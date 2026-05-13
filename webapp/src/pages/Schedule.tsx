@@ -23,6 +23,9 @@ import {
   formatMonthLabel,
   itemsForDay,
   toDatetimeLocalValue,
+  calendarItemVenueName,
+  calendarItemTimeRangeLabel,
+  calendarVenueBookingSummaryLine,
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
@@ -601,6 +604,12 @@ export default function Schedule() {
                         <div className="space-y-1">
                           {foregroundItems.map((item) => {
                             const backing = backingVenueBookingFor(item, backingItems);
+                            const venueLine = calendarItemVenueName(item);
+                            const timeLine = calendarItemTimeRangeLabel(item);
+                            const detailLine = [timeLine, venueLine && `@ ${venueLine}`].filter(Boolean).join(" · ");
+                            const titleText = backing
+                              ? `${item.title} · ${calendarVenueBookingSummaryLine(backing)}`
+                              : [item.title, detailLine].filter(Boolean).join(" · ");
                             return (
                               <button
                                 key={item.id}
@@ -610,12 +619,17 @@ export default function Schedule() {
                                 className={`relative w-full overflow-hidden text-left text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 ${
                                   backing ? "ring-2 ring-rose-300/70 shadow-[0_0_0_2px_rgba(244,63,94,0.22)]" : ""
                                 }`}
-                                title={backing ? `${item.title} · venue booked` : item.title}
+                                title={titleText}
                               >
                                 {backing ? (
                                   <span className="absolute inset-0 bg-rose-500/20 pointer-events-none" aria-hidden="true" />
                                 ) : null}
-                                <span className="relative">{item.title}</span>
+                                <span className="relative block font-medium truncate">{item.title}</span>
+                                {detailLine ? (
+                                  <span className="relative block text-[10px] text-white/55 truncate leading-snug">
+                                    {detailLine}
+                                  </span>
+                                ) : null}
                               </button>
                             );
                           })}

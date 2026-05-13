@@ -8,6 +8,7 @@ import {
   getItemTimeRange,
   layoutTimedBlockInDay,
   computeOverlapLayout,
+  calendarItemVenueName,
 } from "./scheduleUtils";
 import { usePreferences } from "@/hooks/usePreferences";
 import {
@@ -655,6 +656,10 @@ export function OutlookTimeGrid({
                     minute: "2-digit",
                     hour12: effective?.timeFormat === "12h",
                   })}`;
+                  const venueNm = calendarItemVenueName(item);
+                  const bgTooltip = ["Venue booking", item.title, venueNm && `@ ${venueNm}`, timeLabel]
+                    .filter(Boolean)
+                    .join(" · ");
 
                   return (
                     <div
@@ -673,7 +678,7 @@ export function OutlookTimeGrid({
                           canDrag ? "cursor-grab active:cursor-grabbing" : ""
                         }`}
                         style={{ zIndex: 4 }}
-                        title={`Venue booking · ${item.title} · ${timeLabel}`}
+                        title={bgTooltip}
                         onPointerDown={(e) => {
                           if ((e.target as HTMLElement).closest("[data-handle]")) return;
                           if (canDrag) startMoveDrag(item, dayIndex, "move", e);
@@ -775,14 +780,7 @@ export function OutlookTimeGrid({
                   const canDrag = isBooking && !isDisabled && !isLocked && Boolean(onUpdateItemTime);
                   const isBeingDragged = moveDrag?.item.id === item.id && moveDrag.passed;
 
-                  const venueName =
-                    item.kind === "job"
-                      ? item.venueLabel
-                      : item.kind === "tour"
-                        ? item.venueLabel
-                        : item.kind === "event"
-                          ? (item.raw as EventDetail).venue?.name
-                          : (item.raw as InternalBookingDetail).venue?.name;
+                  const venueName = calendarItemVenueName(item);
                   const creatorName =
                     item.kind === "booking" ? (item.raw as InternalBookingDetail).createdBy?.name : undefined;
 
@@ -845,20 +843,18 @@ export function OutlookTimeGrid({
                           >
                             <span className="truncate font-semibold text-[9px] leading-tight whitespace-nowrap">
                               {item.title}
+                              {venueName ? ` · ${venueName}` : ""}
                             </span>
                           </div>
                         ) : (
                           <div className="flex flex-col h-full px-1.5 py-1 overflow-hidden">
                             <div className="truncate font-semibold text-[11px] leading-tight shrink-0 pr-9">
                               {item.title}
-                              {venueName && (item.kind === "event" || item.kind === "job" || item.kind === "tour") ? (
-                                <span className="font-normal opacity-75"> @ {venueName}</span>
-                              ) : null}
+                              {venueName ? <span className="font-normal opacity-75"> @ {venueName}</span> : null}
                             </div>
                             <div className="flex items-center gap-1 text-[10px] leading-tight mt-0.5 opacity-90 flex-1 min-h-0 overflow-hidden pr-9">
                               <span className="truncate shrink-0">
                                 {timeLabel}
-                                {item.kind === "booking" && venueName ? ` · ${venueName}` : ""}
                                 {creatorName ? ` · ${creatorName}` : ""}
                               </span>
                               <StatusLabel status={item.status} />

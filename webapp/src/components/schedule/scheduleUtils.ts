@@ -352,6 +352,47 @@ export function hasTimedStart(item: CalendarItem): boolean {
   return /\dT\d/.test(item.startDate);
 }
 
+/** Venue name for calendar chips (events, jobs, tours, internal bookings). */
+export function calendarItemVenueName(item: CalendarItem): string | undefined {
+  if (item.kind === "job" || item.kind === "tour") {
+    const v = item.venueLabel?.trim();
+    return v || undefined;
+  }
+  if (item.kind === "event") {
+    const v = (item.raw as EventDetail).venue?.name?.trim();
+    return v || undefined;
+  }
+  if (item.kind === "booking") {
+    const v = (item.raw as InternalBookingDetail).venue?.name?.trim();
+    return v || undefined;
+  }
+  return undefined;
+}
+
+/** Local time (or range) for calendar tooltips and compact lines. */
+export function calendarItemTimeRangeLabel(item: CalendarItem, hour12?: boolean): string {
+  if (!hasTimedStart(item)) return "";
+  const start = new Date(item.startDate);
+  if (!Number.isFinite(start.getTime())) return "";
+  const opts: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" };
+  if (hour12 != null) opts.hour12 = hour12;
+  const a = start.toLocaleTimeString(undefined, opts);
+  if (item.endDate) {
+    const end = new Date(item.endDate);
+    if (!Number.isFinite(end.getTime())) return a;
+    return `${a}–${end.toLocaleTimeString(undefined, opts)}`;
+  }
+  return a;
+}
+
+/** One-line summary for tooltips when a venue booking sits behind an event. */
+export function calendarVenueBookingSummaryLine(item: CalendarItem): string {
+  if (item.kind !== "booking") return item.title;
+  const v = calendarItemVenueName(item);
+  const t = calendarItemTimeRangeLabel(item);
+  return [item.title, v && `@ ${v}`, t].filter(Boolean).join(" · ");
+}
+
 export function getItemTimeRange(item: CalendarItem): { start: Date; end: Date; hasExplicitTime: boolean } {
   const start = new Date(item.startDate || 0);
   const end = item.endDate ? new Date(item.endDate) : new Date(start.getTime() + 60 * 60 * 1000);

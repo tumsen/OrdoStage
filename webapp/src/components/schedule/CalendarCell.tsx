@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { CalendarItem } from "./scheduleUtils";
 import type { InternalBookingDetail, EventDetail } from "../../../../backend/src/types";
-import { itemColor, itemsForDay, hasTimedStart } from "./scheduleUtils";
+import { itemColor, itemsForDay, hasTimedStart, calendarItemVenueName, calendarItemTimeRangeLabel, calendarVenueBookingSummaryLine } from "./scheduleUtils";
 
 const PILL_LIMIT = 3;
 
@@ -85,14 +85,11 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
       <div className="flex flex-col gap-0.5 flex-1">
         {visible.map((item) => {
           const backing = backingFor(item);
-          const venueName =
-            item.kind === "job"
-              ? item.venueLabel
-              : item.kind === "tour"
-                ? item.venueLabel
-                : item.kind === "event"
-                  ? (item.raw as EventDetail).venue?.name
-                  : undefined;
+          const venueName = calendarItemVenueName(item);
+          const backingSummary = backing ? calendarVenueBookingSummaryLine(backing) : "";
+          const itemSummary = [item.title, venueName && `@ ${venueName}`, calendarItemTimeRangeLabel(item)]
+            .filter(Boolean)
+            .join(" · ");
           return (
             <button
               key={item.id}
@@ -105,7 +102,11 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
                 itemColor(item),
                 backing && "ring-2 ring-rose-300/70 shadow-[0_0_0_2px_rgba(244,63,94,0.22)]"
               )}
-              title={backing ? `${item.title} · venue booked` : item.title}
+              title={
+                backing
+                  ? `${itemSummary} · Venue: ${backingSummary}`
+                  : itemSummary
+              }
             >
               {backing ? (
                 <span className="absolute inset-0 bg-rose-500/20 pointer-events-none" aria-hidden="true" />
