@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import type { EventDetail, InternalBookingDetail, TourDetail } from "../../../../backend/src/types";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import {
@@ -46,6 +47,52 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
   );
 }
 
+function StartEndRows({
+  start,
+  end,
+  hasExplicitTime,
+  locale,
+  hour12,
+}: {
+  start: Date;
+  end: Date;
+  hasExplicitTime: boolean;
+  locale: string;
+  hour12: boolean;
+}) {
+  if (hasExplicitTime) {
+    return (
+      <>
+        <DetailRow label="Start:">{formatDateTime(start, locale, hour12)}</DetailRow>
+        <DetailRow label="End:">{formatDateTime(end, locale, hour12)}</DetailRow>
+      </>
+    );
+  }
+  return (
+    <>
+      <DetailRow label="Start:">{formatDate(start, locale)}</DetailRow>
+      <DetailRow label="End:">
+        {end.getTime() !== start.getTime() ? formatDate(end, locale) : formatDate(end, locale)}
+      </DetailRow>
+    </>
+  );
+}
+
+function GoToEventLink({ eventId }: { eventId: string }) {
+  if (!eventId) return null;
+  return (
+    <div className="pt-2 border-t border-white/10 mt-2">
+      <Link
+        to={`/events/${eventId}`}
+        className="text-[11px] font-medium text-sky-300 hover:text-sky-200 underline underline-offset-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        Go to event
+      </Link>
+    </div>
+  );
+}
+
 function CalendarItemHoverBody({
   item,
   locale,
@@ -56,9 +103,6 @@ function CalendarItemHoverBody({
   hour12: boolean;
 }) {
   const { start, end, hasExplicitTime } = getItemTimeRange(item);
-  const rangeLabel = hasExplicitTime
-    ? `${formatDateTime(start, locale, hour12)} – ${formatDateTime(end, locale, hour12)}`
-    : `${formatDate(start, locale)}${end.getTime() !== start.getTime() ? ` – ${formatDate(end, locale)}` : ""} (all day)`;
 
   const kindLabel =
     item.kind === "booking"
@@ -87,7 +131,7 @@ function CalendarItemHoverBody({
         </div>
         <div className="space-y-1.5 border-t border-white/10 pt-2">
           <DetailRow label="Type">{bookingTypeLabel(b.type)}</DetailRow>
-          <DetailRow label="When">{rangeLabel}</DetailRow>
+          <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
           <DetailRow label="Status">{item.status}</DetailRow>
           <DetailRow label="Venue">{b.venue?.name}</DetailRow>
           {(b.venue?.addressCity || b.venue?.addressStreet) && (
@@ -103,8 +147,8 @@ function CalendarItemHoverBody({
           <DetailRow label="Created">{b.createdAt ? formatDateTime(new Date(b.createdAt), locale, hour12) : null}</DetailRow>
           <DetailRow label="Updated">{b.updatedAt ? formatDateTime(new Date(b.updatedAt), locale, hour12) : null}</DetailRow>
           {b.isLocked ? <DetailRow label="Lock">Locked</DetailRow> : null}
-          {b.eventId ? <DetailRow label="Linked">Mirrored from an event on this schedule</DetailRow> : null}
         </div>
+        {b.eventId ? <GoToEventLink eventId={b.eventId} /> : null}
       </div>
     );
   }
@@ -118,11 +162,12 @@ function CalendarItemHoverBody({
           <div className="text-sm font-semibold text-white leading-tight mt-0.5">{item.title}</div>
         </div>
         <div className="space-y-1.5 border-t border-white/10 pt-2">
-          <DetailRow label="When">{rangeLabel}</DetailRow>
+          <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
           <DetailRow label="Status">{item.status ?? ev.status}</DetailRow>
           <DetailRow label="Venue">{ev.venue?.name}</DetailRow>
           <DetailRow label="Description">{ev.description?.trim()}</DetailRow>
         </div>
+        <GoToEventLink eventId={ev.id} />
       </div>
     );
   }
@@ -136,11 +181,12 @@ function CalendarItemHoverBody({
           <div className="text-sm font-semibold text-white leading-tight mt-0.5">{item.title}</div>
         </div>
         <div className="space-y-1.5 border-t border-white/10 pt-2">
-          <DetailRow label="When">{rangeLabel}</DetailRow>
+          <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
           <DetailRow label="Status">{item.status}</DetailRow>
           <DetailRow label="Venue">{item.venueLabel ?? ev.venue?.name}</DetailRow>
           <DetailRow label="Event">{ev.title}</DetailRow>
         </div>
+        <GoToEventLink eventId={ev.id} />
       </div>
     );
   }
@@ -154,7 +200,7 @@ function CalendarItemHoverBody({
           <div className="text-sm font-semibold text-white leading-tight mt-0.5">{item.title}</div>
         </div>
         <div className="space-y-1.5 border-t border-white/10 pt-2">
-          <DetailRow label="When">{rangeLabel}</DetailRow>
+          <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
           <DetailRow label="Status">{item.status ?? tour.status}</DetailRow>
           <DetailRow label="Venue / city">{item.venueLabel}</DetailRow>
         </div>
@@ -169,7 +215,7 @@ function CalendarItemHoverBody({
         <div className="text-sm font-semibold text-white leading-tight mt-0.5">{item.title}</div>
       </div>
       <div className="space-y-1.5 border-t border-white/10 pt-2">
-        <DetailRow label="When">{rangeLabel}</DetailRow>
+        <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
         <DetailRow label="Status">{item.status}</DetailRow>
       </div>
     </div>
