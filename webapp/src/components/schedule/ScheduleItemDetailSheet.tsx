@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Calendar, Clock, MapPin, Pencil, UserCircle, Users } from "lucide-react";
 import type { CalendarItem } from "./scheduleUtils";
-import { hasTimedStart, itemColor } from "./scheduleUtils";
+import { getItemTimeRange, itemColor } from "./scheduleUtils";
 import { cn } from "@/lib/utils";
 import type {
   EventDetail,
@@ -23,6 +23,7 @@ import {
   sortedTourScheduleEvents,
   tourShowScheduleSummaryCompact,
 } from "@/lib/tourScheduleDisplay";
+import { usePreferences } from "@/hooks/usePreferences";
 
 const BOOKING_TYPE_LABELS: Record<string, string> = {
   rehearsal: "Rehearsal",
@@ -40,17 +41,36 @@ const STATUS_BADGE: Record<string, string> = {
   completed: "bg-slate-800/80 text-slate-300 border border-slate-600/50",
 };
 
-function formatRange(startIso: string, endIso: string | null, locale: string, hasTime: boolean): string {
-  const s = new Date(startIso);
-  const e = endIso ? new Date(endIso) : null;
-  const opts: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
-  if (!Number.isFinite(s.getTime())) return startIso;
-  if (!hasTime) {
-    return s.toLocaleDateString(locale, { dateStyle: "medium" });
+function formatScheduleInstant(d: Date, locale: string, hasTime: boolean, hour12: boolean): string {
+  if (!Number.isFinite(d.getTime())) return "—";
+  if (hasTime) {
+    return d.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short", hour12 });
   }
-  const a = s.toLocaleString(locale, opts);
-  if (!e || !Number.isFinite(e.getTime())) return a;
-  return `${a} → ${e.toLocaleString(locale, opts)}`;
+  return d.toLocaleDateString(locale, { dateStyle: "medium" });
+}
+
+function ScheduleStartEndBlock({ item, locale, hour12 }: { item: CalendarItem; locale: string; hour12: boolean }) {
+  const { start, end, hasExplicitTime } = getItemTimeRange(item);
+  const startStr = formatScheduleInstant(start, locale, hasExplicitTime, hour12);
+  const endStr = formatScheduleInstant(end, locale, hasExplicitTime, hour12);
+  return (
+    <div className="flex gap-3">
+      <span className="mt-0.5 shrink-0 text-white/35 [&_svg]:block">
+        <Clock size={16} />
+      </span>
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-2 gap-y-1.5 text-sm leading-snug items-baseline">
+          <span className="text-white/45">Start:</span>
+          <span className="text-white/85 tabular-nums">{startStr}</span>
+          <span className="text-white/45">End:</span>
+          <span className="text-white/85 tabular-nums">{endStr}</span>
+        </div>
+        {!hasExplicitTime ? (
+          <p className="text-xs text-white/40">No specific start time on this block.</p>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function formatAddress(parts: {
@@ -112,6 +132,8 @@ export function ScheduleItemDetailSheet({
 }) {
   const open = item !== null;
   const canEdit = Boolean(onEdit) && item && item.kind !== "tour";
+  const { effective } = usePreferences();
+  const hour12 = effective?.timeFormat !== "24h";
 
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
@@ -151,12 +173,7 @@ export function ScheduleItemDetailSheet({
             </SheetHeader>
 
             <div className="flex-1 overflow-y-auto min-h-0 py-4 space-y-5">
-              <DetailBlock icon={<Clock size={16} />} label="When">
-                {formatRange(item.startDate, item.endDate, locale, hasTimedStart(item))}
-                {!hasTimedStart(item) ? (
-                  <span className="block text-xs text-white/40 mt-1">No specific start time on this block.</span>
-                ) : null}
-              </DetailBlock>
+              <ScheduleStartEndBlock item={item} locale={locale} hour12={hour12} />
 
               {item.kind === "booking" ? (
                 <BookingBody item={item} />
