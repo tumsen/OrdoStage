@@ -23,6 +23,7 @@ import {
 import { bottomBoundaryLabel, formatHourLabel } from "@/lib/timeGrid";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { CalendarItemHoverCard } from "@/components/schedule/CalendarItemHoverCard";
 
 const SNAP_MINUTES = 15;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -216,6 +217,7 @@ export function OutlookTimeGrid({
 }: OutlookTimeGridProps) {
   const { effective } = usePreferences();
   const timeFormat = effective?.timeFormat === "12h" ? "12h" : "24h";
+  const hour12 = timeFormat === "12h";
   const locale = effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
 
   const compactMonthBannerLabel = useMemo(() => {
@@ -555,22 +557,22 @@ export function OutlookTimeGrid({
                       const isDisabled = item.disabled === true;
                       return (
                         <div key={item.id} className="group/all relative flex items-center">
-                          <button
-                            data-booking-block
-                            onClick={() => { if (!isDisabled) onItemClick(item); }}
-                            className={`flex-1 text-left text-[10px] px-1.5 py-0.5 rounded font-medium truncate ${itemColor(item)} ${
-                              isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
-                            }`}
-                            title={[
-                              isDisabled ? "Occupied:" : null,
-                              item.title,
-                              eventVenueName && `@ ${eventVenueName}`,
-                            ].filter(Boolean).join(" ")}
-                          >
-                            {item.title}
-                            {eventVenueName ? <span className="opacity-70"> @ {eventVenueName}</span> : null}
-                            {" "}<StatusLabel status={item.status} />
-                          </button>
+                          <CalendarItemHoverCard item={item} locale={locale} hour12={hour12}>
+                            <button
+                              type="button"
+                              data-booking-block
+                              onClick={() => {
+                                if (!isDisabled) onItemClick(item);
+                              }}
+                              className={`flex-1 text-left text-[10px] px-1.5 py-0.5 rounded font-medium truncate ${itemColor(item)} ${
+                                isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
+                              }`}
+                            >
+                              {item.title}
+                              {eventVenueName ? <span className="opacity-70"> @ {eventVenueName}</span> : null}{" "}
+                              <StatusLabel status={item.status} />
+                            </button>
+                          </CalendarItemHoverCard>
                           {onDeleteItem && !readOnly && (item.kind === "job" || item.kind === "tour" || isDisabled ? null : (
                             <button
                               data-booking-block
@@ -835,9 +837,6 @@ export function OutlookTimeGrid({
                     hour12: effective?.timeFormat === "12h",
                   })}`;
                   const venueNm = calendarItemVenueName(item);
-                  const bgTooltip = ["Venue booking", item.title, venueNm && `@ ${venueNm}`, timeLabel]
-                    .filter(Boolean)
-                    .join(" · ");
 
                   return (
                     <div
@@ -850,24 +849,25 @@ export function OutlookTimeGrid({
                         width: target ? `calc(${widthPct}% - ${gapPx * 2}px)` : `calc(100% - ${gapPx * 2}px)`,
                       }}
                     >
-                      <div
-                        data-booking-block
-                        className={`absolute inset-0 rounded-lg border-2 border-rose-300/80 bg-rose-500/20 shadow-[0_0_0_1px_rgba(244,63,94,0.35)] ${
-                          canDrag ? "cursor-grab active:cursor-grabbing" : ""
-                        }`}
-                        style={{ zIndex: 4 }}
-                        title={bgTooltip}
-                        onPointerDown={(e) => {
-                          if ((e.target as HTMLElement).closest("[data-handle]")) return;
-                          if (canDrag) startMoveDrag(item, dayIndex, "move", e);
-                        }}
-                        onClick={(e) => {
-                          if ((e.target as HTMLElement).closest("[data-handle]")) return;
-                          if (canDrag) return;
-                          e.stopPropagation();
-                          onItemClick(item);
-                        }}
-                      />
+                      <CalendarItemHoverCard item={item} locale={locale} hour12={hour12}>
+                        <div
+                          data-booking-block
+                          className={`absolute inset-0 rounded-lg border-2 border-rose-300/80 bg-rose-500/20 shadow-[0_0_0_1px_rgba(244,63,94,0.35)] ${
+                            canDrag ? "cursor-grab active:cursor-grabbing" : ""
+                          }`}
+                          style={{ zIndex: 4 }}
+                          onPointerDown={(e) => {
+                            if ((e.target as HTMLElement).closest("[data-handle]")) return;
+                            if (canDrag) startMoveDrag(item, dayIndex, "move", e);
+                          }}
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest("[data-handle]")) return;
+                            if (canDrag) return;
+                            e.stopPropagation();
+                            onItemClick(item);
+                          }}
+                        />
+                      </CalendarItemHoverCard>
 
                       <div
                         className={cn(
@@ -996,8 +996,6 @@ export function OutlookTimeGrid({
                     minute: "2-digit",
                     hour12: effective?.timeFormat === "12h",
                   })}`;
-                  const tooltipText = [item.title, venueName && `@ ${venueName}`, timeLabel, item.status].filter(Boolean).join(" · ");
-
                   const showInlineActions = !readOnly && isBooking && !isDisabled && Boolean(onToggleLock || onUpdateItemTime);
 
                   return (
@@ -1012,27 +1010,27 @@ export function OutlookTimeGrid({
                         zIndex: 10 + colIndex,
                       }}
                     >
-                      <div
-                        data-booking-block
-                        role="button"
-                        tabIndex={0}
-                        onPointerDown={(e) => {
-                          if ((e.target as HTMLElement).closest("[data-handle]")) return;
-                          if (canDrag) {
-                            startMoveDrag(item, dayIndex, "move", e);
-                          }
-                        }}
-                        onClick={(e) => {
-                          if ((e.target as HTMLElement).closest("[data-handle]")) return;
-                          if (canDrag) return;
-                          e.stopPropagation();
-                          if (!isDisabled) onItemClick(item);
-                        }}
-                        className={`w-full h-full rounded-md text-left overflow-hidden flex flex-col shadow-sm ${itemColor(item)} ${
-                          isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
-                        } ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
-                        title={isDisabled ? `Occupied · ${tooltipText}` : tooltipText}
-                      >
+                      <CalendarItemHoverCard item={item} locale={locale} hour12={hour12}>
+                        <div
+                          data-booking-block
+                          role="button"
+                          tabIndex={0}
+                          onPointerDown={(e) => {
+                            if ((e.target as HTMLElement).closest("[data-handle]")) return;
+                            if (canDrag) {
+                              startMoveDrag(item, dayIndex, "move", e);
+                            }
+                          }}
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest("[data-handle]")) return;
+                            if (canDrag) return;
+                            e.stopPropagation();
+                            if (!isDisabled) onItemClick(item);
+                          }}
+                          className={`w-full h-full rounded-md text-left overflow-hidden flex flex-col shadow-sm ${itemColor(item)} ${
+                            isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
+                          } ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
+                        >
                         {isThin ? (
                           <div
                             className="w-full h-full flex items-center px-1 overflow-hidden"
@@ -1064,6 +1062,7 @@ export function OutlookTimeGrid({
                           </div>
                         )}
                       </div>
+                      </CalendarItemHoverCard>
 
                       {/* Locked badge (bottom-left) */}
                       {isBooking && isLocked && !isThin ? (

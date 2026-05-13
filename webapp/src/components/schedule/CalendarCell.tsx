@@ -1,4 +1,6 @@
 import { cn } from "@/lib/utils";
+import { usePreferences } from "@/hooks/usePreferences";
+import { CalendarItemHoverCard } from "@/components/schedule/CalendarItemHoverCard";
 import type { CalendarItem } from "./scheduleUtils";
 import type { InternalBookingDetail } from "../../../../backend/src/types";
 import {
@@ -6,7 +8,6 @@ import {
   itemsForDay,
   hasTimedStart,
   calendarItemVenueName,
-  calendarItemTimeRangeLabel,
   calendarVenueBookingSummaryLine,
   backingVenueBookingForEvent,
   orphanBackingVenueBookings,
@@ -23,6 +24,11 @@ interface CalendarCellProps {
 }
 
 export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }: CalendarCellProps) {
+  const { effective } = usePreferences();
+  const locale =
+    effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
+  const hour12 = effective?.timeFormat === "12h";
+
   if (!date) {
     return (
       <div className="min-h-[100px] bg-white/[0.01] border border-white/5 rounded-lg" />
@@ -82,30 +88,20 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
           const backing = isOrphanBacking ? null : backingVenueBookingForEvent(item, backingItems);
           const venueName = calendarItemVenueName(item);
           const backingSummary = backing ? calendarVenueBookingSummaryLine(backing) : "";
-          const itemSummary = [item.title, venueName && `@ ${venueName}`, calendarItemTimeRangeLabel(item)]
-            .filter(Boolean)
-            .join(" · ");
-          const orphanSummary = isOrphanBacking ? calendarVenueBookingSummaryLine(item) : "";
           return (
-            <button
-              key={item.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                onItemClick(item);
-              }}
-              className={cn(
-                "relative w-full text-left text-[11px] px-1.5 py-0.5 rounded font-medium transition-opacity hover:opacity-80 overflow-hidden",
-                itemColor(item),
-                backing && "ring-2 ring-rose-300/70 shadow-[0_0_0_2px_rgba(244,63,94,0.22)]"
-              )}
-              title={
-                backing
-                  ? `${itemSummary} · Venue booking: ${backingSummary}`
-                  : isOrphanBacking
-                    ? orphanSummary
-                    : itemSummary
-              }
-            >
+            <CalendarItemHoverCard key={item.id} item={item} locale={locale} hour12={hour12} side="right">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onItemClick(item);
+                }}
+                className={cn(
+                  "relative w-full text-left text-[11px] px-1.5 py-0.5 rounded font-medium transition-opacity hover:opacity-80 overflow-hidden",
+                  itemColor(item),
+                  backing && "ring-2 ring-rose-300/70 shadow-[0_0_0_2px_rgba(244,63,94,0.22)]"
+                )}
+              >
               {backing ? (
                 <span className="absolute inset-0 bg-rose-500/20 pointer-events-none" aria-hidden="true" />
               ) : null}
@@ -156,7 +152,8 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
                   by {(item.raw as InternalBookingDetail).createdBy!.name}
                 </span>
               ) : null}
-            </button>
+              </button>
+            </CalendarItemHoverCard>
           );
         })}
         {overflow > 0 ? (
