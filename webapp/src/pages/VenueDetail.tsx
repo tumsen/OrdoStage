@@ -22,6 +22,7 @@ import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { VenueCalendarContextStrip } from "@/components/venue/VenueCalendarContextStrip";
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePreferences } from "@/hooks/usePreferences";
+import { cn } from "@/lib/utils";
 
 interface ScheduleData {
   events: EventDetail[];
@@ -155,8 +156,8 @@ export default function VenueDetail() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden p-4 md:p-6">
-      <div className="flex flex-wrap items-center gap-3 shrink-0 min-w-0">
+    <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden pl-0 pr-4 pb-4 pt-4 md:pr-6 md:pb-6 md:pt-6">
+      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3 pl-3">
         <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white gap-1 -ml-2 shrink-0">
           <Link to="/venues">
             <ChevronLeft className="h-4 w-4" />
@@ -170,8 +171,10 @@ export default function VenueDetail() {
 
       {venueLoading || !venue ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <Skeleton className="h-8 w-64 shrink-0 bg-white/5" />
-          <Skeleton className="min-h-0 flex-1 w-full bg-white/5 rounded-xl border border-white/10" />
+          <div className="pl-3">
+            <Skeleton className="h-8 w-64 shrink-0 bg-white/5" />
+          </div>
+          <Skeleton className="min-h-0 flex-1 w-full rounded-l-none border border-white/10 bg-white/5" />
         </div>
       ) : (
         <>
@@ -291,13 +294,13 @@ export default function VenueDetail() {
             </div>
           </div>
 
-          <div className={`${CALENDAR_PANEL_SHELL_CLASS} flex-1 min-h-0`}>
+          <div className={cn(CALENDAR_PANEL_SHELL_CLASS, "flex-1 min-h-0 rounded-l-none !pl-0 md:!pl-0")}>
             <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
               {scheduleLoading ? (
                 <Skeleton className="min-h-0 flex-1 w-full bg-white/5 rounded-xl border border-white/10" />
               ) : (
                 <OutlookTimeGrid
-                  className="min-h-0 flex-1"
+                  className="min-h-0 flex-1 rounded-l-none"
                   days={gridDays}
                   items={calendarItems}
                   onItemClick={(item) => setDetailItem(item)}
