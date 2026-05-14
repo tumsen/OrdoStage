@@ -155,7 +155,7 @@ export default function VenueDetail() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col gap-5 overflow-hidden p-4 md:p-6">
+    <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden p-4 md:p-6">
       <div className="flex flex-wrap items-center gap-3 shrink-0 min-w-0">
         <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white gap-1 -ml-2 shrink-0">
           <Link to="/venues">
@@ -169,12 +169,14 @@ export default function VenueDetail() {
       </div>
 
       {venueLoading || !venue ? (
-        <div className="space-y-3">
-          <Skeleton className="h-8 w-64 bg-white/5" />
-          <Skeleton className="min-h-[280px] w-full bg-white/5 rounded-xl border border-white/10" />
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <Skeleton className="h-8 w-64 shrink-0 bg-white/5" />
+          <Skeleton className="min-h-0 flex-1 w-full bg-white/5 rounded-xl border border-white/10" />
         </div>
       ) : (
         <>
+          {/* Booking calendar uses all space above the strip so fitHoursVertically can fill one viewport band. */}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               <h2 className="text-sm font-semibold text-white/90 shrink-0">Bookings</h2>
@@ -318,13 +320,16 @@ export default function VenueDetail() {
               )}
             </div>
           </div>
+          </div>
 
-          <VenueCalendarContextStrip
-            venueId={venueId}
-            venue={venue}
-            showEditLink={canWrite}
-            archiveFolderName={venue?.name}
-          />
+          <div className="max-h-[min(38svh,22rem)] min-h-0 shrink-0 overflow-x-hidden overflow-y-auto">
+            <VenueCalendarContextStrip
+              venueId={venueId}
+              venue={venue}
+              showEditLink={canWrite}
+              archiveFolderName={venue?.name}
+            />
+          </div>
         </>
       )}
 
