@@ -103,9 +103,9 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
     .slice(0, 2);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Logo */}
-      <div className="px-3 py-4 border-b border-white/10 contain-layout">
+      <div className="shrink-0 px-3 py-4 border-b border-white/10 contain-layout">
         <Link
           to="/dashboard"
           onClick={onNav}
@@ -115,10 +115,12 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
         </Link>
       </div>
 
-      <OrgWorkspaceMenu onNav={onNav} />
+      <div className="shrink-0">
+        <OrgWorkspaceMenu onNav={onNav} />
+      </div>
 
       {/* Nav — avoid showing every link then hiding (blink); skeleton until /api/me */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 space-y-1">
         {!session?.user ? (
           <>
             {publicNavItems.map(({ to, label, icon: Icon }) => {
@@ -218,7 +220,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
       </nav>
 
       {/* User + Sign out */}
-      <div className="px-3 py-4 border-t border-white/10 space-y-2">
+      <div className="shrink-0 px-3 py-4 border-t border-white/10 space-y-2">
         {session?.user ? (
           <div className="flex items-start gap-2.5 px-3 py-2">
             <div className="w-9 h-9 rounded-full bg-ordo-violet/45 ring-1 ring-ordo-magenta/25 flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -304,19 +306,19 @@ export function Layout({ children }: LayoutProps) {
     <div className="flex h-screen bg-[#0a0a0f] text-white overflow-hidden">
       <a
         href="#main-content"
-        className="absolute left-4 top-0 z-[200] -translate-y-full bg-red-900 px-4 py-2 text-sm text-white shadow-lg transition-transform focus:translate-y-4 focus:outline-none focus:ring-2 focus:ring-white/40"
+        className="absolute left-4 top-0 z-[260] -translate-y-full bg-red-900 px-4 py-2 text-sm text-white shadow-lg transition-transform focus:translate-y-4 focus:outline-none focus:ring-2 focus:ring-white/40"
       >
         {t("common.skipToContent")}
       </a>
       {/* Desktop Sidebar */}
       {!isMobile ? (
-        <aside className="w-56 flex-shrink-0 bg-[#0d0d14] border-r border-white/10 flex flex-col">
+        <aside className="fixed left-0 top-0 z-40 flex h-screen w-56 flex-col overflow-hidden border-r border-white/10 bg-[#0d0d14]">
           <SidebarContent />
         </aside>
       ) : null}
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", !isMobile && "pl-56")}>
         {/* Mobile header — only the hamburger, no title */}
         {isMobile ? (
           <header className="flex-shrink-0 h-12 border-b border-ordo-violet/20 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3">

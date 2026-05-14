@@ -40,8 +40,8 @@ function AdminSidebarContent({ onNav, t }: { onNav?: () => void; t: TFn }) {
   const location = useLocation();
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-5 py-5 border-b border-white/10">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 px-5 py-5 border-b border-white/10">
         <Link
           to="/admin"
           onClick={onNav}
@@ -55,7 +55,7 @@ function AdminSidebarContent({ onNav, t }: { onNav?: () => void; t: TFn }) {
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 space-y-1">
         {adminNavDefs.map(({ to, labelKey, icon: Icon, exact }) => {
           const isActive = exact
             ? location.pathname === to
@@ -82,7 +82,7 @@ function AdminSidebarContent({ onNav, t }: { onNav?: () => void; t: TFn }) {
         })}
       </nav>
 
-      <div className="px-3 py-4 border-t border-white/10">
+      <div className="shrink-0 px-3 py-4 border-t border-white/10">
         <Link
           to="/dashboard"
           onClick={onNav}
@@ -116,12 +116,12 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-[#0a0a0f] text-white overflow-hidden">
       {!isMobile ? (
-        <aside className="w-56 flex-shrink-0 bg-[#0d0d14] border-r border-white/10 flex flex-col">
+        <aside className="fixed left-0 top-0 z-40 flex h-screen w-56 flex-col overflow-hidden border-r border-white/10 bg-[#0d0d14]">
           <AdminSidebarContent t={t} />
         </aside>
       ) : null}
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", !isMobile && "pl-56")}>
         <header className="flex-shrink-0 h-14 border-b border-ordo-violet/25 bg-[#0d0d14]/80 backdrop-blur flex items-center px-4 md:px-6 gap-3 min-w-0">
           {isMobile ? (
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -171,7 +171,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   );

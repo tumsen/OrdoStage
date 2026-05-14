@@ -59,14 +59,15 @@ export default function Login() {
   return (
     <div className="flex h-screen bg-[#0a0a0f] text-white overflow-hidden">
       {/* Sidebar — exact same as the authenticated app */}
-      <aside className="w-56 flex-shrink-0 bg-[#0d0d14] border-r border-white/10 flex flex-col">
+      <aside className="fixed left-0 top-0 z-40 flex h-screen w-56 flex-col overflow-hidden border-r border-white/10 bg-[#0d0d14]">
         <SidebarContent />
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md">
-          <div className="mb-7">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pl-56">
+        <div className="flex min-h-0 flex-1 overflow-y-auto flex items-center justify-center px-4 py-10">
+          <div className="w-full max-w-md">
+            <div className="mb-7">
             <h1 className="text-xl font-bold tracking-tight">{mode === "signin" ? "Sign in" : "Create your account"}</h1>
             <p className="text-white/40 text-sm mt-1">
               {mode === "signin" ? "Welcome back to OrdoStage" : "Start using OrdoStage in minutes"}
@@ -156,6 +157,7 @@ export default function Login() {
                 {loading ? "Please wait..." : mode === "signin" ? "Sign in" : "Create account"}
               </button>
             </form>
+          </div>
           </div>
         </div>
       </div>

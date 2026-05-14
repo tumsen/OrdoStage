@@ -46,8 +46,8 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-3 py-4 border-b border-white/10 contain-layout">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 px-3 py-4 border-b border-white/10 contain-layout">
         <Link
           to="/"
           onClick={onNav}
@@ -57,7 +57,7 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1" aria-label="Homepage sections and legal">
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 space-y-1" aria-label="Homepage sections and legal">
         {navItems.map(({ to, label, icon: Icon, exact, homeHash }) => {
           const isActive = isNavActive(to, exact, homeHash);
           const linkTo = homeHash ? { pathname: "/" as const, hash: homeHash } : to;
@@ -81,7 +81,7 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
         })}
       </nav>
 
-      <div className="px-3 py-4 border-t border-white/10">
+      <div className="shrink-0 px-3 py-4 border-t border-white/10">
         <Link
           to="/login"
           onClick={onNav}
@@ -114,18 +114,18 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
     <div className="flex h-screen bg-[#0a0a0f] text-white overflow-hidden">
       <a
         href="#main-content"
-        className="absolute left-4 top-0 z-[200] -translate-y-full bg-ordo-violet/95 px-4 py-2 text-sm text-white shadow-lg transition-transform focus:translate-y-4 focus:outline-none focus:ring-2 focus:ring-ordo-yellow/50"
+        className="absolute left-4 top-0 z-[260] -translate-y-full bg-ordo-violet/95 px-4 py-2 text-sm text-white shadow-lg transition-transform focus:translate-y-4 focus:outline-none focus:ring-2 focus:ring-ordo-yellow/50"
       >
         Skip to main content
       </a>
 
       {!isMobile ? (
-        <aside className="w-56 flex-shrink-0 bg-[#0d0d14] border-r border-white/10 flex flex-col">
+        <aside className="fixed left-0 top-0 z-40 flex h-screen w-56 flex-col overflow-hidden border-r border-white/10 bg-[#0d0d14]">
           <PublicSidebarContent />
         </aside>
       ) : null}
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", !isMobile && "pl-56")}>
         {isMobile ? (
           <header className="flex-shrink-0 h-12 border-b border-ordo-magenta/25 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -144,7 +144,7 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15"
+          className="min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15"
         >
           {children}
         </main>

@@ -9,6 +9,12 @@ All colors MUST be HSL.
 */
 
 @layer base {
+  /* Full-viewport app shell: prevent document-level scroll so sidebars stay pinned. */
+  html {
+    height: 100%;
+    overflow: hidden;
+  }
+
   :root {
     --background: 240 10% 4%;
     --foreground: 0 0% 95%;
@@ -118,6 +124,14 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground antialiased;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   @media (prefers-reduced-motion: reduce) {
