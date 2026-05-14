@@ -312,14 +312,27 @@ const contactInputClass = "bg-white/5 border-white/10 text-white h-9 text-sm foc
 export function VenueContactFields({
   register,
   errors,
+  hideHeader = false,
+  className,
 }: {
   register: UseFormRegister<VenueFormValues>;
   errors?: FieldErrors<VenueFormValues>;
+  hideHeader?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
-      <Label className="text-white/50 text-xs uppercase tracking-wide">Venue contact</Label>
-      <p className="text-[11px] text-white/35 leading-snug">On-site or technical contact for this venue.</p>
+    <div
+      className={cn(
+        "flex min-h-0 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6",
+        className
+      )}
+    >
+      {!hideHeader ? (
+        <Label className="text-white/50 text-xs uppercase tracking-wide">Venue contact</Label>
+      ) : null}
+      <p className="text-[11px] text-white/35 leading-relaxed">
+        On-site or technical contact for this venue.
+      </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">Company name</Label>

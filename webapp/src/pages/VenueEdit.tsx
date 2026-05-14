@@ -189,20 +189,33 @@ export default function VenueEdit() {
             </div>
           </div>
 
-          <VenueContactFields register={form.register} errors={form.formState.errors} />
-
-          <section className="space-y-3">
-            <Label htmlFor="venue-notes" className="text-white/50 text-xs uppercase tracking-wide">
-              Notes
-            </Label>
-            <Textarea
-              id="venue-notes"
-              {...form.register("notes")}
-              placeholder="Access, loading dock, quirks…"
-              rows={4}
-              className="bg-white/5 border-white/10 text-white text-sm focus:border-white/30 resize-y min-h-[100px]"
-            />
-          </section>
+          <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-stretch md:gap-5">
+            <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Venue contact</Label>
+              <VenueContactFields
+                hideHeader
+                className="flex-1"
+                register={form.register}
+                errors={form.formState.errors}
+              />
+            </div>
+            <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
+              <Label htmlFor="venue-notes" className="text-white/50 text-xs uppercase tracking-wide">
+                Notes
+              </Label>
+              <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
+                <p className="shrink-0 text-[11px] text-white/35 leading-relaxed">
+                  Access, load-in, rigging quirks — anything the team should know.
+                </p>
+                <Textarea
+                  id="venue-notes"
+                  {...form.register("notes")}
+                  placeholder="Access, loading dock, quirks…"
+                  className="min-h-[10rem] w-full flex-1 resize-y bg-white/5 border-white/10 text-white text-sm focus:border-white/30 placeholder:text-white/25"
+                />
+              </div>
+            </div>
+          </div>
 
           <section className="space-y-3">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Custom fields</Label>
