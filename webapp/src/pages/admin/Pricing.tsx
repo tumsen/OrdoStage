@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
 
 type CurrencyRow = {
   userDailyRateCents: string; // major units input (e.g. "5" means 5.00)
@@ -178,6 +179,19 @@ export default function Pricing() {
 
   return (
     <div className="p-6 space-y-4">
+      <Card className="bg-gray-900 border border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white">Seat curve calculator</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-white/55">
+            Illustrative tiered model for projections. Adjust inputs to explore scenarios; global postpaid currency
+            rates below remain the source of truth for invoicing.
+          </p>
+          <TieredSeatPricingCalculator showModelControls />
+        </CardContent>
+      </Card>
+
       <Card className="bg-gray-900 border border-white/10">
         <CardHeader>
           <CardTitle className="text-white">Global currency pricing</CardTitle>

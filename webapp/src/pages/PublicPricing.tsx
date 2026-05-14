@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
 
 const REGION_TO_CURRENCY: Record<string, string> = {
   DK: "DKK",
@@ -139,6 +140,18 @@ export default function PublicPricing() {
             </Button>
           </div>
         </header>
+
+        {/* Illustrative seat curve — matches OrdoStage marketing styling */}
+        <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6 md:p-8">
+          <div className="space-y-1">
+            <h2 className="text-xl md:text-2xl font-semibold text-white">Pricing calculator</h2>
+            <p className="text-sm text-white/60 leading-relaxed">
+              Estimates use illustrative tiered USD pricing. Billable users are people who are on a job, logged time,
+              created an event, or scheduled an event—everyone else does not count toward your seat total.
+            </p>
+          </div>
+          <TieredSeatPricingCalculator />
+        </section>
 
         {/* How billing works */}
         <section className="space-y-4">
