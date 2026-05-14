@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
+import { filenameFromDisplayRename } from "../lib/documentFilenameRename";
 import { auth } from "../auth";
 import {
   CreatePersonSchema,
@@ -1113,7 +1114,7 @@ peopleRouter.patch("/people/documents/:docId", zValidator("json", UpdatePersonDo
   const body = c.req.valid("json");
   const doc = await prisma.personDocument.findFirst({
     where: { id: docId, person: { organizationId: user.organizationId } },
-    select: { id: true, person: { select: { email: true } } },
+    select: { id: true, filename: true, person: { select: { email: true } } },
   });
   if (!doc) {
     return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
@@ -1123,8 +1124,13 @@ peopleRouter.patch("/people/documents/:docId", zValidator("json", UpdatePersonDo
   if (!canWritePeople && !canEditSelf) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
-  const data: { name?: string; type?: string; expiresAt?: Date | null; doesNotExpire?: boolean } = {};
-  if (body.name !== undefined) data.name = body.name;
+  const data: { name?: string; type?: string; filename?: string; expiresAt?: Date | null; doesNotExpire?: boolean } =
+    {};
+  if (body.name !== undefined) {
+    const nextName = body.name.trim();
+    data.name = nextName;
+    data.filename = filenameFromDisplayRename(nextName, doc.filename);
+  }
   if (body.type !== undefined) data.type = body.type.trim();
   if (body.doesNotExpire === true) {
     data.doesNotExpire = true;

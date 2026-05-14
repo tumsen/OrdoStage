@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
+import { filenameFromDisplayRename } from "../lib/documentFilenameRename";
 import { CreateVenueSchema, UpdateVenueSchema, UpdateVenueDocumentSchema, type VenueDocumentKind } from "../types";
 import { canAction } from "../requestRole";
 import { env } from "../env";
@@ -301,13 +302,17 @@ venuesRouter.patch("/venues/documents/:docId", zValidator("json", UpdateVenueDoc
   const body = c.req.valid("json");
   const doc = await prisma.venueDocument.findFirst({
     where: { id: docId, venue: { organizationId: user.organizationId } },
-    select: { id: true },
+    select: { id: true, filename: true },
   });
   if (!doc) {
     return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
   }
-  const data: { name?: string; kind?: string } = {};
-  if (body.name !== undefined) data.name = body.name.trim();
+  const data: { name?: string; kind?: string; filename?: string } = {};
+  if (body.name !== undefined) {
+    const nextName = body.name.trim();
+    data.name = nextName;
+    data.filename = filenameFromDisplayRename(nextName, doc.filename);
+  }
   if (body.kind !== undefined) data.kind = body.kind;
   const row = await prisma.venueDocument.update({
     where: { id: doc.id },
