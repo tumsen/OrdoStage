@@ -15,7 +15,6 @@ import {
   toDatetimeLocalValue,
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
-import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
 import { ScheduleItemDetailSheet } from "@/components/schedule/ScheduleItemDetailSheet";
 import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
@@ -155,7 +154,7 @@ export default function VenueDetail() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col gap-5 overflow-hidden p-4 md:p-6">
+    <div className="flex w-full shrink-0 flex-col gap-5 p-4 md:p-6">
       <div className="flex flex-wrap items-center gap-3 shrink-0 min-w-0">
         <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white gap-1 -ml-2 shrink-0">
           <Link to="/venues">
@@ -289,35 +288,30 @@ export default function VenueDetail() {
             </div>
           </div>
 
-          <div className={`${CALENDAR_PANEL_SHELL_CLASS} flex-1 min-h-0`}>
-            <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
-              {scheduleLoading ? (
-                <Skeleton className="min-h-[320px] w-full bg-white/5 rounded-xl border border-white/10" />
-              ) : (
-                <OutlookTimeGrid
-                  className="min-h-0 flex-1"
-                  days={gridDays}
-                  items={calendarItems}
-                  onItemClick={(item) => setDetailItem(item)}
-                  readOnly
-                  compactDayHeaders
-                  fitHoursVertically
-                  rejectCreateDragWhenOverlapping={canWrite}
-                  onSelectTimeRange={
-                    canWrite
-                      ? (start, end) => {
-                          setBookingSlot({
-                            startDate: toDatetimeLocalValue(start),
-                            endDate: toDatetimeLocalValue(end),
-                          });
-                          setBookingOpen(true);
-                        }
-                      : undefined
-                  }
-                />
-              )}
-            </div>
-          </div>
+          {scheduleLoading ? (
+            <Skeleton className="min-h-[320px] w-full bg-white/5 rounded-xl border border-white/10" />
+          ) : (
+            <OutlookTimeGrid
+              className="w-full max-w-full flex-none"
+              days={gridDays}
+              items={calendarItems}
+              onItemClick={(item) => setDetailItem(item)}
+              readOnly
+              compactDayHeaders
+              rejectCreateDragWhenOverlapping={canWrite}
+              onSelectTimeRange={
+                canWrite
+                  ? (start, end) => {
+                      setBookingSlot({
+                        startDate: toDatetimeLocalValue(start),
+                        endDate: toDatetimeLocalValue(end),
+                      });
+                      setBookingOpen(true);
+                    }
+                  : undefined
+              }
+            />
+          )}
 
           <VenueCalendarContextStrip
             venueId={venueId}
