@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
-import { CreateCalendarSchema } from "../types";
+import { CreateCalendarSchema, PatchCalendarSchema } from "../types";
 import { canAction } from "../requestRole";
 import { env } from "../env";
 import { normalizeClientIanaZone, wallClockInstantFromStoredDayAndHHMM } from "../clientWallClock";
@@ -496,14 +496,51 @@ calendarsRouter.post("/calendars", zValidator("json", CreateCalendarSchema), asy
   }
 
   const body = c.req.valid("json");
+  const icsWallClockZone = normalizeClientIanaZone(
+    body.icsWallClockZone ?? c.req.header("X-Client-Time-Zone")
+  );
   const calendar = await prisma.calendar.create({
     data: {
       name: body.name,
       filter: body.filter ?? null,
+      icsWallClockZone,
       organizationId: user.organizationId,
     },
   });
   return c.json({ data: calendar }, 201);
+});
+
+// PATCH /api/calendars/:id
+calendarsRouter.patch("/calendars/:id", zValidator("json", PatchCalendarSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+  if (!canAction(c, "write.calendars")) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+
+  const { id } = c.req.param();
+  const existing = await prisma.calendar.findUnique({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!existing) {
+    return c.json({ error: { message: "Calendar not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const body = c.req.valid("json");
+  const data: { name?: string; filter?: string | null; icsWallClockZone?: string } = {};
+  if (body.name !== undefined) data.name = body.name;
+  if (body.filter !== undefined) data.filter = body.filter;
+  if (body.icsWallClockZone !== undefined) {
+    data.icsWallClockZone = normalizeClientIanaZone(body.icsWallClockZone);
+  }
+
+  const calendar = await prisma.calendar.update({
+    where: { id },
+    data,
+  });
+  return c.json({ data: calendar });
 });
 
 // DELETE /api/calendars/:id
@@ -576,7 +613,9 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
     };
   }
 
-  const wallClockZone = normalizeClientIanaZone(c.req.query("tz") ?? c.req.header("X-Client-Time-Zone"));
+  const wallClockZone = normalizeClientIanaZone(
+    c.req.query("tz") ?? calendar.icsWallClockZone ?? c.req.header("X-Client-Time-Zone")
+  );
 
   const events = await prisma.event.findMany({
     where,

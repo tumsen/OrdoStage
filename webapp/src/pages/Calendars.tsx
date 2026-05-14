@@ -3,8 +3,9 @@ import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Copy, Trash2, Check, Share2 } from "lucide-react";
+import { Plus, Copy, Trash2, Check, Share2, Globe } from "lucide-react";
 import { api } from "@/lib/api";
+import { getBrowserIanaTimeZone } from "@/lib/browserUserTime";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Calendar } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,7 @@ export default function Calendars() {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editZone, setEditZone] = useState<{ id: string; value: string } | null>(null);
 
   const { data: calendars, isLoading, error } = useQuery({
     queryKey: ["calendars"],
@@ -98,6 +100,7 @@ export default function Calendars() {
       api.post<Calendar>("/api/calendars", {
         name: data.name,
         filter: data.filter || undefined,
+        icsWallClockZone: getBrowserIanaTimeZone(),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["calendars"] });
@@ -114,6 +117,15 @@ export default function Calendars() {
     },
   });
 
+  const patchTimezoneMutation = useMutation({
+    mutationFn: ({ id, icsWallClockZone }: { id: string; icsWallClockZone: string }) =>
+      api.patch<Calendar>(`/api/calendars/${id}`, { icsWallClockZone }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["calendars"] });
+      setEditZone(null);
+    },
+  });
+
   return (
     <div className="p-6 space-y-6">
       {/* Explainer */}
@@ -124,7 +136,8 @@ export default function Calendars() {
         <div>
           <div className="text-sm font-medium text-white/80 mb-1">Calendar Subscriptions</div>
           <p className="text-sm text-white/45 leading-relaxed">
-            Share these URLs with your team. They can subscribe in Google Calendar, Apple Calendar, Outlook, or any app that supports ICS feeds. The feed stays live — new events and tour shows appear automatically.
+            Share these URLs with your team. They can subscribe in Google Calendar, Apple Calendar, Outlook, or any app that supports ICS feeds. The feed stays live — new events and tour shows appear automatically. Each feed stores a{" "}
+            <strong className="text-white/55 font-medium">timezone</strong> so subscribed calendars show the same local times as TheaterPlanner (Google never sends your browser zone).
           </p>
         </div>
       </div>
@@ -172,6 +185,29 @@ export default function Calendars() {
                     ) : (
                       <div className="text-xs text-white/30 mt-0.5">All events + tours</div>
                     )}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-xs text-white/45">
+                      <Globe size={12} className="text-white/35 shrink-0" aria-hidden />
+                      <span>
+                        Feed timezone:{" "}
+                        <code className="text-white/65">{cal.icsWallClockZone}</code>
+                      </span>
+                      {cal.icsWallClockZone === "UTC" ? (
+                        <span className="text-amber-400/90">
+                          Wrong times in other apps? Set the timezone your team uses.
+                        </span>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-white/45 hover:text-white border border-white/10"
+                        onClick={() =>
+                          setEditZone({ id: cal.id, value: cal.icsWallClockZone || "UTC" })
+                        }
+                      >
+                        Edit timezone
+                      </Button>
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
@@ -272,6 +308,57 @@ export default function Calendars() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editZone !== null} onOpenChange={(o) => { if (!o) setEditZone(null); }}>
+        <DialogContent className="bg-[#16161f] border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle>Feed timezone</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-white/45">
+            IANA name (e.g. <code className="text-white/60">Europe/Copenhagen</code>). Used when Google or Apple fetches this URL — they do not send your browser timezone.
+          </p>
+          <Input
+            value={editZone?.value ?? ""}
+            onChange={(e) => setEditZone((z) => (z ? { ...z, value: e.target.value } : z))}
+            placeholder="Europe/Copenhagen"
+            className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 font-mono text-sm"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          {patchTimezoneMutation.isError && (
+            <div className="text-red-400 text-sm">
+              {patchTimezoneMutation.error instanceof Error
+                ? patchTimezoneMutation.error.message
+                : "Failed to save."}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditZone(null)}
+              className="border-white/10 text-white/60 hover:text-white bg-transparent"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={patchTimezoneMutation.isPending || !editZone?.value.trim()}
+              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+              onClick={() => {
+                if (!editZone?.value.trim()) return;
+                patchTimezoneMutation.mutate({
+                  id: editZone.id,
+                  icsWallClockZone: editZone.value.trim(),
+                });
+              }}
+            >
+              {patchTimezoneMutation.isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -558,12 +558,23 @@ export const CalendarSchema = z.object({
   name: z.string(),
   token: z.string(),
   filter: z.string().nullable(),
+  icsWallClockZone: z.string(),
 });
 
 export const CreateCalendarSchema = z.object({
   name: z.string().min(1),
   filter: z.string().optional(),
+  /** IANA zone for ICS wall-clock times; omit to use `X-Client-Time-Zone` or UTC. */
+  icsWallClockZone: z.string().max(120).optional(),
 });
+
+export const PatchCalendarSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    filter: z.string().nullable().optional(),
+    icsWallClockZone: z.string().max(120).optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: "No changes" });
 
 // Full event with relations
 export const EventDetailSchema = EventSchema.extend({

@@ -595,6 +595,8 @@ model Calendar {
   name           String
   token          String       @unique @default(cuid())
   filter         String?
+  /** IANA zone for interpreting show/tour date + time in public ICS (matches in-app wall clock). */
+  icsWallClockZone String     @default("UTC")
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
