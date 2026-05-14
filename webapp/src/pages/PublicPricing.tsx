@@ -97,6 +97,8 @@ export default function PublicPricing() {
   }>({
     queryKey: ["public-pricing-rates"],
     queryFn: () => api.get("/api/public/pricing"),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const supportedCurrencies = (publicPricing?.prices ?? []).map((p) => p.currencyCode);

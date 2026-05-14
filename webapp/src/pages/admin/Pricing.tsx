@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -6,6 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
 
 type CurrencyRow = {
@@ -75,6 +84,7 @@ export default function Pricing() {
   const [fxError, setFxError] = useState<string | null>(null);
   const [fxUpdatedAt, setFxUpdatedAt] = useState<string | null>(null); // Provider update time
   const [fxRefreshedAt, setFxRefreshedAt] = useState<string | null>(null); // Local fetch time
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
   const { data, isPending } = useQuery<{
     paymentDueDays: number;
@@ -145,12 +155,39 @@ export default function Pricing() {
   }, [fetchBaseRates]);
   const calculatedRows = calculateBaseComparison(currencyRows, fxRates, form.baseCurrencyCode || "USD");
 
+  const yearlyDiscountPercentClamped = Math.min(100, Math.max(0, Math.round(Number(form.yearlyDiscountPercent)) || 0));
+
+  const saveSummaryLines = useMemo(() => {
+    const lines: string[] = [];
+    lines.push(`Base currency: ${(form.baseCurrencyCode || "USD").toUpperCase()}`);
+    lines.push(`Invoice payment due: ${form.paymentDueDays} day(s) after issue`);
+    lines.push(
+      `Public pricing calculator — annual discount: ${yearlyDiscountPercentClamped}% (${form.yearlyDiscountEnabled ? "applied when annual billing is on" : "disabled"})`,
+    );
+    const priceLines = Object.entries(currencyRows)
+      .filter(([, row]) => row.userDailyRateCents.trim().length > 0)
+      .map(([code, row]) => {
+        const currentMajor = row.userDailyRateCents.trim();
+        const next =
+          row.nextMonthUserDailyRateCents.trim().length > 0
+            ? ` → next month ${row.nextMonthUserDailyRateCents.trim()}`
+            : "";
+        return `${code}: ${currentMajor} / day${next}`;
+      });
+    if (priceLines.length === 0) lines.push("No currency daily rates filled in (existing server values may be unchanged).");
+    else {
+      lines.push("Per-user daily rates to save:");
+      for (const p of priceLines) lines.push(`  · ${p}`);
+    }
+    return lines;
+  }, [currencyRows, form.baseCurrencyCode, form.paymentDueDays, form.yearlyDiscountEnabled, yearlyDiscountPercentClamped]);
+
   const saveMutation = useMutation({
     mutationFn: () =>
       api.patch("/api/admin/billing/settings", {
         paymentDueDays: Number(form.paymentDueDays),
         baseCurrencyCode: form.baseCurrencyCode,
-        yearlyDiscountPercent: Math.min(100, Math.max(0, Math.round(Number(form.yearlyDiscountPercent)) || 0)),
+        yearlyDiscountPercent: yearlyDiscountPercentClamped,
         yearlyDiscountEnabled: form.yearlyDiscountEnabled,
         currencyPrices: Object.entries(currencyRows)
           .filter(([, row]) => row.userDailyRateCents.trim().length > 0)
@@ -163,7 +200,12 @@ export default function Pricing() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "billing-settings"] });
-      toast({ title: "Saved", description: "Default billing settings updated." });
+      queryClient.invalidateQueries({ queryKey: ["public-pricing-rates"] });
+      setSaveConfirmOpen(false);
+      toast({
+        title: "Pricing updated",
+        description: "Global billing defaults are saved. The public pricing page will show new rates on the next load or tab focus.",
+      });
     },
     onError: (err) => {
       const msg = isApiError(err) ? err.message : "Failed to save settings.";
@@ -198,7 +240,7 @@ export default function Pricing() {
           </p>
           <TieredSeatPricingCalculator
             showModelControls
-            yearlyDiscountPercent={Math.min(100, Math.max(0, Math.round(Number(form.yearlyDiscountPercent)) || 0))}
+            yearlyDiscountPercent={yearlyDiscountPercentClamped}
             yearlyDiscountEnabled={form.yearlyDiscountEnabled}
             showYearlyDiscountControls
             onYearlyDiscountPercentChange={(p) => setForm((f) => ({ ...f, yearlyDiscountPercent: String(p) }))}
@@ -316,14 +358,53 @@ export default function Pricing() {
               <p className="text-xs text-white/50">Invoice due days</p>
               <Input value={form.paymentDueDays} onChange={(e) => setForm((p) => ({ ...p, paymentDueDays: e.target.value }))} />
             </div>
-            <div className="flex items-end">
-              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || isPending}>
-                {saveMutation.isPending ? "Saving..." : "Save settings"}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <Button
+                type="button"
+                className="bg-rose-700 hover:bg-rose-600"
+                onClick={() => setSaveConfirmOpen(true)}
+                disabled={saveMutation.isPending || isPending}
+              >
+                Save new pricing
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={saveConfirmOpen} onOpenChange={setSaveConfirmOpen}>
+        <AlertDialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-gray-900 text-white sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Save new global pricing?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-white/70" asChild>
+              <div>
+                <p>
+                  This updates default billing for all organisations that use the global table, and updates the public
+                  pricing page (per-user / day and annual discount defaults).
+                </p>
+                <ul className="list-disc space-y-1 pl-4 text-left text-sm text-white/80">
+                  {saveSummaryLines.map((line, i) => (
+                    <li key={`${i}-${line.slice(0, 80)}`}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel className="border-white/20 bg-transparent text-white hover:bg-white/10">
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              className="bg-rose-700 hover:bg-rose-600"
+              disabled={saveMutation.isPending}
+              onClick={() => saveMutation.mutate()}
+            >
+              {saveMutation.isPending ? "Saving…" : "Confirm and save"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card className="bg-gray-900 border border-white/10">
         <CardHeader>
