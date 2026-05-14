@@ -132,7 +132,7 @@ function WelcomeHero({
   titleClass?: string;
 }) {
   return (
-    <section className="w-full max-w-4xl space-y-4 text-center">
+    <section className="w-full space-y-4 text-center">
       <h1 className={`text-2xl font-bold leading-tight tracking-tight ${titleClass}`}>{title}</h1>
       <p className="text-base font-medium leading-relaxed text-white/90 md:text-xl">{subtitle}</p>
       <p className="text-sm leading-relaxed text-white/85 md:text-base text-left sm:text-center">{lead}</p>
@@ -152,7 +152,7 @@ function FeatureBlock({
   return (
     <section
       id="features"
-      className="w-full max-w-6xl scroll-mt-6 space-y-8 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm sm:p-7"
+      className="w-full scroll-mt-6 space-y-8 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm sm:p-7"
     >
       <div className="space-y-4">
         <h2 className="text-center text-lg font-semibold text-white sm:text-left md:text-2xl">{sectionHeading}</h2>
@@ -229,14 +229,14 @@ function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefi
   return (
     <FrontShell>
       <HashScroll />
-      <main className="relative flex min-h-full flex-col gap-10 px-4 pb-12 pt-6 sm:px-6">
-        <section className="mx-auto flex min-h-[40vh] max-w-lg flex-col items-center justify-center gap-6 text-center">
+      <main className="relative flex min-h-full w-full flex-col gap-10 px-6 pb-12 pt-6 md:pt-8">
+        <section className="flex min-h-[40vh] w-full flex-col items-center justify-center gap-6 px-2 text-center">
           <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">{title}</h1>
           <p className="text-base leading-relaxed text-white/85">{subtitle}</p>
         </section>
 
         <section
-          className="mx-auto w-full max-w-3xl scroll-mt-6 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm md:p-6"
+          className="w-full scroll-mt-6 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm md:p-6"
           id="features"
         >
           <h2 className="text-lg font-semibold text-white">Features</h2>
@@ -263,7 +263,7 @@ function EarlyBirdFrontpage({ siteContent }: { siteContent: SiteContent | undefi
   return (
     <FrontShell>
       <HashScroll />
-      <main className="relative mx-auto flex min-h-full max-w-6xl flex-col items-center justify-start gap-8 px-4 pb-12 pt-6 sm:px-6 md:pt-8">
+      <main className="relative flex min-h-full w-full flex-col items-center justify-start gap-8 px-6 pb-12 pt-6 md:pt-8">
         <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} />
         <FeatureBlock
           sectionHeading={welcome.sectionHeading}
@@ -271,7 +271,7 @@ function EarlyBirdFrontpage({ siteContent }: { siteContent: SiteContent | undefi
           closing={welcome.closing}
         />
         {welcome.postscript ? (
-          <p className="w-full max-w-4xl text-center text-sm leading-relaxed text-white/80">{welcome.postscript}</p>
+          <p className="w-full text-center text-sm leading-relaxed text-white/80">{welcome.postscript}</p>
         ) : null}
         <div className="pb-2">
           <Button
@@ -294,9 +294,9 @@ function LiveFrontpage({ siteContent }: { siteContent: SiteContent | undefined }
   return (
     <FrontShell>
       <HashScroll />
-      <main className="relative mx-auto flex min-h-full max-w-6xl flex-col items-center justify-start gap-8 px-4 pb-12 pt-6 text-center sm:px-6 md:pt-8">
+      <main className="relative flex min-h-full w-full flex-col items-center justify-start gap-8 px-6 pb-12 pt-6 text-center md:pt-8">
         <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} titleClass="md:text-4xl" />
-        <p className="w-full max-w-2xl text-sm leading-relaxed text-white/70">
+        <p className="w-full text-sm leading-relaxed text-white/70">
           Use the sidebar to jump to <strong>Features</strong>, or open <strong>Pricing</strong> for billing details.{" "}
           <strong>Terms</strong> and <strong>Privacy</strong> are there too.
         </p>
