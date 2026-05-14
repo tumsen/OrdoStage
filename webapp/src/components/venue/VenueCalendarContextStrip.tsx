@@ -74,7 +74,7 @@ function LabeledRows({
   return (
     <div className="space-y-1.5">
       <div className="text-[10px] uppercase tracking-wide text-white/40">{title}</div>
-      <dl className="grid max-w-xl grid-cols-[minmax(4.5rem,auto)_1fr] gap-x-2 gap-y-1 text-[11px] leading-snug">
+      <dl className="grid w-full min-w-0 grid-cols-[minmax(4.5rem,auto)_1fr] gap-x-2 gap-y-1 text-[11px] leading-snug">
         {filtered.map(({ label, value }) => (
           <div key={label} className="contents">
             <dt className="text-white/40">{label}</dt>
@@ -277,116 +277,30 @@ export function VenueCalendarContextStrip({
   const docList = docs ?? [];
   const showDownloadAll = !isLoading && docList.length > 0;
 
+  const hasStageInfo = Boolean(
+    venue &&
+      (venue.capacity != null ||
+        venue.width?.trim() ||
+        venue.length?.trim() ||
+        venue.height?.trim()),
+  );
+
   return (
     <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 space-y-3">
+        <div className="min-w-0 flex-1">
           <div className="text-[10px] uppercase tracking-wide text-white/45">Venue info</div>
           {venue ? (
-            <div className="space-y-3">
-              <div className="text-sm font-medium text-white/90">{venue.name}</div>
+            <>
+              <div className="mt-1 text-sm font-medium text-white/90">{venue.name}</div>
               {venue.documentCount != null ? (
-                <p className="text-[11px] text-white/40">
+                <p className="mt-0.5 text-[11px] text-white/40">
                   {venue.documentCount} file{venue.documentCount === 1 ? "" : "s"} on record
                 </p>
               ) : null}
-
-              {hasAddr ? (
-                <div className="space-y-1.5">
-                  <LabeledRows
-                    title="Address"
-                    rows={[
-                      { label: "Street", value: venue.addressStreet ?? "" },
-                      { label: "No.", value: venue.addressNumber ?? "" },
-                      { label: "ZIP", value: venue.addressZip ?? "" },
-                      { label: "City", value: venue.addressCity ?? "" },
-                      { label: "State", value: venue.addressState ?? "" },
-                      { label: "Country", value: venue.addressCountry ?? "" },
-                    ]}
-                  />
-                  <p className="text-[11px] leading-snug text-white/45">{addr}</p>
-                </div>
-              ) : (
-                <p className="text-xs text-white/35">No address on file</p>
-              )}
-
-              <LabeledRows
-                title="Stage & capacity"
-                rows={[
-                  ...(venue.capacity != null
-                    ? [{ label: "Capacity", value: venue.capacity.toLocaleString() }]
-                    : []),
-                  ...(venue.width?.trim() ? [{ label: "Width", value: venue.width.trim() }] : []),
-                  ...(venue.length?.trim() ? [{ label: "Depth", value: venue.length.trim() }] : []),
-                  ...(venue.height?.trim() ? [{ label: "Height", value: venue.height.trim() }] : []),
-                ]}
-              />
-
-              {hasContact ? (
-                <div className="space-y-1.5">
-                  <div className="text-[10px] uppercase tracking-wide text-white/40">Contact</div>
-                  <dl className="grid max-w-xl grid-cols-[minmax(4.5rem,auto)_1fr] gap-x-2 gap-y-1 text-[11px] leading-snug">
-                    {venue.contactPersonName?.trim() ? (
-                      <div className="contents">
-                        <dt className="text-white/40">Name</dt>
-                        <dd className="break-words text-white/75">{venue.contactPersonName.trim()}</dd>
-                      </div>
-                    ) : null}
-                    {venue.contactPersonRole?.trim() ? (
-                      <div className="contents">
-                        <dt className="text-white/40">Role</dt>
-                        <dd className="break-words text-white/75">{venue.contactPersonRole.trim()}</dd>
-                      </div>
-                    ) : null}
-                    {venue.contactPersonPhone?.trim() ? (
-                      <div className="contents">
-                        <dt className="text-white/40">Phone</dt>
-                        <dd className="break-words text-white/75">
-                          <a href={`tel:${venue.contactPersonPhone.trim()}`} className="text-blue-300 hover:text-blue-200">
-                            {venue.contactPersonPhone.trim()}
-                          </a>
-                        </dd>
-                      </div>
-                    ) : null}
-                    {venue.contactPersonEmail?.trim() ? (
-                      <div className="contents">
-                        <dt className="text-white/40">Email</dt>
-                        <dd className="break-all text-white/75">
-                          <a
-                            href={`mailto:${venue.contactPersonEmail.trim()}`}
-                            className="text-blue-300 hover:text-blue-200"
-                          >
-                            {venue.contactPersonEmail.trim()}
-                          </a>
-                        </dd>
-                      </div>
-                    ) : null}
-                  </dl>
-                </div>
-              ) : null}
-
-              {(venue.customFields ?? []).length > 0 ? (
-                <div className="space-y-1.5">
-                  <div className="text-[10px] uppercase tracking-wide text-white/40">Custom fields</div>
-                  <ul className="max-w-xl list-inside list-disc space-y-0.5 text-[11px] leading-snug text-white/70">
-                    {(venue.customFields ?? []).map((f, i) => (
-                      <li key={`${i}-${f.key}`}>
-                        <span className="text-white/50">{f.key}:</span> {f.value}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              {venue.notes?.trim() ? (
-                <div className="space-y-1.5">
-                  <div className="text-[10px] uppercase tracking-wide text-white/40">Notes</div>
-                  <p className="max-w-xl whitespace-pre-wrap text-[11px] leading-relaxed text-white/65">{venue.notes}</p>
-                </div>
-              ) : null}
-            </div>
+            </>
           ) : (
-            <Skeleton className="h-24 w-full max-w-lg bg-white/5" />
+            <Skeleton className="mt-2 h-5 w-48 max-w-full bg-white/5" />
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5 text-[11px]">
@@ -420,6 +334,112 @@ export function VenueCalendarContextStrip({
           ) : null}
         </div>
       </div>
+
+      {venue ? (
+        <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="min-w-0 space-y-2">
+            {hasAddr ? (
+              <>
+                <LabeledRows
+                  title="Address"
+                  rows={[
+                    { label: "Street", value: venue.addressStreet ?? "" },
+                    { label: "No.", value: venue.addressNumber ?? "" },
+                    { label: "ZIP", value: venue.addressZip ?? "" },
+                    { label: "City", value: venue.addressCity ?? "" },
+                    { label: "State", value: venue.addressState ?? "" },
+                    { label: "Country", value: venue.addressCountry ?? "" },
+                  ]}
+                />
+                <p className="text-[11px] leading-snug text-white/45">{addr}</p>
+              </>
+            ) : (
+              <p className="text-xs text-white/35">No address on file</p>
+            )}
+          </div>
+
+          {hasStageInfo ? (
+            <div className="min-w-0">
+              <LabeledRows
+                title="Stage & capacity"
+                rows={[
+                  ...(venue.capacity != null
+                    ? [{ label: "Capacity", value: venue.capacity.toLocaleString() }]
+                    : []),
+                  ...(venue.width?.trim() ? [{ label: "Width", value: venue.width.trim() }] : []),
+                  ...(venue.length?.trim() ? [{ label: "Depth", value: venue.length.trim() }] : []),
+                  ...(venue.height?.trim() ? [{ label: "Height", value: venue.height.trim() }] : []),
+                ]}
+              />
+            </div>
+          ) : null}
+
+          {hasContact ? (
+            <div className="min-w-0 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-wide text-white/40">Contact</div>
+              <dl className="grid w-full min-w-0 grid-cols-[minmax(4.5rem,auto)_1fr] gap-x-2 gap-y-1 text-[11px] leading-snug">
+                {venue.contactPersonName?.trim() ? (
+                  <div className="contents">
+                    <dt className="text-white/40">Name</dt>
+                    <dd className="break-words text-white/75">{venue.contactPersonName.trim()}</dd>
+                  </div>
+                ) : null}
+                {venue.contactPersonRole?.trim() ? (
+                  <div className="contents">
+                    <dt className="text-white/40">Role</dt>
+                    <dd className="break-words text-white/75">{venue.contactPersonRole.trim()}</dd>
+                  </div>
+                ) : null}
+                {venue.contactPersonPhone?.trim() ? (
+                  <div className="contents">
+                    <dt className="text-white/40">Phone</dt>
+                    <dd className="break-words text-white/75">
+                      <a href={`tel:${venue.contactPersonPhone.trim()}`} className="text-blue-300 hover:text-blue-200">
+                        {venue.contactPersonPhone.trim()}
+                      </a>
+                    </dd>
+                  </div>
+                ) : null}
+                {venue.contactPersonEmail?.trim() ? (
+                  <div className="contents">
+                    <dt className="text-white/40">Email</dt>
+                    <dd className="break-all text-white/75">
+                      <a
+                        href={`mailto:${venue.contactPersonEmail.trim()}`}
+                        className="text-blue-300 hover:text-blue-200"
+                      >
+                        {venue.contactPersonEmail.trim()}
+                      </a>
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
+          ) : null}
+
+          {(venue.customFields ?? []).length > 0 ? (
+            <div className="min-w-0 space-y-1.5 md:col-span-2 xl:col-span-1">
+              <div className="text-[10px] uppercase tracking-wide text-white/40">Custom fields</div>
+              <ul className="list-inside list-disc space-y-0.5 text-[11px] leading-snug text-white/70">
+                {(venue.customFields ?? []).map((f, i) => (
+                  <li key={`${i}-${f.key}`}>
+                    <span className="text-white/50">{f.key}:</span> {f.value}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {venue.notes?.trim() ? (
+            <div className="col-span-full min-w-0 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-wide text-white/40">Notes</div>
+              <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-white/65">{venue.notes}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <Skeleton className="h-24 w-full max-w-lg bg-white/5" />
+      )}
 
       <div>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
