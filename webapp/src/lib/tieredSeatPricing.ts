@@ -7,18 +7,23 @@ export const DEFAULT_TIERED_SEAT_MODEL = {
 } as const;
 
 export const TIERED_SEAT_MAX_USERS = 150;
-export const TIERED_SEAT_ANNUAL_DISCOUNT = 0.85;
-/** Rough competitor benchmark for “vs Planday” row ($/user/mo). */
-export const TIERED_SEAT_PLANDAY_ESTIMATE_PER_USER = 4;
+
+/** Monthly multiplier when annual billing is on (1 = no discount). */
+export function annualMonthlyMultiplier(discountPercent: number, discountEnabled: boolean): number {
+  if (!discountEnabled) return 1;
+  const p = Math.min(100, Math.max(0, discountPercent));
+  return 1 - p / 100;
+}
 
 export function perUserRate(n: number, start: number, floor: number, floorAt: number): number {
+  const safeFloorAt = Math.max(3, Math.floor(floorAt));
   if (n <= 1) return 0;
-  if (n >= floorAt) return floor;
-  return start - ((start - floor) * (n - 2)) / (floorAt - 2);
+  if (n >= safeFloorAt) return floor;
+  return start - ((start - floor) * (n - 2)) / (safeFloorAt - 2);
 }
 
 export function calcMonthlyTotal(users: number, base: number, start: number, floor: number, floorAt: number): number {
-  const safeFloorAt = Math.max(3, floorAt);
+  const safeFloorAt = Math.max(3, Math.floor(floorAt));
   let total = base;
   for (let n = 2; n <= users; n++) {
     total += perUserRate(n, start, floor, safeFloorAt);

@@ -91,6 +91,8 @@ export default function PublicPricing() {
 
   const { data: publicPricing } = useQuery<{
     baseCurrencyCode: string;
+    yearlyDiscountPercent?: number;
+    yearlyDiscountEnabled?: boolean;
     prices: Array<{ currencyCode: string; userDailyRateCents: number }>;
   }>({
     queryKey: ["public-pricing-rates"],
@@ -150,7 +152,10 @@ export default function PublicPricing() {
               created an event, or scheduled an event—everyone else does not count toward your seat total.
             </p>
           </div>
-          <TieredSeatPricingCalculator />
+          <TieredSeatPricingCalculator
+            yearlyDiscountPercent={publicPricing?.yearlyDiscountPercent ?? 15}
+            yearlyDiscountEnabled={publicPricing?.yearlyDiscountEnabled ?? true}
+          />
         </section>
 
         {/* How billing works */}

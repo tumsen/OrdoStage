@@ -20,6 +20,9 @@ import {
   type AdminOrgEmailMembersResult,
 } from "../../../../backend/src/types";
 import { syncAuthSessionAfterWorkspaceChange } from "@/lib/auth-client";
+import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
+import { DEFAULT_TIERED_SEAT_MODEL, type TieredSeatModel } from "@/lib/tieredSeatPricing";
+import { parseSeatCalculatorJson } from "../../../../backend/src/seatCalculatorJson";
 
 interface OrgUser {
   id: string;
@@ -64,6 +67,12 @@ interface OrgDetail {
   customDiscountPercent: number | null;
   customFlatRateCents: number | null;
   customFlatRateMaxUsers: number | null;
+  customUserDailyRateCents: number | null;
+  customSeatCalculatorJson: string | null;
+  seatCalculatorDefaults?: {
+    yearlyDiscountPercent: number;
+    yearlyDiscountEnabled: boolean;
+  };
   billingCurrencyCode: string;
   estimatedMonthlyCents: number;
   estimatedCurrencyCode: string;
@@ -71,6 +80,37 @@ interface OrgDetail {
   users: OrgUser[];
   invoices: Invoice[];
   _count: { events: number; venues: number; people: number };
+}
+
+function formatEditableMajorFromCents(cents: number | null | undefined): string {
+  if (cents == null || !Number.isFinite(cents)) return "";
+  const major = cents / 100;
+  const fixed = major.toFixed(2);
+  return fixed.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+}
+
+function majorToCents(value: string): number {
+  const normalized = value.trim().replace(",", ".");
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(1, Math.round(parsed * 100));
+}
+
+function mergeOrgSeatModel(org: OrgDetail): TieredSeatModel {
+  const parsed = parseSeatCalculatorJson(org.customSeatCalculatorJson);
+  return {
+    ...DEFAULT_TIERED_SEAT_MODEL,
+    ...parsed?.model,
+  };
+}
+
+function initialOrgYearly(org: OrgDetail): { percent: number; enabled: boolean } {
+  const parsed = parseSeatCalculatorJson(org.customSeatCalculatorJson);
+  const d = org.seatCalculatorDefaults ?? { yearlyDiscountPercent: 15, yearlyDiscountEnabled: true };
+  return {
+    percent: parsed?.yearlyDiscountPercent ?? d.yearlyDiscountPercent,
+    enabled: parsed?.yearlyDiscountEnabled ?? d.yearlyDiscountEnabled,
+  };
 }
 
 function formatDate(dateStr: string): string {
@@ -124,7 +164,11 @@ function BillingTab({ org }: { org: OrgDetail }) {
     customFlatRateCents: "",
     customFlatRateMaxUsers: "",
     billingCurrencyCode: "EUR",
+    customUserDailyRateMajor: "",
   });
+  const [seatModel, setSeatModel] = useState<TieredSeatModel>({ ...DEFAULT_TIERED_SEAT_MODEL });
+  const [seatYearlyPercent, setSeatYearlyPercent] = useState(15);
+  const [seatYearlyEnabled, setSeatYearlyEnabled] = useState(true);
 
   useEffect(() => {
     setForm({
@@ -132,12 +176,23 @@ function BillingTab({ org }: { org: OrgDetail }) {
       customFlatRateCents: org.customFlatRateCents == null ? "" : String(org.customFlatRateCents),
       customFlatRateMaxUsers: org.customFlatRateMaxUsers == null ? "" : String(org.customFlatRateMaxUsers),
       billingCurrencyCode: org.billingCurrencyCode || "EUR",
+      customUserDailyRateMajor: formatEditableMajorFromCents(org.customUserDailyRateCents),
     });
-  }, [org.customDiscountPercent, org.customFlatRateCents, org.customFlatRateMaxUsers, org.billingCurrencyCode]);
+    setSeatModel(mergeOrgSeatModel(org));
+    const y = initialOrgYearly(org);
+    setSeatYearlyPercent(y.percent);
+    setSeatYearlyEnabled(y.enabled);
+  }, [org]);
 
   const pricingMutation = useMutation({
     mutationFn: () =>
       api.put(`/api/admin/orgs/${org.id}/billing-pricing`, {
+        customUserDailyRateCents: form.customUserDailyRateMajor.trim() ? majorToCents(form.customUserDailyRateMajor) : null,
+        customSeatCalculatorJson: JSON.stringify({
+          model: seatModel,
+          yearlyDiscountPercent: seatYearlyPercent,
+          yearlyDiscountEnabled: seatYearlyEnabled,
+        }),
         customDiscountPercent: form.customDiscountPercent.trim() ? Number(form.customDiscountPercent) : null,
         customFlatRateCents: form.customFlatRateCents.trim() ? Number(form.customFlatRateCents) : null,
         customFlatRateMaxUsers: form.customFlatRateMaxUsers.trim() ? Number(form.customFlatRateMaxUsers) : null,
@@ -182,6 +237,16 @@ function BillingTab({ org }: { org: OrgDetail }) {
           <CardContent className="space-y-3">
             <p className="text-sm text-white/70">Custom organization pricing</p>
             <Input placeholder="Billing currency (e.g. EUR, USD, DKK)" value={form.billingCurrencyCode} onChange={(e) => setForm((p) => ({ ...p, billingCurrencyCode: e.target.value.toUpperCase() }))} />
+            <div>
+              <Label className="text-xs text-white/50">Custom per-user daily rate ({org.estimatedCurrencyCode}, optional)</Label>
+              <Input
+                className="mt-1"
+                placeholder="Leave empty to use global table rate"
+                value={form.customUserDailyRateMajor}
+                onChange={(e) => setForm((p) => ({ ...p, customUserDailyRateMajor: e.target.value }))}
+              />
+              <p className="text-[11px] text-white/40 mt-1">Major units (e.g. 5 or 5.50); stored as cents.</p>
+            </div>
             <Input placeholder="Discount % (optional)" value={form.customDiscountPercent} onChange={(e) => setForm((p) => ({ ...p, customDiscountPercent: e.target.value }))} />
             <Input placeholder="Flat rate cents (optional)" value={form.customFlatRateCents} onChange={(e) => setForm((p) => ({ ...p, customFlatRateCents: e.target.value }))} />
             <Input placeholder="Flat rate max users (optional)" value={form.customFlatRateMaxUsers} onChange={(e) => setForm((p) => ({ ...p, customFlatRateMaxUsers: e.target.value }))} />
@@ -219,6 +284,29 @@ function BillingTab({ org }: { org: OrgDetail }) {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="bg-gray-900 border border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white text-base">Organisation seat curve (illustrative)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-white/55">
+            Overrides the marketing calculator for this customer. Values are stored as JSON and save with the button
+            above.
+          </p>
+          <TieredSeatPricingCalculator
+            showTrialBadge={false}
+            showModelControls
+            seatModel={seatModel}
+            onSeatModelChange={setSeatModel}
+            yearlyDiscountPercent={seatYearlyPercent}
+            yearlyDiscountEnabled={seatYearlyEnabled}
+            showYearlyDiscountControls
+            onYearlyDiscountPercentChange={setSeatYearlyPercent}
+            onYearlyDiscountEnabledChange={setSeatYearlyEnabled}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

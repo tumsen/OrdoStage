@@ -2,6 +2,8 @@ import { PrismaClient } from "@prisma/client";
 
 export type BillingConfigResolved = {
   paymentDueDays: number;
+  yearlyDiscountPercent: number;
+  yearlyDiscountEnabled: boolean;
 };
 
 export const SUPPORTED_BILLING_CURRENCIES = [
@@ -48,7 +50,11 @@ export async function getBillingConfig(prisma: PrismaClient): Promise<BillingCon
     create: { id: "default" },
     update: {},
   });
-  return cfg;
+  return {
+    paymentDueDays: cfg.paymentDueDays,
+    yearlyDiscountPercent: cfg.yearlyDiscountPercent,
+    yearlyDiscountEnabled: cfg.yearlyDiscountEnabled,
+  };
 }
 
 export async function ensureCurrencyPriceMonthRollover(prisma: PrismaClient, now = new Date()): Promise<void> {
@@ -93,11 +99,17 @@ export function estimateMonthlyOrgAmountCents(input: {
   activeUsers: number;
   daysInMonth: number;
   userDailyRateCents: number;
+  /** Organization override: per-user daily rate in cents (replaces table rate when set). */
+  customUserDailyRateCents?: number | null;
   customDiscountPercent: number | null;
   customFlatRateCents: number | null;
   customFlatRateMaxUsers: number | null;
 }): number {
-  const subtotal = input.activeUsers * input.daysInMonth * input.userDailyRateCents;
+  const rateCents =
+    input.customUserDailyRateCents != null && input.customUserDailyRateCents > 0
+      ? input.customUserDailyRateCents
+      : input.userDailyRateCents;
+  const subtotal = input.activeUsers * input.daysInMonth * rateCents;
   const discountPercent = Math.min(Math.max(input.customDiscountPercent ?? 0, 0), 100);
   const flatRateApplicable =
     input.customFlatRateCents != null &&
@@ -117,6 +129,7 @@ export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new
     select: {
       id: true,
       billingCurrencyCode: true,
+      customUserDailyRateCents: true,
     },
   });
 
@@ -128,19 +141,25 @@ export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new
         user: { isActive: true },
       },
     });
+    const currency = (org.billingCurrencyCode || "USD").toUpperCase();
+    const tableRate = currencyPrices[currency] ?? fallbackRate;
+    const rateCents =
+      org.customUserDailyRateCents != null && org.customUserDailyRateCents > 0
+        ? org.customUserDailyRateCents
+        : tableRate;
     await prisma.billingUsageSnapshot.upsert({
       where: { organizationId_snapshotDate: { organizationId: org.id, snapshotDate } },
       create: {
         organizationId: org.id,
         snapshotDate,
         activeUsers,
-        userDailyRateCents: currencyPrices[(org.billingCurrencyCode || "USD").toUpperCase()] ?? fallbackRate,
-        currencyCode: (org.billingCurrencyCode || "USD").toUpperCase(),
+        userDailyRateCents: rateCents,
+        currencyCode: currency,
       },
       update: {
         activeUsers,
-        userDailyRateCents: currencyPrices[(org.billingCurrencyCode || "USD").toUpperCase()] ?? fallbackRate,
-        currencyCode: (org.billingCurrencyCode || "USD").toUpperCase(),
+        userDailyRateCents: rateCents,
+        currencyCode: currency,
       },
     });
     created += 1;
@@ -251,6 +270,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
     select: {
       id: true,
       billingCurrencyCode: true,
+      customUserDailyRateCents: true,
       customDiscountPercent: true,
       customFlatRateCents: true,
       customFlatRateMaxUsers: true,
@@ -285,7 +305,11 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
     });
 
     const totalUserDays = snapshots.reduce((sum, s) => sum + s.activeUsers, 0);
-    const avgRateCents = currencyPrices[currency] ?? fallbackRate;
+    const tableRate = currencyPrices[currency] ?? fallbackRate;
+    const avgRateCents =
+      org.customUserDailyRateCents != null && org.customUserDailyRateCents > 0
+        ? org.customUserDailyRateCents
+        : tableRate;
     const subtotalCents = totalUserDays * avgRateCents;
 
     // Approximate user-level days equally across active users (future snapshots can be improved per user).

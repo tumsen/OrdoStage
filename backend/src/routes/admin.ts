@@ -21,6 +21,7 @@ import {
 import { createPaddleCustomer, createPaddleTransactionForInvoice } from "../paddleClient";
 import { AdminOrgEmailMembersBodySchema } from "../types";
 import { sendHtmlEmail } from "../resendMail";
+import { parseSeatCalculatorJson, SEAT_CALCULATOR_JSON_MAX_CHARS } from "../seatCalculatorJson";
 
 const app = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -49,6 +50,7 @@ app.get("/admin/stats", async (c) => {
         select: {
           id: true,
           billingCurrencyCode: true,
+          customUserDailyRateCents: true,
           customDiscountPercent: true,
           customFlatRateCents: true,
           customFlatRateMaxUsers: true,
@@ -68,6 +70,7 @@ app.get("/admin/stats", async (c) => {
       activeUsers: org.memberships.length,
       daysInMonth,
       userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
+      customUserDailyRateCents: org.customUserDailyRateCents,
       customDiscountPercent: org.customDiscountPercent,
       customFlatRateCents: org.customFlatRateCents,
       customFlatRateMaxUsers: org.customFlatRateMaxUsers,
@@ -167,6 +170,8 @@ app.patch("/admin/billing/settings", async (c) => {
         .optional(),
       baseCurrencyCode: z.string().length(3).optional(),
       paymentDueDays: z.number().int().min(1).max(30).optional(),
+      yearlyDiscountPercent: z.number().int().min(0).max(100).optional(),
+      yearlyDiscountEnabled: z.boolean().optional(),
     })
     .parse(body);
 
@@ -176,9 +181,13 @@ app.patch("/admin/billing/settings", async (c) => {
     create: {
       id: "default",
       paymentDueDays: parsed.paymentDueDays ?? 7,
+      yearlyDiscountPercent: parsed.yearlyDiscountPercent ?? 15,
+      yearlyDiscountEnabled: parsed.yearlyDiscountEnabled ?? true,
     },
     update: {
       ...(parsed.paymentDueDays !== undefined ? { paymentDueDays: parsed.paymentDueDays } : {}),
+      ...(parsed.yearlyDiscountPercent !== undefined ? { yearlyDiscountPercent: parsed.yearlyDiscountPercent } : {}),
+      ...(parsed.yearlyDiscountEnabled !== undefined ? { yearlyDiscountEnabled: parsed.yearlyDiscountEnabled } : {}),
     },
   });
   if (parsed.baseCurrencyCode !== undefined) {
@@ -391,6 +400,7 @@ app.get("/admin/orgs", async (c) => {
       activeUsers: org._count.memberships,
       daysInMonth,
       userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
+      customUserDailyRateCents: org.customUserDailyRateCents,
       customDiscountPercent: org.customDiscountPercent,
       customFlatRateCents: org.customFlatRateCents,
       customFlatRateMaxUsers: org.customFlatRateMaxUsers,
@@ -506,16 +516,29 @@ app.get("/admin/orgs/:id", async (c) => {
   const now = new Date();
   const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
   const fallbackRate = currencyPrices.USD ?? 1500;
+  const billingDefaults = await getBillingConfig(prisma);
   const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
     activeUsers: org.memberships.length,
     daysInMonth,
     userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
+    customUserDailyRateCents: org.customUserDailyRateCents,
     customDiscountPercent: org.customDiscountPercent,
     customFlatRateCents: org.customFlatRateCents,
     customFlatRateMaxUsers: org.customFlatRateMaxUsers,
   });
   const { memberships: _m, ...rest } = org;
-  return c.json({ data: { ...rest, users, estimatedMonthlyCents, estimatedCurrencyCode: currency } });
+  return c.json({
+    data: {
+      ...rest,
+      users,
+      estimatedMonthlyCents,
+      estimatedCurrencyCode: currency,
+      seatCalculatorDefaults: {
+        yearlyDiscountPercent: billingDefaults.yearlyDiscountPercent,
+        yearlyDiscountEnabled: billingDefaults.yearlyDiscountEnabled,
+      },
+    },
+  });
 });
 
 app.post("/admin/orgs/:id/grant-org-admin", async (c) => {
@@ -770,6 +793,7 @@ app.put("/admin/orgs/:id/billing-pricing", async (c) => {
   const parsed = z
     .object({
       customUserDailyRateCents: z.number().int().min(1).nullable().optional(),
+      customSeatCalculatorJson: z.string().max(SEAT_CALCULATOR_JSON_MAX_CHARS).nullable().optional(),
       customDiscountPercent: z.number().int().min(0).max(100).nullable().optional(),
       customFlatRateCents: z.number().int().min(1).nullable().optional(),
       customFlatRateMaxUsers: z.number().int().min(1).nullable().optional(),
@@ -780,9 +804,29 @@ app.put("/admin/orgs/:id/billing-pricing", async (c) => {
   const org = await prisma.organization.findUnique({ where: { id: c.req.param("id") } });
   if (!org) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
 
+  let normalizedSeatJson: string | null | undefined;
+  if (parsed.customSeatCalculatorJson !== undefined) {
+    const raw = parsed.customSeatCalculatorJson;
+    if (raw === null || !String(raw).trim()) {
+      normalizedSeatJson = null;
+    } else {
+      const trimmed = String(raw).trim();
+      const parsedJson = parseSeatCalculatorJson(trimmed);
+      if (!parsedJson) {
+        return c.json(
+          { error: { message: "customSeatCalculatorJson is invalid JSON or failed validation.", code: "BAD_REQUEST" } },
+          400
+        );
+      }
+      normalizedSeatJson = JSON.stringify(parsedJson);
+    }
+  }
+
   const updated = await prisma.organization.update({
     where: { id: org.id },
     data: {
+      ...(parsed.customUserDailyRateCents !== undefined ? { customUserDailyRateCents: parsed.customUserDailyRateCents } : {}),
+      ...(normalizedSeatJson !== undefined ? { customSeatCalculatorJson: normalizedSeatJson } : {}),
       ...(parsed.customDiscountPercent !== undefined ? { customDiscountPercent: parsed.customDiscountPercent } : {}),
       ...(parsed.customFlatRateCents !== undefined ? { customFlatRateCents: parsed.customFlatRateCents } : {}),
       ...(parsed.customFlatRateMaxUsers !== undefined ? { customFlatRateMaxUsers: parsed.customFlatRateMaxUsers } : {}),

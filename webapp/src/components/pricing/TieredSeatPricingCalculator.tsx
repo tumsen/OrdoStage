@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -14,12 +14,11 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
+  annualMonthlyMultiplier,
   calcMonthlyTotal,
   DEFAULT_TIERED_SEAT_MODEL,
   perUserRate,
-  TIERED_SEAT_ANNUAL_DISCOUNT,
   TIERED_SEAT_MAX_USERS,
-  TIERED_SEAT_PLANDAY_ESTIMATE_PER_USER,
   type TieredSeatModel,
 } from "@/lib/tieredSeatPricing";
 
@@ -32,6 +31,18 @@ type Props = {
   /** Owner admin: editable model inputs. Public: fixed defaults. */
   showModelControls?: boolean;
   className?: string;
+  /** When false, hides the marketing trial chip (e.g. internal org billing). */
+  showTrialBadge?: boolean;
+  /** Global or org defaults for annual price reduction (0–100). */
+  yearlyDiscountPercent?: number;
+  yearlyDiscountEnabled?: boolean;
+  /** Show percent + master switch for annual discount (admin / org pricing). */
+  showYearlyDiscountControls?: boolean;
+  onYearlyDiscountPercentChange?: (percent: number) => void;
+  onYearlyDiscountEnabledChange?: (enabled: boolean) => void;
+  /** Controlled seat curve (organisation overrides). */
+  seatModel?: TieredSeatModel;
+  onSeatModelChange?: (m: TieredSeatModel) => void;
 };
 
 function clampInt(n: number, min: number, max: number): number {
@@ -44,13 +55,42 @@ function parseMoney(s: string, fallback: number): number {
   return Number.isFinite(v) ? v : fallback;
 }
 
-export function TieredSeatPricingCalculator({ showModelControls = false, className }: Props) {
+export function TieredSeatPricingCalculator({
+  showModelControls = false,
+  className,
+  showTrialBadge = true,
+  yearlyDiscountPercent = 15,
+  yearlyDiscountEnabled = true,
+  showYearlyDiscountControls = false,
+  onYearlyDiscountPercentChange,
+  onYearlyDiscountEnabledChange,
+  seatModel: controlledSeatModel,
+  onSeatModelChange,
+}: Props) {
   const [users, setUsers] = useState(20);
   const [annual, setAnnual] = useState(false);
-  const [model, setModel] = useState<TieredSeatModel>({ ...DEFAULT_TIERED_SEAT_MODEL });
+  const [innerModel, setInnerModel] = useState<TieredSeatModel>({ ...DEFAULT_TIERED_SEAT_MODEL });
+  const model = controlledSeatModel ?? innerModel;
 
-  const floorAtSafe = Math.max(3, model.floorAt);
+  const setModel = (next: TieredSeatModel | ((prev: TieredSeatModel) => TieredSeatModel)) => {
+    const resolved = typeof next === "function" ? next(model) : next;
+    if (onSeatModelChange) onSeatModelChange(resolved);
+    else setInnerModel(resolved);
+  };
+
+  const [floorAtDraft, setFloorAtDraft] = useState(String(model.floorAt));
+  useEffect(() => {
+    setFloorAtDraft(String(model.floorAt));
+  }, [model.floorAt]);
+
+  const [yearlyPercentDraft, setYearlyPercentDraft] = useState(String(yearlyDiscountPercent));
+  useEffect(() => {
+    setYearlyPercentDraft(String(yearlyDiscountPercent));
+  }, [yearlyDiscountPercent]);
+
+  const floorAtSafe = Math.max(3, Math.floor(model.floorAt));
   const monthlyList = useMemo(() => monthlyAtUsers(model), [model]);
+  const mult = annualMonthlyMultiplier(yearlyDiscountPercent, yearlyDiscountEnabled);
   const chartRows = useMemo(
     () =>
       Array.from({ length: TIERED_SEAT_MAX_USERS }, (_, i) => {
@@ -64,22 +104,50 @@ export function TieredSeatPricingCalculator({ showModelControls = false, classNa
     [monthlyList, model.start, model.floor, floorAtSafe],
   );
 
-  const discountedMonthly = annual ? monthlyList[users - 1] * TIERED_SEAT_ANNUAL_DISCOUNT : monthlyList[users - 1];
+  const baseMonthly = monthlyList[users - 1] ?? 0;
+  const discountedMonthly = annual ? baseMonthly * mult : baseMonthly;
   const annualTotal = discountedMonthly * 12;
   const perUserEffective = users > 0 ? discountedMonthly / users : 0;
-  const plandayMonthly = users * TIERED_SEAT_PLANDAY_ESTIMATE_PER_USER;
-  const vsPlanday = Math.round(discountedMonthly) - plandayMonthly;
   const thisRate = perUserRate(users, model.start, model.floor, floorAtSafe);
-  const step = (model.start - model.floor) / (floorAtSafe - 2);
-  const annualSavingsYear = annual ? Math.round((monthlyList[users - 1] - discountedMonthly) * 12) : 0;
+  const stepDen = floorAtSafe - 2;
+  const step = stepDen > 0 ? (model.start - model.floor) / stepDen : 0;
+  const annualSavingsYear = annual ? Math.round((baseMonthly - discountedMonthly) * 12) : 0;
+
+  const annualSub =
+    annual && yearlyDiscountEnabled
+      ? `billed annually (${yearlyDiscountPercent}% off)`
+      : annual
+        ? "billed annually (no discount)"
+        : "billed monthly";
+  const annualTotalSub =
+    annual && yearlyDiscountEnabled ? `${yearlyDiscountPercent}% saved vs monthly` : annual ? "per year" : "per year";
+
+  function commitFloorAtDraft() {
+    const parsed = parseInt(floorAtDraft.replace(/\s/g, ""), 10);
+    const fallback = model.floorAt;
+    const n = Number.isFinite(parsed) ? parsed : fallback;
+    const clamped = clampInt(n, 3, TIERED_SEAT_MAX_USERS);
+    setModel((m) => ({ ...m, floorAt: clamped }));
+    setFloorAtDraft(String(clamped));
+  }
+
+  function commitYearlyPercentDraft() {
+    const parsed = parseInt(yearlyPercentDraft.replace(/\s/g, ""), 10);
+    const n = Number.isFinite(parsed) ? parsed : yearlyDiscountPercent;
+    const clamped = clampInt(n, 0, 100);
+    onYearlyDiscountPercentChange?.(clamped);
+    setYearlyPercentDraft(String(clamped));
+  }
 
   return (
     <div className={cn("space-y-6 text-white", className)}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex rounded-md border border-ordo-blue/35 bg-ordo-blue/10 px-2.5 py-1 text-[11px] font-medium text-sky-200/95">
-          30-day free trial · No credit card required
-        </span>
-      </div>
+      {showTrialBadge ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex rounded-md border border-ordo-blue/35 bg-ordo-blue/10 px-2.5 py-1 text-[11px] font-medium text-sky-200/95">
+            30-day free trial · No credit card required
+          </span>
+        </div>
+      ) : null}
 
       <div className="space-y-3">
         <div className="flex items-baseline justify-between gap-3">
@@ -112,30 +180,45 @@ export function TieredSeatPricingCalculator({ showModelControls = false, classNa
         <Label htmlFor="annual-billing" className="cursor-pointer text-sm text-white/70">
           Annual billing
         </Label>
-        {annual ? (
+        {annual && yearlyDiscountEnabled && yearlyDiscountPercent > 0 ? (
           <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
             Save ${annualSavingsYear.toLocaleString()}/yr
           </span>
         ) : null}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <MetricCard
-          label="Monthly total"
-          value={`$${Math.round(discountedMonthly).toLocaleString()}`}
-          sub={annual ? "billed annually (15% off)" : "billed monthly"}
-        />
-        <MetricCard
-          label="Annual total"
-          value={`$${Math.round(annualTotal).toLocaleString()}`}
-          sub={annual ? "15% saved vs monthly" : "per year"}
-        />
+      {showYearlyDiscountControls ? (
+        <div className="grid grid-cols-1 gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="text-[11px] text-white/50">Annual discount (%)</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={yearlyPercentDraft}
+              onChange={(e) => setYearlyPercentDraft(e.target.value)}
+              onBlur={commitYearlyPercentDraft}
+              className="h-9 border-white/15 bg-black/30 text-white tabular-nums"
+            />
+            <p className="text-[10px] text-white/40">Applied when “Annual billing” is on above.</p>
+          </div>
+          <div className="flex items-center gap-3 pt-5 sm:pt-6">
+            <Switch
+              id="yearly-discount-enabled"
+              checked={yearlyDiscountEnabled}
+              onCheckedChange={(v) => onYearlyDiscountEnabledChange?.(v)}
+              className="data-[state=checked]:bg-ordo-magenta data-[state=unchecked]:bg-white/20"
+            />
+            <Label htmlFor="yearly-discount-enabled" className="cursor-pointer text-sm text-white/70">
+              Apply annual discount
+            </Label>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <MetricCard label="Monthly total" value={`$${Math.round(discountedMonthly).toLocaleString()}`} sub={annualSub} />
+        <MetricCard label="Annual total" value={`$${Math.round(annualTotal).toLocaleString()}`} sub={annualTotalSub} />
         <MetricCard label="Effective per user" value={`$${perUserEffective.toFixed(2)}`} sub="per active user/mo" />
-        <MetricCard
-          label="vs. Planday estimate"
-          value={`${vsPlanday >= 0 ? "+" : ""}$${vsPlanday.toLocaleString()}`}
-          sub={`Planday ~$${TIERED_SEAT_PLANDAY_ESTIMATE_PER_USER}/user/mo`}
-        />
       </div>
 
       {showModelControls ? (
@@ -155,13 +238,9 @@ export function TieredSeatPricingCalculator({ showModelControls = false, classNa
             <ModelInput
               label="Floor reached at user #"
               highlight
-              value={String(model.floorAt)}
-              onChange={(v) =>
-                setModel((m) => ({
-                  ...m,
-                  floorAt: Math.max(3, clampInt(parseMoney(v, m.floorAt), 3, TIERED_SEAT_MAX_USERS)),
-                }))
-              }
+              value={floorAtDraft}
+              onChange={setFloorAtDraft}
+              onBlur={commitFloorAtDraft}
             />
             <ModelInput
               label="Floor price $"
@@ -280,7 +359,7 @@ export function TieredSeatPricingCalculator({ showModelControls = false, classNa
 }
 
 function monthlyAtUsers(m: TieredSeatModel): number[] {
-  const floorAt = Math.max(3, m.floorAt);
+  const floorAt = Math.max(3, Math.floor(m.floorAt));
   return Array.from({ length: TIERED_SEAT_MAX_USERS }, (_, i) =>
     calcMonthlyTotal(i + 1, m.base, m.start, m.floor, floorAt),
   );
@@ -300,11 +379,13 @@ function ModelInput({
   label,
   value,
   onChange,
+  onBlur,
   highlight,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  onBlur?: () => void;
   highlight?: boolean;
 }) {
   return (
@@ -316,9 +397,11 @@ function ModelInput({
     >
       <Label className={cn("text-[11px] font-medium", highlight ? "text-emerald-200/90" : "text-white/50")}>{label}</Label>
       <Input
-        type="number"
+        type="text"
+        inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
         className={cn(
           "mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums",
           highlight && "border-emerald-500/30 focus-visible:ring-emerald-500/40",

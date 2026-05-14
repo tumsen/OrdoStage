@@ -374,6 +374,7 @@ app.get("/org", async (c) => {
     activeUsers: activeUserCount,
     daysInMonth,
     userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
+    customUserDailyRateCents: org.customUserDailyRateCents,
     customDiscountPercent: org.customDiscountPercent,
     customFlatRateCents: org.customFlatRateCents,
     customFlatRateMaxUsers: org.customFlatRateMaxUsers,

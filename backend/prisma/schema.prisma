@@ -93,6 +93,10 @@ model Organization {
   customDiscountPercent   Int?
   customFlatRateCents     Int?
   customFlatRateMaxUsers  Int?
+  /** When set, postpaid estimates use this per-user daily rate (cents) instead of the global currency table. */
+  customUserDailyRateCents Int?
+  /** Optional JSON for owner-admin seat calculator: tier {base,start,floor,floorAt}, yearlyDiscountPercent, yearlyDiscountApply. */
+  customSeatCalculatorJson String?
   billingCurrencyCode     String             @default("USD")
   paddleCustomerId        String?
   /** Company / invoice information (optional — used on generated PDF invoices). */
@@ -129,6 +133,10 @@ model BillingConfig {
   paymentDueDays         Int     @default(7)
   baseCurrencyCode       String   @default("USD")
   priceRolloverMonthKey  String?
+  /** When annual billing is selected in the seat calculator, apply this percent off the monthly total (0–100). */
+  yearlyDiscountPercent  Int      @default(15)
+  /** Master switch: when false, annual mode does not reduce the monthly rate (still ×12 for yearly total). */
+  yearlyDiscountEnabled  Boolean  @default(true)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }

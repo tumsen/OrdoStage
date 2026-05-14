@@ -77,9 +77,10 @@ publicRouter.get("/mail-config", (c) => {
 publicRouter.get("/pricing", async (c) => {
   await ensureCurrencyPriceMonthRollover(prisma);
   const [cfgRows, priceRows] = await Promise.all([
-    prisma.$queryRaw<Array<{ baseCurrencyCode: string | null }>>`
-      SELECT "baseCurrencyCode" FROM "BillingConfig" WHERE "id" = 'default' LIMIT 1
-    `,
+    prisma.billingConfig.findUnique({
+      where: { id: "default" },
+      select: { baseCurrencyCode: true, yearlyDiscountPercent: true, yearlyDiscountEnabled: true },
+    }),
     prisma.billingCurrencyPrice.findMany(),
   ]);
 
@@ -91,7 +92,9 @@ publicRouter.get("/pricing", async (c) => {
 
   return c.json({
     data: {
-      baseCurrencyCode: cfgRows[0]?.baseCurrencyCode?.toUpperCase() || "USD",
+      baseCurrencyCode: cfgRows?.baseCurrencyCode?.toUpperCase() || "USD",
+      yearlyDiscountPercent: cfgRows?.yearlyDiscountPercent ?? 15,
+      yearlyDiscountEnabled: cfgRows?.yearlyDiscountEnabled ?? true,
       prices,
     },
   });

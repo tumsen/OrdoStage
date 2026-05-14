@@ -66,6 +66,8 @@ export default function Pricing() {
   const [form, setForm] = useState({
     paymentDueDays: "7",
     baseCurrencyCode: "USD",
+    yearlyDiscountPercent: "15",
+    yearlyDiscountEnabled: true,
   });
   const [currencyRows, setCurrencyRows] = useState<Record<string, CurrencyRow>>({});
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
@@ -76,6 +78,8 @@ export default function Pricing() {
 
   const { data, isPending } = useQuery<{
     paymentDueDays: number;
+    yearlyDiscountPercent?: number;
+    yearlyDiscountEnabled?: boolean;
     baseCurrencyCode?: string;
     currencyPrices: Array<{
       currencyCode: string;
@@ -102,6 +106,8 @@ export default function Pricing() {
     setForm({
       paymentDueDays: String(data.paymentDueDays),
       baseCurrencyCode: data.baseCurrencyCode || "USD",
+      yearlyDiscountPercent: String(data.yearlyDiscountPercent ?? 15),
+      yearlyDiscountEnabled: data.yearlyDiscountEnabled !== false,
     });
   }, [data]);
 
@@ -144,6 +150,8 @@ export default function Pricing() {
       api.patch("/api/admin/billing/settings", {
         paymentDueDays: Number(form.paymentDueDays),
         baseCurrencyCode: form.baseCurrencyCode,
+        yearlyDiscountPercent: Math.min(100, Math.max(0, Math.round(Number(form.yearlyDiscountPercent)) || 0)),
+        yearlyDiscountEnabled: form.yearlyDiscountEnabled,
         currencyPrices: Object.entries(currencyRows)
           .filter(([, row]) => row.userDailyRateCents.trim().length > 0)
           .map(([currencyCode, row]) => ({
@@ -188,7 +196,14 @@ export default function Pricing() {
             Illustrative tiered model for projections. Adjust inputs to explore scenarios; global postpaid currency
             rates below remain the source of truth for invoicing.
           </p>
-          <TieredSeatPricingCalculator showModelControls />
+          <TieredSeatPricingCalculator
+            showModelControls
+            yearlyDiscountPercent={Math.min(100, Math.max(0, Math.round(Number(form.yearlyDiscountPercent)) || 0))}
+            yearlyDiscountEnabled={form.yearlyDiscountEnabled}
+            showYearlyDiscountControls
+            onYearlyDiscountPercentChange={(p) => setForm((f) => ({ ...f, yearlyDiscountPercent: String(p) }))}
+            onYearlyDiscountEnabledChange={(enabled) => setForm((f) => ({ ...f, yearlyDiscountEnabled: enabled }))}
+          />
         </CardContent>
       </Card>
 
