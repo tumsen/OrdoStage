@@ -288,7 +288,7 @@ model VenueDocument {
   venueId   String
   venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
   name      String
-  /** drawing | image | other */
+  /** drawing | image | document | other */
   kind      String   @default("other")
   filename  String
   data      Bytes

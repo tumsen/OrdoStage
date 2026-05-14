@@ -14,6 +14,11 @@ import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { BillingSummary, type OrgBillingPayload } from "@/components/BillingSummary";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
+import {
+  PERSON_DOCUMENT_TYPE_OPTIONS,
+  personDocumentTypeLabel,
+  type PersonDocumentTypeKey,
+} from "@/lib/personDocumentTypes";
 import type { Person, PersonDocument } from "../../../backend/src/types";
 import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
 import { Button } from "@/components/ui/button";
@@ -292,16 +297,6 @@ const PEOPLE_SORT_OPTIONS: { mode: PeopleSortMode; label: string }[] = [
   { mode: "internal", label: "Internal" },
   { mode: "external", label: "External" },
 ];
-
-const PERSON_DOCUMENT_TYPE_OPTIONS = [
-  "passport",
-  "driver_license",
-  "certificate",
-  "visa",
-  "contract",
-  "medical",
-  "other",
-] as const;
 
 async function uploadPersonPhoto(personId: string, file: File): Promise<void> {
   const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
@@ -1099,14 +1094,14 @@ function PersonFormDialog({
                     onChange={(e) => setDocName(e.target.value)}
                     className="w-[220px] bg-white/5 border-white/10 text-white placeholder:text-white/25"
                   />
-                  <Select value={docType} onValueChange={(v) => setDocType(v as (typeof PERSON_DOCUMENT_TYPE_OPTIONS)[number])}>
+                  <Select value={docType} onValueChange={(v) => setDocType(v as PersonDocumentTypeKey)}>
                     <SelectTrigger className="w-[170px] bg-white/5 border-white/10 text-white">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                    <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-64">
                       {PERSON_DOCUMENT_TYPE_OPTIONS.map((value) => (
                         <SelectItem key={value} value={value}>
-                          {value.replace(/_/g, " ")}
+                          {personDocumentTypeLabel(value)}
                         </SelectItem>
                       ))}
                     </SelectContent>

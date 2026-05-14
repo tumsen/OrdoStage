@@ -3,15 +3,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import type { PersonDocument } from "../../../backend/src/types";
 import { formatDateForDateInput, getPersonDocumentExpiryInfo } from "@/lib/personDocumentExpiry";
+import { PERSON_DOCUMENT_TYPE_OPTIONS, personDocumentTypeLabel } from "@/lib/personDocumentTypes";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 
 const backendBase = () => import.meta.env.VITE_BACKEND_URL || "";
 
 export type PersonDocumentSavePatch = {
   name: string;
+  type: string;
   doesNotExpire: boolean;
   /** YYYY-MM-DD or `null` when no date (ignored when `doesNotExpire` is true). */
   expiresAt: string | null;
@@ -35,11 +44,13 @@ export type PersonDocumentListRowHandle = {
 
 function buildSaveBody(
   name: string,
+  type: string,
   doesNotExpire: boolean,
   expires: string
 ): PersonDocumentSavePatch {
   return {
     name: name.trim(),
+    type: type.trim() || "other",
     doesNotExpire,
     expiresAt: doesNotExpire ? null : expires.trim() || null,
   };
@@ -59,6 +70,7 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
   ref
 ) {
   const [name, setName] = useState(doc.name);
+  const [docType, setDocType] = useState(doc.type);
   const [expires, setExpires] = useState(() => formatDateForDateInput(doc.expiresAt ?? null));
   const [doesNotExpire, setDoesNotExpire] = useState(Boolean(doc.doesNotExpire));
 
@@ -66,6 +78,7 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
   // `doc` briefly overwrites a just-saved name before the list cache updates.
   useEffect(() => {
     setName(doc.name);
+    setDocType(doc.type);
     setExpires(formatDateForDateInput(doc.expiresAt ?? null));
     setDoesNotExpire(Boolean(doc.doesNotExpire));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when doc.id changes
@@ -78,7 +91,10 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
   const localExp = doesNotExpire ? null : (expires.trim() || null);
   const docExp = docDne ? null : docDate;
   const dirty =
-    name.trim() !== doc.name || doesNotExpire !== docDne || localExp !== docExp;
+    name.trim() !== doc.name ||
+    docType.trim() !== doc.type ||
+    doesNotExpire !== docDne ||
+    localExp !== docExp;
 
   useImperativeHandle(
     ref,
@@ -87,20 +103,20 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
         if (!canEdit) return;
         if (!name.trim() || isSaving) return;
         if (!dirty) return;
-        await onSave(doc.id, buildSaveBody(name, doesNotExpire, expires));
+        await onSave(doc.id, buildSaveBody(name, docType, doesNotExpire, expires));
       },
     }),
-    [canEdit, dirty, name, doesNotExpire, expires, isSaving, doc.id, onSave]
+    [canEdit, dirty, name, docType, doesNotExpire, expires, isSaving, doc.id, onSave]
   );
 
   return (
-    <div className="flex items-center gap-2 px-2 py-2 text-xs border-b border-white/5 last:border-0 w-full min-w-0">
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+    <div className="flex flex-col gap-2 px-2 py-2 text-xs border-b border-white/5 last:border-0 w-full min-w-0 sm:flex-row sm:items-center sm:gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
         {canEdit ? (
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="h-7 w-[14rem] min-w-[10rem] bg-white/5 border-white/10 text-white"
+            className="h-7 w-full min-w-[8rem] max-w-[14rem] bg-white/5 border-white/10 text-white"
             placeholder="Document name"
             aria-label="Document name"
           />
@@ -109,8 +125,32 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
             {doc.name}
           </div>
         )}
-        <span className="text-white/35 truncate min-w-[10rem]" title={`${doc.type} · ${doc.filename}`}>
-          {doc.type} · {doc.filename}
+        {canEdit ? (
+          <Select value={docType} onValueChange={setDocType}>
+            <SelectTrigger
+              className="h-7 w-full min-w-[9rem] max-w-[12rem] bg-white/5 border-white/10 text-white text-[11px]"
+              aria-label="Document type"
+            >
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-64">
+              {(PERSON_DOCUMENT_TYPE_OPTIONS as readonly string[]).includes(doc.type) ? null : (
+                <SelectItem value={doc.type}>{personDocumentTypeLabel(doc.type)}</SelectItem>
+              )}
+              {PERSON_DOCUMENT_TYPE_OPTIONS.map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {personDocumentTypeLabel(opt)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Badge variant="outline" className="w-fit border-white/15 text-white/70 text-[10px] font-normal">
+            {personDocumentTypeLabel(doc.type)}
+          </Badge>
+        )}
+        <span className="text-white/35 truncate text-[10px] sm:max-w-[10rem]" title={doc.filename}>
+          {doc.filename}
         </span>
       </div>
       <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
@@ -169,7 +209,7 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
               e.stopPropagation();
               const n = name.trim();
               if (!n || isSaving) return;
-              await onSave(doc.id, buildSaveBody(n, doesNotExpire, expires));
+              await onSave(doc.id, buildSaveBody(n, docType, doesNotExpire, expires));
             }}
           >
             {isSaving ? "Saving…" : "Save"}

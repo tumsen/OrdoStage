@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
-import { CreateVenueSchema, UpdateVenueSchema, type VenueDocumentKind } from "../types";
+import { CreateVenueSchema, UpdateVenueSchema, UpdateVenueDocumentSchema, type VenueDocumentKind } from "../types";
 import { canAction } from "../requestRole";
 import { env } from "../env";
 
@@ -64,7 +64,7 @@ function serializeVenue(
 
 function normalizeVenueDocKind(raw: string | undefined): VenueDocumentKind {
   const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
-  if (s === "drawing" || s === "image" || s === "other") return s;
+  if (s === "drawing" || s === "image" || s === "document" || s === "other") return s;
   return "other";
 }
 
@@ -269,6 +269,42 @@ venuesRouter.get("/venues/documents/:docId/download", async (c) => {
       "Content-Length": String(doc.data.length),
     },
   });
+});
+
+venuesRouter.patch("/venues/documents/:docId", zValidator("json", UpdateVenueDocumentSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "write.venues")) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+  const { docId } = c.req.param();
+  const body = c.req.valid("json");
+  const doc = await prisma.venueDocument.findFirst({
+    where: { id: docId, venue: { organizationId: user.organizationId } },
+    select: { id: true },
+  });
+  if (!doc) {
+    return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+  const data: { name?: string; kind?: string } = {};
+  if (body.name !== undefined) data.name = body.name.trim();
+  if (body.kind !== undefined) data.kind = body.kind;
+  const row = await prisma.venueDocument.update({
+    where: { id: doc.id },
+    data,
+    select: {
+      id: true,
+      venueId: true,
+      name: true,
+      kind: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+  });
+  return c.json({ data: serializeVenueDocument(row) });
 });
 
 venuesRouter.delete("/venues/documents/:docId", async (c) => {

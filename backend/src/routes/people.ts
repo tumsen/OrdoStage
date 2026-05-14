@@ -1123,8 +1123,9 @@ peopleRouter.patch("/people/documents/:docId", zValidator("json", UpdatePersonDo
   if (!canWritePeople && !canEditSelf) {
     return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
   }
-  const data: { name?: string; expiresAt?: Date | null; doesNotExpire?: boolean } = {};
+  const data: { name?: string; type?: string; expiresAt?: Date | null; doesNotExpire?: boolean } = {};
   if (body.name !== undefined) data.name = body.name;
+  if (body.type !== undefined) data.type = body.type.trim();
   if (body.doesNotExpire === true) {
     data.doesNotExpire = true;
     data.expiresAt = null;

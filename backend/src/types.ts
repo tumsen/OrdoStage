@@ -66,8 +66,17 @@ export const DepartmentMemberSchema = z.object({
 });
 
 // Venue
-export const VENUE_DOCUMENT_KINDS = ["drawing", "image", "other"] as const;
+export const VENUE_DOCUMENT_KINDS = ["drawing", "image", "document", "other"] as const;
 export type VenueDocumentKind = (typeof VENUE_DOCUMENT_KINDS)[number];
+
+export const UpdateVenueDocumentSchema = z
+  .object({
+    name: z.string().min(1).max(500).optional(),
+    kind: z.enum(VENUE_DOCUMENT_KINDS).optional(),
+  })
+  .refine((b) => b.name !== undefined || b.kind !== undefined, {
+    message: "At least one of name or kind is required",
+  });
 
 export const VenueSchema = z.object({
   id: z.string(),
@@ -234,6 +243,8 @@ export const PersonDocumentSchema = z.object({
 
 export const UpdatePersonDocumentSchema = z.object({
   name: z.string().min(1).optional(),
+  /** Category label (e.g. image, passport, contract). */
+  type: z.string().min(1).max(80).optional(),
   /** YYYY-MM-DD, ISO 8601 string, or null to clear. */
   expiresAt: z.union([z.string().min(1), z.null()]).optional(),
   doesNotExpire: z.boolean().optional(),

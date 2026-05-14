@@ -36,6 +36,11 @@ import {
   type DocumentPermissionState,
   type DocumentPermissionOptions,
 } from "@/components/DocumentPermissionsForm";
+import {
+  PERSON_DOCUMENT_TYPE_OPTIONS,
+  personDocumentTypeLabel,
+  type PersonDocumentTypeKey,
+} from "@/lib/personDocumentTypes";
 
 async function uploadPersonPhoto(personId: string, file: File): Promise<void> {
   const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
@@ -104,7 +109,7 @@ export default function Account() {
   const [docName, setDocName] = useState("");
   const [docExpires, setDocExpires] = useState("");
   const [docDoesNotExpire, setDocDoesNotExpire] = useState(false);
-  const [docType, setDocType] = useState("other");
+  const [docType, setDocType] = useState<PersonDocumentTypeKey>("other");
   const [permissionsDoc, setPermissionsDoc] = useState<PersonDocument | null>(null);
   const [permissionDraft, setPermissionDraft] = useState<DocumentPermissionState>({ teamIds: [], personIds: [] });
 
@@ -751,19 +756,31 @@ export default function Account() {
               <div className="space-y-2 w-full min-w-0">
                 <Label className="text-white/70 text-xs uppercase tracking-wide">Documents</Label>
                 <div className="overflow-x-auto">
-                  <div className="flex items-center gap-2 min-w-[980px]">
-                    <Input
-                      placeholder="Document name"
-                      value={docName}
-                      onChange={(e) => setDocName(e.target.value)}
-                      className="w-[220px] bg-white/5 border-white/10 text-white"
-                    />
-                    <Input
-                      placeholder="Document type"
-                      value={docType}
-                      onChange={(e) => setDocType(e.target.value)}
-                      className="w-[170px] bg-white/5 border-white/10 text-white"
-                    />
+                  <div className="flex flex-wrap items-end gap-2 min-w-0">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-white/45 uppercase tracking-wide">Name</Label>
+                      <Input
+                        placeholder="Document name"
+                        value={docName}
+                        onChange={(e) => setDocName(e.target.value)}
+                        className="w-[220px] bg-white/5 border-white/10 text-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-white/45 uppercase tracking-wide">Type</Label>
+                      <Select value={docType} onValueChange={(v) => setDocType(v as PersonDocumentTypeKey)}>
+                        <SelectTrigger className="w-[200px] h-9 bg-white/5 border-white/10 text-white text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-64">
+                          {PERSON_DOCUMENT_TYPE_OPTIONS.map((value) => (
+                            <SelectItem key={value} value={value}>
+                              {personDocumentTypeLabel(value)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <label className="flex items-center gap-2 text-sm text-white/55 cursor-pointer whitespace-nowrap">
                       <input
                         type="checkbox"
