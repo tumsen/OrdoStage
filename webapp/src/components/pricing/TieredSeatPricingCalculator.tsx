@@ -71,7 +71,7 @@ export function TieredSeatPricingCalculator({
   afterModelControls,
 }: Props) {
   const [users, setUsers] = useState(20);
-  const [annual, setAnnual] = useState(false);
+  const [annual, setAnnual] = useState(() => (showYearlyDiscountControls ? yearlyDiscountEnabled : false));
   const [innerModel, setInnerModel] = useState<TieredSeatModel>({ ...DEFAULT_TIERED_SEAT_MODEL });
   const model = controlledSeatModel ?? innerModel;
 
@@ -105,9 +105,15 @@ export function TieredSeatPricingCalculator({
     setYearlyPercentDraft(String(yearlyDiscountPercent));
   }, [yearlyDiscountPercent]);
 
+  useEffect(() => {
+    if (!showYearlyDiscountControls) return;
+    setAnnual(yearlyDiscountEnabled);
+  }, [yearlyDiscountEnabled, showYearlyDiscountControls]);
+
   const floorAtSafe = Math.max(3, Math.floor(model.floorAt));
   const monthlyList = useMemo(() => monthlyAtUsers(model), [model]);
-  const mult = annualMonthlyMultiplier(yearlyDiscountPercent, yearlyDiscountEnabled);
+  const discountEnabledForMath = annual && (showYearlyDiscountControls ? true : yearlyDiscountEnabled);
+  const mult = annualMonthlyMultiplier(yearlyDiscountPercent, discountEnabledForMath);
   const chartRows = useMemo(
     () =>
       Array.from({ length: TIERED_SEAT_MAX_USERS }, (_, i) => {
@@ -131,13 +137,17 @@ export function TieredSeatPricingCalculator({
   const annualSavingsYear = annual ? Math.round((baseMonthly - discountedMonthly) * 12) : 0;
 
   const annualSub =
-    annual && yearlyDiscountEnabled
+    annual && discountEnabledForMath && yearlyDiscountPercent > 0
       ? `billed annually (${yearlyDiscountPercent}% off)`
       : annual
         ? "billed annually (no discount)"
         : "billed monthly";
   const annualTotalSub =
-    annual && yearlyDiscountEnabled ? `${yearlyDiscountPercent}% saved vs monthly` : annual ? "per year" : "per year";
+    annual && discountEnabledForMath && yearlyDiscountPercent > 0
+      ? `${yearlyDiscountPercent}% saved vs monthly`
+      : annual
+        ? "per year"
+        : "per year";
 
   function commitFloorAtDraft() {
     const parsed = parseInt(floorAtDraft.replace(/\s/g, ""), 10);
@@ -227,46 +237,37 @@ export function TieredSeatPricingCalculator({
         <Switch
           id="annual-billing"
           checked={annual}
-          onCheckedChange={setAnnual}
+          onCheckedChange={(v) => {
+            setAnnual(v);
+            if (showYearlyDiscountControls) onYearlyDiscountEnabledChange?.(v);
+          }}
           className="data-[state=checked]:bg-ordo-magenta data-[state=unchecked]:bg-white/20"
         />
         <Label htmlFor="annual-billing" className="cursor-pointer text-sm text-white/70">
           Annual billing
         </Label>
-        {annual && yearlyDiscountEnabled && yearlyDiscountPercent > 0 ? (
+        {annual && discountEnabledForMath && yearlyDiscountPercent > 0 ? (
           <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
             Save €{annualSavingsYear.toLocaleString()}/yr
           </span>
         ) : null}
-      </div>
-
-      {showYearlyDiscountControls ? (
-        <div className="grid grid-cols-1 gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label className="text-[11px] text-white/50">Annual discount (%)</Label>
+        {showYearlyDiscountControls && annual ? (
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <Label htmlFor="annual-discount-pct" className="text-[11px] text-white/50 whitespace-nowrap">
+              Annual discount (%)
+            </Label>
             <Input
+              id="annual-discount-pct"
               type="text"
               inputMode="numeric"
               value={yearlyPercentDraft}
               onChange={(e) => setYearlyPercentDraft(e.target.value)}
               onBlur={commitYearlyPercentDraft}
-              className="h-9 border-white/15 bg-black/30 text-white tabular-nums"
+              className="h-9 w-[4.25rem] shrink-0 border-white/15 bg-black/30 text-white tabular-nums"
             />
-            <p className="text-[10px] text-white/40">Applied when “Annual billing” is on above.</p>
           </div>
-          <div className="flex items-center gap-3 pt-5 sm:pt-6">
-            <Switch
-              id="yearly-discount-enabled"
-              checked={yearlyDiscountEnabled}
-              onCheckedChange={(v) => onYearlyDiscountEnabledChange?.(v)}
-              className="data-[state=checked]:bg-ordo-magenta data-[state=unchecked]:bg-white/20"
-            />
-            <Label htmlFor="yearly-discount-enabled" className="cursor-pointer text-sm text-white/70">
-              Apply annual discount
-            </Label>
-          </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <MetricCard label="Monthly total" value={`€${Math.round(discountedMonthly).toLocaleString()}`} sub={annualSub} />
@@ -277,7 +278,7 @@ export function TieredSeatPricingCalculator({
       {showModelControls ? (
         <>
           <p className="text-xs font-medium uppercase tracking-wide text-white/45">Model settings (illustrative EUR)</p>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
             <ModelInput
               label="Base fee (1 user) €"
               value={baseDraft}
@@ -304,8 +305,8 @@ export function TieredSeatPricingCalculator({
               onChange={setFloorPriceDraft}
               onBlur={commitFloorPriceDraft}
             />
+            {afterModelControls ? <div className="contents">{afterModelControls}</div> : null}
           </div>
-          {afterModelControls ? <div className="space-y-3">{afterModelControls}</div> : null}
         </>
       ) : null}
 

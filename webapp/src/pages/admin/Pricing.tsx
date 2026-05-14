@@ -178,54 +178,49 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
             onSeatModelChange={setSeatModel}
             afterModelControls={
               <>
-                <p className="text-xs font-medium uppercase tracking-wide text-white/45">Invoice & access timing</p>
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                  <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                    <Label className="text-[11px] font-medium text-white/50">Invoice due days (1–30)</Label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      value={paymentDueDays}
-                      onChange={(e) => setPaymentDueDays(e.target.value)}
-                      className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
-                    />
-                    <p className="mt-1.5 text-[10px] text-white/40">Days after issue until due.</p>
-                  </div>
-                  <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                    <Label className="text-[11px] font-medium text-white/50">Trial period (days)</Label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      value={billingTrialDays}
-                      onChange={(e) => setBillingTrialDays(e.target.value)}
-                      className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
-                    />
-                    <p className="mt-1.5 text-[10px] text-white/40">From org creation; 0 = no trial.</p>
-                  </div>
-                  <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 col-span-2 md:col-span-1">
-                    <Label className="text-[11px] font-medium text-white/50">Grace after invoice due (days)</Label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      value={billingGraceDaysAfterDue}
-                      onChange={(e) => setBillingGraceDaysAfterDue(e.target.value)}
-                      className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
-                    />
-                    <p className="mt-1.5 text-[10px] text-white/40">Extra days after due before read-only; 0 = none.</p>
-                  </div>
+                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                  <Label className="text-[11px] font-medium text-white/50">Due (1–30 d)</Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={paymentDueDays}
+                    onChange={(e) => setPaymentDueDays(e.target.value)}
+                    className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
+                  />
                 </div>
-                <p className="text-[10px] text-white/40 leading-relaxed">
-                  <span className="text-white/55">Trial</span> — unpaid invoices do not force read-only until the trial
-                  ends. <span className="text-white/55">Grace</span> — after the due date, read-only waits this many
-                  extra days.
-                </p>
+                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                  <Label className="text-[11px] font-medium text-white/50">Trial (d)</Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={billingTrialDays}
+                    onChange={(e) => setBillingTrialDays(e.target.value)}
+                    className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
+                  />
+                </div>
+                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                  <Label className="text-[11px] font-medium text-white/50">Grace (d)</Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={billingGraceDaysAfterDue}
+                    onChange={(e) => setBillingGraceDaysAfterDue(e.target.value)}
+                    className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
+                  />
+                </div>
               </>
             }
           />
 
+          <p className="text-[10px] text-white/40 leading-relaxed">
+            <span className="text-white/55">Due</span> — days after issue until due.{" "}
+            <span className="text-white/55">Trial</span> — from org creation; unpaid invoices do not force read-only
+            until trial ends (0 = none). <span className="text-white/55">Grace</span> — extra days after due before
+            read-only (0 = none).
+          </p>
         </CardContent>
       </Card>
 
