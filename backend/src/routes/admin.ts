@@ -16,11 +16,13 @@ import {
   generateMonthlyInvoices,
   getCurrencyPriceMap,
   getBillingConfig,
+  getGlobalDefaultSeatCalculatorJson,
   ensureCurrencyPriceMonthRollover,
   markInvoicePaid,
   recordDailyUsageSnapshot,
   SUPPORTED_BILLING_CURRENCIES,
 } from "../postpaidBilling";
+import { DEFAULT_TIERED_SEAT_MODEL, tieredMonthlyTotalCents, type TieredSeatModel } from "../tieredSeatPricing";
 import { createPaddleCustomer, createPaddleTransactionForInvoice } from "../paddleClient";
 import { AdminOrgEmailMembersBodySchema } from "../types";
 import { sendHtmlEmail } from "../resendMail";
@@ -37,7 +39,7 @@ app.use("/admin/*", adminMiddleware);
 // ── Stats ──────────────────────────────────────────────────────────────────
 
 app.get("/admin/stats", async (c) => {
-  const [totalOrgs, totalUsers, totalRevenue, totalPeople, recentInvoices, openInvoices, orgs, currencyPrices] =
+  const [totalOrgs, totalUsers, totalRevenue, totalPeople, recentInvoices, openInvoices, orgs, currencyPrices, globalSeatJson] =
     await Promise.all([
       prisma.organization.count(),
       prisma.user.count({ where: { organizationId: { not: null } } }),
@@ -54,6 +56,7 @@ app.get("/admin/stats", async (c) => {
           id: true,
           billingCurrencyCode: true,
           customUserDailyRateCents: true,
+          customSeatCalculatorJson: true,
           customDiscountPercent: true,
           customFlatRateCents: true,
           customFlatRateMaxUsers: true,
@@ -61,6 +64,7 @@ app.get("/admin/stats", async (c) => {
         },
       }),
       getCurrencyPriceMap(prisma),
+      getGlobalDefaultSeatCalculatorJson(prisma),
     ]);
   const now = new Date();
   const { start: monthStart, endExclusive: monthEnd } = currentUtcMonthRange(now);
@@ -79,6 +83,8 @@ app.get("/admin/stats", async (c) => {
         customFlatRateCents: org.customFlatRateCents,
         customFlatRateMaxUsers: org.customFlatRateMaxUsers,
         activeMemberCount: org.memberships.length,
+        orgSeatCalculatorJson: org.customSeatCalculatorJson,
+        globalSeatCalculatorJson: globalSeatJson,
       });
       return { currency, estimate };
     }),
@@ -102,16 +108,21 @@ app.get("/admin/stats", async (c) => {
 
 app.get("/admin/billing/settings", async (c) => {
   await ensureCurrencyPriceMonthRollover(prisma);
-  const [cfg, currencyPrices, baseRow] = await Promise.all([
+  const [cfg, currencyPrices, baseRow, cfgExtras] = await Promise.all([
     getBillingConfig(prisma),
     prisma.billingCurrencyPrice.findMany(),
     prisma.$queryRaw<Array<{ baseCurrencyCode: string | null }>>`
       SELECT "baseCurrencyCode" FROM "BillingConfig" WHERE "id" = 'default' LIMIT 1
     `,
+    prisma.billingConfig.findUnique({
+      where: { id: "default" },
+      select: { defaultSeatCalculatorJson: true },
+    }),
   ]);
   return c.json({
     data: {
       ...cfg,
+      defaultSeatCalculatorJson: cfgExtras?.defaultSeatCalculatorJson ?? null,
       baseCurrencyCode: baseRow[0]?.baseCurrencyCode || "USD",
       currencyPrices: currencyPrices.map((p) => ({
         currencyCode: p.currencyCode,
@@ -181,6 +192,7 @@ app.patch("/admin/billing/settings", async (c) => {
       paymentDueDays: z.number().int().min(1).max(30).optional(),
       yearlyDiscountPercent: z.number().int().min(0).max(100).optional(),
       yearlyDiscountEnabled: z.boolean().optional(),
+      defaultSeatCalculatorJson: z.string().max(SEAT_CALCULATOR_JSON_MAX_CHARS).nullable().optional(),
     })
     .parse(body);
 
@@ -199,6 +211,44 @@ app.patch("/admin/billing/settings", async (c) => {
       ...(parsed.yearlyDiscountEnabled !== undefined ? { yearlyDiscountEnabled: parsed.yearlyDiscountEnabled } : {}),
     },
   });
+  let normalizedDefaultSeatJson: string | null | undefined;
+  if (parsed.defaultSeatCalculatorJson !== undefined) {
+    const raw = parsed.defaultSeatCalculatorJson;
+    if (raw === null || !String(raw).trim()) {
+      normalizedDefaultSeatJson = null;
+    } else {
+      const trimmed = String(raw).trim();
+      const seatParsed = parseSeatCalculatorJson(trimmed);
+      if (!seatParsed) {
+        return c.json(
+          { error: { message: "defaultSeatCalculatorJson is invalid JSON or failed validation.", code: "BAD_REQUEST" } },
+          400
+        );
+      }
+      normalizedDefaultSeatJson = JSON.stringify(seatParsed);
+    }
+    await prisma.billingConfig.update({
+      where: { id: "default" },
+      data: { defaultSeatCalculatorJson: normalizedDefaultSeatJson },
+    });
+    if (normalizedDefaultSeatJson != null) {
+      const seatParsed = parseSeatCalculatorJson(normalizedDefaultSeatJson);
+      if (seatParsed?.model) {
+        const model: TieredSeatModel = { ...DEFAULT_TIERED_SEAT_MODEL, ...seatParsed.model };
+        const oneSeatCents = tieredMonthlyTotalCents(1, model);
+        await prisma.billingCurrencyPrice.upsert({
+          where: { currencyCode: "EUR" },
+          create: {
+            currencyCode: "EUR",
+            userDailyRateCents: Math.max(1, oneSeatCents),
+          },
+          update: {
+            userDailyRateCents: Math.max(1, oneSeatCents),
+          },
+        });
+      }
+    }
+  }
   if (parsed.baseCurrencyCode !== undefined) {
     await prisma.$executeRaw`
       UPDATE "BillingConfig"
@@ -230,15 +280,20 @@ app.patch("/admin/billing/settings", async (c) => {
       )
     );
   }
-  const [prices, baseRow] = await Promise.all([
+  const [prices, baseRow, cfgSeatRow] = await Promise.all([
     prisma.billingCurrencyPrice.findMany(),
     prisma.$queryRaw<Array<{ baseCurrencyCode: string | null }>>`
       SELECT "baseCurrencyCode" FROM "BillingConfig" WHERE "id" = 'default' LIMIT 1
     `,
+    prisma.billingConfig.findUnique({
+      where: { id: "default" },
+      select: { defaultSeatCalculatorJson: true },
+    }),
   ]);
   return c.json({
     data: {
       ...cfg,
+      defaultSeatCalculatorJson: cfgSeatRow?.defaultSeatCalculatorJson ?? null,
       baseCurrencyCode: baseRow[0]?.baseCurrencyCode || "USD",
       currencyPrices: prices.map((p) => ({
         currencyCode: p.currencyCode,
@@ -385,7 +440,7 @@ app.post("/admin/email/test", async (c) => {
 // ── Organizations ──────────────────────────────────────────────────────────
 
 app.get("/admin/orgs", async (c) => {
-  const [orgs, currencyPrices] = await Promise.all([prisma.organization.findMany({
+  const [orgs, currencyPrices, globalSeatJson] = await Promise.all([prisma.organization.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { users: true, memberships: true, events: true, people: true } },
@@ -399,7 +454,7 @@ app.get("/admin/orgs", async (c) => {
         },
       },
     },
-  }), getCurrencyPriceMap(prisma)]);
+  }), getCurrencyPriceMap(prisma), getGlobalDefaultSeatCalculatorJson(prisma)]);
   const now = new Date();
   const { start: monthStart, endExclusive: monthEnd } = currentUtcMonthRange(now);
   const fallbackRate = currencyPrices[BILLING_CURRENCY_CODE] ?? 1500;
@@ -414,6 +469,8 @@ app.get("/admin/orgs", async (c) => {
         customFlatRateCents: org.customFlatRateCents,
         customFlatRateMaxUsers: org.customFlatRateMaxUsers,
         activeMemberCount: org._count.memberships,
+        orgSeatCalculatorJson: org.customSeatCalculatorJson,
+        globalSeatCalculatorJson: globalSeatJson,
       });
       return { ...org, estimatedMonthlyCents, estimatedCurrencyCode: BILLING_CURRENCY_CODE };
     }),
@@ -490,7 +547,7 @@ app.post("/admin/orgs", async (c) => {
 });
 
 app.get("/admin/orgs/:id", async (c) => {
-  const [org, currencyPrices] = await Promise.all([prisma.organization.findUnique({
+  const [org, currencyPrices, globalSeatJson] = await Promise.all([prisma.organization.findUnique({
     where: { id: c.req.param("id") },
     include: {
       memberships: {
@@ -510,7 +567,7 @@ app.get("/admin/orgs/:id", async (c) => {
       invoices: { orderBy: { issuedAt: "desc" }, take: 20, include: { lines: true } },
       _count: { select: { events: true, venues: true, people: true } },
     },
-  }), getCurrencyPriceMap(prisma)]);
+  }), getCurrencyPriceMap(prisma), getGlobalDefaultSeatCalculatorJson(prisma)]);
   if (!org)
     return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
 
@@ -536,6 +593,8 @@ app.get("/admin/orgs/:id", async (c) => {
     customFlatRateCents: org.customFlatRateCents,
     customFlatRateMaxUsers: org.customFlatRateMaxUsers,
     activeMemberCount: org.memberships.length,
+    orgSeatCalculatorJson: org.customSeatCalculatorJson,
+    globalSeatCalculatorJson: globalSeatJson,
   });
   const { memberships: _m, ...rest } = org;
   return c.json({

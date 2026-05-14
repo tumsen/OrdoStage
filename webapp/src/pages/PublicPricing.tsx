@@ -4,6 +4,8 @@ import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
+import { parseSeatCalculatorJson } from "@/lib/seatCalculatorJson";
+import { DEFAULT_TIERED_SEAT_MODEL, type TieredSeatModel } from "@/lib/tieredSeatPricing";
 
 function formatMajorFromCents(cents: number): string {
   return (cents / 100).toFixed(2);
@@ -33,6 +35,7 @@ export default function PublicPricing() {
     baseCurrencyCode: string;
     yearlyDiscountPercent?: number;
     yearlyDiscountEnabled?: boolean;
+    defaultSeatCalculatorJson?: string | null;
     prices: Array<{ currencyCode: string; userDailyRateCents: number }>;
   }>({
     queryKey: ["public-pricing-rates"],
@@ -45,9 +48,14 @@ export default function PublicPricing() {
     refetchOnReconnect: true,
   });
 
-  /** API field name is legacy; value is per-user monthly price in cents. */
+  /** API field name is legacy; value is updated from the first-seat tier when a global curve is saved. */
   const eurPerUserMonthCents =
     publicPricing?.prices.find((p) => p.currencyCode === "EUR")?.userDailyRateCents ?? 0;
+
+  const publicSeatModel: TieredSeatModel = (() => {
+    const parsed = parseSeatCalculatorJson(publicPricing?.defaultSeatCalculatorJson);
+    return { ...DEFAULT_TIERED_SEAT_MODEL, ...parsed?.model };
+  })();
 
   return (
     <div className="text-white">
@@ -56,12 +64,13 @@ export default function PublicPricing() {
         {/* Hero */}
         <header className="space-y-6">
           <div className="space-y-1">
-            <p className="text-sm uppercase tracking-wide text-white/60">Price per billable user</p>
+            <p className="text-sm uppercase tracking-wide text-white/60">Starting platform fee (1 billable seat)</p>
             <p className="text-3xl md:text-4xl font-bold text-white">
               EUR {formatMajorFromCents(eurPerUserMonthCents)} / month
             </p>
             <p className="text-lg md:text-xl text-white/80">
-              Full month when someone has jobs, event work, or logged work time in that month.
+              Total invoice scales with the number of billable members using the published seat curve (see calculator
+              below).
             </p>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">
@@ -88,11 +97,12 @@ export default function PublicPricing() {
           <div className="space-y-1">
             <h2 className="text-xl md:text-2xl font-semibold text-white">Pricing calculator</h2>
             <p className="text-sm text-white/60 leading-relaxed">
-              Estimates use an illustrative tiered EUR model. Real invoices use the flat per-seat monthly rate for each
-              member who had assigned jobs, show staffing, event edits, or work time entries in that calendar month.
+              Move the seat slider to estimate your monthly total. When Ordo Stage has published a global curve, it
+              matches what postpaid invoicing uses (unless your workspace has a custom curve or flat override).
             </p>
           </div>
           <TieredSeatPricingCalculator
+            seatModel={publicSeatModel}
             yearlyDiscountPercent={publicPricing?.yearlyDiscountPercent ?? 15}
             yearlyDiscountEnabled={publicPricing?.yearlyDiscountEnabled ?? true}
           />
@@ -102,9 +112,10 @@ export default function PublicPricing() {
         <section className="space-y-4">
           <h2 className="text-xl md:text-2xl font-semibold text-white">How postpaid billing works</h2>
           <p className="text-white/75 leading-relaxed">
-            Each billable member in a calendar month is charged one full seat for that month. Someone is billable if they
-            had assigned show jobs, show staffing, event team activity (notes or documents they created), or work time
-            entries in that month.
+            Each billable member in a calendar month counts toward your seat total for that month. Someone is billable
+            if they had assigned show jobs, show staffing, event team activity (notes or documents they created), or
+            work time entries in that month. Invoices use the tier total for that seat count unless your organization
+            has a fixed per-seat override from Ordo Stage.
           </p>
           <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-yellow">
             <li>Invoice generated on the 1st for the previous month</li>

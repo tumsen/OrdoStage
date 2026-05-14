@@ -80,7 +80,12 @@ publicRouter.get("/pricing", async (c) => {
   const [cfgRows, priceRows] = await Promise.all([
     prisma.billingConfig.findUnique({
       where: { id: "default" },
-      select: { baseCurrencyCode: true, yearlyDiscountPercent: true, yearlyDiscountEnabled: true },
+      select: {
+        baseCurrencyCode: true,
+        yearlyDiscountPercent: true,
+        yearlyDiscountEnabled: true,
+        defaultSeatCalculatorJson: true,
+      },
     }),
     prisma.billingCurrencyPrice.findMany(),
   ]);
@@ -94,6 +99,7 @@ publicRouter.get("/pricing", async (c) => {
       baseCurrencyCode: "EUR",
       yearlyDiscountPercent: cfgRows?.yearlyDiscountPercent ?? 15,
       yearlyDiscountEnabled: cfgRows?.yearlyDiscountEnabled ?? true,
+      defaultSeatCalculatorJson: cfgRows?.defaultSeatCalculatorJson ?? null,
       prices: [{ currencyCode: "EUR" as const, userDailyRateCents: eurCents }],
     },
   });

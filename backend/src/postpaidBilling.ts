@@ -1,4 +1,10 @@
 import { PrismaClient } from "@prisma/client";
+import { parseSeatCalculatorJson } from "./seatCalculatorJson";
+import {
+  DEFAULT_TIERED_SEAT_MODEL,
+  tieredMonthlyTotalCents,
+  type TieredSeatModel,
+} from "./tieredSeatPricing";
 
 export type BillingConfigResolved = {
   paymentDueDays: number;
@@ -90,6 +96,44 @@ export async function getCurrencyPriceMap(prisma: PrismaClient): Promise<Currenc
     map[row.currencyCode.toUpperCase()] = row.userDailyRateCents;
   }
   return map;
+}
+
+/** Global default seat curve from BillingConfig (null = use flat table only). */
+export async function getGlobalDefaultSeatCalculatorJson(prisma: PrismaClient): Promise<string | null> {
+  const row = await prisma.billingConfig.findUnique({
+    where: { id: "default" },
+    select: { defaultSeatCalculatorJson: true },
+  });
+  const raw = row?.defaultSeatCalculatorJson;
+  if (raw == null || !String(raw).trim()) return null;
+  return String(raw).trim();
+}
+
+/**
+ * Monthly seat subtotal in cents: org flat override, else tier curve when global/org JSON has a `model`,
+ * else legacy flat table × billable users.
+ */
+export function seatCurveSubtotalCents(input: {
+  billableUsers: number;
+  customUserMonthlyRateCents: number | null | undefined;
+  orgSeatCalculatorJson: string | null | undefined;
+  globalSeatCalculatorJson: string | null | undefined;
+  tablePerUserMonthlyRateCents: number;
+}): number {
+  const u = input.billableUsers;
+  if (u <= 0) return 0;
+  if (input.customUserMonthlyRateCents != null && input.customUserMonthlyRateCents > 0) {
+    return u * input.customUserMonthlyRateCents;
+  }
+  const g = parseSeatCalculatorJson(input.globalSeatCalculatorJson);
+  const o = parseSeatCalculatorJson(input.orgSeatCalculatorJson);
+  if (g?.model == null && o?.model == null) {
+    return u * input.tablePerUserMonthlyRateCents;
+  }
+  const model: TieredSeatModel = { ...DEFAULT_TIERED_SEAT_MODEL };
+  if (g?.model) Object.assign(model, g.model);
+  if (o?.model) Object.assign(model, o.model);
+  return tieredMonthlyTotalCents(u, model);
 }
 
 function tableMonthlyRateCents(map: CurrencyPriceMap): number {
@@ -207,12 +251,16 @@ export function estimateMonthlyOrgAmountCents(input: {
   customFlatRateMaxUsers: number | null;
   /** Active members (for flat-rate seat cap). */
   activeMemberCount: number;
+  orgSeatCalculatorJson?: string | null;
+  globalSeatCalculatorJson?: string | null;
 }): number {
-  const rateCents =
-    input.customUserMonthlyRateCents != null && input.customUserMonthlyRateCents > 0
-      ? input.customUserMonthlyRateCents
-      : input.perUserMonthlyRateCents;
-  const subtotal = input.billableUsers * rateCents;
+  const subtotal = seatCurveSubtotalCents({
+    billableUsers: input.billableUsers,
+    customUserMonthlyRateCents: input.customUserMonthlyRateCents,
+    orgSeatCalculatorJson: input.orgSeatCalculatorJson,
+    globalSeatCalculatorJson: input.globalSeatCalculatorJson,
+    tablePerUserMonthlyRateCents: input.perUserMonthlyRateCents,
+  });
   const discountPercent = Math.min(Math.max(input.customDiscountPercent ?? 0, 0), 100);
   const flatRateApplicable =
     input.customFlatRateCents != null &&
@@ -227,12 +275,14 @@ export function estimateMonthlyOrgAmountCents(input: {
 export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new Date()): Promise<number> {
   const currencyPrices = await getCurrencyPriceMap(prisma);
   const fallbackRate = tableMonthlyRateCents(currencyPrices);
+  const globalSeatJson = await getGlobalDefaultSeatCalculatorJson(prisma);
   const dayStart = startOfUtcDay(today);
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
   const orgs = await prisma.organization.findMany({
     select: {
       id: true,
       customUserDailyRateCents: true,
+      customSeatCalculatorJson: true,
     },
   });
 
@@ -242,10 +292,15 @@ export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new
     const activeUsers = billable.size;
     const currency = BILLING_CURRENCY_CODE;
     const tableRate = currencyPrices[BILLING_CURRENCY_CODE] ?? fallbackRate;
+    const subtotal = seatCurveSubtotalCents({
+      billableUsers: activeUsers,
+      customUserMonthlyRateCents: org.customUserDailyRateCents,
+      orgSeatCalculatorJson: org.customSeatCalculatorJson,
+      globalSeatCalculatorJson: globalSeatJson,
+      tablePerUserMonthlyRateCents: tableRate,
+    });
     const rateCents =
-      org.customUserDailyRateCents != null && org.customUserDailyRateCents > 0
-        ? org.customUserDailyRateCents
-        : tableRate;
+      activeUsers > 0 ? Math.max(1, Math.round(subtotal / activeUsers)) : tableRate;
     await prisma.billingUsageSnapshot.upsert({
       where: { organizationId_snapshotDate: { organizationId: org.id, snapshotDate: dayStart } },
       create: {
@@ -360,6 +415,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
   const cfg = await getBillingConfig(prisma);
   const currencyPrices = await getCurrencyPriceMap(prisma);
   const fallbackRate = tableMonthlyRateCents(currencyPrices);
+  const globalSeatJson = await getGlobalDefaultSeatCalculatorJson(prisma);
   const currentMonthStart = startOfUtcMonth(runAt);
   const targetMonthEnd = currentMonthStart;
   const targetMonthStart = startOfUtcMonth(new Date(Date.UTC(runAt.getUTCFullYear(), runAt.getUTCMonth() - 1, 1)));
@@ -369,6 +425,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
     select: {
       id: true,
       customUserDailyRateCents: true,
+      customSeatCalculatorJson: true,
       customDiscountPercent: true,
       customFlatRateCents: true,
       customFlatRateMaxUsers: true,
@@ -395,10 +452,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
     });
 
     const currency = BILLING_CURRENCY_CODE;
-    const monthlyRateCents =
-      org.customUserDailyRateCents != null && org.customUserDailyRateCents > 0
-        ? org.customUserDailyRateCents
-        : currencyPrices[currency] ?? fallbackRate;
+    const tableRate = currencyPrices[currency] ?? fallbackRate;
 
     const chargedUserIds = [...billableUserIds].filter((id) => memberRows.some((m) => m.userId === id));
     if (chargedUserIds.length === 0) continue;
@@ -413,7 +467,15 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
       memberRows.length <= flatRateMaxUsers;
 
     const seatCount = chargedUserIds.length;
-    const subtotalCents = flatRateApplicable ? flatRateCents : seatCount * monthlyRateCents;
+    const subtotalCents = flatRateApplicable
+      ? flatRateCents!
+      : seatCurveSubtotalCents({
+          billableUsers: seatCount,
+          customUserMonthlyRateCents: org.customUserDailyRateCents,
+          orgSeatCalculatorJson: org.customSeatCalculatorJson,
+          globalSeatCalculatorJson: globalSeatJson,
+          tablePerUserMonthlyRateCents: tableRate,
+        });
     const discountCents = flatRateApplicable ? 0 : Math.round((subtotalCents * discountPercent) / 100);
     const totalCents = flatRateApplicable ? flatRateCents : Math.max(subtotalCents - discountCents, 0);
 
@@ -445,16 +507,20 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
           },
         });
       } else {
-        const lines = chargedUserIds.map((userId) => {
+        const baseEach = Math.floor(subtotalCents / seatCount);
+        const remainder = subtotalCents - baseEach * seatCount;
+        const lines = chargedUserIds.map((userId, idx) => {
           const row = memberRows.find((m) => m.userId === userId)!;
+          const extra = idx < remainder ? 1 : 0;
+          const lineSub = baseEach + extra;
           return {
             invoiceId: invoice.id,
             userId,
             userName: row.user.name || null,
             userEmail: row.user.email || null,
             daysConsumed: 1,
-            rateCents: monthlyRateCents,
-            subtotalCents: monthlyRateCents,
+            rateCents: lineSub,
+            subtotalCents: lineSub,
           };
         });
         if (lines.length > 0) await tx.billingInvoiceLine.createMany({ data: lines });

@@ -16,6 +16,7 @@ import {
   estimateMonthlyOrgAmountCents,
   getBillingConfig,
   getCurrencyPriceMap,
+  getGlobalDefaultSeatCalculatorJson,
   recordDailyUsageSnapshot,
 } from "../postpaidBilling";
 import { getClientWallClockZone, wallClockInstantFromStoredDayAndHHMM } from "../clientWallClock";
@@ -351,7 +352,7 @@ app.get("/org", async (c) => {
 
   await recordDailyUsageSnapshot(prisma);
   const viewOnly = await enforceOverdueAccess(prisma, user.organizationId);
-  const [billingConfig, openInvoice, org, currencyPrices] = await Promise.all([
+  const [billingConfig, openInvoice, org, currencyPrices, globalSeatJson] = await Promise.all([
     getBillingConfig(prisma),
     prisma.billingInvoice.findFirst({
       where: { organizationId: user.organizationId, status: { in: ["issued", "overdue"] } },
@@ -363,6 +364,7 @@ app.get("/org", async (c) => {
       include: { _count: { select: { users: true, memberships: true } } },
     }),
     getCurrencyPriceMap(prisma),
+    getGlobalDefaultSeatCalculatorJson(prisma),
   ]);
 
   if (!org) {
@@ -381,6 +383,8 @@ app.get("/org", async (c) => {
     customFlatRateCents: org.customFlatRateCents,
     customFlatRateMaxUsers: org.customFlatRateMaxUsers,
     activeMemberCount: activeUserCount,
+    orgSeatCalculatorJson: org.customSeatCalculatorJson,
+    globalSeatCalculatorJson: globalSeatJson,
   });
 
   return c.json({

@@ -238,14 +238,17 @@ function BillingTab({ org }: { org: OrgDetail }) {
             <p className="text-sm text-white/70">Custom organization pricing</p>
             <Input placeholder="Billing currency (e.g. EUR, USD, DKK)" value={form.billingCurrencyCode} onChange={(e) => setForm((p) => ({ ...p, billingCurrencyCode: e.target.value.toUpperCase() }))} />
             <div>
-              <Label className="text-xs text-white/50">Custom per-seat monthly rate ({org.estimatedCurrencyCode}, optional)</Label>
+              <Label className="text-xs text-white/50">Fixed EUR per billable seat / month (optional override)</Label>
               <Input
                 className="mt-1"
-                placeholder="Leave empty to use global monthly table rate"
+                placeholder="Leave empty to use the seat curve (global default or organisation curve below)"
                 value={form.customUserDailyRateMajor}
                 onChange={(e) => setForm((p) => ({ ...p, customUserDailyRateMajor: e.target.value }))}
               />
-              <p className="text-[11px] text-white/40 mt-1">Major units (e.g. 5 or 5.50); stored as cents.</p>
+              <p className="text-[11px] text-white/40 mt-1">
+                If set, each billable member is charged this flat amount instead of the tiered total from the
+                calculator.
+              </p>
             </div>
             <Input placeholder="Discount % (optional)" value={form.customDiscountPercent} onChange={(e) => setForm((p) => ({ ...p, customDiscountPercent: e.target.value }))} />
             <Input placeholder="Flat rate cents (optional)" value={form.customFlatRateCents} onChange={(e) => setForm((p) => ({ ...p, customFlatRateCents: e.target.value }))} />
@@ -291,8 +294,9 @@ function BillingTab({ org }: { org: OrgDetail }) {
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-xs text-white/55">
-            Overrides the marketing calculator for this customer. Values are stored as JSON and save with the button
-            above.
+            Overrides the marketing calculator for this customer. Values save with{" "}
+            <span className="text-white/75">Save custom billing pricing</span> and are used for invoices unless a fixed
+            per-seat override is set above.
           </p>
           <TieredSeatPricingCalculator
             showTrialBadge={false}
