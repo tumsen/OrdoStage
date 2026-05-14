@@ -5,6 +5,11 @@ import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { canAction, canView } from "../requestRole";
 import type { EffectiveRole } from "../effectiveRole";
+import {
+  getClientWallClockZone,
+  startOfLocalCalendarDayInZone,
+  wallClockInstantFromDateIsoAndHHMM,
+} from "../clientWallClock";
 
 const staffingRouter = new Hono<{
   Variables: {
@@ -29,15 +34,7 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
-function toDateTimeFromDateAndTime(dateIso: string, hhmm: string): Date | null {
-  const d = new Date(dateIso);
-  if (Number.isNaN(d.getTime())) return null;
-  const [hhRaw, mmRaw] = hhmm.split(":");
-  const hh = Number(hhRaw);
-  const mm = Number(mmRaw);
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mm, 0, 0));
-}
+const toDateTimeFromDateAndTime = wallClockInstantFromDateIsoAndHHMM;
 
 async function syncJobToSchedule(jobId: string): Promise<void> {
   const job = await prisma.eventShowJob.findUnique({
@@ -105,7 +102,7 @@ staffingRouter.get("/staffing", async (c) => {
   }
 
   const today = new Date();
-  const todayStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const todayStart = startOfLocalCalendarDayInZone(today, getClientWallClockZone());
   const mode = c.req.query("mode") === "upcoming" ? "upcoming" : "range";
   const limitRaw = Number.parseInt(c.req.query("limit") ?? "200", 10);
   const limit = Math.max(25, Math.min(500, Number.isFinite(limitRaw) ? limitRaw : 200));

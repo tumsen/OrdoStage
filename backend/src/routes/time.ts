@@ -23,6 +23,11 @@ import {
   TIME_CATEGORIES,
   type TimeCategory,
 } from "../types";
+import {
+  getClientWallClockZone,
+  startOfLocalCalendarDayInZone,
+  wallClockInstantFromDateIsoAndHHMM,
+} from "../clientWallClock";
 
 const timeRouter = new Hono<{
   Variables: {
@@ -197,15 +202,7 @@ async function syncEventShowTimeProjects(organizationId: string) {
   }
 }
 
-function toDateTimeFromDateAndTime(dateIso: string, hhmm: string): Date | null {
-  const d = new Date(dateIso);
-  if (Number.isNaN(d.getTime())) return null;
-  const [hhRaw, mmRaw] = hhmm.split(":");
-  const hh = Number(hhRaw);
-  const mm = Number(mmRaw);
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mm, 0, 0));
-}
+const toDateTimeFromDateAndTime = wallClockInstantFromDateIsoAndHHMM;
 
 const TOUR_TIME_JOB_PREFIX = "tourshow:";
 const TOUR_EVENT_JOB_PREFIX = "tourevent:";
@@ -1862,7 +1859,7 @@ timeRouter.get("/time/jobs/upcoming", async (c) => {
   }
 
   const now = new Date();
-  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const todayStart = startOfLocalCalendarDayInZone(now, getClientWallClockZone());
 
   const fetchCap = Math.min(200, Math.max(limit * 4, limit));
 

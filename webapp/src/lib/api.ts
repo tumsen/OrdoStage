@@ -1,5 +1,15 @@
+import { getBrowserIanaTimeZone } from "./browserUserTime";
+
 /** Normalize so `/api/...` never becomes `//api/...` when backend URL has a trailing slash. */
 const API_BASE_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
+
+function clientTimeZoneHeaders(): Record<string, string> {
+  try {
+    return { "X-Client-Time-Zone": getBrowserIanaTimeZone() };
+  } catch {
+    return {};
+  }
+}
 
 class ApiError extends Error {
   constructor(message: string, public status: number, public data?: unknown) {
@@ -20,6 +30,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...clientTimeZoneHeaders(),
       ...options.headers,
     },
     credentials: "include",
@@ -59,6 +70,7 @@ async function rawRequest(endpoint: string, options: RequestInit = {}): Promise<
   const config: RequestInit = {
     ...options,
     headers: {
+      ...clientTimeZoneHeaders(),
       ...options.headers,
     },
     credentials: "include",

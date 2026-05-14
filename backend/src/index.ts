@@ -26,6 +26,7 @@ import type { EffectiveRole } from "./effectiveRole";
 import { resolveEffectiveRole } from "./effectiveRole";
 import { prisma } from "./prisma";
 import { enforceOverdueAccess } from "./postpaidBilling";
+import { clientWallClockZoneMiddleware } from "./clientWallClock";
 
 const SUPPORT_EMAILS = new Set(["tumsen@gmail.com"]);
 
@@ -53,7 +54,7 @@ app.use(
   cors({
     origin: (origin) => origin,
     credentials: true,
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Client-Time-Zone"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   })
 );
@@ -63,6 +64,9 @@ app.get("/health", (c) => c.json({ status: "ok", version: "2.0.0" }));
 
 // Logging
 app.use("*", logger());
+
+// Browser IANA zone (`X-Client-Time-Zone`) for wall-clock date+time math on the API
+app.use("*", clientWallClockZoneMiddleware);
 
 // Auth session middleware — runs on every request
 app.use("*", async (c, next) => {

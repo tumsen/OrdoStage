@@ -5,6 +5,7 @@ import { auth } from "../auth";
 import { CreateCalendarSchema } from "../types";
 import { canAction } from "../requestRole";
 import { env } from "../env";
+import { normalizeClientIanaZone, wallClockInstantFromStoredDayAndHHMM } from "../clientWallClock";
 
 const calendarsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -173,7 +174,8 @@ function buildICS(
         person: { name: string } | null;
       }>;
     }>;
-  }>
+  }>,
+  wallClockZone: string
 ): string {
   const now = formatICSDate(new Date());
   const appBase = (env.FRONTEND_URL || env.BACKEND_URL || "http://localhost:5173").replace(/\/+$/, "");
@@ -191,8 +193,11 @@ function buildICS(
           const [hhRaw, mmRaw] = show.showTime.split(":");
           const hh = Number(hhRaw);
           const mm = Number(mmRaw);
-          const start = new Date(show.showDate);
-          start.setUTCHours(hh, mm, 0, 0);
+          let start = wallClockInstantFromStoredDayAndHHMM(show.showDate, show.showTime, wallClockZone);
+          if (!start) {
+            start = new Date(show.showDate);
+            start.setUTCHours(hh, mm, 0, 0);
+          }
           const end = new Date(start.getTime() + Math.max(1, show.durationMinutes) * 60 * 1000);
           const categories = normalizeTagList(event.tags);
           categories.unshift("Event", "Show");
@@ -409,7 +414,8 @@ function buildTourICSVEvents(
       notes: string | null;
     }>;
   }>,
-  organizationName: string
+  organizationName: string,
+  wallClockZone: string
 ): string {
   const now = formatICSDate(new Date());
   const appBase = (env.FRONTEND_URL || env.BACKEND_URL || "http://localhost:5173").replace(/\/+$/, "");
@@ -426,7 +432,10 @@ function buildTourICSVEvents(
         const [hhRaw, mmRaw] = hhmm.split(":");
         const hh = Number(hhRaw);
         const mm = Number(mmRaw);
-        const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mm, 0, 0));
+        let start = wallClockInstantFromStoredDayAndHHMM(d, hhmm, wallClockZone);
+        if (!start) {
+          start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mm, 0, 0));
+        }
         const end = new Date(start.getTime() + 60 * 60 * 1000);
         const parts: string[] = [];
         if (tour.description) parts.push(tour.description);
@@ -567,6 +576,8 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
     };
   }
 
+  const wallClockZone = normalizeClientIanaZone(c.req.query("tz") ?? c.req.header("X-Client-Time-Zone"));
+
   const events = await prisma.event.findMany({
     where,
     orderBy: { startDate: "asc" },
@@ -633,8 +644,8 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
     orderBy: { createdAt: "asc" },
   });
 
-  const eventCalendar = buildICS(calendar.name, calendar.organization.name, events);
-  const tourVEvents = buildTourICSVEvents(tours, calendar.organization.name);
+  const eventCalendar = buildICS(calendar.name, calendar.organization.name, events, wallClockZone);
+  const tourVEvents = buildTourICSVEvents(tours, calendar.organization.name, wallClockZone);
   const icsContent = tourVEvents
     ? eventCalendar.replace("\r\nEND:VCALENDAR", `\r\n${tourVEvents}\r\nEND:VCALENDAR`)
     : eventCalendar;

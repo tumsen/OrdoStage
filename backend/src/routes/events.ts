@@ -17,6 +17,7 @@ import {
 } from "../types";
 import { canAction } from "../requestRole";
 import { parseIncomingDateTime } from "../parseIncomingDateTime";
+import { wallClockInstantFromDateIsoAndHHMM } from "../clientWallClock";
 
 const eventsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 const prismaAny = prisma as any;
@@ -316,15 +317,7 @@ function serializeDocument(doc: {
   };
 }
 
-function toDateTimeFromDateAndTime(dateIso: string, hhmm: string): Date | null {
-  const d = new Date(dateIso);
-  if (Number.isNaN(d.getTime())) return null;
-  const [hhRaw, mmRaw] = hhmm.split(":");
-  const hh = Number(hhRaw);
-  const mm = Number(mmRaw);
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mm, 0, 0));
-}
+const toDateTimeFromDateAndTime = wallClockInstantFromDateIsoAndHHMM;
 
 async function syncStaffingToSchedule(staffingId: string): Promise<void> {
   const staffing = await prismaAny.eventShowStaffing.findUnique({

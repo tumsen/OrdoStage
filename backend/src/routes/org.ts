@@ -15,6 +15,7 @@ import {
   getCurrencyPriceMap,
   recordDailyUsageSnapshot,
 } from "../postpaidBilling";
+import { getClientWallClockZone, wallClockInstantFromStoredDayAndHHMM } from "../clientWallClock";
 
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -74,13 +75,7 @@ app.get("/me", async (c) => {
 
 function startOfShowUtc(showDate: Date, showTime: string): Date | null {
   if (!/^\d{2}:\d{2}$/.test(showTime)) return null;
-  const [hhRaw, mmRaw] = showTime.split(":");
-  const hh = Number(hhRaw);
-  const mm = Number(mmRaw);
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-  const start = new Date(showDate);
-  start.setUTCHours(hh, mm, 0, 0);
-  return start;
+  return wallClockInstantFromStoredDayAndHHMM(showDate, showTime, getClientWallClockZone());
 }
 
 function startOfJobUtc(jobDate: Date, startTime: string): Date | null {
