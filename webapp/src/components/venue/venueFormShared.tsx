@@ -216,7 +216,6 @@ export function StageSizeFields({
               maxLength={10}
               inputMode="decimal"
               autoComplete="off"
-              placeholder="999,99"
               title={dimensionHint}
               className={dimInputClass}
             />
@@ -233,7 +232,6 @@ export function StageSizeFields({
               maxLength={10}
               inputMode="decimal"
               autoComplete="off"
-              placeholder="999,99"
               title={dimensionHint}
               className={dimInputClass}
             />
@@ -250,7 +248,6 @@ export function StageSizeFields({
               maxLength={10}
               inputMode="decimal"
               autoComplete="off"
-              placeholder="999,99"
               title={dimensionHint}
               className={dimInputClass}
             />
