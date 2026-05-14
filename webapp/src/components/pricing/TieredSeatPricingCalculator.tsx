@@ -52,6 +52,15 @@ function clampInt(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
+/** Admin/org % input: use draft while typing so annual preview matches the field (parent updates on blur). */
+function percentFromDraftOrProp(showYearlyDiscountControls: boolean, draft: string, prop: number): number {
+  if (!showYearlyDiscountControls) return prop;
+  const t = draft.trim();
+  if (t === "") return clampInt(Math.round(prop), 0, 100);
+  const n = parseInt(t.replace(/\s/g, ""), 10);
+  return Number.isFinite(n) ? clampInt(n, 0, 100) : clampInt(Math.round(prop), 0, 100);
+}
+
 function parseMoney(s: string, fallback: number): number {
   const v = parseFloat(s.replace(",", "."));
   return Number.isFinite(v) ? v : fallback;
@@ -112,9 +121,10 @@ export function TieredSeatPricingCalculator({
 
   const floorAtSafe = Math.max(3, Math.floor(model.floorAt));
   const monthlyList = useMemo(() => monthlyAtUsers(model), [model]);
-  /** Multiplier for the configured annual plan (admin: discount % always applies to the quote). */
+  const percentForAnnualQuote = percentFromDraftOrProp(showYearlyDiscountControls, yearlyPercentDraft, yearlyDiscountPercent);
+  /** Admin/org: quote always uses the (draft) %; public: uses API yearlyDiscountEnabled for whether discount applies. */
   const multWhenPayingAnnual = annualMonthlyMultiplier(
-    yearlyDiscountPercent,
+    percentForAnnualQuote,
     showYearlyDiscountControls ? true : yearlyDiscountEnabled,
   );
   const chartRows = useMemo(
@@ -142,19 +152,19 @@ export function TieredSeatPricingCalculator({
     annual && multWhenPayingAnnual < 1 ? Math.round((baseMonthly - annualPlanMonthlyEq) * 12) : 0;
 
   const monthlySub =
-    annual && multWhenPayingAnnual < 1 && yearlyDiscountPercent > 0
-      ? `billed annually (${yearlyDiscountPercent}% off)`
+    annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0
+      ? `billed annually (${percentForAnnualQuote}% off)`
       : annual
         ? "billed annually (no discount)"
         : "billed monthly";
   const annualTotalSub =
-    annual && multWhenPayingAnnual < 1 && yearlyDiscountPercent > 0
-      ? `${yearlyDiscountPercent}% saved vs monthly`
+    annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0
+      ? `${percentForAnnualQuote}% saved vs monthly`
       : annual
         ? "per year"
-        : multWhenPayingAnnual < 1 && yearlyDiscountPercent > 0
-          ? `if you enable annual billing (${yearlyDiscountPercent}% off vs monthly)`
-          : "if you enable annual billing (no discount vs monthly)";
+        : multWhenPayingAnnual < 1 && percentForAnnualQuote > 0
+          ? `annual billing at ${percentForAnnualQuote}% off vs monthly`
+          : "annual billing at list monthly rate (no discount)";
 
   function commitFloorAtDraft() {
     const parsed = parseInt(floorAtDraft.replace(/\s/g, ""), 10);
@@ -253,7 +263,7 @@ export function TieredSeatPricingCalculator({
         <Label htmlFor="enable-annual-billing" className="cursor-pointer text-sm text-white/70">
           Enable annual billing
         </Label>
-        {annual && multWhenPayingAnnual < 1 && yearlyDiscountPercent > 0 ? (
+        {annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0 ? (
           <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
             Save €{annualSavingsYear.toLocaleString()}/yr
           </span>

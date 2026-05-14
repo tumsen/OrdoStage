@@ -169,7 +169,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         <CardContent className="space-y-6">
           <TieredSeatPricingCalculator
             showModelControls
-            yearlyDiscountPercent={seatYearlyPercent}
+            yearlyDiscountPercent={yearlyDiscountPercentClamped}
             yearlyDiscountEnabled={seatYearlyEnabled}
             showYearlyDiscountControls
             onYearlyDiscountPercentChange={setSeatYearlyPercent}
