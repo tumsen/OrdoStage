@@ -83,6 +83,20 @@ export function TieredSeatPricingCalculator({
     setFloorAtDraft(String(model.floorAt));
   }, [model.floorAt]);
 
+  /** Draft strings so partial edits (e.g. clearing the first digit) are not overwritten by parse fallback on every keystroke. */
+  const [baseDraft, setBaseDraft] = useState(String(model.base));
+  const [startDraft, setStartDraft] = useState(String(model.start));
+  const [floorPriceDraft, setFloorPriceDraft] = useState(String(model.floor));
+  useEffect(() => {
+    setBaseDraft(String(model.base));
+  }, [model.base]);
+  useEffect(() => {
+    setStartDraft(String(model.start));
+  }, [model.start]);
+  useEffect(() => {
+    setFloorPriceDraft(String(model.floor));
+  }, [model.floor]);
+
   const [yearlyPercentDraft, setYearlyPercentDraft] = useState(String(yearlyDiscountPercent));
   useEffect(() => {
     setYearlyPercentDraft(String(yearlyDiscountPercent));
@@ -137,6 +151,42 @@ export function TieredSeatPricingCalculator({
     const clamped = clampInt(n, 0, 100);
     onYearlyDiscountPercentChange?.(clamped);
     setYearlyPercentDraft(String(clamped));
+  }
+
+  function commitBaseDraft() {
+    const t = baseDraft.trim();
+    if (t === "") {
+      setBaseDraft(String(model.base));
+      return;
+    }
+    const n = parseMoney(t, model.base);
+    const clamped = Math.max(0, n);
+    setModel((m) => ({ ...m, base: clamped }));
+    setBaseDraft(String(clamped));
+  }
+
+  function commitStartDraft() {
+    const t = startDraft.trim();
+    if (t === "") {
+      setStartDraft(String(model.start));
+      return;
+    }
+    const n = parseMoney(t, model.start);
+    const clamped = Math.max(1, n);
+    setModel((m) => ({ ...m, start: clamped }));
+    setStartDraft(String(clamped));
+  }
+
+  function commitFloorPriceDraft() {
+    const t = floorPriceDraft.trim();
+    if (t === "") {
+      setFloorPriceDraft(String(model.floor));
+      return;
+    }
+    const n = parseMoney(t, model.floor);
+    const clamped = Math.max(1, n);
+    setModel((m) => ({ ...m, floor: clamped }));
+    setFloorPriceDraft(String(clamped));
   }
 
   return (
@@ -227,13 +277,15 @@ export function TieredSeatPricingCalculator({
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <ModelInput
               label="Base fee (1 user) €"
-              value={String(model.base)}
-              onChange={(v) => setModel((m) => ({ ...m, base: Math.max(0, parseMoney(v, m.base)) }))}
+              value={baseDraft}
+              onChange={setBaseDraft}
+              onBlur={commitBaseDraft}
             />
             <ModelInput
               label="User 2 price €"
-              value={String(model.start)}
-              onChange={(v) => setModel((m) => ({ ...m, start: Math.max(1, parseMoney(v, m.start)) }))}
+              value={startDraft}
+              onChange={setStartDraft}
+              onBlur={commitStartDraft}
             />
             <ModelInput
               label="Floor reached at user #"
@@ -245,8 +297,9 @@ export function TieredSeatPricingCalculator({
             <ModelInput
               label="Floor price €"
               highlight
-              value={String(model.floor)}
-              onChange={(v) => setModel((m) => ({ ...m, floor: Math.max(1, parseMoney(v, m.floor)) }))}
+              value={floorPriceDraft}
+              onChange={setFloorPriceDraft}
+              onBlur={commitFloorPriceDraft}
             />
           </div>
         </>
