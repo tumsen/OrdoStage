@@ -5,7 +5,8 @@ import {
   tourShowCalendarDurationMinutes,
   tourShowCalendarStartTime,
 } from "@/lib/tourScheduleDisplay";
-import { addUtcIsoMinutes, durationMinutesBetween, localWallClockToUtcIso, normalizeTimeHHMM } from "@/lib/showTiming";
+import { addMinutesToUtcIso, wallClockYmdHhMmToUtcIso } from "@/lib/browserUserTime";
+import { durationMinutesBetween, normalizeTimeHHMM } from "@/lib/showTiming";
 
 export type BookingType = "rehearsal" | "maintenance" | "private" | "venue_booking" | "other";
 
@@ -54,11 +55,11 @@ export interface CalendarItem {
 
 /** Same instant semantics as API bookings (`…Z`) for the time grid. */
 function toLocalDatetime(datePart: string, timePart: string): string {
-  return localWallClockToUtcIso(datePart, timePart);
+  return wallClockYmdHhMmToUtcIso(datePart, timePart);
 }
 
 function addMinutesLocal(startIso: string, minutes: number): string | null {
-  return addUtcIsoMinutes(startIso, minutes);
+  return addMinutesToUtcIso(startIso, minutes);
 }
 
 function tourShowVenueLabel(show: TourShow): string | undefined {

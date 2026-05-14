@@ -1,3 +1,5 @@
+import { addMinutesToUtcIso, wallClockYmdHhMmToUtcIso } from "./browserUserTime";
+
 /** Wall-clock time stored as strict `HH:mm` (24h) everywhere in schedules. */
 export function normalizeTimeHHMM(raw: string): string {
   const t = raw.trim();
@@ -90,36 +92,8 @@ export function calendarDateKeyFromJobDate(isoOrDay: string, fallback: string): 
   return t.slice(0, 10);
 }
 
-/**
- * Calendar day + `HH:mm` wall clock in the **browser's local** zone → UTC ISO string.
- *
- * Avoid `new Date("YYYY-MM-DDTHH:mm")` for schedule math: WebKit and some engines treat that
- * form as **UTC**, which shifts timed blocks on the week/day grid by the user's UTC offset
- * (often +1h / +2h in Europe).
- */
-export function localWallClockToUtcIso(dateYmd: string, timeHhMm: string): string {
-  const day = dateYmd.trim().split("T")[0]!.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
-    const t = normalizeTimeHHMM(timeHhMm);
-    return t ? `${day}T${t}` : `${day}T${timeHhMm.trim()}`;
-  }
-  const t = normalizeTimeHHMM(timeHhMm);
-  if (!t) return `${day}T${timeHhMm.trim()}`;
-  const [yy, mo, dd] = day.split("-").map((x) => Number.parseInt(x, 10));
-  const [hh, mm] = t.split(":").map((x) => Number.parseInt(x, 10));
-  if (![yy, mo, dd, hh, mm].every((n) => Number.isFinite(n))) return `${day}T${t}`;
-  const local = new Date(yy, mo - 1, dd, hh, mm, 0, 0);
-  if (!Number.isFinite(local.getTime())) return `${day}T${t}`;
-  return local.toISOString();
-}
-
-/** Add minutes to an absolute ISO instant; returns another ISO string or null if invalid. */
-export function addUtcIsoMinutes(startIso: string, minutes: number): string | null {
-  const d = new Date(startIso);
-  if (!Number.isFinite(d.getTime()) || !Number.isFinite(minutes)) return null;
-  const end = new Date(d.getTime() + minutes * 60_000);
-  return end.toISOString();
-}
+export const localWallClockToUtcIso = wallClockYmdHhMmToUtcIso;
+export const addUtcIsoMinutes = addMinutesToUtcIso;
 
 /** Parse `datetime-local` value to YYYY-MM-DD and HH:mm (local wall clock). */
 export function parseDatetimeLocal(s: string): { date: string; time: string } {
@@ -231,9 +205,15 @@ export function dateToBookingApiIso(d: Date): string {
   return d.toISOString();
 }
 
-/** Browser `datetime-local` value (`YYYY-MM-DDTHH:mm`) → UTC ISO for the same instant. */
+/** Browser `datetime-local` value (`YYYY-MM-DDTHH:mm`) → UTC ISO for the same instant (browser-local wall clock). */
 export function datetimeLocalInputToBookingApiIso(value: string | null | undefined): string | undefined {
   if (!value?.trim()) return undefined;
+  const parts = parseDatetimeLocal(value);
+  if (parts.date && parts.time) {
+    const iso = wallClockYmdHhMmToUtcIso(parts.date, parts.time);
+    const probe = new Date(iso);
+    if (Number.isFinite(probe.getTime())) return iso;
+  }
   const d = new Date(value);
   if (!Number.isFinite(d.getTime())) return undefined;
   return d.toISOString();
