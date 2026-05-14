@@ -6,6 +6,8 @@ import { Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
+import { formatVenueCapacityDisplay, formatVenueDimensionMetersDisplay } from "@/lib/venueDisplay";
 import type { Venue, VenueDocument } from "@/lib/types";
 import { appleMapsUrl, formatAddress, googleMapsUrl } from "@/components/AddressFields";
 import { Button } from "@/components/ui/button";
@@ -199,6 +201,7 @@ export function VenueCalendarContextStrip({
   className?: string;
 }) {
   const [zipping, setZipping] = useState(false);
+  const { locale, t } = useI18n();
 
   const { data: docs, isLoading } = useQuery({
     queryKey: ["venues", venueId, "documents"],
@@ -249,6 +252,36 @@ export function VenueCalendarContextStrip({
       setZipping(false);
     }
   }, [docs, folderBase]);
+
+  const stageInfoRows = useMemo(() => {
+    if (!venue) return [];
+    const rows: Array<{ label: string; value: string }> = [];
+    if (venue.capacity != null) {
+      rows.push({
+        label: t("venueInfo.capacityMetricLabel"),
+        value: formatVenueCapacityDisplay(venue.capacity, locale, t),
+      });
+    }
+    if (venue.width?.trim()) {
+      rows.push({
+        label: t("venueInfo.widthLabel"),
+        value: formatVenueDimensionMetersDisplay(venue.width.trim()),
+      });
+    }
+    if (venue.length?.trim()) {
+      rows.push({
+        label: t("venueInfo.depthLabel"),
+        value: formatVenueDimensionMetersDisplay(venue.length.trim()),
+      });
+    }
+    if (venue.height?.trim()) {
+      rows.push({
+        label: t("venueInfo.heightLabel"),
+        value: formatVenueDimensionMetersDisplay(venue.height.trim()),
+      });
+    }
+    return rows;
+  }, [venue, locale, t]);
 
   if (!venueId) return null;
 
@@ -365,17 +398,7 @@ export function VenueCalendarContextStrip({
 
           {hasStageInfo ? (
             <div className="min-w-0">
-              <LabeledRows
-                title="Stage & capacity"
-                rows={[
-                  ...(venue.capacity != null
-                    ? [{ label: "Capacity", value: venue.capacity.toLocaleString() }]
-                    : []),
-                  ...(venue.width?.trim() ? [{ label: "Width", value: venue.width.trim() }] : []),
-                  ...(venue.length?.trim() ? [{ label: "Depth", value: venue.length.trim() }] : []),
-                  ...(venue.height?.trim() ? [{ label: "Height", value: venue.height.trim() }] : []),
-                ]}
-              />
+              <LabeledRows title={t("venueInfo.stageCapacityTitle")} rows={stageInfoRows} />
             </div>
           ) : null}
 

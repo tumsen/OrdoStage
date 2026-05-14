@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useI18n } from "@/lib/i18n";
+import { formatVenueCapacityDisplay, formatVenueDimensionMetersDisplay } from "@/lib/venueDisplay";
 import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
 import {
   VenueFormSchema,
@@ -37,6 +39,12 @@ import {
   customFieldsToText,
 } from "@/components/venue/venueFormShared";
 
+function dimCell(raw: string | null | undefined): string {
+  const s = (raw ?? "").trim();
+  if (!s) return "—";
+  return formatVenueDimensionMetersDisplay(s);
+}
+
 function VenueRow({
   venue,
   onDelete,
@@ -46,6 +54,7 @@ function VenueRow({
   onDelete: (id: string) => void;
   canWrite: boolean;
 }) {
+  const { locale, t } = useI18n();
   return (
     <tr className="border-b border-white/5 group hover:bg-white/[0.02] transition-colors">
       <td className="px-5 py-3.5 text-sm font-medium">
@@ -100,9 +109,12 @@ function VenueRow({
         ) : null}
       </td>
       <td className="px-5 py-3.5 text-sm text-white/50 hidden md:table-cell">
-        <div>{venue.capacity != null ? venue.capacity.toLocaleString() : "—"}</div>
+        <div>
+          {venue.capacity != null ? formatVenueCapacityDisplay(venue.capacity, locale, t) : "—"}
+        </div>
         <div className="text-[11px] text-white/30">
-          W {venue.width ?? "—"} · D {venue.length ?? "—"} · H {venue.height ?? "—"}
+          {t("venueInfo.widthShort")} {dimCell(venue.width)} · {t("venueInfo.depthShort")} {dimCell(venue.length)} ·{" "}
+          {t("venueInfo.heightShort")} {dimCell(venue.height)}
         </div>
         {venue.documentCount != null && venue.documentCount > 0 ? (
           <div className="text-[11px] text-white/40 mt-0.5">
@@ -244,6 +256,7 @@ function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite
 
 export default function Venues() {
   const { canWrite } = usePermissions();
+  const { t } = useI18n();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const queryClient = useQueryClient();
@@ -282,7 +295,9 @@ export default function Venues() {
             <tr className="border-b border-white/10">
               <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide">Name</th>
               <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden sm:table-cell">Address</th>
-              <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden md:table-cell">Size &amp; capacity</th>
+              <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden md:table-cell">
+                {t("venueInfo.tableColumnTitle")}
+              </th>
               <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide w-20"></th>
             </tr>
           </thead>

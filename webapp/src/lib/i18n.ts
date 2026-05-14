@@ -241,6 +241,25 @@ const en = {
       flagSaveError: "Could not update that setting.",
     },
   },
+  venueInfo: {
+    stageCapacityTitle: "Stage & capacity",
+    capacityMetricLabel: "Capacity",
+    widthLabel: "Width",
+    depthLabel: "Depth",
+    heightLabel: "Height",
+    capacityPerson: "{{count}} person",
+    capacityPersons: "{{count}} persons",
+    tableColumnTitle: "Size & capacity (m · persons)",
+    widthShort: "W",
+    depthShort: "D",
+    heightShort: "H",
+    audienceCapacityLabel: "Audience capacity (persons)",
+    widthMetersLabel: "Width (m)",
+    depthMetersLabel: "Depth (m)",
+    heightMetersLabel: "Height (m)",
+    capacityShortLabel: "Capacity",
+    capacityInputSuffix: "persons",
+  },
 };
 
 const da: DeepPartial<typeof en> = {
@@ -336,6 +355,22 @@ const da: DeepPartial<typeof en> = {
         "Gælder alle sprog. For Paddle: slå begge fra, så besøgende får fuld navigation inkl. Priser.",
     },
   },
+  venueInfo: {
+    stageCapacityTitle: "Scene & kapacitet",
+    capacityMetricLabel: "Kapacitet",
+    widthLabel: "Bredde",
+    depthLabel: "Dybde",
+    heightLabel: "Højde",
+    capacityPerson: "{{count}} person",
+    capacityPersons: "{{count}} personer",
+    tableColumnTitle: "Størrelse & kapacitet (m · personer)",
+    audienceCapacityLabel: "Publikumskapacitet (personer)",
+    widthMetersLabel: "Bredde (m)",
+    depthMetersLabel: "Dybde (m)",
+    heightMetersLabel: "Højde (m)",
+    capacityShortLabel: "Kapacitet",
+    capacityInputSuffix: "personer",
+  },
 };
 
 const de: DeepPartial<typeof en> = {
@@ -416,6 +451,22 @@ const de: DeepPartial<typeof en> = {
       publicHomeModeHint:
         "Fuer alle Sprachen. Fuer Paddle beide ausschalten, damit Navigation und Preise sichtbar sind.",
     },
+  },
+  venueInfo: {
+    stageCapacityTitle: "Buehne & Kapazitaet",
+    capacityMetricLabel: "Kapazitaet",
+    widthLabel: "Breite",
+    depthLabel: "Tiefe",
+    heightLabel: "Hoehe",
+    capacityPerson: "{{count}} Person",
+    capacityPersons: "{{count}} Personen",
+    tableColumnTitle: "Groesse & Kapazitaet (m · Personen)",
+    audienceCapacityLabel: "Zuschauerkapazitaet (Personen)",
+    widthMetersLabel: "Breite (m)",
+    depthMetersLabel: "Tiefe (m)",
+    heightMetersLabel: "Hoehe (m)",
+    capacityShortLabel: "Kapazitaet",
+    capacityInputSuffix: "Personen",
   },
 };
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { FieldErrors, UseFormRegister } from "react-hook-form";
 import { Plus, Trash2 } from "lucide-react";
 import type { Venue } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -197,6 +198,7 @@ export function StageSizeFields({
   register: UseFormRegister<VenueFormValues>;
   errors?: FieldErrors<VenueFormValues>;
 }) {
+  const { t } = useI18n();
   const dimErrors = [errors?.width, errors?.length, errors?.height].filter((e) => e?.message);
 
   return (
@@ -209,7 +211,7 @@ export function StageSizeFields({
       </p>
       <div className="flex flex-nowrap items-end gap-4 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
         <div className="shrink-0 space-y-1.5">
-          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Width</Label>
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide">{t("venueInfo.widthMetersLabel")}</Label>
           <div className="flex items-center gap-1.5">
             <Input
               {...register("width")}
@@ -225,7 +227,7 @@ export function StageSizeFields({
           </div>
         </div>
         <div className="shrink-0 space-y-1.5">
-          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Depth</Label>
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide">{t("venueInfo.depthMetersLabel")}</Label>
           <div className="flex items-center gap-1.5">
             <Input
               {...register("length")}
@@ -241,7 +243,7 @@ export function StageSizeFields({
           </div>
         </div>
         <div className="shrink-0 space-y-1.5">
-          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Height</Label>
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide">{t("venueInfo.heightMetersLabel")}</Label>
           <div className="flex items-center gap-1.5">
             <Input
               {...register("height")}
@@ -267,14 +269,19 @@ export function StageSizeFields({
         </div>
       ) : null}
       <div className="space-y-1.5 pt-1">
-        <Label className="text-white/45 text-[10px] uppercase tracking-wide">Audience capacity</Label>
-        <Input
-          {...register("capacity")}
-          type="number"
-          min={0}
-          placeholder="e.g. 500"
-          className="max-w-[10rem] bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30"
-        />
+        <Label className="text-white/45 text-[10px] uppercase tracking-wide">{t("venueInfo.audienceCapacityLabel")}</Label>
+        <div className="flex items-center gap-1.5 max-w-[14rem]">
+          <Input
+            {...register("capacity")}
+            type="number"
+            min={0}
+            placeholder="e.g. 500"
+            className="max-w-[10rem] bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30"
+          />
+          <span className="select-none text-sm tabular-nums text-white/50 shrink-0" aria-hidden>
+            {t("venueInfo.capacityInputSuffix")}
+          </span>
+        </div>
       </div>
     </div>
   );

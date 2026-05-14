@@ -7,6 +7,8 @@ import {
 import { MapPin, Clock, Users, UserCircle } from "lucide-react";
 import type { CalendarItem } from "./scheduleUtils";
 import { formatTime, itemColor } from "./scheduleUtils";
+import { useI18n } from "@/lib/i18n";
+import { formatVenueCapacityDisplay } from "@/lib/venueDisplay";
 import { cn } from "@/lib/utils";
 import type { EventDetail, InternalBookingDetail } from "../../../../backend/src/types";
 
@@ -50,6 +52,7 @@ function formatAddress(parts: {
 
 export function ItemDetailSheet({ item, onClose }: ItemDetailSheetProps) {
   const detailRaw = item && item.kind !== "tour" ? (item.raw as EventDetail | InternalBookingDetail) : null;
+  const { locale, t } = useI18n();
 
   return (
     <Sheet open={item !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -136,8 +139,11 @@ export function ItemDetailSheet({ item, onClose }: ItemDetailSheetProps) {
                         })}
                       </div>
                     ) : null}
-                    {detailRaw.venue.capacity ? (
-                      <div className="text-xs text-white/30 mt-0.5">Capacity: {detailRaw.venue.capacity}</div>
+                    {detailRaw.venue.capacity != null ? (
+                      <div className="text-xs text-white/30 mt-0.5">
+                        {t("venueInfo.capacityShortLabel")}:{" "}
+                        {formatVenueCapacityDisplay(detailRaw.venue.capacity, locale, t)}
+                      </div>
                     ) : null}
                   </div>
                 </div>
