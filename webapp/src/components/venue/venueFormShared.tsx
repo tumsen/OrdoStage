@@ -217,7 +217,7 @@ export function StageSizeFields({
         <span className="text-white/50">m</span> is shown beside each box — you do not need to type it unless you want
         to.
       </p>
-      <div className="flex flex-nowrap items-end gap-4 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+      <div className="flex flex-wrap items-end gap-4">
         <div className="shrink-0 space-y-1.5">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">{t("venueInfo.widthMetersLabel")}</Label>
           <div className="flex items-center gap-1.5">

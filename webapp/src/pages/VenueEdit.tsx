@@ -154,31 +154,36 @@ export default function VenueEdit() {
             )}
           </section>
 
-          <section className="space-y-3">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">Address</Label>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
-              <AddressFields
-                value={{
-                  street: form.watch("addressStreet") ?? "",
-                  number: form.watch("addressNumber") ?? "",
-                  zip: form.watch("addressZip") ?? "",
-                  city: form.watch("addressCity") ?? "",
-                  state: form.watch("addressState") ?? "",
-                  country: form.watch("addressCountry") ?? "",
-                }}
-                onChange={(addr: Address) => {
-                  form.setValue("addressStreet", addr.street);
-                  form.setValue("addressNumber", addr.number);
-                  form.setValue("addressZip", addr.zip);
-                  form.setValue("addressCity", addr.city);
-                  form.setValue("addressState", addr.state);
-                  form.setValue("addressCountry", addr.country);
-                }}
-              />
+          <div className="mx-auto w-full max-w-5xl">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8 md:items-start">
+              <section className="min-w-0 space-y-3">
+                <Label className="text-white/50 text-xs uppercase tracking-wide">Address</Label>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
+                  <AddressFields
+                    value={{
+                      street: form.watch("addressStreet") ?? "",
+                      number: form.watch("addressNumber") ?? "",
+                      zip: form.watch("addressZip") ?? "",
+                      city: form.watch("addressCity") ?? "",
+                      state: form.watch("addressState") ?? "",
+                      country: form.watch("addressCountry") ?? "",
+                    }}
+                    onChange={(addr: Address) => {
+                      form.setValue("addressStreet", addr.street);
+                      form.setValue("addressNumber", addr.number);
+                      form.setValue("addressZip", addr.zip);
+                      form.setValue("addressCity", addr.city);
+                      form.setValue("addressState", addr.state);
+                      form.setValue("addressCountry", addr.country);
+                    }}
+                  />
+                </div>
+              </section>
+              <div className="min-w-0">
+                <StageSizeFields register={form.register} errors={form.formState.errors} />
+              </div>
             </div>
-          </section>
-
-          <StageSizeFields register={form.register} errors={form.formState.errors} />
+          </div>
 
           <VenueContactFields register={form.register} errors={form.formState.errors} />
 
