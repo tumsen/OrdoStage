@@ -41,6 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Department } from "../../../backend/src/types";
 import { formatDate } from "@/lib/dateUtils";
+import { DocumentListThumbnail, LocalFileThumbnail } from "@/components/DocumentListThumbnail";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
@@ -1742,29 +1743,44 @@ function EventDocumentsSection({ event }: { event: EventDetail }) {
 
   return (
     <div className="space-y-4 rounded-lg border border-white/10 bg-white/[0.02] p-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs uppercase tracking-wide text-white/45">Documents</p>
-        <span className="text-xs text-white/40">{event.documents.length} document{event.documents.length !== 1 ? "s" : ""}</span>
-        <Button
-          size="sm"
-          onClick={() => setUploadOpen(true)}
-          className="bg-white/5 hover:bg-white/10 text-white border border-white/10 gap-2 h-8"
-        >
-          <Upload size={13} /> Upload
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-white/40">
+            {event.documents.length} document{event.documents.length !== 1 ? "s" : ""}
+          </span>
+          <Button
+            size="sm"
+            onClick={() => setUploadOpen(true)}
+            className="h-8 gap-2 border border-white/10 bg-white/5 text-white hover:bg-white/10"
+          >
+            <Upload size={13} /> Upload
+          </Button>
+        </div>
       </div>
 
       {event.documents.length === 0 ? (
-        <div className="py-8 text-center text-white/30 text-sm">No documents uploaded yet.</div>
+        <div className="py-8 text-center text-sm text-white/30">No documents uploaded yet.</div>
       ) : (
         <div className="space-y-2">
           {event.documents.map((doc: Document) => (
-            <div key={doc.id} className="flex items-center justify-between bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3">
+            <div
+              key={doc.id}
+              className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2.5"
+            >
+              <DocumentListThumbnail
+                downloadUrl={`${backendBase}/api/documents/${doc.id}/download`}
+                mimeType={doc.mimeType}
+                filename={doc.filename}
+                preferImage={doc.mimeType.startsWith("image/")}
+              />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-white/90 truncate">{doc.name}</div>
-                <div className="text-xs text-white/40 mt-0.5 capitalize">{doc.type} · {formatDate(doc.createdAt)}</div>
+                <div className="truncate text-sm font-medium text-white/90">{doc.name}</div>
+                <div className="mt-0.5 text-xs capitalize text-white/40">
+                  {doc.type} · {formatDate(doc.createdAt)}
+                </div>
               </div>
-              <div className="flex items-center gap-1 ml-3">
+              <div className="ml-auto flex shrink-0 items-center gap-1">
                 <a
                   href={`${backendBase}/api/documents/${doc.id}/download`}
                   target="_blank"
@@ -1811,7 +1827,7 @@ function EventDocumentsSection({ event }: { event: EventDetail }) {
               >
                 <Input
                   type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                  accept="image/*,video/*,.pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov"
                   onChange={(e) => {
                     const f = e.target.files?.[0] ?? null;
                     setFile(f);
@@ -1822,6 +1838,15 @@ function EventDocumentsSection({ event }: { event: EventDetail }) {
                 <p className="mt-1 text-[10px] text-white/35">Drag & drop supported</p>
               </div>
             </div>
+            {file ? (
+              <div className="flex items-center gap-3 rounded-md border border-white/10 bg-black/25 p-2">
+                <LocalFileThumbnail file={file} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-white/85">{file.name}</p>
+                  <p className="text-[10px] text-white/40">{file.type || "Unknown type"}</p>
+                </div>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label className="text-white/60 text-xs uppercase tracking-wide">Name</Label>
               <Input

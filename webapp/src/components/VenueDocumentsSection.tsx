@@ -16,8 +16,13 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { VenueDocument } from "@/lib/types";
+import { DocumentListThumbnail } from "@/components/DocumentListThumbnail";
 
 const backendBase = () => import.meta.env.VITE_BACKEND_URL || "";
+
+function venueDocDownloadUrl(docId: string): string {
+  return `${backendBase()}/api/venues/documents/${docId}/download`;
+}
 
 type VenueDocKind = VenueDocument["kind"];
 
@@ -118,23 +123,29 @@ export function VenueDocumentsSection({
       ) : (docs ?? []).length === 0 ? (
         <p className="text-[11px] text-white/35 py-1">No files yet.</p>
       ) : (
-        <ul className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
+        <ul className="max-h-52 space-y-1.5 overflow-y-auto pr-0.5">
           {(docs ?? []).map((d) => (
             <li
               key={d.id}
               className="flex items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-2 py-1.5 text-[11px]"
             >
+              <DocumentListThumbnail
+                downloadUrl={venueDocDownloadUrl(d.id)}
+                mimeType={d.mimeType}
+                filename={d.filename}
+                preferImage={d.kind === "image"}
+              />
               <Badge
                 variant="outline"
                 className="shrink-0 border-white/15 text-white/70 text-[10px] font-normal"
               >
                 {kindLabel(d.kind)}
               </Badge>
-              <span className="text-white/80 truncate min-w-0 flex-1" title={d.filename}>
+              <span className="min-w-0 flex-1 truncate text-white/80" title={d.filename}>
                 {d.name}
               </span>
               <a
-                href={`${backendBase()}/api/venues/documents/${d.id}/download`}
+                href={venueDocDownloadUrl(d.id)}
                 className="shrink-0 text-blue-300 hover:text-blue-200"
               >
                 Download
@@ -201,7 +212,7 @@ export function VenueDocumentsSection({
             ref={fileRef}
             type="file"
             className="hidden"
-            accept="image/*,.pdf,.svg,application/pdf"
+            accept="image/*,video/*,.pdf,.svg,application/pdf"
             onChange={async (e) => {
               const file = e.target.files?.[0] ?? null;
               e.target.value = "";
