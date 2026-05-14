@@ -101,6 +101,17 @@ export const VenueSchema = z.object({
   notes: z.string().nullable(),
   /** Present on list/detail from API when included. */
   documentCount: z.number().optional(),
+  /** Latest files (metadata only) for list thumbnails — max count set by API. */
+  documentThumbnails: z
+    .array(
+      z.object({
+        id: z.string(),
+        kind: z.enum(VENUE_DOCUMENT_KINDS),
+        filename: z.string(),
+        mimeType: z.string(),
+      })
+    )
+    .optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

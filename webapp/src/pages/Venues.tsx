@@ -27,6 +27,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useI18n } from "@/lib/i18n";
 import { formatVenueCapacityDisplay, formatVenueDimensionMetersDisplay } from "@/lib/venueDisplay";
 import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
+import { DocumentListThumbnail } from "@/components/DocumentListThumbnail";
 import {
   VenueFormSchema,
   type VenueFormValues,
@@ -43,6 +44,16 @@ function dimCell(raw: string | null | undefined): string {
   const s = (raw ?? "").trim();
   if (!s) return "—";
   return formatVenueDimensionMetersDisplay(s);
+}
+
+const backendBase = () => import.meta.env.VITE_BACKEND_URL || "";
+
+function venueDocThumbDownloadUrl(docId: string): string {
+  return `${backendBase()}/api/venues/documents/${docId}/download`;
+}
+
+function isVenueThumbImage(kind: string, mimeType: string): boolean {
+  return kind === "image" || mimeType.startsWith("image/");
 }
 
 function VenueRow({
@@ -108,6 +119,32 @@ function VenueRow({
           </div>
         ) : null}
       </td>
+      <td className="px-4 py-3 hidden md:table-cell align-middle">
+        <div className="flex flex-wrap items-center gap-1 max-w-[11rem]">
+          {(venue.documentThumbnails ?? []).length === 0 ? (
+            <span className="text-[11px] text-white/25">—</span>
+          ) : (
+            (venue.documentThumbnails ?? []).map((d) => (
+              <a
+                key={d.id}
+                href={venueDocThumbDownloadUrl(d.id)}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                title={`${d.filename} — open`}
+              >
+                <DocumentListThumbnail
+                  downloadUrl={venueDocThumbDownloadUrl(d.id)}
+                  mimeType={d.mimeType}
+                  filename={d.filename}
+                  preferImage={isVenueThumbImage(d.kind, d.mimeType)}
+                  sizeClassName="h-9 w-9"
+                />
+              </a>
+            ))
+          )}
+        </div>
+      </td>
       <td className="px-5 py-3.5 text-sm text-white/50 hidden md:table-cell">
         <div>
           {venue.capacity != null ? formatVenueCapacityDisplay(venue.capacity, locale, t) : "—"}
@@ -121,12 +158,20 @@ function VenueRow({
             {venue.documentCount} file{venue.documentCount === 1 ? "" : "s"}
           </div>
         ) : null}
-        {venue.notes ? <div className="text-[11px] text-white/30 truncate max-w-56">{venue.notes}</div> : null}
         {(venue.customFields ?? []).length > 0 ? (
-          <div className="text-[11px] text-white/30 truncate max-w-56">
+          <div className="text-[11px] text-white/30 truncate max-w-[14rem]">
             {(venue.customFields ?? []).map((f) => `${f.key}: ${f.value}`).join(" · ")}
           </div>
         ) : null}
+      </td>
+      <td className="px-4 py-3 text-sm text-white/45 hidden md:table-cell max-w-[14rem]">
+        {venue.notes?.trim() ? (
+          <p className="text-[12px] leading-snug text-white/55 line-clamp-4 whitespace-pre-wrap break-words" title={venue.notes}>
+            {venue.notes}
+          </p>
+        ) : (
+          <span className="text-[11px] text-white/25">—</span>
+        )}
       </td>
       <td className="px-5 py-3.5">
         <div className="flex items-center justify-end gap-0.5">
@@ -212,18 +257,13 @@ function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite
           }}
         />
       </td>
+      <td className="px-4 py-3 hidden md:table-cell align-top">
+        <p className="text-[11px] text-white/30 leading-snug">After saving, upload files from Edit.</p>
+      </td>
       <td className="px-5 py-3 hidden md:table-cell align-top">
         <div className="space-y-3 max-w-md">
           <StageSizeFields register={form.register} errors={form.formState.errors} />
           <VenueContactFields register={form.register} errors={form.formState.errors} />
-          <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
-            <Input
-              {...form.register("notes")}
-              placeholder="Access, loading dock, quirks…"
-              className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
-            />
-          </div>
           <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Custom fields</Label>
             <Textarea {...form.register("customFieldsText")} className="hidden" />
@@ -237,6 +277,16 @@ function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite
               Save this venue first, then use <span className="text-white/60">Edit</span> to upload drawings and photos.
             </p>
           </div>
+        </div>
+      </td>
+      <td className="px-4 py-3 hidden md:table-cell align-top max-w-[14rem]">
+        <div className="space-y-1.5">
+          <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
+          <Input
+            {...form.register("notes")}
+            placeholder="Access, loading dock, quirks…"
+            className="bg-white/5 border-white/10 text-white h-8 text-sm placeholder:text-white/25 focus:border-white/30"
+          />
         </div>
       </td>
       <td className="px-5 py-3">
@@ -295,8 +345,14 @@ export default function Venues() {
             <tr className="border-b border-white/10">
               <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide">Name</th>
               <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden sm:table-cell">Address</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden md:table-cell w-[7.5rem]">
+                {t("venueInfo.tableColumnFiles")}
+              </th>
               <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden md:table-cell">
                 {t("venueInfo.tableColumnTitle")}
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide hidden md:table-cell max-w-[14rem]">
+                {t("venueInfo.tableColumnNotes")}
               </th>
               <th className="px-5 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wide w-20"></th>
             </tr>
@@ -304,7 +360,7 @@ export default function Venues() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={4} className="px-5 py-8">
+                <td colSpan={6} className="px-5 py-8">
                   <div className="space-y-3">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <Skeleton key={i} className="h-8 w-full bg-white/5" />
@@ -314,13 +370,13 @@ export default function Venues() {
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={4} className="px-5 py-10 text-center text-red-400 text-sm">
+                <td colSpan={6} className="px-5 py-10 text-center text-red-400 text-sm">
                   Failed to load venues.
                 </td>
               </tr>
             ) : (venues ?? []).length === 0 && !showAddForm ? (
               <tr>
-                <td colSpan={4} className="px-5 py-10 text-center text-white/30 text-sm">
+                <td colSpan={6} className="px-5 py-10 text-center text-white/30 text-sm">
                   No venues yet.
                 </td>
               </tr>

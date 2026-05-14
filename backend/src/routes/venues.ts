@@ -50,7 +50,8 @@ function serializeVenue(
     createdAt: Date;
     updatedAt: Date;
   },
-  documentCount?: number
+  documentCount?: number,
+  documentThumbnails?: Array<{ id: string; kind: string; filename: string; mimeType: string }>
 ) {
   const { organizationId: _org, ...rest } = venue;
   return {
@@ -59,6 +60,16 @@ function serializeVenue(
     createdAt: venue.createdAt.toISOString(),
     updatedAt: venue.updatedAt.toISOString(),
     ...(documentCount !== undefined ? { documentCount } : {}),
+    ...(documentThumbnails !== undefined
+      ? {
+          documentThumbnails: documentThumbnails.map((d) => ({
+            id: d.id,
+            kind: normalizeVenueDocKind(d.kind),
+            filename: d.filename,
+            mimeType: d.mimeType,
+          })),
+        }
+      : {}),
   };
 }
 
@@ -98,12 +109,19 @@ venuesRouter.get("/venues", async (c) => {
   const venues = await prisma.venue.findMany({
     where: { organizationId: user.organizationId },
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { documents: true } } },
+    include: {
+      _count: { select: { documents: true } },
+      documents: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { id: true, kind: true, filename: true, mimeType: true },
+      },
+    },
   });
   return c.json({
     data: venues.map((v) => {
-      const { _count, ...row } = v;
-      return serializeVenue(row, _count.documents);
+      const { _count, documents, ...row } = v;
+      return serializeVenue(row, _count.documents, documents);
     }),
   });
 });
