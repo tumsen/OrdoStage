@@ -178,8 +178,8 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
             onSeatModelChange={setSeatModel}
             afterModelControls={
               <>
-                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
-                  <Label className="text-[11px] font-medium text-white/50">Due (1–30 d)</Label>
+                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                  <Label className="text-[11px] font-medium text-white/50">Invoice due days (1–30)</Label>
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -189,8 +189,8 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
                     className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
                   />
                 </div>
-                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
-                  <Label className="text-[11px] font-medium text-white/50">Trial (d)</Label>
+                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                  <Label className="text-[11px] font-medium text-white/50">Trial period (days)</Label>
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -200,8 +200,8 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
                     className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
                   />
                 </div>
-                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
-                  <Label className="text-[11px] font-medium text-white/50">Grace (d)</Label>
+                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                  <Label className="text-[11px] font-medium text-white/50">Grace after invoice due (days)</Label>
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -216,10 +216,11 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
           />
 
           <p className="text-[10px] text-white/40 leading-relaxed">
-            <span className="text-white/55">Due</span> — days after issue until due.{" "}
-            <span className="text-white/55">Trial</span> — from org creation; unpaid invoices do not force read-only
-            until trial ends (0 = none). <span className="text-white/55">Grace</span> — extra days after due before
-            read-only (0 = none).
+            <span className="text-white/55">Invoice due days</span> — days after issue until due.{" "}
+            <span className="text-white/55">Trial period</span> — from org creation; unpaid invoices do not force
+            read-only until trial ends (0 = none).{" "}
+            <span className="text-white/55">Grace after invoice due</span> — extra days after due before read-only (0 =
+            none).
           </p>
         </CardContent>
       </Card>
