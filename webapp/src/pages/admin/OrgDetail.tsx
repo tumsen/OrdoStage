@@ -238,10 +238,10 @@ function BillingTab({ org }: { org: OrgDetail }) {
             <p className="text-sm text-white/70">Custom organization pricing</p>
             <Input placeholder="Billing currency (e.g. EUR, USD, DKK)" value={form.billingCurrencyCode} onChange={(e) => setForm((p) => ({ ...p, billingCurrencyCode: e.target.value.toUpperCase() }))} />
             <div>
-              <Label className="text-xs text-white/50">Custom per-user daily rate ({org.estimatedCurrencyCode}, optional)</Label>
+              <Label className="text-xs text-white/50">Custom per-seat monthly rate ({org.estimatedCurrencyCode}, optional)</Label>
               <Input
                 className="mt-1"
-                placeholder="Leave empty to use global table rate"
+                placeholder="Leave empty to use global monthly table rate"
                 value={form.customUserDailyRateMajor}
                 onChange={(e) => setForm((p) => ({ ...p, customUserDailyRateMajor: e.target.value }))}
               />

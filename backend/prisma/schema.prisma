@@ -93,7 +93,7 @@ model Organization {
   customDiscountPercent   Int?
   customFlatRateCents     Int?
   customFlatRateMaxUsers  Int?
-  /** When set, postpaid estimates use this per-user daily rate (cents) instead of the global currency table. */
+  /** When set, postpaid uses this per-seat monthly rate (cents) instead of the global table (legacy field name). */
   customUserDailyRateCents Int?
   /** Optional JSON for owner-admin seat calculator: tier {base,start,floor,floorAt}, yearlyDiscountPercent, yearlyDiscountApply. */
   customSeatCalculatorJson String?
@@ -143,6 +143,7 @@ model BillingConfig {
 
 model BillingCurrencyPrice {
   currencyCode       String   @id
+  /** Per-seat monthly price in cents (legacy column name `userDailyRateCents`). */
   userDailyRateCents Int
   nextMonthUserDailyRateCents Int?
   followBaseCurrency Boolean  @default(false)
@@ -157,7 +158,9 @@ model BillingUsageSnapshot {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   snapshotDate   DateTime
+  /** Billable members that UTC day (legacy column name). */
   activeUsers    Int
+  /** Per-seat monthly rate in cents at snapshot time (legacy column name). */
   userDailyRateCents Int
   currencyCode    String       @default("EUR")
   createdAt      DateTime @default(now())

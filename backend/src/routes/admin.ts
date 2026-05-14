@@ -9,6 +9,9 @@ import { ensureSystemRoles } from "../effectiveRole";
 import { env, isDeployedRuntime } from "../env";
 import { findUserByEmailLoose } from "../findUserByEmail";
 import {
+  BILLING_CURRENCY_CODE,
+  countBillableMemberUserIdsInUtcRange,
+  currentUtcMonthRange,
   estimateMonthlyOrgAmountCents,
   generateMonthlyInvoices,
   getCurrencyPriceMap,
@@ -60,22 +63,28 @@ app.get("/admin/stats", async (c) => {
       getCurrencyPriceMap(prisma),
     ]);
   const now = new Date();
-  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
-  const fallbackRate = currencyPrices.USD ?? 1500;
+  const { start: monthStart, endExclusive: monthEnd } = currentUtcMonthRange(now);
+  const fallbackRate = currencyPrices[BILLING_CURRENCY_CODE] ?? 1500;
   const expectedIncomeByCurrencyCents: Record<string, number> = {};
   for (const currency of SUPPORTED_BILLING_CURRENCIES) expectedIncomeByCurrencyCents[currency] = 0;
-  for (const org of orgs) {
-    const currency = (org.billingCurrencyCode || "USD").toUpperCase();
-    const estimate = estimateMonthlyOrgAmountCents({
-      activeUsers: org.memberships.length,
-      daysInMonth,
-      userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
-      customUserDailyRateCents: org.customUserDailyRateCents,
-      customDiscountPercent: org.customDiscountPercent,
-      customFlatRateCents: org.customFlatRateCents,
-      customFlatRateMaxUsers: org.customFlatRateMaxUsers,
-    });
-    expectedIncomeByCurrencyCents[currency] = (expectedIncomeByCurrencyCents[currency] ?? 0) + estimate;
+  const orgEstimates = await Promise.all(
+    orgs.map(async (org) => {
+      const billable = await countBillableMemberUserIdsInUtcRange(prisma, org.id, monthStart, monthEnd);
+      const currency = BILLING_CURRENCY_CODE;
+      const estimate = estimateMonthlyOrgAmountCents({
+        billableUsers: billable.size,
+        perUserMonthlyRateCents: currencyPrices[currency] ?? fallbackRate,
+        customUserMonthlyRateCents: org.customUserDailyRateCents,
+        customDiscountPercent: org.customDiscountPercent,
+        customFlatRateCents: org.customFlatRateCents,
+        customFlatRateMaxUsers: org.customFlatRateMaxUsers,
+        activeMemberCount: org.memberships.length,
+      });
+      return { currency, estimate };
+    }),
+  );
+  for (const row of orgEstimates) {
+    expectedIncomeByCurrencyCents[row.currency] = (expectedIncomeByCurrencyCents[row.currency] ?? 0) + row.estimate;
   }
 
   return c.json({
@@ -392,22 +401,24 @@ app.get("/admin/orgs", async (c) => {
     },
   }), getCurrencyPriceMap(prisma)]);
   const now = new Date();
-  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
-  const fallbackRate = currencyPrices.USD ?? 1500;
-  const data = orgs.map((org) => {
-    const currency = (org.billingCurrencyCode || "USD").toUpperCase();
-    const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
-      activeUsers: org._count.memberships,
-      daysInMonth,
-      userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
-      customUserDailyRateCents: org.customUserDailyRateCents,
-      customDiscountPercent: org.customDiscountPercent,
-      customFlatRateCents: org.customFlatRateCents,
-      customFlatRateMaxUsers: org.customFlatRateMaxUsers,
-    });
-    return { ...org, estimatedMonthlyCents, estimatedCurrencyCode: currency };
-  });
-  return c.json({ data });
+  const { start: monthStart, endExclusive: monthEnd } = currentUtcMonthRange(now);
+  const fallbackRate = currencyPrices[BILLING_CURRENCY_CODE] ?? 1500;
+  const enriched = await Promise.all(
+    orgs.map(async (org) => {
+      const billable = await countBillableMemberUserIdsInUtcRange(prisma, org.id, monthStart, monthEnd);
+      const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
+        billableUsers: billable.size,
+        perUserMonthlyRateCents: currencyPrices[BILLING_CURRENCY_CODE] ?? fallbackRate,
+        customUserMonthlyRateCents: org.customUserDailyRateCents,
+        customDiscountPercent: org.customDiscountPercent,
+        customFlatRateCents: org.customFlatRateCents,
+        customFlatRateMaxUsers: org.customFlatRateMaxUsers,
+        activeMemberCount: org._count.memberships,
+      });
+      return { ...org, estimatedMonthlyCents, estimatedCurrencyCode: BILLING_CURRENCY_CODE };
+    }),
+  );
+  return c.json({ data: enriched });
 });
 
 app.post("/admin/orgs", async (c) => {
@@ -512,19 +523,19 @@ app.get("/admin/orgs/:id", async (c) => {
     isActive: m.user.isActive,
   }));
 
-  const currency = (org.billingCurrencyCode || "USD").toUpperCase();
   const now = new Date();
-  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
-  const fallbackRate = currencyPrices.USD ?? 1500;
+  const { start: monthStart, endExclusive: monthEnd } = currentUtcMonthRange(now);
+  const fallbackRate = currencyPrices[BILLING_CURRENCY_CODE] ?? 1500;
+  const billable = await countBillableMemberUserIdsInUtcRange(prisma, org.id, monthStart, monthEnd);
   const billingDefaults = await getBillingConfig(prisma);
   const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
-    activeUsers: org.memberships.length,
-    daysInMonth,
-    userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
-    customUserDailyRateCents: org.customUserDailyRateCents,
+    billableUsers: billable.size,
+    perUserMonthlyRateCents: currencyPrices[BILLING_CURRENCY_CODE] ?? fallbackRate,
+    customUserMonthlyRateCents: org.customUserDailyRateCents,
     customDiscountPercent: org.customDiscountPercent,
     customFlatRateCents: org.customFlatRateCents,
     customFlatRateMaxUsers: org.customFlatRateMaxUsers,
+    activeMemberCount: org.memberships.length,
   });
   const { memberships: _m, ...rest } = org;
   return c.json({
@@ -532,7 +543,7 @@ app.get("/admin/orgs/:id", async (c) => {
       ...rest,
       users,
       estimatedMonthlyCents,
-      estimatedCurrencyCode: currency,
+      estimatedCurrencyCode: BILLING_CURRENCY_CODE,
       seatCalculatorDefaults: {
         yearlyDiscountPercent: billingDefaults.yearlyDiscountPercent,
         yearlyDiscountEnabled: billingDefaults.yearlyDiscountEnabled,

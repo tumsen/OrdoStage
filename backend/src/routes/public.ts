@@ -85,6 +85,7 @@ publicRouter.get("/pricing", async (c) => {
     prisma.billingCurrencyPrice.findMany(),
   ]);
 
+  // `userDailyRateCents` in JSON is legacy; value is per-seat monthly price in cents.
   const byCurrency = new Map(priceRows.map((r) => [r.currencyCode.toUpperCase(), r.userDailyRateCents]));
   const eurCents = byCurrency.get("EUR") ?? 0;
 

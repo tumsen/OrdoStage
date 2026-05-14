@@ -45,11 +45,9 @@ export default function PublicPricing() {
     refetchOnReconnect: true,
   });
 
-  const eurDailyCents =
+  /** API field name is legacy; value is per-user monthly price in cents. */
+  const eurPerUserMonthCents =
     publicPricing?.prices.find((p) => p.currencyCode === "EUR")?.userDailyRateCents ?? 0;
-  const now = new Date();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const perUserMonthlyCents = eurDailyCents * daysInMonth;
 
   return (
     <div className="text-white">
@@ -58,19 +56,19 @@ export default function PublicPricing() {
         {/* Hero */}
         <header className="space-y-6">
           <div className="space-y-1">
-            <p className="text-sm uppercase tracking-wide text-white/60">Price per user</p>
+            <p className="text-sm uppercase tracking-wide text-white/60">Price per billable user</p>
             <p className="text-3xl md:text-4xl font-bold text-white">
-              EUR {formatMajorFromCents(eurDailyCents)} / day
+              EUR {formatMajorFromCents(eurPerUserMonthCents)} / month
             </p>
             <p className="text-lg md:text-xl text-white/80">
-              EUR {formatMajorFromCents(perUserMonthlyCents)} / month
+              Full month when someone has jobs, event work, or logged work time in that month.
             </p>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">
             {pricingTitle}
           </h1>
           <p className="text-lg md:text-xl text-white/75 leading-relaxed">
-            Monthly postpaid billing in euros, based on real usage days.
+            Monthly postpaid billing in euros: only members with billable activity in a month are charged for that month.
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
@@ -90,8 +88,8 @@ export default function PublicPricing() {
           <div className="space-y-1">
             <h2 className="text-xl md:text-2xl font-semibold text-white">Pricing calculator</h2>
             <p className="text-sm text-white/60 leading-relaxed">
-              Estimates use an illustrative tiered EUR pricing model. Billable users are people who are on a job, logged
-              time, created an event, or scheduled an event—everyone else does not count toward your seat total.
+              Estimates use an illustrative tiered EUR model. Real invoices use the flat per-seat monthly rate for each
+              member who had assigned jobs, show staffing, event edits, or work time entries in that calendar month.
             </p>
           </div>
           <TieredSeatPricingCalculator
@@ -104,8 +102,9 @@ export default function PublicPricing() {
         <section className="space-y-4">
           <h2 className="text-xl md:text-2xl font-semibold text-white">How postpaid billing works</h2>
           <p className="text-white/75 leading-relaxed">
-            Every active user contributes usage days. We total those usage days for the month and bill
-            based on your actual usage.
+            Each billable member in a calendar month is charged one full seat for that month. Someone is billable if they
+            had assigned show jobs, show staffing, event team activity (notes or documents they created), or work time
+            entries in that month.
           </p>
           <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-yellow">
             <li>Invoice generated on the 1st for the previous month</li>
@@ -129,7 +128,7 @@ export default function PublicPricing() {
               If an invoice is overdue after the grace period, your account switches to view-only mode
               until payment is completed.
             </li>
-            <li>Detailed invoice breakdowns can include per-user consumed days.</li>
+            <li>Invoice PDFs list each billed member for that month (one seat per billable member).</li>
           </ul>
           <p className="text-lg md:text-xl font-semibold leading-snug bg-gradient-to-r from-ordo-magenta via-ordo-yellow to-ordo-violet bg-clip-text text-transparent">
             Pay for what you use. Stop when you don't.

@@ -84,7 +84,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
       }
       const currentTrim = eurCurrent.trim();
       if (!currentTrim) {
-        throw new Error("Enter the current EUR daily rate.");
+        throw new Error("Enter the current EUR per-seat monthly rate.");
       }
       const nextTrim = eurNext.trim();
       const currencyPrices = [
@@ -107,7 +107,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
       await queryClient.refetchQueries({ queryKey: ["public-pricing-rates"], type: "all" });
       toast({
         title: "Pricing updated",
-        description: "Global billing defaults are saved. The public pricing page will refetch the latest rates.",
+        description: "Global billing defaults are saved. Public pricing shows the updated per-seat monthly rate.",
       });
     },
     onError: (err) => {
@@ -119,7 +119,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
   const snapshotMutation = useMutation({
     mutationFn: () => api.post("/api/admin/billing/snapshot"),
     onSuccess: () => {
-      toast({ title: "Snapshot completed", description: "Daily usage snapshots updated." });
+      toast({ title: "Snapshot completed", description: "Billing activity snapshots updated." });
     },
   });
 
@@ -138,8 +138,8 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-xs text-white/55">
-            Illustrative tiered model for projections. Adjust inputs to explore scenarios; the EUR postpaid daily rates
-            below remain the source of truth for invoicing.
+            Illustrative tiered model for projections. The EUR per-seat monthly rate below is what invoices use for each
+            billable member in a month (jobs, staffing, event edits, work time).
           </p>
           <TieredSeatPricingCalculator
             showModelControls
@@ -155,7 +155,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
       <Card className="bg-gray-900 border border-white/10">
         <CardHeader className="flex flex-col gap-3 space-y-0 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-white">EUR billing rates</CardTitle>
+            <CardTitle className="text-white">EUR billing (per seat / month)</CardTitle>
             <p className="mt-1 text-xs text-white/50">
               Edit amounts below, then press <span className="text-white/80">Save pricing</span>. All billing is in
               euros.
@@ -174,7 +174,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 max-w-xl">
             <div className="space-y-1">
-              <p className="text-xs text-white/50">Current daily rate (EUR)</p>
+              <p className="text-xs text-white/50">Per-seat monthly rate (EUR)</p>
               <Input
                 type="text"
                 inputMode="decimal"
@@ -185,7 +185,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
               />
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-white/50">Next month daily rate (EUR, optional)</p>
+              <p className="text-xs text-white/50">Next month per-seat rate (EUR, optional)</p>
               <Input
                 type="text"
                 inputMode="decimal"
@@ -228,7 +228,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           <Button variant="outline" onClick={() => snapshotMutation.mutate()} disabled={snapshotMutation.isPending}>
-            {snapshotMutation.isPending ? "Running..." : "Run daily usage snapshot"}
+            {snapshotMutation.isPending ? "Running..." : "Run billing activity snapshot"}
           </Button>
           <Button variant="outline" onClick={() => invoiceMutation.mutate()} disabled={invoiceMutation.isPending}>
             {invoiceMutation.isPending ? "Running..." : "Generate previous month invoices"}

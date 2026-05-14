@@ -42,7 +42,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
       {!embedded ? (
         <div>
           <h2 className="text-2xl font-bold text-white">Billing</h2>
-          <p className="text-gray-400 mt-1 text-sm">Postpaid: billed monthly for real usage days, due within {org?.paymentDueDays ?? 7} days.</p>
+          <p className="text-gray-400 mt-1 text-sm">Postpaid: monthly invoice for the previous calendar month—one seat per member with billable activity (jobs, staffing, event edits, work time), due within {org?.paymentDueDays ?? 7} days.</p>
         </div>
       ) : null}
       <Card className="bg-gray-900 border-white/10">
@@ -56,7 +56,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
           {isLoading ? (
             <p className="text-sm text-white/50">Loading...</p>
           ) : !org?.openInvoice ? (
-            <p className="text-sm text-white/50">No open invoice. Next billing run will create one from usage snapshots.</p>
+            <p className="text-sm text-white/50">No open invoice. The next billing run creates one from billable activity in the closed month.</p>
           ) : (
             <div className="space-y-2">
               <p className="text-sm text-white">Status: <span className="text-white/70">{org.openInvoice.status}</span></p>
@@ -75,9 +75,9 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-white">
-              Based on current active users and this month&apos;s pricing:
+              Based on billable members so far this month and your per-seat monthly rate:
               <span className="ml-1 text-white/80">
-                {org.estimatedCurrencyCode || org.billingCurrencyCode || "USD"} {(org.estimatedMonthlyCents / 100).toFixed(2)}
+                {org.estimatedCurrencyCode || org.billingCurrencyCode || "EUR"} {(org.estimatedMonthlyCents / 100).toFixed(2)}
               </span>
             </p>
           </CardContent>

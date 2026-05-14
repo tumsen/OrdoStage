@@ -9,6 +9,9 @@ import { wipeOrganizationCompletely } from "../deleteOrganizationWipe";
 import { verifyUserCredentialPassword } from "../verifyCredentialPassword";
 import { DistanceUnitSchema, LanguageSchema, TimeFormatSchema } from "../types";
 import {
+  BILLING_CURRENCY_CODE,
+  countBillableMemberUserIdsInUtcRange,
+  currentUtcMonthRange,
   enforceOverdueAccess,
   estimateMonthlyOrgAmountCents,
   getBillingConfig,
@@ -366,18 +369,18 @@ app.get("/org", async (c) => {
     return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
   }
 
-  const currency = (org.billingCurrencyCode || "USD").toUpperCase();
   const now = new Date();
-  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
-  const fallbackRate = currencyPrices.USD ?? 1500;
+  const { start: monthStart, endExclusive: monthEnd } = currentUtcMonthRange(now);
+  const billable = await countBillableMemberUserIdsInUtcRange(prisma, user.organizationId, monthStart, monthEnd);
+  const fallbackRate = currencyPrices[BILLING_CURRENCY_CODE] ?? 1500;
   const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
-    activeUsers: activeUserCount,
-    daysInMonth,
-    userDailyRateCents: currencyPrices[currency] ?? fallbackRate,
-    customUserDailyRateCents: org.customUserDailyRateCents,
+    billableUsers: billable.size,
+    perUserMonthlyRateCents: currencyPrices[BILLING_CURRENCY_CODE] ?? fallbackRate,
+    customUserMonthlyRateCents: org.customUserDailyRateCents,
     customDiscountPercent: org.customDiscountPercent,
     customFlatRateCents: org.customFlatRateCents,
     customFlatRateMaxUsers: org.customFlatRateMaxUsers,
+    activeMemberCount: activeUserCount,
   });
 
   return c.json({
@@ -385,7 +388,7 @@ app.get("/org", async (c) => {
       ...org,
       userCount: activeUserCount,
       estimatedMonthlyCents,
-      estimatedCurrencyCode: currency,
+      estimatedCurrencyCode: BILLING_CURRENCY_CODE,
       isViewOnlyDueToBilling: viewOnly,
       billingStatus: org.billingStatus,
       paymentDueDays: billingConfig.paymentDueDays,
