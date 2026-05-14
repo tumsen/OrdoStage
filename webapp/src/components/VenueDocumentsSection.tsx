@@ -111,7 +111,7 @@ export function VenueDocumentsSection({
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+    <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
       <Label className="text-white/50 text-xs uppercase tracking-wide">Drawings &amp; photos</Label>
       <p className="text-[10px] text-white/35 leading-snug">
         {readOnly
@@ -137,7 +137,7 @@ export function VenueDocumentsSection({
               />
               <Badge
                 variant="outline"
-                className="shrink-0 border-white/15 text-white/70 text-[10px] font-normal"
+                className="shrink-0 border-white/10 text-white/70 text-[10px] font-normal"
               >
                 {kindLabel(d.kind)}
               </Badge>
@@ -169,7 +169,7 @@ export function VenueDocumentsSection({
         </ul>
       )}
       {canWrite && !readOnly ? (
-        <div className="space-y-2 pt-1 border-t border-white/5">
+        <div className="space-y-2 pt-1 border-t border-white/10">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="space-y-1.5">
               <Label className="text-white/45 text-[10px] uppercase tracking-wide">File type</Label>
@@ -198,7 +198,7 @@ export function VenueDocumentsSection({
             </div>
           </div>
           <div
-            className="rounded-md border border-dashed border-white/15 bg-white/[0.02] p-2"
+            className="rounded-md border border-dashed border-white/10 bg-white/[0.03] p-2"
             onDragOver={(e) => {
               e.preventDefault();
             }}
@@ -223,7 +223,7 @@ export function VenueDocumentsSection({
             type="button"
             size="sm"
             variant="outline"
-            className="h-8 border-white/15 bg-white/5 text-white/85 hover:bg-white/10 gap-1.5"
+            className="h-8 border-white/10 bg-white/5 text-white/85 hover:bg-white/10 gap-1.5"
             onClick={() => fileRef.current?.click()}
           >
             <FileUp className="h-3.5 w-3.5" />

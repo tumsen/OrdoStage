@@ -69,10 +69,10 @@ export default function VenueEdit() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 min-h-0 flex-col p-4 md:p-8 max-w-3xl mx-auto w-full gap-6">
+      <div className="flex flex-1 min-h-0 flex-col gap-6 p-6">
         <Skeleton className="h-9 w-48 bg-white/5" />
-        <Skeleton className="h-64 w-full bg-white/5 rounded-xl" />
-        <Skeleton className="h-40 w-full bg-white/5 rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl border border-white/10 bg-white/5" />
+        <Skeleton className="h-40 w-full rounded-xl border border-white/10 bg-white/5" />
       </div>
     );
   }
@@ -81,7 +81,7 @@ export default function VenueEdit() {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-8 text-center gap-4">
         <p className="text-red-400 text-sm">Could not load this venue.</p>
-        <Button asChild variant="outline" className="border-white/15 bg-white/5 text-white">
+        <Button asChild variant="outline" className="border-white/10 bg-white/5 text-white">
           <Link to="/venues">Back to venues</Link>
         </Button>
       </div>
@@ -94,7 +94,7 @@ export default function VenueEdit() {
         <p className="text-white/50 text-sm">
           You do not have permission to edit venues. Ask an org owner for Manager access if you need to make changes.
         </p>
-        <Button asChild variant="outline" className="border-white/15 bg-white/5 text-white">
+        <Button asChild variant="outline" className="border-white/10 bg-white/5 text-white">
           <Link to="/venues">Back to venues</Link>
         </Button>
       </div>
@@ -103,8 +103,8 @@ export default function VenueEdit() {
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
-      <div className="border-b border-white/10 bg-white/[0.02] px-4 py-4 md:px-8">
-        <div className="max-w-3xl mx-auto w-full flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="shrink-0 border-b border-white/10 px-6 py-4">
+        <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <Button
               asChild
@@ -125,7 +125,7 @@ export default function VenueEdit() {
             asChild
             variant="outline"
             size="sm"
-            className="border-white/15 bg-white/5 text-white/80 hover:text-white shrink-0 self-start sm:self-center"
+            className="border-white/10 bg-white/5 text-white/80 hover:text-white shrink-0 self-start sm:self-center"
           >
             <Link to={`/venues/${venueId}`} className="gap-2">
               <CalendarDays className="h-4 w-4 opacity-70" />
@@ -136,10 +136,10 @@ export default function VenueEdit() {
       </div>
 
       <form
-        className="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8"
+        className="flex-1 overflow-y-auto p-6"
         onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))}
       >
-        <div className="max-w-3xl mx-auto w-full space-y-8 pb-24">
+        <div className="w-full space-y-8 pb-24">
           <section className="space-y-3">
             <Label htmlFor="venue-name" className="text-white/50 text-xs uppercase tracking-wide">
               Name
@@ -147,7 +147,7 @@ export default function VenueEdit() {
             <Input
               id="venue-name"
               {...form.register("name")}
-              className="bg-white/5 border-white/10 text-white h-10 text-sm focus:border-white/30 max-w-xl"
+              className="w-full bg-white/5 border-white/10 text-white h-10 text-sm focus:border-white/30"
             />
             {form.formState.errors.name && (
               <p className="text-red-400 text-xs">{form.formState.errors.name.message}</p>
@@ -156,7 +156,7 @@ export default function VenueEdit() {
 
           <section className="space-y-3">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Address</Label>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 md:p-5">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
               <AddressFields
                 value={{
                   street: form.watch("addressStreet") ?? "",
@@ -198,7 +198,7 @@ export default function VenueEdit() {
           <section className="space-y-3">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Custom fields</Label>
             <Textarea {...form.register("customFieldsText")} className="hidden" aria-hidden />
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 md:p-5">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
               <CustomFieldsEditor
                 fields={textToCustomFields(form.watch("customFieldsText"))}
                 onChange={(fields) => form.setValue("customFieldsText", customFieldsToText(fields))}

@@ -210,7 +210,7 @@ export function StageSizeFields({
   const dimErrors = [errors?.width, errors?.length, errors?.height].filter((e) => e?.message);
 
   return (
-    <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-4 md:p-5">
+    <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
       <Label className="text-white/50 text-xs uppercase tracking-wide">Stage &amp; room size</Label>
       <p className="text-[11px] text-white/35 leading-snug">
         Values are in meters: up to <span className="text-white/50">999,99</span> per field (comma or dot). The unit{" "}
@@ -305,7 +305,7 @@ export function VenueContactFields({
   errors?: FieldErrors<VenueFormValues>;
 }) {
   return (
-    <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-4 md:p-5">
+    <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
       <Label className="text-white/50 text-xs uppercase tracking-wide">Venue contact</Label>
       <p className="text-[11px] text-white/35 leading-snug">On-site or technical contact for this venue.</p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
