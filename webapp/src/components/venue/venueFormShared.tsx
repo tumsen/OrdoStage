@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { FieldErrors, UseFormRegister } from "react-hook-form";
 import { Plus, Trash2 } from "lucide-react";
 import type { Venue } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -197,30 +198,41 @@ export function CustomFieldsEditor({
 }
 
 const dimInputClass =
-  "bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30 w-[9ch] min-w-0 font-mono tabular-nums tracking-tight";
+  "min-w-0 w-full bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30 font-mono tabular-nums tracking-tight";
 
 export function StageSizeFields({
   register,
   errors,
+  hideHeader = false,
+  className,
 }: {
   register: UseFormRegister<VenueFormValues>;
   errors?: FieldErrors<VenueFormValues>;
+  /** When true, omit the card title — use an external label for a two-column layout. */
+  hideHeader?: boolean;
+  className?: string;
 }) {
   const { t } = useI18n();
   const dimErrors = [errors?.width, errors?.length, errors?.height].filter((e) => e?.message);
 
   return (
-    <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
-      <Label className="text-white/50 text-xs uppercase tracking-wide">Stage &amp; room size</Label>
-      <p className="text-[11px] text-white/35 leading-snug">
-        Values are in meters: up to <span className="text-white/50">999,99</span> per field (comma or dot). The unit{" "}
-        <span className="text-white/50">m</span> is shown beside each box — you do not need to type it unless you want
-        to.
+    <div
+      className={cn(
+        "flex min-h-0 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6",
+        className
+      )}
+    >
+      {!hideHeader ? (
+        <Label className="text-white/50 text-xs uppercase tracking-wide">Stage &amp; room size</Label>
+      ) : null}
+      <p className="text-[11px] text-white/35 leading-relaxed">
+        Meters, up to <span className="text-white/50">999,99</span> per field (comma or dot). The{" "}
+        <span className="text-white/50">m</span> suffix is optional.
       </p>
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="shrink-0 space-y-1.5">
+      <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+        <div className="min-w-0 space-y-1.5">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">{t("venueInfo.widthMetersLabel")}</Label>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <Input
               {...register("width")}
               maxLength={10}
@@ -229,14 +241,14 @@ export function StageSizeFields({
               title={dimensionHint}
               className={dimInputClass}
             />
-            <span className="select-none text-sm tabular-nums text-white/50" aria-hidden>
+            <span className="w-4 shrink-0 select-none text-center text-sm tabular-nums text-white/50" aria-hidden>
               m
             </span>
           </div>
         </div>
-        <div className="shrink-0 space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">{t("venueInfo.depthMetersLabel")}</Label>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <Input
               {...register("length")}
               maxLength={10}
@@ -245,14 +257,14 @@ export function StageSizeFields({
               title={dimensionHint}
               className={dimInputClass}
             />
-            <span className="select-none text-sm tabular-nums text-white/50" aria-hidden>
+            <span className="w-4 shrink-0 select-none text-center text-sm tabular-nums text-white/50" aria-hidden>
               m
             </span>
           </div>
         </div>
-        <div className="shrink-0 space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">{t("venueInfo.heightMetersLabel")}</Label>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <Input
               {...register("height")}
               maxLength={10}
@@ -261,7 +273,7 @@ export function StageSizeFields({
               title={dimensionHint}
               className={dimInputClass}
             />
-            <span className="select-none text-sm tabular-nums text-white/50" aria-hidden>
+            <span className="w-4 shrink-0 select-none text-center text-sm tabular-nums text-white/50" aria-hidden>
               m
             </span>
           </div>
@@ -276,17 +288,17 @@ export function StageSizeFields({
           ))}
         </div>
       ) : null}
-      <div className="space-y-1.5 pt-1">
+      <div className="mt-auto space-y-1.5 border-t border-white/10 pt-3">
         <Label className="text-white/45 text-[10px] uppercase tracking-wide">{t("venueInfo.audienceCapacityLabel")}</Label>
-        <div className="flex items-center gap-1.5 max-w-[14rem]">
+        <div className="flex min-w-0 max-w-full items-center gap-2">
           <Input
             {...register("capacity")}
             type="number"
             min={0}
             placeholder="e.g. 500"
-            className="max-w-[10rem] bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30"
+            className="h-9 min-w-0 flex-1 bg-white/5 border-white/10 text-white text-sm focus:border-white/30"
           />
-          <span className="select-none text-sm tabular-nums text-white/50 shrink-0" aria-hidden>
+          <span className="shrink-0 select-none text-sm tabular-nums text-white/50" aria-hidden>
             {t("venueInfo.capacityInputSuffix")}
           </span>
         </div>
