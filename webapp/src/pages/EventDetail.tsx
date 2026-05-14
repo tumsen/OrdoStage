@@ -1773,6 +1773,7 @@ function EventDocumentsSection({ event }: { event: EventDetail }) {
                 mimeType={doc.mimeType}
                 filename={doc.filename}
                 preferImage={doc.mimeType.startsWith("image/")}
+                name={doc.name}
               />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-white/90">{doc.name}</div>
@@ -3439,12 +3440,19 @@ function TeamsTab({ event }: { event: EventDetail }) {
             <p className="text-sm text-white/35">No documents for selected team.</p>
           ) : (
             documents.map((doc) => (
-              <div key={doc.id} className="flex items-center justify-between rounded border border-white/10 bg-white/[0.03] px-3 py-2">
-                <div className="min-w-0">
+              <div key={doc.id} className="flex items-center gap-3 rounded border border-white/10 bg-white/[0.03] px-3 py-2">
+                <DocumentListThumbnail
+                  downloadUrl={`${backendBase}/api/events/${event.id}/team-documents/${doc.id}/download`}
+                  mimeType={doc.mimeType}
+                  filename={doc.filename}
+                  preferImage={doc.mimeType.startsWith("image/")}
+                  name={doc.name}
+                />
+                <div className="min-w-0 flex-1">
                   <p className="text-sm text-white/85 truncate">{doc.name}</p>
                   <p className="text-xs text-white/45">{doc.type} · {formatDate(doc.createdAt)}</p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1">
                   <a href={`${backendBase}/api/events/${event.id}/team-documents/${doc.id}/download`} target="_blank" rel="noreferrer">
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-white/25 hover:text-white">
                       <Download size={13} />

@@ -119,6 +119,7 @@ function VenueDocRow({
           mimeType={doc.mimeType}
           filename={doc.filename}
           preferImage={isImagePreviewDoc(doc)}
+          name={doc.name}
         />
         {editable ? (
           <Select value={kind} onValueChange={(v) => setKind(v as VenueDocKind)}>

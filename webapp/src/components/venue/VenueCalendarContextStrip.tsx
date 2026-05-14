@@ -2,16 +2,15 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import JSZip from "jszip";
-import { Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 
+import { DocumentListThumbnail, triggerBlobDownload } from "@/components/DocumentListThumbnail";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { formatVenueCapacityDisplay, formatVenueDimensionMetersDisplay } from "@/lib/venueDisplay";
 import type { Venue, VenueDocument } from "@/lib/types";
 import { appleMapsUrl, formatAddress, googleMapsUrl } from "@/components/AddressFields";
 import { Button } from "@/components/ui/button";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -49,18 +48,6 @@ function uniqueFileName(base: string, used: Set<string>): string {
   return n;
 }
 
-function triggerBlobDownload(blob: Blob, filename: string) {
-  const a = document.createElement("a");
-  const href = URL.createObjectURL(blob);
-  a.href = href;
-  a.download = filename;
-  a.rel = "noreferrer";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(href);
-}
-
 function isImageDoc(d: VenueDocument): boolean {
   return d.kind === "image" || (d.mimeType?.startsWith("image/") ?? false);
 }
@@ -86,102 +73,6 @@ function LabeledRows({
         ))}
       </dl>
     </div>
-  );
-}
-
-function DocThumb({ doc }: { doc: VenueDocument }) {
-  const [imgErr, setImgErr] = useState(false);
-  const [previewErr, setPreviewErr] = useState(false);
-  const url = documentDownloadUrl(doc.id);
-  const tryImg = isImageDoc(doc) && !imgErr;
-
-  const handleDownload = useCallback(
-    async (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        const res = await api.raw(documentDownloadPath(doc.id));
-        if (!res.ok) throw new Error(String(res.status));
-        const blob = await res.blob();
-        triggerBlobDownload(blob, doc.filename || doc.name || "download");
-      } catch {
-        toast.error("Download failed");
-      }
-    },
-    [doc.filename, doc.id, doc.name],
-  );
-
-  return (
-    <HoverCard openDelay={100} closeDelay={280}>
-      <HoverCardTrigger asChild>
-        <button
-          type="button"
-          title={`${doc.name} (${doc.filename}) — hover for preview`}
-          aria-label={`Preview ${doc.name}`}
-          className="group relative flex h-[4.75rem] w-[4.75rem] shrink-0 flex-col overflow-hidden rounded-md border border-white/10 bg-white/[0.04] text-left hover:border-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45"
-        >
-          {tryImg ? (
-            <img
-              src={url}
-              alt=""
-              className="h-full w-full object-cover"
-              loading="lazy"
-              onError={() => setImgErr(true)}
-            />
-          ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-1.5">
-              <FileText className="h-5 w-5 shrink-0 text-white/45" aria-hidden />
-              <span className="line-clamp-2 text-center text-[9px] leading-tight text-white/55">{doc.name}</span>
-            </div>
-          )}
-          {tryImg ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 line-clamp-1 bg-gradient-to-t from-black/80 to-transparent px-1 pb-1 pt-3 text-[9px] text-white/90 opacity-0 transition-opacity group-hover:opacity-100">
-              {doc.name}
-            </div>
-          ) : null}
-        </button>
-      </HoverCardTrigger>
-      <HoverCardContent
-        side="top"
-        align="center"
-        sideOffset={8}
-        className="w-auto max-w-[min(92vw,26rem)] border-white/10 bg-[#14141a] p-3 text-white shadow-xl"
-      >
-        <div className="overflow-hidden rounded-md border border-white/10 bg-black/50">
-          {tryImg && !previewErr ? (
-            <img
-              src={url}
-              alt=""
-              className="max-h-[min(70vh,22rem)] w-full max-w-full object-contain"
-              loading="eager"
-              onError={() => setPreviewErr(true)}
-            />
-          ) : (
-            <div className="flex min-h-[9rem] flex-col items-center justify-center gap-2 px-6 py-8">
-              <FileText className="h-12 w-12 text-white/35" aria-hidden />
-              <span className="max-w-[18rem] text-center text-xs leading-snug text-white/65">{doc.name}</span>
-              {tryImg && previewErr ? (
-                <span className="text-center text-[10px] text-white/40">Preview unavailable — use Download.</span>
-              ) : null}
-            </div>
-          )}
-        </div>
-        <div className="mt-2 space-y-1">
-          <p className="line-clamp-2 text-[11px] font-medium text-white/90">{doc.name}</p>
-          <p className="truncate text-[10px] text-white/40">{doc.filename}</p>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            className="mt-1.5 w-full gap-2 bg-white/10 text-white hover:bg-white/15"
-            onClick={handleDownload}
-          >
-            <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Download
-          </Button>
-        </div>
-      </HoverCardContent>
-    </HoverCard>
   );
 }
 
@@ -513,7 +404,15 @@ export function VenueCalendarContextStrip({
         ) : (
           <div className="-mx-0.5 flex gap-2 overflow-x-auto px-0.5 pb-0.5">
             {docList.map((d) => (
-              <DocThumb key={d.id} doc={d} />
+              <DocumentListThumbnail
+                key={d.id}
+                downloadUrl={documentDownloadUrl(d.id)}
+                mimeType={d.mimeType ?? ""}
+                filename={d.filename || d.name || "download"}
+                preferImage={isImageDoc(d)}
+                name={d.name}
+                sizeClassName="h-[4.75rem] w-[4.75rem]"
+              />
             ))}
           </div>
         )}

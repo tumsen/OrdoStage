@@ -56,6 +56,7 @@ import {
   type PersonDocumentListRowHandle,
   type PersonDocumentSavePatch,
 } from "@/components/PersonDocumentListRow";
+import { RemoteImageHoverPreview } from "@/components/DocumentListThumbnail";
 import {
   DocumentPermissionsForm,
   normalizeDocumentPermissions,
@@ -1055,10 +1056,11 @@ function PersonFormDialog({
                 Upload a profile image (jpg/png/webp). For new people, the image is uploaded right after you click Add Person.
               </p>
               {person?.hasPhoto ? (
-                <img
+                <RemoteImageHoverPreview
                   src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
                   alt={`${person.name} profile`}
-                  className="h-24 w-24 rounded-md object-cover border border-white/10"
+                  triggerClassName="h-24 w-24 rounded-md border border-white/10 bg-black/20 p-0 shadow-none"
+                  triggerImgClassName="h-full w-full object-cover"
                 />
               ) : null}
               <Input
@@ -1375,10 +1377,12 @@ function PersonCard({
       {/* Avatar */}
       <div className="w-14 h-14 rounded-full overflow-hidden bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
         {person.hasPhoto ? (
-          <img
+          <RemoteImageHoverPreview
             src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
             alt={person.name}
-            className="h-full w-full object-cover"
+            triggerClassName="h-full w-full rounded-full border-0 bg-transparent p-0 ring-0 shadow-none hover:border-white/20"
+            triggerImgClassName="h-full w-full object-cover"
+            title={person.name}
           />
         ) : (
           <User size={21} className="text-white/30" />

@@ -125,22 +125,14 @@ function VenueRow({
             <span className="text-[11px] text-white/25">—</span>
           ) : (
             (venue.documentThumbnails ?? []).map((d) => (
-              <a
+              <DocumentListThumbnail
                 key={d.id}
-                href={venueDocThumbDownloadUrl(d.id)}
-                target="_blank"
-                rel="noreferrer"
-                className="shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-                title={`${d.filename} — open`}
-              >
-                <DocumentListThumbnail
-                  downloadUrl={venueDocThumbDownloadUrl(d.id)}
-                  mimeType={d.mimeType}
-                  filename={d.filename}
-                  preferImage={isVenueThumbImage(d.kind, d.mimeType)}
-                  sizeClassName="h-9 w-9"
-                />
-              </a>
+                downloadUrl={venueDocThumbDownloadUrl(d.id)}
+                mimeType={d.mimeType}
+                filename={d.filename}
+                preferImage={isVenueThumbImage(d.kind, d.mimeType)}
+                sizeClassName="h-9 w-9"
+              />
             ))
           )}
         </div>

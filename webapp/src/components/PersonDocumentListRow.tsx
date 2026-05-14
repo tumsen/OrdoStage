@@ -15,6 +15,7 @@ import type { PersonDocument } from "../../../backend/src/types";
 import { formatDateForDateInput, getPersonDocumentExpiryInfo } from "@/lib/personDocumentExpiry";
 import { PERSON_DOCUMENT_TYPE_OPTIONS, personDocumentTypeLabel } from "@/lib/personDocumentTypes";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
+import { DocumentListThumbnail } from "@/components/DocumentListThumbnail";
 
 const backendBase = () => import.meta.env.VITE_BACKEND_URL || "";
 
@@ -111,6 +112,14 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
 
   return (
     <div className="flex flex-col gap-2 px-2 py-2 text-xs border-b border-white/5 last:border-0 w-full min-w-0 sm:flex-row sm:items-center sm:gap-2">
+      <DocumentListThumbnail
+        downloadUrl={`${backendBase()}/api/people/documents/${doc.id}/download`}
+        mimeType={doc.mimeType}
+        filename={doc.filename}
+        preferImage={doc.mimeType.startsWith("image/")}
+        name={doc.name}
+        sizeClassName="h-10 w-10"
+      />
       <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
         {canEdit ? (
           <Input

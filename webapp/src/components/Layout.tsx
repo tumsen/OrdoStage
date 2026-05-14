@@ -32,6 +32,7 @@ import { OrgWorkspaceMenu } from "@/components/OrgWorkspaceMenu";
 import { WorkAnnouncementBar } from "@/components/WorkAnnouncementBar";
 import { useI18n } from "@/lib/i18n";
 import type { Person } from "../../../backend/src/types";
+import { RemoteImageHoverPreview } from "@/components/DocumentListThumbnail";
 
 interface OrgData {
   id: string;
@@ -225,10 +226,12 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
           <div className="flex items-start gap-2.5 px-3 py-2">
             <div className="w-9 h-9 rounded-full bg-ordo-violet/45 ring-1 ring-ordo-magenta/25 flex items-center justify-center flex-shrink-0 overflow-hidden">
               {photoSrc ? (
-                <img
+                <RemoteImageHoverPreview
                   src={photoSrc}
-                  alt=""
-                  className="w-full h-full object-cover"
+                  alt={displayName}
+                  triggerClassName="h-full w-full rounded-full border-0 bg-transparent p-0 ring-0 shadow-none"
+                  triggerImgClassName="h-full w-full object-cover"
+                  title={displayName}
                 />
               ) : (
                 <span className="text-white text-[11px] font-semibold leading-none">{initials || "?"}</span>

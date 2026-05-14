@@ -36,6 +36,7 @@ import {
   type DocumentPermissionState,
   type DocumentPermissionOptions,
 } from "@/components/DocumentPermissionsForm";
+import { RemoteImageHoverPreview } from "@/components/DocumentListThumbnail";
 import {
   PERSON_DOCUMENT_TYPE_OPTIONS,
   personDocumentTypeLabel,
@@ -600,10 +601,11 @@ export default function Account() {
           <div className="space-y-2">
             <Label className="text-white/70 text-xs uppercase tracking-wide">Company logo</Label>
             {companyInfo?.hasCompanyLogo ? (
-              <img
+              <RemoteImageHoverPreview
                 src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/org/company-logo?ts=${companyInfo.companyLogoUpdatedAt ?? ""}`}
                 alt="Company logo"
-                className="h-20 max-w-[240px] rounded border border-white/10 bg-white object-contain p-2"
+                triggerClassName="h-20 max-w-[240px] rounded border border-white/10 bg-white p-2 shadow-none"
+                triggerImgClassName="h-full w-full max-h-[4.5rem] object-contain"
               />
             ) : null}
             <div className="flex flex-wrap items-start gap-3">
@@ -641,10 +643,11 @@ export default function Account() {
               {companyLogoPreviewUrl ? (
                 <div className="rounded border border-white/10 bg-white/5 p-2">
                   <p className="mb-1 text-[10px] uppercase tracking-wide text-white/40">New logo preview</p>
-                  <img
+                  <RemoteImageHoverPreview
                     src={companyLogoPreviewUrl}
                     alt="New company logo preview"
-                    className="h-20 max-w-[200px] object-contain"
+                    triggerClassName="h-20 max-w-[200px] rounded border-0 bg-transparent p-0 shadow-none"
+                    triggerImgClassName="h-full w-full object-contain"
                   />
                 </div>
               ) : null}
@@ -724,10 +727,11 @@ export default function Account() {
               <div className="space-y-2 w-full max-w-md">
                 <Label className="text-white/70 text-xs uppercase tracking-wide">Profile image</Label>
                 {mePerson.hasPhoto ? (
-                  <img
+                  <RemoteImageHoverPreview
                     src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${mePerson.id}/photo?ts=${mePerson.photoUpdatedAt ?? ""}`}
                     alt="Profile"
-                    className="h-24 w-24 rounded-md object-cover border border-white/10"
+                    triggerClassName="h-24 w-24 rounded-md border border-white/10 bg-black/20 p-0 shadow-none"
+                    triggerImgClassName="h-full w-full object-cover"
                   />
                 ) : null}
                 <Input
