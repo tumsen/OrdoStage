@@ -20,11 +20,8 @@ import {
   DEFAULT_VENUE_FORM_VALUES,
   venueToFormValues,
   venueFormValuesToPayload,
-  CustomFieldsEditor,
   StageSizeFields,
   VenueContactFields,
-  textToCustomFields,
-  customFieldsToText,
 } from "@/components/venue/venueFormShared";
 
 export default function VenueEdit() {
@@ -139,6 +136,7 @@ export default function VenueEdit() {
         className="flex-1 overflow-y-auto p-6"
         onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))}
       >
+        <input type="hidden" {...form.register("customFieldsText")} />
         <div className="w-full space-y-8 pb-24">
           <section className="space-y-3">
             <Label htmlFor="venue-name" className="text-white/50 text-xs uppercase tracking-wide">
@@ -216,17 +214,6 @@ export default function VenueEdit() {
               </div>
             </div>
           </div>
-
-          <section className="space-y-3">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">Custom fields</Label>
-            <Textarea {...form.register("customFieldsText")} className="hidden" aria-hidden />
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5">
-              <CustomFieldsEditor
-                fields={textToCustomFields(form.watch("customFieldsText"))}
-                onChange={(fields) => form.setValue("customFieldsText", customFieldsToText(fields))}
-              />
-            </div>
-          </section>
 
           <section className="space-y-3">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Files</Label>
