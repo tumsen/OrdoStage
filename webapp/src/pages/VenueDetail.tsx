@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
@@ -20,9 +20,9 @@ import { ScheduleItemDetailSheet } from "@/components/schedule/ScheduleItemDetai
 import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { VenueCalendarContextStrip } from "@/components/venue/VenueCalendarContextStrip";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePreferences } from "@/hooks/usePreferences";
-import { cn } from "@/lib/utils";
 
 interface ScheduleData {
   events: EventDetail[];
@@ -75,10 +75,16 @@ function formatDayRangeLabel(start: Date, end: Date, locale: string): string {
 
 type VenueBookingCalendarView = "month" | "next31";
 
+const SIDEBAR_USER_BLOCK_SELECTOR = "[data-ordo-sidebar-user-block]";
+const CALENDAR_SHELL_MIN_HEIGHT_PX = 200;
+
 export default function VenueDetail() {
   const { id: venueId = "" } = useParams<{ id: string }>();
+  const isMobile = useIsMobile();
   const { canWrite } = usePermissions();
   const { effective } = usePreferences();
+  const calendarShellRef = useRef<HTMLDivElement>(null);
+  const [calendarShellHeightPx, setCalendarShellHeightPx] = useState<number | null>(null);
   const locale =
     effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
 
@@ -133,6 +139,53 @@ export default function VenueDetail() {
     return raw.filter((item) => calendarItemVenueIdForFilter(item) === venueId);
   }, [scheduleData, venueId]);
 
+  useLayoutEffect(() => {
+    if (!venueId || isMobile) {
+      setCalendarShellHeightPx(null);
+      return;
+    }
+
+    const measure = () => {
+      const shell = calendarShellRef.current;
+      const divider = document.querySelector<HTMLElement>(SIDEBAR_USER_BLOCK_SELECTOR);
+      if (!shell || !divider || venueLoading || !venue) {
+        setCalendarShellHeightPx(null);
+        return;
+      }
+      const shellTop = shell.getBoundingClientRect().top;
+      const dividerTop = divider.getBoundingClientRect().top;
+      const raw = Math.floor(dividerTop - shellTop);
+      if (raw < CALENDAR_SHELL_MIN_HEIGHT_PX || raw > 8000) {
+        setCalendarShellHeightPx(null);
+        return;
+      }
+      setCalendarShellHeightPx(raw);
+    };
+
+    measure();
+
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(measure);
+    });
+    ro.observe(document.documentElement);
+
+    const shellEl = calendarShellRef.current;
+    if (shellEl) ro.observe(shellEl);
+
+    const dividerEl = document.querySelector<HTMLElement>(SIDEBAR_USER_BLOCK_SELECTOR);
+    if (dividerEl) ro.observe(dividerEl);
+
+    const scrollEl = document.querySelector<HTMLElement>("[data-ordo-main-scroll]");
+    scrollEl?.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+
+    return () => {
+      ro.disconnect();
+      scrollEl?.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+    };
+  }, [isMobile, venueId, venueLoading, venue, scheduleLoading, calendarView]);
+
   if (!venueId) {
     return (
       <div className="p-6">
@@ -156,8 +209,8 @@ export default function VenueDetail() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden pl-0 pr-4 pb-4 pt-4 md:pr-6 md:pb-6 md:pt-6">
-      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3 pl-3">
+    <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden p-4 md:p-6">
+      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3">
         <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white gap-1 -ml-2 shrink-0">
           <Link to="/venues">
             <ChevronLeft className="h-4 w-4" />
@@ -171,10 +224,8 @@ export default function VenueDetail() {
 
       {venueLoading || !venue ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <div className="pl-3">
-            <Skeleton className="h-8 w-64 shrink-0 bg-white/5" />
-          </div>
-          <Skeleton className="min-h-0 flex-1 w-full rounded-l-none border border-white/10 bg-white/5" />
+          <Skeleton className="h-8 w-64 shrink-0 bg-white/5" />
+          <Skeleton className="min-h-0 flex-1 w-full rounded-xl border border-white/10 bg-white/5" />
         </div>
       ) : (
         <>
@@ -294,13 +345,19 @@ export default function VenueDetail() {
             </div>
           </div>
 
-          <div className={cn(CALENDAR_PANEL_SHELL_CLASS, "flex-1 min-h-0 rounded-l-none !pl-0 md:!pl-0")}>
+          <div
+            ref={calendarShellRef}
+            className={`${CALENDAR_PANEL_SHELL_CLASS} min-h-0 ${
+              calendarShellHeightPx != null ? "shrink-0" : "flex-1"
+            }`}
+            style={calendarShellHeightPx != null ? { height: calendarShellHeightPx } : undefined}
+          >
             <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
               {scheduleLoading ? (
                 <Skeleton className="min-h-0 flex-1 w-full bg-white/5 rounded-xl border border-white/10" />
               ) : (
                 <OutlookTimeGrid
-                  className="min-h-0 flex-1 rounded-l-none"
+                  className="min-h-0 flex-1"
                   days={gridDays}
                   items={calendarItems}
                   onItemClick={(item) => setDetailItem(item)}

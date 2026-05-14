@@ -217,8 +217,11 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
         ) : null}
       </nav>
 
-      {/* User + Sign out */}
-      <div className="px-3 py-4 border-t border-white/10 space-y-2">
+      {/* User + Sign out — data attr used by VenueDetail to align calendar bottom with this divider (desktop). */}
+      <div
+        data-ordo-sidebar-user-block
+        className="px-3 py-4 border-t border-white/10 space-y-2"
+      >
         {session?.user ? (
           <div className="flex items-start gap-2.5 px-3 py-2">
             <div className="w-9 h-9 rounded-full bg-ordo-violet/45 ring-1 ring-ordo-magenta/25 flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -348,7 +351,10 @@ export function Layout({ children }: LayoutProps) {
           className="flex min-h-0 flex-1 flex-col overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15"
         >
           {/* Inner scroll so routed pages can use flex-1 + min-h-0 without fighting overflow-y-auto on main. */}
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div
+            data-ordo-main-scroll
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+          >
             {children}
           </div>
         </main>
