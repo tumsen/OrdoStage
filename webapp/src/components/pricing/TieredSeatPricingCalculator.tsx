@@ -182,7 +182,7 @@ export function TieredSeatPricingCalculator({
         </Label>
         {annual && yearlyDiscountEnabled && yearlyDiscountPercent > 0 ? (
           <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
-            Save ${annualSavingsYear.toLocaleString()}/yr
+            Save €{annualSavingsYear.toLocaleString()}/yr
           </span>
         ) : null}
       </div>
@@ -216,22 +216,22 @@ export function TieredSeatPricingCalculator({
       ) : null}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <MetricCard label="Monthly total" value={`$${Math.round(discountedMonthly).toLocaleString()}`} sub={annualSub} />
-        <MetricCard label="Annual total" value={`$${Math.round(annualTotal).toLocaleString()}`} sub={annualTotalSub} />
-        <MetricCard label="Effective per user" value={`$${perUserEffective.toFixed(2)}`} sub="per active user/mo" />
+        <MetricCard label="Monthly total" value={`€${Math.round(discountedMonthly).toLocaleString()}`} sub={annualSub} />
+        <MetricCard label="Annual total" value={`€${Math.round(annualTotal).toLocaleString()}`} sub={annualTotalSub} />
+        <MetricCard label="Effective per user" value={`€${perUserEffective.toFixed(2)}`} sub="per active user/mo" />
       </div>
 
       {showModelControls ? (
         <>
-          <p className="text-xs font-medium uppercase tracking-wide text-white/45">Model settings (illustrative USD)</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-white/45">Model settings (illustrative EUR)</p>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <ModelInput
-              label="Base fee (1 user) $"
+              label="Base fee (1 user) €"
               value={String(model.base)}
               onChange={(v) => setModel((m) => ({ ...m, base: Math.max(0, parseMoney(v, m.base)) }))}
             />
             <ModelInput
-              label="User 2 price $"
+              label="User 2 price €"
               value={String(model.start)}
               onChange={(v) => setModel((m) => ({ ...m, start: Math.max(1, parseMoney(v, m.start)) }))}
             />
@@ -243,7 +243,7 @@ export function TieredSeatPricingCalculator({
               onBlur={commitFloorAtDraft}
             />
             <ModelInput
-              label="Floor price $"
+              label="Floor price €"
               highlight
               value={String(model.floor)}
               onChange={(v) => setModel((m) => ({ ...m, floor: Math.max(1, parseMoney(v, m.floor)) }))}
@@ -255,11 +255,11 @@ export function TieredSeatPricingCalculator({
       <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white/65 sm:flex-row sm:items-center sm:justify-between">
         <span>
           User <strong className="font-medium text-white">{users}</strong> costs{" "}
-          <strong className="font-medium text-white">{users === 1 ? "(base only)" : `$${thisRate.toFixed(2)}`}</strong>
+          <strong className="font-medium text-white">{users === 1 ? "(base only)" : `€${thisRate.toFixed(2)}`}</strong>
         </span>
         <span>
           Discount step per user:{" "}
-          <strong className="font-medium text-white">${step.toFixed(2)}</strong>
+          <strong className="font-medium text-white">€{step.toFixed(2)}</strong>
         </span>
       </div>
 
@@ -293,8 +293,8 @@ export function TieredSeatPricingCalculator({
                 axisLine={false}
                 tickLine={false}
                 width={44}
-                tickFormatter={(v) => `$${v}`}
-                label={{ value: "Total $/mo", angle: -90, position: "insideLeft", fill: CHART_TOTAL, fontSize: 11 }}
+                tickFormatter={(v) => `€${v}`}
+                label={{ value: "Total €/mo", angle: -90, position: "insideLeft", fill: CHART_TOTAL, fontSize: 11 }}
               />
               <YAxis
                 yAxisId="right"
@@ -303,8 +303,8 @@ export function TieredSeatPricingCalculator({
                 axisLine={false}
                 tickLine={false}
                 width={44}
-                tickFormatter={(v) => `$${v}`}
-                label={{ value: "Per-user $", angle: 90, position: "insideRight", fill: CHART_PER_USER, fontSize: 11 }}
+                tickFormatter={(v) => `€${v}`}
+                label={{ value: "Per-user €", angle: 90, position: "insideRight", fill: CHART_PER_USER, fontSize: 11 }}
               />
               <Tooltip
                 contentStyle={{
@@ -315,8 +315,8 @@ export function TieredSeatPricingCalculator({
                   fontSize: 12,
                 }}
                 formatter={(value: number, name: string) => {
-                  if (name === "Monthly total") return [`$${Math.round(value).toLocaleString()}/mo`, name];
-                  if (name === "Per-user rate") return [`$${Number(value).toFixed(2)}`, name];
+                  if (name === "Monthly total") return [`€${Math.round(value).toLocaleString()}/mo`, name];
+                  if (name === "Per-user rate") return [`€${Number(value).toFixed(2)}`, name];
                   return [value, name];
                 }}
                 labelFormatter={(label) => `${label} active users`}

@@ -1,17 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
-
-type CurrencyRow = {
-  userDailyRateCents: string; // major units input (e.g. "5" means 5.00)
-  nextMonthUserDailyRateCents: string; // major units input
-};
 
 /** Matches GET/PATCH `/api/admin/billing/settings` `data` envelope. */
 type AdminBillingSettingsData = {
@@ -25,21 +19,6 @@ type AdminBillingSettingsData = {
     nextMonthUserDailyRateCents?: number | null;
   }>;
   supportedCurrencies: string[];
-};
-const CURRENCY_COUNTRY_LABELS: Record<string, string> = {
-  USD: "United States",
-  EUR: "Eurozone",
-  DKK: "Denmark",
-  SEK: "Sweden",
-  NOK: "Norway",
-  GBP: "United Kingdom",
-  CHF: "Switzerland",
-  PLN: "Poland",
-  CZK: "Czech Republic",
-  HUF: "Hungary",
-  RON: "Romania",
-  BGN: "Bulgaria",
-  HRK: "Croatia",
 };
 
 function formatEditableMajorFromCents(cents: number | null | undefined): string {
@@ -56,163 +35,68 @@ function majorToCents(value: string): number {
   return Math.max(1, Math.round(parsed * 100));
 }
 
-function calculateBaseComparison(
-  rows: Record<string, CurrencyRow>,
-  rates: Record<string, number>,
-  baseCurrency: string
-): Record<string, number> {
-  const baseMajor = Number((rows[baseCurrency]?.userDailyRateCents ?? "0").replace(",", "."));
-  const calculated: Record<string, number> = {};
-  if (!Number.isFinite(baseMajor) || baseMajor <= 0) return calculated;
-  for (const currency of Object.keys(rows)) {
-    if (currency === baseCurrency) continue;
-    const fx = rates[currency];
-    if (!fx || !Number.isFinite(fx)) continue;
-    calculated[currency] = Math.max(baseMajor * fx, 0);
-  }
-  return calculated;
+/** Stable across referential churn so keyed remounts only track real server changes. */
+function stableBillingFingerprint(d: AdminBillingSettingsData | undefined): string {
+  if (!d) return "";
+  const prices = [...d.currencyPrices]
+    .sort((a, b) => a.currencyCode.localeCompare(b.currencyCode))
+    .map((p) => ({
+      currencyCode: p.currencyCode,
+      userDailyRateCents: p.userDailyRateCents,
+      nextMonthUserDailyRateCents: p.nextMonthUserDailyRateCents ?? null,
+    }));
+  return JSON.stringify({
+    paymentDueDays: d.paymentDueDays,
+    yearlyDiscountPercent: d.yearlyDiscountPercent ?? null,
+    yearlyDiscountEnabled: d.yearlyDiscountEnabled ?? null,
+    baseCurrencyCode: d.baseCurrencyCode ?? null,
+    currencyPrices: prices,
+  });
 }
 
-/** Merge form with last-known server rows so PATCH always sends rates for every filled currency (avoids empty `currencyPrices`). */
-function buildCurrencyPricesPayload(
-  supported: string[] | undefined,
-  rows: Record<string, CurrencyRow>,
-  serverPrices: AdminBillingSettingsData["currencyPrices"] | undefined,
-): Array<{
-  currencyCode: string;
-  userDailyRateCents: number;
-  nextMonthUserDailyRateCents: number | null;
-}> {
-  if (!supported?.length) return [];
-  const out: Array<{
-    currencyCode: string;
-    userDailyRateCents: number;
-    nextMonthUserDailyRateCents: number | null;
-  }> = [];
-  for (const currencyCode of supported) {
-    const row = rows[currencyCode] ?? { userDailyRateCents: "", nextMonthUserDailyRateCents: "" };
-    const server = serverPrices?.find((p) => p.currencyCode === currencyCode);
-    const currentMajor =
-      row.userDailyRateCents.trim() || formatEditableMajorFromCents(server?.userDailyRateCents);
-    if (!currentMajor.trim()) continue;
-    const nextTrim = row.nextMonthUserDailyRateCents.trim();
-    const nextMonthUserDailyRateCents = nextTrim.length > 0 ? majorToCents(nextTrim) : null;
-    out.push({
-      currencyCode,
-      userDailyRateCents: majorToCents(currentMajor),
-      nextMonthUserDailyRateCents,
-    });
-  }
-  return out;
-}
+type BillingEditorProps = {
+  initialData: AdminBillingSettingsData;
+  queryClient: ReturnType<typeof useQueryClient>;
+};
 
-
-export default function Pricing() {
+/**
+ * Mounted with `key={stableBillingFingerprint(data)}` so we hydrate from the server only
+ * on real data changes (initial load / after save), never from a sync effect while typing.
+ */
+function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorProps) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const eurServer = initialData.currencyPrices.find((p) => p.currencyCode === "EUR");
+  const [eurCurrent, setEurCurrent] = useState(() => formatEditableMajorFromCents(eurServer?.userDailyRateCents));
+  const [eurNext, setEurNext] = useState(() => formatEditableMajorFromCents(eurServer?.nextMonthUserDailyRateCents));
+  const [paymentDueDays, setPaymentDueDays] = useState(() => String(initialData.paymentDueDays));
   const [form, setForm] = useState({
-    paymentDueDays: "7",
-    baseCurrencyCode: "USD",
-    yearlyDiscountPercent: "15",
-    yearlyDiscountEnabled: true,
+    yearlyDiscountPercent: String(initialData.yearlyDiscountPercent ?? 15),
+    yearlyDiscountEnabled: initialData.yearlyDiscountEnabled !== false,
   });
-  const [currencyRows, setCurrencyRows] = useState<Record<string, CurrencyRow>>({});
-  const [fxRates, setFxRates] = useState<Record<string, number>>({});
-  const [fxLoading, setFxLoading] = useState(false);
-  const [fxError, setFxError] = useState<string | null>(null);
-  const [fxUpdatedAt, setFxUpdatedAt] = useState<string | null>(null); // Provider update time
-  const [fxRefreshedAt, setFxRefreshedAt] = useState<string | null>(null); // Local fetch time
-
-  const { data, isPending } = useQuery<AdminBillingSettingsData>({
-    queryKey: ["admin", "billing-settings"],
-    queryFn: () => api.get("/api/admin/billing/settings"),
-  });
-
-  const billingDataFingerprint = useMemo(() => {
-    if (!data) return "";
-    const prices = [...data.currencyPrices].sort((a, b) => a.currencyCode.localeCompare(b.currencyCode));
-    return JSON.stringify({
-      paymentDueDays: data.paymentDueDays,
-      yearlyDiscountPercent: data.yearlyDiscountPercent,
-      yearlyDiscountEnabled: data.yearlyDiscountEnabled,
-      baseCurrencyCode: data.baseCurrencyCode,
-      currencyPrices: prices,
-    });
-  }, [data]);
-
-  useEffect(() => {
-    if (!billingDataFingerprint) return;
-    const snapshot = queryClient.getQueryData<AdminBillingSettingsData>(["admin", "billing-settings"]);
-    if (!snapshot) return;
-    const rowMap: Record<string, CurrencyRow> = {};
-    for (const currency of snapshot.supportedCurrencies) {
-      const found = snapshot.currencyPrices.find((p) => p.currencyCode === currency);
-      rowMap[currency] = {
-        userDailyRateCents: formatEditableMajorFromCents(found?.userDailyRateCents),
-        nextMonthUserDailyRateCents: formatEditableMajorFromCents(found?.nextMonthUserDailyRateCents),
-      };
-    }
-    setCurrencyRows(rowMap);
-    setForm({
-      paymentDueDays: String(snapshot.paymentDueDays),
-      baseCurrencyCode: snapshot.baseCurrencyCode || "USD",
-      yearlyDiscountPercent: String(snapshot.yearlyDiscountPercent ?? 15),
-      yearlyDiscountEnabled: snapshot.yearlyDiscountEnabled !== false,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- queryClient is stable; never list `data` here (new object ref every notify resets inputs).
-  }, [billingDataFingerprint]);
-
-  const fetchBaseRates = useCallback(async () => {
-    setFxLoading(true);
-    setFxError(null);
-    try {
-      const base = (form.baseCurrencyCode || "USD").toUpperCase();
-      const data = await api.get<{ base: string; rates: Record<string, number>; updatedAt?: string | null }>(
-        `/api/admin/billing/fx-rates?base=${encodeURIComponent(base)}&t=${Date.now()}`
-      );
-      if (!data.rates) throw new Error("No rates in response");
-      setFxRates(data.rates);
-      setFxUpdatedAt(data.updatedAt ?? null);
-      setFxRefreshedAt(new Date().toISOString());
-      toast({ title: `${base} rates refreshed` });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Failed to fetch rates.";
-      setFxError(msg);
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setFxLoading(false);
-    }
-  }, [toast, form.baseCurrencyCode]);
-
-  useEffect(() => {
-    fetchBaseRates().catch(() => {});
-  }, [fetchBaseRates]);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      fetchBaseRates().catch(() => {});
-    }, 10 * 60 * 1000);
-    return () => clearInterval(id);
-  }, [fetchBaseRates]);
-  const calculatedRows = calculateBaseComparison(currencyRows, fxRates, form.baseCurrencyCode || "USD");
 
   const yearlyDiscountPercentClamped = Math.min(100, Math.max(0, Math.round(Number(form.yearlyDiscountPercent)) || 0));
 
   const saveMutation = useMutation({
     mutationFn: async (): Promise<AdminBillingSettingsData> => {
-      const paymentDueDays = Number(form.paymentDueDays);
-      if (!Number.isFinite(paymentDueDays) || paymentDueDays < 1 || paymentDueDays > 30) {
+      const due = Number(paymentDueDays);
+      if (!Number.isFinite(due) || due < 1 || due > 30) {
         throw new Error("Invoice due days must be a number between 1 and 30.");
       }
-      const snap = queryClient.getQueryData<AdminBillingSettingsData>(["admin", "billing-settings"]);
-      const currencyPrices = buildCurrencyPricesPayload(
-        snap?.supportedCurrencies,
-        currencyRows,
-        snap?.currencyPrices,
-      );
+      const currentTrim = eurCurrent.trim();
+      if (!currentTrim) {
+        throw new Error("Enter the current EUR daily rate.");
+      }
+      const nextTrim = eurNext.trim();
+      const currencyPrices = [
+        {
+          currencyCode: "EUR",
+          userDailyRateCents: majorToCents(currentTrim),
+          nextMonthUserDailyRateCents: nextTrim.length > 0 ? majorToCents(nextTrim) : null,
+        },
+      ];
       return api.patch<AdminBillingSettingsData>("/api/admin/billing/settings", {
-        paymentDueDays,
-        baseCurrencyCode: form.baseCurrencyCode,
+        paymentDueDays: due,
+        baseCurrencyCode: "EUR",
         yearlyDiscountPercent: yearlyDiscountPercentClamped,
         yearlyDiscountEnabled: form.yearlyDiscountEnabled,
         currencyPrices,
@@ -254,8 +138,8 @@ export default function Pricing() {
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-xs text-white/55">
-            Illustrative tiered model for projections. Adjust inputs to explore scenarios; global postpaid currency
-            rates below remain the source of truth for invoicing.
+            Illustrative tiered model for projections. Adjust inputs to explore scenarios; the EUR postpaid daily rates
+            below remain the source of truth for invoicing.
           </p>
           <TieredSeatPricingCalculator
             showModelControls
@@ -271,9 +155,10 @@ export default function Pricing() {
       <Card className="bg-gray-900 border border-white/10">
         <CardHeader className="flex flex-col gap-3 space-y-0 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-white">Global currency pricing</CardTitle>
+            <CardTitle className="text-white">EUR billing rates</CardTitle>
             <p className="mt-1 text-xs text-white/50">
-              Edit rates below, then press <span className="text-white/80">Save pricing</span>.
+              Edit amounts below, then press <span className="text-white/80">Save pricing</span>. All billing is in
+              euros.
             </p>
           </div>
           <Button
@@ -281,115 +166,35 @@ export default function Pricing() {
             size="lg"
             className="h-11 w-full shrink-0 bg-rose-600 px-8 text-base font-semibold hover:bg-rose-500 sm:w-auto"
             onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending || isPending || !data}
+            disabled={saveMutation.isPending}
           >
             {saveMutation.isPending ? "Saving…" : "Save pricing"}
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <p className="text-xs text-white/60">
-              Manual prices per currency with compact fields. Base currency is{" "}
-              <span className="text-white font-medium">{form.baseCurrencyCode || "USD"}</span>.
-            </p>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => fetchBaseRates()} disabled={fxLoading}>
-                {fxLoading ? "Loading rates..." : "Refresh base rates"}
-              </Button>
-              {fxRefreshedAt ? (
-                <span className="text-[11px] text-white/45">Checked: {new Date(fxRefreshedAt).toLocaleString()}</span>
-              ) : null}
-              {fxUpdatedAt ? <span className="text-[11px] text-white/45">Provider: {fxUpdatedAt}</span> : null}
+          <div className="grid gap-4 sm:grid-cols-2 max-w-xl">
+            <div className="space-y-1">
+              <p className="text-xs text-white/50">Current daily rate (EUR)</p>
+              <Input
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                className="h-9 text-sm"
+                value={eurCurrent}
+                onChange={(e) => setEurCurrent(e.target.value)}
+              />
             </div>
-          </div>
-
-          {fxError ? <p className="text-xs text-red-300">Rate lookup failed: {fxError}</p> : null}
-
-          <div className="space-y-2 overflow-x-auto">
-            <div className="grid min-w-[760px] grid-cols-12 gap-2 text-xs text-white/45 px-1 whitespace-nowrap">
-              <p className="col-span-4">Base / Currency</p>
-              <p className="col-span-2">Current</p>
-              <p className="col-span-2">Next month</p>
-              <p className="col-span-2">Base calculation</p>
+            <div className="space-y-1">
+              <p className="text-xs text-white/50">Next month daily rate (EUR, optional)</p>
+              <Input
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                className="h-9 text-sm"
+                value={eurNext}
+                onChange={(e) => setEurNext(e.target.value)}
+              />
             </div>
-            {[...(data?.supportedCurrencies ?? [])]
-              .sort((a, b) => {
-                if (a === form.baseCurrencyCode) return -1;
-                if (b === form.baseCurrencyCode) return 1;
-                return a.localeCompare(b);
-              })
-              .map((currency) => {
-              const row = currencyRows[currency] ?? {
-                userDailyRateCents: "",
-                nextMonthUserDailyRateCents: "",
-              };
-              const calculatedValue =
-                currency === form.baseCurrencyCode
-                  ? row.userDailyRateCents || ""
-                  : calculatedRows[currency] != null
-                    ? String(calculatedRows[currency].toFixed(2))
-                    : "";
-              return (
-                <div
-                  key={currency}
-                  className={`grid min-w-[760px] grid-cols-12 gap-2 items-center whitespace-nowrap rounded px-1 py-1 ${
-                    currency === form.baseCurrencyCode ? "bg-emerald-950/30 border border-emerald-700/40" : ""
-                  }`}
-                >
-                  <div className="col-span-4">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={currency === form.baseCurrencyCode}
-                        onCheckedChange={(checked) => {
-                          if (!checked) return;
-                          setForm((prev) => ({ ...prev, baseCurrencyCode: currency }));
-                        }}
-                      />
-                      <p className="text-xs text-white font-medium">
-                        {currency} - {CURRENCY_COUNTRY_LABELS[currency] ?? "Other"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="col-span-2 flex items-center gap-1">
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      className="h-7 text-xs px-2"
-                      value={row.userDailyRateCents}
-                      onChange={(e) =>
-                        setCurrencyRows((prev) => {
-                          const cur = prev[currency] ?? { userDailyRateCents: "", nextMonthUserDailyRateCents: "" };
-                          return { ...prev, [currency]: { ...cur, userDailyRateCents: e.target.value } };
-                        })
-                      }
-                    />
-                    <span className="text-[10px] text-white/45">{currency}</span>
-                  </div>
-                  <div className="col-span-2 flex items-center gap-1">
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      className="h-7 text-xs px-2"
-                      value={row.nextMonthUserDailyRateCents}
-                      onChange={(e) =>
-                        setCurrencyRows((prev) => {
-                          const cur = prev[currency] ?? { userDailyRateCents: "", nextMonthUserDailyRateCents: "" };
-                          return { ...prev, [currency]: { ...cur, nextMonthUserDailyRateCents: e.target.value } };
-                        })
-                      }
-                    />
-                    <span className="text-[10px] text-white/45">{currency}</span>
-                  </div>
-                  <Input
-                    className="col-span-2 h-7 text-xs px-2"
-                    value={calculatedValue || "-"}
-                    readOnly
-                  />
-                </div>
-              );
-            })}
           </div>
 
           <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-end sm:justify-between">
@@ -400,8 +205,8 @@ export default function Pricing() {
                 inputMode="numeric"
                 autoComplete="off"
                 className="max-w-[120px]"
-                value={form.paymentDueDays}
-                onChange={(e) => setForm((p) => ({ ...p, paymentDueDays: e.target.value }))}
+                value={paymentDueDays}
+                onChange={(e) => setPaymentDueDays(e.target.value)}
               />
             </div>
             <Button
@@ -409,7 +214,7 @@ export default function Pricing() {
               size="lg"
               className="h-11 w-full shrink-0 bg-rose-600 px-8 text-base font-semibold hover:bg-rose-500 sm:w-auto"
               onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending || isPending || !data}
+              disabled={saveMutation.isPending}
             >
               {saveMutation.isPending ? "Saving…" : "Save pricing"}
             </Button>
@@ -432,8 +237,41 @@ export default function Pricing() {
       </Card>
 
       <p className="text-xs text-white/50">
-        This is the global postpaid default model. Organizations can still override these defaults on their org detail page.
+        This is the global postpaid default model. Organizations can still override these defaults on their org detail
+        page.
       </p>
     </div>
+  );
+}
+
+export default function Pricing() {
+  const queryClient = useQueryClient();
+  const { data, isPending, isError, error } = useQuery<AdminBillingSettingsData>({
+    queryKey: ["admin", "billing-settings"],
+    queryFn: () => api.get("/api/admin/billing/settings"),
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
+
+  const billingDataFingerprint = useMemo(() => stableBillingFingerprint(data), [data]);
+
+  if (isPending) {
+    return <div className="p-6 text-sm text-white/60">Loading billing settings…</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 text-sm text-red-300">
+        {error instanceof Error ? error.message : "Failed to load billing settings."}
+      </div>
+    );
+  }
+
+  if (!data) {
+    return <div className="p-6 text-sm text-white/60">No billing settings loaded.</div>;
+  }
+
+  return (
+    <AdminBillingPricingEditor key={billingDataFingerprint} initialData={data} queryClient={queryClient} />
   );
 }

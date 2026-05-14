@@ -5,66 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
 
-const REGION_TO_CURRENCY: Record<string, string> = {
-  DK: "DKK",
-  SE: "SEK",
-  NO: "NOK",
-  GB: "GBP",
-  CH: "CHF",
-  PL: "PLN",
-  CZ: "CZK",
-  HU: "HUF",
-  RO: "RON",
-  BG: "BGN",
-  HR: "HRK",
-  US: "USD",
-};
-
-const TIMEZONE_TO_CURRENCY: Array<{ prefix: string; currency: string }> = [
-  { prefix: "Europe/Copenhagen", currency: "DKK" },
-  { prefix: "Europe/Stockholm", currency: "SEK" },
-  { prefix: "Europe/Oslo", currency: "NOK" },
-  { prefix: "Europe/London", currency: "GBP" },
-  { prefix: "Europe/Warsaw", currency: "PLN" },
-  { prefix: "Europe/Prague", currency: "CZK" },
-  { prefix: "Europe/Budapest", currency: "HUF" },
-  { prefix: "Europe/Bucharest", currency: "RON" },
-  { prefix: "Europe/Sofia", currency: "BGN" },
-  { prefix: "Europe/Zagreb", currency: "HRK" },
-  { prefix: "Europe/Zurich", currency: "CHF" },
-  { prefix: "America/New_York", currency: "USD" },
-  { prefix: "America/Chicago", currency: "USD" },
-  { prefix: "America/Denver", currency: "USD" },
-  { prefix: "America/Los_Angeles", currency: "USD" },
-];
-
-function detectUserCurrency(supported: string[], fallback: string): string {
-  if (typeof Intl !== "undefined") {
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const fromTz = TIMEZONE_TO_CURRENCY.find((row) => tz?.startsWith(row.prefix))?.currency;
-      if (fromTz && supported.includes(fromTz)) return fromTz;
-    } catch {
-      // Ignore and continue with locale fallback.
-    }
-  }
-  if (typeof navigator !== "undefined") {
-    const locales = [navigator.language, ...(navigator.languages ?? [])].filter(Boolean);
-    for (const locale of locales) {
-      const region = locale.split("-")[1]?.toUpperCase();
-      if (region && REGION_TO_CURRENCY[region] && supported.includes(REGION_TO_CURRENCY[region])) {
-        return REGION_TO_CURRENCY[region];
-      }
-    }
-    for (const locale of locales) {
-      const currencyFromLocale =
-        locale.includes("en-US") ? "USD" : locale.includes("da-") ? "DKK" : locale.includes("sv-") ? "SEK" : locale.includes("nb-") || locale.includes("nn-") ? "NOK" : locale.includes("en-GB") ? "GBP" : "EUR";
-      if (supported.includes(currencyFromLocale)) return currencyFromLocale;
-    }
-  }
-  return supported.includes(fallback) ? fallback : supported[0] || "USD";
-}
-
 function formatMajorFromCents(cents: number): string {
   return (cents / 100).toFixed(2);
 }
@@ -105,15 +45,11 @@ export default function PublicPricing() {
     refetchOnReconnect: true,
   });
 
-  const supportedCurrencies = (publicPricing?.prices ?? []).map((p) => p.currencyCode);
-  const userCurrency = detectUserCurrency(supportedCurrencies, publicPricing?.baseCurrencyCode || "USD");
-  const selectedPriceCents =
-    publicPricing?.prices.find((p) => p.currencyCode === userCurrency)?.userDailyRateCents ??
-    publicPricing?.prices.find((p) => p.currencyCode === publicPricing?.baseCurrencyCode)?.userDailyRateCents ??
-    0;
+  const eurDailyCents =
+    publicPricing?.prices.find((p) => p.currencyCode === "EUR")?.userDailyRateCents ?? 0;
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const perUserMonthlyCents = selectedPriceCents * daysInMonth;
+  const perUserMonthlyCents = eurDailyCents * daysInMonth;
 
   return (
     <div className="text-white">
@@ -124,17 +60,17 @@ export default function PublicPricing() {
           <div className="space-y-1">
             <p className="text-sm uppercase tracking-wide text-white/60">Price per user</p>
             <p className="text-3xl md:text-4xl font-bold text-white">
-              {userCurrency} {formatMajorFromCents(selectedPriceCents)} / day
+              EUR {formatMajorFromCents(eurDailyCents)} / day
             </p>
             <p className="text-lg md:text-xl text-white/80">
-              {userCurrency} {formatMajorFromCents(perUserMonthlyCents)} / month
+              EUR {formatMajorFromCents(perUserMonthlyCents)} / month
             </p>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">
             {pricingTitle}
           </h1>
           <p className="text-lg md:text-xl text-white/75 leading-relaxed">
-            Monthly postpaid billing based on real usage days.
+            Monthly postpaid billing in euros, based on real usage days.
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
@@ -154,8 +90,8 @@ export default function PublicPricing() {
           <div className="space-y-1">
             <h2 className="text-xl md:text-2xl font-semibold text-white">Pricing calculator</h2>
             <p className="text-sm text-white/60 leading-relaxed">
-              Estimates use illustrative tiered USD pricing. Billable users are people who are on a job, logged time,
-              created an event, or scheduled an event—everyone else does not count toward your seat total.
+              Estimates use an illustrative tiered EUR pricing model. Billable users are people who are on a job, logged
+              time, created an event, or scheduled an event—everyone else does not count toward your seat total.
             </p>
           </div>
           <TieredSeatPricingCalculator

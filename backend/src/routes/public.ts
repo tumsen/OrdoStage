@@ -5,7 +5,7 @@ import { prisma } from "../prisma";
 import { dayKeyFromDateInput } from "../lib/timeHHMM";
 import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
 import { env, isDeployedRuntime } from "../env";
-import { ensureCurrencyPriceMonthRollover, SUPPORTED_BILLING_CURRENCIES } from "../postpaidBilling";
+import { ensureCurrencyPriceMonthRollover } from "../postpaidBilling";
 
 const DEFAULT_RIDER_VISIBILITY = {
   venue: true,
@@ -86,17 +86,14 @@ publicRouter.get("/pricing", async (c) => {
   ]);
 
   const byCurrency = new Map(priceRows.map((r) => [r.currencyCode.toUpperCase(), r.userDailyRateCents]));
-  const prices = SUPPORTED_BILLING_CURRENCIES.map((currencyCode) => ({
-    currencyCode,
-    userDailyRateCents: byCurrency.get(currencyCode) ?? 0,
-  }));
+  const eurCents = byCurrency.get("EUR") ?? 0;
 
   return c.json({
     data: {
-      baseCurrencyCode: cfgRows?.baseCurrencyCode?.toUpperCase() || "USD",
+      baseCurrencyCode: "EUR",
       yearlyDiscountPercent: cfgRows?.yearlyDiscountPercent ?? 15,
       yearlyDiscountEnabled: cfgRows?.yearlyDiscountEnabled ?? true,
-      prices,
+      prices: [{ currencyCode: "EUR" as const, userDailyRateCents: eurCents }],
     },
   });
 });
