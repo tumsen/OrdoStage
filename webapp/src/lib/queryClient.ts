@@ -11,10 +11,12 @@ function queryRetry(failureCount: number, error: unknown): boolean {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      /** Fewer duplicate network hits when navigating between screens that share queries. */
+      staleTime: 60_000,
       gcTime: 5 * 60_000,
       retry: queryRetry,
-      refetchOnWindowFocus: true,
+      /** Tab focus refetches were stacking with navigation and felt sluggish on large payloads. */
+      refetchOnWindowFocus: false,
     },
     mutations: {
       retry: false,

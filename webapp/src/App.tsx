@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,39 +11,41 @@ import { PublicLayout } from "@/components/PublicLayout";
 import { AdminLayout, AdminRoute } from "@/components/AdminLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { GuestRoute } from "@/components/GuestRoute";
-import Index from "./pages/Index";
-import Events from "./pages/Events";
-import EventDetail from "./pages/EventDetail";
-import Venues from "./pages/Venues";
-import VenueEdit from "./pages/VenueEdit";
-import VenueDetail from "./pages/VenueDetail";
-import People from "./pages/People";
-import Team from "./pages/Team";
-import Calendars from "./pages/Calendars";
-import Schedule from "./pages/Schedule";
-import Staffing from "./pages/Staffing";
-import TimeTracking from "./pages/TimeTracking";
-import TimeReport from "./pages/TimeReport";
-import Login from "./pages/Login";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import SetupOrg from "./pages/SetupOrg";
-import SelectOrg from "./pages/SelectOrg";
-import Account from "./pages/Account";
-import Roles from "./pages/Roles";
-import Tours from "./pages/Tours";
-import TourDetail from "./pages/TourDetail";
-import PublicTourSchedule from "./pages/PublicTourSchedule";
-import PersonalTourView from "./pages/PersonalTourView";
-import AdminDashboard from "./pages/admin/Dashboard";
-import AdminOrgs from "./pages/admin/Orgs";
-import AdminOrgDetail from "./pages/admin/OrgDetail";
-import AdminPricing from "./pages/admin/Pricing";
-import AdminUsers from "./pages/admin/Users";
-import SiteContentAdmin from "./pages/admin/SiteContent";
-import Frontpage from "./pages/Frontpage";
-import PublicPricing from "./pages/PublicPricing";
-import LegalPage from "./pages/LegalPage";
+import { RouteFallback } from "@/components/RouteFallback";
+
+const Index = lazy(() => import("./pages/Index"));
+const Events = lazy(() => import("./pages/Events"));
+const EventDetail = lazy(() => import("./pages/EventDetail"));
+const Venues = lazy(() => import("./pages/Venues"));
+const VenueEdit = lazy(() => import("./pages/VenueEdit"));
+const VenueDetail = lazy(() => import("./pages/VenueDetail"));
+const People = lazy(() => import("./pages/People"));
+const Team = lazy(() => import("./pages/Team"));
+const Calendars = lazy(() => import("./pages/Calendars"));
+const Schedule = lazy(() => import("./pages/Schedule"));
+const Staffing = lazy(() => import("./pages/Staffing"));
+const TimeTracking = lazy(() => import("./pages/TimeTracking"));
+const TimeReport = lazy(() => import("./pages/TimeReport"));
+const Login = lazy(() => import("./pages/Login"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const SetupOrg = lazy(() => import("./pages/SetupOrg"));
+const SelectOrg = lazy(() => import("./pages/SelectOrg"));
+const Account = lazy(() => import("./pages/Account"));
+const Roles = lazy(() => import("./pages/Roles"));
+const Tours = lazy(() => import("./pages/Tours"));
+const TourDetail = lazy(() => import("./pages/TourDetail"));
+const PublicTourSchedule = lazy(() => import("./pages/PublicTourSchedule"));
+const PersonalTourView = lazy(() => import("./pages/PersonalTourView"));
+const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const AdminOrgs = lazy(() => import("./pages/admin/Orgs"));
+const AdminOrgDetail = lazy(() => import("./pages/admin/OrgDetail"));
+const AdminPricing = lazy(() => import("./pages/admin/Pricing"));
+const AdminUsers = lazy(() => import("./pages/admin/Users"));
+const SiteContentAdmin = lazy(() => import("./pages/admin/SiteContent"));
+const Frontpage = lazy(() => import("./pages/Frontpage"));
+const PublicPricing = lazy(() => import("./pages/PublicPricing"));
+const LegalPage = lazy(() => import("./pages/LegalPage"));
 
 /** Opt into React Router v7 behaviors early — removes dev-only future-flag console warnings. */
 const ROUTER_FUTURE = {
@@ -57,6 +60,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter future={ROUTER_FUTURE}>
         <AppErrorBoundary>
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
           {/* Guest-only routes */}
           <Route
@@ -428,6 +432,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
         </AppErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>
