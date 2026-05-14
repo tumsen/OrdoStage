@@ -326,8 +326,9 @@ export default function VenueDetail() {
       </div>
 
       {!venueLoading && venue ? (
-        <div className="w-full shrink-0 border-t border-white/10 px-4 pb-10 pt-6 md:px-6">
+        <div className="w-full min-w-0 shrink-0 px-4 pb-10 pt-4 md:px-6">
           <VenueCalendarContextStrip
+            flatTop
             venueId={venueId}
             venue={venue}
             showEditLink={canWrite}
