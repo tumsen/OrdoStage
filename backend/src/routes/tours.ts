@@ -47,9 +47,12 @@ const MAX_VENUE_TECH_RIDER_BYTES = 25 * 1024 * 1024;
 function hasVenueTechRiderPdfStored(show: {
   techRiderPdfUrl?: string | null;
   venueTechRiderPdfData?: Buffer | Uint8Array | null;
+  /** When `venueTechRiderPdfData` is omitted from the query (e.g. schedule API), name/url still imply a PDF. */
+  venueTechRiderPdfName?: string | null;
 }): boolean {
   return (
     Boolean(show.techRiderPdfUrl?.trim()) ||
+    Boolean(show.venueTechRiderPdfName?.trim()) ||
     Boolean(show.venueTechRiderPdfData && show.venueTechRiderPdfData.length > 0)
   );
 }

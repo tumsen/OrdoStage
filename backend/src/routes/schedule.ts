@@ -9,6 +9,75 @@ const scheduleRouter = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
 }>();
 
+/**
+ * Tour shows for the calendar must NOT load `venueTechRiderPdfData` (multi‑MB PDF bytes) —
+ * `include` previously pulled every column and could make GET /api/schedule take seconds.
+ */
+const scheduleTourShowSelect = {
+  id: true,
+  tourId: true,
+  date: true,
+  dayKey: true,
+  type: true,
+  fromLocation: true,
+  toLocation: true,
+  showTime: true,
+  getInTime: true,
+  rehearsalTime: true,
+  soundcheckTime: true,
+  doorsTime: true,
+  venueName: true,
+  venueStreet: true,
+  venueNumber: true,
+  venueZip: true,
+  venueCity: true,
+  venueState: true,
+  venueCountry: true,
+  contactName: true,
+  contactPhone: true,
+  contactEmail: true,
+  hotelName: true,
+  hotelStreet: true,
+  hotelNumber: true,
+  hotelZip: true,
+  hotelCity: true,
+  hotelState: true,
+  hotelCountry: true,
+  hotelPhone: true,
+  hotelCheckIn: true,
+  hotelCheckOut: true,
+  travelInfo: true,
+  cateringInfo: true,
+  notes: true,
+  order: true,
+  handsNeeded: true,
+  travelTimeMinutes: true,
+  distanceKm: true,
+  techRiderSentAt: true,
+  techRiderSentTo: true,
+  techRiderOpenedAt: true,
+  techRiderOpenCount: true,
+  techRiderLastOpenedAt: true,
+  techRiderPdfUrl: true,
+  venueTechRiderPdfName: true,
+  createdAt: true,
+  updatedAt: true,
+  scheduleEvents: {
+    orderBy: { sortOrder: "asc" as const },
+    select: {
+      id: true,
+      tourShowId: true,
+      kind: true,
+      customLabel: true,
+      startTime: true,
+      endTime: true,
+      sortOrder: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+} as const;
+
 function serializeDate(d: Date) {
   return d.toISOString();
 }
@@ -192,10 +261,41 @@ scheduleRouter.get("/schedule", async (c) => {
     prisma.internalBooking.findMany({
       where: bookingWhere,
       orderBy: { startDate: "asc" },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        startDate: true,
+        endDate: true,
+        type: true,
+        venueId: true,
+        eventId: true,
+        isLocked: true,
+        organizationId: true,
+        createdById: true,
+        createdAt: true,
+        updatedAt: true,
         venue: true,
         createdBy: { select: { id: true, name: true, email: true } },
-        people: { include: { person: true } },
+        people: {
+          select: {
+            id: true,
+            personId: true,
+            role: true,
+            person: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+                email: true,
+                phone: true,
+                organizationId: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+          },
+        },
       },
     }),
     prisma.tour.findMany({
@@ -242,9 +342,7 @@ scheduleRouter.get("/schedule", async (c) => {
               }
             : {}),
           orderBy: [{ date: "asc" }, { order: "asc" }],
-          include: {
-            scheduleEvents: { orderBy: { sortOrder: "asc" } },
-          },
+          select: scheduleTourShowSelect,
         },
       },
     }),

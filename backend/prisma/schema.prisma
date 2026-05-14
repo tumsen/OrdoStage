@@ -420,6 +420,7 @@ model Event {
   bookings       InternalBooking[]
 
   @@index([ownerTeamId])
+  @@index([organizationId, startDate])
 }
 
 model EventTeam {
@@ -634,6 +635,7 @@ model InternalBooking {
 
   @@index([eventId])
   @@index([venueId, startDate])
+  @@index([organizationId, startDate])
 }
 
 model InternalBookingPerson {
@@ -779,6 +781,7 @@ model TourShow {
   updatedAt      DateTime @updatedAt
 
   @@unique([tourId, dayKey])
+  @@index([date])
 }
 
 model TourScheduleEvent {
