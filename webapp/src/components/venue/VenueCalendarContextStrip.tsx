@@ -62,6 +62,30 @@ function isImageDoc(d: VenueDocument): boolean {
   return d.kind === "image" || (d.mimeType?.startsWith("image/") ?? false);
 }
 
+function LabeledRows({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{ label: string; value: string }>;
+}) {
+  const filtered = rows.filter((r) => r.value.trim().length > 0);
+  if (filtered.length === 0) return null;
+  return (
+    <div className="space-y-1.5">
+      <div className="text-[10px] uppercase tracking-wide text-white/40">{title}</div>
+      <dl className="grid max-w-xl grid-cols-[minmax(4.5rem,auto)_1fr] gap-x-2 gap-y-1 text-[11px] leading-snug">
+        {filtered.map(({ label, value }) => (
+          <div key={label} className="contents">
+            <dt className="text-white/40">{label}</dt>
+            <dd className="break-words text-white/75">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function DocThumb({ doc }: { doc: VenueDocument }) {
   const [imgErr, setImgErr] = useState(false);
   const [previewErr, setPreviewErr] = useState(false);
@@ -242,42 +266,127 @@ export function VenueCalendarContextStrip({
       venue?.addressCountry?.trim()
   );
 
+  const hasContact = Boolean(
+    venue &&
+      (venue.contactPersonName?.trim() ||
+        venue.contactPersonRole?.trim() ||
+        venue.contactPersonPhone?.trim() ||
+        venue.contactPersonEmail?.trim()),
+  );
+
   const docList = docs ?? [];
   const showDownloadAll = !isLoading && docList.length > 0;
 
   return (
     <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="min-w-0 flex-1 space-y-3">
           <div className="text-[10px] uppercase tracking-wide text-white/45">Venue info</div>
           {venue ? (
-            <>
+            <div className="space-y-3">
               <div className="text-sm font-medium text-white/90">{venue.name}</div>
+              {venue.documentCount != null ? (
+                <p className="text-[11px] text-white/40">
+                  {venue.documentCount} file{venue.documentCount === 1 ? "" : "s"} on record
+                </p>
+              ) : null}
+
               {hasAddr ? (
-                <p className="text-xs leading-snug text-white/55">{addr}</p>
+                <div className="space-y-1.5">
+                  <LabeledRows
+                    title="Address"
+                    rows={[
+                      { label: "Street", value: venue.addressStreet ?? "" },
+                      { label: "No.", value: venue.addressNumber ?? "" },
+                      { label: "ZIP", value: venue.addressZip ?? "" },
+                      { label: "City", value: venue.addressCity ?? "" },
+                      { label: "State", value: venue.addressState ?? "" },
+                      { label: "Country", value: venue.addressCountry ?? "" },
+                    ]}
+                  />
+                  <p className="text-[11px] leading-snug text-white/45">{addr}</p>
+                </div>
               ) : (
                 <p className="text-xs text-white/35">No address on file</p>
               )}
-              {venue.capacity != null || venue.width || venue.length || venue.height ? (
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/45">
-                  {venue.capacity != null ? (
-                    <span>Capacity {venue.capacity.toLocaleString()}</span>
-                  ) : null}
-                  {venue.width || venue.length || venue.height ? (
-                    <span>
-                      Stage W {venue.width ?? "—"} · L {venue.length ?? "—"} · H {venue.height ?? "—"}
-                    </span>
-                  ) : null}
+
+              <LabeledRows
+                title="Stage & capacity"
+                rows={[
+                  ...(venue.capacity != null
+                    ? [{ label: "Capacity", value: venue.capacity.toLocaleString() }]
+                    : []),
+                  ...(venue.width?.trim() ? [{ label: "Width", value: venue.width.trim() }] : []),
+                  ...(venue.length?.trim() ? [{ label: "Depth", value: venue.length.trim() }] : []),
+                  ...(venue.height?.trim() ? [{ label: "Height", value: venue.height.trim() }] : []),
+                ]}
+              />
+
+              {hasContact ? (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] uppercase tracking-wide text-white/40">Contact</div>
+                  <dl className="grid max-w-xl grid-cols-[minmax(4.5rem,auto)_1fr] gap-x-2 gap-y-1 text-[11px] leading-snug">
+                    {venue.contactPersonName?.trim() ? (
+                      <div className="contents">
+                        <dt className="text-white/40">Name</dt>
+                        <dd className="break-words text-white/75">{venue.contactPersonName.trim()}</dd>
+                      </div>
+                    ) : null}
+                    {venue.contactPersonRole?.trim() ? (
+                      <div className="contents">
+                        <dt className="text-white/40">Role</dt>
+                        <dd className="break-words text-white/75">{venue.contactPersonRole.trim()}</dd>
+                      </div>
+                    ) : null}
+                    {venue.contactPersonPhone?.trim() ? (
+                      <div className="contents">
+                        <dt className="text-white/40">Phone</dt>
+                        <dd className="break-words text-white/75">
+                          <a href={`tel:${venue.contactPersonPhone.trim()}`} className="text-blue-300 hover:text-blue-200">
+                            {venue.contactPersonPhone.trim()}
+                          </a>
+                        </dd>
+                      </div>
+                    ) : null}
+                    {venue.contactPersonEmail?.trim() ? (
+                      <div className="contents">
+                        <dt className="text-white/40">Email</dt>
+                        <dd className="break-all text-white/75">
+                          <a
+                            href={`mailto:${venue.contactPersonEmail.trim()}`}
+                            className="text-blue-300 hover:text-blue-200"
+                          >
+                            {venue.contactPersonEmail.trim()}
+                          </a>
+                        </dd>
+                      </div>
+                    ) : null}
+                  </dl>
                 </div>
               ) : null}
-              {venue.notes?.trim() ? (
-                <p className="line-clamp-3 text-[11px] leading-snug text-white/50" title={venue.notes}>
-                  {venue.notes}
-                </p>
+
+              {(venue.customFields ?? []).length > 0 ? (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] uppercase tracking-wide text-white/40">Custom fields</div>
+                  <ul className="max-w-xl list-inside list-disc space-y-0.5 text-[11px] leading-snug text-white/70">
+                    {(venue.customFields ?? []).map((f, i) => (
+                      <li key={`${i}-${f.key}`}>
+                        <span className="text-white/50">{f.key}:</span> {f.value}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
-            </>
+
+              {venue.notes?.trim() ? (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] uppercase tracking-wide text-white/40">Notes</div>
+                  <p className="max-w-xl whitespace-pre-wrap text-[11px] leading-relaxed text-white/65">{venue.notes}</p>
+                </div>
+              ) : null}
+            </div>
           ) : (
-            <Skeleton className="h-16 w-full max-w-lg bg-white/5" />
+            <Skeleton className="h-24 w-full max-w-lg bg-white/5" />
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5 text-[11px]">

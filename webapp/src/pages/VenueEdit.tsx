@@ -22,6 +22,7 @@ import {
   venueFormValuesToPayload,
   CustomFieldsEditor,
   StageSizeFields,
+  VenueContactFields,
   textToCustomFields,
   customFieldsToText,
 } from "@/components/venue/venueFormShared";
@@ -177,7 +178,9 @@ export default function VenueEdit() {
             </div>
           </section>
 
-          <StageSizeFields register={form.register} />
+          <StageSizeFields register={form.register} errors={form.formState.errors} />
+
+          <VenueContactFields register={form.register} errors={form.formState.errors} />
 
           <section className="space-y-3">
             <Label htmlFor="venue-notes" className="text-white/50 text-xs uppercase tracking-wide">

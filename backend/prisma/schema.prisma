@@ -261,11 +261,15 @@ model Venue {
   addressState     String?
   addressCountry   String?
   capacity         Int?
-  width            String?
-  length           String?
-  height           String?
-  customFields     String?
-  notes            String?
+  width              String?
+  length             String?
+  height             String?
+  contactPersonName  String?
+  contactPersonEmail String?
+  contactPersonPhone String?
+  contactPersonRole  String?
+  customFields       String?
+  notes              String?
   organizationId   String
   organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   events           Event[]

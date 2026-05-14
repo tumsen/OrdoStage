@@ -82,6 +82,10 @@ export const VenueSchema = z.object({
   width: z.string().nullable(),
   length: z.string().nullable(),
   height: z.string().nullable(),
+  contactPersonName: z.string().nullable(),
+  contactPersonEmail: z.string().nullable(),
+  contactPersonPhone: z.string().nullable(),
+  contactPersonRole: z.string().nullable(),
   customFields: z.array(CustomFieldSchema),
   notes: z.string().nullable(),
   /** Present on list/detail from API when included. */
@@ -100,6 +104,15 @@ export const VenueDocumentSchema = z.object({
   createdAt: z.string(),
 });
 
+const VenueDimensionInputSchema = z
+  .string()
+  .max(24)
+  .optional()
+  .refine(
+    (s) => !s || !s.trim() || /^(\d{1,3})([.,]\d{1,2})?(\s*[mM])?$/.test(s.trim()),
+    "Dimension must be at most 999,99 m",
+  );
+
 export const CreateVenueSchema = z.object({
   name: z.string().min(1),
   addressStreet:  z.string().optional(),
@@ -109,9 +122,17 @@ export const CreateVenueSchema = z.object({
   addressState:   z.string().optional(),
   addressCountry: z.string().optional(),
   capacity: z.number().optional(),
-  width: z.string().optional(),
-  length: z.string().optional(),
-  height: z.string().optional(),
+  width: VenueDimensionInputSchema,
+  length: VenueDimensionInputSchema,
+  height: VenueDimensionInputSchema,
+  contactPersonName: z.string().max(120).optional(),
+  contactPersonEmail: z
+    .string()
+    .max(254)
+    .optional()
+    .refine((v) => !v || !v.trim() || z.string().email().safeParse(v.trim()).success, "Invalid contact email"),
+  contactPersonPhone: z.string().max(40).optional(),
+  contactPersonRole: z.string().max(120).optional(),
   customFields: z.array(CustomFieldSchema).optional(),
   notes: z.string().optional(),
 });

@@ -38,6 +38,10 @@ function serializeVenue(
     width: string | null;
     length: string | null;
     height: string | null;
+    contactPersonName: string | null;
+    contactPersonEmail: string | null;
+    contactPersonPhone: string | null;
+    contactPersonRole: string | null;
     customFields: string | null;
     notes: string | null;
     organizationId: string;
@@ -228,6 +232,10 @@ venuesRouter.post("/venues", zValidator("json", CreateVenueSchema), async (c) =>
       width: body.width ?? null,
       length: body.length ?? null,
       height: body.height ?? null,
+      contactPersonName: body.contactPersonName?.trim() || null,
+      contactPersonEmail: body.contactPersonEmail?.trim() || null,
+      contactPersonPhone: body.contactPersonPhone?.trim() || null,
+      contactPersonRole: body.contactPersonRole?.trim() || null,
       customFields: body.customFields ? JSON.stringify(body.customFields) : null,
       notes: body.notes ?? null,
       organizationId: user.organizationId,
@@ -407,6 +415,18 @@ venuesRouter.put("/venues/:id", zValidator("json", UpdateVenueSchema), async (c)
       ...(body.width !== undefined && { width: body.width }),
       ...(body.length !== undefined && { length: body.length }),
       ...(body.height !== undefined && { height: body.height }),
+      ...(body.contactPersonName !== undefined && {
+        contactPersonName: body.contactPersonName?.trim() || null,
+      }),
+      ...(body.contactPersonEmail !== undefined && {
+        contactPersonEmail: body.contactPersonEmail?.trim() || null,
+      }),
+      ...(body.contactPersonPhone !== undefined && {
+        contactPersonPhone: body.contactPersonPhone?.trim() || null,
+      }),
+      ...(body.contactPersonRole !== undefined && {
+        contactPersonRole: body.contactPersonRole?.trim() || null,
+      }),
       ...(body.customFields !== undefined && {
         customFields: body.customFields ? JSON.stringify(body.customFields) : null,
       }),

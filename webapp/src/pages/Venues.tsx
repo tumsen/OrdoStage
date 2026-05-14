@@ -32,6 +32,7 @@ import {
   venueFormValuesToPayload,
   CustomFieldsEditor,
   StageSizeFields,
+  VenueContactFields,
   textToCustomFields,
   customFieldsToText,
 } from "@/components/venue/venueFormShared";
@@ -101,7 +102,7 @@ function VenueRow({
       <td className="px-5 py-3.5 text-sm text-white/50 hidden md:table-cell">
         <div>{venue.capacity != null ? venue.capacity.toLocaleString() : "—"}</div>
         <div className="text-[11px] text-white/30">
-          W {venue.width ?? "—"} · L {venue.length ?? "—"} · H {venue.height ?? "—"}
+          W {venue.width ?? "—"} · D {venue.length ?? "—"} · H {venue.height ?? "—"}
         </div>
         {venue.documentCount != null && venue.documentCount > 0 ? (
           <div className="text-[11px] text-white/40 mt-0.5">
@@ -201,7 +202,8 @@ function AddVenueForm({ onSuccess, canWrite }: { onSuccess: () => void; canWrite
       </td>
       <td className="px-5 py-3 hidden md:table-cell align-top">
         <div className="space-y-3 max-w-md">
-          <StageSizeFields register={form.register} />
+          <StageSizeFields register={form.register} errors={form.formState.errors} />
+          <VenueContactFields register={form.register} errors={form.formState.errors} />
           <div className="space-y-1.5">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
             <Input

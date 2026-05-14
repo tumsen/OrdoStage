@@ -1,10 +1,23 @@
 import { z } from "zod";
-import type { UseFormRegister } from "react-hook-form";
+import type { FieldErrors, UseFormRegister } from "react-hook-form";
 import { Plus, Trash2 } from "lucide-react";
 import type { Venue } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+/** Up to 999.99 with comma or dot decimals; optional trailing " m" (meters). */
+export const VENUE_DIMENSION_VALUE_REGEX = /^(\d{1,3})([.,]\d{1,2})?(\s*[mM])?$/;
+
+const dimensionHint = "Up to 999,99 m (e.g. 12,5 m)";
+
+function optionalVenueDimension() {
+  return z
+    .string()
+    .optional()
+    .transform((s) => (s == null ? "" : s.trim()))
+    .refine((s) => s === "" || VENUE_DIMENSION_VALUE_REGEX.test(s), dimensionHint);
+}
 
 export const VenueFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -15,9 +28,20 @@ export const VenueFormSchema = z.object({
   addressState: z.string().optional(),
   addressCountry: z.string().optional(),
   capacity: z.union([z.literal(""), z.coerce.number().int().min(0)]),
-  width: z.string().optional(),
-  length: z.string().optional(),
-  height: z.string().optional(),
+  width: optionalVenueDimension(),
+  length: optionalVenueDimension(),
+  height: optionalVenueDimension(),
+  contactPersonName: z.string().max(120).optional(),
+  contactPersonEmail: z
+    .string()
+    .max(254)
+    .optional()
+    .refine(
+      (v) => v == null || v.trim() === "" || z.string().email().safeParse(v.trim()).success,
+      "Invalid email",
+    ),
+  contactPersonPhone: z.string().max(40).optional(),
+  contactPersonRole: z.string().max(120).optional(),
   customFieldsText: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -36,6 +60,10 @@ export const DEFAULT_VENUE_FORM_VALUES: VenueFormValues = {
   width: "",
   length: "",
   height: "",
+  contactPersonName: "",
+  contactPersonEmail: "",
+  contactPersonPhone: "",
+  contactPersonRole: "",
   customFieldsText: "",
   notes: "",
 };
@@ -73,6 +101,10 @@ export function venueToFormValues(venue: Venue): VenueFormValues {
     width: venue.width ?? "",
     length: venue.length ?? "",
     height: venue.height ?? "",
+    contactPersonName: venue.contactPersonName ?? "",
+    contactPersonEmail: venue.contactPersonEmail ?? "",
+    contactPersonPhone: venue.contactPersonPhone ?? "",
+    contactPersonRole: venue.contactPersonRole ?? "",
     customFieldsText: customFieldsToText(venue.customFields ?? []),
     notes: venue.notes ?? "",
   };
@@ -91,6 +123,10 @@ export function venueFormValuesToPayload(data: VenueFormValues) {
     width: data.width?.trim() || undefined,
     length: data.length?.trim() || undefined,
     height: data.height?.trim() || undefined,
+    contactPersonName: data.contactPersonName?.trim() || undefined,
+    contactPersonEmail: data.contactPersonEmail?.trim() || undefined,
+    contactPersonPhone: data.contactPersonPhone?.trim() || undefined,
+    contactPersonRole: data.contactPersonRole?.trim() || undefined,
     customFields: textToCustomFields(data.customFieldsText),
     notes: data.notes || undefined,
   };
@@ -151,37 +187,67 @@ export function CustomFieldsEditor({
   );
 }
 
-export function StageSizeFields({ register }: { register: UseFormRegister<VenueFormValues> }) {
+const dimInputClass =
+  "bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30 max-w-[10ch] font-mono tabular-nums tracking-tight";
+
+export function StageSizeFields({
+  register,
+  errors,
+}: {
+  register: UseFormRegister<VenueFormValues>;
+  errors?: FieldErrors<VenueFormValues>;
+}) {
   return (
     <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-4 md:p-5">
       <Label className="text-white/50 text-xs uppercase tracking-wide">Stage &amp; room size</Label>
       <p className="text-[11px] text-white/35 leading-snug">
-        Interior dimensions; include units if helpful (e.g. 12&nbsp;m).
+        Meters: up to <span className="text-white/50">999,99 m</span> per field (comma or dot).
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">Width</Label>
           <Input
             {...register("width")}
-            placeholder="e.g. 14 m"
-            className="bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30"
+            maxLength={10}
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="999,99 m"
+            title={dimensionHint}
+            className={dimInputClass}
           />
+          {errors?.width?.message ? (
+            <p className="text-[11px] text-red-400/90">{String(errors.width.message)}</p>
+          ) : null}
         </div>
         <div className="space-y-1.5">
-          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Length</Label>
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Depth</Label>
           <Input
             {...register("length")}
-            placeholder="e.g. 20 m"
-            className="bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30"
+            maxLength={10}
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="999,99 m"
+            title={dimensionHint}
+            className={dimInputClass}
           />
+          {errors?.length?.message ? (
+            <p className="text-[11px] text-red-400/90">{String(errors.length.message)}</p>
+          ) : null}
         </div>
         <div className="space-y-1.5">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">Height</Label>
           <Input
             {...register("height")}
-            placeholder="e.g. 8 m"
-            className="bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30"
+            maxLength={10}
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="999,99 m"
+            title={dimensionHint}
+            className={dimInputClass}
           />
+          {errors?.height?.message ? (
+            <p className="text-[11px] text-red-400/90">{String(errors.height.message)}</p>
+          ) : null}
         </div>
         <div className="space-y-1.5">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">Audience capacity</Label>
@@ -190,8 +256,63 @@ export function StageSizeFields({ register }: { register: UseFormRegister<VenueF
             type="number"
             min={0}
             placeholder="e.g. 500"
-            className="bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30"
+            className="bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30 max-w-[10rem]"
           />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const contactInputClass = "bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30";
+
+export function VenueContactFields({
+  register,
+  errors,
+}: {
+  register: UseFormRegister<VenueFormValues>;
+  errors?: FieldErrors<VenueFormValues>;
+}) {
+  return (
+    <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-4 md:p-5">
+      <Label className="text-white/50 text-xs uppercase tracking-wide">Venue contact</Label>
+      <p className="text-[11px] text-white/35 leading-snug">On-site or technical contact for this venue.</p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Name</Label>
+          <Input {...register("contactPersonName")} maxLength={120} className={contactInputClass} placeholder="Name" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Role</Label>
+          <Input
+            {...register("contactPersonRole")}
+            maxLength={120}
+            className={contactInputClass}
+            placeholder="e.g. Technical director"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Phone</Label>
+          <Input
+            {...register("contactPersonPhone")}
+            maxLength={40}
+            className={contactInputClass}
+            placeholder="Phone"
+            inputMode="tel"
+          />
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Email</Label>
+          <Input
+            {...register("contactPersonEmail")}
+            maxLength={254}
+            type="email"
+            className={contactInputClass}
+            placeholder="email@example.com"
+          />
+          {errors?.contactPersonEmail?.message ? (
+            <p className="text-[11px] text-red-400/90">{String(errors.contactPersonEmail.message)}</p>
+          ) : null}
         </div>
       </div>
     </div>
