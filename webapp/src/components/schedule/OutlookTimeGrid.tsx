@@ -514,7 +514,7 @@ export function OutlookTimeGrid({
             >
               <div className="border-r border-white/10 bg-white/[0.02]" aria-hidden />
               <div
-                className="flex min-h-[1.75rem] items-center justify-center border-l border-white/10 px-2 py-1.5 text-center text-[11px] font-semibold text-white/85 tabular-nums"
+                className="flex min-h-[1.75rem] items-center justify-center border-l-0 px-2 py-1.5 text-center text-[11px] font-semibold text-white/85 tabular-nums"
                 style={{ gridColumn: `2 / -1` }}
               >
                 {compactSingleMonthBannerLabel}
@@ -527,10 +527,13 @@ export function OutlookTimeGrid({
               style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}
             >
               <div className="border-r border-white/10 bg-white/[0.02]" aria-hidden />
-              {compactMultiMonthRuns.map((run) => (
+              {compactMultiMonthRuns.map((run, runIdx) => (
                 <div
                   key={run.key}
-                  className="flex min-h-[1.75rem] items-end justify-center border-l border-white/10 px-0.5 py-1 text-center text-[10px] font-semibold text-white/85 tabular-nums"
+                  className={cn(
+                    "flex min-h-[1.75rem] items-end justify-center px-0.5 py-1 text-center text-[10px] font-semibold text-white/85 tabular-nums",
+                    runIdx > 0 ? "border-l border-white/10" : "border-l-0",
+                  )}
                   style={{ gridColumn: `${run.colStart} / span ${run.span}` }}
                 >
                   <span className="truncate w-full">{run.label}</span>
@@ -542,18 +545,18 @@ export function OutlookTimeGrid({
           <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}>
             <div
               className={cn(
-                "w-full border-b-0",
+                "w-full border-b-0 border-r border-white/10 bg-white/[0.02]",
                 compactDayHeaders
                   ? "min-h-[3.75rem] shrink-0 border-b border-white/10 box-border flex flex-col items-stretch justify-center px-1 py-1"
                   : WEEK_GRID_HEADER_CLASS
               )}
               aria-hidden
             />
-            {days.map((d) => (
+            {days.map((d, dayIdx) => (
               <div
                 key={d.toISOString()}
                 className={cn(
-                  "border-l border-white/10",
+                  dayIdx > 0 && "border-l border-white/10",
                   compactDayHeaders
                     ? "min-h-[3.75rem] shrink-0 border-b border-white/10 box-border flex flex-col items-stretch justify-center px-0.5 py-1 text-[10px] text-white/75"
                     : `${WEEK_GRID_HEADER_CLASS} text-xs text-white/70`
@@ -593,10 +596,16 @@ export function OutlookTimeGrid({
               <div className="bg-white/[0.01] border-r border-white/10 flex items-center justify-end pr-1.5 py-1">
                 <span className="text-[9px] text-white/25 uppercase tracking-wide">All day</span>
               </div>
-              {days.map((day) => {
+              {days.map((day, dayIdx) => {
                 const allDay = itemsForDay(items, day).filter((i) => !getItemTimeRange(i).hasExplicitTime);
                 return (
-                  <div key={day.toISOString()} className="border-l border-white/10 bg-white/[0.01] p-0.5 min-h-[28px] flex flex-col gap-0.5">
+                  <div
+                    key={day.toISOString()}
+                    className={cn(
+                      "bg-white/[0.01] p-0.5 min-h-[28px] flex flex-col gap-0.5",
+                      dayIdx > 0 && "border-l border-white/10",
+                    )}
+                  >
                     {allDay.map((item) => {
                       const eventVenueName =
                         item.kind === "job"
@@ -831,7 +840,10 @@ export function OutlookTimeGrid({
                   ref={(el) => {
                     columnRefs.current[dayIndex] = el;
                   }}
-                  className="absolute inset-x-0 touch-none select-none border-l border-white/10"
+                  className={cn(
+                    "absolute inset-x-0 touch-none select-none",
+                    dayIndex > 0 && "border-l border-white/10",
+                  )}
                   style={{
                     top: CALENDAR_TIME_GRID_TOP_PAD_PX,
                     height: totalHeight,

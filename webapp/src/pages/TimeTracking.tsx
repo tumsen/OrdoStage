@@ -1373,7 +1373,7 @@ export default function TimeTracking() {
                     className="grid min-w-0"
                     style={{ gridTemplateColumns: weekGridTemplateColumns }}
                   >
-                    <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full border-b-0")} aria-hidden />
+                    <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full border-b-0 border-r border-white/10 bg-white/[0.02]")} aria-hidden />
                     {weekDays.map((day, dayIdx) => {
                       const dayYmd = format(day, "yyyy-MM-dd");
                       const dayTotalMinutes = totalsByColumnDay.get(dayYmd) ?? 0;
@@ -1422,7 +1422,8 @@ export default function TimeTracking() {
                           className={cn(
                             "group",
                             WEEK_GRID_HEADER_CLASS,
-                            "min-w-0 border-l border-white/10 text-xs text-white/70",
+                            "min-w-0 text-xs text-white/70",
+                            dayIdx > 0 && "border-l border-white/10",
                             col?.bg,
                             col ? `border-b ${col.border}` : "border-b border-white/10"
                           )}
@@ -1550,7 +1551,8 @@ export default function TimeTracking() {
                     }}
                     data-day-col={dayYmd}
                     className={cn(
-                      "absolute inset-x-0 touch-none select-none border-l border-white/10",
+                      "absolute inset-x-0 touch-none select-none",
+                      dayIndex > 0 && "border-l border-white/10",
                       col?.bg
                     )}
                     style={{
@@ -1948,11 +1950,11 @@ export default function TimeTracking() {
                   className="grid min-w-0"
                   style={{ gridTemplateColumns: weekGridTemplateColumns }}
                 >
-                  <div className="h-6 shrink-0" />
-                  {weekDays.map((day) => (
+                  <div className="h-6 shrink-0 border-r border-white/10 bg-white/[0.02]" />
+                  {weekDays.map((day, dayIdx) => (
                     <div
                       key={`pad-${format(day, "yyyy-MM-dd")}`}
-                      className="h-6 shrink-0 border-l border-white/10"
+                      className={cn("h-6 shrink-0", dayIdx > 0 && "border-l border-white/10")}
                     />
                   ))}
                 </div>
