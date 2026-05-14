@@ -150,10 +150,12 @@ export default function Pricing() {
   }, [data]);
 
   useEffect(() => {
-    if (!data || !billingDataFingerprint) return;
+    if (!billingDataFingerprint) return;
+    const snapshot = queryClient.getQueryData<AdminBillingSettingsData>(["admin", "billing-settings"]);
+    if (!snapshot) return;
     const rowMap: Record<string, CurrencyRow> = {};
-    for (const currency of data.supportedCurrencies) {
-      const found = data.currencyPrices.find((p) => p.currencyCode === currency);
+    for (const currency of snapshot.supportedCurrencies) {
+      const found = snapshot.currencyPrices.find((p) => p.currencyCode === currency);
       rowMap[currency] = {
         userDailyRateCents: formatEditableMajorFromCents(found?.userDailyRateCents),
         nextMonthUserDailyRateCents: formatEditableMajorFromCents(found?.nextMonthUserDailyRateCents),
@@ -161,12 +163,12 @@ export default function Pricing() {
     }
     setCurrencyRows(rowMap);
     setForm({
-      paymentDueDays: String(data.paymentDueDays),
-      baseCurrencyCode: data.baseCurrencyCode || "USD",
-      yearlyDiscountPercent: String(data.yearlyDiscountPercent ?? 15),
-      yearlyDiscountEnabled: data.yearlyDiscountEnabled !== false,
+      paymentDueDays: String(snapshot.paymentDueDays),
+      baseCurrencyCode: snapshot.baseCurrencyCode || "USD",
+      yearlyDiscountPercent: String(snapshot.yearlyDiscountPercent ?? 15),
+      yearlyDiscountEnabled: snapshot.yearlyDiscountEnabled !== false,
     });
-  }, [billingDataFingerprint, data]);
+  }, [billingDataFingerprint, queryClient]);
 
   const fetchBaseRates = useCallback(async () => {
     setFxLoading(true);
@@ -369,6 +371,9 @@ export default function Pricing() {
                   </div>
                   <div className="col-span-2 flex items-center gap-1">
                     <Input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
                       className="h-7 text-xs px-2"
                       value={row.userDailyRateCents}
                       onChange={(e) =>
@@ -382,6 +387,9 @@ export default function Pricing() {
                   </div>
                   <div className="col-span-2 flex items-center gap-1">
                     <Input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
                       className="h-7 text-xs px-2"
                       value={row.nextMonthUserDailyRateCents}
                       onChange={(e) =>
