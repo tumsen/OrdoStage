@@ -174,7 +174,7 @@ export default function PublicPricing() {
           <TieredSeatPricingCalculator
             seatModel={publicSeatModel}
             yearlyDiscountPercent={publicPricing?.yearlyDiscountPercent ?? 15}
-            yearlyDiscountEnabled={publicPricing?.yearlyDiscountEnabled ?? true}
+            yearlyDiscountEnabled={publicPricing?.yearlyDiscountEnabled !== false}
           />
         </section>
 

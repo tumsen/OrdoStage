@@ -79,6 +79,8 @@ export function TieredSeatPricingCalculator({
   onSeatModelChange,
   afterModelControls,
 }: Props) {
+  /** Admin/org always sees annual controls; public page only when global setting enables annual discount. */
+  const publicAnnualOffered = showYearlyDiscountControls || yearlyDiscountEnabled;
   const [users, setUsers] = useState(20);
   const [annual, setAnnual] = useState(() => (showYearlyDiscountControls ? yearlyDiscountEnabled : false));
   const [innerModel, setInnerModel] = useState<TieredSeatModel>({ ...DEFAULT_TIERED_SEAT_MODEL });
@@ -118,6 +120,10 @@ export function TieredSeatPricingCalculator({
     if (!showYearlyDiscountControls) return;
     setAnnual(yearlyDiscountEnabled);
   }, [yearlyDiscountEnabled, showYearlyDiscountControls]);
+
+  useEffect(() => {
+    if (!publicAnnualOffered) setAnnual(false);
+  }, [publicAnnualOffered]);
 
   const floorAtSafe = Math.max(3, Math.floor(model.floorAt));
   const monthlyList = useMemo(() => monthlyAtUsers(model), [model]);
@@ -250,53 +256,62 @@ export function TieredSeatPricingCalculator({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-        <Switch
-          id="enable-annual-billing"
-          checked={annual}
-          onCheckedChange={(v) => {
-            setAnnual(v);
-            if (showYearlyDiscountControls) onYearlyDiscountEnabledChange?.(v);
-          }}
-          className="data-[state=checked]:bg-ordo-magenta data-[state=unchecked]:bg-white/20"
-        />
-        <Label htmlFor="enable-annual-billing" className="cursor-pointer text-sm text-white/70">
-          Enable annual billing
-        </Label>
-        {annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0 ? (
-          <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
-            Save €{annualSavingsYear.toLocaleString()}/yr
-          </span>
-        ) : null}
-        {showYearlyDiscountControls ? (
-          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            <Label htmlFor="annual-discount-pct" className="text-[11px] text-white/50 whitespace-nowrap">
-              Annual discount (%)
-            </Label>
-            <Input
-              id="annual-discount-pct"
-              type="text"
-              inputMode="numeric"
-              value={yearlyPercentDraft}
-              onChange={(e) => setYearlyPercentDraft(e.target.value)}
-              onBlur={commitYearlyPercentDraft}
-              className="h-9 w-[4.25rem] shrink-0 border-white/15 bg-black/30 text-white tabular-nums"
-            />
-          </div>
-        ) : null}
-      </div>
+      {publicAnnualOffered ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+          <Switch
+            id="enable-annual-billing"
+            checked={annual}
+            onCheckedChange={(v) => {
+              setAnnual(v);
+              if (showYearlyDiscountControls) onYearlyDiscountEnabledChange?.(v);
+            }}
+            className="data-[state=checked]:bg-ordo-magenta data-[state=unchecked]:bg-white/20"
+          />
+          <Label htmlFor="enable-annual-billing" className="cursor-pointer text-sm text-white/70">
+            Enable annual billing
+          </Label>
+          {annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0 ? (
+            <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
+              Save €{annualSavingsYear.toLocaleString()}/yr
+            </span>
+          ) : null}
+          {showYearlyDiscountControls ? (
+            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+              <Label htmlFor="annual-discount-pct" className="text-[11px] text-white/50 whitespace-nowrap">
+                Annual discount (%)
+              </Label>
+              <Input
+                id="annual-discount-pct"
+                type="text"
+                inputMode="numeric"
+                value={yearlyPercentDraft}
+                onChange={(e) => setYearlyPercentDraft(e.target.value)}
+                onBlur={commitYearlyPercentDraft}
+                className="h-9 w-[4.25rem] shrink-0 border-white/15 bg-black/30 text-white tabular-nums"
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-3",
+          publicAnnualOffered ? "md:grid-cols-3" : "md:grid-cols-2",
+        )}
+      >
         <MetricCard
           label="Monthly total"
           value={`€${Math.round(discountedMonthly).toLocaleString()}`}
           sub={monthlySub}
         />
-        <MetricCard
-          label="Annual total"
-          value={`€${Math.round(annualPlanYearTotal).toLocaleString()}`}
-          sub={annualTotalSub}
-        />
+        {publicAnnualOffered ? (
+          <MetricCard
+            label="Annual total"
+            value={`€${Math.round(annualPlanYearTotal).toLocaleString()}`}
+            sub={annualTotalSub}
+          />
+        ) : null}
         <MetricCard label="Effective per user" value={`€${perUserEffective.toFixed(2)}`} sub="per active user/mo" />
       </div>
 
