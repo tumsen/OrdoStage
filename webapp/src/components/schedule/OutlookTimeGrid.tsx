@@ -510,10 +510,13 @@ export function OutlookTimeGrid({
           {compactSingleMonthBannerLabel ? (
             <div
               className="grid shrink-0 border-b border-white/10 bg-white/[0.04]"
-              style={{ gridTemplateColumns: `56px minmax(0, 1fr)` }}
+              style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(0, 1fr))` }}
             >
               <div className="border-r border-white/10 bg-white/[0.02]" aria-hidden />
-              <div className="px-2 py-1.5 text-center text-[11px] font-semibold text-white/85 tabular-nums">
+              <div
+                className="flex min-h-[1.75rem] items-center justify-center border-l border-white/10 px-2 py-1.5 text-center text-[11px] font-semibold text-white/85 tabular-nums"
+                style={{ gridColumn: `2 / -1` }}
+              >
                 {compactSingleMonthBannerLabel}
               </div>
             </div>
