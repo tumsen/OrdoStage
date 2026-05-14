@@ -188,7 +188,7 @@ export function CustomFieldsEditor({
 }
 
 const dimInputClass =
-  "bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30 max-w-[10ch] font-mono tabular-nums tracking-tight";
+  "bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30 w-[9ch] min-w-0 font-mono tabular-nums tracking-tight";
 
 export function StageSizeFields({
   register,
@@ -197,68 +197,87 @@ export function StageSizeFields({
   register: UseFormRegister<VenueFormValues>;
   errors?: FieldErrors<VenueFormValues>;
 }) {
+  const dimErrors = [errors?.width, errors?.length, errors?.height].filter((e) => e?.message);
+
   return (
     <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-4 md:p-5">
       <Label className="text-white/50 text-xs uppercase tracking-wide">Stage &amp; room size</Label>
       <p className="text-[11px] text-white/35 leading-snug">
-        Meters: up to <span className="text-white/50">999,99 m</span> per field (comma or dot).
+        Values are in meters: up to <span className="text-white/50">999,99</span> per field (comma or dot). The unit{" "}
+        <span className="text-white/50">m</span> is shown beside each box — you do not need to type it unless you want
+        to.
       </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
+      <div className="flex flex-nowrap items-end gap-4 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+        <div className="shrink-0 space-y-1.5">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">Width</Label>
-          <Input
-            {...register("width")}
-            maxLength={10}
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder="999,99 m"
-            title={dimensionHint}
-            className={dimInputClass}
-          />
-          {errors?.width?.message ? (
-            <p className="text-[11px] text-red-400/90">{String(errors.width.message)}</p>
-          ) : null}
+          <div className="flex items-center gap-1.5">
+            <Input
+              {...register("width")}
+              maxLength={10}
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="999,99"
+              title={dimensionHint}
+              className={dimInputClass}
+            />
+            <span className="select-none text-sm tabular-nums text-white/50" aria-hidden>
+              m
+            </span>
+          </div>
         </div>
-        <div className="space-y-1.5">
+        <div className="shrink-0 space-y-1.5">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">Depth</Label>
-          <Input
-            {...register("length")}
-            maxLength={10}
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder="999,99 m"
-            title={dimensionHint}
-            className={dimInputClass}
-          />
-          {errors?.length?.message ? (
-            <p className="text-[11px] text-red-400/90">{String(errors.length.message)}</p>
-          ) : null}
+          <div className="flex items-center gap-1.5">
+            <Input
+              {...register("length")}
+              maxLength={10}
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="999,99"
+              title={dimensionHint}
+              className={dimInputClass}
+            />
+            <span className="select-none text-sm tabular-nums text-white/50" aria-hidden>
+              m
+            </span>
+          </div>
         </div>
-        <div className="space-y-1.5">
+        <div className="shrink-0 space-y-1.5">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">Height</Label>
-          <Input
-            {...register("height")}
-            maxLength={10}
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder="999,99 m"
-            title={dimensionHint}
-            className={dimInputClass}
-          />
-          {errors?.height?.message ? (
-            <p className="text-[11px] text-red-400/90">{String(errors.height.message)}</p>
-          ) : null}
+          <div className="flex items-center gap-1.5">
+            <Input
+              {...register("height")}
+              maxLength={10}
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="999,99"
+              title={dimensionHint}
+              className={dimInputClass}
+            />
+            <span className="select-none text-sm tabular-nums text-white/50" aria-hidden>
+              m
+            </span>
+          </div>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Audience capacity</Label>
-          <Input
-            {...register("capacity")}
-            type="number"
-            min={0}
-            placeholder="e.g. 500"
-            className="bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30 max-w-[10rem]"
-          />
+      </div>
+      {dimErrors.length > 0 ? (
+        <div className="space-y-0.5">
+          {dimErrors.map((e, i) => (
+            <p key={i} className="text-[11px] text-red-400/90">
+              {String(e?.message)}
+            </p>
+          ))}
         </div>
+      ) : null}
+      <div className="space-y-1.5 pt-1">
+        <Label className="text-white/45 text-[10px] uppercase tracking-wide">Audience capacity</Label>
+        <Input
+          {...register("capacity")}
+          type="number"
+          min={0}
+          placeholder="e.g. 500"
+          className="max-w-[10rem] bg-white/5 border-white/10 text-white h-9 text-sm focus:border-white/30"
+        />
       </div>
     </div>
   );
