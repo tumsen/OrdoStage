@@ -295,7 +295,7 @@ export function VenueCalendarContextStrip({
     <div
       className={cn(
         "w-full min-w-0 space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3",
-        flatTop && "rounded-t-none border-t-0",
+        flatTop && "rounded-t-none",
         className,
       )}
     >
