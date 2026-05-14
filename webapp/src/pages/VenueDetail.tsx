@@ -15,7 +15,7 @@ import {
   toDatetimeLocalValue,
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
-import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
+import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS, CALENDAR_PANEL_SHELL_INSET_X_CLASS } from "@/lib/weekGridColumns";
 import { ScheduleItemDetailSheet } from "@/components/schedule/ScheduleItemDetailSheet";
 import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
@@ -327,13 +327,15 @@ export default function VenueDetail() {
 
       {!venueLoading && venue ? (
         <div className="w-full min-w-0 shrink-0 px-4 pb-10 pt-4 md:px-6">
-          <VenueCalendarContextStrip
-            flatTop
-            venueId={venueId}
-            venue={venue}
-            showEditLink={canWrite}
-            archiveFolderName={venue?.name}
-          />
+          <div className={`min-w-0 ${CALENDAR_PANEL_SHELL_INSET_X_CLASS}`}>
+            <VenueCalendarContextStrip
+              flatTop
+              venueId={venueId}
+              venue={venue}
+              showEditLink={canWrite}
+              archiveFolderName={venue?.name}
+            />
+          </div>
         </div>
       ) : null}
 

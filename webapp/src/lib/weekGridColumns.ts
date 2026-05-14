@@ -23,6 +23,9 @@ export const CALENDAR_STICKY_HEADER_CHROME =
 export const CALENDAR_PANEL_SHELL_CLASS =
   "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl p-3 md:p-4";
 
+/** Horizontal inset matching the shell’s `p-3 md:p-4` so content outside the shell (e.g. venue info) lines up with the grid border. */
+export const CALENDAR_PANEL_SHELL_INSET_X_CLASS = "mx-3 md:mx-4";
+
 /**
  * Fills the shell so the bordered scroller can use `min-h-0 flex-1` (matches schedule week wrapper).
  * Do not use `h-full` here — nested under flex + overflow it often resolves to 0 and hides the grid.
