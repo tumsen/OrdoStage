@@ -154,12 +154,14 @@ export default function VenueDetail() {
       }
       const shellTop = shell.getBoundingClientRect().top;
       const dividerTop = divider.getBoundingClientRect().top;
-      const raw = Math.floor(dividerTop - shellTop);
-      if (raw < CALENDAR_SHELL_MIN_HEIGHT_PX || raw > 8000) {
+      // Base span = distance from shell top to sidebar user divider; calendar uses 2× that height.
+      const spanPx = Math.floor(dividerTop - shellTop);
+      const heightPx = spanPx * 2;
+      if (spanPx < CALENDAR_SHELL_MIN_HEIGHT_PX / 2 || heightPx > 16_000) {
         setCalendarShellHeightPx(null);
         return;
       }
-      setCalendarShellHeightPx(raw);
+      setCalendarShellHeightPx(Math.max(CALENDAR_SHELL_MIN_HEIGHT_PX, heightPx));
     };
 
     measure();
