@@ -149,7 +149,6 @@ export function DocumentListThumbnail({
   }, [downloadUrl, mimeType, filename, preferImage]);
 
   const primaryLabel = (name?.trim() || filename).trim() || "Document";
-  const showFilenameSubtitle = primaryLabel !== filename && filename.trim().length > 0;
 
   const handleDownload = useCallback(
     async (e: React.MouseEvent) => {
@@ -166,7 +165,7 @@ export function DocumentListThumbnail({
   );
 
   const box = cn(boxBase, sizeClassName, className);
-  const triggerTitle = `${primaryLabel}${filename && filename !== primaryLabel ? ` (${filename})` : ""} — hover for preview`;
+  const triggerTitle = `${primaryLabel} — hover for preview`;
 
   const triggerInner = (
     <>
@@ -257,7 +256,6 @@ export function DocumentListThumbnail({
         {previewBlock}
         <div className="mt-2 space-y-1">
           <p className="line-clamp-2 text-[11px] font-medium text-white/90">{primaryLabel}</p>
-          {showFilenameSubtitle ? <p className="truncate text-[10px] text-white/40">{filename}</p> : null}
           <Button
             type="button"
             size="sm"
