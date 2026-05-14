@@ -96,9 +96,13 @@ export default function PublicPricing() {
     prices: Array<{ currencyCode: string; userDailyRateCents: number }>;
   }>({
     queryKey: ["public-pricing-rates"],
-    queryFn: () => api.get("/api/public/pricing"),
+    queryFn: ({ signal }) =>
+      api.get(`/api/public/pricing?t=${Date.now()}`, { cache: "no-store", signal }),
     staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
     refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const supportedCurrencies = (publicPricing?.prices ?? []).map((p) => p.currencyCode);

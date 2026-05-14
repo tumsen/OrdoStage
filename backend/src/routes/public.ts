@@ -75,6 +75,7 @@ publicRouter.get("/mail-config", (c) => {
 
 // GET /api/public/pricing — public pricing table
 publicRouter.get("/pricing", async (c) => {
+  c.header("Cache-Control", "no-store, no-cache, must-revalidate");
   await ensureCurrencyPriceMonthRollover(prisma);
   const [cfgRows, priceRows] = await Promise.all([
     prisma.billingConfig.findUnique({

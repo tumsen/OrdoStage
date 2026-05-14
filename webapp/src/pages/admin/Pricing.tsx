@@ -21,6 +21,20 @@ type CurrencyRow = {
   userDailyRateCents: string; // major units input (e.g. "5" means 5.00)
   nextMonthUserDailyRateCents: string; // major units input
 };
+
+/** Matches GET/PATCH `/api/admin/billing/settings` `data` envelope. */
+type AdminBillingSettingsData = {
+  paymentDueDays: number;
+  yearlyDiscountPercent?: number;
+  yearlyDiscountEnabled?: boolean;
+  baseCurrencyCode?: string;
+  currencyPrices: Array<{
+    currencyCode: string;
+    userDailyRateCents: number;
+    nextMonthUserDailyRateCents?: number | null;
+  }>;
+  supportedCurrencies: string[];
+};
 const CURRENCY_COUNTRY_LABELS: Record<string, string> = {
   USD: "United States",
   EUR: "Eurozone",
@@ -68,6 +82,39 @@ function calculateBaseComparison(
   return calculated;
 }
 
+/** Merge form with last-known server rows so PATCH always sends rates for every filled currency (avoids empty `currencyPrices`). */
+function buildCurrencyPricesPayload(
+  supported: string[] | undefined,
+  rows: Record<string, CurrencyRow>,
+  serverPrices: AdminBillingSettingsData["currencyPrices"] | undefined,
+): Array<{
+  currencyCode: string;
+  userDailyRateCents: number;
+  nextMonthUserDailyRateCents: number | null;
+}> {
+  if (!supported?.length) return [];
+  const out: Array<{
+    currencyCode: string;
+    userDailyRateCents: number;
+    nextMonthUserDailyRateCents: number | null;
+  }> = [];
+  for (const currencyCode of supported) {
+    const row = rows[currencyCode] ?? { userDailyRateCents: "", nextMonthUserDailyRateCents: "" };
+    const server = serverPrices?.find((p) => p.currencyCode === currencyCode);
+    const currentMajor =
+      row.userDailyRateCents.trim() || formatEditableMajorFromCents(server?.userDailyRateCents);
+    if (!currentMajor.trim()) continue;
+    const nextTrim = row.nextMonthUserDailyRateCents.trim();
+    const nextMonthUserDailyRateCents = nextTrim.length > 0 ? majorToCents(nextTrim) : null;
+    out.push({
+      currencyCode,
+      userDailyRateCents: majorToCents(currentMajor),
+      nextMonthUserDailyRateCents,
+    });
+  }
+  return out;
+}
+
 
 export default function Pricing() {
   const { toast } = useToast();
@@ -86,24 +133,24 @@ export default function Pricing() {
   const [fxRefreshedAt, setFxRefreshedAt] = useState<string | null>(null); // Local fetch time
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
-  const { data, isPending } = useQuery<{
-    paymentDueDays: number;
-    yearlyDiscountPercent?: number;
-    yearlyDiscountEnabled?: boolean;
-    baseCurrencyCode?: string;
-    currencyPrices: Array<{
-      currencyCode: string;
-      userDailyRateCents: number;
-      nextMonthUserDailyRateCents?: number | null;
-    }>;
-    supportedCurrencies: string[];
-  }>({
+  const { data, isPending } = useQuery<AdminBillingSettingsData>({
     queryKey: ["admin", "billing-settings"],
     queryFn: () => api.get("/api/admin/billing/settings"),
   });
 
+  const billingDataFingerprint = useMemo(() => {
+    if (!data) return "";
+    return JSON.stringify({
+      paymentDueDays: data.paymentDueDays,
+      yearlyDiscountPercent: data.yearlyDiscountPercent,
+      yearlyDiscountEnabled: data.yearlyDiscountEnabled,
+      baseCurrencyCode: data.baseCurrencyCode,
+      currencyPrices: data.currencyPrices,
+    });
+  }, [data]);
+
   useEffect(() => {
-    if (!data) return;
+    if (!data || !billingDataFingerprint) return;
     const rowMap: Record<string, CurrencyRow> = {};
     for (const currency of data.supportedCurrencies) {
       const found = data.currencyPrices.find((p) => p.currencyCode === currency);
@@ -119,7 +166,7 @@ export default function Pricing() {
       yearlyDiscountPercent: String(data.yearlyDiscountPercent ?? 15),
       yearlyDiscountEnabled: data.yearlyDiscountEnabled !== false,
     });
-  }, [data]);
+  }, [billingDataFingerprint, data]);
 
   const fetchBaseRates = useCallback(async () => {
     setFxLoading(true);
@@ -183,28 +230,31 @@ export default function Pricing() {
   }, [currencyRows, form.baseCurrencyCode, form.paymentDueDays, form.yearlyDiscountEnabled, yearlyDiscountPercentClamped]);
 
   const saveMutation = useMutation({
-    mutationFn: () =>
-      api.patch("/api/admin/billing/settings", {
-        paymentDueDays: Number(form.paymentDueDays),
+    mutationFn: async (): Promise<AdminBillingSettingsData> => {
+      const paymentDueDays = Number(form.paymentDueDays);
+      if (!Number.isFinite(paymentDueDays) || paymentDueDays < 1 || paymentDueDays > 30) {
+        throw new Error("Invoice due days must be a number between 1 and 30.");
+      }
+      const currencyPrices = buildCurrencyPricesPayload(
+        data?.supportedCurrencies,
+        currencyRows,
+        data?.currencyPrices,
+      );
+      return api.patch<AdminBillingSettingsData>("/api/admin/billing/settings", {
+        paymentDueDays,
         baseCurrencyCode: form.baseCurrencyCode,
         yearlyDiscountPercent: yearlyDiscountPercentClamped,
         yearlyDiscountEnabled: form.yearlyDiscountEnabled,
-        currencyPrices: Object.entries(currencyRows)
-          .filter(([, row]) => row.userDailyRateCents.trim().length > 0)
-          .map(([currencyCode, row]) => ({
-            currencyCode,
-            userDailyRateCents: majorToCents(row.userDailyRateCents),
-            nextMonthUserDailyRateCents:
-              row.nextMonthUserDailyRateCents.trim().length > 0 ? majorToCents(row.nextMonthUserDailyRateCents) : null,
-          })),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "billing-settings"] });
-      queryClient.invalidateQueries({ queryKey: ["public-pricing-rates"] });
+        currencyPrices,
+      });
+    },
+    onSuccess: async (saved) => {
+      queryClient.setQueryData(["admin", "billing-settings"], saved);
+      await queryClient.refetchQueries({ queryKey: ["public-pricing-rates"], type: "all" });
       setSaveConfirmOpen(false);
       toast({
         title: "Pricing updated",
-        description: "Global billing defaults are saved. The public pricing page will show new rates on the next load or tab focus.",
+        description: "Global billing defaults are saved. The public pricing page will refetch the latest rates.",
       });
     },
     onError: (err) => {
@@ -363,7 +413,7 @@ export default function Pricing() {
                 type="button"
                 className="bg-rose-700 hover:bg-rose-600"
                 onClick={() => setSaveConfirmOpen(true)}
-                disabled={saveMutation.isPending || isPending}
+                disabled={saveMutation.isPending || isPending || !data}
               >
                 Save new pricing
               </Button>
@@ -397,7 +447,7 @@ export default function Pricing() {
             <Button
               type="button"
               className="bg-rose-700 hover:bg-rose-600"
-              disabled={saveMutation.isPending}
+              disabled={saveMutation.isPending || !data}
               onClick={() => saveMutation.mutate()}
             >
               {saveMutation.isPending ? "Saving…" : "Confirm and save"}
