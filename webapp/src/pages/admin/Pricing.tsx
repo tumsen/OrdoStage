@@ -4,6 +4,7 @@ import { api, isApiError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
 import { parseSeatCalculatorJson } from "@/lib/seatCalculatorJson";
@@ -175,62 +176,56 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
             onYearlyDiscountEnabledChange={setSeatYearlyEnabled}
             seatModel={seatModel}
             onSeatModelChange={setSeatModel}
+            afterModelControls={
+              <>
+                <p className="text-xs font-medium uppercase tracking-wide text-white/45">Invoice & access timing</p>
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                    <Label className="text-[11px] font-medium text-white/50">Invoice due days (1–30)</Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={paymentDueDays}
+                      onChange={(e) => setPaymentDueDays(e.target.value)}
+                      className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
+                    />
+                    <p className="mt-1.5 text-[10px] text-white/40">Days after issue until due.</p>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                    <Label className="text-[11px] font-medium text-white/50">Trial period (days)</Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={billingTrialDays}
+                      onChange={(e) => setBillingTrialDays(e.target.value)}
+                      className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
+                    />
+                    <p className="mt-1.5 text-[10px] text-white/40">From org creation; 0 = no trial.</p>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 col-span-2 md:col-span-1">
+                    <Label className="text-[11px] font-medium text-white/50">Grace after invoice due (days)</Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={billingGraceDaysAfterDue}
+                      onChange={(e) => setBillingGraceDaysAfterDue(e.target.value)}
+                      className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
+                    />
+                    <p className="mt-1.5 text-[10px] text-white/40">Extra days after due before read-only; 0 = none.</p>
+                  </div>
+                </div>
+                <p className="text-[10px] text-white/40 leading-relaxed">
+                  <span className="text-white/55">Trial</span> — unpaid invoices do not force read-only until the trial
+                  ends. <span className="text-white/55">Grace</span> — after the due date, read-only waits this many
+                  extra days.
+                </p>
+              </>
+            }
           />
 
-          <div className="space-y-4 border-t border-white/10 pt-4">
-            <p className="text-xs text-white/55 leading-relaxed">
-              <span className="text-white/75">Trial</span> — days from each organization&apos;s creation date where
-              unpaid invoices never switch the workspace to read-only (0 disables).{" "}
-              <span className="text-white/75">Grace after due</span> — extra days after an invoice due date before
-              read-only applies (0 means the due date is the cutoff).
-            </p>
-            <div className="grid gap-4 sm:grid-cols-3 max-w-2xl">
-              <div className="space-y-1">
-                <p className="text-xs text-white/50">Invoice due days (1–30)</p>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  className="max-w-[120px]"
-                  value={paymentDueDays}
-                  onChange={(e) => setPaymentDueDays(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-white/50">Trial period (days)</p>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  className="max-w-[120px]"
-                  value={billingTrialDays}
-                  onChange={(e) => setBillingTrialDays(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-white/50">Grace after invoice due (days)</p>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  className="max-w-[120px]"
-                  value={billingGraceDaysAfterDue}
-                  onChange={(e) => setBillingGraceDaysAfterDue(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button
-              type="button"
-              size="lg"
-              className="h-11 w-full shrink-0 bg-rose-600 px-8 text-base font-semibold hover:bg-rose-500 sm:w-auto"
-              onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending}
-            >
-              {saveMutation.isPending ? "Saving…" : "Save pricing"}
-            </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
 

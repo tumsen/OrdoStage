@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   CartesianGrid,
   Line,
@@ -43,6 +43,8 @@ type Props = {
   /** Controlled seat curve (organisation overrides). */
   seatModel?: TieredSeatModel;
   onSeatModelChange?: (m: TieredSeatModel) => void;
+  /** Rendered after the model price/floor cards (e.g. admin invoice timing fields). */
+  afterModelControls?: ReactNode;
 };
 
 function clampInt(n: number, min: number, max: number): number {
@@ -66,6 +68,7 @@ export function TieredSeatPricingCalculator({
   onYearlyDiscountEnabledChange,
   seatModel: controlledSeatModel,
   onSeatModelChange,
+  afterModelControls,
 }: Props) {
   const [users, setUsers] = useState(20);
   const [annual, setAnnual] = useState(false);
@@ -302,6 +305,7 @@ export function TieredSeatPricingCalculator({
               onBlur={commitFloorPriceDraft}
             />
           </div>
+          {afterModelControls ? <div className="space-y-3">{afterModelControls}</div> : null}
         </>
       ) : null}
 
