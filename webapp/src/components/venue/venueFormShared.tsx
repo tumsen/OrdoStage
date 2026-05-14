@@ -43,6 +43,8 @@ export const VenueFormSchema = z.object({
     ),
   contactPersonPhone: z.string().max(40).optional(),
   contactPersonRole: z.string().max(120).optional(),
+  contactCompanyName: z.string().max(200).optional(),
+  contactCompanyVat: z.string().max(64).optional(),
   customFieldsText: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -65,6 +67,8 @@ export const DEFAULT_VENUE_FORM_VALUES: VenueFormValues = {
   contactPersonEmail: "",
   contactPersonPhone: "",
   contactPersonRole: "",
+  contactCompanyName: "",
+  contactCompanyVat: "",
   customFieldsText: "",
   notes: "",
 };
@@ -106,6 +110,8 @@ export function venueToFormValues(venue: Venue): VenueFormValues {
     contactPersonEmail: venue.contactPersonEmail ?? "",
     contactPersonPhone: venue.contactPersonPhone ?? "",
     contactPersonRole: venue.contactPersonRole ?? "",
+    contactCompanyName: venue.contactCompanyName ?? "",
+    contactCompanyVat: venue.contactCompanyVat ?? "",
     customFieldsText: customFieldsToText(venue.customFields ?? []),
     notes: venue.notes ?? "",
   };
@@ -128,6 +134,8 @@ export function venueFormValuesToPayload(data: VenueFormValues) {
     contactPersonEmail: data.contactPersonEmail?.trim() || undefined,
     contactPersonPhone: data.contactPersonPhone?.trim() || undefined,
     contactPersonRole: data.contactPersonRole?.trim() || undefined,
+    contactCompanyName: data.contactCompanyName?.trim() || undefined,
+    contactCompanyVat: data.contactCompanyVat?.trim() || undefined,
     customFields: textToCustomFields(data.customFieldsText),
     notes: data.notes || undefined,
   };
@@ -301,6 +309,25 @@ export function VenueContactFields({
       <Label className="text-white/50 text-xs uppercase tracking-wide">Venue contact</Label>
       <p className="text-[11px] text-white/35 leading-snug">On-site or technical contact for this venue.</p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide">Company name</Label>
+          <Input
+            {...register("contactCompanyName")}
+            maxLength={200}
+            className={contactInputClass}
+            placeholder="Legal or trading name"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-white/45 text-[10px] uppercase tracking-wide">VAT number</Label>
+          <Input
+            {...register("contactCompanyVat")}
+            maxLength={64}
+            className={contactInputClass}
+            placeholder="e.g. DK12345678"
+            autoComplete="off"
+          />
+        </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label className="text-white/45 text-[10px] uppercase tracking-wide">Name</Label>
           <Input {...register("contactPersonName")} maxLength={120} className={contactInputClass} placeholder="Name" />

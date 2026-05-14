@@ -86,6 +86,8 @@ export const VenueSchema = z.object({
   contactPersonEmail: z.string().nullable(),
   contactPersonPhone: z.string().nullable(),
   contactPersonRole: z.string().nullable(),
+  contactCompanyName: z.string().nullable(),
+  contactCompanyVat: z.string().nullable(),
   customFields: z.array(CustomFieldSchema),
   notes: z.string().nullable(),
   /** Present on list/detail from API when included. */
@@ -133,6 +135,8 @@ export const CreateVenueSchema = z.object({
     .refine((v) => !v || !v.trim() || z.string().email().safeParse(v.trim()).success, "Invalid contact email"),
   contactPersonPhone: z.string().max(40).optional(),
   contactPersonRole: z.string().max(120).optional(),
+  contactCompanyName: z.string().max(200).optional(),
+  contactCompanyVat: z.string().max(64).optional(),
   customFields: z.array(CustomFieldSchema).optional(),
   notes: z.string().optional(),
 });

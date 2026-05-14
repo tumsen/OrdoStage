@@ -304,7 +304,9 @@ export function VenueCalendarContextStrip({
 
   const hasContact = Boolean(
     venue &&
-      (venue.contactPersonName?.trim() ||
+      (venue.contactCompanyName?.trim() ||
+        venue.contactCompanyVat?.trim() ||
+        venue.contactPersonName?.trim() ||
         venue.contactPersonRole?.trim() ||
         venue.contactPersonPhone?.trim() ||
         venue.contactPersonEmail?.trim()),
@@ -406,6 +408,18 @@ export function VenueCalendarContextStrip({
             <div className="min-w-0 space-y-1.5">
               <div className="text-[10px] uppercase tracking-wide text-white/40">Contact</div>
               <dl className="grid w-full min-w-0 grid-cols-[minmax(4.5rem,auto)_1fr] gap-x-2 gap-y-1 text-[11px] leading-snug">
+                {venue.contactCompanyName?.trim() ? (
+                  <div className="contents">
+                    <dt className="text-white/40">Company</dt>
+                    <dd className="break-words text-white/75">{venue.contactCompanyName.trim()}</dd>
+                  </div>
+                ) : null}
+                {venue.contactCompanyVat?.trim() ? (
+                  <div className="contents">
+                    <dt className="text-white/40">VAT</dt>
+                    <dd className="break-words text-white/75 tabular-nums">{venue.contactCompanyVat.trim()}</dd>
+                  </div>
+                ) : null}
                 {venue.contactPersonName?.trim() ? (
                   <div className="contents">
                     <dt className="text-white/40">Name</dt>
