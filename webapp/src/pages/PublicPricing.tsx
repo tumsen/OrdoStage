@@ -10,6 +10,7 @@ import {
   DEFAULT_TIERED_SEAT_MODEL,
   formatEuroMajor,
   marginalSeatMajorForIndex1Based,
+  ordinalEn,
   type TieredSeatModel,
 } from "@/lib/tieredSeatPricing";
 
@@ -61,7 +62,12 @@ export default function PublicPricing() {
     return { ...DEFAULT_TIERED_SEAT_MODEL, ...parsed?.model };
   })();
 
-  const firstSeatMajor = marginalSeatMajorForIndex1Based(1, publicSeatModel);
+  const firstSeatLabel = formatEuroMajor(marginalSeatMajorForIndex1Based(1, publicSeatModel));
+  const safeFloorAt = Math.max(3, Math.floor(publicSeatModel.floorAt));
+  const secondSeatMajor = formatEuroMajor(marginalSeatMajorForIndex1Based(2, publicSeatModel));
+  const floorMajor = formatEuroMajor(publicSeatModel.floor);
+  const seatCurveDeclines =
+    publicSeatModel.start > publicSeatModel.floor + 1e-9 && safeFloorAt > 2;
 
   return (
     <div className="text-white">
@@ -71,16 +77,37 @@ export default function PublicPricing() {
         <header className="space-y-6">
           <div className="space-y-3">
             <p className="text-sm uppercase tracking-wide text-white/60">First billable seat (monthly, EUR)</p>
-            <p className="text-3xl md:text-4xl font-bold text-white">{formatEuroMajor(firstSeatMajor)} / month</p>
-            <SeatTierIntroBlurb model={publicSeatModel} className="max-w-3xl" />
+            <p className="text-3xl md:text-4xl font-bold text-white">{firstSeatLabel} / month</p>
+            <div className="max-w-3xl rounded-xl border border-ordo-violet/30 bg-white/[0.06] p-4 md:p-5 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ordo-yellow/90">
+                Published EUR structure (per billable month)
+              </p>
+              <p className="text-base md:text-lg text-white/85 leading-relaxed">
+                The base charge is <strong className="text-white">{firstSeatLabel}</strong> per month, which{" "}
+                <strong className="text-white">includes the first billable user</strong>.
+                {seatCurveDeclines ? (
+                  <>
+                    {" "}
+                    The <strong className="text-white">second</strong> billable user adds{" "}
+                    <strong className="text-white">{secondSeatMajor}</strong>. Each further billable user then pays a{" "}
+                    <strong className="text-white">lower marginal amount</strong> on the curve until the per-seat
+                    marginal reaches <strong className="text-white">{floorMajor}</strong> from the{" "}
+                    <strong className="text-white">{ordinalEn(safeFloorAt)} billable user</strong> onward.
+                  </>
+                ) : (
+                  <>
+                    {" "}
+                    Each billable user from the <strong className="text-white">second</strong> onward adds{" "}
+                    <strong className="text-white">{secondSeatMajor}</strong> per month on the published curve.
+                  </>
+                )}{" "}
+                Your invoice total is the <strong className="text-white">sum</strong> of those marginal amounts for
+                everyone who was billable that month (see the calculator below for any seat count).
+              </p>
+            </div>
             <p className="text-sm text-white/50 max-w-3xl leading-relaxed">
-              <strong className="text-white/80 font-medium">Your total invoice scales with how many members were
-              billable</strong> in that month, using the published seat curve: each person adds the next marginal amount
-              on the curve—not a flat multiple of the first-seat rate. Use the{" "}
-              <strong className="text-white/80 font-medium">pricing calculator below</strong> to see estimated monthly
-              totals at any seat count. The large figure above is only the first seat; the published EUR row in billing (
-              {formatEuroMajor((eurPerUserMonthCents || 0) / 100)}) is kept in sync with that first-seat rate for legacy
-              summaries.
+              The large figure above is the first-seat portion only. The published EUR row in billing (
+              {formatEuroMajor((eurPerUserMonthCents || 0) / 100)}) tracks that first-seat rate for legacy summaries.
             </p>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">
