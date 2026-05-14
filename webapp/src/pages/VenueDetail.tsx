@@ -302,6 +302,7 @@ export default function VenueDetail() {
                   items={calendarItems}
                   onItemClick={(item) => setDetailItem(item)}
                   readOnly
+                  compactDayHeaders
                   fitHoursVertically
                   rejectCreateDragWhenOverlapping={canWrite}
                   onSelectTimeRange={
