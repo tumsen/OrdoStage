@@ -155,56 +155,56 @@ export default function VenueDetail() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
-      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3">
-        <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white gap-1 -ml-2 shrink-0">
-          <Link to="/venues">
-            <ChevronLeft className="h-4 w-4" />
-            Venues
-          </Link>
-        </Button>
-        {venue && !venueLoading ? (
-          <span className="text-lg font-semibold text-white truncate min-w-0">{venue.name}</span>
-        ) : null}
-      </div>
-
-      {venueLoading || !venue ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-4">
-          <Skeleton className="h-8 w-64 shrink-0 bg-white/5" />
-          <Skeleton className="min-h-0 flex-1 w-full rounded-xl border border-white/10 bg-white/5" />
+    <>
+      {/* One full scrollport band (like Schedule): strip is a sibling below so it does not steal flex height from fitHoursVertically. */}
+      <div className="flex h-full min-h-0 w-full shrink-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
+        <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3">
+          <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white gap-1 -ml-2 shrink-0">
+            <Link to="/venues">
+              <ChevronLeft className="h-4 w-4" />
+              Venues
+            </Link>
+          </Button>
+          {venue && !venueLoading ? (
+            <span className="text-lg font-semibold text-white truncate min-w-0">{venue.name}</span>
+          ) : null}
         </div>
-      ) : (
-        <>
-          {/* Same panel flex pattern as Schedule.tsx: shell is flex-1 so OutlookTimeGrid + fitHoursVertically match. */}
+
+        {venueLoading || !venue ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-4">
+            <Skeleton className="h-8 w-64 shrink-0 bg-white/5" />
+            <Skeleton className="min-h-0 flex-1 w-full rounded-xl border border-white/10 bg-white/5" />
+          </div>
+        ) : (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
               <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <h2 className="text-sm font-semibold text-white/90 shrink-0">Bookings</h2>
-              <div className="flex rounded-lg border border-white/10 p-0.5 bg-white/[0.03]">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className={`h-7 px-2.5 text-xs ${calendarView === "month" ? "bg-white/10 text-white" : "text-white/60 hover:text-white"}`}
-                  onClick={() => setCalendarView("month")}
-                >
-                  Month
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className={`h-7 px-2.5 text-xs ${calendarView === "next31" ? "bg-white/10 text-white" : "text-white/60 hover:text-white"}`}
-                  onClick={() => {
-                    setNext31Start(startOfLocalDay(new Date()));
-                    setCalendarView("next31");
-                  }}
-                >
-                  Next 31 days
-                </Button>
+                <h2 className="text-sm font-semibold text-white/90 shrink-0">Bookings</h2>
+                <div className="flex rounded-lg border border-white/10 p-0.5 bg-white/[0.03]">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={`h-7 px-2.5 text-xs ${calendarView === "month" ? "bg-white/10 text-white" : "text-white/60 hover:text-white"}`}
+                    onClick={() => setCalendarView("month")}
+                  >
+                    Month
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={`h-7 px-2.5 text-xs ${calendarView === "next31" ? "bg-white/10 text-white" : "text-white/60 hover:text-white"}`}
+                    onClick={() => {
+                      setNext31Start(startOfLocalDay(new Date()));
+                      setCalendarView("next31");
+                    }}
+                  >
+                    Next 31 days
+                  </Button>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
               {calendarView === "month" ? (
                 <>
                   <Button
@@ -319,18 +319,21 @@ export default function VenueDetail() {
               )}
             </div>
           </div>
-          </div>
+        </div>
+        )}
 
-          <div className="max-h-[min(38svh,22rem)] min-h-0 shrink-0 overflow-x-hidden overflow-y-auto">
-            <VenueCalendarContextStrip
-              venueId={venueId}
-              venue={venue}
-              showEditLink={canWrite}
-              archiveFolderName={venue?.name}
-            />
-          </div>
-        </>
-      )}
+      </div>
+
+      {!venueLoading && venue ? (
+        <div className="w-full shrink-0 border-t border-white/10 px-4 pb-10 pt-6 md:px-6">
+          <VenueCalendarContextStrip
+            venueId={venueId}
+            venue={venue}
+            showEditLink={canWrite}
+            archiveFolderName={venue?.name}
+          />
+        </div>
+      ) : null}
 
       <ScheduleItemDetailSheet
         item={detailItem}
@@ -359,6 +362,6 @@ export default function VenueDetail() {
         fixedVenueName={venue?.name}
         fixedBookingType="venue_booking"
       />
-    </div>
+    </>
   );
 }
