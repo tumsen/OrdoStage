@@ -1,6 +1,6 @@
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { CalendarDays, MapPin, CheckCircle2, Plus, ArrowRight, TrendingUp, Route, ChevronLeft, ChevronRight, Coffee, Truck } from "lucide-react";
+import { CalendarDays, MapPin, CheckCircle2, Plus, ArrowRight, TrendingUp, Route, ChevronLeft, ChevronRight, Coffee, Truck, Receipt } from "lucide-react";
 import { api } from "@/lib/api";
 import type { EventDetail, Venue } from "@/lib/types";
 import type { TourDetail } from "../../../backend/src/types";
@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { CALENDAR_STICKY_HEADER_CHROME } from "@/lib/weekGridColumns";
 import { useMemo, useState } from "react";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -199,6 +200,8 @@ function MonthCalendar({ events, tourDetails }: { events: EventDetail[]; tourDet
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { canAction } = usePermissions();
+  const canManageBilling = canAction("billing.manage");
 
   const { data: events, isLoading: eventsLoading } = useQuery({
     queryKey: ["events"],
@@ -213,6 +216,16 @@ export default function Dashboard() {
   const { data: tours } = useQuery({
     queryKey: ["tours"],
     queryFn: () => api.get<TourListItem[]>("/api/tours"),
+  });
+
+  const { data: orgUsage } = useQuery({
+    queryKey: ["org"],
+    queryFn: () =>
+      api.get<{
+        billableMembersThisMonth?: Array<{ id: string; name: string | null; email: string }>;
+        estimatedMonthlyCents?: number;
+        estimatedCurrencyCode?: string;
+      }>("/api/org"),
   });
 
   // Fetch detail for each tour that has shows (to get show dates)
@@ -251,6 +264,7 @@ export default function Dashboard() {
   const confirmedEvents = events?.filter((e) => e.status === "confirmed").length ?? 0;
   const venueCount = venues?.length ?? 0;
   const tourCount = tours?.length ?? 0;
+  const billableCount = orgUsage?.billableMembersThisMonth?.length ?? 0;
 
   // Upcoming tour shows (next 60 days across all tours)
   const now = new Date();
@@ -282,9 +296,9 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         {eventsLoading || venuesLoading ? (
-          Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl bg-white/5" />)
+          Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl bg-white/5" />)
         ) : (
           <>
             <StatCard icon={CalendarDays} label="Total Events" value={totalEvents} color="bg-indigo-500/15 text-indigo-400" />
@@ -292,9 +306,45 @@ export default function Dashboard() {
             <StatCard icon={CheckCircle2} label="Confirmed" value={confirmedEvents} color="bg-emerald-500/15 text-emerald-400" />
             <StatCard icon={MapPin} label="Venues" value={venueCount} color="bg-red-500/15 text-red-400" />
             <StatCard icon={Route} label="Tours" value={tourCount} color="bg-amber-500/15 text-amber-400" />
+            <StatCard icon={Receipt} label="Billable seats (month)" value={billableCount} color="bg-rose-500/15 text-rose-300" />
           </>
         )}
       </div>
+
+      {orgUsage?.billableMembersThisMonth && orgUsage.billableMembersThisMonth.length > 0 ? (
+        <div className="bg-white/[0.03] border border-white/10 rounded-xl p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-white">Usage this month</h3>
+            <Link to="/account#billing" className="text-xs text-white/40 hover:text-white/70">
+              Billing details →
+            </Link>
+          </div>
+          <p className="text-xs text-white/45 leading-relaxed">
+            Billable members (UTC month to date) had jobs, staffing, event edits, or work time. You only pay for seats
+            with activity—idle teammates are not counted.
+          </p>
+          <ul className="divide-y divide-white/5 rounded-lg border border-white/10 overflow-hidden">
+            {orgUsage.billableMembersThisMonth.slice(0, 8).map((u) => (
+              <li key={u.id} className="px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-sm">
+                <span className="text-white/85 truncate">{u.name?.trim() || "—"}</span>
+                <span className="text-white/40 text-xs truncate">{u.email}</span>
+              </li>
+            ))}
+          </ul>
+          {orgUsage.billableMembersThisMonth.length > 8 ? (
+            <p className="text-[11px] text-white/35">+{orgUsage.billableMembersThisMonth.length - 8} more on the billing page.</p>
+          ) : null}
+          {canManageBilling && orgUsage.estimatedMonthlyCents != null ? (
+            <p className="text-xs text-white/55 pt-1">
+              Estimated run rate:{" "}
+              <span className="text-white/80 font-medium">
+                {orgUsage.estimatedCurrencyCode ?? "EUR"} {(orgUsage.estimatedMonthlyCents / 100).toFixed(2)}
+              </span>{" "}
+              this month (estimate only).
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Calendar */}
       <MonthCalendar events={events ?? []} tourDetails={tourDetails} />

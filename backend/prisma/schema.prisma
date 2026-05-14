@@ -139,6 +139,10 @@ model BillingConfig {
   yearlyDiscountEnabled  Boolean  @default(true)
   /** Global default seat curve JSON (same shape as Organization.customSeatCalculatorJson). When null, billing uses the flat EUR table rate. */
   defaultSeatCalculatorJson String?
+  /** Days after organization creation during which unpaid invoices do not force view-only (0 = disabled). */
+  billingTrialDays           Int      @default(0)
+  /** Extra days after an invoice due date before overdue view-only applies (0 = due date is the cutoff). */
+  billingGraceDaysAfterDue   Int      @default(0)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }

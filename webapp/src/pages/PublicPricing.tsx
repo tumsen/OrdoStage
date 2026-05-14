@@ -36,6 +36,8 @@ export default function PublicPricing() {
     yearlyDiscountPercent?: number;
     yearlyDiscountEnabled?: boolean;
     defaultSeatCalculatorJson?: string | null;
+    billingTrialDays?: number;
+    billingGraceDaysAfterDue?: number;
     prices: Array<{ currencyCode: string; userDailyRateCents: number }>;
   }>({
     queryKey: ["public-pricing-rates"],
@@ -79,6 +81,33 @@ export default function PublicPricing() {
           <p className="text-lg md:text-xl text-white/75 leading-relaxed">
             Monthly postpaid billing in euros: only members with billable activity in a month are charged for that month.
           </p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6 space-y-3 text-white/80 leading-relaxed">
+            <h2 className="text-lg font-semibold text-white">Only pay for what you use</h2>
+            <p>
+              Your invoice is driven by <strong className="text-white/90 font-medium">real activity</strong>, not how
+              many accounts you have on paper. Someone only becomes a billable seat when they contribute in that
+              calendar month—through show jobs, staffing, event team work, or logged work time. If a teammate is away
+              for a month and does nothing billable, you do not pay for their seat that month.
+            </p>
+            <p>
+              That means costs rise when your season is busy and taper when things go quiet, without you having to
+              remove users or downgrade plans by hand. You stay in control: use the product when you need it, and your
+              bill reflects actual usage.
+            </p>
+            {(publicPricing?.billingTrialDays ?? 0) > 0 || (publicPricing?.billingGraceDaysAfterDue ?? 0) > 0 ? (
+              <p className="text-sm text-white/55">
+                {(publicPricing?.billingTrialDays ?? 0) > 0 ? (
+                  <>
+                    New workspaces may include a trial window from signup where unpaid invoices do not lock the
+                    account.{" "}
+                  </>
+                ) : null}
+                {(publicPricing?.billingGraceDaysAfterDue ?? 0) > 0 ? (
+                  <>After an invoice due date, a short grace period may apply before read-only mode.</>
+                ) : null}
+              </p>
+            ) : null}
+          </div>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
               asChild
@@ -123,7 +152,13 @@ export default function PublicPricing() {
             <li>No credit card is required to start</li>
             <li>If you do not want to continue, simply stop paying</li>
             <li>If a negative balance remains unpaid for 30 days, the account may be permanently deleted</li>
-            <li>If unpaid after due date, organization switches to view-only</li>
+            <li>
+              If unpaid after the due date
+              {(publicPricing?.billingGraceDaysAfterDue ?? 0) > 0
+                ? ` (plus a ${publicPricing?.billingGraceDaysAfterDue}-day grace period when configured)`
+                : ""}
+              , the organization switches to view-only
+            </li>
             <li>Full access is restored automatically after payment</li>
           </ul>
         </section>

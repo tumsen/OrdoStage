@@ -85,6 +85,8 @@ publicRouter.get("/pricing", async (c) => {
         yearlyDiscountPercent: true,
         yearlyDiscountEnabled: true,
         defaultSeatCalculatorJson: true,
+        billingTrialDays: true,
+        billingGraceDaysAfterDue: true,
       },
     }),
     prisma.billingCurrencyPrice.findMany(),
@@ -100,6 +102,8 @@ publicRouter.get("/pricing", async (c) => {
       yearlyDiscountPercent: cfgRows?.yearlyDiscountPercent ?? 15,
       yearlyDiscountEnabled: cfgRows?.yearlyDiscountEnabled ?? true,
       defaultSeatCalculatorJson: cfgRows?.defaultSeatCalculatorJson ?? null,
+      billingTrialDays: cfgRows?.billingTrialDays ?? 0,
+      billingGraceDaysAfterDue: cfgRows?.billingGraceDaysAfterDue ?? 0,
       prices: [{ currencyCode: "EUR" as const, userDailyRateCents: eurCents }],
     },
   });

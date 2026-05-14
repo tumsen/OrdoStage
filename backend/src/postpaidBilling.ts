@@ -10,6 +10,8 @@ export type BillingConfigResolved = {
   paymentDueDays: number;
   yearlyDiscountPercent: number;
   yearlyDiscountEnabled: boolean;
+  billingTrialDays: number;
+  billingGraceDaysAfterDue: number;
 };
 
 /** Single billing currency for the product (USD and others may be added again later). */
@@ -54,6 +56,8 @@ export async function getBillingConfig(prisma: PrismaClient): Promise<BillingCon
     paymentDueDays: cfg.paymentDueDays,
     yearlyDiscountPercent: cfg.yearlyDiscountPercent,
     yearlyDiscountEnabled: cfg.yearlyDiscountEnabled,
+    billingTrialDays: cfg.billingTrialDays,
+    billingGraceDaysAfterDue: cfg.billingGraceDaysAfterDue,
   };
 }
 
@@ -239,6 +243,23 @@ export async function countBillableMemberUserIdsInUtcRange(
   return billable;
 }
 
+/** Billable members in the UTC range, with display fields (sorted by name). */
+export async function listBillableMembersForUtcRange(
+  prisma: PrismaClient,
+  organizationId: string,
+  rangeStart: Date,
+  rangeEndExclusive: Date
+): Promise<Array<{ id: string; name: string | null; email: string }>> {
+  const ids = await countBillableMemberUserIdsInUtcRange(prisma, organizationId, rangeStart, rangeEndExclusive);
+  if (ids.size === 0) return [];
+  const users = await prisma.user.findMany({
+    where: { id: { in: [...ids] } },
+    select: { id: true, name: true, email: true },
+    orderBy: [{ name: "asc" }, { email: "asc" }],
+  });
+  return users.map((u) => ({ id: u.id, name: u.name, email: u.email }));
+}
+
 export function estimateMonthlyOrgAmountCents(input: {
   /** Users who incurred billable activity in the priced month (or projection). */
   billableUsers: number;
@@ -323,15 +344,43 @@ export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new
 
 export async function enforceOverdueAccess(prisma: PrismaClient, organizationId: string): Promise<boolean> {
   const now = new Date();
-  const overdueInvoice = await prisma.billingInvoice.findFirst({
-    where: {
-      organizationId,
-      status: { in: ["issued", "overdue"] },
-      dueAt: { lt: now },
-    },
+  const [cfgRow, orgRow] = await Promise.all([
+    prisma.billingConfig.findUnique({
+      where: { id: "default" },
+      select: { billingTrialDays: true, billingGraceDaysAfterDue: true },
+    }),
+    prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { createdAt: true },
+    }),
+  ]);
+  const trialDays = Math.max(0, cfgRow?.billingTrialDays ?? 0);
+  const graceDays = Math.max(0, cfgRow?.billingGraceDaysAfterDue ?? 0);
+  const graceMs = graceDays * 24 * 60 * 60 * 1000;
+
+  if (orgRow && trialDays > 0) {
+    const trialEndMs = orgRow.createdAt.getTime() + trialDays * 24 * 60 * 60 * 1000;
+    if (now.getTime() < trialEndMs) {
+      await prisma.organization.update({
+        where: { id: organizationId },
+        data: {
+          billingStatus: "active",
+          billingViewOnlySince: null,
+          billingDueAt: null,
+        },
+      });
+      return false;
+    }
+  }
+
+  const openInvoices = await prisma.billingInvoice.findMany({
+    where: { organizationId, status: { in: ["issued", "overdue"] } },
     orderBy: { dueAt: "asc" },
+    select: { id: true, dueAt: true },
   });
-  if (!overdueInvoice) {
+  const blocking = openInvoices.find((inv) => now.getTime() > inv.dueAt.getTime() + graceMs);
+
+  if (!blocking) {
     await prisma.organization.update({
       where: { id: organizationId },
       data: {
@@ -344,14 +393,14 @@ export async function enforceOverdueAccess(prisma: PrismaClient, organizationId:
 
   await prisma.$transaction([
     prisma.billingInvoice.update({
-      where: { id: overdueInvoice.id },
+      where: { id: blocking.id },
       data: { status: "overdue" },
     }),
     prisma.organization.update({
       where: { id: organizationId },
       data: {
         billingStatus: "overdue_view_only",
-        billingDueAt: overdueInvoice.dueAt,
+        billingDueAt: blocking.dueAt,
         billingViewOnlySince: now,
       },
     }),

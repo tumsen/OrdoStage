@@ -193,6 +193,8 @@ app.patch("/admin/billing/settings", async (c) => {
       yearlyDiscountPercent: z.number().int().min(0).max(100).optional(),
       yearlyDiscountEnabled: z.boolean().optional(),
       defaultSeatCalculatorJson: z.string().max(SEAT_CALCULATOR_JSON_MAX_CHARS).nullable().optional(),
+      billingTrialDays: z.number().int().min(0).max(3650).optional(),
+      billingGraceDaysAfterDue: z.number().int().min(0).max(365).optional(),
     })
     .parse(body);
 
@@ -209,6 +211,8 @@ app.patch("/admin/billing/settings", async (c) => {
       ...(parsed.paymentDueDays !== undefined ? { paymentDueDays: parsed.paymentDueDays } : {}),
       ...(parsed.yearlyDiscountPercent !== undefined ? { yearlyDiscountPercent: parsed.yearlyDiscountPercent } : {}),
       ...(parsed.yearlyDiscountEnabled !== undefined ? { yearlyDiscountEnabled: parsed.yearlyDiscountEnabled } : {}),
+      ...(parsed.billingTrialDays !== undefined ? { billingTrialDays: parsed.billingTrialDays } : {}),
+      ...(parsed.billingGraceDaysAfterDue !== undefined ? { billingGraceDaysAfterDue: parsed.billingGraceDaysAfterDue } : {}),
     },
   });
   let normalizedDefaultSeatJson: string | null | undefined;

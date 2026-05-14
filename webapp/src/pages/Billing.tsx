@@ -1,8 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Receipt } from "lucide-react";
+import { Receipt, Users } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+interface BillableMemberRow {
+  id: string;
+  name: string | null;
+  email: string;
+}
 
 interface OrgBillingData {
   id: string;
@@ -10,8 +18,15 @@ interface OrgBillingData {
   billingStatus: string;
   billingCurrencyCode?: string;
   paymentDueDays: number;
+  billingTrialDays?: number;
+  billingGraceDaysAfterDue?: number;
+  billingOnTrial?: boolean;
+  trialEndsAt?: string | null;
+  billingInGraceAfterDue?: boolean;
+  billingReadOnlyEffectiveAt?: string | null;
   estimatedMonthlyCents?: number;
   estimatedCurrencyCode?: string;
+  billableMembersThisMonth?: BillableMemberRow[];
   openInvoice?: {
     id: string;
     issuedAt: string;
@@ -29,6 +44,11 @@ interface OrgBillingData {
   } | null;
 }
 
+function formatShortDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
 export default function Billing({ embedded = false }: { embedded?: boolean } = {}) {
   const { canAction } = usePermissions();
   const canManageBilling = canAction("billing.manage");
@@ -37,14 +57,98 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
     queryFn: () => api.get<OrgBillingData>("/api/org"),
   });
 
+  const billable = org?.billableMembersThisMonth ?? [];
+  const trialDays = org?.billingTrialDays ?? 0;
+  const graceDays = org?.billingGraceDaysAfterDue ?? 0;
+
   return (
     <div className={embedded ? "space-y-8" : "p-6 md:p-8 space-y-8"}>
       {!embedded ? (
         <div>
           <h2 className="text-2xl font-bold text-white">Billing</h2>
-          <p className="text-gray-400 mt-1 text-sm">Postpaid: monthly invoice for the previous calendar month—one seat per member with billable activity (jobs, staffing, event edits, work time), due within {org?.paymentDueDays ?? 7} days.</p>
+          <p className="text-gray-400 mt-2 text-sm leading-relaxed max-w-3xl">
+            You only pay for seats that actually get used in a calendar month. If nobody on your team had billable
+            activity (show jobs, staffing, event edits, or logged work time), that month costs nothing for those idle
+            seats. When people do contribute, each billable member counts as one seat for that month—no charge for
+            months where they stay inactive.
+          </p>
+          <p className="text-gray-400 mt-2 text-sm leading-relaxed max-w-3xl">
+            Invoices cover the <strong className="text-white/80 font-medium">previous</strong> calendar month and are
+            due within {org?.paymentDueDays ?? 7} days of issue.
+            {trialDays > 0 ? (
+              <>
+                {" "}
+                New workspaces have a <strong className="text-white/80 font-medium">{trialDays}-day trial</strong> from
+                creation: unpaid invoices do not switch the organization to read-only during the trial.
+              </>
+            ) : null}
+            {graceDays > 0 ? (
+              <>
+                {" "}
+                After the due date there is a <strong className="text-white/80 font-medium">{graceDays}-day grace</strong>{" "}
+                period before the account becomes read-only.
+              </>
+            ) : (
+              <> If an invoice stays unpaid after the due date, the organization becomes read-only until payment.</>
+            )}
+          </p>
         </div>
       ) : null}
+
+      {org?.billingOnTrial ? (
+        <div className="rounded-lg border border-emerald-800/40 bg-emerald-950/25 px-4 py-3 text-sm text-emerald-100/90">
+          Trial active until {formatShortDate(org.trialEndsAt)}. Billing reminders may still appear, but read-only mode
+          does not apply from unpaid invoices until after the trial.
+        </div>
+      ) : null}
+
+      {org?.billingInGraceAfterDue ? (
+        <div className="rounded-lg border border-amber-800/40 bg-amber-950/25 px-4 py-3 text-sm text-amber-100/90">
+          Payment is past the invoice due date. You have until{" "}
+          <strong className="text-amber-50">{formatShortDate(org.billingReadOnlyEffectiveAt)}</strong> before the
+          workspace switches to read-only unless the invoice is paid.
+        </div>
+      ) : null}
+
+      <Card className="bg-gray-900 border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Users size={16} />
+            Billable members this month
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-white/50 mb-3 leading-relaxed">
+            UTC calendar month to date: people listed here had at least one billable action (jobs, staffing, event team
+            activity, or work time). This is the set your running-month estimate is based on.
+          </p>
+          {isLoading ? (
+            <p className="text-sm text-white/50">Loading...</p>
+          ) : billable.length === 0 ? (
+            <p className="text-sm text-white/50">No billable activity yet this month.</p>
+          ) : (
+            <div className="rounded-md border border-white/10 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/10 hover:bg-transparent">
+                    <TableHead className="text-white/50 text-xs">Name</TableHead>
+                    <TableHead className="text-white/50 text-xs">Email</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {billable.map((u) => (
+                    <TableRow key={u.id} className="border-white/5">
+                      <TableCell className="text-white/90 text-sm">{u.name?.trim() || "—"}</TableCell>
+                      <TableCell className="text-white/55 text-sm">{u.email}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="bg-gray-900 border-white/10">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
@@ -56,14 +160,28 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
           {isLoading ? (
             <p className="text-sm text-white/50">Loading...</p>
           ) : !org?.openInvoice ? (
-            <p className="text-sm text-white/50">No open invoice. The next billing run creates one from billable activity in the closed month.</p>
+            <p className="text-sm text-white/50">
+              No open invoice. The next billing run creates one from billable activity in the closed month.
+            </p>
           ) : (
             <div className="space-y-2">
-              <p className="text-sm text-white">Status: <span className="text-white/70">{org.openInvoice.status}</span></p>
-              <p className="text-sm text-white">Issued: <span className="text-white/70">{new Date(org.openInvoice.issuedAt).toLocaleDateString()}</span></p>
-              <p className="text-sm text-white">Due: <span className="text-white/70">{new Date(org.openInvoice.dueAt).toLocaleDateString()}</span></p>
-              <p className="text-sm text-white">Total: <span className="text-white/70">€{(org.openInvoice.totalCents / 100).toFixed(2)}</span></p>
-              <p className="text-xs text-white/50">If overdue, organization becomes view-only until payment is registered.</p>
+              <p className="text-sm text-white">
+                Status: <span className="text-white/70">{org.openInvoice.status}</span>
+              </p>
+              <p className="text-sm text-white">
+                Issued:{" "}
+                <span className="text-white/70">{new Date(org.openInvoice.issuedAt).toLocaleDateString()}</span>
+              </p>
+              <p className="text-sm text-white">
+                Due: <span className="text-white/70">{new Date(org.openInvoice.dueAt).toLocaleDateString()}</span>
+              </p>
+              <p className="text-sm text-white">
+                Total: <span className="text-white/70">€{(org.openInvoice.totalCents / 100).toFixed(2)}</span>
+              </p>
+              <p className="text-xs text-white/50">
+                If overdue past any configured grace period, the organization becomes view-only until payment is
+                registered.
+              </p>
             </div>
           )}
         </CardContent>
@@ -74,14 +192,28 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
             <CardTitle className="text-white">Expected monthly price</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-white">
-              Based on billable members so far this month and your per-seat monthly rate:
-              <span className="ml-1 text-white/80">
-                {org.estimatedCurrencyCode || org.billingCurrencyCode || "EUR"} {(org.estimatedMonthlyCents / 100).toFixed(2)}
+            <p className="text-sm text-white leading-relaxed">
+              Based on billable members so far this month and your pricing curve (or a fixed per-seat override if
+              Ordo Stage set one):
+              <span className="ml-1 text-white/80 font-medium">
+                {org.estimatedCurrencyCode || org.billingCurrencyCode || "EUR"}{" "}
+                {(org.estimatedMonthlyCents / 100).toFixed(2)}
               </span>
+            </p>
+            <p className="text-xs text-white/45 mt-2">
+              This is an estimate only; the closed-month invoice is authoritative.
             </p>
           </CardContent>
         </Card>
+      ) : null}
+      {!embedded ? (
+        <p className="text-xs text-white/40">
+          Questions? Open{" "}
+          <Link to="/account" className="text-rose-300/90 hover:text-rose-200 underline underline-offset-2">
+            Account
+          </Link>{" "}
+          for workspace settings.
+        </p>
       ) : null}
     </div>
   );

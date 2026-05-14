@@ -40,6 +40,10 @@ interface OrgData {
   userCount: number;
   billingStatus?: string;
   isViewOnlyDueToBilling?: boolean;
+  billingOnTrial?: boolean;
+  trialEndsAt?: string | null;
+  billingInGraceAfterDue?: boolean;
+  billingReadOnlyEffectiveAt?: string | null;
   openInvoice?: { dueAt?: string | null } | null;
 }
 
@@ -276,17 +280,52 @@ function BillingBanner() {
       </div>
     );
   }
-  if (org.openInvoice?.dueAt) {
-    const due = new Date(org.openInvoice.dueAt).toLocaleDateString();
+  if (org.billingInGraceAfterDue && org.billingReadOnlyEffectiveAt) {
+    const until = new Date(org.billingReadOnlyEffectiveAt).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     return (
-      <div className="flex-shrink-0 bg-ordo-orange/15 border-b border-ordo-yellow/35 px-4 py-2 flex items-center gap-2 text-sm">
-        <AlertTriangle size={14} className="text-ordo-yellow flex-shrink-0" />
-        <span className="text-ordo-yellow/95">Open invoice due on {due}.</span>
-        <Link to="/account#billing" className="ml-auto text-ordo-yellow underline underline-offset-2 hover:text-white whitespace-nowrap">
+      <div className="flex-shrink-0 bg-amber-950/70 border-b border-amber-800/45 px-4 py-2 flex items-center gap-2 text-sm">
+        <AlertTriangle size={14} className="text-amber-300 flex-shrink-0" />
+        <span className="text-amber-100/95">
+          Invoice is past due. Read-only starts after <span className="font-medium text-amber-50">{until}</span> unless
+          paid.
+        </span>
+        <Link to="/account#billing" className="ml-auto text-amber-100 underline underline-offset-2 hover:text-white whitespace-nowrap">
           Open billing
         </Link>
       </div>
     );
+  }
+  if (org.billingOnTrial && org.trialEndsAt) {
+    const end = new Date(org.trialEndsAt).toLocaleDateString();
+    return (
+      <div className="flex-shrink-0 bg-emerald-950/50 border-b border-emerald-800/40 px-4 py-2 flex items-center gap-2 text-sm">
+        <AlertTriangle size={14} className="text-emerald-400 flex-shrink-0" />
+        <span className="text-emerald-100/90">Trial active until {end}. Unpaid invoices do not lock the workspace during the trial.</span>
+        <Link to="/account#billing" className="ml-auto text-emerald-100 underline underline-offset-2 hover:text-white whitespace-nowrap">
+          Billing
+        </Link>
+      </div>
+    );
+  }
+  if (org.openInvoice?.dueAt) {
+    const due = new Date(org.openInvoice.dueAt);
+    if (due.getTime() >= Date.now()) {
+      const dueStr = due.toLocaleDateString();
+      return (
+        <div className="flex-shrink-0 bg-ordo-orange/15 border-b border-ordo-yellow/35 px-4 py-2 flex items-center gap-2 text-sm">
+          <AlertTriangle size={14} className="text-ordo-yellow flex-shrink-0" />
+          <span className="text-ordo-yellow/95">Open invoice due on {dueStr}.</span>
+          <Link to="/account#billing" className="ml-auto text-ordo-yellow underline underline-offset-2 hover:text-white whitespace-nowrap">
+            Open billing
+          </Link>
+        </div>
+      );
+    }
   }
 
   return null;

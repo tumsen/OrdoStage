@@ -16,6 +16,8 @@ type AdminBillingSettingsData = {
   yearlyDiscountEnabled?: boolean;
   baseCurrencyCode?: string;
   defaultSeatCalculatorJson?: string | null;
+  billingTrialDays?: number;
+  billingGraceDaysAfterDue?: number;
   currencyPrices: Array<{
     currencyCode: string;
     userDailyRateCents: number;
@@ -56,6 +58,8 @@ function stableBillingFingerprint(d: AdminBillingSettingsData | undefined): stri
     yearlyDiscountEnabled: d.yearlyDiscountEnabled ?? null,
     baseCurrencyCode: d.baseCurrencyCode ?? null,
     defaultSeatCalculatorJson: d.defaultSeatCalculatorJson ?? null,
+    billingTrialDays: d.billingTrialDays ?? 0,
+    billingGraceDaysAfterDue: d.billingGraceDaysAfterDue ?? 0,
     currencyPrices: prices,
   });
 }
@@ -72,6 +76,10 @@ type BillingEditorProps = {
 function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorProps) {
   const { toast } = useToast();
   const [paymentDueDays, setPaymentDueDays] = useState(() => String(initialData.paymentDueDays));
+  const [billingTrialDays, setBillingTrialDays] = useState(() => String(initialData.billingTrialDays ?? 0));
+  const [billingGraceDaysAfterDue, setBillingGraceDaysAfterDue] = useState(() =>
+    String(initialData.billingGraceDaysAfterDue ?? 0)
+  );
   const [seatModel, setSeatModel] = useState<TieredSeatModel>(() => mergeGlobalSeatModel(initialData.defaultSeatCalculatorJson));
   const y0 = initialYearlyFromSettings(initialData);
   const [seatYearlyPercent, setSeatYearlyPercent] = useState(y0.percent);
@@ -85,11 +93,21 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
       if (!Number.isFinite(due) || due < 1 || due > 30) {
         throw new Error("Invoice due days must be a number between 1 and 30.");
       }
+      const trial = Math.round(Number(billingTrialDays.trim()));
+      const grace = Math.round(Number(billingGraceDaysAfterDue.trim()));
+      if (!Number.isFinite(trial) || trial < 0 || trial > 3650) {
+        throw new Error("Trial period must be between 0 and 3650 days (0 = no trial).");
+      }
+      if (!Number.isFinite(grace) || grace < 0 || grace > 365) {
+        throw new Error("Grace period must be between 0 and 365 days.");
+      }
       return api.patch<AdminBillingSettingsData>("/api/admin/billing/settings", {
         paymentDueDays: due,
         baseCurrencyCode: "EUR",
         yearlyDiscountPercent: yearlyDiscountPercentClamped,
         yearlyDiscountEnabled: seatYearlyEnabled,
+        billingTrialDays: trial,
+        billingGraceDaysAfterDue: grace,
         defaultSeatCalculatorJson: JSON.stringify({
           model: seatModel,
           yearlyDiscountPercent: yearlyDiscountPercentClamped,
@@ -159,19 +177,50 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
             onSeatModelChange={setSeatModel}
           />
 
-          <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="space-y-1">
-              <p className="text-xs text-white/50">Invoice due days</p>
-              <Input
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                className="max-w-[120px]"
-                value={paymentDueDays}
-                onChange={(e) => setPaymentDueDays(e.target.value)}
-              />
+          <div className="space-y-4 border-t border-white/10 pt-4">
+            <p className="text-xs text-white/55 leading-relaxed">
+              <span className="text-white/75">Trial</span> — days from each organization&apos;s creation date where
+              unpaid invoices never switch the workspace to read-only (0 disables).{" "}
+              <span className="text-white/75">Grace after due</span> — extra days after an invoice due date before
+              read-only applies (0 means the due date is the cutoff).
+            </p>
+            <div className="grid gap-4 sm:grid-cols-3 max-w-2xl">
+              <div className="space-y-1">
+                <p className="text-xs text-white/50">Invoice due days (1–30)</p>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="max-w-[120px]"
+                  value={paymentDueDays}
+                  onChange={(e) => setPaymentDueDays(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-white/50">Trial period (days)</p>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="max-w-[120px]"
+                  value={billingTrialDays}
+                  onChange={(e) => setBillingTrialDays(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-white/50">Grace after invoice due (days)</p>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="max-w-[120px]"
+                  value={billingGraceDaysAfterDue}
+                  onChange={(e) => setBillingGraceDaysAfterDue(e.target.value)}
+                />
+              </div>
             </div>
-            <Button
+            <div className="flex justify-end">
+              <Button
               type="button"
               size="lg"
               className="h-11 w-full shrink-0 bg-rose-600 px-8 text-base font-semibold hover:bg-rose-500 sm:w-auto"
@@ -180,6 +229,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
             >
               {saveMutation.isPending ? "Saving…" : "Save pricing"}
             </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

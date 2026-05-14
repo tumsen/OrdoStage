@@ -10,13 +10,13 @@ import { verifyUserCredentialPassword } from "../verifyCredentialPassword";
 import { DistanceUnitSchema, LanguageSchema, TimeFormatSchema } from "../types";
 import {
   BILLING_CURRENCY_CODE,
-  countBillableMemberUserIdsInUtcRange,
   currentUtcMonthRange,
   enforceOverdueAccess,
   estimateMonthlyOrgAmountCents,
   getBillingConfig,
   getCurrencyPriceMap,
   getGlobalDefaultSeatCalculatorJson,
+  listBillableMembersForUtcRange,
   recordDailyUsageSnapshot,
 } from "../postpaidBilling";
 import { getClientWallClockZone, wallClockInstantFromStoredDayAndHHMM } from "../clientWallClock";
@@ -356,7 +356,7 @@ app.get("/org", async (c) => {
     getBillingConfig(prisma),
     prisma.billingInvoice.findFirst({
       where: { organizationId: user.organizationId, status: { in: ["issued", "overdue"] } },
-      orderBy: { issuedAt: "desc" },
+      orderBy: { dueAt: "asc" },
       include: { lines: true },
     }),
     prisma.organization.findUnique({
@@ -373,10 +373,11 @@ app.get("/org", async (c) => {
 
   const now = new Date();
   const { start: monthStart, endExclusive: monthEnd } = currentUtcMonthRange(now);
-  const billable = await countBillableMemberUserIdsInUtcRange(prisma, user.organizationId, monthStart, monthEnd);
+  const billableMembers = await listBillableMembersForUtcRange(prisma, user.organizationId, monthStart, monthEnd);
+  const billableCount = billableMembers.length;
   const fallbackRate = currencyPrices[BILLING_CURRENCY_CODE] ?? 1500;
   const estimatedMonthlyCents = estimateMonthlyOrgAmountCents({
-    billableUsers: billable.size,
+    billableUsers: billableCount,
     perUserMonthlyRateCents: currencyPrices[BILLING_CURRENCY_CODE] ?? fallbackRate,
     customUserMonthlyRateCents: org.customUserDailyRateCents,
     customDiscountPercent: org.customDiscountPercent,
@@ -387,6 +388,22 @@ app.get("/org", async (c) => {
     globalSeatCalculatorJson: globalSeatJson,
   });
 
+  const trialDays = Math.max(0, billingConfig.billingTrialDays);
+  const trialEndMs = trialDays > 0 ? org.createdAt.getTime() + trialDays * 24 * 60 * 60 * 1000 : 0;
+  const onTrial = trialDays > 0 && now.getTime() < trialEndMs;
+
+  const graceDays = Math.max(0, billingConfig.billingGraceDaysAfterDue);
+  let inGraceAfterDue = false;
+  let readOnlyEffectiveAt: string | null = null;
+  if (graceDays > 0 && openInvoice?.dueAt) {
+    const dueT = new Date(openInvoice.dueAt).getTime();
+    const graceEnd = dueT + graceDays * 24 * 60 * 60 * 1000;
+    readOnlyEffectiveAt = new Date(graceEnd).toISOString();
+    if (now.getTime() > dueT && now.getTime() < graceEnd && org.billingStatus !== "overdue_view_only") {
+      inGraceAfterDue = true;
+    }
+  }
+
   return c.json({
     data: {
       ...org,
@@ -396,6 +413,13 @@ app.get("/org", async (c) => {
       isViewOnlyDueToBilling: viewOnly,
       billingStatus: org.billingStatus,
       paymentDueDays: billingConfig.paymentDueDays,
+      billingTrialDays: billingConfig.billingTrialDays,
+      billingGraceDaysAfterDue: billingConfig.billingGraceDaysAfterDue,
+      billingOnTrial: onTrial,
+      trialEndsAt: trialDays > 0 ? new Date(trialEndMs).toISOString() : null,
+      billingInGraceAfterDue: inGraceAfterDue,
+      billingReadOnlyEffectiveAt: readOnlyEffectiveAt,
+      billableMembersThisMonth: billableMembers,
       openInvoice,
     },
   });
