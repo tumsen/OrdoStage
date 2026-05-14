@@ -329,7 +329,6 @@ export default function VenueDetail() {
         <div className="w-full min-w-0 shrink-0 px-4 pb-10 pt-4 md:px-6">
           <div className={`min-w-0 pt-px ${CALENDAR_PANEL_SHELL_INSET_X_CLASS}`}>
             <VenueCalendarContextStrip
-              flatTop
               venueId={venueId}
               venue={venue}
               showEditLink={canWrite}

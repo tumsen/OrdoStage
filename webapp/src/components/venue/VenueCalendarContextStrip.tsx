@@ -189,7 +189,6 @@ export function VenueCalendarContextStrip({
   venue,
   showEditLink = false,
   archiveFolderName,
-  flatTop = false,
   className,
 }: {
   venueId: string;
@@ -197,8 +196,6 @@ export function VenueCalendarContextStrip({
   showEditLink?: boolean;
   /** Root folder inside the ZIP and the `.zip` basename (e.g. event title on event page, venue name on venue page). */
   archiveFolderName?: string;
-  /** When true, no top border/radius so the card can sit flush under a calendar panel. */
-  flatTop?: boolean;
   className?: string;
 }) {
   const [zipping, setZipping] = useState(false);
@@ -293,11 +290,7 @@ export function VenueCalendarContextStrip({
 
   return (
     <div
-      className={cn(
-        "w-full min-w-0 space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3",
-        flatTop && "rounded-t-none",
-        className,
-      )}
+      className={cn("w-full min-w-0 space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3", className)}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
