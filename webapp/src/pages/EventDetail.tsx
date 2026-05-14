@@ -97,6 +97,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 import { AddressFields, type Address } from "@/components/AddressFields";
 import { ContactFieldsOneRowNote } from "@/components/event/ContactFieldsOneRowNote";
 import {
@@ -108,6 +109,7 @@ import {
 } from "@/lib/eventContactRow";
 import { parseEventCustomFieldsJson, type EventCustomField } from "@/lib/eventCustomFields";
 import { StatusBadge } from "@/components/StatusBadge";
+import { VenueCalendarContextStrip } from "@/components/venue/VenueCalendarContextStrip";
 
 type TeamDocument = {
   id: string;
@@ -2309,6 +2311,7 @@ type ScheduleResponse = {
 
 function VenueBookingTab({ event }: { event: EventDetail }) {
   const queryClient = useQueryClient();
+  const { canWrite } = usePermissions();
   const { data: venues } = useQuery({
     queryKey: ["venues"],
     queryFn: () => api.get<Venue[]>("/api/venues"),
@@ -2623,6 +2626,10 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
   };
 
   const venueOptions = venues ?? [];
+  const selectedVenue = useMemo(
+    () => (venues ?? []).find((v) => v.id === venueId),
+    [venues, venueId]
+  );
   const weekLabel = `${weekStart.toLocaleDateString(undefined, {
     day: "2-digit",
     month: "short",
@@ -2696,6 +2703,10 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
         onUpdateItemTime={handleUpdateItemTime}
         onToggleLock={handleToggleLock}
       />
+
+      {venueId ? (
+        <VenueCalendarContextStrip venueId={venueId} venue={selectedVenue} showEditLink={canWrite} />
+      ) : null}
 
       <EditItemSheet
         item={selectedItem}

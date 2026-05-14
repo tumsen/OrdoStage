@@ -19,6 +19,7 @@ import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/
 import { ScheduleItemDetailSheet } from "@/components/schedule/ScheduleItemDetailSheet";
 import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
+import { VenueCalendarContextStrip } from "@/components/venue/VenueCalendarContextStrip";
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePreferences } from "@/hooks/usePreferences";
 
@@ -317,6 +318,8 @@ export default function VenueDetail() {
               )}
             </div>
           </div>
+
+          <VenueCalendarContextStrip venueId={venueId} venue={venue} showEditLink={canWrite} />
         </>
       )}
 
