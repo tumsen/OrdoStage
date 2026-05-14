@@ -22,7 +22,7 @@ import {
 import { syncAuthSessionAfterWorkspaceChange } from "@/lib/auth-client";
 import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
 import { DEFAULT_TIERED_SEAT_MODEL, type TieredSeatModel } from "@/lib/tieredSeatPricing";
-import { parseSeatCalculatorJson } from "../../../../backend/src/seatCalculatorJson";
+import { parseSeatCalculatorJson } from "@/lib/seatCalculatorJson";
 
 interface OrgUser {
   id: string;

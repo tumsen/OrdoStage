@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-/** Duplicated in `webapp/src/lib/seatCalculatorJson.ts` for Docker-only webapp builds. */
-
+/** Keep in sync with `backend/src/seatCalculatorJson.ts` (Docker webapp build has no backend tree). */
 export const SEAT_CALCULATOR_JSON_MAX_CHARS = 16_384;
 
 export const SeatCalculatorJsonSchema = z.object({
