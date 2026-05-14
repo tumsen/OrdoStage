@@ -112,8 +112,11 @@ export function TieredSeatPricingCalculator({
 
   const floorAtSafe = Math.max(3, Math.floor(model.floorAt));
   const monthlyList = useMemo(() => monthlyAtUsers(model), [model]);
-  const discountEnabledForMath = annual && (showYearlyDiscountControls ? true : yearlyDiscountEnabled);
-  const mult = annualMonthlyMultiplier(yearlyDiscountPercent, discountEnabledForMath);
+  /** Multiplier for the configured annual plan (admin: discount % always applies to the quote). */
+  const multWhenPayingAnnual = annualMonthlyMultiplier(
+    yearlyDiscountPercent,
+    showYearlyDiscountControls ? true : yearlyDiscountEnabled,
+  );
   const chartRows = useMemo(
     () =>
       Array.from({ length: TIERED_SEAT_MAX_USERS }, (_, i) => {
@@ -128,26 +131,30 @@ export function TieredSeatPricingCalculator({
   );
 
   const baseMonthly = monthlyList[users - 1] ?? 0;
-  const discountedMonthly = annual ? baseMonthly * mult : baseMonthly;
-  const annualTotal = discountedMonthly * 12;
+  const annualPlanMonthlyEq = baseMonthly * multWhenPayingAnnual;
+  const annualPlanYearTotal = annualPlanMonthlyEq * 12;
+  const discountedMonthly = annual ? annualPlanMonthlyEq : baseMonthly;
   const perUserEffective = users > 0 ? discountedMonthly / users : 0;
   const thisRate = perUserRate(users, model.start, model.floor, floorAtSafe);
   const stepDen = floorAtSafe - 2;
   const step = stepDen > 0 ? (model.start - model.floor) / stepDen : 0;
-  const annualSavingsYear = annual ? Math.round((baseMonthly - discountedMonthly) * 12) : 0;
+  const annualSavingsYear =
+    annual && multWhenPayingAnnual < 1 ? Math.round((baseMonthly - annualPlanMonthlyEq) * 12) : 0;
 
-  const annualSub =
-    annual && discountEnabledForMath && yearlyDiscountPercent > 0
+  const monthlySub =
+    annual && multWhenPayingAnnual < 1 && yearlyDiscountPercent > 0
       ? `billed annually (${yearlyDiscountPercent}% off)`
       : annual
         ? "billed annually (no discount)"
         : "billed monthly";
   const annualTotalSub =
-    annual && discountEnabledForMath && yearlyDiscountPercent > 0
+    annual && multWhenPayingAnnual < 1 && yearlyDiscountPercent > 0
       ? `${yearlyDiscountPercent}% saved vs monthly`
       : annual
         ? "per year"
-        : "per year";
+        : multWhenPayingAnnual < 1 && yearlyDiscountPercent > 0
+          ? `if you enable annual billing (${yearlyDiscountPercent}% off vs monthly)`
+          : "if you enable annual billing (no discount vs monthly)";
 
   function commitFloorAtDraft() {
     const parsed = parseInt(floorAtDraft.replace(/\s/g, ""), 10);
@@ -235,7 +242,7 @@ export function TieredSeatPricingCalculator({
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
         <Switch
-          id="annual-billing"
+          id="enable-annual-billing"
           checked={annual}
           onCheckedChange={(v) => {
             setAnnual(v);
@@ -243,15 +250,15 @@ export function TieredSeatPricingCalculator({
           }}
           className="data-[state=checked]:bg-ordo-magenta data-[state=unchecked]:bg-white/20"
         />
-        <Label htmlFor="annual-billing" className="cursor-pointer text-sm text-white/70">
-          Annual billing
+        <Label htmlFor="enable-annual-billing" className="cursor-pointer text-sm text-white/70">
+          Enable annual billing
         </Label>
-        {annual && discountEnabledForMath && yearlyDiscountPercent > 0 ? (
+        {annual && multWhenPayingAnnual < 1 && yearlyDiscountPercent > 0 ? (
           <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
             Save €{annualSavingsYear.toLocaleString()}/yr
           </span>
         ) : null}
-        {showYearlyDiscountControls && annual ? (
+        {showYearlyDiscountControls ? (
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <Label htmlFor="annual-discount-pct" className="text-[11px] text-white/50 whitespace-nowrap">
               Annual discount (%)
@@ -270,8 +277,16 @@ export function TieredSeatPricingCalculator({
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <MetricCard label="Monthly total" value={`€${Math.round(discountedMonthly).toLocaleString()}`} sub={annualSub} />
-        <MetricCard label="Annual total" value={`€${Math.round(annualTotal).toLocaleString()}`} sub={annualTotalSub} />
+        <MetricCard
+          label="Monthly total"
+          value={`€${Math.round(discountedMonthly).toLocaleString()}`}
+          sub={monthlySub}
+        />
+        <MetricCard
+          label="Annual total"
+          value={`€${Math.round(annualPlanYearTotal).toLocaleString()}`}
+          sub={annualTotalSub}
+        />
         <MetricCard label="Effective per user" value={`€${perUserEffective.toFixed(2)}`} sub="per active user/mo" />
       </div>
 
