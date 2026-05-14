@@ -37,3 +37,34 @@ export type TieredSeatModel = {
   floorAt: number;
   floor: number;
 };
+
+/** Marginal monthly EUR for the n-th billable seat (1-based): seat 1 = base platform fee; seat 2+ = tier marginal. */
+export function marginalSeatMajorForIndex1Based(seatIndex: number, m: TieredSeatModel): number {
+  if (seatIndex < 1 || !Number.isFinite(seatIndex)) return 0;
+  if (seatIndex === 1) return m.base;
+  const safeFloorAt = Math.max(3, Math.floor(m.floorAt));
+  return perUserRate(seatIndex, m.start, m.floor, safeFloorAt);
+}
+
+/** English ordinal for seat counts (1 → 1st, 11 → 11th). */
+export function ordinalEn(n: number): string {
+  const v = Math.floor(Math.abs(n));
+  const j = v % 10;
+  const k = v % 100;
+  if (j === 1 && k !== 11) return `${v}st`;
+  if (j === 2 && k !== 12) return `${v}nd`;
+  if (j === 3 && k !== 13) return `${v}rd`;
+  return `${v}th`;
+}
+
+/** Format whole euros when possible (e.g. €80, €19.50). */
+export function formatEuroMajor(amount: number): string {
+  const rounded = Math.round((amount + Number.EPSILON) * 100) / 100;
+  const maxFrac = Number.isInteger(rounded) ? 0 : 2;
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxFrac,
+  }).format(rounded);
+}
