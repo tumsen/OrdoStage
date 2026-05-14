@@ -131,6 +131,7 @@ function VenueRow({
                 mimeType={d.mimeType}
                 filename={d.filename}
                 preferImage={isVenueThumbImage(d.kind, d.mimeType)}
+                name={d.name}
                 sizeClassName="h-9 w-9"
               />
             ))

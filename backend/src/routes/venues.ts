@@ -52,7 +52,7 @@ function serializeVenue(
     updatedAt: Date;
   },
   documentCount?: number,
-  documentThumbnails?: Array<{ id: string; kind: string; filename: string; mimeType: string }>
+  documentThumbnails?: Array<{ id: string; kind: string; name: string; filename: string; mimeType: string }>
 ) {
   const { organizationId: _org, ...rest } = venue;
   return {
@@ -66,6 +66,7 @@ function serializeVenue(
           documentThumbnails: documentThumbnails.map((d) => ({
             id: d.id,
             kind: normalizeVenueDocKind(d.kind),
+            name: d.name,
             filename: d.filename,
             mimeType: d.mimeType,
           })),
@@ -115,7 +116,7 @@ venuesRouter.get("/venues", async (c) => {
       documents: {
         orderBy: { createdAt: "desc" },
         take: 5,
-        select: { id: true, kind: true, filename: true, mimeType: true },
+        select: { id: true, kind: true, name: true, filename: true, mimeType: true },
       },
     },
   });

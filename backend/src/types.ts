@@ -107,6 +107,7 @@ export const VenueSchema = z.object({
       z.object({
         id: z.string(),
         kind: z.enum(VENUE_DOCUMENT_KINDS),
+        name: z.string(),
         filename: z.string(),
         mimeType: z.string(),
       })
