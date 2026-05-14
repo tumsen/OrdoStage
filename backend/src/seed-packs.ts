@@ -9,25 +9,27 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   { key: "landing_title", value: "OrdoStage" },
   {
     key: "landing_subtitle",
-    value: "The operating platform for theaters, venues, and touring productions",
+    value:
+      "Production operations for theatres, concert halls, clubs, and touring shows — one workspace your whole company can trust on show day.",
   },
   {
     key: "landing_lead",
     value:
-      "Stop managing productions across spreadsheets, emails, and shared drives. OrdoStage brings your entire operation into one place — from first rehearsal to closing night.",
+      "Whether you run a repertory season, book a busy music room, or move a tour through cities every week, the same problems show up: dates slip, specs drift apart, and crews work from outdated notes. OrdoStage ties events, venues, tours, staffing, and documents together so technical, production, and front-of-house teams share one live picture — from first hold on the calendar to load-out.",
   },
   {
     key: "landing_section_heading",
-    value: "Built for how live performance actually works:",
+    value: "Everything your live organisation already juggles — in one place",
   },
   {
     key: "landing_section_body",
     value:
-      "Planning that follows your workflow, not a generic project manager. Shared scheduling across venues, tours, and departments. Technical riders, venue specs, and team coordination — all connected, always current.",
+      "Plan shows and venue holds on a real calendar. Route tours with day-by-day detail. Keep venue specs, files, and tech riders next to the booking they belong to. Staff jobs from the same roster your people and departments already use. Track time when you need it, share calendars when partners ask, and lock access down with roles that match how theatres and venues actually work.",
   },
   {
     key: "landing_closing",
-    value: "For theaters. For venues. For touring companies. For the people running the show.",
+    value:
+      "Built for resident companies and presenting houses. For music venues and festivals. For tour managers and road crews. For anyone who cannot afford a wrong answer on opening night.",
   },
   {
     key: "landing_postscript",
