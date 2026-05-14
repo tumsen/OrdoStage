@@ -5,7 +5,7 @@ import {
   tourShowCalendarDurationMinutes,
   tourShowCalendarStartTime,
 } from "@/lib/tourScheduleDisplay";
-import { durationMinutesBetween, normalizeTimeHHMM } from "@/lib/showTiming";
+import { addUtcIsoMinutes, durationMinutesBetween, localWallClockToUtcIso, normalizeTimeHHMM } from "@/lib/showTiming";
 
 export type BookingType = "rehearsal" | "maintenance" | "private" | "venue_booking" | "other";
 
@@ -52,16 +52,13 @@ export interface CalendarItem {
   renderBehind?: boolean;
 }
 
+/** Same instant semantics as API bookings (`…Z`) for the time grid. */
 function toLocalDatetime(datePart: string, timePart: string): string {
-  return `${datePart}T${timePart}`;
+  return localWallClockToUtcIso(datePart, timePart);
 }
 
-function addMinutesLocal(startLocal: string, minutes: number): string | null {
-  const d = new Date(startLocal);
-  if (!Number.isFinite(d.getTime())) return null;
-  const end = new Date(d.getTime() + minutes * 60_000);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`;
+function addMinutesLocal(startIso: string, minutes: number): string | null {
+  return addUtcIsoMinutes(startIso, minutes);
 }
 
 function tourShowVenueLabel(show: TourShow): string | undefined {
@@ -286,11 +283,21 @@ export function getMonthDays(year: number, month: number): (Date | null)[] {
 
 export function itemsForDay(items: CalendarItem[], date: Date): CalendarItem[] {
   const dateStr = toDateStr(date);
+  const dayKeyFromField = (raw: string): string => {
+    const t = raw.trim();
+    if (!t) return "";
+    if (t.includes("T")) {
+      const d = new Date(t);
+      if (!Number.isFinite(d.getTime())) return t.slice(0, 10);
+      return toDateStr(d);
+    }
+    return t.slice(0, 10);
+  };
   return items.filter((item) => {
     if (!item.startDate) return false;
-    const start = item.startDate.slice(0, 10);
-    const end = item.endDate ? item.endDate.slice(0, 10) : start;
-    return dateStr >= start && dateStr <= end;
+    const startKey = dayKeyFromField(item.startDate);
+    const endKey = item.endDate ? dayKeyFromField(item.endDate) : startKey;
+    return dateStr >= startKey && dateStr <= endKey;
   });
 }
 

@@ -55,8 +55,10 @@ import {
 } from "@/components/schedule/scheduleUtils";
 import {
   dateToBookingApiIso,
+  addUtcIsoMinutes,
   durationMinutesBetween,
   endTimeFromStartAndDuration,
+  localWallClockToUtcIso,
 } from "@/lib/showTiming";
 import { computeEventWorkTotals, computeShowStaffingStats, parseStaffingOkMap } from "@/lib/eventShowStaffing";
 import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
@@ -1298,11 +1300,13 @@ function formatShowCardSummaryLine(show: EventShow): string {
 function bookingSlotFromShow(show: Pick<EventShow, "showDate" | "showTime" | "durationMinutes">) {
   if (!/^\d{2}:\d{2}$/.test(show.showTime)) return null;
   const day = show.showDate.slice(0, 10);
+  const startDate = localWallClockToUtcIso(day, show.showTime);
   const end = endTimeFromStartAndDuration(show.showTime, show.durationMinutes);
-  return {
-    startDate: `${day}T${show.showTime}`,
-    endDate: `${day}T${end}`,
-  };
+  const endDate =
+    end && /^\d{2}:\d{2}$/.test(end)
+      ? localWallClockToUtcIso(day, end)
+      : addUtcIsoMinutes(startDate, show.durationMinutes) ?? startDate;
+  return { startDate, endDate };
 }
 
 function bookingSlotFromEventShows(event: EventDetail) {
@@ -2408,9 +2412,12 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
       if (!dayYmdInWeek(day)) continue;
       if (venueId && show.venueId !== venueId) continue;
       if (!/^\d{2}:\d{2}$/.test(show.showTime)) continue;
-      const start = `${day}T${show.showTime}`;
+      const start = localWallClockToUtcIso(day, show.showTime);
       const end = endTimeFromStartAndDuration(show.showTime, show.durationMinutes);
-      const endIso = `${day}T${end}`;
+      const endIso =
+        end && /^\d{2}:\d{2}$/.test(end)
+          ? localWallClockToUtcIso(day, end)
+          : addUtcIsoMinutes(start, show.durationMinutes) ?? start;
       out.push({
         id: `${event.id}:show:${show.id}`,
         title: `${event.title} (show)`,
@@ -2427,11 +2434,9 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
         if (!jobDay || !dayYmdInWeek(jobDay)) continue;
         if (venueId && job.venueId !== venueId) continue;
         if (!/^\d{2}:\d{2}$/.test(job.startTime)) continue;
-        const jobStart = `${jobDay}T${job.startTime}`;
+        const jobStart = localWallClockToUtcIso(jobDay, job.startTime);
         const jobEnd =
-          job.durationMinutes > 0
-            ? `${jobDay}T${endTimeFromStartAndDuration(job.startTime, job.durationMinutes)}`
-            : null;
+          job.durationMinutes > 0 ? addUtcIsoMinutes(jobStart, job.durationMinutes) : null;
         const venueName = job.venue?.name ?? show.venue?.name;
         out.push({
           id: `${event.id}:show:${show.id}:job:${job.id}`,
@@ -2455,15 +2460,19 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
           if (!show.showDate) continue;
           if (show.venueId && show.venueId !== venueId) continue;
           const day = show.showDate.slice(0, 10);
-          const start = `${day}T${show.showTime}`;
           const end = endTimeFromStartAndDuration(show.showTime, show.durationMinutes);
+          const start = localWallClockToUtcIso(day, show.showTime);
+          const endIso =
+            end && /^\d{2}:\d{2}$/.test(end)
+              ? localWallClockToUtcIso(day, end)
+              : addUtcIsoMinutes(start, show.durationMinutes) ?? start;
           out.push({
             id: `${otherEvent.id}:show:${show.id}`,
             title: otherEvent.title,
             kind: "event",
             status: show.status ?? otherEvent.status,
             startDate: start,
-            endDate: `${day}T${end}`,
+            endDate: endIso,
             raw: otherEvent,
             disabled: true,
             venueLabel: show.venue?.name,

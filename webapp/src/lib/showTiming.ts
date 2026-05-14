@@ -90,6 +90,37 @@ export function calendarDateKeyFromJobDate(isoOrDay: string, fallback: string): 
   return t.slice(0, 10);
 }
 
+/**
+ * Calendar day + `HH:mm` wall clock in the **browser's local** zone → UTC ISO string.
+ *
+ * Avoid `new Date("YYYY-MM-DDTHH:mm")` for schedule math: WebKit and some engines treat that
+ * form as **UTC**, which shifts timed blocks on the week/day grid by the user's UTC offset
+ * (often +1h / +2h in Europe).
+ */
+export function localWallClockToUtcIso(dateYmd: string, timeHhMm: string): string {
+  const day = dateYmd.trim().split("T")[0]!.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    const t = normalizeTimeHHMM(timeHhMm);
+    return t ? `${day}T${t}` : `${day}T${timeHhMm.trim()}`;
+  }
+  const t = normalizeTimeHHMM(timeHhMm);
+  if (!t) return `${day}T${timeHhMm.trim()}`;
+  const [yy, mo, dd] = day.split("-").map((x) => Number.parseInt(x, 10));
+  const [hh, mm] = t.split(":").map((x) => Number.parseInt(x, 10));
+  if (![yy, mo, dd, hh, mm].every((n) => Number.isFinite(n))) return `${day}T${t}`;
+  const local = new Date(yy, mo - 1, dd, hh, mm, 0, 0);
+  if (!Number.isFinite(local.getTime())) return `${day}T${t}`;
+  return local.toISOString();
+}
+
+/** Add minutes to an absolute ISO instant; returns another ISO string or null if invalid. */
+export function addUtcIsoMinutes(startIso: string, minutes: number): string | null {
+  const d = new Date(startIso);
+  if (!Number.isFinite(d.getTime()) || !Number.isFinite(minutes)) return null;
+  const end = new Date(d.getTime() + minutes * 60_000);
+  return end.toISOString();
+}
+
 /** Parse `datetime-local` value to YYYY-MM-DD and HH:mm (local wall clock). */
 export function parseDatetimeLocal(s: string): { date: string; time: string } {
   if (!s || !s.trim()) return { date: "", time: "" };
