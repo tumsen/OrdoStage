@@ -2705,7 +2705,12 @@ function VenueBookingTab({ event }: { event: EventDetail }) {
       />
 
       {venueId ? (
-        <VenueCalendarContextStrip venueId={venueId} venue={selectedVenue} showEditLink={canWrite} />
+        <VenueCalendarContextStrip
+          venueId={venueId}
+          venue={selectedVenue}
+          showEditLink={canWrite}
+          archiveFolderName={event.title}
+        />
       ) : null}
 
       <EditItemSheet

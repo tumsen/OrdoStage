@@ -1,15 +1,61 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { FileText } from "lucide-react";
+import JSZip from "jszip";
+import { Download, FileText } from "lucide-react";
+import { toast } from "sonner";
+
 import { api } from "@/lib/api";
 import type { Venue, VenueDocument } from "@/lib/types";
 import { appleMapsUrl, formatAddress, googleMapsUrl } from "@/components/AddressFields";
+import { Button } from "@/components/ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Skeleton } from "@/components/ui/skeleton";
+
+function documentDownloadPath(docId: string): string {
+  return `/api/venues/documents/${docId}/download`;
+}
 
 function documentDownloadUrl(docId: string): string {
   const base = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
-  return `${base}/api/venues/documents/${docId}/download`;
+  return `${base}${documentDownloadPath(docId)}`;
+}
+
+function sanitizeForPath(raw: string, maxLen = 120): string {
+  const trimmed = raw.trim().slice(0, maxLen) || "files";
+  const cleaned = trimmed.replace(/[/\\?%*:|"<>]/g, "_").replace(/\s+/g, " ").trim();
+  return cleaned || "files";
+}
+
+function sanitizeEntryFilename(name: string): string {
+  const base = name.trim().replace(/[/\\]/g, "_") || "file";
+  return base.slice(0, 200);
+}
+
+function uniqueFileName(base: string, used: Set<string>): string {
+  let n = base;
+  let i = 1;
+  const dot = base.lastIndexOf(".");
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  const ext = dot > 0 ? base.slice(dot) : "";
+  while (used.has(n)) {
+    i += 1;
+    n = ext ? `${stem} (${i})${ext}` : `${base} (${i})`;
+  }
+  used.add(n);
+  return n;
+}
+
+function triggerBlobDownload(blob: Blob, filename: string) {
+  const a = document.createElement("a");
+  const href = URL.createObjectURL(blob);
+  a.href = href;
+  a.download = filename;
+  a.rel = "noreferrer";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(href);
 }
 
 function isImageDoc(d: VenueDocument): boolean {
@@ -18,37 +64,97 @@ function isImageDoc(d: VenueDocument): boolean {
 
 function DocThumb({ doc }: { doc: VenueDocument }) {
   const [imgErr, setImgErr] = useState(false);
+  const [previewErr, setPreviewErr] = useState(false);
   const url = documentDownloadUrl(doc.id);
   const tryImg = isImageDoc(doc) && !imgErr;
 
+  const handleDownload = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        const res = await api.raw(documentDownloadPath(doc.id));
+        if (!res.ok) throw new Error(String(res.status));
+        const blob = await res.blob();
+        triggerBlobDownload(blob, doc.filename || doc.name || "download");
+      } catch {
+        toast.error("Download failed");
+      }
+    },
+    [doc.filename, doc.id, doc.name],
+  );
+
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      title={`${doc.name} (${doc.filename})`}
-      className="group relative shrink-0 flex h-[4.75rem] w-[4.75rem] flex-col overflow-hidden rounded-md border border-white/10 bg-white/[0.04] hover:border-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45"
-    >
-      {tryImg ? (
-        <img
-          src={url}
-          alt=""
-          className="h-full w-full object-cover"
-          loading="lazy"
-          onError={() => setImgErr(true)}
-        />
-      ) : (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-1.5">
-          <FileText className="h-5 w-5 shrink-0 text-white/45" aria-hidden />
-          <span className="line-clamp-2 text-center text-[9px] leading-tight text-white/55">{doc.name}</span>
+    <HoverCard openDelay={100} closeDelay={280}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          title={`${doc.name} (${doc.filename}) — hover for preview`}
+          aria-label={`Preview ${doc.name}`}
+          className="group relative flex h-[4.75rem] w-[4.75rem] shrink-0 flex-col overflow-hidden rounded-md border border-white/10 bg-white/[0.04] text-left hover:border-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45"
+        >
+          {tryImg ? (
+            <img
+              src={url}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+              onError={() => setImgErr(true)}
+            />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-1.5">
+              <FileText className="h-5 w-5 shrink-0 text-white/45" aria-hidden />
+              <span className="line-clamp-2 text-center text-[9px] leading-tight text-white/55">{doc.name}</span>
+            </div>
+          )}
+          {tryImg ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 line-clamp-1 bg-gradient-to-t from-black/80 to-transparent px-1 pb-1 pt-3 text-[9px] text-white/90 opacity-0 transition-opacity group-hover:opacity-100">
+              {doc.name}
+            </div>
+          ) : null}
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent
+        side="top"
+        align="center"
+        sideOffset={8}
+        className="w-auto max-w-[min(92vw,26rem)] border-white/10 bg-[#14141a] p-3 text-white shadow-xl"
+      >
+        <div className="overflow-hidden rounded-md border border-white/10 bg-black/50">
+          {tryImg && !previewErr ? (
+            <img
+              src={url}
+              alt=""
+              className="max-h-[min(70vh,22rem)] w-full max-w-full object-contain"
+              loading="eager"
+              onError={() => setPreviewErr(true)}
+            />
+          ) : (
+            <div className="flex min-h-[9rem] flex-col items-center justify-center gap-2 px-6 py-8">
+              <FileText className="h-12 w-12 text-white/35" aria-hidden />
+              <span className="max-w-[18rem] text-center text-xs leading-snug text-white/65">{doc.name}</span>
+              {tryImg && previewErr ? (
+                <span className="text-center text-[10px] text-white/40">Preview unavailable — use Download.</span>
+              ) : null}
+            </div>
+          )}
         </div>
-      )}
-      {tryImg ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 line-clamp-1 bg-gradient-to-t from-black/80 to-transparent px-1 pb-1 pt-3 text-[9px] text-white/90 opacity-0 transition-opacity group-hover:opacity-100">
-          {doc.name}
+        <div className="mt-2 space-y-1">
+          <p className="line-clamp-2 text-[11px] font-medium text-white/90">{doc.name}</p>
+          <p className="truncate text-[10px] text-white/40">{doc.filename}</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="mt-1.5 w-full gap-2 bg-white/10 text-white hover:bg-white/15"
+            onClick={handleDownload}
+          >
+            <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Download
+          </Button>
         </div>
-      ) : null}
-    </a>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
@@ -57,16 +163,65 @@ export function VenueCalendarContextStrip({
   venueId,
   venue,
   showEditLink = false,
+  archiveFolderName,
 }: {
   venueId: string;
   venue: Venue | null | undefined;
   showEditLink?: boolean;
+  /** Root folder inside the ZIP and the `.zip` basename (e.g. event title on event page, venue name on venue page). */
+  archiveFolderName?: string;
 }) {
+  const [zipping, setZipping] = useState(false);
+
   const { data: docs, isLoading } = useQuery({
     queryKey: ["venues", venueId, "documents"],
     queryFn: () => api.get<VenueDocument[]>(`/api/venues/${venueId}/documents`),
     enabled: Boolean(venueId),
   });
+
+  const folderBase = useMemo(
+    () =>
+      sanitizeForPath(
+        archiveFolderName?.trim() || venue?.name?.trim() || "venue-documents",
+      ),
+    [archiveFolderName, venue?.name],
+  );
+
+  const handleDownloadAll = useCallback(async () => {
+    const list = docs ?? [];
+    if (list.length === 0) return;
+    setZipping(true);
+    try {
+      const zip = new JSZip();
+      const root = zip.folder(folderBase);
+      if (!root) throw new Error("Could not create archive folder");
+      const used = new Set<string>();
+      let ok = 0;
+      for (const d of list) {
+        const res = await api.raw(documentDownloadPath(d.id));
+        if (!res.ok) continue;
+        const blob = await res.blob();
+        const fname = uniqueFileName(sanitizeEntryFilename(d.filename || d.name || "file"), used);
+        root.file(fname, blob);
+        ok += 1;
+      }
+      if (ok === 0) {
+        toast.error("Could not download venue files. Check your connection or sign in again.");
+        return;
+      }
+      const out = await zip.generateAsync({ type: "blob" });
+      triggerBlobDownload(out, `${folderBase}.zip`);
+      if (ok < list.length) {
+        toast.message(`Packed ${ok} of ${list.length} files (some were skipped).`);
+      } else {
+        toast.success("ZIP download started.");
+      }
+    } catch {
+      toast.error("Could not build the ZIP archive.");
+    } finally {
+      setZipping(false);
+    }
+  }, [docs, folderBase]);
 
   if (!venueId) return null;
 
@@ -86,6 +241,9 @@ export function VenueCalendarContextStrip({
       venue?.addressCity?.trim() ||
       venue?.addressCountry?.trim()
   );
+
+  const docList = docs ?? [];
+  const showDownloadAll = !isLoading && docList.length > 0;
 
   return (
     <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
@@ -155,21 +313,35 @@ export function VenueCalendarContextStrip({
       </div>
 
       <div>
-        <div className="mb-2 text-[10px] uppercase tracking-wide text-white/45">Drawings &amp; photos</div>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-[10px] uppercase tracking-wide text-white/45">Drawings &amp; photos</div>
+          {showDownloadAll ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={zipping}
+              className="h-7 border-white/15 bg-white/[0.04] text-[11px] text-white/80 hover:bg-white/10 hover:text-white"
+              onClick={() => void handleDownloadAll()}
+            >
+              {zipping ? "Preparing ZIP…" : "Download all"}
+            </Button>
+          ) : null}
+        </div>
         {isLoading ? (
           <div className="flex gap-2">
             {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-[4.75rem] w-[4.75rem] shrink-0 rounded-md bg-white/5" />
             ))}
           </div>
-        ) : (docs ?? []).length === 0 ? (
+        ) : docList.length === 0 ? (
           <p className="text-[11px] text-white/35">
             No venue files yet.
             {showEditLink ? " Upload from venue edit." : ""}
           </p>
         ) : (
           <div className="-mx-0.5 flex gap-2 overflow-x-auto px-0.5 pb-0.5">
-            {(docs ?? []).map((d) => (
+            {docList.map((d) => (
               <DocThumb key={d.id} doc={d} />
             ))}
           </div>

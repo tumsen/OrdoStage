@@ -319,7 +319,12 @@ export default function VenueDetail() {
             </div>
           </div>
 
-          <VenueCalendarContextStrip venueId={venueId} venue={venue} showEditLink={canWrite} />
+          <VenueCalendarContextStrip
+            venueId={venueId}
+            venue={venue}
+            showEditLink={canWrite}
+            archiveFolderName={venue?.name}
+          />
         </>
       )}
 
