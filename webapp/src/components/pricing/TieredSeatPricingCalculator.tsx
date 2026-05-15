@@ -66,6 +66,53 @@ function parseMoney(s: string, fallback: number): number {
   return Number.isFinite(v) ? v : fallback;
 }
 
+/** Right-aligned unit chip next to numeric inputs (EUR, Days, %, Users). */
+export function InputWithUnitSuffix({
+  id,
+  value,
+  onChange,
+  onBlur,
+  inputMode = "decimal",
+  suffix,
+  highlight,
+  className,
+  "aria-describedby": ariaDescribedBy,
+}: {
+  id?: string;
+  value: string;
+  onChange: (v: string) => void;
+  onBlur?: () => void;
+  inputMode?: "decimal" | "numeric" | "text";
+  suffix: "EUR" | "Days" | "%" | "Users";
+  highlight?: boolean;
+  className?: string;
+  "aria-describedby"?: string;
+}) {
+  return (
+    <div className={cn("flex shrink-0 gap-1.5", className)}>
+      <Input
+        id={id}
+        type="text"
+        inputMode={inputMode}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        aria-describedby={ariaDescribedBy}
+        className={cn(
+          "h-9 min-w-0 flex-1 border-white/15 bg-black/30 text-white tabular-nums",
+          highlight && "border-emerald-500/30 focus-visible:ring-emerald-500/40",
+        )}
+      />
+      <span
+        className="flex h-9 min-w-[2.85rem] max-w-[3.5rem] shrink-0 items-center justify-center rounded-md border border-white/15 bg-black/45 px-1 text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/55"
+        aria-hidden
+      >
+        {suffix}
+      </span>
+    </div>
+  );
+}
+
 export function TieredSeatPricingCalculator({
   showModelControls = false,
   className,
@@ -286,63 +333,104 @@ export function TieredSeatPricingCalculator({
       >
         <MetricCard
           label="Monthly total"
+          hint="Estimated invoice for one month at the slider seat count, using the curve below. All amounts are in euros (EUR)."
           value={`€${Math.round(discountedMonthly).toLocaleString()}`}
+          valueSuffix="EUR"
           sub={monthlySub}
         />
         {publicAnnualOffered ? (
           <MetricCard
             label="Annual total"
+            hint="If annual billing is on, 12× the discounted monthly equivalent at this seat count. Shown in EUR for comparison with monthly."
             value={`€${Math.round(annualPlanYearTotal).toLocaleString()}`}
+            valueSuffix="EUR"
             sub={annualTotalSub}
           />
         ) : null}
-        <MetricCard label="Effective per user" value={`€${perUserEffective.toFixed(2)}`} sub="per active user/mo" />
+        <MetricCard
+          label="Effective per user"
+          hint="Monthly total divided by active users — a quick average, not a flat per-seat rate on the invoice."
+          value={`€${perUserEffective.toFixed(2)}`}
+          valueSuffix="EUR"
+          sub="per active user / month (EUR)"
+        />
       </div>
 
       {showModelControls ? (
         <>
-          <p className="text-xs font-medium uppercase tracking-wide text-white/45">Model settings (illustrative EUR)</p>
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-white/45">Model settings (illustrative EUR)</p>
+            <p className="max-w-4xl text-[11px] leading-relaxed text-white/50">
+              These fields define the published postpaid curve in <strong className="text-white/70">EUR</strong>: the
+              first billable seat uses the base fee, the second uses the user-2 marginal, and further seats step down
+              until the floor marginal applies from the seat number you set. Invoices sum marginals for each billable
+              member in the month.
+            </p>
+          </div>
           <div className="grid w-full auto-cols-[minmax(7.5rem,1fr)] grid-flow-col gap-2 overflow-x-auto pb-0.5">
             <ModelInput
-              label="Base fee (1 user) €"
+              fieldId="seat-model-base"
+              label="Base fee (1st billable seat)"
+              hint="Fixed monthly EUR for the first billable seat before any additional marginals."
+              suffix="EUR"
               value={baseDraft}
               onChange={setBaseDraft}
               onBlur={commitBaseDraft}
             />
             <ModelInput
-              label="User 2 price €"
+              fieldId="seat-model-user2"
+              label="2nd seat marginal"
+              hint="EUR added for the second billable seat in a month (marginal, not cumulative with base)."
+              suffix="EUR"
               value={startDraft}
               onChange={setStartDraft}
               onBlur={commitStartDraft}
             />
             <ModelInput
-              label="Floor reached at user #"
+              fieldId="seat-model-floor-at"
+              label="Floor from seat #"
+              hint="From this billable seat count upward, each additional seat uses the floor marginal (EUR) only."
+              suffix="Users"
               highlight
+              inputMode="numeric"
               value={floorAtDraft}
               onChange={setFloorAtDraft}
               onBlur={commitFloorAtDraft}
             />
             <ModelInput
-              label="Floor price €"
+              fieldId="seat-model-floor-eur"
+              label="Floor marginal / seat"
+              hint="Minimum EUR per additional billable seat once the floor seat count is reached."
+              suffix="EUR"
               highlight
               value={floorPriceDraft}
               onChange={setFloorPriceDraft}
               onBlur={commitFloorPriceDraft}
             />
             {publicAnnualOffered ? (
-              <div className="flex min-h-[9.25rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+              <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
                 <div className="shrink-0 space-y-2">
                   {showYearlyDiscountControls ? (
                     <Label
                       htmlFor="annual-discount-pct"
-                      className="block min-h-[2.75rem] text-[11px] font-medium leading-snug text-white/50 line-clamp-3"
+                      className="block min-h-[2.5rem] text-[11px] font-medium leading-snug text-white/50 line-clamp-3"
                     >
-                      Annual discount (%)
+                      Annual prepay discount
                     </Label>
                   ) : (
-                    <span className="block min-h-[2.75rem] text-[11px] font-medium leading-snug text-white/50">
+                    <span className="block min-h-[2.5rem] text-[11px] font-medium leading-snug text-white/50">
                       Annual billing
                     </span>
+                  )}
+                  {showYearlyDiscountControls ? (
+                    <p className="text-[10px] leading-snug text-white/45">
+                      Percent off the monthly total when customers pay annually (0–100%). Shown as <strong className="text-white/60">%</strong>{" "}
+                      beside the field; calculator preview uses EUR totals.
+                    </p>
+                  ) : (
+                    <p className="text-[10px] leading-snug text-white/45">
+                      Toggle whether annual prepayment is offered. Savings chip is shown in EUR when a discount applies.
+                    </p>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
                     <Switch
@@ -359,21 +447,20 @@ export function TieredSeatPricingCalculator({
                     </Label>
                     {annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0 ? (
                       <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
-                        Save €{annualSavingsYear.toLocaleString()}/yr
+                        Save €{annualSavingsYear.toLocaleString()} / yr
                       </span>
                     ) : null}
                   </div>
                 </div>
                 <div className="min-h-0 flex-1" aria-hidden />
                 {showYearlyDiscountControls ? (
-                  <Input
+                  <InputWithUnitSuffix
                     id="annual-discount-pct"
-                    type="text"
                     inputMode="numeric"
+                    suffix="%"
                     value={yearlyPercentDraft}
-                    onChange={(e) => setYearlyPercentDraft(e.target.value)}
+                    onChange={setYearlyPercentDraft}
                     onBlur={commitYearlyPercentDraft}
-                    className="h-9 shrink-0 border-white/15 bg-black/30 text-white tabular-nums"
                   />
                 ) : (
                   <div className="h-9 shrink-0" aria-hidden />
@@ -387,12 +474,14 @@ export function TieredSeatPricingCalculator({
 
       <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white/65 sm:flex-row sm:items-center sm:justify-between">
         <span>
-          User <strong className="font-medium text-white">{users}</strong> costs{" "}
-          <strong className="font-medium text-white">{users === 1 ? "(base only)" : `€${thisRate.toFixed(2)}`}</strong>
+          User <strong className="font-medium text-white">{users}</strong> marginal (EUR):{" "}
+          <strong className="font-medium text-white">
+            {users === 1 ? `€${model.base} EUR (1st seat)` : `€${thisRate.toFixed(2)} EUR marginal`}
+          </strong>
         </span>
         <span>
-          Discount step per user:{" "}
-          <strong className="font-medium text-white">€{step.toFixed(2)}</strong>
+          Discount step / user (EUR):{" "}
+          <strong className="font-medium text-white">€{step.toFixed(2)} EUR</strong>
         </span>
       </div>
 
@@ -498,18 +587,41 @@ function monthlyAtUsers(m: TieredSeatModel): number[] {
   );
 }
 
-function MetricCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+function MetricCard({
+  label,
+  hint,
+  value,
+  valueSuffix,
+  sub,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  valueSuffix?: string;
+  sub: string;
+}) {
   return (
-    <div className="flex min-h-[9.5rem] flex-col rounded-xl border border-white/10 bg-white/[0.04] p-3 md:min-h-[10rem] md:p-4">
-      <p className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-white/45">{label}</p>
-      <p className="mt-1 shrink-0 text-xl font-semibold tabular-nums text-white md:text-2xl">{value}</p>
+    <div className="flex min-h-[11rem] flex-col rounded-xl border border-white/10 bg-white/[0.04] p-3 md:min-h-[11.5rem] md:p-4">
+      <div className="flex shrink-0 items-start justify-between gap-2">
+        <p className="text-[11px] font-medium uppercase leading-snug tracking-wide text-white/45">{label}</p>
+        {valueSuffix ? (
+          <span className="shrink-0 rounded border border-white/10 bg-black/30 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/45">
+            {valueSuffix}
+          </span>
+        ) : null}
+      </div>
+      {hint ? <p className="mt-1.5 shrink-0 text-[10px] leading-snug text-white/45 line-clamp-4">{hint}</p> : null}
+      <p className="mt-2 shrink-0 text-xl font-semibold tabular-nums text-white md:text-2xl">{value}</p>
       <p className="mt-auto text-[11px] leading-snug text-white/45 line-clamp-3">{sub}</p>
     </div>
   );
 }
 
 function ModelInput({
+  fieldId,
   label,
+  hint,
+  suffix,
   value,
   onChange,
   onBlur,
@@ -517,7 +629,10 @@ function ModelInput({
   inputMode = "decimal",
   className,
 }: {
+  fieldId: string;
   label: string;
+  hint?: string;
+  suffix: "EUR" | "Days" | "%" | "Users";
   value: string;
   onChange: (v: string) => void;
   onBlur?: () => void;
@@ -528,30 +643,35 @@ function ModelInput({
   return (
     <div
       className={cn(
-        "flex min-h-[9.25rem] min-w-0 flex-col rounded-lg border px-3 py-2.5",
+        "flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border px-3 py-2.5",
         highlight ? "border-emerald-500/40 bg-emerald-500/10" : "border-white/10 bg-white/[0.03]",
         className,
       )}
     >
       <Label
+        htmlFor={fieldId}
         className={cn(
-          "min-h-[2.75rem] shrink-0 text-[11px] font-medium leading-snug line-clamp-3",
+          "min-h-[2.5rem] shrink-0 text-[11px] font-medium leading-snug line-clamp-3",
           highlight ? "text-emerald-200/90" : "text-white/50",
         )}
       >
         {label}
       </Label>
+      {hint ? (
+        <p id={`${fieldId}-hint`} className="mt-1 shrink-0 text-[10px] leading-snug text-white/45 line-clamp-4">
+          {hint}
+        </p>
+      ) : null}
       <div className="min-h-0 flex-1" aria-hidden />
-      <Input
-        type="text"
+      <InputWithUnitSuffix
+        id={fieldId}
         inputMode={inputMode}
+        suffix={suffix}
+        highlight={highlight}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         onBlur={onBlur}
-        className={cn(
-          "h-9 shrink-0 border-white/15 bg-black/30 text-white tabular-nums",
-          highlight && "border-emerald-500/30 focus-visible:ring-emerald-500/40",
-        )}
+        aria-describedby={hint ? `${fieldId}-hint` : undefined}
       />
     </div>
   );

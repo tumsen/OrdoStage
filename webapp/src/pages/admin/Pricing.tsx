@@ -3,10 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
+import {
+  InputWithUnitSuffix,
+  TieredSeatPricingCalculator,
+} from "@/components/pricing/TieredSeatPricingCalculator";
 import { parseSeatCalculatorJson } from "@/lib/seatCalculatorJson";
 import { DEFAULT_TIERED_SEAT_MODEL, type TieredSeatModel } from "@/lib/tieredSeatPricing";
 
@@ -178,44 +180,67 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
             onSeatModelChange={setSeatModel}
             afterModelControls={
               <>
-                <div className="flex min-h-[9.25rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                  <Label className="min-h-[2.75rem] shrink-0 text-[11px] font-medium leading-snug text-white/50 line-clamp-3">
-                    Invoice due days (1–30)
+                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                  <Label
+                    htmlFor="admin-invoice-due-days"
+                    className="min-h-[2.5rem] shrink-0 text-[11px] font-medium leading-snug text-white/50 line-clamp-3"
+                  >
+                    Invoice payment due
                   </Label>
+                  <p id="admin-invoice-due-days-hint" className="mt-1 shrink-0 text-[10px] leading-snug text-white/45 line-clamp-4">
+                    Calendar days after an invoice is issued until it is due (1–30). Stored as whole <strong className="text-white/55">Days</strong>; affects
+                    reminder timing and when read-only can apply.
+                  </p>
                   <div className="min-h-0 flex-1" aria-hidden />
-                  <Input
-                    type="text"
+                  <InputWithUnitSuffix
+                    id="admin-invoice-due-days"
                     inputMode="numeric"
-                    autoComplete="off"
+                    suffix="Days"
                     value={paymentDueDays}
-                    onChange={(e) => setPaymentDueDays(e.target.value)}
-                    className="h-9 shrink-0 border-white/15 bg-black/30 text-white tabular-nums"
+                    onChange={setPaymentDueDays}
+                    aria-describedby="admin-invoice-due-days-hint"
                   />
                 </div>
-                <div className="flex min-h-[9.25rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                  <Label className="min-h-[2.75rem] shrink-0 text-[11px] font-medium leading-snug text-white/50 line-clamp-3">Trial period (days)</Label>
-                  <div className="min-h-0 flex-1" aria-hidden />
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    value={billingTrialDays}
-                    onChange={(e) => setBillingTrialDays(e.target.value)}
-                    className="h-9 shrink-0 border-white/15 bg-black/30 text-white tabular-nums"
-                  />
-                </div>
-                <div className="flex min-h-[9.25rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                  <Label className="min-h-[2.75rem] shrink-0 text-[11px] font-medium leading-snug text-white/50 line-clamp-3">
-                    Grace after invoice due (days)
+                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                  <Label
+                    htmlFor="admin-billing-trial-days"
+                    className="min-h-[2.5rem] shrink-0 text-[11px] font-medium leading-snug text-white/50 line-clamp-3"
+                  >
+                    Free trial length
                   </Label>
+                  <p id="admin-billing-trial-days-hint" className="mt-1 shrink-0 text-[10px] leading-snug text-white/45 line-clamp-4">
+                    Days from organisation creation before post-trial rules apply strongly. Use <strong className="text-white/55">0 Days</strong> for no trial.
+                    Unpaid invoices still respect this window before forcing read-only.
+                  </p>
                   <div className="min-h-0 flex-1" aria-hidden />
-                  <Input
-                    type="text"
+                  <InputWithUnitSuffix
+                    id="admin-billing-trial-days"
                     inputMode="numeric"
-                    autoComplete="off"
+                    suffix="Days"
+                    value={billingTrialDays}
+                    onChange={setBillingTrialDays}
+                    aria-describedby="admin-billing-trial-days-hint"
+                  />
+                </div>
+                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                  <Label
+                    htmlFor="admin-billing-grace-days"
+                    className="min-h-[2.5rem] shrink-0 text-[11px] font-medium leading-snug text-white/50 line-clamp-3"
+                  >
+                    Grace after due date
+                  </Label>
+                  <p id="admin-billing-grace-days-hint" className="mt-1 shrink-0 text-[10px] leading-snug text-white/45 line-clamp-4">
+                    Extra <strong className="text-white/55">Days</strong> after the invoice due date before the organisation becomes view-only (0 = none). Helps
+                    teams who pay a few days late.
+                  </p>
+                  <div className="min-h-0 flex-1" aria-hidden />
+                  <InputWithUnitSuffix
+                    id="admin-billing-grace-days"
+                    inputMode="numeric"
+                    suffix="Days"
                     value={billingGraceDaysAfterDue}
-                    onChange={(e) => setBillingGraceDaysAfterDue(e.target.value)}
-                    className="h-9 shrink-0 border-white/15 bg-black/30 text-white tabular-nums"
+                    onChange={setBillingGraceDaysAfterDue}
+                    aria-describedby="admin-billing-grace-days-hint"
                   />
                 </div>
               </>
