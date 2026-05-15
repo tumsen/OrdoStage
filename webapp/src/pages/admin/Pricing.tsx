@@ -178,7 +178,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
             onSeatModelChange={setSeatModel}
             afterModelControls={
               <>
-                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                <div className="min-w-[8.75rem] flex-1 basis-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
                   <Label className="text-[11px] font-medium text-white/50">Invoice due days (1–30)</Label>
                   <Input
                     type="text"
@@ -189,7 +189,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
                     className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
                   />
                 </div>
-                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                <div className="min-w-[8.75rem] flex-1 basis-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
                   <Label className="text-[11px] font-medium text-white/50">Trial period (days)</Label>
                   <Input
                     type="text"
@@ -200,7 +200,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
                     className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
                   />
                 </div>
-                <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                <div className="min-w-[8.75rem] flex-1 basis-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
                   <Label className="text-[11px] font-medium text-white/50">Grace after invoice due (days)</Label>
                   <Input
                     type="text"
