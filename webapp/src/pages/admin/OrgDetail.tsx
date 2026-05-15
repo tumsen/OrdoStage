@@ -69,6 +69,8 @@ interface OrgDetail {
   customFlatRateMaxUsers: number | null;
   customUserDailyRateCents: number | null;
   customSeatCalculatorJson: string | null;
+  /** Persisted admin default seat JSON; used when customSeatCalculatorJson is null. */
+  globalDefaultSeatCalculatorJson?: string | null;
   seatCalculatorDefaults?: {
     yearlyDiscountPercent: number;
     yearlyDiscountEnabled: boolean;
@@ -96,20 +98,22 @@ function majorToCents(value: string): number {
   return Math.max(1, Math.round(parsed * 100));
 }
 
-function mergeOrgSeatModel(org: OrgDetail): TieredSeatModel {
-  const parsed = parseSeatCalculatorJson(org.customSeatCalculatorJson);
+function mergeSeatModelFromJson(json: string | null | undefined): TieredSeatModel {
+  const parsed = parseSeatCalculatorJson(json ?? null);
   return {
     ...DEFAULT_TIERED_SEAT_MODEL,
     ...parsed?.model,
   };
 }
 
-function initialOrgYearly(org: OrgDetail): { percent: number; enabled: boolean } {
-  const parsed = parseSeatCalculatorJson(org.customSeatCalculatorJson);
-  const d = org.seatCalculatorDefaults ?? { yearlyDiscountPercent: 15, yearlyDiscountEnabled: true };
+function yearlyFromCalculatorJson(
+  json: string | null | undefined,
+  defaults: { yearlyDiscountPercent: number; yearlyDiscountEnabled: boolean },
+): { percent: number; enabled: boolean } {
+  const parsed = parseSeatCalculatorJson(json ?? null);
   return {
-    percent: parsed?.yearlyDiscountPercent ?? d.yearlyDiscountPercent,
-    enabled: parsed?.yearlyDiscountEnabled ?? d.yearlyDiscountEnabled,
+    percent: parsed?.yearlyDiscountPercent ?? defaults.yearlyDiscountPercent,
+    enabled: parsed?.yearlyDiscountEnabled ?? defaults.yearlyDiscountEnabled,
   };
 }
 
@@ -166,9 +170,14 @@ function BillingTab({ org }: { org: OrgDetail }) {
     billingCurrencyCode: "EUR",
     customUserDailyRateMajor: "",
   });
+  const [useCustomSeatCurve, setUseCustomSeatCurve] = useState(() => Boolean(org.customSeatCalculatorJson?.trim()));
   const [seatModel, setSeatModel] = useState<TieredSeatModel>({ ...DEFAULT_TIERED_SEAT_MODEL });
   const [seatYearlyPercent, setSeatYearlyPercent] = useState(15);
   const [seatYearlyEnabled, setSeatYearlyEnabled] = useState(true);
+
+  useEffect(() => {
+    setUseCustomSeatCurve(Boolean(org.customSeatCalculatorJson?.trim()));
+  }, [org.id, org.customSeatCalculatorJson]);
 
   useEffect(() => {
     setForm({
@@ -178,21 +187,49 @@ function BillingTab({ org }: { org: OrgDetail }) {
       billingCurrencyCode: org.billingCurrencyCode || "EUR",
       customUserDailyRateMajor: formatEditableMajorFromCents(org.customUserDailyRateCents),
     });
-    setSeatModel(mergeOrgSeatModel(org));
-    const y = initialOrgYearly(org);
-    setSeatYearlyPercent(y.percent);
-    setSeatYearlyEnabled(y.enabled);
-  }, [org]);
+  }, [
+    org.id,
+    org.customDiscountPercent,
+    org.customFlatRateCents,
+    org.customFlatRateMaxUsers,
+    org.billingCurrencyCode,
+    org.customUserDailyRateCents,
+  ]);
+
+  useEffect(() => {
+    const defaults = org.seatCalculatorDefaults ?? { yearlyDiscountPercent: 15, yearlyDiscountEnabled: true };
+    if (useCustomSeatCurve) {
+      if (org.customSeatCalculatorJson?.trim()) {
+        setSeatModel(mergeSeatModelFromJson(org.customSeatCalculatorJson));
+        const y = yearlyFromCalculatorJson(org.customSeatCalculatorJson, defaults);
+        setSeatYearlyPercent(y.percent);
+        setSeatYearlyEnabled(y.enabled);
+      }
+    } else {
+      setSeatModel(mergeSeatModelFromJson(org.globalDefaultSeatCalculatorJson));
+      const y = yearlyFromCalculatorJson(org.globalDefaultSeatCalculatorJson, defaults);
+      setSeatYearlyPercent(y.percent);
+      setSeatYearlyEnabled(y.enabled);
+    }
+  }, [
+    org.id,
+    org.customSeatCalculatorJson,
+    org.globalDefaultSeatCalculatorJson,
+    org.seatCalculatorDefaults,
+    useCustomSeatCurve,
+  ]);
 
   const pricingMutation = useMutation({
     mutationFn: () =>
       api.put(`/api/admin/orgs/${org.id}/billing-pricing`, {
         customUserDailyRateCents: form.customUserDailyRateMajor.trim() ? majorToCents(form.customUserDailyRateMajor) : null,
-        customSeatCalculatorJson: JSON.stringify({
-          model: seatModel,
-          yearlyDiscountPercent: seatYearlyPercent,
-          yearlyDiscountEnabled: seatYearlyEnabled,
-        }),
+        customSeatCalculatorJson: useCustomSeatCurve
+          ? JSON.stringify({
+              model: seatModel,
+              yearlyDiscountPercent: seatYearlyPercent,
+              yearlyDiscountEnabled: seatYearlyEnabled,
+            })
+          : null,
         customDiscountPercent: form.customDiscountPercent.trim() ? Number(form.customDiscountPercent) : null,
         customFlatRateCents: form.customFlatRateCents.trim() ? Number(form.customFlatRateCents) : null,
         customFlatRateMaxUsers: form.customFlatRateMaxUsers.trim() ? Number(form.customFlatRateMaxUsers) : null,
@@ -294,13 +331,30 @@ function BillingTab({ org }: { org: OrgDetail }) {
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-xs text-white/55">
-            Overrides the marketing calculator for this customer. Values save with{" "}
-            <span className="text-white/75">Save custom billing pricing</span> and are used for invoices unless a fixed
-            per-seat override is set above.
+            By default this matches the admin pricing defaults and updates when those change. Enable a custom curve to
+            override for this organisation only. Values save with <span className="text-white/75">Save custom billing
+            pricing</span> and are used for invoices unless a fixed per-seat override is set above.
           </p>
+          <div className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <Checkbox
+              id="org-custom-seat-curve"
+              checked={useCustomSeatCurve}
+              onCheckedChange={(v) => setUseCustomSeatCurve(v === true)}
+              className="mt-0.5 border-white/30 data-[state=checked]:bg-rose-600 data-[state=checked]:border-rose-600"
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="org-custom-seat-curve" className="text-sm text-white/85 cursor-pointer">
+                Use organisation-specific seat curve
+              </Label>
+              <p className="text-[11px] text-white/45 leading-snug">
+                When off, invoices use the global admin seat curve; the fields below mirror it read-only.
+              </p>
+            </div>
+          </div>
           <TieredSeatPricingCalculator
             showTrialBadge={false}
             showModelControls
+            disableModelControls={!useCustomSeatCurve}
             seatModel={seatModel}
             onSeatModelChange={setSeatModel}
             yearlyDiscountPercent={seatYearlyPercent}

@@ -30,6 +30,8 @@ const CHART_AXIS = "rgba(255,255,255,0.38)";
 type Props = {
   /** Owner admin: editable model inputs. Public: fixed defaults. */
   showModelControls?: boolean;
+  /** When true with showModelControls, curve inputs are read-only (e.g. mirroring global admin defaults). */
+  disableModelControls?: boolean;
   className?: string;
   /** When false, hides the marketing trial chip (e.g. internal org billing). */
   showTrialBadge?: boolean;
@@ -76,6 +78,7 @@ export function InputWithUnitSuffix({
   suffix,
   highlight,
   className,
+  disabled,
   "aria-describedby": ariaDescribedBy,
 }: {
   id?: string;
@@ -87,6 +90,7 @@ export function InputWithUnitSuffix({
   highlight?: boolean;
   className?: string;
   "aria-describedby"?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className={cn("flex shrink-0 gap-1.5", className)}>
@@ -97,6 +101,7 @@ export function InputWithUnitSuffix({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
+        disabled={disabled}
         aria-describedby={ariaDescribedBy}
         className={cn(
           "h-9 min-w-0 flex-1 border-white/15 bg-black/30 text-white tabular-nums",
@@ -115,6 +120,7 @@ export function InputWithUnitSuffix({
 
 export function TieredSeatPricingCalculator({
   showModelControls = false,
+  disableModelControls = false,
   className,
   showTrialBadge = true,
   yearlyDiscountPercent = 15,
@@ -126,6 +132,7 @@ export function TieredSeatPricingCalculator({
   onSeatModelChange,
   afterModelControls,
 }: Props) {
+  const modelInputsLocked = showModelControls && disableModelControls;
   /** Admin/org always sees annual controls; public page only when global setting enables annual discount. */
   const publicAnnualOffered = showYearlyDiscountControls || yearlyDiscountEnabled;
   const [users, setUsers] = useState(20);
@@ -376,6 +383,7 @@ export function TieredSeatPricingCalculator({
               value={baseDraft}
               onChange={setBaseDraft}
               onBlur={commitBaseDraft}
+              disabled={modelInputsLocked}
             />
             <ModelInput
               fieldId="seat-model-user2"
@@ -385,6 +393,7 @@ export function TieredSeatPricingCalculator({
               value={startDraft}
               onChange={setStartDraft}
               onBlur={commitStartDraft}
+              disabled={modelInputsLocked}
             />
             <ModelInput
               fieldId="seat-model-floor-at"
@@ -396,6 +405,7 @@ export function TieredSeatPricingCalculator({
               value={floorAtDraft}
               onChange={setFloorAtDraft}
               onBlur={commitFloorAtDraft}
+              disabled={modelInputsLocked}
             />
             <ModelInput
               fieldId="seat-model-floor-eur"
@@ -406,6 +416,7 @@ export function TieredSeatPricingCalculator({
               value={floorPriceDraft}
               onChange={setFloorPriceDraft}
               onBlur={commitFloorPriceDraft}
+              disabled={modelInputsLocked}
             />
             {publicAnnualOffered ? (
               <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
@@ -436,6 +447,7 @@ export function TieredSeatPricingCalculator({
                     <Switch
                       id="enable-annual-billing-model"
                       checked={annual}
+                      disabled={modelInputsLocked}
                       onCheckedChange={(v) => {
                         setAnnual(v);
                         if (showYearlyDiscountControls) onYearlyDiscountEnabledChange?.(v);
@@ -461,6 +473,7 @@ export function TieredSeatPricingCalculator({
                     value={yearlyPercentDraft}
                     onChange={setYearlyPercentDraft}
                     onBlur={commitYearlyPercentDraft}
+                    disabled={modelInputsLocked}
                   />
                 ) : (
                   <div className="h-9 shrink-0" aria-hidden />
@@ -628,6 +641,7 @@ function ModelInput({
   highlight,
   inputMode = "decimal",
   className,
+  disabled,
 }: {
   fieldId: string;
   label: string;
@@ -639,6 +653,7 @@ function ModelInput({
   highlight?: boolean;
   inputMode?: "decimal" | "numeric";
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <div
@@ -671,6 +686,7 @@ function ModelInput({
         value={value}
         onChange={onChange}
         onBlur={onBlur}
+        disabled={disabled}
         aria-describedby={hint ? `${fieldId}-hint` : undefined}
       />
     </div>

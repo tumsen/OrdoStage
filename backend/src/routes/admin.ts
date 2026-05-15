@@ -607,6 +607,8 @@ app.get("/admin/orgs/:id", async (c) => {
       users,
       estimatedMonthlyCents,
       estimatedCurrencyCode: BILLING_CURRENCY_CODE,
+      /** Same persisted JSON used for invoices when the org has no custom curve. */
+      globalDefaultSeatCalculatorJson: globalSeatJson,
       seatCalculatorDefaults: {
         yearlyDiscountPercent: billingDefaults.yearlyDiscountPercent,
         yearlyDiscountEnabled: billingDefaults.yearlyDiscountEnabled,
