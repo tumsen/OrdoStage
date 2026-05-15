@@ -302,7 +302,7 @@ export function TieredSeatPricingCalculator({
       {showModelControls ? (
         <>
           <p className="text-xs font-medium uppercase tracking-wide text-white/45">Model settings (illustrative EUR)</p>
-          <div className="flex w-full flex-nowrap gap-2 overflow-x-auto pb-0.5">
+          <div className="flex w-full flex-nowrap items-stretch gap-2 overflow-x-auto pb-0.5">
             <ModelInput
               label="Base fee (1 user) €"
               value={baseDraft}
@@ -330,44 +330,49 @@ export function TieredSeatPricingCalculator({
               onBlur={commitFloorPriceDraft}
             />
             {publicAnnualOffered ? (
-              <div className="flex min-w-[11rem] flex-[1.35] basis-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                {showYearlyDiscountControls ? (
-                  <>
-                    <Label htmlFor="annual-discount-pct" className="text-[11px] font-medium text-white/50">
+              <div className="flex h-full min-h-0 min-w-[11rem] flex-[1.35] basis-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                <div className="shrink-0 space-y-2">
+                  {showYearlyDiscountControls ? (
+                    <Label htmlFor="annual-discount-pct" className="text-[11px] font-medium leading-snug text-white/50">
                       Annual discount (%)
                     </Label>
-                    <Input
-                      id="annual-discount-pct"
-                      type="text"
-                      inputMode="numeric"
-                      value={yearlyPercentDraft}
-                      onChange={(e) => setYearlyPercentDraft(e.target.value)}
-                      onBlur={commitYearlyPercentDraft}
-                      className="mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums"
+                  ) : (
+                    <span className="text-[11px] font-medium leading-snug text-white/50">Annual billing</span>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Switch
+                      id="enable-annual-billing-model"
+                      checked={annual}
+                      onCheckedChange={(v) => {
+                        setAnnual(v);
+                        if (showYearlyDiscountControls) onYearlyDiscountEnabledChange?.(v);
+                      }}
+                      className="data-[state=checked]:bg-ordo-magenta data-[state=unchecked]:bg-white/20"
                     />
-                  </>
-                ) : (
-                  <span className="text-[11px] font-medium text-white/50">Annual billing</span>
-                )}
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Switch
-                    id="enable-annual-billing-model"
-                    checked={annual}
-                    onCheckedChange={(v) => {
-                      setAnnual(v);
-                      if (showYearlyDiscountControls) onYearlyDiscountEnabledChange?.(v);
-                    }}
-                    className="data-[state=checked]:bg-ordo-magenta data-[state=unchecked]:bg-white/20"
-                  />
-                  <Label htmlFor="enable-annual-billing-model" className="cursor-pointer text-sm text-white/70">
-                    Enable annual billing
-                  </Label>
-                  {annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0 ? (
-                    <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
-                      Save €{annualSavingsYear.toLocaleString()}/yr
-                    </span>
-                  ) : null}
+                    <Label htmlFor="enable-annual-billing-model" className="cursor-pointer text-sm text-white/70">
+                      Enable annual billing
+                    </Label>
+                    {annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0 ? (
+                      <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
+                        Save €{annualSavingsYear.toLocaleString()}/yr
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
+                <div className="min-h-0 flex-1" aria-hidden />
+                {showYearlyDiscountControls ? (
+                  <Input
+                    id="annual-discount-pct"
+                    type="text"
+                    inputMode="numeric"
+                    value={yearlyPercentDraft}
+                    onChange={(e) => setYearlyPercentDraft(e.target.value)}
+                    onBlur={commitYearlyPercentDraft}
+                    className="h-9 shrink-0 border-white/15 bg-black/30 text-white tabular-nums"
+                  />
+                ) : (
+                  <div className="h-9 shrink-0" aria-hidden />
+                )}
               </div>
             ) : null}
             {afterModelControls ? <div className="contents">{afterModelControls}</div> : null}
@@ -518,12 +523,20 @@ function ModelInput({
   return (
     <div
       className={cn(
-        "min-w-[8.25rem] flex-1 basis-0 rounded-lg border px-3 py-2.5",
+        "flex h-full min-h-0 min-w-[8.25rem] flex-1 basis-0 flex-col rounded-lg border px-3 py-2.5",
         highlight ? "border-emerald-500/40 bg-emerald-500/10" : "border-white/10 bg-white/[0.03]",
         className,
       )}
     >
-      <Label className={cn("text-[11px] font-medium", highlight ? "text-emerald-200/90" : "text-white/50")}>{label}</Label>
+      <Label
+        className={cn(
+          "shrink-0 text-[11px] font-medium leading-snug",
+          highlight ? "text-emerald-200/90" : "text-white/50",
+        )}
+      >
+        {label}
+      </Label>
+      <div className="min-h-0 flex-1" aria-hidden />
       <Input
         type="text"
         inputMode={inputMode}
@@ -531,7 +544,7 @@ function ModelInput({
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         className={cn(
-          "mt-1.5 h-9 border-white/15 bg-black/30 text-white tabular-nums",
+          "h-9 shrink-0 border-white/15 bg-black/30 text-white tabular-nums",
           highlight && "border-emerald-500/30 focus-visible:ring-emerald-500/40",
         )}
       />
