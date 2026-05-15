@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Children, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   CartesianGrid,
   Line,
@@ -280,7 +280,7 @@ export function TieredSeatPricingCalculator({
 
       <div
         className={cn(
-          "grid grid-cols-1 gap-3",
+          "grid grid-cols-1 items-stretch gap-3",
           publicAnnualOffered ? "md:grid-cols-3" : "md:grid-cols-2",
         )}
       >
@@ -302,7 +302,7 @@ export function TieredSeatPricingCalculator({
       {showModelControls ? (
         <>
           <p className="text-xs font-medium uppercase tracking-wide text-white/45">Model settings (illustrative EUR)</p>
-          <div className="flex w-full flex-nowrap items-stretch gap-2 overflow-x-auto pb-0.5">
+          <div className="grid w-full auto-cols-[minmax(7.5rem,1fr)] grid-flow-col gap-2 overflow-x-auto pb-0.5">
             <ModelInput
               label="Base fee (1 user) €"
               value={baseDraft}
@@ -330,14 +330,19 @@ export function TieredSeatPricingCalculator({
               onBlur={commitFloorPriceDraft}
             />
             {publicAnnualOffered ? (
-              <div className="flex h-full min-h-0 min-w-[11rem] flex-[1.35] basis-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+              <div className="flex min-h-[9.25rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
                 <div className="shrink-0 space-y-2">
                   {showYearlyDiscountControls ? (
-                    <Label htmlFor="annual-discount-pct" className="text-[11px] font-medium leading-snug text-white/50">
+                    <Label
+                      htmlFor="annual-discount-pct"
+                      className="block min-h-[2.75rem] text-[11px] font-medium leading-snug text-white/50 line-clamp-3"
+                    >
                       Annual discount (%)
                     </Label>
                   ) : (
-                    <span className="text-[11px] font-medium leading-snug text-white/50">Annual billing</span>
+                    <span className="block min-h-[2.75rem] text-[11px] font-medium leading-snug text-white/50">
+                      Annual billing
+                    </span>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
                     <Switch
@@ -375,7 +380,7 @@ export function TieredSeatPricingCalculator({
                 )}
               </div>
             ) : null}
-            {afterModelControls ? <div className="contents">{afterModelControls}</div> : null}
+            {afterModelControls ? Children.toArray(afterModelControls) : null}
           </div>
         </>
       ) : null}
@@ -495,10 +500,10 @@ function monthlyAtUsers(m: TieredSeatModel): number[] {
 
 function MetricCard({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 md:p-4">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-white/45">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-white md:text-2xl">{value}</p>
-      <p className="mt-0.5 text-[11px] text-white/45">{sub}</p>
+    <div className="flex min-h-[9.5rem] flex-col rounded-xl border border-white/10 bg-white/[0.04] p-3 md:min-h-[10rem] md:p-4">
+      <p className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-white/45">{label}</p>
+      <p className="mt-1 shrink-0 text-xl font-semibold tabular-nums text-white md:text-2xl">{value}</p>
+      <p className="mt-auto text-[11px] leading-snug text-white/45 line-clamp-3">{sub}</p>
     </div>
   );
 }
@@ -523,14 +528,14 @@ function ModelInput({
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 min-w-[8.25rem] flex-1 basis-0 flex-col rounded-lg border px-3 py-2.5",
+        "flex min-h-[9.25rem] min-w-0 flex-col rounded-lg border px-3 py-2.5",
         highlight ? "border-emerald-500/40 bg-emerald-500/10" : "border-white/10 bg-white/[0.03]",
         className,
       )}
     >
       <Label
         className={cn(
-          "shrink-0 text-[11px] font-medium leading-snug",
+          "min-h-[2.75rem] shrink-0 text-[11px] font-medium leading-snug line-clamp-3",
           highlight ? "text-emerald-200/90" : "text-white/50",
         )}
       >
