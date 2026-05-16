@@ -32,10 +32,16 @@ function Metric({
   label: string;
   value: string;
   sub?: string;
-  accent?: "violet" | "neutral";
+  accent?: "flex" | "fixedMonthly" | "fixedAnnual" | "neutral";
 }) {
   const border =
-    accent === "violet" ? "border-ordo-violet/35 bg-ordo-violet/5" : "border-white/10 bg-white/[0.03]";
+    accent === "flex"
+      ? "border-red-500/35 bg-red-500/10"
+      : accent === "fixedMonthly"
+        ? "border-emerald-500/35 bg-emerald-500/10"
+        : accent === "fixedAnnual"
+          ? "border-blue-500/35 bg-blue-500/10"
+          : "border-white/10 bg-white/[0.03]";
   return (
     <div className={cn("rounded-xl border p-4 space-y-1", border)}>
       <p className="text-[11px] font-medium uppercase tracking-wide text-white/45">{label}</p>
@@ -99,14 +105,19 @@ export function FlexFixedPlanComparison({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-4">
           <div>
             <h3 className="text-lg font-semibold text-white">Flex</h3>
             <p className="text-sm text-white/55 mt-1">
               Monthly postpaid. Pay for billable activity each month along the seat curve — no annual commitment.
             </p>
           </div>
-          <Metric label="Monthly total" value={formatEuroMajor(quote.flexMo)} sub="Estimated at this seat count" />
+          <Metric
+            label="Monthly total"
+            value={formatEuroMajor(quote.flexMo)}
+            sub="Estimated at this seat count"
+            accent="flex"
+          />
           <ul className="text-xs text-white/55 space-y-1.5 list-disc pl-4 marker:text-white/30">
             <li>€60/mo base (includes 1st billable seat)</li>
             <li>2nd seat +€25; marginals step down to €5 from seat 20+</li>
@@ -114,7 +125,7 @@ export function FlexFixedPlanComparison({
           </ul>
         </div>
 
-        <div className="rounded-xl border border-ordo-violet/30 bg-ordo-violet/5 p-5 space-y-4">
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-lg font-semibold text-white">Fixed</h3>
             <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
@@ -130,22 +141,22 @@ export function FlexFixedPlanComparison({
               label="Monthly equivalent"
               value={formatEuroMajor(quote.fixedMo)}
               sub={`${quote.monthlyDiscount.toFixed(1)}% monthly volume discount`}
-              accent="violet"
+              accent="fixedMonthly"
             />
             <Metric
               label="Annual (€/mo equiv.)"
               value={formatEuroMajor(quote.fixedAnnualMo)}
               sub={`${quote.annualDiscount.toFixed(1)}% annual volume discount`}
-              accent="violet"
+              accent="fixedAnnual"
             />
             <Metric
               label="Annual invoice"
               value={formatEuroMajor(quote.annual)}
               sub="Billed yearly via Paddle"
-              accent="violet"
+              accent="fixedAnnual"
             />
           </div>
-          <p className="text-sm text-emerald-200/90">
+          <p className="text-sm text-blue-200/90">
             Save {formatEuroMajor(quote.saving)} per year vs paying Flex monthly for the same seat count.
           </p>
         </div>

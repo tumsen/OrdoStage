@@ -32,9 +32,10 @@ import {
   type TieredSeatModel,
 } from "@/lib/tieredSeatPricing";
 
-const CHART_TOTAL = "#ff006e";
-const CHART_FIXED = "#a855f7";
-const CHART_FIXED_ANNUAL = "#22c55e";
+const CHART_FLEX = "#ef4444";
+const CHART_FIXED_MONTHLY = "#22c55e";
+const CHART_FIXED_ANNUAL = "#3b82f6";
+const CHART_TOTAL = CHART_FLEX;
 const CHART_PER_USER = "#3a86ff";
 const CHART_GRID = "rgba(255,255,255,0.06)";
 const CHART_AXIS = "rgba(255,255,255,0.38)";
@@ -372,6 +373,7 @@ export function TieredSeatPricingCalculator({
               value={`€${Math.round(baseMonthly).toLocaleString()}`}
               valueSuffix="EUR"
               sub="billed monthly for billable activity"
+              accent="flex"
             />
             <MetricCard
               label="Fixed monthly"
@@ -379,6 +381,7 @@ export function TieredSeatPricingCalculator({
               value={`€${Math.round(fixedAtSlider.monthlyEquiv).toLocaleString()}`}
               valueSuffix="EUR"
               sub="monthly volume discount curve"
+              accent="fixedMonthly"
             />
             <MetricCard
               label="Fixed annual (€/mo)"
@@ -580,11 +583,11 @@ export function TieredSeatPricingCalculator({
           {compareFlexFixedPlans ? (
             <>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#ff006e]" aria-hidden />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CHART_FLEX }} aria-hidden />
                 Flex postpaid
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#a855f7]" aria-hidden />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CHART_FIXED_MONTHLY }} aria-hidden />
                 Fixed monthly
               </span>
               <span className="inline-flex items-center gap-1.5">
@@ -595,7 +598,7 @@ export function TieredSeatPricingCalculator({
           ) : (
             <>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#ff006e]" aria-hidden />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CHART_FLEX }} aria-hidden />
                 Total monthly cost
               </span>
               <span className="inline-flex items-center gap-1.5">
@@ -701,10 +704,10 @@ export function TieredSeatPricingCalculator({
                     type="monotone"
                     dataKey="fixedMonthlyEquiv"
                     name="Fixed monthly"
-                    stroke={CHART_FIXED}
+                    stroke={CHART_FIXED_MONTHLY}
                     strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 5, fill: CHART_FIXED }}
+                    activeDot={{ r: 5, fill: CHART_FIXED_MONTHLY }}
                     isAnimationActive={false}
                   />
                   <Line
@@ -774,12 +777,32 @@ function MetricCard({
   value: string;
   valueSuffix?: string;
   sub: string;
-  accent?: "fixedAnnual";
+  accent?: "flex" | "fixedMonthly" | "fixedAnnual";
 }) {
   const border =
-    accent === "fixedAnnual" ? "border-emerald-500/35 bg-emerald-500/10" : "border-white/10 bg-white/[0.04]";
-  const labelClass = accent === "fixedAnnual" ? "text-emerald-200/80" : "text-white/45";
-  const valueClass = accent === "fixedAnnual" ? "text-emerald-300" : "text-white";
+    accent === "flex"
+      ? "border-red-500/35 bg-red-500/10"
+      : accent === "fixedMonthly"
+        ? "border-emerald-500/35 bg-emerald-500/10"
+        : accent === "fixedAnnual"
+          ? "border-blue-500/35 bg-blue-500/10"
+          : "border-white/10 bg-white/[0.04]";
+  const labelClass =
+    accent === "flex"
+      ? "text-red-200/80"
+      : accent === "fixedMonthly"
+        ? "text-emerald-200/80"
+        : accent === "fixedAnnual"
+          ? "text-blue-200/80"
+          : "text-white/45";
+  const valueClass =
+    accent === "flex"
+      ? "text-red-300"
+      : accent === "fixedMonthly"
+        ? "text-emerald-300"
+        : accent === "fixedAnnual"
+          ? "text-blue-300"
+          : "text-white";
   return (
     <div className={cn("flex min-h-[11rem] flex-col rounded-xl border p-3 md:min-h-[11.5rem] md:p-4", border)}>
       <div className="flex shrink-0 items-start justify-between gap-2">
