@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { formatEuroMajor } from "@/lib/tieredSeatPricing";
 import {
-  FLEX_FIXED_MAX_SEATS,
   FLEX_FIXED_MIN_SEATS,
   annualDiscountPercent,
   annualInvoiceTotalMajor,
@@ -11,12 +10,16 @@ import {
   annualSavingMajor,
   flexMonthlyTotalMajor,
 } from "@/lib/flexFixedPricing";
+import {
+  DEFAULT_FIXED_PLAN_PRICING,
+  type FixedPlanPricingConfig,
+} from "@/lib/fixedPlanPricingConfig";
 
 const DEFAULT_SEATS = 10;
 
-function clampSeats(n: number): number {
+function clampSeats(n: number, max: number): number {
   if (!Number.isFinite(n)) return DEFAULT_SEATS;
-  return Math.min(FLEX_FIXED_MAX_SEATS, Math.max(FLEX_FIXED_MIN_SEATS, Math.round(n)));
+  return Math.min(max, Math.max(1, Math.round(n)));
 }
 
 function Metric({
@@ -41,20 +44,30 @@ function Metric({
   );
 }
 
-export function FlexFixedPlanComparison({ className }: { className?: string }) {
+export function FlexFixedPlanComparison({
+  className,
+  roundAnnualToTen = true,
+  fixedPlanPricing = DEFAULT_FIXED_PLAN_PRICING,
+}: {
+  className?: string;
+  /** When true, annual invoice totals round to nearest €10 (matches checkout). */
+  roundAnnualToTen?: boolean;
+  fixedPlanPricing?: FixedPlanPricingConfig;
+}) {
   const [seats, setSeats] = useState(DEFAULT_SEATS);
+  const maxSeats = fixedPlanPricing.selfServeMaxSeats;
 
   const quote = useMemo(() => {
-    const n = clampSeats(seats);
+    const n = clampSeats(seats, maxSeats);
     return {
       n,
       flexMo: flexMonthlyTotalMajor(n),
-      fixedMo: annualMonthlyEquivMajor(n),
-      annual: annualInvoiceTotalMajor(n),
-      discount: annualDiscountPercent(n),
-      saving: annualSavingMajor(n),
+      fixedMo: annualMonthlyEquivMajor(n, fixedPlanPricing),
+      annual: annualInvoiceTotalMajor(n, roundAnnualToTen, fixedPlanPricing),
+      discount: annualDiscountPercent(n, fixedPlanPricing),
+      saving: annualSavingMajor(n, roundAnnualToTen, fixedPlanPricing),
     };
-  }, [seats]);
+  }, [seats, roundAnnualToTen, fixedPlanPricing, maxSeats]);
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -71,14 +84,14 @@ export function FlexFixedPlanComparison({ className }: { className?: string }) {
           id="plan-seat-slider"
           type="range"
           min={FLEX_FIXED_MIN_SEATS}
-          max={FLEX_FIXED_MAX_SEATS}
+          max={maxSeats}
           step={1}
           value={quote.n}
-          onChange={(e) => setSeats(clampSeats(Number(e.target.value)))}
+          onChange={(e) => setSeats(clampSeats(Number(e.target.value), maxSeats))}
           className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-ordo-magenta [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-ordo-magenta"
         />
         <p className="text-[11px] text-white/45">
-          Fixed caps at {FLEX_FIXED_MAX_SEATS} seats for self-serve checkout; larger venues — contact us.
+          Fixed caps at {maxSeats} seats for self-serve checkout; larger venues — contact us.
         </p>
       </div>
 

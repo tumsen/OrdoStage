@@ -14,6 +14,15 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
+  annualInvoiceTotalMajor,
+  annualMonthlyEquivMajor,
+  annualSavingMajor,
+} from "@/lib/flexFixedPricing";
+import {
+  DEFAULT_FIXED_PLAN_PRICING,
+  type FixedPlanPricingConfig,
+} from "@/lib/fixedPlanPricingConfig";
+import {
   annualMonthlyMultiplier,
   calcMonthlyTotal,
   DEFAULT_TIERED_SEAT_MODEL,
@@ -23,6 +32,7 @@ import {
 } from "@/lib/tieredSeatPricing";
 
 const CHART_TOTAL = "#ff006e";
+const CHART_FIXED = "#a855f7";
 const CHART_PER_USER = "#3a86ff";
 const CHART_GRID = "rgba(255,255,255,0.06)";
 const CHART_AXIS = "rgba(255,255,255,0.38)";
@@ -47,6 +57,10 @@ type Props = {
   onSeatModelChange?: (m: TieredSeatModel) => void;
   /** Rendered after the model price/floor cards (e.g. admin invoice timing fields). */
   afterModelControls?: ReactNode;
+  /** Chart Flex postpaid curve vs Fixed annual monthly equivalent on one graph. */
+  compareFlexFixedPlans?: boolean;
+  fixedPlanPricing?: FixedPlanPricingConfig;
+  fixedAnnualRoundToTen?: boolean;
 };
 
 function clampInt(n: number, min: number, max: number): number {
@@ -131,8 +145,14 @@ export function TieredSeatPricingCalculator({
   seatModel: controlledSeatModel,
   onSeatModelChange,
   afterModelControls,
+  compareFlexFixedPlans = false,
+  fixedPlanPricing = DEFAULT_FIXED_PLAN_PRICING,
+  fixedAnnualRoundToTen = true,
 }: Props) {
   const modelInputsLocked = showModelControls && disableModelControls;
+  const sliderMax = compareFlexFixedPlans
+    ? fixedPlanPricing.selfServeMaxSeats
+    : TIERED_SEAT_MAX_USERS;
   /** Admin/org always sees annual controls; public page only when global setting enables annual discount. */
   const publicAnnualOffered = showYearlyDiscountControls || yearlyDiscountEnabled;
   const [users, setUsers] = useState(20);
@@ -189,15 +209,23 @@ export function TieredSeatPricingCalculator({
   );
   const chartRows = useMemo(
     () =>
-      Array.from({ length: TIERED_SEAT_MAX_USERS }, (_, i) => {
+      Array.from({ length: sliderMax }, (_, i) => {
         const u = i + 1;
+        const flexPostpaid = monthlyList[u - 1] ?? 0;
+        if (compareFlexFixedPlans) {
+          return {
+            users: u,
+            flexTotal: flexPostpaid,
+            fixedMonthlyEquiv: annualMonthlyEquivMajor(u, fixedPlanPricing),
+          };
+        }
         return {
           users: u,
-          total: monthlyList[u - 1] ?? 0,
+          total: flexPostpaid,
           perUser: perUserRate(u, model.start, model.floor, floorAtSafe),
         };
       }),
-    [monthlyList, model.start, model.floor, floorAtSafe],
+    [monthlyList, model.start, model.floor, floorAtSafe, compareFlexFixedPlans, fixedPlanPricing, sliderMax],
   );
 
   const baseMonthly = monthlyList[users - 1] ?? 0;
@@ -210,6 +238,14 @@ export function TieredSeatPricingCalculator({
   const step = stepDen > 0 ? (model.start - model.floor) / stepDen : 0;
   const annualSavingsYear =
     annual && multWhenPayingAnnual < 1 ? Math.round((baseMonthly - annualPlanMonthlyEq) * 12) : 0;
+
+  const fixedAtSlider = compareFlexFixedPlans
+    ? {
+        monthlyEquiv: annualMonthlyEquivMajor(users, fixedPlanPricing),
+        annualInvoice: annualInvoiceTotalMajor(users, fixedAnnualRoundToTen, fixedPlanPricing),
+        savingYear: annualSavingMajor(users, fixedAnnualRoundToTen, fixedPlanPricing),
+      }
+    : null;
 
   const monthlySub =
     annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0
@@ -302,15 +338,15 @@ export function TieredSeatPricingCalculator({
           id="seat-slider"
           type="range"
           min={1}
-          max={TIERED_SEAT_MAX_USERS}
+          max={sliderMax}
           step={1}
           value={users}
-          onChange={(e) => setUsers(clampInt(Number(e.target.value), 1, TIERED_SEAT_MAX_USERS))}
+          onChange={(e) => setUsers(clampInt(Number(e.target.value), 1, sliderMax))}
           className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-ordo-magenta [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-ordo-magenta [&::-webkit-slider-thumb]:shadow-md"
         />
       </div>
 
-      {publicAnnualOffered && !showModelControls ? (
+      {publicAnnualOffered && !showModelControls && !compareFlexFixedPlans ? (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
           <Switch
             id="enable-annual-billing"
@@ -335,32 +371,75 @@ export function TieredSeatPricingCalculator({
       <div
         className={cn(
           "grid grid-cols-1 items-stretch gap-3",
-          publicAnnualOffered ? "md:grid-cols-3" : "md:grid-cols-2",
+          compareFlexFixedPlans
+            ? "md:grid-cols-2 lg:grid-cols-4"
+            : publicAnnualOffered
+              ? "md:grid-cols-3"
+              : "md:grid-cols-2",
         )}
       >
-        <MetricCard
-          label="Monthly total"
-          hint="Estimated invoice for one month at the slider seat count, using the curve below. All amounts are in euros (EUR)."
-          value={`€${Math.round(discountedMonthly).toLocaleString()}`}
-          valueSuffix="EUR"
-          sub={monthlySub}
-        />
-        {publicAnnualOffered ? (
-          <MetricCard
-            label="Annual total"
-            hint="If annual billing is on, 12× the discounted monthly equivalent at this seat count. Shown in EUR for comparison with monthly."
-            value={`€${Math.round(annualPlanYearTotal).toLocaleString()}`}
-            valueSuffix="EUR"
-            sub={annualTotalSub}
-          />
-        ) : null}
-        <MetricCard
-          label="Effective per user"
-          hint="Monthly total divided by active users — a quick average, not a flat per-seat rate on the invoice."
-          value={`€${perUserEffective.toFixed(2)}`}
-          valueSuffix="EUR"
-          sub="per active user / month (EUR)"
-        />
+        {compareFlexFixedPlans && fixedAtSlider ? (
+          <>
+            <MetricCard
+              label="Flex (monthly)"
+              hint="Postpaid monthly total at this seat count using the Flex seat curve."
+              value={`€${Math.round(baseMonthly).toLocaleString()}`}
+              valueSuffix="EUR"
+              sub="billed monthly for billable activity"
+            />
+            <MetricCard
+              label="Fixed (monthly equiv.)"
+              hint="Annual Fixed plan expressed as €/month before ×12 at checkout."
+              value={`€${Math.round(fixedAtSlider.monthlyEquiv).toLocaleString()}`}
+              valueSuffix="EUR"
+              sub="annual commitment · volume discount on seats 2+"
+            />
+            <MetricCard
+              label="Fixed (annual invoice)"
+              hint={
+                fixedAnnualRoundToTen
+                  ? "12× monthly equivalent, rounded to nearest €10 when enabled."
+                  : "12× monthly equivalent at this seat count."
+              }
+              value={`€${Math.round(fixedAtSlider.annualInvoice).toLocaleString()}`}
+              valueSuffix="EUR"
+              sub="paid upfront for 12 months"
+            />
+            <MetricCard
+              label="vs Flex (year)"
+              hint="Flex postpaid ×12 minus Fixed annual invoice at this seat count."
+              value={`€${Math.round(fixedAtSlider.savingYear).toLocaleString()}`}
+              valueSuffix="EUR"
+              sub="estimated annual saving on Fixed"
+            />
+          </>
+        ) : (
+          <>
+            <MetricCard
+              label="Monthly total"
+              hint="Estimated invoice for one month at the slider seat count, using the curve below. All amounts are in euros (EUR)."
+              value={`€${Math.round(discountedMonthly).toLocaleString()}`}
+              valueSuffix="EUR"
+              sub={monthlySub}
+            />
+            {publicAnnualOffered ? (
+              <MetricCard
+                label="Annual total"
+                hint="If annual billing is on, 12× the discounted monthly equivalent at this seat count. Shown in EUR for comparison with monthly."
+                value={`€${Math.round(annualPlanYearTotal).toLocaleString()}`}
+                valueSuffix="EUR"
+                sub={annualTotalSub}
+              />
+            ) : null}
+            <MetricCard
+              label="Effective per user"
+              hint="Monthly total divided by active users — a quick average, not a flat per-seat rate on the invoice."
+              value={`€${perUserEffective.toFixed(2)}`}
+              valueSuffix="EUR"
+              sub="per active user / month (EUR)"
+            />
+          </>
+        )}
       </div>
 
       {showModelControls ? (
@@ -499,16 +578,33 @@ export function TieredSeatPricingCalculator({
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-white/45">Price curve</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-white/45">
+          {compareFlexFixedPlans ? "Flex vs Fixed (€/month)" : "Price curve"}
+        </p>
         <div className="flex flex-wrap gap-4 text-[11px] text-white/55">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[#ff006e]" aria-hidden />
-            Total monthly cost
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[#3a86ff]" aria-hidden />
-            Per-user rate
-          </span>
+          {compareFlexFixedPlans ? (
+            <>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-[#ff006e]" aria-hidden />
+                Flex postpaid
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-[#a855f7]" aria-hidden />
+                Fixed (monthly equiv.)
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-[#ff006e]" aria-hidden />
+                Total monthly cost
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-[#3a86ff]" aria-hidden />
+                Per-user rate
+              </span>
+            </>
+          )}
         </div>
         <div className="h-[260px] w-full rounded-xl border border-white/10 bg-black/20 p-2 pt-3">
           <ResponsiveContainer width="100%" height="100%">
@@ -531,16 +627,18 @@ export function TieredSeatPricingCalculator({
                 tickFormatter={(v) => `€${v}`}
                 label={{ value: "Total €/mo", angle: -90, position: "insideLeft", fill: CHART_TOTAL, fontSize: 11 }}
               />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                tick={{ fill: CHART_PER_USER, fontSize: 10 }}
-                axisLine={false}
-                tickLine={false}
-                width={44}
-                tickFormatter={(v) => `€${v}`}
-                label={{ value: "Per-user €", angle: 90, position: "insideRight", fill: CHART_PER_USER, fontSize: 11 }}
-              />
+              {!compareFlexFixedPlans ? (
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fill: CHART_PER_USER, fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={44}
+                  tickFormatter={(v) => `€${v}`}
+                  label={{ value: "Per-user €", angle: 90, position: "insideRight", fill: CHART_PER_USER, fontSize: 11 }}
+                />
+              ) : null}
               <Tooltip
                 contentStyle={{
                   background: "#16161f",
@@ -550,6 +648,8 @@ export function TieredSeatPricingCalculator({
                   fontSize: 12,
                 }}
                 formatter={(value: number, name: string) => {
+                  if (name === "Flex postpaid") return [`€${Math.round(value).toLocaleString()}/mo`, name];
+                  if (name === "Fixed (monthly equiv.)") return [`€${Math.round(value).toLocaleString()}/mo`, name];
                   if (name === "Monthly total") return [`€${Math.round(value).toLocaleString()}/mo`, name];
                   if (name === "Per-user rate") return [`€${Number(value).toFixed(2)}`, name];
                   return [value, name];
@@ -562,29 +662,59 @@ export function TieredSeatPricingCalculator({
                 stroke="rgba(255,190,11,0.45)"
                 strokeDasharray="4 4"
               />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="total"
-                name="Monthly total"
-                stroke={CHART_TOTAL}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 5, fill: CHART_TOTAL }}
-                isAnimationActive={false}
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="perUser"
-                name="Per-user rate"
-                stroke={CHART_PER_USER}
-                strokeWidth={1.5}
-                strokeDasharray="4 3"
-                dot={false}
-                activeDot={{ r: 4, fill: CHART_PER_USER }}
-                isAnimationActive={false}
-              />
+              {compareFlexFixedPlans ? (
+                <>
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="flexTotal"
+                    name="Flex postpaid"
+                    stroke={CHART_TOTAL}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 5, fill: CHART_TOTAL }}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="fixedMonthlyEquiv"
+                    name="Fixed (monthly equiv.)"
+                    stroke={CHART_FIXED}
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    dot={false}
+                    activeDot={{ r: 5, fill: CHART_FIXED }}
+                    isAnimationActive={false}
+                  />
+                </>
+              ) : (
+                <>
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="total"
+                    name="Monthly total"
+                    stroke={CHART_TOTAL}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 5, fill: CHART_TOTAL }}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="perUser"
+                    name="Per-user rate"
+                    stroke={CHART_PER_USER}
+                    strokeWidth={1.5}
+                    strokeDasharray="4 3"
+                    dot={false}
+                    activeDot={{ r: 4, fill: CHART_PER_USER }}
+                    isAnimationActive={false}
+                  />
+                </>
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>

@@ -153,6 +153,8 @@ model BillingConfig {
   billingGraceDaysAfterDue   Int      @default(0)
   /** Round Fixed annual checkout totals to nearest €10. */
   fixedAnnualRoundToTen      Boolean  @default(true)
+  /** JSON: firstSeatAnnualMonthlyMajor, discountPercentMin/Max, discountCapSeats, selfServeMaxSeats. */
+  fixedPlanPricingJson       String?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }

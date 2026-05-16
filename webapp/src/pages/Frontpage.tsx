@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
+import { HomePricingCalculator } from "@/components/pricing/HomePricingCalculator";
 import { isPublicFlagOn } from "@/lib/publicSiteFlags";
 
 type SiteContent = Record<string, string>;
@@ -296,6 +297,7 @@ function LiveFrontpage({ siteContent }: { siteContent: SiteContent | undefined }
       <HashScroll />
       <main className="relative flex min-h-full w-full flex-col items-center justify-start gap-8 px-6 pb-12 pt-6 text-center md:pt-8">
         <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} titleClass="md:text-4xl" />
+        <HomePricingCalculator />
         <p className="w-full text-sm leading-relaxed text-white/70">
           Use the sidebar to jump to <strong>Features</strong>, or open <strong>Pricing</strong> for billing details.{" "}
           <strong>Terms</strong> and <strong>Privacy</strong> are there too.

@@ -106,7 +106,8 @@ async function handleFixedPlanWebhook(eventType: string, data: PaddleWebhookData
   if (eventType === "subscription.renewed" && parseCommittedSeats(custom) != null) {
     const seats = parseCommittedSeats(custom)!;
     const cfg = await getBillingConfig(prisma);
-    const amountCents = parseAmountCents(data) ?? annualInvoiceTotalCents(seats, cfg.fixedAnnualRoundToTen);
+    const amountCents =
+      parseAmountCents(data) ?? annualInvoiceTotalCents(seats, cfg.fixedAnnualRoundToTen, cfg.fixedPlanPricing);
     const renewalAt = new Date();
     renewalAt.setUTCFullYear(renewalAt.getUTCFullYear() + 1);
     await provisionFixedPlanSubscription(prisma, {
@@ -140,7 +141,7 @@ async function handleFixedPlanWebhook(eventType: string, data: PaddleWebhookData
     if (seats == null) return;
     const cfg = await getBillingConfig(prisma);
     const amountCents =
-      parseAmountCents(data) ?? annualInvoiceTotalCents(seats, cfg.fixedAnnualRoundToTen);
+      parseAmountCents(data) ?? annualInvoiceTotalCents(seats, cfg.fixedAnnualRoundToTen, cfg.fixedPlanPricing);
     const renewalAt = new Date();
     renewalAt.setUTCFullYear(renewalAt.getUTCFullYear() + 1);
     await provisionFixedPlanSubscription(prisma, {
@@ -207,7 +208,8 @@ app.post("/billing/fixed/checkout", async (c) => {
 
   const body = FixedCheckoutRequestSchema.parse(await c.req.json());
   const seats = body.seats;
-  if (requiresEnterpriseContact(seats)) {
+  const cfg = await getBillingConfig(prisma);
+  if (requiresEnterpriseContact(seats, cfg.fixedPlanPricing)) {
     return c.json({
       data: {
         checkoutUrl: null,
@@ -218,8 +220,7 @@ app.post("/billing/fixed/checkout", async (c) => {
     });
   }
 
-  const cfg = await getBillingConfig(prisma);
-  const annualCents = annualInvoiceTotalCents(seats, cfg.fixedAnnualRoundToTen);
+  const annualCents = annualInvoiceTotalCents(seats, cfg.fixedAnnualRoundToTen, cfg.fixedPlanPricing);
 
   const org = await prisma.organization.findUnique({
     where: { id: user.organizationId },
@@ -294,6 +295,7 @@ app.get("/billing/fixed/seat-increase-quote", async (c) => {
     renewalAt,
     now,
     cfg.fixedAnnualRoundToTen,
+    cfg.fixedPlanPricing,
   );
 
   return c.json({
@@ -302,7 +304,7 @@ app.get("/billing/fixed/seat-increase-quote", async (c) => {
       newCommittedSeats,
       topUpCents,
       monthsRemainingFraction,
-      requiresEnterpriseContact: requiresEnterpriseContact(newCommittedSeats),
+      requiresEnterpriseContact: requiresEnterpriseContact(newCommittedSeats, cfg.fixedPlanPricing),
     },
   });
 });
@@ -319,7 +321,8 @@ app.post("/billing/fixed/seat-increase", async (c) => {
 
   const body = FixedSeatIncreaseRequestSchema.parse(await c.req.json());
   const newCommittedSeats = body.newCommittedSeats;
-  if (requiresEnterpriseContact(newCommittedSeats)) {
+  const cfgEarly = await getBillingConfig(prisma);
+  if (requiresEnterpriseContact(newCommittedSeats, cfgEarly.fixedPlanPricing)) {
     return c.json({ error: { message: "Contact us for 150+ seats", code: "ENTERPRISE_REQUIRED" } }, 400);
   }
 
@@ -353,6 +356,7 @@ app.post("/billing/fixed/seat-increase", async (c) => {
     renewalAt,
     new Date(),
     cfg.fixedAnnualRoundToTen,
+    cfg.fixedPlanPricing,
   );
   if (topUpCents < 1) {
     return c.json({ error: { message: "Nothing to charge for this change", code: "BAD_REQUEST" } }, 400);

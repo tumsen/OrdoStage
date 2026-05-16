@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { FlexFixedPlanComparison } from "@/components/pricing/FlexFixedPlanComparison";
 import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
 import { SeatTierIntroBlurb } from "@/components/pricing/SeatTierIntroBlurb";
+import { DEFAULT_FIXED_PLAN_PRICING, type FixedPlanPricingConfig } from "@/lib/fixedPlanPricingConfig";
 import { parseSeatCalculatorJson } from "@/lib/seatCalculatorJson";
 import {
   DEFAULT_TIERED_SEAT_MODEL,
@@ -33,8 +33,7 @@ export default function PublicPricing() {
   });
 
   const pricingTitle =
-    siteMeta?.pricing_page_title?.trim() || "Postpaid pricing that scales with usage";
-
+    siteMeta?.pricing_page_title?.trim() || "Flex or Fixed — pricing that scales with your team";
   const { data: publicPricing } = useQuery<{
     baseCurrencyCode: string;
     yearlyDiscountPercent?: number;
@@ -42,6 +41,8 @@ export default function PublicPricing() {
     defaultSeatCalculatorJson?: string | null;
     billingTrialDays?: number;
     billingGraceDaysAfterDue?: number;
+    fixedAnnualRoundToTen?: boolean;
+    fixedPlanPricing?: FixedPlanPricingConfig;
     prices: Array<{ currencyCode: string; userDailyRateCents: number }>;
   }>({
     queryKey: ["public-pricing-rates"],
@@ -70,14 +71,51 @@ export default function PublicPricing() {
   const seatCurveDeclines =
     publicSeatModel.start > publicSeatModel.floor + 1e-9 && safeFloorAt > 2;
 
+  const fixedPlan = publicPricing?.fixedPlanPricing ?? DEFAULT_FIXED_PLAN_PRICING;
+  const roundAnnualToTen = publicPricing?.fixedAnnualRoundToTen !== false;
+  const fixedFirstSeat = formatEuroMajor(fixedPlan.firstSeatAnnualMonthlyMajor);
+
   return (
     <div className="text-white">
       <article className="w-full px-6 py-14 md:py-20 space-y-10 md:space-y-12">
 
-        {/* Hero */}
+        <header className="space-y-4">
+          <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">{pricingTitle}</h1>
+          <p className="text-lg text-white/75 leading-relaxed max-w-3xl">
+            Compare <strong className="text-white/90">Flex</strong> (monthly postpaid) and{" "}
+            <strong className="text-white/90">Fixed</strong> (annual commitment) using the calculator below — scroll
+            past it for Flex-only curve details.
+          </p>
+        </header>
+
+        <section
+          id="flex-vs-fixed"
+          className="space-y-4 rounded-xl border-2 border-ordo-violet/45 bg-gradient-to-b from-ordo-violet/15 to-transparent p-6 md:p-8 scroll-mt-8"
+        >
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-ordo-yellow/90">Two plans</p>
+            <h2 className="text-2xl md:text-3xl font-semibold text-white">Flex vs Fixed pricing</h2>
+            <p className="text-sm text-white/60 leading-relaxed max-w-3xl">
+              Move the slider to compare monthly Flex (postpaid) with Fixed (annual commitment). Fixed locks seats for
+              12 months — first seat at {fixedFirstSeat}/mo equivalent, volume discount on seats 2+.{" "}
+              <SeatTierIntroBlurb model={publicSeatModel} compact className="inline text-sm text-white/60" />
+            </p>
+          </div>
+          <TieredSeatPricingCalculator
+            compareFlexFixedPlans
+            seatModel={publicSeatModel}
+            fixedPlanPricing={fixedPlan}
+            fixedAnnualRoundToTen={roundAnnualToTen}
+            yearlyDiscountPercent={publicPricing?.yearlyDiscountPercent ?? 15}
+            yearlyDiscountEnabled={publicPricing?.yearlyDiscountEnabled !== false}
+          />
+        </section>
+
+        <SectionDivider />
+
         <header className="space-y-6">
           <div className="space-y-3">
-            <p className="text-sm uppercase tracking-wide text-white/60">First billable seat (monthly, EUR)</p>
+            <p className="text-sm uppercase tracking-wide text-white/60">Flex plan · first billable seat (monthly, EUR)</p>
             <p className="text-3xl md:text-4xl font-bold text-white">{firstSeatLabel} / month</p>
             <div className="max-w-3xl rounded-xl border border-ordo-violet/30 bg-white/[0.06] p-4 md:p-5 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-ordo-yellow/90">
@@ -111,16 +149,8 @@ export default function PublicPricing() {
               {formatEuroMajor((eurPerUserMonthCents || 0) / 100)}) tracks that first-seat rate for legacy summaries.
             </p>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">
-            {pricingTitle}
-          </h1>
-          <p className="text-lg md:text-xl text-white/75 leading-relaxed">
-            Monthly postpaid billing in euros: only members with billable activity in a month are charged for that
-            month, and <strong className="text-white/90 font-medium">your invoice total is the sum of marginal seat prices
-            along the published curve</strong> for however many billable people you had—not a single per-user flat rate.
-          </p>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6 space-y-3 text-white/80 leading-relaxed">
-            <h2 className="text-lg font-semibold text-white">Only pay for what you use</h2>
+            <h2 className="text-lg font-semibold text-white">Flex: only pay for what you use</h2>
             <p>
               Your invoice is driven by <strong className="text-white/90 font-medium">real activity</strong>, not how
               many accounts you have on paper. Someone only becomes a billable seat when they contribute in that
@@ -160,36 +190,6 @@ export default function PublicPricing() {
             </Button>
           </div>
         </header>
-
-        <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6 md:p-8">
-          <div className="space-y-1">
-            <h2 className="text-xl md:text-2xl font-semibold text-white">Flex vs Fixed</h2>
-            <p className="text-sm text-white/60 leading-relaxed max-w-3xl">
-              Choose monthly Flex (postpaid, pay for billable activity) or annual Fixed (committed seats, upfront
-              invoice). Both use the same Flex marginal seat curve; Fixed applies a volume discount on seats 2+ and
-              locks the first seat at €30/mo equivalent.
-            </p>
-          </div>
-          <FlexFixedPlanComparison />
-        </section>
-
-        {/* Illustrative seat curve — matches OrdoStage marketing styling */}
-        <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6 md:p-8">
-          <div className="space-y-1">
-            <h2 className="text-xl md:text-2xl font-semibold text-white">Flex pricing calculator</h2>
-            <p className="text-sm text-white/60 leading-relaxed">
-              Move the seat slider to estimate the <strong className="text-white/75 font-medium">monthly invoice total
-              </strong> the same tier structure would produce—the curve below is what billing uses (unless your
-              organization has a fixed per-seat override).{" "}
-              <SeatTierIntroBlurb model={publicSeatModel} compact className="inline text-sm text-white/60" />
-            </p>
-          </div>
-          <TieredSeatPricingCalculator
-            seatModel={publicSeatModel}
-            yearlyDiscountPercent={publicPricing?.yearlyDiscountPercent ?? 15}
-            yearlyDiscountEnabled={publicPricing?.yearlyDiscountEnabled !== false}
-          />
-        </section>
 
         {/* How billing works */}
         <section className="space-y-4">

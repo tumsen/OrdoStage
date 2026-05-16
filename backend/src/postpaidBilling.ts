@@ -1,5 +1,10 @@
 import { PrismaClient } from "@prisma/client";
 import { organizationUsesFlexPostpaid } from "./flexFixedPricing";
+import {
+  DEFAULT_FIXED_PLAN_PRICING,
+  parseFixedPlanPricingJson,
+  type FixedPlanPricingConfig,
+} from "./fixedPlanPricingConfig";
 import { parseSeatCalculatorJson } from "./seatCalculatorJson";
 import {
   DEFAULT_TIERED_SEAT_MODEL,
@@ -14,6 +19,7 @@ export type BillingConfigResolved = {
   billingTrialDays: number;
   billingGraceDaysAfterDue: number;
   fixedAnnualRoundToTen: boolean;
+  fixedPlanPricing: FixedPlanPricingConfig;
 };
 
 /** Single billing currency for the product (USD and others may be added again later). */
@@ -61,8 +67,11 @@ export async function getBillingConfig(prisma: PrismaClient): Promise<BillingCon
     billingTrialDays: cfg.billingTrialDays,
     billingGraceDaysAfterDue: cfg.billingGraceDaysAfterDue,
     fixedAnnualRoundToTen: cfg.fixedAnnualRoundToTen,
+    fixedPlanPricing: parseFixedPlanPricingJson(cfg.fixedPlanPricingJson),
   };
 }
+
+export { DEFAULT_FIXED_PLAN_PRICING };
 
 export async function ensureCurrencyPriceMonthRollover(prisma: PrismaClient, now = new Date()): Promise<void> {
   const monthKey = currentUtcMonthKey(now);

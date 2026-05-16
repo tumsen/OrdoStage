@@ -22,6 +22,11 @@ import {
   recordDailyUsageSnapshot,
   SUPPORTED_BILLING_CURRENCIES,
 } from "../postpaidBilling";
+import {
+  FixedPlanPricingConfigSchema,
+  parseFixedPlanPricingJson,
+  serializeFixedPlanPricingJson,
+} from "../fixedPlanPricingConfig";
 import { DEFAULT_TIERED_SEAT_MODEL, tieredMonthlyTotalCents, type TieredSeatModel } from "../tieredSeatPricing";
 import { createPaddleCustomer, createPaddleTransactionForInvoice } from "../paddleClient";
 import { AdminOrgEmailMembersBodySchema } from "../types";
@@ -119,9 +124,14 @@ app.get("/admin/billing/settings", async (c) => {
       select: { defaultSeatCalculatorJson: true },
     }),
   ]);
+  const cfgRow = await prisma.billingConfig.findUnique({
+    where: { id: "default" },
+    select: { fixedPlanPricingJson: true },
+  });
   return c.json({
     data: {
       ...cfg,
+      fixedPlanPricing: parseFixedPlanPricingJson(cfgRow?.fixedPlanPricingJson),
       defaultSeatCalculatorJson: cfgExtras?.defaultSeatCalculatorJson ?? null,
       baseCurrencyCode: baseRow[0]?.baseCurrencyCode || "USD",
       currencyPrices: currencyPrices.map((p) => ({
@@ -196,6 +206,7 @@ app.patch("/admin/billing/settings", async (c) => {
       billingTrialDays: z.number().int().min(0).max(3650).optional(),
       billingGraceDaysAfterDue: z.number().int().min(0).max(365).optional(),
       fixedAnnualRoundToTen: z.boolean().optional(),
+      fixedPlanPricing: FixedPlanPricingConfigSchema.optional(),
     })
     .parse(body);
 
@@ -217,6 +228,12 @@ app.patch("/admin/billing/settings", async (c) => {
       ...(parsed.fixedAnnualRoundToTen !== undefined ? { fixedAnnualRoundToTen: parsed.fixedAnnualRoundToTen } : {}),
     },
   });
+  if (parsed.fixedPlanPricing !== undefined) {
+    await prisma.billingConfig.update({
+      where: { id: "default" },
+      data: { fixedPlanPricingJson: serializeFixedPlanPricingJson(parsed.fixedPlanPricing) },
+    });
+  }
   let normalizedDefaultSeatJson: string | null | undefined;
   if (parsed.defaultSeatCalculatorJson !== undefined) {
     const raw = parsed.defaultSeatCalculatorJson;
@@ -293,12 +310,13 @@ app.patch("/admin/billing/settings", async (c) => {
     `,
     prisma.billingConfig.findUnique({
       where: { id: "default" },
-      select: { defaultSeatCalculatorJson: true },
+      select: { defaultSeatCalculatorJson: true, fixedPlanPricingJson: true },
     }),
   ]);
   return c.json({
     data: {
       ...cfg,
+      fixedPlanPricing: parseFixedPlanPricingJson(cfgSeatRow?.fixedPlanPricingJson),
       defaultSeatCalculatorJson: cfgSeatRow?.defaultSeatCalculatorJson ?? null,
       baseCurrencyCode: baseRow[0]?.baseCurrencyCode || "USD",
       currencyPrices: prices.map((p) => ({

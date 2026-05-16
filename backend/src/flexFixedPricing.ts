@@ -3,11 +3,17 @@
  * Amounts in major currency units (EUR). Mirrors `webapp/src/lib/flexFixedPricing.ts`.
  */
 
+import {
+  DEFAULT_FIXED_PLAN_PRICING,
+  type FixedPlanPricingConfig,
+} from "./fixedPlanPricingConfig";
+
 export const FLEX_FIXED_MIN_SEATS = 1;
-export const FLEX_FIXED_MAX_SEATS = 150;
-export const FLEX_FIXED_DISCOUNT_CAP_SEATS = 150;
-export const FLEX_FIXED_MAX_DISCOUNT_PERCENT = 42;
-export const FIXED_FIRST_SEAT_ANNUAL_MONTHLY_MAJOR = 30;
+export const FLEX_FIXED_MAX_SEATS = DEFAULT_FIXED_PLAN_PRICING.selfServeMaxSeats;
+export const FLEX_FIXED_DISCOUNT_CAP_SEATS = DEFAULT_FIXED_PLAN_PRICING.discountCapSeats;
+export const FLEX_FIXED_MAX_DISCOUNT_PERCENT = DEFAULT_FIXED_PLAN_PRICING.discountPercentMax;
+export const FIXED_FIRST_SEAT_ANNUAL_MONTHLY_MAJOR =
+  DEFAULT_FIXED_PLAN_PRICING.firstSeatAnnualMonthlyMajor;
 
 /** Flex marginal €/month for the n-th billable seat (1-based). */
 export function flexMarginalCostMajor(seatIndex: number): number {
@@ -27,45 +33,65 @@ export function flexMonthlyTotalMajor(seats: number): number {
   return total;
 }
 
-/** Linear volume discount for Fixed annual (15% at 1 seat → 42% at 150 seats). */
-export function annualDiscountPercent(seats: number): number {
-  const n = clampSeatCount(seats);
-  const capped = Math.min(n, FLEX_FIXED_DISCOUNT_CAP_SEATS);
-  const raw = 15 + (27 / 149) * (capped - 1);
-  return Math.min(FLEX_FIXED_MAX_DISCOUNT_PERCENT, raw);
+/** Linear volume discount for Fixed annual (min% at 1 seat → max% at cap seats). */
+export function annualDiscountPercent(seats: number, config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING): number {
+  const n = clampSeatCount(seats, config);
+  const cap = config.discountCapSeats;
+  const capped = Math.min(n, cap);
+  const span = Math.max(1, cap - 1);
+  const min = config.discountPercentMin;
+  const max = config.discountPercentMax;
+  const raw = min + ((max - min) / span) * (capped - 1);
+  return Math.min(max, raw);
 }
 
 /** Fixed plan monthly equivalent (EUR) before ×12 for invoice. */
-export function annualMonthlyEquivMajor(seats: number): number {
-  const n = clampSeatCount(seats);
-  if (n === 1) return FIXED_FIRST_SEAT_ANNUAL_MONTHLY_MAJOR;
+export function annualMonthlyEquivMajor(
+  seats: number,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
+  const n = clampSeatCount(seats, config);
+  const first = config.firstSeatAnnualMonthlyMajor;
+  if (n === 1) return first;
   let restTotal = 0;
   for (let i = 2; i <= n; i++) {
     restTotal += flexMarginalCostMajor(i);
   }
-  const discount = annualDiscountPercent(n) / 100;
-  return FIXED_FIRST_SEAT_ANNUAL_MONTHLY_MAJOR + restTotal * (1 - discount);
+  const discount = annualDiscountPercent(n, config) / 100;
+  return first + restTotal * (1 - discount);
 }
 
-export function annualInvoiceTotalMajor(seats: number, roundToNearestTenMajor = false): number {
-  let annual = annualMonthlyEquivMajor(seats) * 12;
+export function annualInvoiceTotalMajor(
+  seats: number,
+  roundToNearestTenMajor = false,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
+  let annual = annualMonthlyEquivMajor(seats, config) * 12;
   if (roundToNearestTenMajor) {
     annual = Math.round(annual / 10) * 10;
   }
   return annual;
 }
 
-export function annualSavingMajor(seats: number, roundToNearestTenMajor = false): number {
+export function annualSavingMajor(
+  seats: number,
+  roundToNearestTenMajor = false,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
   const flexYear = flexMonthlyTotalMajor(seats) * 12;
-  return Math.max(0, flexYear - annualInvoiceTotalMajor(seats, roundToNearestTenMajor));
+  return Math.max(0, flexYear - annualInvoiceTotalMajor(seats, roundToNearestTenMajor, config));
 }
 
 export function flexMonthlyTotalCents(seats: number): number {
   return majorToCents(flexMonthlyTotalMajor(seats));
 }
 
-export function annualInvoiceTotalCents(seats: number, roundToNearestTenMajor = false): number {
-  return majorToCents(annualInvoiceTotalMajor(seats, roundToNearestTenMajor));
+export function annualInvoiceTotalCents(
+  seats: number,
+  roundToNearestTenMajor = false,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
+  return majorToCents(annualInvoiceTotalMajor(seats, roundToNearestTenMajor, config));
 }
 
 export const INVOICE_KIND = {
@@ -76,12 +102,15 @@ export const INVOICE_KIND = {
 
 export type InvoiceKind = (typeof INVOICE_KIND)[keyof typeof INVOICE_KIND];
 
-export function requiresEnterpriseContact(seats: number): boolean {
-  return seats > FLEX_FIXED_MAX_SEATS;
+export function requiresEnterpriseContact(seats: number, config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING): boolean {
+  return seats > config.selfServeMaxSeats;
 }
 
-export function annualMonthlyEquivCents(seats: number): number {
-  return majorToCents(annualMonthlyEquivMajor(seats));
+export function annualMonthlyEquivCents(
+  seats: number,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
+  return majorToCents(annualMonthlyEquivMajor(seats, config));
 }
 
 /** Marginal €/month for the next seat above committed count (overage billing). */
@@ -113,9 +142,10 @@ export function proratedSeatIncreaseTopUpMajor(
   renewalAt: Date,
   now = new Date(),
   roundToNearestTenMajor = false,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
 ): number {
-  const oldN = clampSeatCount(oldSeats);
-  const newN = clampSeatCount(newSeats);
+  const oldN = clampSeatCount(oldSeats, config);
+  const newN = clampSeatCount(newSeats, config);
   if (newN <= oldN) return 0;
 
   const termMs = Math.max(1, renewalAt.getTime() - termStart.getTime());
@@ -123,7 +153,8 @@ export function proratedSeatIncreaseTopUpMajor(
   const fraction = Math.min(1, remainingMs / termMs);
 
   const deltaAnnual =
-    annualInvoiceTotalMajor(newN, roundToNearestTenMajor) - annualInvoiceTotalMajor(oldN, roundToNearestTenMajor);
+    annualInvoiceTotalMajor(newN, roundToNearestTenMajor, config) -
+    annualInvoiceTotalMajor(oldN, roundToNearestTenMajor, config);
   return Math.max(0, deltaAnnual * fraction);
 }
 
@@ -134,15 +165,16 @@ export function proratedSeatIncreaseTopUpCents(
   renewalAt: Date,
   now = new Date(),
   roundToNearestTenMajor = false,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
 ): number {
   return majorToCents(
-    proratedSeatIncreaseTopUpMajor(oldSeats, newSeats, termStart, renewalAt, now, roundToNearestTenMajor),
+    proratedSeatIncreaseTopUpMajor(oldSeats, newSeats, termStart, renewalAt, now, roundToNearestTenMajor, config),
   );
 }
 
-function clampSeatCount(seats: number): number {
+function clampSeatCount(seats: number, config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING): number {
   if (!Number.isFinite(seats)) return FLEX_FIXED_MIN_SEATS;
-  return Math.min(FLEX_FIXED_MAX_SEATS, Math.max(FLEX_FIXED_MIN_SEATS, Math.round(seats)));
+  return Math.min(config.selfServeMaxSeats, Math.max(FLEX_FIXED_MIN_SEATS, Math.round(seats)));
 }
 
 function majorToCents(major: number): number {

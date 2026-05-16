@@ -12,6 +12,7 @@ import {
   annualSavingMajor,
   flexMonthlyTotalMajor,
 } from "../flexFixedPricing";
+import { parseFixedPlanPricingJson } from "../fixedPlanPricingConfig";
 import { ensureCurrencyPriceMonthRollover, getBillingConfig } from "../postpaidBilling";
 import { PublicPlanQuoteQuerySchema, PublicPlanQuoteSchema } from "../types";
 
@@ -95,6 +96,8 @@ publicRouter.get("/pricing", async (c) => {
         defaultSeatCalculatorJson: true,
         billingTrialDays: true,
         billingGraceDaysAfterDue: true,
+        fixedAnnualRoundToTen: true,
+        fixedPlanPricingJson: true,
       },
     }),
     prisma.billingCurrencyPrice.findMany(),
@@ -112,6 +115,8 @@ publicRouter.get("/pricing", async (c) => {
       defaultSeatCalculatorJson: cfgRows?.defaultSeatCalculatorJson ?? null,
       billingTrialDays: cfgRows?.billingTrialDays ?? 0,
       billingGraceDaysAfterDue: cfgRows?.billingGraceDaysAfterDue ?? 0,
+      fixedAnnualRoundToTen: cfgRows?.fixedAnnualRoundToTen !== false,
+      fixedPlanPricing: parseFixedPlanPricingJson(cfgRows?.fixedPlanPricingJson),
       prices: [{ currencyCode: "EUR" as const, userDailyRateCents: eurCents }],
     },
   });
@@ -122,13 +127,14 @@ publicRouter.get("/plan-quote", async (c) => {
   const { seats } = PublicPlanQuoteQuerySchema.parse({ seats: c.req.query("seats") ?? "10" });
   const cfg = await getBillingConfig(prisma);
   const roundTen = cfg.fixedAnnualRoundToTen;
+  const fixedCfg = cfg.fixedPlanPricing;
   const quote = PublicPlanQuoteSchema.parse({
     seats,
     flexMonthlyMajor: flexMonthlyTotalMajor(seats),
-    fixedAnnualMonthlyEquivMajor: annualMonthlyEquivMajor(seats),
-    fixedAnnualInvoiceMajor: annualInvoiceTotalMajor(seats, roundTen),
-    discountPercent: Math.round(annualDiscountPercent(seats) * 10) / 10,
-    annualSavingMajor: annualSavingMajor(seats, roundTen),
+    fixedAnnualMonthlyEquivMajor: annualMonthlyEquivMajor(seats, fixedCfg),
+    fixedAnnualInvoiceMajor: annualInvoiceTotalMajor(seats, roundTen, fixedCfg),
+    discountPercent: Math.round(annualDiscountPercent(seats, fixedCfg) * 10) / 10,
+    annualSavingMajor: annualSavingMajor(seats, roundTen, fixedCfg),
   });
   return c.json({ data: quote });
 });
