@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   InputWithUnitSuffix,
   TieredSeatPricingCalculator,
@@ -21,6 +22,7 @@ type AdminBillingSettingsData = {
   defaultSeatCalculatorJson?: string | null;
   billingTrialDays?: number;
   billingGraceDaysAfterDue?: number;
+  fixedAnnualRoundToTen?: boolean;
   currencyPrices: Array<{
     currencyCode: string;
     userDailyRateCents: number;
@@ -63,6 +65,7 @@ function stableBillingFingerprint(d: AdminBillingSettingsData | undefined): stri
     defaultSeatCalculatorJson: d.defaultSeatCalculatorJson ?? null,
     billingTrialDays: d.billingTrialDays ?? 0,
     billingGraceDaysAfterDue: d.billingGraceDaysAfterDue ?? 0,
+    fixedAnnualRoundToTen: d.fixedAnnualRoundToTen ?? true,
     currencyPrices: prices,
   });
 }
@@ -82,6 +85,9 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
   const [billingTrialDays, setBillingTrialDays] = useState(() => String(initialData.billingTrialDays ?? 0));
   const [billingGraceDaysAfterDue, setBillingGraceDaysAfterDue] = useState(() =>
     String(initialData.billingGraceDaysAfterDue ?? 0)
+  );
+  const [fixedAnnualRoundToTen, setFixedAnnualRoundToTen] = useState(
+    () => initialData.fixedAnnualRoundToTen !== false,
   );
   const [seatModel, setSeatModel] = useState<TieredSeatModel>(() => mergeGlobalSeatModel(initialData.defaultSeatCalculatorJson));
   const y0 = initialYearlyFromSettings(initialData);
@@ -111,6 +117,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         yearlyDiscountEnabled: seatYearlyEnabled,
         billingTrialDays: trial,
         billingGraceDaysAfterDue: grace,
+        fixedAnnualRoundToTen,
         defaultSeatCalculatorJson: JSON.stringify({
           model: seatModel,
           yearlyDiscountPercent: yearlyDiscountPercentClamped,
@@ -242,6 +249,24 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
                     onChange={setBillingGraceDaysAfterDue}
                     aria-describedby="admin-billing-grace-days-hint"
                   />
+                </div>
+                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                  <Label htmlFor="admin-fixed-round-ten" className="text-[11px] font-medium text-white/50">
+                    Fixed annual rounding
+                  </Label>
+                  <p className="mt-1 text-[10px] leading-snug text-white/45">
+                    Round Fixed plan annual checkout totals to the nearest €10 for cleaner Paddle invoices.
+                  </p>
+                  <div className="mt-auto flex items-center gap-2 pt-2">
+                    <Checkbox
+                      id="admin-fixed-round-ten"
+                      checked={fixedAnnualRoundToTen}
+                      onCheckedChange={(v) => setFixedAnnualRoundToTen(v === true)}
+                    />
+                    <Label htmlFor="admin-fixed-round-ten" className="text-xs text-white/60 cursor-pointer">
+                      Round to €10
+                    </Label>
+                  </div>
                 </div>
               </>
             }

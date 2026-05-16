@@ -1,8 +1,8 @@
-/** Default illustrative USD seat curve (matches legacy calculator defaults). */
+/** Default illustrative EUR Flex seat curve (matches `flexFixedPricing`). */
 export const DEFAULT_TIERED_SEAT_MODEL = {
-  base: 99,
-  start: 30,
-  floorAt: 100,
+  base: 60,
+  start: 25,
+  floorAt: 20,
   floor: 5,
 } as const;
 

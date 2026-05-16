@@ -1,9 +1,10 @@
 /** Tier curve in major currency units (e.g. euros), matching `webapp/src/lib/tieredSeatPricing.ts`. */
 
+/** Canonical Flex postpaid curve (EUR). */
 export const DEFAULT_TIERED_SEAT_MODEL = {
-  base: 99,
-  start: 30,
-  floorAt: 100,
+  base: 60,
+  start: 25,
+  floorAt: 20,
   floor: 5,
 } as const;
 

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { FlexFixedPlanComparison } from "@/components/pricing/FlexFixedPlanComparison";
 import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
 import { SeatTierIntroBlurb } from "@/components/pricing/SeatTierIntroBlurb";
 import { parseSeatCalculatorJson } from "@/lib/seatCalculatorJson";
@@ -160,10 +161,22 @@ export default function PublicPricing() {
           </div>
         </header>
 
+        <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6 md:p-8">
+          <div className="space-y-1">
+            <h2 className="text-xl md:text-2xl font-semibold text-white">Flex vs Fixed</h2>
+            <p className="text-sm text-white/60 leading-relaxed max-w-3xl">
+              Choose monthly Flex (postpaid, pay for billable activity) or annual Fixed (committed seats, upfront
+              invoice). Both use the same Flex marginal seat curve; Fixed applies a volume discount on seats 2+ and
+              locks the first seat at €30/mo equivalent.
+            </p>
+          </div>
+          <FlexFixedPlanComparison />
+        </section>
+
         {/* Illustrative seat curve — matches OrdoStage marketing styling */}
         <section className="space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6 md:p-8">
           <div className="space-y-1">
-            <h2 className="text-xl md:text-2xl font-semibold text-white">Pricing calculator</h2>
+            <h2 className="text-xl md:text-2xl font-semibold text-white">Flex pricing calculator</h2>
             <p className="text-sm text-white/60 leading-relaxed">
               Move the seat slider to estimate the <strong className="text-white/75 font-medium">monthly invoice total
               </strong> the same tier structure would produce—the curve below is what billing uses (unless your

@@ -90,6 +90,14 @@ model Organization {
   billingStatus    String             @default("active")
   billingDueAt     DateTime?
   billingViewOnlySince DateTime?
+  /** `flex` = monthly postpaid seat curve; `fixed` = annual committed seats (Paddle subscription). */
+  billingPlan      String             @default("flex")
+  committedSeats   Int?
+  annualRenewalDate DateTime?
+  annualTermStartDate DateTime?
+  /** Annual invoice total in cents at last Fixed purchase / renewal. */
+  annualInvoiceAmountCents Int?
+  paddleSubscriptionId String?
   customDiscountPercent   Int?
   customFlatRateCents     Int?
   customFlatRateMaxUsers  Int?
@@ -143,6 +151,8 @@ model BillingConfig {
   billingTrialDays           Int      @default(0)
   /** Extra days after an invoice due date before overdue view-only applies (0 = due date is the cutoff). */
   billingGraceDaysAfterDue   Int      @default(0)
+  /** Round Fixed annual checkout totals to nearest €10. */
+  fixedAnnualRoundToTen      Boolean  @default(true)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }
@@ -184,6 +194,8 @@ model BillingInvoice {
   issuedAt       DateTime     @default(now())
   dueAt          DateTime
   status         String       @default("issued") // issued | paid | overdue | cancelled
+  /** flex_monthly | fixed_overage | fixed_topup */
+  invoiceKind    String       @default("flex_monthly")
   subtotalCents  Int
   discountPercent Int         @default(0)
   discountCents  Int          @default(0)

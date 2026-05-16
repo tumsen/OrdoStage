@@ -1401,3 +1401,53 @@ export type CreateTour = z.infer<typeof CreateTourSchema>;
 export type UpdateTour = z.infer<typeof UpdateTourSchema>;
 export type AssignTourTeam = z.infer<typeof AssignTourTeamSchema>;
 // TourPersonNote is already exported above as a named export
+
+/** Organisation billing plan: Flex (monthly postpaid) or Fixed (annual commitment). */
+export const BillingPlanSchema = z.enum(["flex", "fixed"]);
+export type BillingPlan = z.infer<typeof BillingPlanSchema>;
+
+export const PublicPlanQuoteQuerySchema = z.object({
+  seats: z.coerce.number().int().min(1).max(150),
+});
+
+export const PublicPlanQuoteSchema = z.object({
+  seats: z.number().int(),
+  flexMonthlyMajor: z.number(),
+  fixedAnnualMonthlyEquivMajor: z.number(),
+  fixedAnnualInvoiceMajor: z.number(),
+  discountPercent: z.number(),
+  annualSavingMajor: z.number(),
+});
+export type PublicPlanQuote = z.infer<typeof PublicPlanQuoteSchema>;
+
+export const FixedCheckoutRequestSchema = z.object({
+  seats: z.number().int().min(1).max(200),
+});
+export const FixedCheckoutResponseSchema = z.object({
+  checkoutUrl: z.string().url().nullable(),
+  annualInvoiceCents: z.number().int(),
+  seats: z.number().int(),
+  requiresEnterpriseContact: z.boolean().optional(),
+});
+
+export const FixedSeatIncreaseRequestSchema = z.object({
+  newCommittedSeats: z.number().int().min(1).max(200),
+});
+
+export const FixedSeatIncreaseQuoteSchema = z.object({
+  currentCommittedSeats: z.number().int(),
+  newCommittedSeats: z.number().int(),
+  topUpCents: z.number().int(),
+  monthsRemainingFraction: z.number(),
+  requiresEnterpriseContact: z.boolean(),
+});
+
+export const OrgBillingPlanSummarySchema = z.object({
+  billingPlan: BillingPlanSchema,
+  committedSeats: z.number().int().nullable(),
+  annualRenewalDate: z.string().nullable(),
+  annualTermStartDate: z.string().nullable(),
+  annualInvoiceAmountCents: z.number().int().nullable(),
+  fixedOverageEstimateCents: z.number().int(),
+  fixedAnnualRoundToTen: z.boolean(),
+});

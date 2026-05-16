@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { BillingPlanPicker } from "@/components/billing/BillingPlanPicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Receipt, Users } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -16,8 +17,13 @@ interface OrgBillingData {
   id: string;
   name: string;
   billingStatus: string;
+  billingPlan?: string;
+  committedSeats?: number | null;
+  annualRenewalDate?: string | null;
   billingCurrencyCode?: string;
   paymentDueDays: number;
+  fixedOverageEstimateCents?: number;
+  fixedAnnualRoundToTen?: boolean;
   billingTrialDays?: number;
   billingGraceDaysAfterDue?: number;
   billingOnTrial?: boolean;
@@ -50,7 +56,7 @@ function formatShortDate(iso: string | null | undefined): string {
 }
 
 export default function Billing({ embedded = false }: { embedded?: boolean } = {}) {
-  const { canAction } = usePermissions();
+  const { canAction, isOwner } = usePermissions();
   const canManageBilling = canAction("billing.manage");
   const { data: org, isLoading } = useQuery<OrgBillingData>({
     queryKey: ["org"],
@@ -60,6 +66,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
   const billable = org?.billableMembersThisMonth ?? [];
   const trialDays = org?.billingTrialDays ?? 0;
   const graceDays = org?.billingGraceDaysAfterDue ?? 0;
+  const billingPlan = org?.billingPlan === "fixed" ? "fixed" : "flex";
 
   return (
     <div className={embedded ? "space-y-8" : "p-6 md:p-8 space-y-8"}>
@@ -110,6 +117,15 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
         </div>
       ) : null}
 
+      <BillingPlanPicker
+        billingPlan={billingPlan}
+        committedSeats={org?.committedSeats ?? null}
+        annualRenewalDate={org?.annualRenewalDate ?? null}
+        billableCountThisMonth={billable.length}
+        isOwner={isOwner}
+        fixedAnnualRoundToTen={org?.fixedAnnualRoundToTen !== false}
+      />
+
       <Card className="bg-gray-900 border-white/10">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
@@ -120,7 +136,10 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
         <CardContent>
           <p className="text-xs text-white/50 mb-3 leading-relaxed">
             UTC calendar month to date: people listed here had at least one billable action (jobs, staffing, event team
-            activity, or work time). This is the set your running-month estimate is based on.
+            activity, or work time).
+            {billingPlan === "flex"
+              ? " This is the set your running-month Flex estimate is based on."
+              : " Overage applies when billable count exceeds your Fixed commitment."}
           </p>
           {isLoading ? (
             <p className="text-sm text-white/50">Loading...</p>
@@ -189,19 +208,34 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
       {canManageBilling && org?.estimatedMonthlyCents != null ? (
         <Card className="bg-gray-900 border-white/10">
           <CardHeader>
-            <CardTitle className="text-white">Expected monthly price</CardTitle>
+            <CardTitle className="text-white">
+              {billingPlan === "fixed" ? "Estimated overage this month" : "Expected monthly price"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-white leading-relaxed">
-              Based on billable members so far this month and your pricing curve (or a fixed per-seat override if
-              Ordo Stage set one):
-              <span className="ml-1 text-white/80 font-medium">
-                {org.estimatedCurrencyCode || org.billingCurrencyCode || "EUR"}{" "}
-                {(org.estimatedMonthlyCents / 100).toFixed(2)}
-              </span>
+              {billingPlan === "fixed" ? (
+                <>
+                  Billable seats above your {org.committedSeats ?? 0}-seat commitment (Flex marginal rates):
+                  <span className="ml-1 text-white/80 font-medium">
+                    {org.estimatedCurrencyCode || "EUR"} {(org.estimatedMonthlyCents / 100).toFixed(2)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Based on billable members so far this month and your pricing curve (or a fixed per-seat override if
+                  Ordo Stage set one):
+                  <span className="ml-1 text-white/80 font-medium">
+                    {org.estimatedCurrencyCode || org.billingCurrencyCode || "EUR"}{" "}
+                    {(org.estimatedMonthlyCents / 100).toFixed(2)}
+                  </span>
+                </>
+              )}
             </p>
             <p className="text-xs text-white/45 mt-2">
-              This is an estimate only; the closed-month invoice is authoritative.
+              {billingPlan === "fixed"
+                ? "Committed seats are covered by your annual Fixed plan. Overage is invoiced monthly."
+                : "This is an estimate only; the closed-month invoice is authoritative."}
             </p>
           </CardContent>
         </Card>

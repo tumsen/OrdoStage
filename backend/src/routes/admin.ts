@@ -8,12 +8,12 @@ import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 import { ensureSystemRoles } from "../effectiveRole";
 import { env, isDeployedRuntime } from "../env";
 import { findUserByEmailLoose } from "../findUserByEmail";
+import { generateAllBillingInvoices } from "../fixedBilling";
 import {
   BILLING_CURRENCY_CODE,
   countBillableMemberUserIdsInUtcRange,
   currentUtcMonthRange,
   estimateMonthlyOrgAmountCents,
-  generateMonthlyInvoices,
   getCurrencyPriceMap,
   getBillingConfig,
   getGlobalDefaultSeatCalculatorJson,
@@ -195,6 +195,7 @@ app.patch("/admin/billing/settings", async (c) => {
       defaultSeatCalculatorJson: z.string().max(SEAT_CALCULATOR_JSON_MAX_CHARS).nullable().optional(),
       billingTrialDays: z.number().int().min(0).max(3650).optional(),
       billingGraceDaysAfterDue: z.number().int().min(0).max(365).optional(),
+      fixedAnnualRoundToTen: z.boolean().optional(),
     })
     .parse(body);
 
@@ -213,6 +214,7 @@ app.patch("/admin/billing/settings", async (c) => {
       ...(parsed.yearlyDiscountEnabled !== undefined ? { yearlyDiscountEnabled: parsed.yearlyDiscountEnabled } : {}),
       ...(parsed.billingTrialDays !== undefined ? { billingTrialDays: parsed.billingTrialDays } : {}),
       ...(parsed.billingGraceDaysAfterDue !== undefined ? { billingGraceDaysAfterDue: parsed.billingGraceDaysAfterDue } : {}),
+      ...(parsed.fixedAnnualRoundToTen !== undefined ? { fixedAnnualRoundToTen: parsed.fixedAnnualRoundToTen } : {}),
     },
   });
   let normalizedDefaultSeatJson: string | null | undefined;
@@ -315,8 +317,8 @@ app.post("/admin/billing/snapshot", async (c) => {
 });
 
 app.post("/admin/billing/generate-invoices", async (c) => {
-  const generated = await generateMonthlyInvoices(prisma, new Date());
-  return c.json({ data: { generated } });
+  const result = await generateAllBillingInvoices(prisma, new Date());
+  return c.json({ data: { generated: result.flexMonthly + result.fixedOverage, ...result } });
 });
 
 app.post("/admin/billing/invoices/:id/mark-paid", async (c) => {

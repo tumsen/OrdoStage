@@ -69,6 +69,11 @@ interface OrgDetail {
   customFlatRateMaxUsers: number | null;
   customUserDailyRateCents: number | null;
   customSeatCalculatorJson: string | null;
+  billingPlan?: string;
+  committedSeats?: number | null;
+  annualRenewalDate?: string | null;
+  annualTermStartDate?: string | null;
+  annualInvoiceAmountCents?: number | null;
   /** Persisted admin default seat JSON; used when customSeatCalculatorJson is null. */
   globalDefaultSeatCalculatorJson?: string | null;
   seatCalculatorDefaults?: {
@@ -266,6 +271,16 @@ function BillingTab({ org }: { org: OrgDetail }) {
         <div>
           <div className="text-white/40 text-xs uppercase tracking-wider mb-0.5">Organization Billing Status</div>
           <BillingStatusBadge status={org.billingStatus} />
+          <p className="text-xs text-white/50 mt-1">
+            Plan:{" "}
+            <span className="text-white/80 capitalize">
+              {org.billingPlan === "fixed" ? "Fixed (annual)" : "Flex (monthly)"}
+            </span>
+            {org.billingPlan === "fixed" && org.committedSeats != null ? (
+              <> · {org.committedSeats} committed seats</>
+            ) : null}
+            {org.annualRenewalDate ? <> · renews {formatDate(org.annualRenewalDate)}</> : null}
+          </p>
         </div>
       </div>
 

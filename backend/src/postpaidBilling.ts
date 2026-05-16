@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { organizationUsesFlexPostpaid } from "./flexFixedPricing";
 import { parseSeatCalculatorJson } from "./seatCalculatorJson";
 import {
   DEFAULT_TIERED_SEAT_MODEL,
@@ -12,6 +13,7 @@ export type BillingConfigResolved = {
   yearlyDiscountEnabled: boolean;
   billingTrialDays: number;
   billingGraceDaysAfterDue: number;
+  fixedAnnualRoundToTen: boolean;
 };
 
 /** Single billing currency for the product (USD and others may be added again later). */
@@ -58,6 +60,7 @@ export async function getBillingConfig(prisma: PrismaClient): Promise<BillingCon
     yearlyDiscountEnabled: cfg.yearlyDiscountEnabled,
     billingTrialDays: cfg.billingTrialDays,
     billingGraceDaysAfterDue: cfg.billingGraceDaysAfterDue,
+    fixedAnnualRoundToTen: cfg.fixedAnnualRoundToTen,
   };
 }
 
@@ -302,6 +305,7 @@ export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new
   const orgs = await prisma.organization.findMany({
     select: {
       id: true,
+      billingPlan: true,
       customUserDailyRateCents: true,
       customSeatCalculatorJson: true,
     },
@@ -309,6 +313,7 @@ export async function recordDailyUsageSnapshot(prisma: PrismaClient, today = new
 
   let created = 0;
   for (const org of orgs) {
+    if (!organizationUsesFlexPostpaid(org.billingPlan)) continue;
     const billable = await countBillableMemberUserIdsInUtcRange(prisma, org.id, dayStart, dayEnd);
     const activeUsers = billable.size;
     const currency = BILLING_CURRENCY_CODE;
@@ -351,14 +356,15 @@ export async function enforceOverdueAccess(prisma: PrismaClient, organizationId:
     }),
     prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { createdAt: true },
+      select: { createdAt: true, billingPlan: true },
     }),
   ]);
+  const isFixed = orgRow && !organizationUsesFlexPostpaid(orgRow.billingPlan);
   const trialDays = Math.max(0, cfgRow?.billingTrialDays ?? 0);
   const graceDays = Math.max(0, cfgRow?.billingGraceDaysAfterDue ?? 0);
   const graceMs = graceDays * 24 * 60 * 60 * 1000;
 
-  if (orgRow && trialDays > 0) {
+  if (!isFixed && orgRow && trialDays > 0) {
     const trialEndMs = orgRow.createdAt.getTime() + trialDays * 24 * 60 * 60 * 1000;
     if (now.getTime() < trialEndMs) {
       await prisma.organization.update({
@@ -374,7 +380,13 @@ export async function enforceOverdueAccess(prisma: PrismaClient, organizationId:
   }
 
   const openInvoices = await prisma.billingInvoice.findMany({
-    where: { organizationId, status: { in: ["issued", "overdue"] } },
+    where: {
+      organizationId,
+      status: { in: ["issued", "overdue"] },
+      ...(isFixed
+        ? { invoiceKind: { in: ["fixed_overage", "fixed_topup"] } }
+        : { invoiceKind: "flex_monthly" }),
+    },
     orderBy: { dueAt: "asc" },
     select: { id: true, dueAt: true },
   });
@@ -473,6 +485,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
   const orgs = await prisma.organization.findMany({
     select: {
       id: true,
+      billingPlan: true,
       customUserDailyRateCents: true,
       customSeatCalculatorJson: true,
       customDiscountPercent: true,
@@ -483,8 +496,14 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
 
   let generated = 0;
   for (const org of orgs) {
+    if (!organizationUsesFlexPostpaid(org.billingPlan)) continue;
     const existing = await prisma.billingInvoice.findFirst({
-      where: { organizationId: org.id, periodStart: targetMonthStart, periodEnd: targetMonthEnd },
+      where: {
+        organizationId: org.id,
+        periodStart: targetMonthStart,
+        periodEnd: targetMonthEnd,
+        invoiceKind: "flex_monthly",
+      },
       select: { id: true },
     });
     if (existing) continue;
@@ -536,6 +555,7 @@ export async function generateMonthlyInvoices(prisma: PrismaClient, runAt = new 
           periodEnd: targetMonthEnd,
           dueAt,
           status: "issued",
+          invoiceKind: "flex_monthly",
           subtotalCents,
           discountPercent: flatRateApplicable ? 0 : discountPercent,
           discountCents: flatRateApplicable ? 0 : discountCents,

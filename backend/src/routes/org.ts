@@ -8,6 +8,7 @@ import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
 import { wipeOrganizationCompletely } from "../deleteOrganizationWipe";
 import { verifyUserCredentialPassword } from "../verifyCredentialPassword";
 import { DistanceUnitSchema, LanguageSchema, TimeFormatSchema } from "../types";
+import { fixedOverageMonthlyTotalCents, organizationUsesFlexPostpaid } from "../flexFixedPricing";
 import {
   BILLING_CURRENCY_CODE,
   currentUtcMonthRange,
@@ -350,7 +351,13 @@ app.get("/org", async (c) => {
     },
   });
 
-  await recordDailyUsageSnapshot(prisma);
+  const orgPreview = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { billingPlan: true },
+  });
+  if (orgPreview?.billingPlan !== "fixed") {
+    await recordDailyUsageSnapshot(prisma);
+  }
   const viewOnly = await enforceOverdueAccess(prisma, user.organizationId);
   const [billingConfig, openInvoice, org, currencyPrices, globalSeatJson] = await Promise.all([
     getBillingConfig(prisma),
@@ -404,23 +411,32 @@ app.get("/org", async (c) => {
     }
   }
 
+  const isFlex = organizationUsesFlexPostpaid(org.billingPlan);
+  const committed = org.committedSeats ?? 0;
+  const fixedOverageEstimateCents =
+    !isFlex && committed > 0
+      ? fixedOverageMonthlyTotalCents(billableCount, committed)
+      : 0;
+
   return c.json({
     data: {
       ...org,
       userCount: activeUserCount,
-      estimatedMonthlyCents,
+      estimatedMonthlyCents: isFlex ? estimatedMonthlyCents : fixedOverageEstimateCents,
       estimatedCurrencyCode: BILLING_CURRENCY_CODE,
       isViewOnlyDueToBilling: viewOnly,
       billingStatus: org.billingStatus,
       paymentDueDays: billingConfig.paymentDueDays,
       billingTrialDays: billingConfig.billingTrialDays,
       billingGraceDaysAfterDue: billingConfig.billingGraceDaysAfterDue,
-      billingOnTrial: onTrial,
-      trialEndsAt: trialDays > 0 ? new Date(trialEndMs).toISOString() : null,
+      billingOnTrial: isFlex ? onTrial : false,
+      trialEndsAt: isFlex && trialDays > 0 ? new Date(trialEndMs).toISOString() : null,
       billingInGraceAfterDue: inGraceAfterDue,
       billingReadOnlyEffectiveAt: readOnlyEffectiveAt,
       billableMembersThisMonth: billableMembers,
       openInvoice,
+      fixedOverageEstimateCents,
+      fixedAnnualRoundToTen: billingConfig.fixedAnnualRoundToTen,
     },
   });
 });

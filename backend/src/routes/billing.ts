@@ -2,8 +2,24 @@ import { Hono } from "hono";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../env";
 import { auth } from "../auth";
-import { markInvoiceOverdue, markInvoicePaid } from "../postpaidBilling";
+import {
+  annualInvoiceTotalCents,
+  proratedSeatIncreaseTopUpCents,
+  requiresEnterpriseContact,
+} from "../flexFixedPricing";
+import {
+  downgradeFixedPlanAtPeriodEnd,
+  increaseFixedCommittedSeats,
+  provisionFixedPlanSubscription,
+} from "../fixedPlanProvisioning";
+import {
+  createPaddleCheckoutForFixedPlan,
+  createPaddleCheckoutForFixedTopUp,
+  createPaddleCustomer,
+} from "../paddleClient";
+import { getBillingConfig, markInvoiceOverdue, markInvoicePaid } from "../postpaidBilling";
 import { prisma } from "../prisma";
+import { FixedCheckoutRequestSchema, FixedSeatIncreaseRequestSchema } from "../types";
 
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -12,7 +28,7 @@ function verifyPaddleSignature(rawBody: string, signatureHeader: string, secret:
     signatureHeader
       .split(";")
       .map((part) => part.trim().split("="))
-      .filter(([k, v]) => Boolean(k) && Boolean(v))
+      .filter(([k, v]) => Boolean(k) && Boolean(v)),
   );
 
   const ts = parts.ts;
@@ -29,12 +45,144 @@ function verifyPaddleSignature(rawBody: string, signatureHeader: string, secret:
   }
 }
 
+type PaddleCustomData = {
+  invoiceId?: string;
+  organizationId?: string;
+  billingPlan?: string;
+  committedSeats?: string;
+  checkoutKind?: string;
+  newCommittedSeats?: string;
+  topUpCents?: string;
+};
+
+type PaddleWebhookData = {
+  id?: string;
+  transaction_id?: string;
+  invoice_id?: string;
+  subscription_id?: string;
+  custom_data?: PaddleCustomData;
+  checkout?: { url?: string | null } | null;
+  invoice?: { id?: string | null } | null;
+  details?: { totals?: { total?: string | null } | null } | null;
+};
+
+function parseCommittedSeats(custom: PaddleCustomData | undefined): number | null {
+  const raw = custom?.committedSeats?.trim() || custom?.newCommittedSeats?.trim();
+  if (!raw) return null;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+function parseAmountCents(data: PaddleWebhookData): number | null {
+  const raw = data.details?.totals?.total;
+  if (raw == null) return null;
+  const n = parseInt(String(raw).replace(/\D/g, ""), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function handleFixedPlanWebhook(eventType: string, data: PaddleWebhookData): Promise<void> {
+  const custom = data.custom_data;
+  if (custom?.billingPlan !== "fixed") return;
+  const organizationId = custom.organizationId?.trim();
+  if (!organizationId) return;
+
+  const subscriptionId = data.subscription_id || data.id;
+  if (!subscriptionId) return;
+
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true },
+  });
+  if (!org) return;
+
+  const activateEvents = new Set([
+    "subscription.activated",
+    "subscription.created",
+    "subscription.renewed",
+    "transaction.completed",
+  ]);
+  const cancelEvents = new Set(["subscription.canceled", "subscription.cancelled"]);
+
+  if (eventType === "subscription.renewed" && parseCommittedSeats(custom) != null) {
+    const seats = parseCommittedSeats(custom)!;
+    const cfg = await getBillingConfig(prisma);
+    const amountCents = parseAmountCents(data) ?? annualInvoiceTotalCents(seats, cfg.fixedAnnualRoundToTen);
+    const renewalAt = new Date();
+    renewalAt.setUTCFullYear(renewalAt.getUTCFullYear() + 1);
+    await provisionFixedPlanSubscription(prisma, {
+      organizationId,
+      committedSeats: seats,
+      annualInvoiceAmountCents: amountCents,
+      paddleSubscriptionId: subscriptionId,
+      renewalAt,
+    });
+    return;
+  }
+
+  if (activateEvents.has(eventType)) {
+    const checkoutKind = custom.checkoutKind || "initial";
+    if (checkoutKind === "topup") {
+      const newSeats = parseCommittedSeats(custom);
+      const topUp =
+        parseInt(custom.topUpCents?.trim() || "", 10) || parseAmountCents(data) || 0;
+      if (newSeats != null && topUp > 0) {
+        await increaseFixedCommittedSeats(prisma, {
+          organizationId,
+          newCommittedSeats: newSeats,
+          topUpAmountCents: topUp,
+          paddleSubscriptionId: subscriptionId,
+        });
+      }
+      return;
+    }
+
+    const seats = parseCommittedSeats(custom);
+    if (seats == null) return;
+    const cfg = await getBillingConfig(prisma);
+    const amountCents =
+      parseAmountCents(data) ?? annualInvoiceTotalCents(seats, cfg.fixedAnnualRoundToTen);
+    const renewalAt = new Date();
+    renewalAt.setUTCFullYear(renewalAt.getUTCFullYear() + 1);
+    await provisionFixedPlanSubscription(prisma, {
+      organizationId,
+      committedSeats: seats,
+      annualInvoiceAmountCents: amountCents,
+      paddleSubscriptionId: subscriptionId,
+      renewalAt,
+    });
+    return;
+  }
+
+  if (cancelEvents.has(eventType)) {
+    await downgradeFixedPlanAtPeriodEnd(prisma, organizationId);
+  }
+}
+
+async function ensurePaddleCustomer(
+  org: { id: string; name: string; paddleCustomerId: string | null; invoiceEmail: string | null },
+  userEmail: string,
+): Promise<string> {
+  let customerId = org.paddleCustomerId?.trim() || null;
+  if (!customerId) {
+    const customer = await createPaddleCustomer({
+      organizationId: org.id,
+      name: org.name,
+      email: org.invoiceEmail || userEmail,
+    });
+    customerId = customer.id;
+    await prisma.organization.update({
+      where: { id: org.id },
+      data: { paddleCustomerId: customerId },
+    });
+  }
+  return customerId;
+}
+
 // Legacy endpoint kept for compatibility after pricing-model migration.
 app.get("/billing/packs", async (c) => {
   return c.json({ data: [] });
 });
 
-// Legacy checkout endpoint (prepaid flow removed).
 app.post("/billing/checkout", async (c) => {
   return c.json(
     {
@@ -43,8 +191,187 @@ app.post("/billing/checkout", async (c) => {
         code: "LEGACY_CREDIT_FLOW_REMOVED",
       },
     },
-    410
+    410,
   );
+});
+
+// POST /api/billing/fixed/checkout — annual Fixed plan (org owner)
+app.post("/billing/fixed/checkout", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (user.orgRole !== "owner") {
+    return c.json({ error: { message: "Only organisation owners can start Fixed checkout", code: "FORBIDDEN" } }, 403);
+  }
+
+  const body = FixedCheckoutRequestSchema.parse(await c.req.json());
+  const seats = body.seats;
+  if (requiresEnterpriseContact(seats)) {
+    return c.json({
+      data: {
+        checkoutUrl: null,
+        annualInvoiceCents: 0,
+        seats,
+        requiresEnterpriseContact: true,
+      },
+    });
+  }
+
+  const cfg = await getBillingConfig(prisma);
+  const annualCents = annualInvoiceTotalCents(seats, cfg.fixedAnnualRoundToTen);
+
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { id: true, name: true, paddleCustomerId: true, invoiceEmail: true, billingPlan: true },
+  });
+  if (!org) {
+    return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
+  }
+  if (org.billingPlan === "fixed") {
+    return c.json({ error: { message: "Organization is already on Fixed plan", code: "ALREADY_FIXED" } }, 400);
+  }
+
+  try {
+    const customerId = await ensurePaddleCustomer(org, user.email);
+    const tx = await createPaddleCheckoutForFixedPlan({
+      customerId,
+      organizationId: org.id,
+      seats,
+      amountCents: annualCents,
+      checkoutKind: "initial",
+    });
+    return c.json({
+      data: {
+        checkoutUrl: tx.checkout?.url ?? null,
+        annualInvoiceCents: annualCents,
+        seats,
+        requiresEnterpriseContact: false,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Paddle checkout failed";
+    return c.json({ error: { message, code: "PADDLE_CHECKOUT_FAILED" } }, 502);
+  }
+});
+
+// GET /api/billing/fixed/seat-increase-quote?newCommittedSeats=
+app.get("/billing/fixed/seat-increase-quote", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const newCommittedSeats = parseInt(c.req.query("newCommittedSeats") || "0", 10);
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: {
+      billingPlan: true,
+      committedSeats: true,
+      annualRenewalDate: true,
+      annualTermStartDate: true,
+    },
+  });
+  if (!org || org.billingPlan !== "fixed" || org.committedSeats == null) {
+    return c.json({ error: { message: "Not on Fixed plan", code: "NOT_FIXED" } }, 400);
+  }
+  if (newCommittedSeats <= org.committedSeats) {
+    return c.json({ error: { message: "New seat count must exceed current commitment", code: "BAD_REQUEST" } }, 400);
+  }
+
+  const cfg = await getBillingConfig(prisma);
+  const renewalAt = org.annualRenewalDate ?? new Date();
+  const termStart = org.annualTermStartDate ?? new Date();
+  const now = new Date();
+  const termMs = Math.max(1, renewalAt.getTime() - termStart.getTime());
+  const remainingMs = Math.max(0, renewalAt.getTime() - now.getTime());
+  const monthsRemainingFraction = Math.min(1, remainingMs / termMs);
+
+  const topUpCents = proratedSeatIncreaseTopUpCents(
+    org.committedSeats,
+    newCommittedSeats,
+    termStart,
+    renewalAt,
+    now,
+    cfg.fixedAnnualRoundToTen,
+  );
+
+  return c.json({
+    data: {
+      currentCommittedSeats: org.committedSeats,
+      newCommittedSeats,
+      topUpCents,
+      monthsRemainingFraction,
+      requiresEnterpriseContact: requiresEnterpriseContact(newCommittedSeats),
+    },
+  });
+});
+
+// POST /api/billing/fixed/seat-increase
+app.post("/billing/fixed/seat-increase", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (user.orgRole !== "owner") {
+    return c.json({ error: { message: "Only organisation owners can increase Fixed seats", code: "FORBIDDEN" } }, 403);
+  }
+
+  const body = FixedSeatIncreaseRequestSchema.parse(await c.req.json());
+  const newCommittedSeats = body.newCommittedSeats;
+  if (requiresEnterpriseContact(newCommittedSeats)) {
+    return c.json({ error: { message: "Contact us for 150+ seats", code: "ENTERPRISE_REQUIRED" } }, 400);
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: {
+      id: true,
+      name: true,
+      billingPlan: true,
+      committedSeats: true,
+      annualRenewalDate: true,
+      annualTermStartDate: true,
+      paddleCustomerId: true,
+      invoiceEmail: true,
+    },
+  });
+  if (!org || org.billingPlan !== "fixed" || org.committedSeats == null) {
+    return c.json({ error: { message: "Not on Fixed plan", code: "NOT_FIXED" } }, 400);
+  }
+  if (newCommittedSeats <= org.committedSeats) {
+    return c.json({ error: { message: "New seat count must exceed current commitment", code: "BAD_REQUEST" } }, 400);
+  }
+
+  const cfg = await getBillingConfig(prisma);
+  const renewalAt = org.annualRenewalDate ?? new Date();
+  const termStart = org.annualTermStartDate ?? new Date();
+  const topUpCents = proratedSeatIncreaseTopUpCents(
+    org.committedSeats,
+    newCommittedSeats,
+    termStart,
+    renewalAt,
+    new Date(),
+    cfg.fixedAnnualRoundToTen,
+  );
+  if (topUpCents < 1) {
+    return c.json({ error: { message: "Nothing to charge for this change", code: "BAD_REQUEST" } }, 400);
+  }
+
+  try {
+    const customerId = await ensurePaddleCustomer(org, user.email);
+    const tx = await createPaddleCheckoutForFixedTopUp({
+      customerId,
+      organizationId: org.id,
+      currentSeats: org.committedSeats,
+      newSeats: newCommittedSeats,
+      amountCents: topUpCents,
+    });
+    return c.json({ data: { checkoutUrl: tx.checkout?.url ?? null, topUpCents } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Paddle checkout failed";
+    return c.json({ error: { message, code: "PADDLE_CHECKOUT_FAILED" } }, 502);
+  }
 });
 
 // POST /api/billing/webhook — Paddle webhook
@@ -59,28 +386,19 @@ app.post("/billing/webhook", async (c) => {
     return c.json({ error: { message: "Invalid signature", code: "INVALID_SIGNATURE" } }, 400);
   }
 
-  const event = JSON.parse(body) as {
-    event_type?: string;
-    data?: {
-      id?: string;
-      transaction_id?: string;
-      invoice_id?: string;
-      custom_data?: { invoiceId?: string };
-      checkout?: { url?: string | null } | null;
-      invoice?: { id?: string | null } | null;
-    };
-  };
+  const event = JSON.parse(body) as { event_type?: string; data?: PaddleWebhookData };
   const eventType = event?.event_type || "";
   const data = event?.data;
+
   if (data) {
+    await handleFixedPlanWebhook(eventType, data);
+
     const customInvoiceId = data.custom_data?.invoiceId?.trim();
     const paddleTransactionId = data.transaction_id || data.id || undefined;
     const paddleInvoiceId = data.invoice_id || data.invoice?.id || undefined;
 
     const invoice =
-      (customInvoiceId
-        ? await prisma.billingInvoice.findUnique({ where: { id: customInvoiceId } })
-        : null) ??
+      (customInvoiceId ? await prisma.billingInvoice.findUnique({ where: { id: customInvoiceId } }) : null) ??
       (paddleTransactionId
         ? await prisma.billingInvoice.findFirst({ where: { paddleTransactionId }, orderBy: { issuedAt: "desc" } })
         : null) ??

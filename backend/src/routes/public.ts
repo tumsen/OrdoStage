@@ -5,7 +5,15 @@ import { prisma } from "../prisma";
 import { dayKeyFromDateInput } from "../lib/timeHHMM";
 import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
 import { env, isDeployedRuntime } from "../env";
-import { ensureCurrencyPriceMonthRollover } from "../postpaidBilling";
+import {
+  annualDiscountPercent,
+  annualInvoiceTotalMajor,
+  annualMonthlyEquivMajor,
+  annualSavingMajor,
+  flexMonthlyTotalMajor,
+} from "../flexFixedPricing";
+import { ensureCurrencyPriceMonthRollover, getBillingConfig } from "../postpaidBilling";
+import { PublicPlanQuoteQuerySchema, PublicPlanQuoteSchema } from "../types";
 
 const DEFAULT_RIDER_VISIBILITY = {
   venue: true,
@@ -107,6 +115,22 @@ publicRouter.get("/pricing", async (c) => {
       prices: [{ currencyCode: "EUR" as const, userDailyRateCents: eurCents }],
     },
   });
+});
+
+// GET /api/public/plan-quote?seats=10 — Flex vs Fixed comparison (EUR)
+publicRouter.get("/plan-quote", async (c) => {
+  const { seats } = PublicPlanQuoteQuerySchema.parse({ seats: c.req.query("seats") ?? "10" });
+  const cfg = await getBillingConfig(prisma);
+  const roundTen = cfg.fixedAnnualRoundToTen;
+  const quote = PublicPlanQuoteSchema.parse({
+    seats,
+    flexMonthlyMajor: flexMonthlyTotalMajor(seats),
+    fixedAnnualMonthlyEquivMajor: annualMonthlyEquivMajor(seats),
+    fixedAnnualInvoiceMajor: annualInvoiceTotalMajor(seats, roundTen),
+    discountPercent: Math.round(annualDiscountPercent(seats) * 10) / 10,
+    annualSavingMajor: annualSavingMajor(seats, roundTen),
+  });
+  return c.json({ data: quote });
 });
 
 // GET /api/public/invite/:token — invitation preview (no auth)

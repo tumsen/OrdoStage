@@ -53,6 +53,92 @@ export async function createPaddleCustomer(input: {
   return paddleRequest<PaddleCustomer>("/customers", { method: "POST", body: payload });
 }
 
+/** Annual Fixed plan checkout — custom total from seat curve (not catalog unit × qty). */
+export async function createPaddleCheckoutForFixedPlan(input: {
+  customerId: string;
+  organizationId: string;
+  seats: number;
+  amountCents: number;
+  currencyCode?: string;
+  checkoutKind?: "initial" | "topup";
+}): Promise<PaddleTransaction> {
+  const amount = Math.max(0, Math.round(input.amountCents)).toString();
+  const currencyCode = (input.currencyCode ?? "EUR").toUpperCase();
+  const seats = Math.max(1, Math.round(input.seats));
+  return paddleRequest<PaddleTransaction>("/transactions", {
+    method: "POST",
+    body: {
+      customer_id: input.customerId,
+      collection_mode: "automatic",
+      currency_code: currencyCode,
+      items: [
+        {
+          quantity: 1,
+          price: {
+            name: `OrdoStage Fixed — ${seats} seats (annual)`,
+            description: `12-month committed seats (${seats}). Extra seats above commitment billed monthly at Flex marginal rates.`,
+            unit_price: {
+              amount,
+              currency_code: currencyCode,
+            },
+            billing_cycle: {
+              interval: "year",
+              frequency: 1,
+            },
+          },
+        },
+      ],
+      custom_data: {
+        organizationId: input.organizationId,
+        billingPlan: "fixed",
+        checkoutKind: input.checkoutKind ?? "initial",
+        committedSeats: String(seats),
+      },
+    },
+  });
+}
+
+export async function createPaddleCheckoutForFixedTopUp(input: {
+  customerId: string;
+  organizationId: string;
+  currentSeats: number;
+  newSeats: number;
+  amountCents: number;
+  currencyCode?: string;
+}): Promise<PaddleTransaction> {
+  const amount = Math.max(0, Math.round(input.amountCents)).toString();
+  const currencyCode = (input.currencyCode ?? "EUR").toUpperCase();
+  return paddleRequest<PaddleTransaction>("/transactions", {
+    method: "POST",
+    body: {
+      customer_id: input.customerId,
+      collection_mode: "automatic",
+      currency_code: currencyCode,
+      items: [
+        {
+          quantity: 1,
+          price: {
+            name: `OrdoStage Fixed — seat increase (${input.currentSeats} → ${input.newSeats})`,
+            description: "Prorated top-up for the remainder of the annual term.",
+            unit_price: {
+              amount,
+              currency_code: currencyCode,
+            },
+          },
+        },
+      ],
+      custom_data: {
+        organizationId: input.organizationId,
+        billingPlan: "fixed",
+        checkoutKind: "topup",
+        committedSeats: String(input.currentSeats),
+        newCommittedSeats: String(input.newSeats),
+        topUpCents: amount,
+      },
+    },
+  });
+}
+
 export async function createPaddleTransactionForInvoice(input: {
   customerId: string;
   invoiceId: string;
