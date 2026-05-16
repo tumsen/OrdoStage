@@ -6,7 +6,8 @@ import { dayKeyFromDateInput } from "../lib/timeHHMM";
 import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
 import { env, isDeployedRuntime } from "../env";
 import {
-  annualDiscountPercent,
+  fixedMonthlyEquivMajor,
+  fixedVolumeDiscountPercent,
   annualInvoiceTotalMajor,
   annualMonthlyEquivMajor,
   annualSavingMajor,
@@ -131,9 +132,11 @@ publicRouter.get("/plan-quote", async (c) => {
   const quote = PublicPlanQuoteSchema.parse({
     seats,
     flexMonthlyMajor: flexMonthlyTotalMajor(seats),
+    fixedMonthlyEquivMajor: fixedMonthlyEquivMajor(seats, fixedCfg),
     fixedAnnualMonthlyEquivMajor: annualMonthlyEquivMajor(seats, fixedCfg),
     fixedAnnualInvoiceMajor: annualInvoiceTotalMajor(seats, roundTen, fixedCfg),
-    discountPercent: Math.round(annualDiscountPercent(seats, fixedCfg) * 10) / 10,
+    monthlyDiscountPercent: Math.round(fixedVolumeDiscountPercent(seats, "monthly", fixedCfg) * 10) / 10,
+    discountPercent: Math.round(fixedVolumeDiscountPercent(seats, "annual", fixedCfg) * 10) / 10,
     annualSavingMajor: annualSavingMajor(seats, roundTen, fixedCfg),
   });
   return c.json({ data: quote });

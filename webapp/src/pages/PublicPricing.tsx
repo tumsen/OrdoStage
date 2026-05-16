@@ -73,7 +73,7 @@ export default function PublicPricing() {
 
   const fixedPlan = publicPricing?.fixedPlanPricing ?? DEFAULT_FIXED_PLAN_PRICING;
   const roundAnnualToTen = publicPricing?.fixedAnnualRoundToTen !== false;
-  const fixedFirstSeat = formatEuroMajor(fixedPlan.firstSeatAnnualMonthlyMajor);
+  const fixedFirstSeat = formatEuroMajor(fixedPlan.firstSeatMonthlyMajor);
 
   return (
     <div className="text-white">

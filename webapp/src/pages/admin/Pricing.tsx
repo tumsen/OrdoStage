@@ -3,13 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
 import {
-  InputWithUnitSuffix,
-  TieredSeatPricingCalculator,
-} from "@/components/pricing/TieredSeatPricingCalculator";
+  BillingOpsRow,
+  FixedPlanSettingsRow,
+  FlexSeatModelRow,
+} from "@/components/pricing/AdminPlanSettingsFields";
 import { parseSeatCalculatorJson } from "@/lib/seatCalculatorJson";
 import {
   DEFAULT_FIXED_PLAN_PRICING,
@@ -45,14 +45,6 @@ function mergeGlobalSeatModel(json: string | null | undefined): TieredSeatModel 
   return {
     ...DEFAULT_TIERED_SEAT_MODEL,
     ...parsed?.model,
-  };
-}
-
-function initialYearlyFromSettings(d: AdminBillingSettingsData): { percent: number; enabled: boolean } {
-  const parsed = parseSeatCalculatorJson(d.defaultSeatCalculatorJson);
-  return {
-    percent: parsed?.yearlyDiscountPercent ?? d.yearlyDiscountPercent ?? 15,
-    enabled: parsed?.yearlyDiscountEnabled ?? d.yearlyDiscountEnabled !== false,
   };
 }
 
@@ -103,49 +95,58 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
   const [fixedPlan, setFixedPlan] = useState<FixedPlanPricingConfig>(() =>
     mergeFixedPlan(initialData.fixedPlanPricing),
   );
-  const [fixedFirstSeatDraft, setFixedFirstSeatDraft] = useState(() =>
-    String(mergeFixedPlan(initialData.fixedPlanPricing).firstSeatAnnualMonthlyMajor),
-  );
-  const [fixedDiscMinDraft, setFixedDiscMinDraft] = useState(() =>
-    String(mergeFixedPlan(initialData.fixedPlanPricing).discountPercentMin),
-  );
-  const [fixedDiscMaxDraft, setFixedDiscMaxDraft] = useState(() =>
-    String(mergeFixedPlan(initialData.fixedPlanPricing).discountPercentMax),
-  );
-  const [fixedDiscCapDraft, setFixedDiscCapDraft] = useState(() =>
-    String(mergeFixedPlan(initialData.fixedPlanPricing).discountCapSeats),
-  );
-  const [fixedMaxSeatsDraft, setFixedMaxSeatsDraft] = useState(() =>
-    String(mergeFixedPlan(initialData.fixedPlanPricing).selfServeMaxSeats),
-  );
-  const y0 = initialYearlyFromSettings(initialData);
-  const [seatYearlyPercent, setSeatYearlyPercent] = useState(y0.percent);
-  const [seatYearlyEnabled, setSeatYearlyEnabled] = useState(y0.enabled);
-
-  const yearlyDiscountPercentClamped = Math.min(100, Math.max(0, Math.round(seatYearlyPercent) || 0));
+  const initialFixed = mergeFixedPlan(initialData.fixedPlanPricing);
+  const [fixedDrafts, setFixedDrafts] = useState(() => ({
+    firstSeat: String(initialFixed.firstSeatMonthlyMajor),
+    monthlyDiscMin: String(initialFixed.monthlyVolumeDiscountPercentMin),
+    monthlyDiscMax: String(initialFixed.monthlyVolumeDiscountPercentMax),
+    annualDiscMin: String(initialFixed.annualVolumeDiscountPercentMin),
+    annualDiscMax: String(initialFixed.annualVolumeDiscountPercentMax),
+    discCap: String(initialFixed.discountCapSeats),
+    maxSeats: String(initialFixed.selfServeMaxSeats),
+  }));
 
   function commitFixedPlanFromDrafts(): FixedPlanPricingConfig {
-    const first = parseFloat(fixedFirstSeatDraft.replace(",", "."));
-    const dMin = parseInt(fixedDiscMinDraft, 10);
-    const dMax = parseInt(fixedDiscMaxDraft, 10);
-    const cap = parseInt(fixedDiscCapDraft, 10);
-    const maxSeats = parseInt(fixedMaxSeatsDraft, 10);
+    const first = parseFloat(fixedDrafts.firstSeat.replace(",", "."));
+    const monthlyMin = parseInt(fixedDrafts.monthlyDiscMin, 10);
+    const monthlyMax = parseInt(fixedDrafts.monthlyDiscMax, 10);
+    const annualMin = parseInt(fixedDrafts.annualDiscMin, 10);
+    const annualMax = parseInt(fixedDrafts.annualDiscMax, 10);
+    const cap = parseInt(fixedDrafts.discCap, 10);
+    const maxSeats = parseInt(fixedDrafts.maxSeats, 10);
     const merged = mergeFixedPlan({
-      firstSeatAnnualMonthlyMajor: Number.isFinite(first) ? Math.max(0, first) : fixedPlan.firstSeatAnnualMonthlyMajor,
-      discountPercentMin: Number.isFinite(dMin) ? Math.min(100, Math.max(0, dMin)) : fixedPlan.discountPercentMin,
-      discountPercentMax: Number.isFinite(dMax) ? Math.min(100, Math.max(0, dMax)) : fixedPlan.discountPercentMax,
+      firstSeatMonthlyMajor: Number.isFinite(first) ? Math.max(0, first) : fixedPlan.firstSeatMonthlyMajor,
+      monthlyVolumeDiscountPercentMin: Number.isFinite(monthlyMin)
+        ? Math.min(100, Math.max(0, monthlyMin))
+        : fixedPlan.monthlyVolumeDiscountPercentMin,
+      monthlyVolumeDiscountPercentMax: Number.isFinite(monthlyMax)
+        ? Math.min(100, Math.max(0, monthlyMax))
+        : fixedPlan.monthlyVolumeDiscountPercentMax,
+      annualVolumeDiscountPercentMin: Number.isFinite(annualMin)
+        ? Math.min(100, Math.max(0, annualMin))
+        : fixedPlan.annualVolumeDiscountPercentMin,
+      annualVolumeDiscountPercentMax: Number.isFinite(annualMax)
+        ? Math.min(100, Math.max(0, annualMax))
+        : fixedPlan.annualVolumeDiscountPercentMax,
       discountCapSeats: Number.isFinite(cap) ? Math.min(500, Math.max(1, cap)) : fixedPlan.discountCapSeats,
       selfServeMaxSeats: Number.isFinite(maxSeats) ? Math.min(500, Math.max(1, maxSeats)) : fixedPlan.selfServeMaxSeats,
     });
-    if (merged.discountPercentMax < merged.discountPercentMin) {
-      merged.discountPercentMax = merged.discountPercentMin;
+    if (merged.monthlyVolumeDiscountPercentMax < merged.monthlyVolumeDiscountPercentMin) {
+      merged.monthlyVolumeDiscountPercentMax = merged.monthlyVolumeDiscountPercentMin;
+    }
+    if (merged.annualVolumeDiscountPercentMax < merged.annualVolumeDiscountPercentMin) {
+      merged.annualVolumeDiscountPercentMax = merged.annualVolumeDiscountPercentMin;
     }
     setFixedPlan(merged);
-    setFixedFirstSeatDraft(String(merged.firstSeatAnnualMonthlyMajor));
-    setFixedDiscMinDraft(String(merged.discountPercentMin));
-    setFixedDiscMaxDraft(String(merged.discountPercentMax));
-    setFixedDiscCapDraft(String(merged.discountCapSeats));
-    setFixedMaxSeatsDraft(String(merged.selfServeMaxSeats));
+    setFixedDrafts({
+      firstSeat: String(merged.firstSeatMonthlyMajor),
+      monthlyDiscMin: String(merged.monthlyVolumeDiscountPercentMin),
+      monthlyDiscMax: String(merged.monthlyVolumeDiscountPercentMax),
+      annualDiscMin: String(merged.annualVolumeDiscountPercentMin),
+      annualDiscMax: String(merged.annualVolumeDiscountPercentMax),
+      discCap: String(merged.discountCapSeats),
+      maxSeats: String(merged.selfServeMaxSeats),
+    });
     return merged;
   }
 
@@ -166,16 +167,16 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
       return api.patch<AdminBillingSettingsData>("/api/admin/billing/settings", {
         paymentDueDays: due,
         baseCurrencyCode: "EUR",
-        yearlyDiscountPercent: yearlyDiscountPercentClamped,
-        yearlyDiscountEnabled: seatYearlyEnabled,
+        yearlyDiscountPercent: 0,
+        yearlyDiscountEnabled: false,
         billingTrialDays: trial,
         billingGraceDaysAfterDue: grace,
         fixedAnnualRoundToTen,
         fixedPlanPricing: commitFixedPlanFromDrafts(),
         defaultSeatCalculatorJson: JSON.stringify({
           model: seatModel,
-          yearlyDiscountPercent: yearlyDiscountPercentClamped,
-          yearlyDiscountEnabled: seatYearlyEnabled,
+          yearlyDiscountPercent: 0,
+          yearlyDiscountEnabled: false,
         }),
       });
     },
@@ -214,8 +215,8 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
           <div>
             <CardTitle className="text-white">Flex &amp; Fixed pricing</CardTitle>
             <p className="mt-1 text-xs text-white/50">
-              Flex postpaid curve, Fixed annual formula, trial/grace, and invoice timing. Press{" "}
-              <span className="text-white/80">Save pricing</span> to persist. Chart compares both plans on one graph.
+              Flex is monthly postpaid only. Fixed has separate monthly and annual volume discounts. Press{" "}
+              <span className="text-white/80">Save pricing</span> to persist.
             </p>
           </div>
           <Button
@@ -230,184 +231,32 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         </CardHeader>
         <CardContent className="space-y-6">
           <TieredSeatPricingCalculator
-            showModelControls
             compareFlexFixedPlans
+            hideInlineModelControls
             fixedPlanPricing={fixedPlan}
             fixedAnnualRoundToTen={fixedAnnualRoundToTen}
-            yearlyDiscountPercent={yearlyDiscountPercentClamped}
-            yearlyDiscountEnabled={seatYearlyEnabled}
-            showYearlyDiscountControls
-            onYearlyDiscountPercentChange={setSeatYearlyPercent}
-            onYearlyDiscountEnabledChange={setSeatYearlyEnabled}
             seatModel={seatModel}
             onSeatModelChange={setSeatModel}
-            afterModelControls={
-              <>
-                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                  <Label
-                    htmlFor="admin-invoice-due-days"
-                    className="min-h-[2.5rem] shrink-0 text-[11px] font-medium leading-snug text-white/50 line-clamp-3"
-                  >
-                    Invoice payment due
-                  </Label>
-                  <p id="admin-invoice-due-days-hint" className="mt-1 shrink-0 text-[10px] leading-snug text-white/45 line-clamp-4">
-                    Calendar days after an invoice is issued until it is due (1–30). Stored as whole <strong className="text-white/55">Days</strong>; affects
-                    reminder timing and when read-only can apply.
-                  </p>
-                  <div className="min-h-0 flex-1" aria-hidden />
-                  <InputWithUnitSuffix
-                    id="admin-invoice-due-days"
-                    inputMode="numeric"
-                    suffix="Days"
-                    value={paymentDueDays}
-                    onChange={setPaymentDueDays}
-                    aria-describedby="admin-invoice-due-days-hint"
-                  />
-                </div>
-                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                  <Label
-                    htmlFor="admin-billing-trial-days"
-                    className="min-h-[2.5rem] shrink-0 text-[11px] font-medium leading-snug text-white/50 line-clamp-3"
-                  >
-                    Free trial length
-                  </Label>
-                  <p id="admin-billing-trial-days-hint" className="mt-1 shrink-0 text-[10px] leading-snug text-white/45 line-clamp-4">
-                    Days from organisation creation before post-trial rules apply strongly. Use <strong className="text-white/55">0 Days</strong> for no trial.
-                    Unpaid invoices still respect this window before forcing read-only.
-                  </p>
-                  <div className="min-h-0 flex-1" aria-hidden />
-                  <InputWithUnitSuffix
-                    id="admin-billing-trial-days"
-                    inputMode="numeric"
-                    suffix="Days"
-                    value={billingTrialDays}
-                    onChange={setBillingTrialDays}
-                    aria-describedby="admin-billing-trial-days-hint"
-                  />
-                </div>
-                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                  <Label
-                    htmlFor="admin-billing-grace-days"
-                    className="min-h-[2.5rem] shrink-0 text-[11px] font-medium leading-snug text-white/50 line-clamp-3"
-                  >
-                    Grace after due date
-                  </Label>
-                  <p id="admin-billing-grace-days-hint" className="mt-1 shrink-0 text-[10px] leading-snug text-white/45 line-clamp-4">
-                    Extra <strong className="text-white/55">Days</strong> after the invoice due date before the organisation becomes view-only (0 = none). Helps
-                    teams who pay a few days late.
-                  </p>
-                  <div className="min-h-0 flex-1" aria-hidden />
-                  <InputWithUnitSuffix
-                    id="admin-billing-grace-days"
-                    inputMode="numeric"
-                    suffix="Days"
-                    value={billingGraceDaysAfterDue}
-                    onChange={setBillingGraceDaysAfterDue}
-                    aria-describedby="admin-billing-grace-days-hint"
-                  />
-                </div>
-                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-ordo-violet/30 bg-ordo-violet/5 px-3 py-2.5">
-                  <Label htmlFor="admin-fixed-first-seat" className="text-[11px] font-medium text-white/50">
-                    Fixed · 1st seat (€/mo equiv.)
-                  </Label>
-                  <p className="mt-1 text-[10px] leading-snug text-white/45">
-                    Monthly equivalent for the first committed seat on the Fixed annual plan.
-                  </p>
-                  <div className="mt-auto pt-2">
-                    <InputWithUnitSuffix
-                      id="admin-fixed-first-seat"
-                      suffix="EUR"
-                      value={fixedFirstSeatDraft}
-                      onChange={setFixedFirstSeatDraft}
-                      onBlur={commitFixedPlanFromDrafts}
-                    />
-                  </div>
-                </div>
-                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-ordo-violet/30 bg-ordo-violet/5 px-3 py-2.5">
-                  <Label htmlFor="admin-fixed-disc-min" className="text-[11px] font-medium text-white/50">
-                    Fixed · min volume discount
-                  </Label>
-                  <p className="mt-1 text-[10px] leading-snug text-white/45">At 1 seat (seats 2+ discounted).</p>
-                  <div className="mt-auto pt-2">
-                    <InputWithUnitSuffix
-                      id="admin-fixed-disc-min"
-                      suffix="%"
-                      inputMode="numeric"
-                      value={fixedDiscMinDraft}
-                      onChange={setFixedDiscMinDraft}
-                      onBlur={commitFixedPlanFromDrafts}
-                    />
-                  </div>
-                </div>
-                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-ordo-violet/30 bg-ordo-violet/5 px-3 py-2.5">
-                  <Label htmlFor="admin-fixed-disc-max" className="text-[11px] font-medium text-white/50">
-                    Fixed · max volume discount
-                  </Label>
-                  <p className="mt-1 text-[10px] leading-snug text-white/45">At discount cap seat count.</p>
-                  <div className="mt-auto pt-2">
-                    <InputWithUnitSuffix
-                      id="admin-fixed-disc-max"
-                      suffix="%"
-                      inputMode="numeric"
-                      value={fixedDiscMaxDraft}
-                      onChange={setFixedDiscMaxDraft}
-                      onBlur={commitFixedPlanFromDrafts}
-                    />
-                  </div>
-                </div>
-                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-ordo-violet/30 bg-ordo-violet/5 px-3 py-2.5">
-                  <Label htmlFor="admin-fixed-disc-cap" className="text-[11px] font-medium text-white/50">
-                    Fixed · discount cap seats
-                  </Label>
-                  <p className="mt-1 text-[10px] leading-snug text-white/45">Seat count where max discount applies.</p>
-                  <div className="mt-auto pt-2">
-                    <InputWithUnitSuffix
-                      id="admin-fixed-disc-cap"
-                      suffix="Users"
-                      inputMode="numeric"
-                      value={fixedDiscCapDraft}
-                      onChange={setFixedDiscCapDraft}
-                      onBlur={commitFixedPlanFromDrafts}
-                    />
-                  </div>
-                </div>
-                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-ordo-violet/30 bg-ordo-violet/5 px-3 py-2.5">
-                  <Label htmlFor="admin-fixed-max-seats" className="text-[11px] font-medium text-white/50">
-                    Self-serve max seats
-                  </Label>
-                  <p className="mt-1 text-[10px] leading-snug text-white/45">Above this → enterprise contact.</p>
-                  <div className="mt-auto pt-2">
-                    <InputWithUnitSuffix
-                      id="admin-fixed-max-seats"
-                      suffix="Users"
-                      inputMode="numeric"
-                      value={fixedMaxSeatsDraft}
-                      onChange={setFixedMaxSeatsDraft}
-                      onBlur={commitFixedPlanFromDrafts}
-                    />
-                  </div>
-                </div>
-                <div className="flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                  <Label htmlFor="admin-fixed-round-ten" className="text-[11px] font-medium text-white/50">
-                    Fixed annual rounding
-                  </Label>
-                  <p className="mt-1 text-[10px] leading-snug text-white/45">
-                    Round Fixed plan annual checkout totals to the nearest €10 for cleaner Paddle invoices.
-                  </p>
-                  <div className="mt-auto flex items-center gap-2 pt-2">
-                    <Checkbox
-                      id="admin-fixed-round-ten"
-                      checked={fixedAnnualRoundToTen}
-                      onCheckedChange={(v) => setFixedAnnualRoundToTen(v === true)}
-                    />
-                    <Label htmlFor="admin-fixed-round-ten" className="text-xs text-white/60 cursor-pointer">
-                      Round to €10
-                    </Label>
-                  </div>
-                </div>
-              </>
-            }
           />
+
+          <div className="space-y-4 border-t border-white/10 pt-5">
+            <FlexSeatModelRow model={seatModel} onChange={setSeatModel} />
+            <FixedPlanSettingsRow
+              onCommit={commitFixedPlanFromDrafts}
+              fixedAnnualRoundToTen={fixedAnnualRoundToTen}
+              onFixedAnnualRoundToTenChange={setFixedAnnualRoundToTen}
+              drafts={fixedDrafts}
+              setDrafts={setFixedDrafts}
+            />
+            <BillingOpsRow
+              paymentDueDays={paymentDueDays}
+              onPaymentDueDaysChange={setPaymentDueDays}
+              billingTrialDays={billingTrialDays}
+              onBillingTrialDaysChange={setBillingTrialDays}
+              billingGraceDaysAfterDue={billingGraceDaysAfterDue}
+              onBillingGraceDaysAfterDueChange={setBillingGraceDaysAfterDue}
+            />
+          </div>
 
           <p className="text-[10px] text-white/40 leading-relaxed">
             <span className="text-white/55">Invoice due days</span> — days after issue until due.{" "}

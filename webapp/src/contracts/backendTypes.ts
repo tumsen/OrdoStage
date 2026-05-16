@@ -1413,8 +1413,11 @@ export const PublicPlanQuoteQuerySchema = z.object({
 export const PublicPlanQuoteSchema = z.object({
   seats: z.number().int(),
   flexMonthlyMajor: z.number(),
+  fixedMonthlyEquivMajor: z.number(),
   fixedAnnualMonthlyEquivMajor: z.number(),
   fixedAnnualInvoiceMajor: z.number(),
+  monthlyDiscountPercent: z.number(),
+  /** Annual volume discount % at this seat count (legacy field name). */
   discountPercent: z.number(),
   annualSavingMajor: z.number(),
 });

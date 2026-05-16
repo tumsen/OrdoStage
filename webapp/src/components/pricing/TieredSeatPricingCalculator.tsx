@@ -15,8 +15,9 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   annualInvoiceTotalMajor,
-  annualMonthlyEquivMajor,
   annualSavingMajor,
+  fixedAnnualMonthlyEquivMajor,
+  fixedMonthlyEquivMajor,
 } from "@/lib/flexFixedPricing";
 import {
   DEFAULT_FIXED_PLAN_PRICING,
@@ -57,8 +58,10 @@ type Props = {
   onSeatModelChange?: (m: TieredSeatModel) => void;
   /** Rendered after the model price/floor cards (e.g. admin invoice timing fields). */
   afterModelControls?: ReactNode;
-  /** Chart Flex postpaid curve vs Fixed annual monthly equivalent on one graph. */
+  /** Chart Flex postpaid vs Fixed monthly and annual equivalents on one graph. */
   compareFlexFixedPlans?: boolean;
+  /** Admin: Flex curve fields rendered outside the calculator. */
+  hideInlineModelControls?: boolean;
   fixedPlanPricing?: FixedPlanPricingConfig;
   fixedAnnualRoundToTen?: boolean;
 };
@@ -146,6 +149,7 @@ export function TieredSeatPricingCalculator({
   onSeatModelChange,
   afterModelControls,
   compareFlexFixedPlans = false,
+  hideInlineModelControls = false,
   fixedPlanPricing = DEFAULT_FIXED_PLAN_PRICING,
   fixedAnnualRoundToTen = true,
 }: Props) {
@@ -216,7 +220,8 @@ export function TieredSeatPricingCalculator({
           return {
             users: u,
             flexTotal: flexPostpaid,
-            fixedMonthlyEquiv: annualMonthlyEquivMajor(u, fixedPlanPricing),
+            fixedMonthlyEquiv: fixedMonthlyEquivMajor(u, fixedPlanPricing),
+            fixedAnnualMonthlyEquiv: fixedAnnualMonthlyEquivMajor(u, fixedPlanPricing),
           };
         }
         return {
@@ -241,7 +246,8 @@ export function TieredSeatPricingCalculator({
 
   const fixedAtSlider = compareFlexFixedPlans
     ? {
-        monthlyEquiv: annualMonthlyEquivMajor(users, fixedPlanPricing),
+        monthlyEquiv: fixedMonthlyEquivMajor(users, fixedPlanPricing),
+        annualMonthlyEquiv: fixedAnnualMonthlyEquivMajor(users, fixedPlanPricing),
         annualInvoice: annualInvoiceTotalMajor(users, fixedAnnualRoundToTen, fixedPlanPricing),
         savingYear: annualSavingMajor(users, fixedAnnualRoundToTen, fixedPlanPricing),
       }
@@ -372,7 +378,7 @@ export function TieredSeatPricingCalculator({
         className={cn(
           "grid grid-cols-1 items-stretch gap-3",
           compareFlexFixedPlans
-            ? "md:grid-cols-2 lg:grid-cols-4"
+            ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
             : publicAnnualOffered
               ? "md:grid-cols-3"
               : "md:grid-cols-2",
@@ -388,11 +394,18 @@ export function TieredSeatPricingCalculator({
               sub="billed monthly for billable activity"
             />
             <MetricCard
-              label="Fixed (monthly equiv.)"
-              hint="Annual Fixed plan expressed as €/month before ×12 at checkout."
+              label="Fixed monthly"
+              hint="€/month equivalent using the monthly volume discount on seats 2+."
               value={`€${Math.round(fixedAtSlider.monthlyEquiv).toLocaleString()}`}
               valueSuffix="EUR"
-              sub="annual commitment · volume discount on seats 2+"
+              sub="monthly volume discount curve"
+            />
+            <MetricCard
+              label="Fixed annual (€/mo)"
+              hint="€/month equivalent using the annual volume discount (×12 at checkout)."
+              value={`€${Math.round(fixedAtSlider.annualMonthlyEquiv).toLocaleString()}`}
+              valueSuffix="EUR"
+              sub="annual volume discount curve"
             />
             <MetricCard
               label="Fixed (annual invoice)"
@@ -442,7 +455,7 @@ export function TieredSeatPricingCalculator({
         )}
       </div>
 
-      {showModelControls ? (
+      {showModelControls && !hideInlineModelControls ? (
         <>
           <div className="space-y-1">
             <p className="text-xs font-medium uppercase tracking-wide text-white/45">Model settings (illustrative EUR)</p>
@@ -590,7 +603,11 @@ export function TieredSeatPricingCalculator({
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-sm bg-[#a855f7]" aria-hidden />
-                Fixed (monthly equiv.)
+                Fixed monthly
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm border border-[#a855f7] bg-transparent" aria-hidden />
+                Fixed annual (€/mo)
               </span>
             </>
           ) : (
@@ -649,7 +666,8 @@ export function TieredSeatPricingCalculator({
                 }}
                 formatter={(value: number, name: string) => {
                   if (name === "Flex postpaid") return [`€${Math.round(value).toLocaleString()}/mo`, name];
-                  if (name === "Fixed (monthly equiv.)") return [`€${Math.round(value).toLocaleString()}/mo`, name];
+                  if (name === "Fixed monthly") return [`€${Math.round(value).toLocaleString()}/mo`, name];
+                  if (name === "Fixed annual (€/mo)") return [`€${Math.round(value).toLocaleString()}/mo`, name];
                   if (name === "Monthly total") return [`€${Math.round(value).toLocaleString()}/mo`, name];
                   if (name === "Per-user rate") return [`€${Number(value).toFixed(2)}`, name];
                   return [value, name];
@@ -679,12 +697,23 @@ export function TieredSeatPricingCalculator({
                     yAxisId="left"
                     type="monotone"
                     dataKey="fixedMonthlyEquiv"
-                    name="Fixed (monthly equiv.)"
+                    name="Fixed monthly"
                     stroke={CHART_FIXED}
                     strokeWidth={2}
-                    strokeDasharray="6 4"
                     dot={false}
                     activeDot={{ r: 5, fill: CHART_FIXED }}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="fixedAnnualMonthlyEquiv"
+                    name="Fixed annual (€/mo)"
+                    stroke={CHART_FIXED}
+                    strokeWidth={1.5}
+                    strokeDasharray="6 4"
+                    dot={false}
+                    activeDot={{ r: 4, fill: CHART_FIXED }}
                     isAnimationActive={false}
                   />
                 </>

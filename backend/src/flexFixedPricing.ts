@@ -11,9 +11,8 @@ import {
 export const FLEX_FIXED_MIN_SEATS = 1;
 export const FLEX_FIXED_MAX_SEATS = DEFAULT_FIXED_PLAN_PRICING.selfServeMaxSeats;
 export const FLEX_FIXED_DISCOUNT_CAP_SEATS = DEFAULT_FIXED_PLAN_PRICING.discountCapSeats;
-export const FLEX_FIXED_MAX_DISCOUNT_PERCENT = DEFAULT_FIXED_PLAN_PRICING.discountPercentMax;
-export const FIXED_FIRST_SEAT_ANNUAL_MONTHLY_MAJOR =
-  DEFAULT_FIXED_PLAN_PRICING.firstSeatAnnualMonthlyMajor;
+export const FLEX_FIXED_MAX_DISCOUNT_PERCENT = DEFAULT_FIXED_PLAN_PRICING.annualVolumeDiscountPercentMax;
+export const FIXED_FIRST_SEAT_ANNUAL_MONTHLY_MAJOR = DEFAULT_FIXED_PLAN_PRICING.firstSeatMonthlyMajor;
 
 /** Flex marginal €/month for the n-th billable seat (1-based). */
 export function flexMarginalCostMajor(seatIndex: number): number {
@@ -33,32 +32,76 @@ export function flexMonthlyTotalMajor(seats: number): number {
   return total;
 }
 
-/** Linear volume discount for Fixed annual (min% at 1 seat → max% at cap seats). */
-export function annualDiscountPercent(seats: number, config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING): number {
+export type FixedVolumeDiscountPeriod = "monthly" | "annual";
+
+/** Linear volume discount on Fixed seats 2+ (min% at 1 seat → max% at cap seats). */
+export function fixedVolumeDiscountPercent(
+  seats: number,
+  period: FixedVolumeDiscountPeriod,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
   const n = clampSeatCount(seats, config);
   const cap = config.discountCapSeats;
   const capped = Math.min(n, cap);
   const span = Math.max(1, cap - 1);
-  const min = config.discountPercentMin;
-  const max = config.discountPercentMax;
+  const min =
+    period === "monthly"
+      ? config.monthlyVolumeDiscountPercentMin
+      : config.annualVolumeDiscountPercentMin;
+  const max =
+    period === "monthly"
+      ? config.monthlyVolumeDiscountPercentMax
+      : config.annualVolumeDiscountPercentMax;
   const raw = min + ((max - min) / span) * (capped - 1);
   return Math.min(max, raw);
 }
 
-/** Fixed plan monthly equivalent (EUR) before ×12 for invoice. */
-export function annualMonthlyEquivMajor(
+/** @deprecated use fixedVolumeDiscountPercent(seats, "annual", config) */
+export function annualDiscountPercent(
   seats: number,
   config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
 ): number {
+  return fixedVolumeDiscountPercent(seats, "annual", config);
+}
+
+function fixedEquivMajor(
+  seats: number,
+  period: FixedVolumeDiscountPeriod,
+  config: FixedPlanPricingConfig,
+): number {
   const n = clampSeatCount(seats, config);
-  const first = config.firstSeatAnnualMonthlyMajor;
+  const first = config.firstSeatMonthlyMajor;
   if (n === 1) return first;
   let restTotal = 0;
   for (let i = 2; i <= n; i++) {
     restTotal += flexMarginalCostMajor(i);
   }
-  const discount = annualDiscountPercent(n, config) / 100;
+  const discount = fixedVolumeDiscountPercent(n, period, config) / 100;
   return first + restTotal * (1 - discount);
+}
+
+/** Fixed plan €/month equivalent using monthly volume discount (comparison / display). */
+export function fixedMonthlyEquivMajor(
+  seats: number,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
+  return fixedEquivMajor(seats, "monthly", config);
+}
+
+/** Fixed plan €/month equivalent using annual volume discount (×12 for checkout). */
+export function fixedAnnualMonthlyEquivMajor(
+  seats: number,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
+  return fixedEquivMajor(seats, "annual", config);
+}
+
+/** Checkout / annual commitment monthly equivalent (annual discount curve). */
+export function annualMonthlyEquivMajor(
+  seats: number,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
+  return fixedAnnualMonthlyEquivMajor(seats, config);
 }
 
 export function annualInvoiceTotalMajor(
@@ -66,7 +109,7 @@ export function annualInvoiceTotalMajor(
   roundToNearestTenMajor = false,
   config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
 ): number {
-  let annual = annualMonthlyEquivMajor(seats, config) * 12;
+  let annual = fixedAnnualMonthlyEquivMajor(seats, config) * 12;
   if (roundToNearestTenMajor) {
     annual = Math.round(annual / 10) * 10;
   }

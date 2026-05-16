@@ -4,10 +4,11 @@ import { Label } from "@/components/ui/label";
 import { formatEuroMajor } from "@/lib/tieredSeatPricing";
 import {
   FLEX_FIXED_MIN_SEATS,
-  annualDiscountPercent,
   annualInvoiceTotalMajor,
-  annualMonthlyEquivMajor,
   annualSavingMajor,
+  fixedAnnualMonthlyEquivMajor,
+  fixedMonthlyEquivMajor,
+  fixedVolumeDiscountPercent,
   flexMonthlyTotalMajor,
 } from "@/lib/flexFixedPricing";
 import {
@@ -62,9 +63,11 @@ export function FlexFixedPlanComparison({
     return {
       n,
       flexMo: flexMonthlyTotalMajor(n),
-      fixedMo: annualMonthlyEquivMajor(n, fixedPlanPricing),
+      fixedMo: fixedMonthlyEquivMajor(n, fixedPlanPricing),
+      fixedAnnualMo: fixedAnnualMonthlyEquivMajor(n, fixedPlanPricing),
       annual: annualInvoiceTotalMajor(n, roundAnnualToTen, fixedPlanPricing),
-      discount: annualDiscountPercent(n, fixedPlanPricing),
+      monthlyDiscount: fixedVolumeDiscountPercent(n, "monthly", fixedPlanPricing),
+      annualDiscount: fixedVolumeDiscountPercent(n, "annual", fixedPlanPricing),
       saving: annualSavingMajor(n, roundAnnualToTen, fixedPlanPricing),
     };
   }, [seats, roundAnnualToTen, fixedPlanPricing, maxSeats]);
@@ -115,7 +118,7 @@ export function FlexFixedPlanComparison({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-lg font-semibold text-white">Fixed</h3>
             <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
-              {quote.discount.toFixed(1)}% volume discount
+              {quote.monthlyDiscount.toFixed(1)}% mo · {quote.annualDiscount.toFixed(1)}% yr
             </span>
           </div>
           <p className="text-sm text-white/55">
@@ -126,7 +129,13 @@ export function FlexFixedPlanComparison({
             <Metric
               label="Monthly equivalent"
               value={formatEuroMajor(quote.fixedMo)}
-              sub="After volume discount"
+              sub={`${quote.monthlyDiscount.toFixed(1)}% monthly volume discount`}
+              accent="violet"
+            />
+            <Metric
+              label="Annual (€/mo equiv.)"
+              value={formatEuroMajor(quote.fixedAnnualMo)}
+              sub={`${quote.annualDiscount.toFixed(1)}% annual volume discount`}
               accent="violet"
             />
             <Metric

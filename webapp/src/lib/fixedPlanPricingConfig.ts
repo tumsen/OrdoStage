@@ -4,22 +4,30 @@ export const FixedPlanPricingConfigSchema = z.object({
   firstSeatAnnualMonthlyMajor: z.number().finite().min(0).max(10_000).optional(),
   discountPercentMin: z.number().int().min(0).max(100).optional(),
   discountPercentMax: z.number().int().min(0).max(100).optional(),
+  monthlyVolumeDiscountPercentMin: z.number().int().min(0).max(100).optional(),
+  monthlyVolumeDiscountPercentMax: z.number().int().min(0).max(100).optional(),
+  annualVolumeDiscountPercentMin: z.number().int().min(0).max(100).optional(),
+  annualVolumeDiscountPercentMax: z.number().int().min(0).max(100).optional(),
   discountCapSeats: z.number().int().min(1).max(500).optional(),
   selfServeMaxSeats: z.number().int().min(1).max(500).optional(),
 });
 
 export type FixedPlanPricingConfig = {
-  firstSeatAnnualMonthlyMajor: number;
-  discountPercentMin: number;
-  discountPercentMax: number;
+  firstSeatMonthlyMajor: number;
+  monthlyVolumeDiscountPercentMin: number;
+  monthlyVolumeDiscountPercentMax: number;
+  annualVolumeDiscountPercentMin: number;
+  annualVolumeDiscountPercentMax: number;
   discountCapSeats: number;
   selfServeMaxSeats: number;
 };
 
 export const DEFAULT_FIXED_PLAN_PRICING: FixedPlanPricingConfig = {
-  firstSeatAnnualMonthlyMajor: 30,
-  discountPercentMin: 15,
-  discountPercentMax: 42,
+  firstSeatMonthlyMajor: 30,
+  monthlyVolumeDiscountPercentMin: 15,
+  monthlyVolumeDiscountPercentMax: 42,
+  annualVolumeDiscountPercentMin: 15,
+  annualVolumeDiscountPercentMax: 42,
   discountCapSeats: 150,
   selfServeMaxSeats: 150,
 };
@@ -37,18 +45,37 @@ export function parseFixedPlanPricingJson(raw: string | null | undefined): Fixed
 }
 
 function mergeFixedPlanPricing(partial: z.infer<typeof FixedPlanPricingConfigSchema>): FixedPlanPricingConfig {
-  const min = partial.discountPercentMin ?? DEFAULT_FIXED_PLAN_PRICING.discountPercentMin;
-  const max = partial.discountPercentMax ?? DEFAULT_FIXED_PLAN_PRICING.discountPercentMax;
+  const legacyMin = partial.discountPercentMin ?? DEFAULT_FIXED_PLAN_PRICING.monthlyVolumeDiscountPercentMin;
+  const legacyMax = partial.discountPercentMax ?? DEFAULT_FIXED_PLAN_PRICING.monthlyVolumeDiscountPercentMax;
+  const monthlyMin = partial.monthlyVolumeDiscountPercentMin ?? legacyMin;
+  const monthlyMaxRaw = partial.monthlyVolumeDiscountPercentMax ?? legacyMax;
+  const monthlyMax = Math.max(monthlyMin, monthlyMaxRaw);
+  const annualMin = partial.annualVolumeDiscountPercentMin ?? legacyMin;
+  const annualMaxRaw = partial.annualVolumeDiscountPercentMax ?? legacyMax;
+  const annualMax = Math.max(annualMin, annualMaxRaw);
   return {
-    firstSeatAnnualMonthlyMajor:
-      partial.firstSeatAnnualMonthlyMajor ?? DEFAULT_FIXED_PLAN_PRICING.firstSeatAnnualMonthlyMajor,
-    discountPercentMin: min,
-    discountPercentMax: Math.max(min, max),
+    firstSeatMonthlyMajor:
+      partial.firstSeatAnnualMonthlyMajor ?? DEFAULT_FIXED_PLAN_PRICING.firstSeatMonthlyMajor,
+    monthlyVolumeDiscountPercentMin: monthlyMin,
+    monthlyVolumeDiscountPercentMax: monthlyMax,
+    annualVolumeDiscountPercentMin: annualMin,
+    annualVolumeDiscountPercentMax: annualMax,
     discountCapSeats: partial.discountCapSeats ?? DEFAULT_FIXED_PLAN_PRICING.discountCapSeats,
     selfServeMaxSeats: partial.selfServeMaxSeats ?? DEFAULT_FIXED_PLAN_PRICING.selfServeMaxSeats,
   };
 }
 
-export function serializeFixedPlanPricingJson(config: FixedPlanPricingConfig): string {
-  return JSON.stringify(mergeFixedPlanPricing(config));
+export function serializeFixedPlanPricingJson(
+  partial: z.infer<typeof FixedPlanPricingConfigSchema> & Partial<FixedPlanPricingConfig>,
+): string {
+  const merged = mergeFixedPlanPricing(partial);
+  return JSON.stringify({
+    firstSeatAnnualMonthlyMajor: merged.firstSeatMonthlyMajor,
+    monthlyVolumeDiscountPercentMin: merged.monthlyVolumeDiscountPercentMin,
+    monthlyVolumeDiscountPercentMax: merged.monthlyVolumeDiscountPercentMax,
+    annualVolumeDiscountPercentMin: merged.annualVolumeDiscountPercentMin,
+    annualVolumeDiscountPercentMax: merged.annualVolumeDiscountPercentMax,
+    discountCapSeats: merged.discountCapSeats,
+    selfServeMaxSeats: merged.selfServeMaxSeats,
+  });
 }
