@@ -713,10 +713,9 @@ export function TieredSeatPricingCalculator({
                     dataKey="fixedAnnualMonthlyEquiv"
                     name="Fixed annual (€/mo)"
                     stroke={CHART_FIXED_ANNUAL}
-                    strokeWidth={1.5}
-                    strokeDasharray="6 4"
+                    strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 4, fill: CHART_FIXED_ANNUAL }}
+                    activeDot={{ r: 5, fill: CHART_FIXED_ANNUAL }}
                     isAnimationActive={false}
                   />
                 </>
