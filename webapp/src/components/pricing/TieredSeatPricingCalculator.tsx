@@ -331,27 +331,6 @@ export function TieredSeatPricingCalculator({
         </div>
       ) : null}
 
-      <div className="space-y-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <Label htmlFor="seat-slider" className="text-sm text-white/60">
-            Active users
-          </Label>
-          <span className="text-lg font-semibold tabular-nums text-white">
-            {users} <span className="text-sm font-normal text-white/50">users</span>
-          </span>
-        </div>
-        <input
-          id="seat-slider"
-          type="range"
-          min={1}
-          max={sliderMax}
-          step={1}
-          value={users}
-          onChange={(e) => setUsers(clampInt(Number(e.target.value), 1, sliderMax))}
-          className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-ordo-magenta [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-ordo-magenta [&::-webkit-slider-thumb]:shadow-md"
-        />
-      </div>
-
       {publicAnnualOffered && !showModelControls && !compareFlexFixedPlans ? (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
           <Switch
@@ -623,6 +602,27 @@ export function TieredSeatPricingCalculator({
             </>
           )}
         </div>
+      <div className="space-y-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <Label htmlFor="seat-slider" className="text-sm text-white/60">
+            Active users
+          </Label>
+          <span className="text-lg font-semibold tabular-nums text-white">
+            {users} <span className="text-sm font-normal text-white/50">users</span>
+          </span>
+        </div>
+        <input
+          id="seat-slider"
+          type="range"
+          min={1}
+          max={sliderMax}
+          step={1}
+          value={users}
+          onChange={(e) => setUsers(clampInt(Number(e.target.value), 1, sliderMax))}
+          className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-ordo-magenta [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-ordo-magenta [&::-webkit-slider-thumb]:shadow-md"
+        />
+      </div>
+
         <div className="h-[260px] w-full rounded-xl border border-white/10 bg-black/20 p-2 pt-3">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartRows} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
