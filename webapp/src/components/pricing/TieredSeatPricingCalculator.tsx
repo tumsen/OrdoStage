@@ -34,6 +34,7 @@ import {
 
 const CHART_TOTAL = "#ff006e";
 const CHART_FIXED = "#a855f7";
+const CHART_FIXED_ANNUAL = "#22c55e";
 const CHART_PER_USER = "#3a86ff";
 const CHART_GRID = "rgba(255,255,255,0.06)";
 const CHART_AXIS = "rgba(255,255,255,0.38)";
@@ -385,6 +386,7 @@ export function TieredSeatPricingCalculator({
               value={`€${Math.round(fixedAtSlider.annualMonthlyEquiv).toLocaleString()}`}
               valueSuffix="EUR"
               sub="annual volume discount curve"
+              accent="fixedAnnual"
             />
             <MetricCard
               label="Fixed (annual invoice)"
@@ -396,6 +398,7 @@ export function TieredSeatPricingCalculator({
               value={`€${Math.round(fixedAtSlider.annualInvoice).toLocaleString()}`}
               valueSuffix="EUR"
               sub="paid upfront for 12 months"
+              accent="fixedAnnual"
             />
             <MetricCard
               label="vs Flex (year)"
@@ -585,7 +588,7 @@ export function TieredSeatPricingCalculator({
                 Fixed monthly
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm border border-[#a855f7] bg-transparent" aria-hidden />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CHART_FIXED_ANNUAL }} aria-hidden />
                 Fixed annual (€/mo)
               </span>
             </>
@@ -709,11 +712,11 @@ export function TieredSeatPricingCalculator({
                     type="monotone"
                     dataKey="fixedAnnualMonthlyEquiv"
                     name="Fixed annual (€/mo)"
-                    stroke={CHART_FIXED}
+                    stroke={CHART_FIXED_ANNUAL}
                     strokeWidth={1.5}
                     strokeDasharray="6 4"
                     dot={false}
-                    activeDot={{ r: 4, fill: CHART_FIXED }}
+                    activeDot={{ r: 4, fill: CHART_FIXED_ANNUAL }}
                     isAnimationActive={false}
                   />
                 </>
@@ -765,17 +768,23 @@ function MetricCard({
   value,
   valueSuffix,
   sub,
+  accent,
 }: {
   label: string;
   hint?: string;
   value: string;
   valueSuffix?: string;
   sub: string;
+  accent?: "fixedAnnual";
 }) {
+  const border =
+    accent === "fixedAnnual" ? "border-emerald-500/35 bg-emerald-500/10" : "border-white/10 bg-white/[0.04]";
+  const labelClass = accent === "fixedAnnual" ? "text-emerald-200/80" : "text-white/45";
+  const valueClass = accent === "fixedAnnual" ? "text-emerald-300" : "text-white";
   return (
-    <div className="flex min-h-[11rem] flex-col rounded-xl border border-white/10 bg-white/[0.04] p-3 md:min-h-[11.5rem] md:p-4">
+    <div className={cn("flex min-h-[11rem] flex-col rounded-xl border p-3 md:min-h-[11.5rem] md:p-4", border)}>
       <div className="flex shrink-0 items-start justify-between gap-2">
-        <p className="text-[11px] font-medium uppercase leading-snug tracking-wide text-white/45">{label}</p>
+        <p className={cn("text-[11px] font-medium uppercase leading-snug tracking-wide", labelClass)}>{label}</p>
         {valueSuffix ? (
           <span className="shrink-0 rounded border border-white/10 bg-black/30 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/45">
             {valueSuffix}
@@ -783,7 +792,7 @@ function MetricCard({
         ) : null}
       </div>
       {hint ? <p className="mt-1.5 shrink-0 text-[10px] leading-snug text-white/45 line-clamp-4">{hint}</p> : null}
-      <p className="mt-2 shrink-0 text-xl font-semibold tabular-nums text-white md:text-2xl">{value}</p>
+      <p className={cn("mt-2 shrink-0 text-xl font-semibold tabular-nums md:text-2xl", valueClass)}>{value}</p>
       <p className="mt-auto text-[11px] leading-snug text-white/45 line-clamp-3">{sub}</p>
     </div>
   );
