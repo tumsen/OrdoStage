@@ -15,6 +15,7 @@ import {
   DEFAULT_FIXED_PLAN_PRICING,
   type FixedPlanPricingConfig,
 } from "@/lib/fixedPlanPricingConfig";
+import { pricingSeatRangeClass } from "@/components/pricing/pricingSeatRangeClass";
 
 const DEFAULT_SEATS = 10;
 
@@ -97,7 +98,7 @@ export function FlexFixedPlanComparison({
           step={1}
           value={quote.n}
           onChange={(e) => setSeats(clampSeats(Number(e.target.value), maxSeats))}
-          className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-ordo-magenta [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-ordo-magenta"
+          className={pricingSeatRangeClass}
         />
         <p className="text-[11px] text-white/45">
           Fixed caps at {maxSeats} seats for self-serve checkout; larger venues — contact us.

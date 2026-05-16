@@ -23,6 +23,7 @@ import {
   DEFAULT_FIXED_PLAN_PRICING,
   type FixedPlanPricingConfig,
 } from "@/lib/fixedPlanPricingConfig";
+import { pricingSeatRangeClass } from "@/components/pricing/pricingSeatRangeClass";
 import {
   annualMonthlyMultiplier,
   calcMonthlyTotal,
@@ -625,7 +626,7 @@ export function TieredSeatPricingCalculator({
           step={1}
           value={users}
           onChange={(e) => setUsers(clampInt(Number(e.target.value), 1, sliderMax))}
-          className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-ordo-magenta [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/80 [&::-webkit-slider-thumb]:bg-ordo-magenta [&::-webkit-slider-thumb]:shadow-md"
+          className={pricingSeatRangeClass}
         />
       </div>
 
