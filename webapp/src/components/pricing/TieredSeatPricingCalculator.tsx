@@ -15,9 +15,9 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   annualInvoiceTotalMajor,
-  annualSavingMajor,
   fixedAnnualMonthlyEquivMajor,
   fixedMonthlyEquivMajor,
+  fixedVolumeDiscountPercent,
 } from "@/lib/flexFixedPricing";
 import {
   DEFAULT_FIXED_PLAN_PRICING,
@@ -252,7 +252,8 @@ export function TieredSeatPricingCalculator({
         monthlyEquiv: fixedMonthlyEquivMajor(users, fixedPlanPricing),
         annualMonthlyEquiv: fixedAnnualMonthlyEquivMajor(users, fixedPlanPricing),
         annualInvoice: annualInvoiceTotalMajor(users, fixedAnnualRoundToTen, fixedPlanPricing),
-        savingYear: annualSavingMajor(users, fixedAnnualRoundToTen, fixedPlanPricing),
+        monthlyDiscount: fixedVolumeDiscountPercent(users, "monthly", fixedPlanPricing),
+        annualDiscount: fixedVolumeDiscountPercent(users, "annual", fixedPlanPricing),
       }
     : null;
 
@@ -360,7 +361,7 @@ export function TieredSeatPricingCalculator({
         className={cn(
           "grid grid-cols-1 items-stretch gap-3",
           compareFlexFixedPlans
-            ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+            ? "md:grid-cols-3"
             : publicAnnualOffered
               ? "md:grid-cols-3"
               : "md:grid-cols-2",
@@ -369,47 +370,39 @@ export function TieredSeatPricingCalculator({
         {compareFlexFixedPlans && fixedAtSlider ? (
           <>
             <MetricCard
-              label="Flex (monthly)"
-              hint="Postpaid monthly total at this seat count using the Flex seat curve."
-              value={`€${Math.round(baseMonthly).toLocaleString()}`}
-              valueSuffix="EUR"
-              sub="billed monthly for billable activity"
+              label="Flex"
+              value={`€${Math.round(baseMonthly).toLocaleString()}/mo`}
+              equivalent={`€${Math.round(baseMonthly * 12).toLocaleString()}/yr at this seat count`}
+              structure={[
+                `€${model.base}/mo base (includes 1st billable seat)`,
+                `2nd seat +€${model.start}; marginals step to €${model.floor}/seat from seat ${floorAtSafe}+`,
+                "Postpaid monthly along the seat curve — no annual commitment",
+              ]}
               accent="flex"
             />
             <MetricCard
-              label="Fixed monthly"
-              hint="€/month equivalent using the monthly volume discount on seats 2+."
-              value={`€${Math.round(fixedAtSlider.monthlyEquiv).toLocaleString()}`}
-              valueSuffix="EUR"
-              sub="monthly volume discount curve"
+              label="Monthly"
+              value={`€${Math.round(fixedAtSlider.monthlyEquiv).toLocaleString()}/mo`}
+              equivalent={`€${Math.round(fixedAtSlider.monthlyEquiv * 12).toLocaleString()}/yr at this seat count`}
+              structure={[
+                `€${fixedPlanPricing.firstSeatMonthlyMajor}/mo first seat; seats 2+ at Flex marginals`,
+                `${fixedAtSlider.monthlyDiscount.toFixed(1)}% monthly volume discount at ${users} seats`,
+                "Fixed monthly commitment — invoice each month",
+              ]}
               accent="fixedMonthly"
             />
             <MetricCard
-              label="Fixed annual (€/mo)"
-              hint="€/month equivalent using the annual volume discount (×12 at checkout)."
-              value={`€${Math.round(fixedAtSlider.annualMonthlyEquiv).toLocaleString()}`}
-              valueSuffix="EUR"
-              sub="annual volume discount curve"
-              accent="fixedAnnual"
-            />
-            <MetricCard
-              label="Fixed (annual invoice)"
-              hint={
+              label="Yearly"
+              value={`€${Math.round(fixedAtSlider.annualInvoice).toLocaleString()}/yr`}
+              equivalent={`€${Math.round(fixedAtSlider.annualMonthlyEquiv).toLocaleString()}/mo equivalent`}
+              structure={[
+                `€${fixedPlanPricing.firstSeatMonthlyMajor}/mo first seat; seats 2+ at Flex marginals`,
+                `${fixedAtSlider.annualDiscount.toFixed(1)}% annual volume discount at ${users} seats`,
                 fixedAnnualRoundToTen
-                  ? "12× monthly equivalent, rounded to nearest €10 when enabled."
-                  : "12× monthly equivalent at this seat count."
-              }
-              value={`€${Math.round(fixedAtSlider.annualInvoice).toLocaleString()}`}
-              valueSuffix="EUR"
-              sub="paid upfront for 12 months"
+                  ? "Paid upfront in advance for 12 months (total rounded to nearest €10)"
+                  : "Paid upfront in advance for 12 months",
+              ]}
               accent="fixedAnnual"
-            />
-            <MetricCard
-              label="vs Flex (year)"
-              hint="Flex postpaid ×12 minus Fixed annual invoice at this seat count."
-              value={`€${Math.round(fixedAtSlider.savingYear).toLocaleString()}`}
-              valueSuffix="EUR"
-              sub="estimated annual saving on Fixed"
             />
           </>
         ) : (
@@ -770,6 +763,8 @@ function MetricCard({
   hint,
   value,
   valueSuffix,
+  equivalent,
+  structure,
   sub,
   accent,
 }: {
@@ -777,7 +772,9 @@ function MetricCard({
   hint?: string;
   value: string;
   valueSuffix?: string;
-  sub: string;
+  equivalent?: string;
+  structure?: string[];
+  sub?: string;
   accent?: "flex" | "fixedMonthly" | "fixedAnnual";
 }) {
   const border =
@@ -805,7 +802,7 @@ function MetricCard({
           ? "text-blue-300"
           : "text-white";
   return (
-    <div className={cn("flex min-h-[11rem] flex-col rounded-xl border p-3 md:min-h-[11.5rem] md:p-4", border)}>
+    <div className={cn("flex min-h-[14rem] flex-col rounded-xl border p-3 md:min-h-[15rem] md:p-4", border)}>
       <div className="flex shrink-0 items-start justify-between gap-2">
         <p className={cn("text-[11px] font-medium uppercase leading-snug tracking-wide", labelClass)}>{label}</p>
         {valueSuffix ? (
@@ -816,7 +813,17 @@ function MetricCard({
       </div>
       {hint ? <p className="mt-1.5 shrink-0 text-[10px] leading-snug text-white/45 line-clamp-4">{hint}</p> : null}
       <p className={cn("mt-2 shrink-0 text-xl font-semibold tabular-nums md:text-2xl", valueClass)}>{value}</p>
-      <p className="mt-auto text-[11px] leading-snug text-white/45 line-clamp-3">{sub}</p>
+      {equivalent ? (
+        <p className="mt-1 shrink-0 text-sm font-medium tabular-nums text-white/60">{equivalent}</p>
+      ) : null}
+      {structure && structure.length > 0 ? (
+        <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] leading-snug text-white/50 marker:text-white/25">
+          {structure.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      ) : null}
+      {sub ? <p className="mt-auto text-[11px] leading-snug text-white/45 line-clamp-3">{sub}</p> : null}
     </div>
   );
 }
