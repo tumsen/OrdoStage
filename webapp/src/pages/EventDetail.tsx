@@ -40,7 +40,7 @@ import {
 } from "@/lib/stageSize";
 import { cn } from "@/lib/utils";
 import type { Department } from "../../../backend/src/types";
-import { formatDate } from "@/lib/dateUtils";
+import { formatDate, isoDatePrefix } from "@/lib/dateUtils";
 import { DocumentListThumbnail, LocalFileThumbnail } from "@/components/DocumentListThumbnail";
 import { EventStartDateInput } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
@@ -242,7 +242,7 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
     actorCount: e.actorCount != null ? String(e.actorCount) : "",
     allergies: e.allergies ?? "",
     ...decodeToFormFields(e.stageSize),
-    getInDate: g.getInDate,
+    getInDate: isoDatePrefix(g.getInDate) || g.getInDate,
     getInStart: g.getInStart || (e.getInTime ?? ""),
     getInEnd: g.getInEnd,
     getInDuration: g.getInDuration,
@@ -1403,7 +1403,7 @@ function ShowTimeEditor({
   const refDur = useRef<SplitTimeFieldHandle>(null);
 
   useEffect(() => {
-    setShowDate(show.showDate.slice(0, 10));
+    setShowDate(isoDatePrefix(show.showDate) || show.showDate.slice(0, 10));
     setStart(show.showTime);
     setDur(String(show.durationMinutes));
     setEnd(endTimeFromStartAndDuration(show.showTime, show.durationMinutes));

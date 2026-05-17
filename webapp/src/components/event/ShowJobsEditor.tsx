@@ -73,6 +73,9 @@ export function ShowJobsEditor({
     venueId: string;
     personId: string;
   } | null>(null);
+  const [windowOverrides, setWindowOverrides] = useState<
+    Record<string, { startValue: string; endValue: string }>
+  >({});
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["event", eventId] });
@@ -155,7 +158,7 @@ export function ShowJobsEditor({
       ) : null}
 
       {jobs.map((j) => {
-        const w = jobWindow(j, show);
+        const w = windowOverrides[j.id] ?? jobWindow(j, show);
         const isHighlight = Boolean(highlightJobId && j.id === highlightJobId);
         return (
           <div
@@ -188,13 +191,47 @@ export function ShowJobsEditor({
                   const ne = toDatetimeLocalString(
                     new Date(new Date(ns).getTime() + j.durationMinutes * 60_000)
                   );
+                  setWindowOverrides((prev) => ({
+                    ...prev,
+                    [j.id]: { startValue: ns, endValue: ne },
+                  }));
                   const body = rangeToJobBody(ns, ne);
-                  if (body) updateJob.mutate({ jobId: j.id, body });
+                  if (body) {
+                    updateJob.mutate(
+                      { jobId: j.id, body },
+                      {
+                        onSettled: () => {
+                          setWindowOverrides((prev) => {
+                            const next = { ...prev };
+                            delete next[j.id];
+                            return next;
+                          });
+                        },
+                      }
+                    );
+                  }
                 }}
                 onEndChange={(ne) => {
                   if (!canEdit) return;
+                  setWindowOverrides((prev) => ({
+                    ...prev,
+                    [j.id]: { startValue: w.startValue, endValue: ne },
+                  }));
                   const body = rangeToJobBody(w.startValue, ne);
-                  if (body) updateJob.mutate({ jobId: j.id, body });
+                  if (body) {
+                    updateJob.mutate(
+                      { jobId: j.id, body },
+                      {
+                        onSettled: () => {
+                          setWindowOverrides((prev) => {
+                            const next = { ...prev };
+                            delete next[j.id];
+                            return next;
+                          });
+                        },
+                      }
+                    );
+                  }
                 }}
                 className={!canEdit ? "pointer-events-none opacity-70" : undefined}
               />

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { formatDdMmYyyy, formatWeekdayOnly, todayIsoDate } from "@/lib/dateUtils";
@@ -93,6 +93,21 @@ export function DateInputWithWeekday({
   showTodayButton = false,
 }: DateInputWithWeekdayProps) {
   const ref = useRef<HTMLInputElement>(null);
+  const [displayValue, setDisplayValue] = useState(value);
+
+  useEffect(() => {
+    setDisplayValue(value);
+  }, [value]);
+
+  const applyValue = (next: string) => {
+    setDisplayValue(next);
+    if (ref.current) ref.current.value = next;
+    onChange(next);
+  };
+
+  const pickToday = () => {
+    applyValue(todayIsoDate());
+  };
 
   const boxClassName = cn(
     "relative rounded-md border border-white/15 bg-white/[0.04] text-white text-xs",
@@ -104,21 +119,21 @@ export function DateInputWithWeekday({
 
   const dateBox = readOnly ? (
     <div className={cn("inline-flex items-center px-3", boxClassName)}>
-      <DateDisplay value={value} weekdayClassName={weekdayClassName} />
+      <DateDisplay value={displayValue} weekdayClassName={weekdayClassName} />
     </div>
   ) : (
     <div className={boxClassName}>
-      <div className="flex h-full items-center px-3">
-        <DateDisplay value={value} weekdayClassName={weekdayClassName} />
+      <div className="relative z-20 flex h-full items-center px-3 pointer-events-none">
+        <DateDisplay value={displayValue} weekdayClassName={weekdayClassName} />
       </div>
       <input
         ref={ref}
         type="date"
-        value={value}
+        value={displayValue}
         disabled={disabled}
         onClick={() => ref.current?.showPicker?.()}
         onFocus={() => ref.current?.showPicker?.()}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => applyValue(e.target.value)}
         className={cn(
           "absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
           "[color-scheme:dark]",
@@ -141,7 +156,11 @@ export function DateInputWithWeekday({
         size="sm"
         disabled={disabled}
         className="h-8 shrink-0 px-2.5 text-xs text-white/50 hover:bg-white/10 hover:text-white/80"
-        onClick={() => onChange(todayIsoDate())}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          pickToday();
+        }}
       >
         Today
       </Button>

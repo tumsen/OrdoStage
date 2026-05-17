@@ -99,6 +99,13 @@ export function formatDdMmYyyy(value: string | null | undefined): string {
   return `${d}/${mo}/${y}`;
 }
 
+/** `YYYY-MM-DD` prefix from ISO or date-only strings (for date inputs). */
+export function isoDatePrefix(value: string | null | undefined): string {
+  if (!value) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  return m ? m[1]! : "";
+}
+
 export function todayIsoDate(): string {
   const now = new Date();
   const y = now.getFullYear();

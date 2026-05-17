@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { EventStartDateInput } from "@/components/DateInputWithWeekday";
@@ -34,10 +34,15 @@ export function DatetimeScheduleFields({
 
   const sd = parseDatetimeLocal(startValue);
   const ed = parseDatetimeLocal(endValue);
-  const date = sd.date;
+  const parsedDate = sd.date;
+  const [date, setLocalDate] = useState(parsedDate);
   const startT = sd.time;
   const endT = ed.time;
   const hasStartTime = /^\d{2}:\d{2}$/.test(startT);
+
+  useEffect(() => {
+    setLocalDate(parsedDate);
+  }, [parsedDate]);
 
   const durationMin = useMemo(() => {
     if (!startValue || !endValue) return 0;
@@ -45,6 +50,7 @@ export function DatetimeScheduleFields({
   }, [startValue, endValue]);
 
   const setDate = (d: string) => {
+    setLocalDate(d);
     const dur = durationMin;
     const st = startT || "00:00";
     const newStart = buildDatetimeLocal(d, st);
