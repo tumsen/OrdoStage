@@ -357,54 +357,78 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
             <div className="space-y-4 border-t border-white/10 pt-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-ordo-magenta/90">Custom overrides</p>
 
-              <div className="space-y-1">
-                <Label className="text-xs text-white/50">Billing currency</Label>
-                <Input
-                  placeholder="EUR"
-                  value={form.billingCurrencyCode}
-                  onChange={(e) => setForm((p) => ({ ...p, billingCurrencyCode: e.target.value.toUpperCase() }))}
-                />
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+                <Card className="bg-black/25 border border-white/10 shadow-none flex flex-col">
+                  <CardHeader className="p-3 pb-1 space-y-0">
+                    <CardTitle className="text-xs font-medium text-white/70">Billing currency</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-1 flex-1">
+                    <Input
+                      placeholder="EUR"
+                      value={form.billingCurrencyCode}
+                      onChange={(e) => setForm((p) => ({ ...p, billingCurrencyCode: e.target.value.toUpperCase() }))}
+                    />
+                  </CardContent>
+                </Card>
 
-              <div className="space-y-1">
-                <Label className="text-xs text-white/50">Fixed price per billable seat / month (EUR)</Label>
-                <Input
-                  placeholder="Leave empty to use tiered seat curve"
-                  value={form.customUserDailyRateMajor}
-                  onChange={(e) => setForm((p) => ({ ...p, customUserDailyRateMajor: e.target.value }))}
-                />
-              </div>
+                <Card className="bg-black/25 border border-white/10 shadow-none flex flex-col">
+                  <CardHeader className="p-3 pb-1 space-y-0">
+                    <CardTitle className="text-xs font-medium text-white/70">Fixed per seat / mo</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-1 flex-1 space-y-1">
+                    <Input
+                      placeholder="Tiered curve"
+                      value={form.customUserDailyRateMajor}
+                      onChange={(e) => setForm((p) => ({ ...p, customUserDailyRateMajor: e.target.value }))}
+                    />
+                    <p className="text-[10px] text-white/40 leading-snug">EUR. Empty = seat curve.</p>
+                  </CardContent>
+                </Card>
 
-              <div className="space-y-1">
-                <Label className="text-xs text-white/50">Discount on curve subtotal (%)</Label>
-                <Input
-                  inputMode="numeric"
-                  placeholder="e.g. 10"
-                  value={form.customDiscountPercent}
-                  onChange={(e) => setForm((p) => ({ ...p, customDiscountPercent: e.target.value }))}
-                />
-              </div>
+                <Card className="bg-black/25 border border-white/10 shadow-none flex flex-col">
+                  <CardHeader className="p-3 pb-1 space-y-0">
+                    <CardTitle className="text-xs font-medium text-white/70">Discount</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-1 flex-1 space-y-1">
+                    <Input
+                      inputMode="numeric"
+                      placeholder="e.g. 10"
+                      value={form.customDiscountPercent}
+                      onChange={(e) => setForm((p) => ({ ...p, customDiscountPercent: e.target.value }))}
+                    />
+                    <p className="text-[10px] text-white/40 leading-snug">% off curve subtotal.</p>
+                  </CardContent>
+                </Card>
 
-              <div className="space-y-1">
-                <Label className="text-xs text-white/50">Monthly cap (EUR)</Label>
-                <Input
-                  placeholder="e.g. 500"
-                  value={form.customFlatRateMajor}
-                  onChange={(e) => setForm((p) => ({ ...p, customFlatRateMajor: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs text-white/50">Cap applies when active members ≤</Label>
-                <Input
-                  inputMode="numeric"
-                  placeholder="e.g. 25"
-                  value={form.customFlatRateMaxUsers}
-                  onChange={(e) => setForm((p) => ({ ...p, customFlatRateMaxUsers: e.target.value }))}
-                />
-                <p className="text-[11px] text-white/40">
-                  Both cap fields required together ({activeMemberCount} active members now).
-                </p>
+                <Card className="bg-black/25 border border-white/10 shadow-none flex flex-col">
+                  <CardHeader className="p-3 pb-1 space-y-0">
+                    <CardTitle className="text-xs font-medium text-white/70">Monthly cap</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-1 flex-1 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-white/45">Amount (EUR)</Label>
+                        <Input
+                          placeholder="500"
+                          value={form.customFlatRateMajor}
+                          onChange={(e) => setForm((p) => ({ ...p, customFlatRateMajor: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-white/45">Max members</Label>
+                        <Input
+                          inputMode="numeric"
+                          placeholder="25"
+                          value={form.customFlatRateMaxUsers}
+                          onChange={(e) => setForm((p) => ({ ...p, customFlatRateMaxUsers: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-white/40 leading-snug">
+                      Set both or neither · {activeMemberCount} active now
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
 
               <div className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
