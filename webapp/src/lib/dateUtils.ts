@@ -108,8 +108,20 @@ export function isoDatePrefix(value: string | null | undefined): string {
 
 export function todayIsoDate(): string {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return localDateToIso(now);
+}
+
+/** Parse `YYYY-MM-DD` (or ISO prefix) as local calendar midnight. */
+export function isoDateToLocalDate(value: string | null | undefined): Date | undefined {
+  const ymd = isoDatePrefix(value);
+  if (!ymd) return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd);
+  if (!m) return undefined;
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(dt.getTime()) ? undefined : dt;
+}
+
+export function localDateToIso(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
