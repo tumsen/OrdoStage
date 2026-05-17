@@ -9,7 +9,7 @@ VAT: DK28625383
 mail@ordostage.com
 
 Terms of Service
-Last updated: April 2026
+Last updated: May 2026
 
 1. Acceptance of terms
 By creating an account or using Ordo Stage, you agree to these terms. If you don't agree, please don't use the service.
@@ -22,10 +22,19 @@ We are not liable for any loss, corruption, or accidental deletion of your data,
 We reserve the right to modify, suspend, or permanently close Ordo Stage at any time, with or without notice. In the event of a planned closure, we will make reasonable efforts to notify users in advance, but we are not obligated to do so.
 We are not responsible for any losses — financial or otherwise — resulting from the suspension or discontinuation of the service.
 5. Billing and payments
-Ordo Stage uses postpaid invoicing based on monthly usage. Invoices are due within the payment period stated on the invoice (default 7 days).
-If an invoice remains unpaid after the due date, the organization may be switched to view-only mode until payment is received.
-No credit card is required to start. If you decide not to continue, you can simply stop paying.
-Accounts with an unpaid negative balance for 30 days may be permanently deleted, including associated organization data.
+All prices and invoices are in EUR unless we agree otherwise in writing.
+
+Ordo Stage offers two billing plans:
+
+Flex (monthly postpaid)
+Flex bills you each month for billable seats in the previous calendar month, using the tiered seat pricing published on our pricing page. Invoices are typically issued on the 1st for the prior month and are due within the payment period stated on the invoice (default 7 days). No credit card is required to start Flex; if you decide not to continue, you can stop paying and stop using the service. New workspaces may include a trial period where unpaid invoices do not restrict access; after any trial, and where we have configured a grace period, a short grace period may apply after the due date before access is restricted.
+
+Yearly (annual commitment)
+Yearly requires you to commit to a number of seats for 12 months and pay upfront for that commitment at checkout (processed via Paddle). There is no free trial on Yearly. Fees paid for the annual commitment are not refundable, including mid-term seat increases and prorated top-ups, except where mandatory consumer law requires otherwise. If billable activity exceeds your committed seats, the extra seats are invoiced monthly at Flex marginal rates for those months only. You may increase committed seats during the term with a prorated charge; you cannot reduce committed seats during the annual term.
+
+Non-payment
+If an invoice remains unpaid after its due date (and after any applicable grace period), the organisation may be restricted to view-only access until payment is received. Organisations with invoices still unpaid 30 days after the due date may be permanently deleted, including associated organisation data, at our discretion. Deletion is not automatic; we may contact you before taking such action.
+
 6. Limitation of liability
 To the fullest extent permitted by law, Ordo Stage and its operators shall not be liable for any indirect, incidental, special, or consequential damages, including but not limited to loss of data, loss of revenue, or loss of business, arising from your use of or inability to use the service.
 Our total liability to you for any claim shall not exceed the amount you paid to Ordo Stage in the 30 days prior to the claim.
@@ -35,7 +44,7 @@ We may update these terms from time to time. Continued use of the service after 
 These terms are governed by the laws of Denmark. Any disputes shall be subject to the exclusive jurisdiction of the Danish courts.`;
 
 export const DEFAULT_PRIVACY_CONTENT = `Privacy Policy
-Last updated: April 2026
+Last updated: May 2026
 
 1. Who we are
 Ordo Stage is operated by Schwifty, based in Denmark. We are the data controller for any personal data you provide when using our service.
@@ -48,7 +57,7 @@ mail@ordostage.com
 We collect only what's necessary to run the service:
 	•	Account information — name, email address, and any details provided when creating an account or adding users.
 	•	Usage data — how the service is used, for troubleshooting and improving the product.
-	•	Billing information — invoices, payment status, and billing contacts. We do not store full payment card details.
+	•	Billing information — invoices, payment status, and billing contacts. We do not store full payment card details on our servers; Yearly checkout is processed by Paddle, which collects payment data according to its own privacy policy.
 3. Why we collect it
 We use your data to:
 	•	Provide and maintain the Ordo Stage service
@@ -58,7 +67,7 @@ We use your data to:
 
 Our legal basis for processing is contract performance (Art. 6(1)(b) GDPR) — we need your data to deliver the service you've signed up for. For legal compliance, our basis is legal obligation (Art. 6(1)(c)).
 4. Who we share your data with
-We do not sell, rent, or share your personal data with third parties outside our company. Your data stays within Ordo Stage and is only accessed by our team for the purposes described in this policy.
+We do not sell, rent, or share your personal data with third parties outside our company except where needed to operate the service (for example payment processing for Yearly plans via Paddle). Your data stays within Ordo Stage and is only accessed by our team for the purposes described in this policy, except as required for those processors.
 We may disclose data if required to do so by law or a valid legal process.
 5. How long we keep your data
 We keep your data for as long as your account is active. When an account is deleted, all associated personal data is permanently deleted from our systems within 30 days.
@@ -89,12 +98,17 @@ datatilsynet.dk
 We may update this policy from time to time. We will notify you of significant changes by email or via a notice in the service.`;
 
 export const DEFAULT_REFUND_CONTENT = `Refund policy (summary)
-Last updated: April 2026
+Last updated: May 2026
 
-Monthly invoices cover delivered usage and are generally not reversible after payment has settled.
+Yearly plan
+Fees paid for a Yearly annual commitment (including checkout via Paddle and any prorated seat top-ups during the term) are not refundable once paid, except where mandatory consumer law requires otherwise.
+
+Flex plan
+Flex monthly invoices cover delivered usage for that billing period and are generally not reversible after payment has settled.
+
+Billing errors
+For billing mistakes or technical charging errors, contact mail@ordostage.com and we will review your case.
 
 If Ordo Stage is permanently closed, any handling of open or prepaid contractual amounts will follow applicable law and your written agreement.
-
-For billing mistakes or technical charging errors, contact mail@ordostage.com and we will review your case.
 
 This summary reflects section 5 (Billing and payments) of our Terms of Service; in case of conflict, the Terms of Service prevail.`;

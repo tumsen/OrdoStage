@@ -11,21 +11,33 @@ function isLegacyLegalPlaceholder(key: string, dbValue: string): boolean {
   const v = dbValue.trim();
   if (!v) return true;
   if (key === "terms_content") {
+    const hasMay2026FlexYearly =
+      v.includes("Last updated: May 2026") &&
+      v.includes("Flex (monthly postpaid)") &&
+      v.includes("Yearly (annual commitment)");
     return (
       v.startsWith("## Terms of Service") ||
       v.includes("By using OrdoStage") ||
-      (v.length < 800 && !v.includes("Last updated: April 2026"))
+      v.includes("postpaid invoicing based on monthly usage") ||
+      v.includes("unpaid negative balance for 30 days") ||
+      (v.includes("Last updated: April 2026") && !hasMay2026FlexYearly) ||
+      (v.length < 800 && !v.includes("Last updated: May 2026"))
     );
   }
   if (key === "privacy_content") {
     return (
       v.startsWith("## Privacy Policy") ||
       v.includes("OrdoStage stores organization") ||
-      (v.length < 800 && !v.includes("Last updated: April 2026"))
+      (v.includes("Last updated: April 2026") && !v.includes("Last updated: May 2026")) ||
+      (v.length < 800 && !v.includes("Last updated: May 2026"))
     );
   }
   if (key === "refund_content") {
-    return v.startsWith("## Refund Policy");
+    return (
+      v.startsWith("## Refund Policy") ||
+      (v.includes("Last updated: April 2026") && !v.includes("Yearly plan")) ||
+      (!v.includes("Yearly plan") && !v.includes("Last updated: May 2026"))
+    );
   }
   return false;
 }
