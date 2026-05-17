@@ -137,6 +137,34 @@ export function eventCalendarStart(e: EventDetail): string | null {
   return sorted[0] ?? null;
 }
 
+/** Local `YYYY-MM-DD` keys for an event (rollup start + each show). */
+export function eventCalendarDateKeys(e: EventDetail): string[] {
+  const keys = new Set<string>();
+  const add = (raw: string | null | undefined) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec((raw ?? "").trim());
+    if (m) keys.add(m[0]!);
+  };
+  add(eventCalendarStart(e));
+  for (const s of e.shows ?? []) add(s.showDate);
+  return [...keys];
+}
+
+/** True when any show/anchor day falls in inclusive `YYYY-MM-DD` range (empty bound = open). */
+export function eventMatchesDateRange(
+  e: EventDetail,
+  dateFrom: string,
+  dateTo: string,
+): boolean {
+  if (!dateFrom && !dateTo) return true;
+  const dates = eventCalendarDateKeys(e);
+  if (dates.length === 0) return false;
+  return dates.some((d) => {
+    if (dateFrom && d < dateFrom) return false;
+    if (dateTo && d > dateTo) return false;
+    return true;
+  });
+}
+
 export interface ToCalendarItemsOptions {
   /** When set, only include show-job rows assigned to this person (still includes events/bookings as usual). */
   personIdFilter?: string | null;

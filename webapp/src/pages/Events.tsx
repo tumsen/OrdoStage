@@ -12,6 +12,7 @@ import {
   effectiveShowStatus,
   formatPlannedHoursShort,
 } from "@/components/event/EventShowsOverviewGrid";
+import { eventMatchesDateRange } from "@/components/schedule/scheduleUtils";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,9 +66,7 @@ export default function Events() {
 
   const filtered = (events ?? []).filter((e) => {
     if (!eventPassesShowStatusFilter(e, statusFilter)) return false;
-    if (dateFrom && e.startDate && new Date(e.startDate) < new Date(dateFrom)) return false;
-    if (dateTo && e.startDate && new Date(e.startDate) > new Date(dateTo + "T23:59:59")) return false;
-    if ((dateFrom || dateTo) && !e.startDate) return false;
+    if (!eventMatchesDateRange(e, dateFrom, dateTo)) return false;
     return true;
   });
 
@@ -94,9 +93,9 @@ export default function Events() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-          <DateInputWithWeekday value={dateFrom} onChange={setDateFrom} showTodayButton />
+          <DateInputWithWeekday value={dateFrom} onChange={setDateFrom} allowClear />
           <span className="text-white/30 text-xs">to</span>
-          <DateInputWithWeekday value={dateTo} onChange={setDateTo} />
+          <DateInputWithWeekday value={dateTo} onChange={setDateTo} allowClear />
         </div>
         <Button
           onClick={() => navigate("/events/new")}

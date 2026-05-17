@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -76,8 +76,12 @@ type DateInputWithWeekdayProps = {
   weekdayClassName?: string;
   disabled?: boolean;
   readOnly?: boolean;
-  /** Opens a calendar popover with a Today action (not a separate field button). */
+  /** @deprecated Calendar popover is always used; kept for call-site compatibility. */
   showTodayButton?: boolean;
+  /** Today shortcut in the calendar footer (default true). */
+  showTodayInPicker?: boolean;
+  /** Clear shortcut in the calendar footer when a date is set. */
+  allowClear?: boolean;
 };
 
 function DateDisplay({
@@ -106,7 +110,7 @@ function DateDisplay({
   );
 }
 
-/** Event show / get-in date with calendar popover including Today. */
+/** Event schedule date field (same calendar popover as all date inputs). */
 export function EventStartDateInput({
   className,
   weekdayClassName,
@@ -115,7 +119,6 @@ export function EventStartDateInput({
   return (
     <DateInputWithWeekday
       {...props}
-      showTodayButton
       className={cn(eventScheduleDateInputClassName, className)}
       weekdayClassName={weekdayClassName ?? eventScheduleDateWeekdayClassName}
     />
@@ -129,9 +132,9 @@ export function DateInputWithWeekday({
   weekdayClassName,
   disabled,
   readOnly,
-  showTodayButton = false,
+  showTodayInPicker = true,
+  allowClear = false,
 }: DateInputWithWeekdayProps) {
-  const ref = useRef<HTMLInputElement>(null);
   const [displayValue, setDisplayValue] = useState(value);
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState<Date>(() => isoDateToLocalDate(value) ?? new Date());
@@ -144,7 +147,6 @@ export function DateInputWithWeekday({
 
   const applyValue = (next: string) => {
     setDisplayValue(next);
-    if (ref.current) ref.current.value = next;
     onChange(next);
     const d = isoDateToLocalDate(next);
     if (d) setMonth(d);
@@ -152,6 +154,11 @@ export function DateInputWithWeekday({
 
   const pickToday = () => {
     applyValue(todayIsoDate());
+    setOpen(false);
+  };
+
+  const clearDate = () => {
+    applyValue("");
     setOpen(false);
   };
 
@@ -164,6 +171,7 @@ export function DateInputWithWeekday({
   );
 
   const selectedDate = isoDateToLocalDate(displayValue);
+  const showFooter = showTodayInPicker || (allowClear && Boolean(displayValue));
 
   if (readOnly) {
     return (
@@ -173,69 +181,60 @@ export function DateInputWithWeekday({
     );
   }
 
-  if (showTodayButton) {
-    return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            disabled={disabled}
-            className={cn(boxClassName, "inline-flex cursor-pointer items-center px-3 text-left")}
-            aria-label="Choose date"
-            aria-expanded={open}
-          >
-            <DateDisplay value={displayValue} weekdayClassName={weekdayClassName} />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className={CALENDAR_POPOVER_CLASS} align="start">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            month={month}
-            onMonthChange={setMonth}
-            onSelect={(d) => {
-              if (!d) return;
-              applyValue(localDateToIso(d));
-              setOpen(false);
-            }}
-            classNames={CALENDAR_CLASS_NAMES}
-            initialFocus
-          />
-          <div className="border-t border-white/10 p-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 w-full text-xs text-white/70 hover:bg-white/10 hover:text-white"
-              onClick={pickToday}
-            >
-              Today
-            </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
-    );
-  }
-
   return (
-    <div className={boxClassName}>
-      <div className="relative z-20 flex h-full items-center px-3 pointer-events-none">
-        <DateDisplay value={displayValue} weekdayClassName={weekdayClassName} />
-      </div>
-      <input
-        ref={ref}
-        type="date"
-        value={displayValue}
-        disabled={disabled}
-        onClick={() => ref.current?.showPicker?.()}
-        onFocus={() => ref.current?.showPicker?.()}
-        onChange={(e) => applyValue(e.target.value)}
-        className={cn(
-          "absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
-          "[color-scheme:dark]",
-        )}
-        aria-label="Date"
-      />
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className={cn(boxClassName, "inline-flex cursor-pointer items-center px-3 text-left")}
+          aria-label="Choose date"
+          aria-expanded={open}
+        >
+          <DateDisplay value={displayValue} weekdayClassName={weekdayClassName} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className={CALENDAR_POPOVER_CLASS} align="start">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          month={month}
+          onMonthChange={setMonth}
+          onSelect={(d) => {
+            if (!d) return;
+            applyValue(localDateToIso(d));
+            setOpen(false);
+          }}
+          classNames={CALENDAR_CLASS_NAMES}
+          initialFocus
+        />
+        {showFooter ? (
+          <div className="flex gap-1 border-t border-white/10 p-2">
+            {showTodayInPicker ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 flex-1 text-xs text-white/70 hover:bg-white/10 hover:text-white"
+                onClick={pickToday}
+              >
+                Today
+              </Button>
+            ) : null}
+            {allowClear && displayValue ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 flex-1 text-xs text-white/50 hover:bg-white/10 hover:text-white/80"
+                onClick={clearDate}
+              >
+                Clear
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </PopoverContent>
+    </Popover>
   );
 }
