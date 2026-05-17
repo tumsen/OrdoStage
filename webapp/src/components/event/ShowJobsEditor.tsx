@@ -179,7 +179,7 @@ export function ShowJobsEditor({
                 disabled={!canEdit}
               />
             </div>
-            <div className="shrink-0 min-w-0 max-w-full">
+            <div className="shrink-0">
               <DatetimeScheduleFields
                 startValue={w.startValue}
                 endValue={w.endValue}
@@ -299,7 +299,7 @@ export function ShowJobsEditor({
               disabled={!canEdit}
             />
           </div>
-          <div className="shrink-0 min-w-0 max-w-full">
+          <div className="shrink-0">
             <DatetimeScheduleFields
               startValue={draft.startValue}
               endValue={draft.endValue}

@@ -10,7 +10,12 @@ import {
   toDatetimeLocalString,
 } from "@/lib/showTiming";
 
-import { ScheduleTimeRow, scheduleDateInputClass, scheduleFieldLabelClass } from "./ScheduleTimeRow";
+import {
+  ScheduleTimeRow,
+  scheduleDateInputClass,
+  scheduleDateWeekdayClass,
+  scheduleFieldLabelClass,
+} from "./ScheduleTimeRow";
 
 /**
  * Event / booking style: **Date — Start — End — Duration** in one row (local `datetime-local` values).
@@ -97,7 +102,7 @@ export function DatetimeScheduleFields({
           value={date}
           onChange={setDate}
           className={scheduleDateInputClass}
-          weekdayClassName="text-sm text-white/45"
+          weekdayClassName={scheduleDateWeekdayClass}
           showTodayButton
         />
       </div>

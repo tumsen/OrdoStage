@@ -43,7 +43,7 @@ import type { Department } from "../../../backend/src/types";
 import { formatDate } from "@/lib/dateUtils";
 import { DocumentListThumbnail, LocalFileThumbnail } from "@/components/DocumentListThumbnail";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
-import { scheduleDateInputClass } from "@/components/ScheduleTimeRow";
+import { scheduleDateInputClass, scheduleDateWeekdayClass } from "@/components/ScheduleTimeRow";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
@@ -1099,7 +1099,7 @@ function DetailsTab({
                         value={field.value ?? ""}
                         onChange={field.onChange}
                         className={scheduleDateInputClass}
-                        weekdayClassName="text-sm text-white/45"
+                        weekdayClassName={scheduleDateWeekdayClass}
                         showTodayButton
                       />
                     </FormControl>
@@ -1426,7 +1426,7 @@ function ShowTimeEditor({
             onUpdate({ showDate: v });
           }}
           className={scheduleDateInputClass}
-          weekdayClassName="text-sm text-white/45"
+          weekdayClassName={scheduleDateWeekdayClass}
           showTodayButton
         />
       </div>
@@ -2890,7 +2890,7 @@ function ShowsTab({
                 value={newShow.showDate}
                 onChange={(v) => setNewShow((s) => mergeNewShowState(s, { showDate: v }))}
                 className={scheduleDateInputClass}
-                weekdayClassName="text-sm text-white/45"
+                weekdayClassName={scheduleDateWeekdayClass}
                 showTodayButton
               />
             </div>

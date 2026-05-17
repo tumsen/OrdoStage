@@ -1223,8 +1223,6 @@ export default function TimeTracking() {
               const next = dateFromISODate(value);
               if (next) setAnchor(next);
             }}
-            className="h-8 min-h-8 border-white/15 bg-white/[0.04]"
-            weekdayClassName="text-xs text-white/45"
           />
           <Button
             type="button"

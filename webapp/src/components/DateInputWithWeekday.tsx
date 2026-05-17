@@ -4,17 +4,28 @@ import { Button } from "@/components/ui/button";
 import { formatDdMmYyyy, formatWeekdayOnly, todayIsoDate } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 
-/** en-US longest weekday name; used with sizing date for uniform width everywhere. */
-const DATE_INPUT_SIZING_WEEKDAY = "Wednesday";
-/** Widest `DD/MM/YYYY` glyph run (same digit width as tabular dates). */
-const DATE_INPUT_SIZING_DATE = "31/12/2026";
-
-/**
- * Shared width for all date fields: invisible sizing row matches longest weekday + date.
- * Native `<input type="date">` is full-size but invisible; click/focus opens the picker.
- */
+/** Width hugs weekday + date text (same approach as Time tracking nav). */
 export const DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS =
-  "relative inline-flex max-w-full shrink-0";
+  "relative inline-flex w-fit max-w-full shrink-0";
+
+/** Time page week/month anchor — canonical date field styling app-wide. */
+export const timeNavDateInputClassName = cn(
+  "h-8 min-h-8 border-white/15 bg-white/[0.04] text-xs [color-scheme:dark]",
+  DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS,
+);
+
+export const timeNavDateWeekdayClassName = "text-xs text-white/45";
+
+/** Monospace date glyphs (same size as weekday on Time tracking). */
+export const timeNavDateValueClassName =
+  "shrink-0 font-mono text-xs tabular-nums tracking-tight text-white/90";
+
+/** @deprecated Alias — events use the same box as Time tracking, not `h-10`. */
+export const eventScheduleDateInputClassName = timeNavDateInputClassName;
+
+export const eventScheduleDateWeekdayClassName = timeNavDateWeekdayClassName;
+
+const DEFAULT_WEEKDAY_CLASS = timeNavDateWeekdayClassName;
 
 type DateInputWithWeekdayProps = {
   value: string;
@@ -34,31 +45,11 @@ function DateDisplay({
   weekdayClassName?: string;
 }) {
   return (
-    <div className="inline-grid">
-      <div
-        className="col-start-1 row-start-1 flex items-center gap-2 invisible pointer-events-none"
-        aria-hidden
-      >
-        <span className={cn("shrink-0 text-sm whitespace-nowrap", weekdayClassName)}>
-          {DATE_INPUT_SIZING_WEEKDAY}
-        </span>
-        <span className="shrink-0 font-mono text-sm tabular-nums tracking-tight whitespace-nowrap">
-          {DATE_INPUT_SIZING_DATE}
-        </span>
-      </div>
-      <div className="col-start-1 row-start-1 flex items-center gap-2">
-        <span
-          className={cn(
-            "shrink-0 text-sm text-white/55 whitespace-nowrap",
-            weekdayClassName
-          )}
-        >
-          {formatWeekdayOnly(value)}
-        </span>
-        <span className="shrink-0 font-mono text-sm tabular-nums tracking-tight text-white/90 whitespace-nowrap">
-          {formatDdMmYyyy(value)}
-        </span>
-      </div>
+    <div className="flex w-max max-w-full items-center gap-2 whitespace-nowrap text-xs">
+      <span className={cn("shrink-0", weekdayClassName ?? DEFAULT_WEEKDAY_CLASS)}>
+        {formatWeekdayOnly(value)}
+      </span>
+      <span className={timeNavDateValueClassName}>{formatDdMmYyyy(value)}</span>
     </div>
   );
 }
@@ -75,10 +66,10 @@ export function DateInputWithWeekday({
   const ref = useRef<HTMLInputElement>(null);
 
   const boxClassName = cn(
-    className,
-    "relative h-10 min-h-10 rounded-md border border-white/10 bg-white/5 text-white",
-    "focus-within:border-white/30",
+    "relative rounded-md border border-white/15 bg-white/[0.04] text-white text-xs",
+    "h-8 min-h-8 focus-within:border-white/30 [color-scheme:dark]",
     DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS,
+    className,
     disabled && "pointer-events-none opacity-40",
   );
 
@@ -101,7 +92,7 @@ export function DateInputWithWeekday({
         onChange={(e) => onChange(e.target.value)}
         className={cn(
           "absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
-          "[color-scheme:dark]"
+          "[color-scheme:dark]",
         )}
         aria-label="Date"
       />
@@ -120,7 +111,7 @@ export function DateInputWithWeekday({
         variant="ghost"
         size="sm"
         disabled={disabled}
-        className="h-10 shrink-0 px-2.5 text-xs text-white/50 hover:bg-white/10 hover:text-white/80"
+        className="h-8 shrink-0 px-2.5 text-xs text-white/50 hover:bg-white/10 hover:text-white/80"
         onClick={() => onChange(todayIsoDate())}
       >
         Today
