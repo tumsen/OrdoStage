@@ -165,14 +165,13 @@ function BillingTab({ org }: { org: OrgDetail }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <OrgBillingPricingPanel org={org} />
+      <OrgBillingPricingPanel org={org} />
 
-        <Card className="bg-gray-900 border border-white/10">
-          <CardHeader>
-            <CardTitle className="text-white text-base">Latest invoices</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+      <Card className="bg-gray-900 border border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white text-base">Latest invoices</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
             {org.invoices.length === 0 ? (
               <p className="text-sm text-white/40">No invoices generated yet.</p>
             ) : (
@@ -197,9 +196,8 @@ function BillingTab({ org }: { org: OrgDetail }) {
                 </div>
               ))
             )}
-          </CardContent>
-        </Card>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
