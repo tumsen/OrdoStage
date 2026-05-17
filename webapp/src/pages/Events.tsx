@@ -94,19 +94,9 @@ export default function Events() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-          <DateInputWithWeekday
-            value={dateFrom}
-            onChange={setDateFrom}
-            className="h-8 w-[10rem] px-3 text-sm text-white/70"
-            weekdayClassName="text-sm text-white/40"
-          />
+          <DateInputWithWeekday value={dateFrom} onChange={setDateFrom} />
           <span className="text-white/30 text-xs">to</span>
-          <DateInputWithWeekday
-            value={dateTo}
-            onChange={setDateTo}
-            className="h-8 w-[10rem] px-3 text-sm text-white/70"
-            weekdayClassName="text-sm text-white/40"
-          />
+          <DateInputWithWeekday value={dateTo} onChange={setDateTo} />
         </div>
         <Button
           onClick={() => navigate("/events/new")}
