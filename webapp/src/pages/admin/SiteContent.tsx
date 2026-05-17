@@ -1,13 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { SUPPORTED_LANGUAGES, type Language, languageLabel } from "@/lib/preferences";
 import { isPublicFlagOn } from "@/lib/publicSiteFlags";
 import {
@@ -19,6 +22,76 @@ import {
 } from "@/components/ui/select";
 
 type SiteContent = Record<string, string>;
+
+function fitTextareaToContent(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
+function CollapsibleLegalEditor({
+  title,
+  hint,
+  value,
+  onChange,
+}: {
+  title: string;
+  hint: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const trimmed = value.trim();
+  const lineCount = trimmed ? trimmed.split("\n").length : 0;
+  const previewLine = trimmed.split("\n").find((line) => line.trim())?.trim() ?? "";
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    fitTextareaToContent(textareaRef.current);
+  }, [value, open]);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border border-white/10 bg-white/[0.02]">
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-start gap-2 rounded-lg p-4 text-left hover:bg-white/[0.03] transition-colors"
+        >
+          <ChevronDown
+            className={cn(
+              "mt-0.5 h-4 w-4 shrink-0 text-white/40 transition-transform",
+              open && "rotate-180",
+            )}
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1 space-y-1">
+            <span className="text-sm font-semibold text-white">{title}</span>
+            <p className="text-xs text-white/45">{hint}</p>
+            {!open ? (
+              <p className="text-[11px] text-white/35 truncate">
+                {previewLine || "(empty)"}
+                {lineCount > 0 ? ` · ${lineCount} ${lineCount === 1 ? "line" : "lines"}` : ""}
+              </p>
+            ) : null}
+          </div>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-4 pb-4 data-[state=closed]:animate-out">
+        <Textarea
+          ref={textareaRef}
+          className="min-h-[4.5rem] resize-none overflow-hidden bg-gray-900/80 border-white/10 text-sm leading-relaxed"
+          rows={1}
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            fitTextareaToContent(e.target);
+          }}
+        />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 export default function SiteContentAdmin() {
   const { toast } = useToast();
@@ -292,22 +365,24 @@ export default function SiteContentAdmin() {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>Terms of Service</Label>
-        <p className="text-xs text-white/40">Full text shown on /terms-of-service.</p>
-        <Textarea
-          className="min-h-48"
+      <div className="max-w-4xl space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Legal pages</h3>
+          <p className="text-xs text-white/45 mt-1">
+            Full text shown on public legal routes. Collapsed by default — expand to edit.
+          </p>
+        </div>
+        <CollapsibleLegalEditor
+          title="Terms of Service"
+          hint="Shown on /terms-of-service"
           value={merged.terms_content ?? ""}
-          onChange={(e) => setField("terms_content", e.target.value)}
+          onChange={(v) => setField("terms_content", v)}
         />
-      </div>
-      <div className="space-y-2">
-        <Label>Privacy Policy</Label>
-        <p className="text-xs text-white/40">Full text shown on /privacy-policy.</p>
-        <Textarea
-          className="min-h-48"
+        <CollapsibleLegalEditor
+          title="Privacy Policy"
+          hint="Shown on /privacy-policy"
           value={merged.privacy_content ?? ""}
-          onChange={(e) => setField("privacy_content", e.target.value)}
+          onChange={(v) => setField("privacy_content", v)}
         />
       </div>
 
