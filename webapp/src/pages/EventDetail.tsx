@@ -43,6 +43,7 @@ import type { Department } from "../../../backend/src/types";
 import { formatDate } from "@/lib/dateUtils";
 import { DocumentListThumbnail, LocalFileThumbnail } from "@/components/DocumentListThumbnail";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
+import { scheduleDateInputClass } from "@/components/ScheduleTimeRow";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
@@ -1091,14 +1092,15 @@ function DetailsTab({
                 control={form.control}
                 name="getInDate"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="w-max max-w-full">
                     <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in date</FormLabel>
                     <FormControl>
                       <DateInputWithWeekday
                         value={field.value ?? ""}
                         onChange={field.onChange}
-                        className="bg-white/5 border-white/10 text-white [color-scheme:dark]"
+                        className={scheduleDateInputClass}
                         weekdayClassName="text-sm text-white/45"
+                        showTodayButton
                       />
                     </FormControl>
                   </FormItem>
@@ -1423,8 +1425,9 @@ function ShowTimeEditor({
             setShowDate(v);
             onUpdate({ showDate: v });
           }}
-          className="bg-white/5 border-white/10 text-white [color-scheme:dark]"
+          className={scheduleDateInputClass}
           weekdayClassName="text-sm text-white/45"
+          showTodayButton
         />
       </div>
       <div>
@@ -2886,8 +2889,9 @@ function ShowsTab({
               <DateInputWithWeekday
                 value={newShow.showDate}
                 onChange={(v) => setNewShow((s) => mergeNewShowState(s, { showDate: v }))}
-                className="bg-white/5 border-white/10 text-white [color-scheme:dark]"
+                className={scheduleDateInputClass}
                 weekdayClassName="text-sm text-white/45"
+                showTodayButton
               />
             </div>
             <div>

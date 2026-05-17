@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 
-import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
+import {
+  DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS,
+  DateInputWithWeekday,
+} from "@/components/DateInputWithWeekday";
 import { SplitTimeInput } from "@/components/SplitTimeField";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -23,7 +26,10 @@ function formatDurationHint(totalMinutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-const dateInputClass = "bg-white/5 border-white/10 text-white [color-scheme:dark] w-full";
+const dateInputClass = cn(
+  "bg-white/5 border-white/10 text-white [color-scheme:dark]",
+  DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS,
+);
 
 /**
  * Two rows like event **shows** styling: start date + start time, then end date + end time.
@@ -95,29 +101,31 @@ export function DatetimeRangeFields({
         <div
           className={cn(
             "inline-grid grid-cols-[max-content_max-content] gap-x-3 gap-y-3 items-end",
-            "justify-items-stretch"
+            "justify-items-start"
           )}
         >
-          <div className="flex w-full min-w-0 flex-col">
+          <div className="flex w-max max-w-full min-w-0 flex-col">
             <FieldLabel>Start date</FieldLabel>
             <DateInputWithWeekday
               value={startDate}
               onChange={setStartDate}
               className={dateInputClass}
               weekdayClassName="text-sm text-white/45"
+              showTodayButton
             />
           </div>
           <div className="shrink-0 justify-self-start">
             <FieldLabel>Start</FieldLabel>
             <SplitTimeInput value={startT} aria-label="Start time" onChange={setStartTime} />
           </div>
-          <div className="flex w-full min-w-0 flex-col">
+          <div className="flex w-max max-w-full min-w-0 flex-col">
             <FieldLabel>End date</FieldLabel>
             <DateInputWithWeekday
               value={endDate}
               onChange={setEndDate}
               className={dateInputClass}
               weekdayClassName="text-sm text-white/45"
+              showTodayButton
             />
           </div>
           <div className="shrink-0 justify-self-start">

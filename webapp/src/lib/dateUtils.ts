@@ -88,6 +88,15 @@ export function formatWeekdayOnly(value: string | null | undefined): string {
 }
 
 /** `DD/MM/YYYY` from ISO `YYYY-MM-DD` prefix; invalid or empty → em dash. */
+/** Local calendar date as `YYYY-MM-DD` (for `<input type="date">`). */
+export function todayIsoDate(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export function formatDdMmYyyy(value: string | null | undefined): string {
   if (!value) return "—";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());

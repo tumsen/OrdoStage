@@ -1,6 +1,7 @@
 import { useRef } from "react";
 
-import { formatDdMmYyyy, formatWeekdayOnly } from "@/lib/dateUtils";
+import { Button } from "@/components/ui/button";
+import { formatDdMmYyyy, formatWeekdayOnly, todayIsoDate } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,6 +18,7 @@ type DateInputWithWeekdayProps = {
   weekdayClassName?: string;
   disabled?: boolean;
   readOnly?: boolean;
+  showTodayButton?: boolean;
 };
 
 export function DateInputWithWeekday({
@@ -26,6 +28,7 @@ export function DateInputWithWeekday({
   weekdayClassName,
   disabled,
   readOnly,
+  showTodayButton = false,
 }: DateInputWithWeekdayProps) {
   const ref = useRef<HTMLInputElement>(null);
 
@@ -39,38 +42,24 @@ export function DateInputWithWeekday({
       >
         {formatWeekdayOnly(value)}
       </span>
-      {/* Match SplitTimeField time digits: text-sm font-mono tabular-nums */}
       <span className="shrink-0 font-mono text-sm tabular-nums tracking-tight text-white/90 whitespace-nowrap">
         {formatDdMmYyyy(value)}
       </span>
     </div>
   );
 
-  if (readOnly) {
-    return (
-      <div
-        className={cn(
-          "inline-flex h-10 min-h-10 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 text-white",
-          DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS,
-          disabled && "opacity-40",
-          className
-        )}
-      >
-        {display}
-      </div>
-    );
-  }
+  const boxClassName = cn(
+    className,
+    "relative h-10 min-h-10 rounded-md border border-white/10 bg-white/5 text-white",
+    "focus-within:border-white/30",
+    DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS,
+    disabled && "pointer-events-none opacity-40",
+  );
 
-  return (
-    <div
-      className={cn(
-        "relative h-10 min-h-10 rounded-md border border-white/10 bg-white/5 text-white",
-        "focus-within:border-white/30",
-        DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS,
-        disabled && "pointer-events-none opacity-40",
-        className
-      )}
-    >
+  const dateBox = readOnly ? (
+    <div className={cn("inline-flex items-center gap-2 px-3", boxClassName)}>{display}</div>
+  ) : (
+    <div className={boxClassName}>
       <div className="flex h-full items-center px-3">{display}</div>
       <input
         ref={ref}
@@ -86,6 +75,26 @@ export function DateInputWithWeekday({
         )}
         aria-label="Date"
       />
+    </div>
+  );
+
+  if (!showTodayButton || readOnly) {
+    return dateBox;
+  }
+
+  return (
+    <div className="inline-flex max-w-full items-end gap-1.5">
+      {dateBox}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={disabled}
+        className="h-10 shrink-0 px-2.5 text-xs text-white/50 hover:bg-white/10 hover:text-white/80"
+        onClick={() => onChange(todayIsoDate())}
+      >
+        Today
+      </Button>
     </div>
   );
 }
