@@ -34,12 +34,8 @@ import {
   DEFAULT_FIXED_PLAN_PRICING,
   type FixedPlanPricingConfig,
 } from "@/lib/fixedPlanPricingConfig";
-import {
-  PRICING_CHART_MARGIN,
-  PRICING_CHART_Y_AXIS_WIDTH,
-  pricingChartSliderPadding,
-} from "@/components/pricing/pricingChartLayout";
-import { pricingSeatRangeClass } from "@/components/pricing/pricingSeatRangeClass";
+import { PricingChartSeatSlider } from "@/components/pricing/PricingChartSeatSlider";
+import { PRICING_CHART_MARGIN, PRICING_CHART_Y_AXIS_WIDTH } from "@/components/pricing/pricingChartLayout";
 import {
   annualMonthlyMultiplier,
   calcMonthlyTotal,
@@ -609,8 +605,14 @@ export function TieredSeatPricingCalculator({
           </span>
         </div>
 
-        <div className="w-full rounded-xl border border-white/10 bg-black/20 p-2 pt-3 pb-2">
-          <div className="h-[240px] w-full">
+        <div className="w-full rounded-xl border border-white/10 bg-black/20 p-2 pt-3 pb-3">
+          <PricingChartSeatSlider
+            users={users}
+            max={sliderMax}
+            onChange={(n) => setUsers(clampInt(n, 1, sliderMax))}
+            measureKey={`${sliderMax}-${compareFlexFixedPlans ? "compare" : "single"}`}
+            className="h-[240px]"
+          >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartRows} margin={PRICING_CHART_MARGIN}>
               <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
@@ -724,23 +726,7 @@ export function TieredSeatPricingCalculator({
               )}
             </LineChart>
           </ResponsiveContainer>
-          </div>
-          <div
-            className="pt-2"
-            style={pricingChartSliderPadding(!compareFlexFixedPlans)}
-          >
-            <input
-              id="seat-slider"
-              type="range"
-              min={1}
-              max={sliderMax}
-              step={1}
-              value={users}
-              onChange={(e) => setUsers(clampInt(Number(e.target.value), 1, sliderMax))}
-              className={pricingSeatRangeClass}
-              aria-label="Active users"
-            />
-          </div>
+          </PricingChartSeatSlider>
         </div>
       </div>
       </div>
