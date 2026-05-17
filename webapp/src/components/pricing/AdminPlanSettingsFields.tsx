@@ -158,8 +158,6 @@ export function FixedPlanSettingsRow({
   onFixedAnnualRoundToTenChange: (v: boolean) => void;
   drafts: {
     firstSeat: string;
-    monthlyDiscMin: string;
-    monthlyDiscMax: string;
     annualDiscMin: string;
     annualDiscMax: string;
     discCap: string;
@@ -171,8 +169,6 @@ export function FixedPlanSettingsRow({
   setDrafts: React.Dispatch<
     React.SetStateAction<{
       firstSeat: string;
-      monthlyDiscMin: string;
-      monthlyDiscMax: string;
       annualDiscMin: string;
       annualDiscMax: string;
       discCap: string;
@@ -187,7 +183,7 @@ export function FixedPlanSettingsRow({
     <PlanSettingsRow title="Yearly · annual prepay" accentClass="text-ordo-violet/90">
       <CompactField
         id="fixed-first-seat"
-        label="1st seat €/mo"
+        label="1st seat (annual curve)"
         suffix="EUR"
         accent="fixed"
         value={drafts.firstSeat}
@@ -195,28 +191,8 @@ export function FixedPlanSettingsRow({
         onBlur={onCommit}
       />
       <CompactField
-        id="fixed-monthly-disc-min"
-        label="Monthly disc. min"
-        suffix="%"
-        inputMode="numeric"
-        accent="fixed"
-        value={drafts.monthlyDiscMin}
-        onChange={(v) => setDrafts((d) => ({ ...d, monthlyDiscMin: v }))}
-        onBlur={onCommit}
-      />
-      <CompactField
-        id="fixed-monthly-disc-max"
-        label="Monthly disc. max"
-        suffix="%"
-        inputMode="numeric"
-        accent="fixed"
-        value={drafts.monthlyDiscMax}
-        onChange={(v) => setDrafts((d) => ({ ...d, monthlyDiscMax: v }))}
-        onBlur={onCommit}
-      />
-      <CompactField
         id="fixed-annual-disc-min"
-        label="Annual disc. min"
+        label="Volume disc. min"
         suffix="%"
         inputMode="numeric"
         accent="fixed"
@@ -226,7 +202,7 @@ export function FixedPlanSettingsRow({
       />
       <CompactField
         id="fixed-annual-disc-max"
-        label="Annual disc. max"
+        label="Volume disc. max"
         suffix="%"
         inputMode="numeric"
         accent="fixed"

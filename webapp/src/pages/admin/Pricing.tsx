@@ -101,8 +101,6 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
   const initialFixed = mergeFixedPlan(initialData.fixedPlanPricing);
   const [fixedDrafts, setFixedDrafts] = useState(() => ({
     firstSeat: String(initialFixed.firstSeatMonthlyMajor),
-    monthlyDiscMin: String(initialFixed.monthlyVolumeDiscountPercentMin),
-    monthlyDiscMax: String(initialFixed.monthlyVolumeDiscountPercentMax),
     annualDiscMin: String(initialFixed.annualVolumeDiscountPercentMin),
     annualDiscMax: String(initialFixed.annualVolumeDiscountPercentMax),
     discCap: String(initialFixed.discountCapSeats),
@@ -114,8 +112,6 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
 
   function commitFixedPlanFromDrafts(): FixedPlanPricingConfig {
     const first = parseFloat(fixedDrafts.firstSeat.replace(",", "."));
-    const monthlyMin = parseInt(fixedDrafts.monthlyDiscMin, 10);
-    const monthlyMax = parseInt(fixedDrafts.monthlyDiscMax, 10);
     const annualMin = parseInt(fixedDrafts.annualDiscMin, 10);
     const annualMax = parseInt(fixedDrafts.annualDiscMax, 10);
     const cap = parseInt(fixedDrafts.discCap, 10);
@@ -124,12 +120,8 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
     const passPrice = parseFloat(fixedDrafts.passPricePerSeat.replace(",", "."));
     const merged = mergeFixedPlan({
       firstSeatMonthlyMajor: Number.isFinite(first) ? Math.max(0, first) : fixedPlan.firstSeatMonthlyMajor,
-      monthlyVolumeDiscountPercentMin: Number.isFinite(monthlyMin)
-        ? Math.min(100, Math.max(0, monthlyMin))
-        : fixedPlan.monthlyVolumeDiscountPercentMin,
-      monthlyVolumeDiscountPercentMax: Number.isFinite(monthlyMax)
-        ? Math.min(100, Math.max(0, monthlyMax))
-        : fixedPlan.monthlyVolumeDiscountPercentMax,
+      monthlyVolumeDiscountPercentMin: fixedPlan.monthlyVolumeDiscountPercentMin,
+      monthlyVolumeDiscountPercentMax: fixedPlan.monthlyVolumeDiscountPercentMax,
       annualVolumeDiscountPercentMin: Number.isFinite(annualMin)
         ? Math.min(100, Math.max(0, annualMin))
         : fixedPlan.annualVolumeDiscountPercentMin,
@@ -146,17 +138,12 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         ? Math.max(0, passPrice)
         : fixedPlan.temporarySeatPassPricePerSeatMajor,
     });
-    if (merged.monthlyVolumeDiscountPercentMax < merged.monthlyVolumeDiscountPercentMin) {
-      merged.monthlyVolumeDiscountPercentMax = merged.monthlyVolumeDiscountPercentMin;
-    }
     if (merged.annualVolumeDiscountPercentMax < merged.annualVolumeDiscountPercentMin) {
       merged.annualVolumeDiscountPercentMax = merged.annualVolumeDiscountPercentMin;
     }
     setFixedPlan(merged);
     setFixedDrafts({
       firstSeat: String(merged.firstSeatMonthlyMajor),
-      monthlyDiscMin: String(merged.monthlyVolumeDiscountPercentMin),
-      monthlyDiscMax: String(merged.monthlyVolumeDiscountPercentMax),
       annualDiscMin: String(merged.annualVolumeDiscountPercentMin),
       annualDiscMax: String(merged.annualVolumeDiscountPercentMax),
       discCap: String(merged.discountCapSeats),
@@ -227,7 +214,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         {formatEuroMajor(seatModel.floor)} from seat {seatModel.floorAt}+
       </li>
       <li>
-        Yearly first seat: {formatEuroMajor(fixedPlan.firstSeatMonthlyMajor)}/mo · annual volume discount{" "}
+        Yearly first seat: {formatEuroMajor(fixedPlan.firstSeatMonthlyMajor)} · volume discount{" "}
         {fixedPlan.annualVolumeDiscountPercentMin}–{fixedPlan.annualVolumeDiscountPercentMax}% (cap{" "}
         {fixedPlan.discountCapSeats} seats)
       </li>
@@ -262,7 +249,7 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
           <div>
             <CardTitle className="text-white">Flex &amp; Fixed pricing</CardTitle>
             <p className="mt-1 text-xs text-white/50">
-              Flex is monthly postpaid only. Fixed has separate monthly and annual volume discounts. Press{" "}
+              Flex is monthly postpaid only. Yearly uses annual volume discount on the committed-seat curve. Press{" "}
               <span className="text-white/80">Save pricing</span> to persist.
             </p>
           </div>
