@@ -140,6 +140,37 @@ export function fixedOverageMonthlyTotalMajor(billableSeats: number, committedSe
   return total;
 }
 
+export function activeTemporarySeatsBoost(
+  boost: number | null | undefined,
+  expiresAtIso: string | null | undefined,
+  now = new Date(),
+): number {
+  if (boost == null || boost < 1 || !expiresAtIso) return 0;
+  const expiresAt = new Date(expiresAtIso);
+  if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= now.getTime()) return 0;
+  return Math.round(boost);
+}
+
+export function effectiveYearlyCommittedSeats(
+  committedSeats: number,
+  temporaryBoost: number | null | undefined,
+  temporaryBoostExpiresAtIso: string | null | undefined,
+  now = new Date(),
+): number {
+  const committed = Math.max(0, Math.round(committedSeats));
+  return committed + activeTemporarySeatsBoost(temporaryBoost, temporaryBoostExpiresAtIso, now);
+}
+
+export function temporarySeatPassTotalMajor(
+  extraSeats: number,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
+  if (!config.temporarySeatPassEnabled) return 0;
+  const n = Math.max(0, Math.round(extraSeats));
+  if (n < 1) return 0;
+  return n * Math.max(0, config.temporarySeatPassPricePerSeatMajor);
+}
+
 export function requiresEnterpriseContact(
   seats: number,
   config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,

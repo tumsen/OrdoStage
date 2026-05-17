@@ -139,6 +139,49 @@ export async function createPaddleCheckoutForFixedTopUp(input: {
   });
 }
 
+export async function createPaddleCheckoutForTemporarySeatPass(input: {
+  customerId: string;
+  organizationId: string;
+  extraSeats: number;
+  passDays: number;
+  amountCents: number;
+  currencyCode?: string;
+}): Promise<PaddleTransaction> {
+  const amount = Math.max(0, Math.round(input.amountCents)).toString();
+  const currencyCode = (input.currencyCode ?? "EUR").toUpperCase();
+  const extra = Math.max(1, Math.round(input.extraSeats));
+  const days = Math.max(1, Math.round(input.passDays));
+  return paddleRequest<PaddleTransaction>("/transactions", {
+    method: "POST",
+    body: {
+      customer_id: input.customerId,
+      collection_mode: "automatic",
+      currency_code: currencyCode,
+      items: [
+        {
+          quantity: 1,
+          price: {
+            name: `OrdoStage Yearly — ${extra} extra seat${extra === 1 ? "" : "s"} (${days} days)`,
+            description: `Short-term seat pass above your Yearly commitment for ${days} days.`,
+            unit_price: {
+              amount,
+              currency_code: currencyCode,
+            },
+          },
+        },
+      ],
+      custom_data: {
+        organizationId: input.organizationId,
+        billingPlan: "fixed",
+        checkoutKind: "temporary_pass",
+        extraSeats: String(extra),
+        passDays: String(days),
+        passCents: amount,
+      },
+    },
+  });
+}
+
 export async function createPaddleTransactionForInvoice(input: {
   customerId: string;
   invoiceId: string;

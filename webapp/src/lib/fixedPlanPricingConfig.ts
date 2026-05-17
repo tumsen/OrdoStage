@@ -10,6 +10,9 @@ export const FixedPlanPricingConfigSchema = z.object({
   annualVolumeDiscountPercentMax: z.number().int().min(0).max(100).optional(),
   discountCapSeats: z.number().int().min(1).max(500).optional(),
   selfServeMaxSeats: z.number().int().min(1).max(500).optional(),
+  temporarySeatPassEnabled: z.boolean().optional(),
+  temporarySeatPassDays: z.number().int().min(1).max(90).optional(),
+  temporarySeatPassPricePerSeatMajor: z.number().finite().min(0).max(10_000).optional(),
 });
 
 export type FixedPlanPricingConfig = {
@@ -20,6 +23,9 @@ export type FixedPlanPricingConfig = {
   annualVolumeDiscountPercentMax: number;
   discountCapSeats: number;
   selfServeMaxSeats: number;
+  temporarySeatPassEnabled: boolean;
+  temporarySeatPassDays: number;
+  temporarySeatPassPricePerSeatMajor: number;
 };
 
 export const DEFAULT_FIXED_PLAN_PRICING: FixedPlanPricingConfig = {
@@ -30,6 +36,9 @@ export const DEFAULT_FIXED_PLAN_PRICING: FixedPlanPricingConfig = {
   annualVolumeDiscountPercentMax: 42,
   discountCapSeats: 150,
   selfServeMaxSeats: 150,
+  temporarySeatPassEnabled: true,
+  temporarySeatPassDays: 30,
+  temporarySeatPassPricePerSeatMajor: 25,
 };
 
 export function parseFixedPlanPricingJson(raw: string | null | undefined): FixedPlanPricingConfig {
@@ -62,6 +71,11 @@ function mergeFixedPlanPricing(partial: z.infer<typeof FixedPlanPricingConfigSch
     annualVolumeDiscountPercentMax: annualMax,
     discountCapSeats: partial.discountCapSeats ?? DEFAULT_FIXED_PLAN_PRICING.discountCapSeats,
     selfServeMaxSeats: partial.selfServeMaxSeats ?? DEFAULT_FIXED_PLAN_PRICING.selfServeMaxSeats,
+    temporarySeatPassEnabled:
+      partial.temporarySeatPassEnabled ?? DEFAULT_FIXED_PLAN_PRICING.temporarySeatPassEnabled,
+    temporarySeatPassDays: partial.temporarySeatPassDays ?? DEFAULT_FIXED_PLAN_PRICING.temporarySeatPassDays,
+    temporarySeatPassPricePerSeatMajor:
+      partial.temporarySeatPassPricePerSeatMajor ?? DEFAULT_FIXED_PLAN_PRICING.temporarySeatPassPricePerSeatMajor,
   };
 }
 
@@ -77,5 +91,8 @@ export function serializeFixedPlanPricingJson(
     annualVolumeDiscountPercentMax: merged.annualVolumeDiscountPercentMax,
     discountCapSeats: merged.discountCapSeats,
     selfServeMaxSeats: merged.selfServeMaxSeats,
+    temporarySeatPassEnabled: merged.temporarySeatPassEnabled,
+    temporarySeatPassDays: merged.temporarySeatPassDays,
+    temporarySeatPassPricePerSeatMajor: merged.temporarySeatPassPricePerSeatMajor,
   });
 }

@@ -24,6 +24,12 @@ interface OrgBillingData {
   paymentDueDays: number;
   fixedOverageEstimateCents?: number;
   fixedAnnualRoundToTen?: boolean;
+  temporarySeatsBoost?: number | null;
+  temporarySeatsBoostExpiresAt?: string | null;
+  temporarySeatPassEnabled?: boolean;
+  temporarySeatPassDays?: number;
+  temporarySeatPassPricePerSeatMajor?: number;
+  effectiveCommittedSeats?: number | null;
   billingTrialDays?: number;
   billingGraceDaysAfterDue?: number;
   billingOnTrial?: boolean;
@@ -124,6 +130,12 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
         billableCountThisMonth={billable.length}
         isOwner={isOwner}
         fixedAnnualRoundToTen={org?.fixedAnnualRoundToTen !== false}
+        temporarySeatsBoost={org?.temporarySeatsBoost ?? null}
+        temporarySeatsBoostExpiresAt={org?.temporarySeatsBoostExpiresAt ?? null}
+        temporarySeatPassEnabled={org?.temporarySeatPassEnabled !== false}
+        temporarySeatPassDays={org?.temporarySeatPassDays ?? 30}
+        temporarySeatPassPricePerSeatMajor={org?.temporarySeatPassPricePerSeatMajor ?? 25}
+        effectiveCommittedSeats={org?.effectiveCommittedSeats ?? null}
       />
 
       <Card className="bg-gray-900 border-white/10">

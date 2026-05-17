@@ -1445,6 +1445,31 @@ export const FixedSeatIncreaseQuoteSchema = z.object({
   requiresEnterpriseContact: z.boolean(),
 });
 
+export const FixedTemporaryPassQuoteRequestSchema = z.object({
+  extraSeats: z.number().int().min(1).max(200),
+});
+
+export const FixedTemporaryPassQuoteSchema = z.object({
+  extraSeats: z.number().int(),
+  passDays: z.number().int(),
+  pricePerSeatMajor: z.number(),
+  totalCents: z.number().int(),
+  effectiveCommittedSeats: z.number().int(),
+  committedSeats: z.number().int(),
+  temporarySeatPassEnabled: z.boolean(),
+});
+
+export const FixedTemporaryPassCheckoutRequestSchema = z.object({
+  extraSeats: z.number().int().min(1).max(200),
+});
+
+export const FixedTemporaryPassCheckoutResponseSchema = z.object({
+  checkoutUrl: z.string().url().nullable(),
+  totalCents: z.number().int(),
+  extraSeats: z.number().int(),
+  passDays: z.number().int(),
+});
+
 export const OrgBillingPlanSummarySchema = z.object({
   billingPlan: BillingPlanSchema,
   committedSeats: z.number().int().nullable(),

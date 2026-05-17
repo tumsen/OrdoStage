@@ -4,10 +4,13 @@ import { env } from "../env";
 import { auth } from "../auth";
 import {
   annualInvoiceTotalCents,
+  effectiveYearlyCommittedSeats,
   proratedSeatIncreaseTopUpCents,
   requiresEnterpriseContact,
+  temporarySeatPassTotalCents,
 } from "../flexFixedPricing";
 import {
+  applyTemporarySeatPass,
   downgradeFixedPlanAtPeriodEnd,
   increaseFixedCommittedSeats,
   provisionFixedPlanSubscription,
@@ -15,11 +18,17 @@ import {
 import {
   createPaddleCheckoutForFixedPlan,
   createPaddleCheckoutForFixedTopUp,
+  createPaddleCheckoutForTemporarySeatPass,
   createPaddleCustomer,
 } from "../paddleClient";
 import { getBillingConfig, markInvoiceOverdue, markInvoicePaid } from "../postpaidBilling";
 import { prisma } from "../prisma";
-import { FixedCheckoutRequestSchema, FixedSeatIncreaseRequestSchema } from "../types";
+import {
+  FixedCheckoutRequestSchema,
+  FixedSeatIncreaseRequestSchema,
+  FixedTemporaryPassCheckoutRequestSchema,
+  FixedTemporaryPassQuoteRequestSchema,
+} from "../types";
 
 const app = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -53,6 +62,8 @@ type PaddleCustomData = {
   checkoutKind?: string;
   newCommittedSeats?: string;
   topUpCents?: string;
+  extraSeats?: string;
+  passDays?: string;
 };
 
 type PaddleWebhookData = {
@@ -86,14 +97,24 @@ async function handleFixedPlanWebhook(eventType: string, data: PaddleWebhookData
   const organizationId = custom.organizationId?.trim();
   if (!organizationId) return;
 
-  const subscriptionId = data.subscription_id || data.id;
-  if (!subscriptionId) return;
-
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
     select: { id: true },
   });
   if (!org) return;
+
+  const paidEvents = new Set(["transaction.completed", "payment.succeeded"]);
+  if (custom.checkoutKind === "temporary_pass" && paidEvents.has(eventType)) {
+    const extraSeats = parseInt(custom.extraSeats?.trim() || "", 10);
+    const passDays = parseInt(custom.passDays?.trim() || "", 10);
+    if (Number.isFinite(extraSeats) && extraSeats > 0 && Number.isFinite(passDays) && passDays > 0) {
+      await applyTemporarySeatPass(prisma, { organizationId, extraSeats, passDays });
+    }
+    return;
+  }
+
+  const subscriptionId = data.subscription_id || data.id;
+  if (!subscriptionId) return;
 
   const activateEvents = new Set([
     "subscription.activated",
@@ -372,6 +393,121 @@ app.post("/billing/fixed/seat-increase", async (c) => {
       amountCents: topUpCents,
     });
     return c.json({ data: { checkoutUrl: tx.checkout?.url ?? null, topUpCents } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Paddle checkout failed";
+    return c.json({ error: { message, code: "PADDLE_CHECKOUT_FAILED" } }, 502);
+  }
+});
+
+// GET /api/billing/fixed/temporary-pass-quote?extraSeats=
+app.get("/billing/fixed/temporary-pass-quote", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const parsed = FixedTemporaryPassQuoteRequestSchema.safeParse({
+    extraSeats: parseInt(c.req.query("extraSeats") || "0", 10),
+  });
+  if (!parsed.success) {
+    return c.json({ error: { message: "extraSeats must be at least 1", code: "BAD_REQUEST" } }, 400);
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: {
+      billingPlan: true,
+      committedSeats: true,
+      temporarySeatsBoost: true,
+      temporarySeatsBoostExpiresAt: true,
+    },
+  });
+  if (!org || org.billingPlan !== "fixed" || org.committedSeats == null) {
+    return c.json({ error: { message: "Not on Yearly plan", code: "NOT_FIXED" } }, 400);
+  }
+
+  const cfg = await getBillingConfig(prisma);
+  const fp = cfg.fixedPlanPricing;
+  if (!fp.temporarySeatPassEnabled) {
+    return c.json({ error: { message: "Temporary seat passes are disabled", code: "DISABLED" } }, 400);
+  }
+
+  const committed = org.committedSeats;
+  const now = new Date();
+  const effectiveCommitted = effectiveYearlyCommittedSeats(
+    committed,
+    org.temporarySeatsBoost,
+    org.temporarySeatsBoostExpiresAt,
+    now,
+  );
+
+  return c.json({
+    data: {
+      extraSeats: parsed.data.extraSeats,
+      passDays: fp.temporarySeatPassDays,
+      pricePerSeatMajor: fp.temporarySeatPassPricePerSeatMajor,
+      totalCents: temporarySeatPassTotalCents(parsed.data.extraSeats, fp),
+      effectiveCommittedSeats: effectiveCommitted,
+      committedSeats: committed,
+      temporarySeatPassEnabled: true,
+    },
+  });
+});
+
+// POST /api/billing/fixed/temporary-pass-checkout
+app.post("/billing/fixed/temporary-pass-checkout", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (user.orgRole !== "owner") {
+    return c.json({ error: { message: "Only organisation owners can buy seat passes", code: "FORBIDDEN" } }, 403);
+  }
+
+  const body = FixedTemporaryPassCheckoutRequestSchema.parse(await c.req.json());
+  const cfg = await getBillingConfig(prisma);
+  const fp = cfg.fixedPlanPricing;
+  if (!fp.temporarySeatPassEnabled) {
+    return c.json({ error: { message: "Temporary seat passes are disabled", code: "DISABLED" } }, 400);
+  }
+
+  const totalCents = temporarySeatPassTotalCents(body.extraSeats, fp);
+  if (totalCents < 1) {
+    return c.json({ error: { message: "Nothing to charge for this pass", code: "BAD_REQUEST" } }, 400);
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: {
+      id: true,
+      name: true,
+      billingPlan: true,
+      committedSeats: true,
+      paddleCustomerId: true,
+      invoiceEmail: true,
+    },
+  });
+  if (!org || org.billingPlan !== "fixed" || org.committedSeats == null) {
+    return c.json({ error: { message: "Not on Yearly plan", code: "NOT_FIXED" } }, 400);
+  }
+
+  try {
+    const customerId = await ensurePaddleCustomer(org, user.email);
+    const tx = await createPaddleCheckoutForTemporarySeatPass({
+      customerId,
+      organizationId: org.id,
+      extraSeats: body.extraSeats,
+      passDays: fp.temporarySeatPassDays,
+      amountCents: totalCents,
+    });
+    return c.json({
+      data: {
+        checkoutUrl: tx.checkout?.url ?? null,
+        totalCents,
+        extraSeats: body.extraSeats,
+        passDays: fp.temporarySeatPassDays,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Paddle checkout failed";
     return c.json({ error: { message, code: "PADDLE_CHECKOUT_FAILED" } }, 502);

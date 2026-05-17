@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import {
+  effectiveYearlyCommittedSeats,
   INVOICE_KIND,
   fixedOverageMonthlyTotalCents,
   organizationUsesFlexPostpaid,
@@ -18,6 +19,8 @@ export async function generateFixedOverageInvoices(prisma: PrismaClient, runAt =
     select: {
       id: true,
       committedSeats: true,
+      temporarySeatsBoost: true,
+      temporarySeatsBoostExpiresAt: true,
     },
   });
 
@@ -25,6 +28,12 @@ export async function generateFixedOverageInvoices(prisma: PrismaClient, runAt =
   for (const org of orgs) {
     const committed = org.committedSeats ?? 0;
     if (committed < 1) continue;
+    const effectiveCommitted = effectiveYearlyCommittedSeats(
+      committed,
+      org.temporarySeatsBoost,
+      org.temporarySeatsBoostExpiresAt,
+      runAt,
+    );
 
     const existing = await prisma.billingInvoice.findFirst({
       where: {
@@ -44,12 +53,12 @@ export async function generateFixedOverageInvoices(prisma: PrismaClient, runAt =
       targetMonthEnd,
     );
     const billableCount = billableIds.size;
-    if (billableCount <= committed) continue;
+    if (billableCount <= effectiveCommitted) continue;
 
-    const totalCents = fixedOverageMonthlyTotalCents(billableCount, committed);
+    const totalCents = fixedOverageMonthlyTotalCents(billableCount, effectiveCommitted);
     if (totalCents <= 0) continue;
 
-    const overageSeats = billableCount - committed;
+    const overageSeats = billableCount - effectiveCommitted;
     await prisma.billingInvoice.create({
       data: {
         organizationId: org.id,
@@ -65,7 +74,7 @@ export async function generateFixedOverageInvoices(prisma: PrismaClient, runAt =
         currency: "EUR",
         lines: {
           create: {
-            userName: `Fixed overage (${overageSeats} seat${overageSeats === 1 ? "" : "s"} above ${committed})`,
+            userName: `Fixed overage (${overageSeats} seat${overageSeats === 1 ? "" : "s"} above ${effectiveCommitted})`,
             userEmail: null,
             daysConsumed: 1,
             rateCents: totalCents,

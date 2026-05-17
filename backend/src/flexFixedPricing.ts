@@ -177,6 +177,45 @@ export function fixedOverageMonthlyTotalCents(billableSeats: number, committedSe
   return majorToCents(fixedOverageMonthlyTotalMajor(billableSeats, committedSeats));
 }
 
+export function activeTemporarySeatsBoost(
+  boost: number | null | undefined,
+  expiresAt: Date | null | undefined,
+  now = new Date(),
+): number {
+  if (boost == null || boost < 1 || !expiresAt) return 0;
+  if (expiresAt.getTime() <= now.getTime()) return 0;
+  return Math.round(boost);
+}
+
+/** Committed seats plus an active short-term pass boost (Yearly). */
+export function effectiveYearlyCommittedSeats(
+  committedSeats: number,
+  temporaryBoost: number | null | undefined,
+  temporaryBoostExpiresAt: Date | null | undefined,
+  now = new Date(),
+): number {
+  const committed = Math.max(0, Math.round(committedSeats));
+  return committed + activeTemporarySeatsBoost(temporaryBoost, temporaryBoostExpiresAt, now);
+}
+
+/** One-time charge for extra seats on a Yearly short-term pass. */
+export function temporarySeatPassTotalMajor(
+  extraSeats: number,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
+  if (!config.temporarySeatPassEnabled) return 0;
+  const n = Math.max(0, Math.round(extraSeats));
+  if (n < 1) return 0;
+  return n * Math.max(0, config.temporarySeatPassPricePerSeatMajor);
+}
+
+export function temporarySeatPassTotalCents(
+  extraSeats: number,
+  config: FixedPlanPricingConfig = DEFAULT_FIXED_PLAN_PRICING,
+): number {
+  return majorToCents(temporarySeatPassTotalMajor(extraSeats, config));
+}
+
 /** Prorated top-up when increasing committed seats mid-term (0 if newSeats <= oldSeats). */
 export function proratedSeatIncreaseTopUpMajor(
   oldSeats: number,

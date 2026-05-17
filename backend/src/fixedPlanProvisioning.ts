@@ -71,10 +71,34 @@ export async function downgradeFixedPlanAtPeriodEnd(prisma: PrismaClient, organi
     data: {
       billingPlan: "flex",
       committedSeats: null,
+      temporarySeatsBoost: null,
+      temporarySeatsBoostExpiresAt: null,
       annualRenewalDate: null,
       annualTermStartDate: null,
       annualInvoiceAmountCents: null,
       paddleSubscriptionId: null,
+    },
+  });
+}
+
+export async function applyTemporarySeatPass(
+  prisma: PrismaClient,
+  input: {
+    organizationId: string;
+    extraSeats: number;
+    passDays: number;
+  },
+): Promise<void> {
+  const extra = Math.max(1, Math.round(input.extraSeats));
+  const days = Math.max(1, Math.round(input.passDays));
+  const expiresAt = new Date();
+  expiresAt.setUTCDate(expiresAt.getUTCDate() + days);
+
+  await prisma.organization.update({
+    where: { id: input.organizationId },
+    data: {
+      temporarySeatsBoost: extra,
+      temporarySeatsBoostExpiresAt: expiresAt,
     },
   });
 }

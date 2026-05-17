@@ -8,7 +8,11 @@ import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
 import { wipeOrganizationCompletely } from "../deleteOrganizationWipe";
 import { verifyUserCredentialPassword } from "../verifyCredentialPassword";
 import { DistanceUnitSchema, LanguageSchema, TimeFormatSchema } from "../types";
-import { fixedOverageMonthlyTotalCents, organizationUsesFlexPostpaid } from "../flexFixedPricing";
+import {
+  effectiveYearlyCommittedSeats,
+  fixedOverageMonthlyTotalCents,
+  organizationUsesFlexPostpaid,
+} from "../flexFixedPricing";
 import {
   BILLING_CURRENCY_CODE,
   currentUtcMonthRange,
@@ -413,14 +417,22 @@ app.get("/org", async (c) => {
 
   const isFlex = organizationUsesFlexPostpaid(org.billingPlan);
   const committed = org.committedSeats ?? 0;
+  const effectiveCommitted = !isFlex
+    ? effectiveYearlyCommittedSeats(committed, org.temporarySeatsBoost, org.temporarySeatsBoostExpiresAt, now)
+    : committed;
   const fixedOverageEstimateCents =
     !isFlex && committed > 0
-      ? fixedOverageMonthlyTotalCents(billableCount, committed)
+      ? fixedOverageMonthlyTotalCents(billableCount, effectiveCommitted)
       : 0;
+  const fp = billingConfig.fixedPlanPricing;
 
   return c.json({
     data: {
       ...org,
+      effectiveCommittedSeats: effectiveCommitted,
+      temporarySeatPassDays: fp.temporarySeatPassDays,
+      temporarySeatPassPricePerSeatMajor: fp.temporarySeatPassPricePerSeatMajor,
+      temporarySeatPassEnabled: fp.temporarySeatPassEnabled,
       userCount: activeUserCount,
       estimatedMonthlyCents: isFlex ? estimatedMonthlyCents : fixedOverageEstimateCents,
       estimatedCurrencyCode: BILLING_CURRENCY_CODE,

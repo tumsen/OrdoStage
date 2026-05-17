@@ -107,6 +107,9 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
     annualDiscMax: String(initialFixed.annualVolumeDiscountPercentMax),
     discCap: String(initialFixed.discountCapSeats),
     maxSeats: String(initialFixed.selfServeMaxSeats),
+    passEnabled: initialFixed.temporarySeatPassEnabled,
+    passDays: String(initialFixed.temporarySeatPassDays),
+    passPricePerSeat: String(initialFixed.temporarySeatPassPricePerSeatMajor),
   }));
 
   function commitFixedPlanFromDrafts(): FixedPlanPricingConfig {
@@ -117,6 +120,8 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
     const annualMax = parseInt(fixedDrafts.annualDiscMax, 10);
     const cap = parseInt(fixedDrafts.discCap, 10);
     const maxSeats = parseInt(fixedDrafts.maxSeats, 10);
+    const passDays = parseInt(fixedDrafts.passDays, 10);
+    const passPrice = parseFloat(fixedDrafts.passPricePerSeat.replace(",", "."));
     const merged = mergeFixedPlan({
       firstSeatMonthlyMajor: Number.isFinite(first) ? Math.max(0, first) : fixedPlan.firstSeatMonthlyMajor,
       monthlyVolumeDiscountPercentMin: Number.isFinite(monthlyMin)
@@ -133,6 +138,13 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         : fixedPlan.annualVolumeDiscountPercentMax,
       discountCapSeats: Number.isFinite(cap) ? Math.min(500, Math.max(1, cap)) : fixedPlan.discountCapSeats,
       selfServeMaxSeats: Number.isFinite(maxSeats) ? Math.min(500, Math.max(1, maxSeats)) : fixedPlan.selfServeMaxSeats,
+      temporarySeatPassEnabled: fixedDrafts.passEnabled,
+      temporarySeatPassDays: Number.isFinite(passDays)
+        ? Math.min(90, Math.max(1, passDays))
+        : fixedPlan.temporarySeatPassDays,
+      temporarySeatPassPricePerSeatMajor: Number.isFinite(passPrice)
+        ? Math.max(0, passPrice)
+        : fixedPlan.temporarySeatPassPricePerSeatMajor,
     });
     if (merged.monthlyVolumeDiscountPercentMax < merged.monthlyVolumeDiscountPercentMin) {
       merged.monthlyVolumeDiscountPercentMax = merged.monthlyVolumeDiscountPercentMin;
@@ -149,6 +161,9 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
       annualDiscMax: String(merged.annualVolumeDiscountPercentMax),
       discCap: String(merged.discountCapSeats),
       maxSeats: String(merged.selfServeMaxSeats),
+      passEnabled: merged.temporarySeatPassEnabled,
+      passDays: String(merged.temporarySeatPassDays),
+      passPricePerSeat: String(merged.temporarySeatPassPricePerSeatMajor),
     });
     return merged;
   }
@@ -215,6 +230,12 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         Yearly first seat: {formatEuroMajor(fixedPlan.firstSeatMonthlyMajor)}/mo · annual volume discount{" "}
         {fixedPlan.annualVolumeDiscountPercentMin}–{fixedPlan.annualVolumeDiscountPercentMax}% (cap{" "}
         {fixedPlan.discountCapSeats} seats)
+      </li>
+      <li>
+        Short-term seat pass:{" "}
+        {fixedPlan.temporarySeatPassEnabled
+          ? `${fixedPlan.temporarySeatPassDays} days · ${formatEuroMajor(fixedPlan.temporarySeatPassPricePerSeatMajor)}/extra seat`
+          : "disabled"}
       </li>
       <li>
         Self-serve Yearly checkout up to {fixedPlan.selfServeMaxSeats} seats

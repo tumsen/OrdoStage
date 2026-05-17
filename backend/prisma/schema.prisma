@@ -93,6 +93,9 @@ model Organization {
   /** `flex` = monthly postpaid seat curve; `fixed` = annual committed seats (Paddle subscription). */
   billingPlan      String             @default("flex")
   committedSeats   Int?
+  /** Extra seats covered above commitment until temporarySeatsBoostExpiresAt (Yearly short-term pass). */
+  temporarySeatsBoost Int?
+  temporarySeatsBoostExpiresAt DateTime?
   annualRenewalDate DateTime?
   annualTermStartDate DateTime?
   /** Annual invoice total in cents at last Fixed purchase / renewal. */

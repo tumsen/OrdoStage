@@ -247,12 +247,16 @@ export default function PublicPricing() {
           </p>
           <ul className="list-disc pl-5 space-y-3 text-white/80 leading-relaxed marker:text-ordo-yellow">
             <li>
-              <strong className="text-white">Busy month:</strong> seats above commitment are invoiced monthly at Flex
-              marginal rates for that month only.
+              <strong className="text-white">Short burst:</strong> buy a short-term seat pass (typically 30 days) to cover
+              extra seats without changing your annual commitment—priced per extra seat in admin settings.
             </li>
             <li>
-              <strong className="text-white">Growing team:</strong> increase committed seats in billing with a prorated
-              top-up for the rest of the term—you cannot reduce seats during the annual term.
+              <strong className="text-white">Growing team:</strong> raise committed seats in billing with a prorated
+              top-up for the rest of the year—you cannot reduce seats during the annual term.
+            </li>
+            <li>
+              <strong className="text-white">Busy month without a pass:</strong> seats above your effective cover are
+              invoiced monthly at Flex marginal rates for that month only.
             </li>
             <li>
               <strong className="text-white">150+ seats:</strong> contact Ordo Stage for enterprise pricing.

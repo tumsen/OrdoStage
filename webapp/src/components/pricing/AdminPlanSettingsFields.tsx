@@ -164,6 +164,9 @@ export function FixedPlanSettingsRow({
     annualDiscMax: string;
     discCap: string;
     maxSeats: string;
+    passEnabled: boolean;
+    passDays: string;
+    passPricePerSeat: string;
   };
   setDrafts: React.Dispatch<
     React.SetStateAction<{
@@ -174,6 +177,9 @@ export function FixedPlanSettingsRow({
       annualDiscMax: string;
       discCap: string;
       maxSeats: string;
+      passEnabled: boolean;
+      passDays: string;
+      passPricePerSeat: string;
     }>
   >;
 }) {
@@ -248,7 +254,39 @@ export function FixedPlanSettingsRow({
         onChange={(v) => setDrafts((d) => ({ ...d, maxSeats: v }))}
         onBlur={onCommit}
       />
-      <div className="flex min-w-[7.25rem] shrink-0 flex-col justify-end rounded-lg border border-ordo-violet/35 bg-ordo-violet/5 px-2.5 py-2">
+      <CompactField
+        id="fixed-pass-days"
+        label="Short pass days"
+        suffix="Days"
+        inputMode="numeric"
+        accent="fixed"
+        value={drafts.passDays}
+        onChange={(v) => setDrafts((d) => ({ ...d, passDays: v }))}
+        onBlur={onCommit}
+      />
+      <CompactField
+        id="fixed-pass-price"
+        label="Pass €/seat"
+        suffix="EUR"
+        accent="fixed"
+        value={drafts.passPricePerSeat}
+        onChange={(v) => setDrafts((d) => ({ ...d, passPricePerSeat: v }))}
+        onBlur={onCommit}
+      />
+      <div className="flex min-w-[7.25rem] shrink-0 flex-col justify-center gap-2 rounded-lg border border-ordo-violet/35 bg-ordo-violet/5 px-2.5 py-2">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="fixed-pass-enabled"
+            checked={drafts.passEnabled}
+            onCheckedChange={(v) => {
+              setDrafts((d) => ({ ...d, passEnabled: v === true }));
+              onCommit();
+            }}
+          />
+          <Label htmlFor="fixed-pass-enabled" className="text-[10px] text-white/60 cursor-pointer leading-snug">
+            Short-term pass
+          </Label>
+        </div>
         <div className="flex items-center gap-2">
           <Checkbox
             id="fixed-round-ten"
