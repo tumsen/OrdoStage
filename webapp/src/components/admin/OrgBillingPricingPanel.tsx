@@ -80,7 +80,6 @@ function orgHasCustomOverrides(org: OrgBillingPricingOrg): boolean {
 }
 
 type FormState = {
-  billingCurrencyCode: string;
   customUserDailyRateMajor: string;
   customDiscountPercent: string;
   customFlatRateMajor: string;
@@ -98,7 +97,6 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
     mergeSeatModelFromJson(org.customSeatCalculatorJson ?? org.globalDefaultSeatCalculatorJson),
   );
   const [form, setForm] = useState<FormState>(() => ({
-    billingCurrencyCode: org.billingCurrencyCode || "EUR",
     customUserDailyRateMajor: formatEditableMajorFromCents(org.customUserDailyRateCents),
     customDiscountPercent: org.customDiscountPercent == null ? "" : String(org.customDiscountPercent),
     customFlatRateMajor: formatEditableMajorFromCents(org.customFlatRateCents),
@@ -135,7 +133,6 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
 
   useEffect(() => {
     setForm((prev) => ({
-      billingCurrencyCode: org.billingCurrencyCode || "EUR",
       customUserDailyRateMajor: formatEditableMajorFromCents(org.customUserDailyRateCents),
       customDiscountPercent: org.customDiscountPercent == null ? "" : String(org.customDiscountPercent),
       customFlatRateMajor: formatEditableMajorFromCents(org.customFlatRateCents),
@@ -147,7 +144,6 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
     org.customDiscountPercent,
     org.customFlatRateCents,
     org.customFlatRateMaxUsers,
-    org.billingCurrencyCode,
     org.customUserDailyRateCents,
   ]);
 
@@ -171,7 +167,6 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
         customDiscountPercent: null as number | null,
         customFlatRateCents: null as number | null,
         customFlatRateMaxUsers: null as number | null,
-        billingCurrencyCode: org.billingCurrencyCode || "EUR",
         customSeatCalculatorJson: null as string | null,
       };
     }
@@ -183,12 +178,11 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
       customFlatRateCents: flatCents,
       customFlatRateMaxUsers:
         flatMax != null && Number.isFinite(flatMax) && flatMax > 0 ? Math.round(flatMax) : null,
-      billingCurrencyCode: form.billingCurrencyCode.trim().toUpperCase() || "EUR",
       customSeatCalculatorJson: useCustomSeatCurve
         ? JSON.stringify({ model: seatModel, yearlyDiscountPercent: 0, yearlyDiscountEnabled: false })
         : null,
     };
-  }, [form, overrideStandardPricing, useCustomSeatCurve, seatModel, org.billingCurrencyCode]);
+  }, [form, overrideStandardPricing, useCustomSeatCurve, seatModel]);
 
   const previewBillable = useMemo(() => {
     const n = Math.round(Number(form.previewBillableSeats));
@@ -222,7 +216,7 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
     const hasFlat = draftPayload.customFlatRateCents != null;
     const hasMax = draftPayload.customFlatRateMaxUsers != null;
     if (hasFlat !== hasMax) {
-      return "Monthly cap amount and member limit must both be set or both left empty.";
+      return "Flat monthly fee and member limit must both be set or both left empty.";
     }
     if (
       draftPayload.customDiscountPercent != null &&
@@ -241,7 +235,7 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
         customDiscountPercent: draftPayload.customDiscountPercent,
         customFlatRateCents: draftPayload.customFlatRateCents,
         customFlatRateMaxUsers: draftPayload.customFlatRateMaxUsers,
-        billingCurrencyCode: draftPayload.billingCurrencyCode,
+        billingCurrencyCode: "EUR",
       }),
     onSuccess: () => {
       setConfirmOpen(false);
@@ -268,9 +262,6 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
       {overrideStandardPricing ? (
         <>
           <li>
-            Billing currency: <strong className="text-white/90">{draftPayload.billingCurrencyCode}</strong>
-          </li>
-          <li>
             Fixed per-seat:{" "}
             <strong className="text-white/90">
               {draftPayload.customUserDailyRateCents != null
@@ -285,10 +276,10 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
             </strong>
           </li>
           <li>
-            Monthly cap:{" "}
+            Flat monthly fee:{" "}
             <strong className="text-white/90">
               {draftPayload.customFlatRateCents != null && draftPayload.customFlatRateMaxUsers != null
-                ? `${formatEuroMajor(draftPayload.customFlatRateCents / 100)} when ≤ ${draftPayload.customFlatRateMaxUsers} active members`
+                ? `${formatEuroMajor(draftPayload.customFlatRateCents / 100)}/mo when ≤ ${draftPayload.customFlatRateMaxUsers} active members`
                 : "none"}
             </strong>
           </li>
@@ -301,7 +292,7 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
       <li>
         Preview at {previewBillable} billable seats:{" "}
         <strong className="text-white/90">{formatEuroMajor(previewCents / 100)}/mo</strong>
-        {flatCapActive ? " (flat cap applies)" : null}
+        {flatCapActive ? " (flat monthly fee applies)" : null}
       </li>
     </ul>
   );
@@ -357,20 +348,7 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
             <div className="space-y-4 border-t border-white/10 pt-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-ordo-magenta/90">Custom overrides</p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
-                <Card className="bg-black/25 border border-white/10 shadow-none flex flex-col">
-                  <CardHeader className="p-3 pb-1 space-y-0">
-                    <CardTitle className="text-xs font-medium text-white/70">Billing currency</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-3 pt-1 flex-1">
-                    <Input
-                      placeholder="EUR"
-                      value={form.billingCurrencyCode}
-                      onChange={(e) => setForm((p) => ({ ...p, billingCurrencyCode: e.target.value.toUpperCase() }))}
-                    />
-                  </CardContent>
-                </Card>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 items-stretch">
                 <Card className="bg-black/25 border border-white/10 shadow-none flex flex-col">
                   <CardHeader className="p-3 pb-1 space-y-0">
                     <CardTitle className="text-xs font-medium text-white/70">Fixed per seat / mo</CardTitle>
@@ -402,12 +380,15 @@ export function OrgBillingPricingPanel({ org }: { org: OrgBillingPricingOrg }) {
 
                 <Card className="bg-black/25 border border-white/10 shadow-none flex flex-col">
                   <CardHeader className="p-3 pb-1 space-y-0">
-                    <CardTitle className="text-xs font-medium text-white/70">Monthly cap</CardTitle>
+                    <CardTitle className="text-xs font-medium text-white/70">Flat monthly fee</CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 pt-1 flex-1 space-y-2">
+                    <p className="text-[10px] text-white/45 leading-snug">
+                      Replaces per-seat pricing when active members are at or below the limit.
+                    </p>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <Label className="text-[10px] text-white/45">Amount (EUR)</Label>
+                        <Label className="text-[10px] text-white/45">Fee (EUR/mo)</Label>
                         <Input
                           placeholder="500"
                           value={form.customFlatRateMajor}
