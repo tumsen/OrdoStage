@@ -34,6 +34,11 @@ import {
   DEFAULT_FIXED_PLAN_PRICING,
   type FixedPlanPricingConfig,
 } from "@/lib/fixedPlanPricingConfig";
+import {
+  PRICING_CHART_MARGIN,
+  PRICING_CHART_Y_AXIS_WIDTH,
+  pricingChartSliderPadding,
+} from "@/components/pricing/pricingChartLayout";
 import { pricingSeatRangeClass } from "@/components/pricing/pricingSeatRangeClass";
 import {
   annualMonthlyMultiplier,
@@ -603,24 +608,18 @@ export function TieredSeatPricingCalculator({
             {users} <span className="text-sm font-normal text-white/50">users</span>
           </span>
         </div>
-        <input
-          id="seat-slider"
-          type="range"
-          min={1}
-          max={sliderMax}
-          step={1}
-          value={users}
-          onChange={(e) => setUsers(clampInt(Number(e.target.value), 1, sliderMax))}
-          className={pricingSeatRangeClass}
-        />
-      </div>
 
-        <div className="h-[260px] w-full rounded-xl border border-white/10 bg-black/20 p-2 pt-3">
+        <div className="w-full rounded-xl border border-white/10 bg-black/20 p-2 pt-3 pb-2">
+          <div className="h-[240px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartRows} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+            <LineChart data={chartRows} margin={PRICING_CHART_MARGIN}>
               <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
               <XAxis
+                type="number"
                 dataKey="users"
+                domain={[1, sliderMax]}
+                allowDecimals={false}
+                padding={{ left: 0, right: 0 }}
                 tick={{ fill: CHART_AXIS, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
@@ -632,7 +631,7 @@ export function TieredSeatPricingCalculator({
                 tick={{ fill: CHART_TOTAL, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
-                width={44}
+                width={PRICING_CHART_Y_AXIS_WIDTH}
                 tickFormatter={(v) => `€${v}`}
                 label={{ value: "Total €/mo", angle: -90, position: "insideLeft", fill: CHART_TOTAL, fontSize: 11 }}
               />
@@ -643,7 +642,7 @@ export function TieredSeatPricingCalculator({
                   tick={{ fill: CHART_PER_USER, fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
-                  width={44}
+                  width={PRICING_CHART_Y_AXIS_WIDTH}
                   tickFormatter={(v) => `€${v}`}
                   label={{ value: "Per-user €", angle: 90, position: "insideRight", fill: CHART_PER_USER, fontSize: 11 }}
                 />
@@ -725,7 +724,25 @@ export function TieredSeatPricingCalculator({
               )}
             </LineChart>
           </ResponsiveContainer>
+          </div>
+          <div
+            className="pt-2"
+            style={pricingChartSliderPadding(!compareFlexFixedPlans)}
+          >
+            <input
+              id="seat-slider"
+              type="range"
+              min={1}
+              max={sliderMax}
+              step={1}
+              value={users}
+              onChange={(e) => setUsers(clampInt(Number(e.target.value), 1, sliderMax))}
+              className={pricingSeatRangeClass}
+              aria-label="Active users"
+            />
+          </div>
         </div>
+      </div>
       </div>
     </div>
   );

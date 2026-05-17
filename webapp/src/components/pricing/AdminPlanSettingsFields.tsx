@@ -192,7 +192,7 @@ export function FixedPlanSettingsRow({
       />
       <CompactField
         id="fixed-annual-disc-min"
-        label="Volume disc. min"
+        label="Volume discount minimum"
         suffix="%"
         inputMode="numeric"
         accent="fixed"
@@ -202,7 +202,7 @@ export function FixedPlanSettingsRow({
       />
       <CompactField
         id="fixed-annual-disc-max"
-        label="Volume disc. max"
+        label="Volume discount maximum"
         suffix="%"
         inputMode="numeric"
         accent="fixed"
@@ -212,7 +212,7 @@ export function FixedPlanSettingsRow({
       />
       <CompactField
         id="fixed-disc-cap"
-        label="Disc. cap seats"
+        label="Discount cap (seats)"
         suffix="Users"
         inputMode="numeric"
         accent="fixed"
@@ -232,7 +232,7 @@ export function FixedPlanSettingsRow({
       />
       <CompactField
         id="fixed-pass-days"
-        label="Short pass days"
+        label="Temporary pass (days)"
         suffix="Days"
         inputMode="numeric"
         accent="fixed"
@@ -242,7 +242,7 @@ export function FixedPlanSettingsRow({
       />
       <CompactField
         id="fixed-pass-price"
-        label="Pass €/seat"
+        label="Temporary pass (EUR per seat)"
         suffix="EUR"
         accent="fixed"
         value={drafts.passPricePerSeat}
