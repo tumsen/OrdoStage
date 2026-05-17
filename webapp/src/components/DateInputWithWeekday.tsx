@@ -67,6 +67,22 @@ function DateDisplay({
   );
 }
 
+/** Event show / get-in date with Today shortcut and shared schedule styling. */
+export function EventStartDateInput({
+  className,
+  weekdayClassName,
+  ...props
+}: Omit<DateInputWithWeekdayProps, "showTodayButton">) {
+  return (
+    <DateInputWithWeekday
+      {...props}
+      showTodayButton
+      className={cn(eventScheduleDateInputClassName, className)}
+      weekdayClassName={weekdayClassName ?? eventScheduleDateWeekdayClassName}
+    />
+  );
+}
+
 export function DateInputWithWeekday({
   value,
   onChange,

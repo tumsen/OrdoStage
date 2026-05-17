@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
-import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
+import { EventStartDateInput } from "@/components/DateInputWithWeekday";
 import { Label } from "@/components/ui/label";
 import {
   buildDatetimeLocal,
@@ -10,12 +10,7 @@ import {
   toDatetimeLocalString,
 } from "@/lib/showTiming";
 
-import {
-  ScheduleTimeRow,
-  scheduleDateInputClass,
-  scheduleDateWeekdayClass,
-  scheduleFieldLabelClass,
-} from "./ScheduleTimeRow";
+import { ScheduleTimeRow, scheduleFieldLabelClass } from "./ScheduleTimeRow";
 
 /**
  * Event / booking style: **Date — Start — End — Duration** in one row (local `datetime-local` values).
@@ -97,14 +92,8 @@ export function DatetimeScheduleFields({
   return (
     <ScheduleTimeRow className={className}>
       <div className="shrink-0">
-        <Label className={scheduleFieldLabelClass}>Date</Label>
-        <DateInputWithWeekday
-          value={date}
-          onChange={setDate}
-          className={scheduleDateInputClass}
-          weekdayClassName={scheduleDateWeekdayClass}
-          showTodayButton
-        />
+        <Label className={scheduleFieldLabelClass}>Start date</Label>
+        <EventStartDateInput value={date} onChange={setDate} />
       </div>
       <div className="shrink-0">
         <Label className={scheduleFieldLabelClass}>Start</Label>

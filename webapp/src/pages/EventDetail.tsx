@@ -42,8 +42,7 @@ import { cn } from "@/lib/utils";
 import type { Department } from "../../../backend/src/types";
 import { formatDate } from "@/lib/dateUtils";
 import { DocumentListThumbnail, LocalFileThumbnail } from "@/components/DocumentListThumbnail";
-import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
-import { scheduleDateInputClass, scheduleDateWeekdayClass } from "@/components/ScheduleTimeRow";
+import { EventStartDateInput } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
@@ -1095,13 +1094,9 @@ function DetailsTab({
                   <FormItem className="shrink-0">
                     <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in date</FormLabel>
                     <FormControl>
-                      <DateInputWithWeekday
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        className={scheduleDateInputClass}
-                        weekdayClassName={scheduleDateWeekdayClass}
-                        showTodayButton
-                      />
+                      <div className="shrink-0">
+                        <EventStartDateInput value={field.value ?? ""} onChange={field.onChange} />
+                      </div>
                     </FormControl>
                   </FormItem>
                 )}
@@ -1417,17 +1412,14 @@ function ShowTimeEditor({
 
   return (
     <div className="flex flex-wrap items-end gap-3">
-      <div>
-        <FieldLabel>Date</FieldLabel>
-        <DateInputWithWeekday
+      <div className="shrink-0">
+        <FieldLabel>Start date</FieldLabel>
+        <EventStartDateInput
           value={showDate}
           onChange={(v) => {
             setShowDate(v);
             onUpdate({ showDate: v });
           }}
-          className={scheduleDateInputClass}
-          weekdayClassName={scheduleDateWeekdayClass}
-          showTodayButton
         />
       </div>
       <div>
@@ -2884,14 +2876,11 @@ function ShowsTab({
       {creating ? (
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
           <div className="flex flex-nowrap items-end gap-3 min-w-0 overflow-x-auto pb-0.5">
-            <div>
-              <FieldLabel>Date</FieldLabel>
-              <DateInputWithWeekday
+            <div className="shrink-0">
+              <FieldLabel>Start date</FieldLabel>
+              <EventStartDateInput
                 value={newShow.showDate}
                 onChange={(v) => setNewShow((s) => mergeNewShowState(s, { showDate: v }))}
-                className={scheduleDateInputClass}
-                weekdayClassName={scheduleDateWeekdayClass}
-                showTodayButton
               />
             </div>
             <div>

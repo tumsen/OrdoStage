@@ -1,10 +1,6 @@
 import { useMemo } from "react";
 
-import {
-  DateInputWithWeekday,
-  eventScheduleDateInputClassName,
-  eventScheduleDateWeekdayClassName,
-} from "@/components/DateInputWithWeekday";
+import { EventStartDateInput } from "@/components/DateInputWithWeekday";
 import { SplitTimeInput } from "@/components/SplitTimeField";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -26,8 +22,6 @@ function formatDurationHint(totalMinutes: number): string {
   const m = totalMinutes % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
-
-const dateInputClass = eventScheduleDateInputClassName;
 
 /**
  * Two rows like event **shows** styling: start date + start time, then end date + end time.
@@ -104,13 +98,7 @@ export function DatetimeRangeFields({
         >
           <div className="flex shrink-0 flex-col">
             <FieldLabel>Start date</FieldLabel>
-            <DateInputWithWeekday
-              value={startDate}
-              onChange={setStartDate}
-              className={dateInputClass}
-              weekdayClassName={eventScheduleDateWeekdayClassName}
-              showTodayButton
-            />
+            <EventStartDateInput value={startDate} onChange={setStartDate} />
           </div>
           <div className="shrink-0 justify-self-start">
             <FieldLabel>Start</FieldLabel>
@@ -118,13 +106,7 @@ export function DatetimeRangeFields({
           </div>
           <div className="flex shrink-0 flex-col">
             <FieldLabel>End date</FieldLabel>
-            <DateInputWithWeekday
-              value={endDate}
-              onChange={setEndDate}
-              className={dateInputClass}
-              weekdayClassName={eventScheduleDateWeekdayClassName}
-              showTodayButton
-            />
+            <EventStartDateInput value={endDate} onChange={setEndDate} />
           </div>
           <div className="shrink-0 justify-self-start">
             <FieldLabel>End</FieldLabel>

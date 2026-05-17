@@ -94,7 +94,7 @@ export default function Events() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-          <DateInputWithWeekday value={dateFrom} onChange={setDateFrom} />
+          <DateInputWithWeekday value={dateFrom} onChange={setDateFrom} showTodayButton />
           <span className="text-white/30 text-xs">to</span>
           <DateInputWithWeekday value={dateTo} onChange={setDateTo} />
         </div>
