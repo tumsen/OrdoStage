@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { ConfirmPricingSaveDialog } from "@/components/admin/ConfirmPricingSaveDialog";
+import { formatEuroMajor } from "@/lib/tieredSeatPricing";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -83,6 +85,7 @@ type BillingEditorProps = {
  */
 function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorProps) {
   const { toast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [paymentDueDays, setPaymentDueDays] = useState(() => String(initialData.paymentDueDays));
   const [billingTrialDays, setBillingTrialDays] = useState(() => String(initialData.billingTrialDays ?? 0));
   const [billingGraceDaysAfterDue, setBillingGraceDaysAfterDue] = useState(() =>
@@ -181,11 +184,12 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
       });
     },
     onSuccess: async (saved) => {
+      setConfirmOpen(false);
       queryClient.setQueryData(["admin", "billing-settings"], saved);
       await queryClient.refetchQueries({ queryKey: ["public-pricing-rates"], type: "all" });
       toast({
         title: "Pricing updated",
-        description: "Flex curve, Fixed plan settings, and billing defaults are saved.",
+        description: "Flex curve, Yearly plan settings, and billing defaults are saved.",
       });
     },
     onError: (err) => {
@@ -200,6 +204,28 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
       toast({ title: "Snapshot completed", description: "Billing activity snapshots updated." });
     },
   });
+
+  const confirmDescription = (
+    <ul className="list-disc pl-4 space-y-1">
+      <li>
+        Flex curve: base {formatEuroMajor(seatModel.base)}, 2nd seat {formatEuroMajor(seatModel.start)}, floor{" "}
+        {formatEuroMajor(seatModel.floor)} from seat {seatModel.floorAt}+
+      </li>
+      <li>
+        Yearly first seat: {formatEuroMajor(fixedPlan.firstSeatMonthlyMajor)}/mo · annual volume discount{" "}
+        {fixedPlan.annualVolumeDiscountPercentMin}–{fixedPlan.annualVolumeDiscountPercentMax}% (cap{" "}
+        {fixedPlan.discountCapSeats} seats)
+      </li>
+      <li>
+        Self-serve Yearly checkout up to {fixedPlan.selfServeMaxSeats} seats
+        {fixedAnnualRoundToTen ? " · annual total rounded to €10" : ""}
+      </li>
+      <li>
+        Invoice due {paymentDueDays} days · trial {billingTrialDays} days · grace {billingGraceDaysAfterDue} days
+      </li>
+      <li className="text-ordo-yellow/90">Public pricing and new org estimates update immediately.</li>
+    </ul>
+  );
 
   const invoiceMutation = useMutation({
     mutationFn: () => api.post("/api/admin/billing/generate-invoices"),
@@ -223,10 +249,13 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
             type="button"
             size="lg"
             className="h-11 w-full shrink-0 bg-rose-600 px-8 text-base font-semibold hover:bg-rose-500 sm:w-auto"
-            onClick={() => saveMutation.mutate()}
+            onClick={() => {
+              commitFixedPlanFromDrafts();
+              setConfirmOpen(true);
+            }}
             disabled={saveMutation.isPending}
           >
-            {saveMutation.isPending ? "Saving…" : "Save pricing"}
+            Save pricing…
           </Button>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -286,6 +315,16 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
         The EUR row in the billing database is updated from the first-seat tier total for compatibility with legacy
         summaries. Organizations can still set a fixed per-seat override on their org detail billing tab.
       </p>
+
+      <ConfirmPricingSaveDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Update global pricing?"
+        description={confirmDescription}
+        confirmLabel="Update global pricing"
+        pending={saveMutation.isPending}
+        onConfirm={() => saveMutation.mutate()}
+      />
     </div>
   );
 }

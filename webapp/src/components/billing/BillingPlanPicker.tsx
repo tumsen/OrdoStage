@@ -16,6 +16,7 @@ import {
   requiresEnterpriseContact,
 } from "@/lib/flexFixedPricing";
 import { FlexFixedPlanComparison } from "@/components/pricing/FlexFixedPlanComparison";
+import { pricingSeatRangeClass } from "@/components/pricing/pricingSeatRangeClass";
 import { z } from "zod";
 import type {
   FixedCheckoutResponseSchema,
@@ -70,7 +71,7 @@ export function BillingPlanPicker({
       if (data.requiresEnterpriseContact) {
         toast({
           title: "Contact us for 150+ seats",
-          description: "Self-serve Fixed checkout is available up to 150 seats.",
+          description: "Self-serve Yearly checkout is available up to 150 seats.",
         });
         return;
       }
@@ -83,7 +84,7 @@ export function BillingPlanPicker({
     onError: (err) => {
       toast({
         title: "Checkout failed",
-        description: isApiError(err) ? err.message : "Could not start Fixed checkout.",
+        description: isApiError(err) ? err.message : "Could not start Yearly checkout.",
         variant: "destructive",
       });
     },
@@ -223,7 +224,7 @@ export function BillingPlanPicker({
                 max={FLEX_FIXED_MAX_SEATS}
                 value={Math.min(quote.n, FLEX_FIXED_MAX_SEATS)}
                 onChange={(e) => setCheckoutSeats(Number(e.target.value))}
-                className="w-full"
+                className={pricingSeatRangeClass}
               />
               <p className="text-sm text-white tabular-nums">{quote.n} seats</p>
             </div>
@@ -237,7 +238,7 @@ export function BillingPlanPicker({
             <p className="text-white/70">
               Discount: <span className="text-white font-medium">{quote.discount.toFixed(1)}%</span>
             </p>
-            <p className="text-emerald-200/90">Save {formatEuroMajor(quote.saving)}/yr vs Flex</p>
+            <p className="text-ordo-yellow/90">Save {formatEuroMajor(quote.saving)}/yr vs Flex</p>
           </div>
 
           {quote.enterprise ? (

@@ -918,6 +918,32 @@ app.put("/admin/orgs/:id/billing-pricing", async (c) => {
     }
   }
 
+  if (parsed.customDiscountPercent !== undefined && parsed.customDiscountPercent != null) {
+    if (parsed.customDiscountPercent < 0 || parsed.customDiscountPercent > 100) {
+      return c.json(
+        { error: { message: "customDiscountPercent must be between 0 and 100.", code: "BAD_REQUEST" } },
+        400,
+      );
+    }
+  }
+  const flatCents = parsed.customFlatRateCents;
+  const flatMax = parsed.customFlatRateMaxUsers;
+  if (flatCents !== undefined || flatMax !== undefined) {
+    const hasFlat = flatCents != null && flatCents > 0;
+    const hasMax = flatMax != null && flatMax > 0;
+    if (hasFlat !== hasMax) {
+      return c.json(
+        {
+          error: {
+            message: "customFlatRateCents and customFlatRateMaxUsers must both be set or both cleared.",
+            code: "BAD_REQUEST",
+          },
+        },
+        400,
+      );
+    }
+  }
+
   const updated = await prisma.organization.update({
     where: { id: org.id },
     data: {
@@ -927,7 +953,7 @@ app.put("/admin/orgs/:id/billing-pricing", async (c) => {
       ...(parsed.customFlatRateCents !== undefined ? { customFlatRateCents: parsed.customFlatRateCents } : {}),
       ...(parsed.customFlatRateMaxUsers !== undefined ? { customFlatRateMaxUsers: parsed.customFlatRateMaxUsers } : {}),
       ...(parsed.billingCurrencyCode !== undefined
-        ? { billingCurrencyCode: (parsed.billingCurrencyCode || "USD").toUpperCase() }
+        ? { billingCurrencyCode: (parsed.billingCurrencyCode || "EUR").toUpperCase() }
         : {}),
     },
   });

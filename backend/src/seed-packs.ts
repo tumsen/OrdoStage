@@ -64,19 +64,17 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   {
     key: "pricing_intro",
     value: [
-      "Billing is postpaid and based on real monthly usage.",
-      "Every active user contributes billable usage days.",
-      "Invoices are issued on the first day of each month for the previous month's usage.",
-      "Payment is due within 7 days (automatic payment can be enabled), unless your contract says otherwise.",
-      "If an invoice is overdue, the organization becomes view-only until payment is completed.",
-      "No credit card is required to start. If you stop paying, accounts with an unpaid negative balance for 30 days may be permanently deleted, including organization data.",
+      "Two plans: Flex (monthly postpaid for billable activity) and Yearly (committed seats, 12 months upfront).",
+      "Flex: pay for real usage each month—or nothing when the team is quiet. No annual lock-in.",
+      "Yearly: deepest volume discount when your roster is stable; checkout in the app via Paddle.",
+      "Yearly overage above commitment is billed monthly at Flex marginal rates; seat increases are prorated top-ups.",
     ].join("\n\n"),
   },
   {
     key: "pricing_notes",
     value: [
-      "Pricing is usage-based and billed monthly in arrears.",
-      "For custom commercial terms, contact us directly.",
+      "Self-serve Yearly checkout up to 150 seats; contact us for enterprise.",
+      "For custom commercial terms, contact mail@ordostage.com.",
     ].join("\n"),
   },
 ];

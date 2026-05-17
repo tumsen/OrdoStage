@@ -29,7 +29,7 @@ export function HomePricingCalculator() {
   return (
     <section
       id="pricing-preview"
-      className="w-full scroll-mt-6 rounded-2xl border border-ordo-violet/35 bg-black/25 p-5 text-left backdrop-blur-sm md:p-8 space-y-5"
+      className="w-full scroll-mt-6 rounded-2xl border border-ordo-magenta/30 bg-black/25 p-5 text-left backdrop-blur-sm md:p-8 space-y-5"
     >
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-ordo-yellow/90">Pricing</p>

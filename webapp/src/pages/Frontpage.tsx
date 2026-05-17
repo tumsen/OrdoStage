@@ -187,7 +187,7 @@ function FeatureBlock({
       </div>
 
       <p className="text-center text-sm text-white/70">
-        Postpaid billing scales with real usage —{" "}
+        Flex and Yearly pricing scale with your team —{" "}
         <Link to="/pricing" className="text-ordo-yellow hover:underline">
           read pricing
         </Link>
@@ -246,7 +246,7 @@ function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefi
             <Link to="/pricing" className="text-ordo-yellow hover:underline">
               Pricing
             </Link>{" "}
-            (postpaid billing) and{" "}
+            (Flex and Yearly plans) and{" "}
             <Link to="/login" className="text-ordo-yellow hover:underline">
               Log in
             </Link>

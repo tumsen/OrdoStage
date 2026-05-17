@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
@@ -20,9 +20,7 @@ import {
   type AdminOrgEmailMembersResult,
 } from "../../../../backend/src/types";
 import { syncAuthSessionAfterWorkspaceChange } from "@/lib/auth-client";
-import { TieredSeatPricingCalculator } from "@/components/pricing/TieredSeatPricingCalculator";
-import { DEFAULT_TIERED_SEAT_MODEL, type TieredSeatModel } from "@/lib/tieredSeatPricing";
-import { parseSeatCalculatorJson } from "@/lib/seatCalculatorJson";
+import { OrgBillingPricingPanel } from "@/components/admin/OrgBillingPricingPanel";
 
 interface OrgUser {
   id: string;
@@ -89,39 +87,6 @@ interface OrgDetail {
   _count: { events: number; venues: number; people: number };
 }
 
-function formatEditableMajorFromCents(cents: number | null | undefined): string {
-  if (cents == null || !Number.isFinite(cents)) return "";
-  const major = cents / 100;
-  const fixed = major.toFixed(2);
-  return fixed.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
-}
-
-function majorToCents(value: string): number {
-  const normalized = value.trim().replace(",", ".");
-  const parsed = Number(normalized);
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.max(1, Math.round(parsed * 100));
-}
-
-function mergeSeatModelFromJson(json: string | null | undefined): TieredSeatModel {
-  const parsed = parseSeatCalculatorJson(json ?? null);
-  return {
-    ...DEFAULT_TIERED_SEAT_MODEL,
-    ...parsed?.model,
-  };
-}
-
-function yearlyFromCalculatorJson(
-  json: string | null | undefined,
-  defaults: { yearlyDiscountPercent: number; yearlyDiscountEnabled: boolean },
-): { percent: number; enabled: boolean } {
-  const parsed = parseSeatCalculatorJson(json ?? null);
-  return {
-    percent: parsed?.yearlyDiscountPercent ?? defaults.yearlyDiscountPercent,
-    enabled: parsed?.yearlyDiscountEnabled ?? defaults.yearlyDiscountEnabled,
-  };
-}
-
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
@@ -168,90 +133,6 @@ function StatItem({ icon: Icon, label, value }: { icon: React.ElementType; label
 function BillingTab({ org }: { org: OrgDetail }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({
-    customDiscountPercent: "",
-    customFlatRateCents: "",
-    customFlatRateMaxUsers: "",
-    billingCurrencyCode: "EUR",
-    customUserDailyRateMajor: "",
-  });
-  const [useCustomSeatCurve, setUseCustomSeatCurve] = useState(() => Boolean(org.customSeatCalculatorJson?.trim()));
-  const [seatModel, setSeatModel] = useState<TieredSeatModel>({ ...DEFAULT_TIERED_SEAT_MODEL });
-  const [seatYearlyPercent, setSeatYearlyPercent] = useState(15);
-  const [seatYearlyEnabled, setSeatYearlyEnabled] = useState(true);
-
-  useEffect(() => {
-    setUseCustomSeatCurve(Boolean(org.customSeatCalculatorJson?.trim()));
-  }, [org.id, org.customSeatCalculatorJson]);
-
-  useEffect(() => {
-    setForm({
-      customDiscountPercent: org.customDiscountPercent == null ? "" : String(org.customDiscountPercent),
-      customFlatRateCents: org.customFlatRateCents == null ? "" : String(org.customFlatRateCents),
-      customFlatRateMaxUsers: org.customFlatRateMaxUsers == null ? "" : String(org.customFlatRateMaxUsers),
-      billingCurrencyCode: org.billingCurrencyCode || "EUR",
-      customUserDailyRateMajor: formatEditableMajorFromCents(org.customUserDailyRateCents),
-    });
-  }, [
-    org.id,
-    org.customDiscountPercent,
-    org.customFlatRateCents,
-    org.customFlatRateMaxUsers,
-    org.billingCurrencyCode,
-    org.customUserDailyRateCents,
-  ]);
-
-  useEffect(() => {
-    const defaults = org.seatCalculatorDefaults ?? { yearlyDiscountPercent: 15, yearlyDiscountEnabled: true };
-    if (useCustomSeatCurve) {
-      if (org.customSeatCalculatorJson?.trim()) {
-        setSeatModel(mergeSeatModelFromJson(org.customSeatCalculatorJson));
-        const y = yearlyFromCalculatorJson(org.customSeatCalculatorJson, defaults);
-        setSeatYearlyPercent(y.percent);
-        setSeatYearlyEnabled(y.enabled);
-      }
-    } else {
-      setSeatModel(mergeSeatModelFromJson(org.globalDefaultSeatCalculatorJson));
-      const y = yearlyFromCalculatorJson(org.globalDefaultSeatCalculatorJson, defaults);
-      setSeatYearlyPercent(y.percent);
-      setSeatYearlyEnabled(y.enabled);
-    }
-  }, [
-    org.id,
-    org.customSeatCalculatorJson,
-    org.globalDefaultSeatCalculatorJson,
-    org.seatCalculatorDefaults,
-    useCustomSeatCurve,
-  ]);
-
-  const pricingMutation = useMutation({
-    mutationFn: () =>
-      api.put(`/api/admin/orgs/${org.id}/billing-pricing`, {
-        customUserDailyRateCents: form.customUserDailyRateMajor.trim() ? majorToCents(form.customUserDailyRateMajor) : null,
-        customSeatCalculatorJson: useCustomSeatCurve
-          ? JSON.stringify({
-              model: seatModel,
-              yearlyDiscountPercent: seatYearlyPercent,
-              yearlyDiscountEnabled: seatYearlyEnabled,
-            })
-          : null,
-        customDiscountPercent: form.customDiscountPercent.trim() ? Number(form.customDiscountPercent) : null,
-        customFlatRateCents: form.customFlatRateCents.trim() ? Number(form.customFlatRateCents) : null,
-        customFlatRateMaxUsers: form.customFlatRateMaxUsers.trim() ? Number(form.customFlatRateMaxUsers) : null,
-        billingCurrencyCode: form.billingCurrencyCode,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
-      toast({ title: "Saved", description: "Organization billing pricing updated." });
-    },
-    onError: (err) => {
-      toast({
-        title: "Error",
-        description: isApiError(err) ? err.message : "Failed to save pricing.",
-        variant: "destructive",
-      });
-    },
-  });
 
   const markPaidMutation = useMutation({
     mutationFn: (invoiceId: string) =>
@@ -274,7 +155,7 @@ function BillingTab({ org }: { org: OrgDetail }) {
           <p className="text-xs text-white/50 mt-1">
             Plan:{" "}
             <span className="text-white/80 capitalize">
-              {org.billingPlan === "fixed" ? "Fixed (annual)" : "Flex (monthly)"}
+              {org.billingPlan === "fixed" ? "Yearly (annual)" : "Flex (monthly)"}
             </span>
             {org.billingPlan === "fixed" && org.committedSeats != null ? (
               <> · {org.committedSeats} committed seats</>
@@ -284,39 +165,14 @@ function BillingTab({ org }: { org: OrgDetail }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-gray-900 border border-white/10">
-          <CardContent className="space-y-3">
-            <p className="text-sm text-white/70">Custom organization pricing</p>
-            <Input placeholder="Billing currency (e.g. EUR, USD, DKK)" value={form.billingCurrencyCode} onChange={(e) => setForm((p) => ({ ...p, billingCurrencyCode: e.target.value.toUpperCase() }))} />
-            <div>
-              <Label className="text-xs text-white/50">Fixed EUR per billable seat / month (optional override)</Label>
-              <Input
-                className="mt-1"
-                placeholder="Leave empty to use the seat curve (global default or organisation curve below)"
-                value={form.customUserDailyRateMajor}
-                onChange={(e) => setForm((p) => ({ ...p, customUserDailyRateMajor: e.target.value }))}
-              />
-              <p className="text-[11px] text-white/40 mt-1">
-                If set, each billable member is charged this flat amount instead of the tiered total from the
-                calculator.
-              </p>
-            </div>
-            <Input placeholder="Discount % (optional)" value={form.customDiscountPercent} onChange={(e) => setForm((p) => ({ ...p, customDiscountPercent: e.target.value }))} />
-            <Input placeholder="Flat rate cents (optional)" value={form.customFlatRateCents} onChange={(e) => setForm((p) => ({ ...p, customFlatRateCents: e.target.value }))} />
-            <Input placeholder="Flat rate max users (optional)" value={form.customFlatRateMaxUsers} onChange={(e) => setForm((p) => ({ ...p, customFlatRateMaxUsers: e.target.value }))} />
-            <p className="text-xs text-white/45">
-              Estimated monthly price (current users): {org.estimatedCurrencyCode} {(org.estimatedMonthlyCents / 100).toFixed(2)}
-            </p>
-            <Button onClick={() => pricingMutation.mutate()} disabled={pricingMutation.isPending} className="w-full bg-rose-700 hover:bg-rose-600">
-              {pricingMutation.isPending ? "Saving..." : "Save custom billing pricing"}
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <OrgBillingPricingPanel org={org} />
 
         <Card className="bg-gray-900 border border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base">Latest invoices</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm text-white/70">Latest invoices</p>
             {org.invoices.length === 0 ? (
               <p className="text-sm text-white/40">No invoices generated yet.</p>
             ) : (
@@ -329,7 +185,12 @@ function BillingTab({ org }: { org: OrgDetail }) {
                   <p className="text-sm text-white">Total €{(inv.totalCents / 100).toFixed(2)}</p>
                   <p className="text-xs text-white/50">Lines: {inv.lines.length}</p>
                   {inv.status !== "paid" ? (
-                    <Button size="sm" variant="outline" onClick={() => markPaidMutation.mutate(inv.id)} disabled={markPaidMutation.isPending}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => markPaidMutation.mutate(inv.id)}
+                      disabled={markPaidMutation.isPending}
+                    >
                       Mark as paid
                     </Button>
                   ) : null}
@@ -339,47 +200,6 @@ function BillingTab({ org }: { org: OrgDetail }) {
           </CardContent>
         </Card>
       </div>
-
-      <Card className="bg-gray-900 border border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white text-base">Organisation seat curve (illustrative)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-xs text-white/55">
-            By default this matches the admin pricing defaults and updates when those change. Enable a custom curve to
-            override for this organisation only. Values save with <span className="text-white/75">Save custom billing
-            pricing</span> and are used for invoices unless a fixed per-seat override is set above.
-          </p>
-          <div className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-            <Checkbox
-              id="org-custom-seat-curve"
-              checked={useCustomSeatCurve}
-              onCheckedChange={(v) => setUseCustomSeatCurve(v === true)}
-              className="mt-0.5 border-white/30 data-[state=checked]:bg-rose-600 data-[state=checked]:border-rose-600"
-            />
-            <div className="space-y-0.5">
-              <Label htmlFor="org-custom-seat-curve" className="text-sm text-white/85 cursor-pointer">
-                Use organisation-specific seat curve
-              </Label>
-              <p className="text-[11px] text-white/45 leading-snug">
-                When off, invoices use the global admin seat curve; the fields below mirror it read-only.
-              </p>
-            </div>
-          </div>
-          <TieredSeatPricingCalculator
-            showTrialBadge={false}
-            showModelControls
-            disableModelControls={!useCustomSeatCurve}
-            seatModel={seatModel}
-            onSeatModelChange={setSeatModel}
-            yearlyDiscountPercent={seatYearlyPercent}
-            yearlyDiscountEnabled={seatYearlyEnabled}
-            showYearlyDiscountControls
-            onYearlyDiscountPercentChange={setSeatYearlyPercent}
-            onYearlyDiscountEnabledChange={setSeatYearlyEnabled}
-          />
-        </CardContent>
-      </Card>
     </div>
   );
 }

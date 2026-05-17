@@ -55,10 +55,6 @@ export default function PublicPricing() {
     refetchOnReconnect: true,
   });
 
-  /** API field name is legacy; value is updated from the first-seat tier when a global curve is saved. */
-  const eurPerUserMonthCents =
-    publicPricing?.prices.find((p) => p.currencyCode === "EUR")?.userDailyRateCents ?? 0;
-
   const publicSeatModel: TieredSeatModel = (() => {
     const parsed = parseSeatCalculatorJson(publicPricing?.defaultSeatCalculatorJson);
     return { ...DEFAULT_TIERED_SEAT_MODEL, ...parsed?.model };
@@ -82,21 +78,21 @@ export default function PublicPricing() {
         <header className="space-y-4">
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">{pricingTitle}</h1>
           <p className="text-lg text-white/75 leading-relaxed max-w-3xl">
-            Compare <strong className="text-white/90">Flex</strong> (monthly postpaid) and{" "}
-            <strong className="text-white/90">Fixed</strong> (annual commitment) using the calculator below — scroll
-            past it for Flex-only curve details.
+            Two plans: <strong className="text-ordo-magenta/95">Flex</strong> (monthly postpaid, no commitment) and{" "}
+            <strong className="text-ordo-violet/95">Yearly</strong> (committed seats, pay once for 12 months). Use the
+            calculator below, then read how each plan fits your season.
           </p>
         </header>
 
         <section
-          id="flex-vs-fixed"
-          className="space-y-4 rounded-xl border-2 border-ordo-violet/45 bg-gradient-to-b from-ordo-violet/15 to-transparent p-6 md:p-8 scroll-mt-8"
+          id="pricing-calculator"
+          className="space-y-4 rounded-xl border-2 border-ordo-magenta/35 bg-gradient-to-b from-ordo-magenta/10 via-transparent to-ordo-violet/10 p-6 md:p-8 scroll-mt-8"
         >
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-wider text-ordo-yellow/90">Two plans</p>
-            <h2 className="text-2xl md:text-3xl font-semibold text-white">Flex vs Fixed pricing</h2>
+            <h2 className="text-2xl md:text-3xl font-semibold text-white">Flex vs Yearly</h2>
             <p className="text-sm text-white/60 leading-relaxed max-w-3xl">
-              Move the slider to compare monthly Flex (postpaid) with Fixed (annual commitment). Fixed locks seats for
+              Move the slider to compare Flex postpaid with Yearly prepay at the same seat count. Yearly locks seats for
               12 months — first seat at {fixedFirstSeat}/mo equivalent, volume discount on seats 2+.{" "}
               <SeatTierIntroBlurb model={publicSeatModel} compact className="inline text-sm text-white/60" />
             </p>
@@ -113,9 +109,16 @@ export default function PublicPricing() {
 
         <SectionDivider />
 
-        <header className="space-y-6">
+        <section id="flex" className="space-y-6 scroll-mt-8 rounded-xl border border-ordo-magenta/30 bg-ordo-magenta/5 p-6 md:p-8">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-ordo-magenta/90">Flex</p>
+            <h2 className="text-2xl md:text-3xl font-semibold text-white">Pay for real activity each month</h2>
+            <p className="text-base text-white/75 leading-relaxed max-w-3xl">
+              Pay for real activity each month—or pay nothing when the team is quiet. No annual lock-in.
+            </p>
+          </div>
           <div className="space-y-3">
-            <p className="text-sm uppercase tracking-wide text-white/60">Flex plan · first billable seat (monthly, EUR)</p>
+            <p className="text-sm uppercase tracking-wide text-white/60">First billable seat (monthly, EUR)</p>
             <p className="text-3xl md:text-4xl font-bold text-white">{firstSeatLabel} / month</p>
             <div className="max-w-3xl rounded-xl border border-ordo-violet/30 bg-white/[0.06] p-4 md:p-5 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-ordo-yellow/90">
@@ -144,10 +147,6 @@ export default function PublicPricing() {
                 everyone who was billable that month (see the calculator below for any seat count).
               </p>
             </div>
-            <p className="text-sm text-white/50 max-w-3xl leading-relaxed">
-              The large figure above is the first-seat portion only. The published EUR row in billing (
-              {formatEuroMajor((eurPerUserMonthCents || 0) / 100)}) tracks that first-seat rate for legacy summaries.
-            </p>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6 space-y-3 text-white/80 leading-relaxed">
             <h2 className="text-lg font-semibold text-white">Flex: only pay for what you use</h2>
@@ -178,6 +177,26 @@ export default function PublicPricing() {
               </p>
             ) : null}
           </div>
+          <section className="space-y-4">
+            <h3 className="text-xl md:text-2xl font-semibold text-white">How postpaid billing works</h3>
+            <p className="text-white/75 leading-relaxed">
+              Each billable member in a calendar month counts toward your seat total. Someone is billable if they had
+              show jobs, staffing, event team activity, or work time that month. Your invoice uses the tier total on the
+              published curve.
+            </p>
+            <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-yellow">
+              <li>Invoice generated on the 1st for the previous month</li>
+              <li>Payment due within 7 days (automatic payment can be enabled)</li>
+              <li>No credit card required to start; stop paying to stop using the product</li>
+              <li>
+                Unpaid after due date
+                {(publicPricing?.billingGraceDaysAfterDue ?? 0) > 0
+                  ? ` (plus ${publicPricing?.billingGraceDaysAfterDue}-day grace when configured)`
+                  : ""}
+                : account becomes view-only until paid
+              </li>
+            </ul>
+          </section>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
               asChild
@@ -189,32 +208,55 @@ export default function PublicPricing() {
               <Link to="/">Learn more</Link>
             </Button>
           </div>
-        </header>
+        </section>
 
-        {/* How billing works */}
-        <section className="space-y-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-white">How postpaid billing works</h2>
-          <p className="text-white/75 leading-relaxed">
-            Each billable member in a calendar month counts toward your seat total for that month. Someone is billable
-            if they had assigned show jobs, show staffing, event team activity (notes or documents they created), or
-            work time entries in that month. Your invoice uses the <strong className="text-white/90 font-medium">tier
-            total for that seat count on the published curve</strong>—the sum of 1st-seat, 2nd-seat, and further marginal
-            amounts—unless your organization has a fixed per-seat override from Ordo Stage.
+        <SectionDivider />
+
+        <section
+          id="yearly"
+          className="space-y-5 scroll-mt-8 rounded-xl border border-ordo-violet/30 bg-ordo-violet/5 p-6 md:p-8"
+        >
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-ordo-violet/90">Yearly</p>
+            <h2 className="text-2xl md:text-3xl font-semibold text-white">Commit once, get the deepest discount</h2>
+            <p className="text-base text-white/75 leading-relaxed max-w-3xl">
+              Commit to your seat count, pay once for the year, and get the deepest volume discount. Best when your
+              roster is stable all season—contrast with Flex when headcount swings month to month.
+            </p>
+          </div>
+          <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-violet">
+            <li>One annual invoice for committed seats (checkout in the app via Paddle)</li>
+            <li>First seat at {fixedFirstSeat}/mo equivalent; seats 2+ at Flex marginals with volume discount</li>
+            <li>Self-serve checkout up to {fixedPlan.selfServeMaxSeats} committed seats</li>
+            <li>No free trial on Yearly—commit and pay at checkout</li>
+          </ul>
+          <Button
+            asChild
+            className="bg-gradient-to-r from-ordo-violet via-ordo-orange to-ordo-magenta text-white shadow-sm hover:opacity-95 border-0"
+          >
+            <Link to="/login">Sign in to choose Yearly</Link>
+          </Button>
+        </section>
+
+        <SectionDivider />
+
+        <section className="space-y-5 rounded-xl border border-ordo-yellow/25 bg-ordo-yellow/5 p-6 md:p-8">
+          <h2 className="text-xl md:text-2xl font-semibold text-white">More seats than you committed?</h2>
+          <p className="text-white/75 leading-relaxed max-w-3xl">
+            Yearly plans cover committed seats for 12 months. When billable activity goes above that number:
           </p>
-          <ul className="list-disc pl-5 space-y-2 text-white/80 leading-relaxed marker:text-ordo-yellow">
-            <li>Invoice generated on the 1st for the previous month</li>
-            <li>Payment is due within 7 days (automatic payment can be enabled)</li>
-            <li>No credit card is required to start</li>
-            <li>If you do not want to continue, simply stop paying</li>
-            <li>If a negative balance remains unpaid for 30 days, the account may be permanently deleted</li>
+          <ul className="list-disc pl-5 space-y-3 text-white/80 leading-relaxed marker:text-ordo-yellow">
             <li>
-              If unpaid after the due date
-              {(publicPricing?.billingGraceDaysAfterDue ?? 0) > 0
-                ? ` (plus a ${publicPricing?.billingGraceDaysAfterDue}-day grace period when configured)`
-                : ""}
-              , the organization switches to view-only
+              <strong className="text-white">Busy month:</strong> seats above commitment are invoiced monthly at Flex
+              marginal rates for that month only.
             </li>
-            <li>Full access is restored automatically after payment</li>
+            <li>
+              <strong className="text-white">Growing team:</strong> increase committed seats in billing with a prorated
+              top-up for the rest of the term—you cannot reduce seats during the annual term.
+            </li>
+            <li>
+              <strong className="text-white">150+ seats:</strong> contact Ordo Stage for enterprise pricing.
+            </li>
           </ul>
         </section>
 
