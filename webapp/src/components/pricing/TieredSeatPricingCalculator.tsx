@@ -16,9 +16,20 @@ import { cn } from "@/lib/utils";
 import {
   annualInvoiceTotalMajor,
   fixedAnnualMonthlyEquivMajor,
-  fixedMonthlyEquivMajor,
   fixedVolumeDiscountPercent,
 } from "@/lib/flexFixedPricing";
+import {
+  ORDO_CHART_AXIS,
+  ORDO_CHART_FLEX,
+  ORDO_CHART_GRID,
+  ORDO_CHART_PER_USER,
+  ORDO_CHART_YEARLY,
+  ORDO_HEX,
+  ordoModelHighlightInputClass,
+  ordoModelHighlightPanelClass,
+  planAccentStyles,
+  type PlanAccent,
+} from "@/lib/ordoBrandColors";
 import {
   DEFAULT_FIXED_PLAN_PRICING,
   type FixedPlanPricingConfig,
@@ -33,13 +44,12 @@ import {
   type TieredSeatModel,
 } from "@/lib/tieredSeatPricing";
 
-const CHART_FLEX = "#ef4444";
-const CHART_FIXED_MONTHLY = "#22c55e";
-const CHART_FIXED_ANNUAL = "#3b82f6";
+const CHART_FLEX = ORDO_CHART_FLEX;
+const CHART_YEARLY = ORDO_CHART_YEARLY;
 const CHART_TOTAL = CHART_FLEX;
-const CHART_PER_USER = "#3a86ff";
-const CHART_GRID = "rgba(255,255,255,0.06)";
-const CHART_AXIS = "rgba(255,255,255,0.38)";
+const CHART_PER_USER = ORDO_CHART_PER_USER;
+const CHART_GRID = ORDO_CHART_GRID;
+const CHART_AXIS = ORDO_CHART_AXIS;
 
 type Props = {
   /** Owner admin: editable model inputs. Public: fixed defaults. */
@@ -125,7 +135,7 @@ export function InputWithUnitSuffix({
         aria-describedby={ariaDescribedBy}
         className={cn(
           "h-9 min-w-0 flex-1 border-white/15 bg-black/30 text-white tabular-nums",
-          highlight && "border-emerald-500/30 focus-visible:ring-emerald-500/40",
+          highlight && ordoModelHighlightInputClass,
         )}
       />
       <span
@@ -223,8 +233,7 @@ export function TieredSeatPricingCalculator({
           return {
             users: u,
             flexTotal: flexPostpaid,
-            fixedMonthlyEquiv: fixedMonthlyEquivMajor(u, fixedPlanPricing),
-            fixedAnnualMonthlyEquiv: fixedAnnualMonthlyEquivMajor(u, fixedPlanPricing),
+            yearlyMonthlyEquiv: fixedAnnualMonthlyEquivMajor(u, fixedPlanPricing),
           };
         }
         return {
@@ -249,10 +258,8 @@ export function TieredSeatPricingCalculator({
 
   const fixedAtSlider = compareFlexFixedPlans
     ? {
-        monthlyEquiv: fixedMonthlyEquivMajor(users, fixedPlanPricing),
         annualMonthlyEquiv: fixedAnnualMonthlyEquivMajor(users, fixedPlanPricing),
         annualInvoice: annualInvoiceTotalMajor(users, fixedAnnualRoundToTen, fixedPlanPricing),
-        monthlyDiscount: fixedVolumeDiscountPercent(users, "monthly", fixedPlanPricing),
         annualDiscount: fixedVolumeDiscountPercent(users, "annual", fixedPlanPricing),
       }
     : null;
@@ -350,7 +357,7 @@ export function TieredSeatPricingCalculator({
             Enable annual billing
           </Label>
           {annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0 ? (
-            <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
+            <span className="rounded-md border border-ordo-yellow/35 bg-ordo-yellow/15 px-2 py-0.5 text-[11px] font-medium text-ordo-yellow/95">
               Save €{annualSavingsYear.toLocaleString()}/yr
             </span>
           ) : null}
@@ -361,7 +368,7 @@ export function TieredSeatPricingCalculator({
         className={cn(
           "grid grid-cols-1 items-stretch gap-3",
           compareFlexFixedPlans
-            ? "md:grid-cols-3"
+            ? "md:grid-cols-2"
             : publicAnnualOffered
               ? "md:grid-cols-3"
               : "md:grid-cols-2",
@@ -381,17 +388,6 @@ export function TieredSeatPricingCalculator({
               accent="flex"
             />
             <MetricCard
-              label="Monthly"
-              value={`€${Math.round(fixedAtSlider.monthlyEquiv).toLocaleString()}/mo`}
-              equivalent={`€${Math.round(fixedAtSlider.monthlyEquiv * 12).toLocaleString()}/yr at this seat count`}
-              structure={[
-                `€${fixedPlanPricing.firstSeatMonthlyMajor}/mo first seat; seats 2+ at Flex marginals`,
-                `${fixedAtSlider.monthlyDiscount.toFixed(1)}% monthly volume discount at ${users} seats`,
-                "Fixed monthly commitment — invoice each month",
-              ]}
-              accent="fixedMonthly"
-            />
-            <MetricCard
               label="Yearly"
               value={`€${Math.round(fixedAtSlider.annualInvoice).toLocaleString()}/yr`}
               equivalent={`€${Math.round(fixedAtSlider.annualMonthlyEquiv).toLocaleString()}/mo equivalent`}
@@ -402,7 +398,7 @@ export function TieredSeatPricingCalculator({
                   ? "Paid upfront in advance for 12 months (total rounded to nearest €10)"
                   : "Paid upfront in advance for 12 months",
               ]}
-              accent="fixedAnnual"
+              accent="yearly"
             />
           </>
         ) : (
@@ -529,7 +525,7 @@ export function TieredSeatPricingCalculator({
                       Enable annual billing
                     </Label>
                     {annual && multWhenPayingAnnual < 1 && percentForAnnualQuote > 0 ? (
-                      <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
+                      <span className="rounded-md border border-ordo-yellow/35 bg-ordo-yellow/15 px-2 py-0.5 text-[11px] font-medium text-ordo-yellow/95">
                         Save €{annualSavingsYear.toLocaleString()} / yr
                       </span>
                     ) : null}
@@ -571,7 +567,7 @@ export function TieredSeatPricingCalculator({
 
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-white/45">
-          {compareFlexFixedPlans ? "Flex vs Fixed (€/month)" : "Price curve"}
+          {compareFlexFixedPlans ? "Flex vs Yearly (€/month equivalent)" : "Price curve"}
         </p>
         <div className="flex flex-wrap gap-4 text-[11px] text-white/55">
           {compareFlexFixedPlans ? (
@@ -581,12 +577,8 @@ export function TieredSeatPricingCalculator({
                 Flex postpaid
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CHART_FIXED_MONTHLY }} aria-hidden />
-                Fixed monthly
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CHART_FIXED_ANNUAL }} aria-hidden />
-                Fixed annual (€/mo)
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CHART_YEARLY }} aria-hidden />
+                Yearly (€/mo equiv.)
               </span>
             </>
           ) : (
@@ -596,7 +588,7 @@ export function TieredSeatPricingCalculator({
                 Total monthly cost
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#3a86ff]" aria-hidden />
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: CHART_PER_USER }} aria-hidden />
                 Per-user rate
               </span>
             </>
@@ -666,8 +658,7 @@ export function TieredSeatPricingCalculator({
                 }}
                 formatter={(value: number, name: string) => {
                   if (name === "Flex postpaid") return [`€${Math.round(value).toLocaleString()}/mo`, name];
-                  if (name === "Fixed monthly") return [`€${Math.round(value).toLocaleString()}/mo`, name];
-                  if (name === "Fixed annual (€/mo)") return [`€${Math.round(value).toLocaleString()}/mo`, name];
+                  if (name === "Yearly (€/mo equiv.)") return [`€${Math.round(value).toLocaleString()}/mo`, name];
                   if (name === "Monthly total") return [`€${Math.round(value).toLocaleString()}/mo`, name];
                   if (name === "Per-user rate") return [`€${Number(value).toFixed(2)}`, name];
                   return [value, name];
@@ -677,7 +668,7 @@ export function TieredSeatPricingCalculator({
               <ReferenceLine
                 x={users}
                 yAxisId="left"
-                stroke="rgba(255,190,11,0.45)"
+                stroke={`${ORDO_HEX.yellow}73`}
                 strokeDasharray="4 4"
               />
               {compareFlexFixedPlans ? (
@@ -696,23 +687,12 @@ export function TieredSeatPricingCalculator({
                   <Line
                     yAxisId="left"
                     type="monotone"
-                    dataKey="fixedMonthlyEquiv"
-                    name="Fixed monthly"
-                    stroke={CHART_FIXED_MONTHLY}
+                    dataKey="yearlyMonthlyEquiv"
+                    name="Yearly (€/mo equiv.)"
+                    stroke={CHART_YEARLY}
                     strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 5, fill: CHART_FIXED_MONTHLY }}
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="fixedAnnualMonthlyEquiv"
-                    name="Fixed annual (€/mo)"
-                    stroke={CHART_FIXED_ANNUAL}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 5, fill: CHART_FIXED_ANNUAL }}
+                    activeDot={{ r: 5, fill: CHART_YEARLY }}
                     isAnimationActive={false}
                   />
                 </>
@@ -775,32 +755,12 @@ function MetricCard({
   equivalent?: string;
   structure?: string[];
   sub?: string;
-  accent?: "flex" | "fixedMonthly" | "fixedAnnual";
+  accent?: PlanAccent;
 }) {
-  const border =
-    accent === "flex"
-      ? "border-red-500/35 bg-red-500/10"
-      : accent === "fixedMonthly"
-        ? "border-emerald-500/35 bg-emerald-500/10"
-        : accent === "fixedAnnual"
-          ? "border-blue-500/35 bg-blue-500/10"
-          : "border-white/10 bg-white/[0.04]";
-  const labelClass =
-    accent === "flex"
-      ? "text-red-200/80"
-      : accent === "fixedMonthly"
-        ? "text-emerald-200/80"
-        : accent === "fixedAnnual"
-          ? "text-blue-200/80"
-          : "text-white/45";
-  const valueClass =
-    accent === "flex"
-      ? "text-red-300"
-      : accent === "fixedMonthly"
-        ? "text-emerald-300"
-        : accent === "fixedAnnual"
-          ? "text-blue-300"
-          : "text-white";
+  const styles = accent ? planAccentStyles[accent] : null;
+  const border = styles?.cardBorder ?? "border-white/10 bg-white/[0.04]";
+  const labelClass = styles?.label ?? "text-white/45";
+  const valueClass = styles?.value ?? "text-white";
   return (
     <div className={cn("flex min-h-[14rem] flex-col rounded-xl border p-3 md:min-h-[15rem] md:p-4", border)}>
       <div className="flex shrink-0 items-start justify-between gap-2">
@@ -857,7 +817,7 @@ function ModelInput({
     <div
       className={cn(
         "flex min-h-[11.5rem] min-w-0 flex-col rounded-lg border px-3 py-2.5",
-        highlight ? "border-emerald-500/40 bg-emerald-500/10" : "border-white/10 bg-white/[0.03]",
+        highlight ? ordoModelHighlightPanelClass.border : "border-white/10 bg-white/[0.03]",
         className,
       )}
     >
@@ -865,7 +825,7 @@ function ModelInput({
         htmlFor={fieldId}
         className={cn(
           "min-h-[2.5rem] shrink-0 text-[11px] font-medium leading-snug line-clamp-3",
-          highlight ? "text-emerald-200/90" : "text-white/50",
+          highlight ? ordoModelHighlightPanelClass.label : "text-white/50",
         )}
       >
         {label}

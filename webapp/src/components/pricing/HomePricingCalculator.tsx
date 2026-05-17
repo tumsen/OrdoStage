@@ -33,9 +33,9 @@ export function HomePricingCalculator() {
     >
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-ordo-yellow/90">Pricing</p>
-        <h2 className="text-xl md:text-2xl font-semibold text-white">Flex vs Fixed — try the seat slider</h2>
+        <h2 className="text-xl md:text-2xl font-semibold text-white">Flex vs Yearly — try the seat slider</h2>
         <p className="text-sm text-white/65 leading-relaxed max-w-3xl">
-          Compare monthly Flex postpaid with annual Fixed on one chart.{" "}
+          Compare monthly Flex postpaid with Yearly prepay on one chart.{" "}
           <Link to="/pricing" className="text-ordo-yellow hover:underline">
             Full pricing details
           </Link>

@@ -95,7 +95,7 @@ const FEATURE_LIST: readonly { title: string; body: string }[] = [
   },
   {
     title: "Account, company profile & billing",
-    body: "Store invoice and company details where finance expects them. Postpaid pricing follows real monthly usage; see the public pricing page for how seat-based billing works for growing organisations.",
+    body: "Store invoice and company details where finance expects them. Choose Flex (monthly, pay for activity) or Yearly (committed seats, best rate) — see pricing for how seat billing scales.",
   },
 ];
 

@@ -178,7 +178,7 @@ export function FixedPlanSettingsRow({
   >;
 }) {
   return (
-    <PlanSettingsRow title="Fixed · monthly &amp; annual commitment" accentClass="text-ordo-violet/90">
+    <PlanSettingsRow title="Yearly · annual prepay" accentClass="text-ordo-violet/90">
       <CompactField
         id="fixed-first-seat"
         label="1st seat €/mo"

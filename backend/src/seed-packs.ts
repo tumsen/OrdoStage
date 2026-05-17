@@ -48,7 +48,7 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   { key: "company_email", value: "mail@ordostage.com" },
   {
     key: "pricing_page_title",
-    value: "Postpaid pricing that scales with usage",
+    value: "Flex or Yearly — pricing that scales with your team",
   },
   /** Global (English row is source of truth; merged for all languages). 1 = on, 0 = off. */
   { key: "public_maintenance_mode", value: "0" },

@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
-import { formatEuroMajor } from "@/lib/tieredSeatPricing";
+import { formatEuroMajor, DEFAULT_TIERED_SEAT_MODEL, type TieredSeatModel } from "@/lib/tieredSeatPricing";
 import {
   FLEX_FIXED_MIN_SEATS,
   annualInvoiceTotalMajor,
   annualSavingMajor,
   fixedAnnualMonthlyEquivMajor,
-  fixedMonthlyEquivMajor,
   fixedVolumeDiscountPercent,
   flexMonthlyTotalMajor,
 } from "@/lib/flexFixedPricing";
@@ -15,6 +14,7 @@ import {
   DEFAULT_FIXED_PLAN_PRICING,
   type FixedPlanPricingConfig,
 } from "@/lib/fixedPlanPricingConfig";
+import { planAccentStyles } from "@/lib/ordoBrandColors";
 import { pricingSeatRangeClass } from "@/components/pricing/pricingSeatRangeClass";
 
 const DEFAULT_SEATS = 10;
@@ -33,19 +33,23 @@ function Metric({
   label: string;
   value: string;
   sub?: string;
-  accent?: "flex" | "fixedMonthly" | "fixedAnnual" | "neutral";
+  accent?: "flex" | "yearly" | "neutral";
 }) {
   const border =
     accent === "flex"
-      ? "border-red-500/35 bg-red-500/10"
-      : accent === "fixedMonthly"
-        ? "border-emerald-500/35 bg-emerald-500/10"
-        : accent === "fixedAnnual"
-          ? "border-blue-500/35 bg-blue-500/10"
-          : "border-white/10 bg-white/[0.03]";
+      ? planAccentStyles.flex.cardBorder
+      : accent === "yearly"
+        ? planAccentStyles.yearly.cardBorder
+        : "border-white/10 bg-white/[0.03]";
+  const labelClass =
+    accent === "flex"
+      ? planAccentStyles.flex.label
+      : accent === "yearly"
+        ? planAccentStyles.yearly.label
+        : "text-white/45";
   return (
     <div className={cn("rounded-xl border p-4 space-y-1", border)}>
-      <p className="text-[11px] font-medium uppercase tracking-wide text-white/45">{label}</p>
+      <p className={cn("text-[11px] font-medium uppercase tracking-wide", labelClass)}>{label}</p>
       <p className="text-xl font-semibold tabular-nums text-white">{value}</p>
       {sub ? <p className="text-[11px] text-white/50 leading-snug">{sub}</p> : null}
     </div>
@@ -56,28 +60,31 @@ export function FlexFixedPlanComparison({
   className,
   roundAnnualToTen = true,
   fixedPlanPricing = DEFAULT_FIXED_PLAN_PRICING,
+  seatModel = DEFAULT_TIERED_SEAT_MODEL,
 }: {
   className?: string;
-  /** When true, annual invoice totals round to nearest €10 (matches checkout). */
   roundAnnualToTen?: boolean;
   fixedPlanPricing?: FixedPlanPricingConfig;
+  seatModel?: TieredSeatModel;
 }) {
   const [seats, setSeats] = useState(DEFAULT_SEATS);
   const maxSeats = fixedPlanPricing.selfServeMaxSeats;
+  const floorAt = Math.max(3, Math.floor(seatModel.floorAt));
 
   const quote = useMemo(() => {
     const n = clampSeats(seats, maxSeats);
     return {
       n,
       flexMo: flexMonthlyTotalMajor(n),
-      fixedMo: fixedMonthlyEquivMajor(n, fixedPlanPricing),
-      fixedAnnualMo: fixedAnnualMonthlyEquivMajor(n, fixedPlanPricing),
+      yearlyMo: fixedAnnualMonthlyEquivMajor(n, fixedPlanPricing),
       annual: annualInvoiceTotalMajor(n, roundAnnualToTen, fixedPlanPricing),
-      monthlyDiscount: fixedVolumeDiscountPercent(n, "monthly", fixedPlanPricing),
       annualDiscount: fixedVolumeDiscountPercent(n, "annual", fixedPlanPricing),
       saving: annualSavingMajor(n, roundAnnualToTen, fixedPlanPricing),
     };
   }, [seats, roundAnnualToTen, fixedPlanPricing, maxSeats]);
+
+  const flex = planAccentStyles.flex;
+  const yearly = planAccentStyles.yearly;
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -101,16 +108,16 @@ export function FlexFixedPlanComparison({
           className={pricingSeatRangeClass}
         />
         <p className="text-[11px] text-white/45">
-          Fixed caps at {maxSeats} seats for self-serve checkout; larger venues — contact us.
+          Yearly self-serve up to {maxSeats} seats; larger venues — contact us.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-4">
+        <div className={cn("rounded-xl border p-5 space-y-4", flex.sectionBorder, flex.sectionBg)}>
           <div>
             <h3 className="text-lg font-semibold text-white">Flex</h3>
             <p className="text-sm text-white/55 mt-1">
-              Monthly postpaid. Pay for billable activity each month along the seat curve — no annual commitment.
+              Monthly postpaid for billable activity — no seat commitment. Stop paying when you stop using the product.
             </p>
           </div>
           <Metric
@@ -119,45 +126,41 @@ export function FlexFixedPlanComparison({
             sub="Estimated at this seat count"
             accent="flex"
           />
-          <ul className="text-xs text-white/55 space-y-1.5 list-disc pl-4 marker:text-white/30">
-            <li>€60/mo base (includes 1st billable seat)</li>
-            <li>2nd seat +€25; marginals step down to €5 from seat 20+</li>
+          <ul className="text-xs text-white/55 space-y-1.5 list-disc pl-4 marker:text-ordo-magenta/60">
+            <li>
+              €{seatModel.base}/mo base (includes 1st billable seat); 2nd +€{seatModel.start}; down to €{seatModel.floor}
+              /seat from seat {floorAt}+
+            </li>
             <li>Invoice monthly; view-only if unpaid after due date</li>
           </ul>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+        <div className={cn("rounded-xl border p-5 space-y-4", yearly.sectionBorder, yearly.sectionBg)}>
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-semibold text-white">Fixed</h3>
-            <span className="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-200/95">
-              {quote.monthlyDiscount.toFixed(1)}% mo · {quote.annualDiscount.toFixed(1)}% yr
+            <h3 className="text-lg font-semibold text-white">Yearly</h3>
+            <span className="rounded-md border border-ordo-yellow/35 bg-ordo-yellow/15 px-2 py-0.5 text-[11px] font-medium text-ordo-yellow/95">
+              {quote.annualDiscount.toFixed(1)}% volume discount
             </span>
           </div>
           <p className="text-sm text-white/55">
-            Annual upfront. First seat at €30/mo equivalent; remaining seats at Flex marginals with linear volume
-            discount. Extra seats above commitment billed monthly at Flex rates.
+            Pay annually upfront for committed seats. First seat at €{fixedPlanPricing.firstSeatMonthlyMajor}/mo
+            equivalent; seats 2+ at Flex marginals with annual volume discount.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Metric
-              label="Monthly equivalent"
-              value={formatEuroMajor(quote.fixedMo)}
-              sub={`${quote.monthlyDiscount.toFixed(1)}% monthly volume discount`}
-              accent="fixedMonthly"
-            />
-            <Metric
-              label="Annual (€/mo equiv.)"
-              value={formatEuroMajor(quote.fixedAnnualMo)}
-              sub={`${quote.annualDiscount.toFixed(1)}% annual volume discount`}
-              accent="fixedAnnual"
-            />
             <Metric
               label="Annual invoice"
               value={formatEuroMajor(quote.annual)}
               sub="Billed yearly via Paddle"
-              accent="fixedAnnual"
+              accent="yearly"
+            />
+            <Metric
+              label="€/mo equivalent"
+              value={formatEuroMajor(quote.yearlyMo)}
+              sub={`${quote.annualDiscount.toFixed(1)}% annual discount`}
+              accent="yearly"
             />
           </div>
-          <p className="text-sm text-blue-200/90">
+          <p className="text-sm text-ordo-yellow/90">
             Save {formatEuroMajor(quote.saving)} per year vs paying Flex monthly for the same seat count.
           </p>
         </div>

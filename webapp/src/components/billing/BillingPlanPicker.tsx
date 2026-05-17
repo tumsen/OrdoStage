@@ -123,7 +123,7 @@ export function BillingPlanPicker({
     return (
       <div className="space-y-4">
         <div className="rounded-lg border border-ordo-violet/30 bg-ordo-violet/10 px-4 py-3 text-sm text-white/85">
-          <p className="font-medium text-white">Fixed plan active</p>
+          <p className="font-medium text-white">Yearly plan active</p>
           <p className="mt-1 text-white/65">
             {committedSeats} committed seats · renews{" "}
             {annualRenewalDate ? new Date(annualRenewalDate).toLocaleDateString() : "—"}
@@ -204,10 +204,10 @@ export function BillingPlanPicker({
       {isOwner ? (
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
           <div>
-            <p className="text-sm font-medium text-white">Switch to Fixed (annual)</p>
+            <p className="text-sm font-medium text-white">Switch to Yearly</p>
             <p className="text-xs text-white/50 mt-1">
-              Pay annually upfront via Paddle. No monthly Flex invoices for committed seats; overage above commitment
-              is billed monthly. Fixed does not include a free trial — commit and pay at checkout.
+              Pay annually upfront via Paddle for your committed seats. Overage above commitment is billed monthly at
+              Flex marginal rates. Yearly does not include a free trial — commit and pay at checkout.
             </p>
           </div>
 
@@ -249,12 +249,12 @@ export function BillingPlanPicker({
               disabled={fixedCheckout.isPending}
               onClick={() => fixedCheckout.mutate()}
             >
-              {fixedCheckout.isPending ? "Opening checkout…" : "Continue to Paddle checkout (Fixed)"}
+              {fixedCheckout.isPending ? "Opening checkout…" : "Continue to Paddle checkout (Yearly)"}
             </Button>
           )}
         </div>
       ) : (
-        <p className="text-xs text-white/45">Only organisation owners can start Fixed checkout.</p>
+        <p className="text-xs text-white/45">Only organisation owners can start Yearly checkout.</p>
       )}
     </div>
   );

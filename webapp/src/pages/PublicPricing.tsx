@@ -33,7 +33,7 @@ export default function PublicPricing() {
   });
 
   const pricingTitle =
-    siteMeta?.pricing_page_title?.trim() || "Flex or Fixed — pricing that scales with your team";
+    siteMeta?.pricing_page_title?.trim() || "Flex or Yearly — pricing that scales with your team";
   const { data: publicPricing } = useQuery<{
     baseCurrencyCode: string;
     yearlyDiscountPercent?: number;
