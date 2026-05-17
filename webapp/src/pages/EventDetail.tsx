@@ -1092,7 +1092,7 @@ function DetailsTab({
                 control={form.control}
                 name="getInDate"
                 render={({ field }) => (
-                  <FormItem className="w-max max-w-full">
+                  <FormItem className="shrink-0">
                     <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in date</FormLabel>
                     <FormControl>
                       <DateInputWithWeekday

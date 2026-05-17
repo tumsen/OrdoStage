@@ -4,12 +4,17 @@ import { Button } from "@/components/ui/button";
 import { formatDdMmYyyy, formatWeekdayOnly, todayIsoDate } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 
+/** en-US longest weekday name; used with sizing date for uniform width everywhere. */
+const DATE_INPUT_SIZING_WEEKDAY = "Wednesday";
+/** Widest `DD/MM/YYYY` glyph run (same digit width as tabular dates). */
+const DATE_INPUT_SIZING_DATE = "31/12/2026";
+
 /**
- * Size to visible copy: longest weekday + `DD/MM/YYYY` (not a wide native date control).
+ * Shared width for all date fields: invisible sizing row matches longest weekday + date.
  * Native `<input type="date">` is full-size but invisible; click/focus opens the picker.
  */
 export const DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS =
-  "relative inline-flex w-max max-w-full min-w-0 shrink-0";
+  "relative inline-flex max-w-full shrink-0";
 
 type DateInputWithWeekdayProps = {
   value: string;
@@ -20,6 +25,43 @@ type DateInputWithWeekdayProps = {
   readOnly?: boolean;
   showTodayButton?: boolean;
 };
+
+function DateDisplay({
+  value,
+  weekdayClassName,
+}: {
+  value: string;
+  weekdayClassName?: string;
+}) {
+  return (
+    <div className="inline-grid">
+      <div
+        className="col-start-1 row-start-1 flex items-center gap-2 invisible pointer-events-none"
+        aria-hidden
+      >
+        <span className={cn("shrink-0 text-sm whitespace-nowrap", weekdayClassName)}>
+          {DATE_INPUT_SIZING_WEEKDAY}
+        </span>
+        <span className="shrink-0 font-mono text-sm tabular-nums tracking-tight whitespace-nowrap">
+          {DATE_INPUT_SIZING_DATE}
+        </span>
+      </div>
+      <div className="col-start-1 row-start-1 flex items-center gap-2">
+        <span
+          className={cn(
+            "shrink-0 text-sm text-white/55 whitespace-nowrap",
+            weekdayClassName
+          )}
+        >
+          {formatWeekdayOnly(value)}
+        </span>
+        <span className="shrink-0 font-mono text-sm tabular-nums tracking-tight text-white/90 whitespace-nowrap">
+          {formatDdMmYyyy(value)}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export function DateInputWithWeekday({
   value,
@@ -32,22 +74,6 @@ export function DateInputWithWeekday({
 }: DateInputWithWeekdayProps) {
   const ref = useRef<HTMLInputElement>(null);
 
-  const display = (
-    <div className="pointer-events-none flex min-w-0 items-center gap-2">
-      <span
-        className={cn(
-          "shrink-0 text-sm text-white/55 whitespace-nowrap",
-          weekdayClassName
-        )}
-      >
-        {formatWeekdayOnly(value)}
-      </span>
-      <span className="shrink-0 font-mono text-sm tabular-nums tracking-tight text-white/90 whitespace-nowrap">
-        {formatDdMmYyyy(value)}
-      </span>
-    </div>
-  );
-
   const boxClassName = cn(
     className,
     "relative h-10 min-h-10 rounded-md border border-white/10 bg-white/5 text-white",
@@ -57,10 +83,14 @@ export function DateInputWithWeekday({
   );
 
   const dateBox = readOnly ? (
-    <div className={cn("inline-flex items-center gap-2 px-3", boxClassName)}>{display}</div>
+    <div className={cn("inline-flex items-center px-3", boxClassName)}>
+      <DateDisplay value={value} weekdayClassName={weekdayClassName} />
+    </div>
   ) : (
     <div className={boxClassName}>
-      <div className="flex h-full items-center px-3">{display}</div>
+      <div className="flex h-full items-center px-3">
+        <DateDisplay value={value} weekdayClassName={weekdayClassName} />
+      </div>
       <input
         ref={ref}
         type="date"

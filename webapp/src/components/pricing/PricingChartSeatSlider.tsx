@@ -8,7 +8,6 @@ export type PricingChartPlotLayout = {
   trackLeft: number;
   trackWidth: number;
   thumbLeft: number;
-  trackTop: number;
 };
 
 function measurePlotLayout(container: HTMLElement): PricingChartPlotLayout | null {
@@ -28,7 +27,6 @@ function measurePlotLayout(container: HTMLElement): PricingChartPlotLayout | nul
     trackLeft: plotX,
     trackWidth: plotW,
     thumbLeft: lineX - plotX - THUMB_SIZE_PX / 2,
-    trackTop: plotY + plotH - THUMB_SIZE_PX / 2,
   };
 }
 
@@ -104,15 +102,14 @@ export function PricingChartSeatSlider({
   );
 
   return (
-    <div ref={wrapRef} className={cn("relative w-full", className)}>
-      {children}
+    <div ref={wrapRef} className="w-full">
+      <div className={cn("relative w-full", className)}>{children}</div>
       {layout ? (
         <div
-          className="absolute z-10 touch-none"
+          className="relative z-10 mt-2 touch-none"
           style={{
-            left: layout.trackLeft,
+            marginLeft: layout.trackLeft,
             width: layout.trackWidth,
-            top: layout.trackTop,
             height: THUMB_SIZE_PX,
           }}
         >

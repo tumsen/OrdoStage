@@ -104,7 +104,7 @@ export function DatetimeRangeFields({
             "justify-items-start"
           )}
         >
-          <div className="flex w-max max-w-full min-w-0 flex-col">
+          <div className="flex shrink-0 flex-col">
             <FieldLabel>Start date</FieldLabel>
             <DateInputWithWeekday
               value={startDate}
@@ -118,7 +118,7 @@ export function DatetimeRangeFields({
             <FieldLabel>Start</FieldLabel>
             <SplitTimeInput value={startT} aria-label="Start time" onChange={setStartTime} />
           </div>
-          <div className="flex w-max max-w-full min-w-0 flex-col">
+          <div className="flex shrink-0 flex-col">
             <FieldLabel>End date</FieldLabel>
             <DateInputWithWeekday
               value={endDate}
