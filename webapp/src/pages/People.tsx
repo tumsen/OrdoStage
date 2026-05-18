@@ -1378,7 +1378,7 @@ function PersonCard({
           <RemoteImageHoverPreview
             src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
             alt={person.name}
-            triggerClassName="h-full w-full rounded-full border-0 bg-transparent p-0 ring-0 shadow-none hover:border-white/20"
+            triggerClassName="h-14 w-14 max-h-14 max-w-14 rounded-full border-0 bg-transparent p-0 ring-0 shadow-none"
             triggerImgClassName="h-full w-full object-cover"
             title={person.name}
           />

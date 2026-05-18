@@ -75,6 +75,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
   const { data: session } = useSession();
   const { canView, isPending: permsLoading, me } = usePermissions();
   const { t } = useI18n();
+  const isMobile = useIsMobile();
 
   const handleSignOut = async () => {
     await signOut();
@@ -116,7 +117,10 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
           onClick={onNav}
           className="block w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#ffbe0b]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d14]"
         >
-          <OrdoStageLogo variant="sidebar" className="rounded-md max-h-[7.75rem]" />
+          <OrdoStageLogo
+            variant="sidebar"
+            className={cn("rounded-md w-full", isMobile ? "max-h-14" : "max-h-[7.75rem]")}
+          />
         </Link>
       </div>
 
@@ -349,7 +353,7 @@ export function Layout({ children }: LayoutProps) {
   }, []);
 
   return (
-    <div className="flex h-screen bg-[#0a0a0f] text-white overflow-hidden">
+    <div className="flex h-[100dvh] max-h-[100dvh] bg-[#0a0a0f] text-white overflow-hidden">
       <a
         href="#main-content"
         className="absolute left-4 top-0 z-[260] -translate-y-full bg-red-900 px-4 py-2 text-sm text-white shadow-lg transition-transform focus:translate-y-4 focus:outline-none focus:ring-2 focus:ring-white/40"
@@ -381,7 +385,7 @@ export function Layout({ children }: LayoutProps) {
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="p-0 w-56 bg-[#0d0d14] border-r border-white/10 pb-[env(safe-area-inset-bottom)]"
+                className="flex h-full max-h-[100dvh] w-[min(100vw,14rem)] max-w-[85vw] flex-col p-0 bg-[#0d0d14] border-r border-white/10 pb-[env(safe-area-inset-bottom)]"
               >
                 <SidebarContent onNav={() => setMobileOpen(false)} />
               </SheetContent>
@@ -398,12 +402,18 @@ export function Layout({ children }: LayoutProps) {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex min-h-0 flex-1 flex-col overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15"
+          className={cn(
+            "flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15",
+            isMobile ? "touch-scroll-y overflow-x-hidden" : "overflow-hidden"
+          )}
         >
-          {/* Inner scroll so routed pages can use flex-1 + min-h-0 without fighting overflow-y-auto on main. */}
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-            {children}
-          </div>
+          {isMobile ? (
+            children
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain">
+              {children}
+            </div>
+          )}
         </main>
       </div>
     </div>

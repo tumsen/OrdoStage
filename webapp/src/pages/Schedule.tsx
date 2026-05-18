@@ -410,7 +410,7 @@ export default function Schedule() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
+    <div className="app-page-fill md:app-page-fill flex flex-col gap-4 p-4 md:p-6 max-md:app-page-fill-mobile">
       {/* Top bar */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between shrink-0">
         <ScheduleFilters

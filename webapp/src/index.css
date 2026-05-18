@@ -137,6 +137,37 @@ All colors MUST be HSL.
   .page-shell {
     @apply p-4 sm:p-6 space-y-6;
   }
+
+  /* Let routed pages grow on mobile so the layout main region can scroll. */
+  @media (max-width: 767px) {
+    .page-shell {
+      @apply flex-none h-auto overflow-visible;
+    }
+  }
+}
+
+@layer utilities {
+  .touch-scroll-y {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  /* Full-viewport fill pages (schedule, time grid): scroll inside on mobile. */
+  @media (max-width: 767px) {
+    .app-page-fill-mobile {
+      @apply flex flex-col min-h-0 w-full flex-1;
+      min-height: min(70dvh, 32rem);
+      max-height: min(85dvh, 40rem);
+    }
+  }
+
+  @media (min-width: 768px) {
+    .app-page-fill {
+      @apply flex h-full min-h-0 flex-col overflow-hidden;
+    }
+  }
 }
 
 @layer components {

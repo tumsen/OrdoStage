@@ -119,7 +119,7 @@ export default function Staffing() {
   }, [data?.requirements, personFilter]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
+    <div className="app-page-fill md:app-page-fill flex flex-col gap-4 p-4 md:p-6 max-md:app-page-fill-mobile">
       <div className="shrink-0 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-white">Staffing</h1>

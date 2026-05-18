@@ -111,7 +111,7 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
   }, [pageTitle]);
 
   return (
-    <div className="flex h-screen bg-[#0a0a0f] text-white overflow-hidden">
+    <div className="flex h-[100dvh] max-h-[100dvh] bg-[#0a0a0f] text-white overflow-hidden">
       <a
         href="#main-content"
         className="absolute left-4 top-0 z-[260] -translate-y-full bg-ordo-violet/95 px-4 py-2 text-sm text-white shadow-lg transition-transform focus:translate-y-4 focus:outline-none focus:ring-2 focus:ring-ordo-yellow/50"
@@ -144,7 +144,7 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
         <main
           id="main-content"
           tabIndex={-1}
-          className="min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15"
+          className="min-h-0 flex-1 touch-scroll-y outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15"
         >
           {children}
         </main>

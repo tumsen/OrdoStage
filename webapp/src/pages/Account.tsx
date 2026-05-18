@@ -730,7 +730,7 @@ export default function Account() {
                   <RemoteImageHoverPreview
                     src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${mePerson.id}/photo?ts=${mePerson.photoUpdatedAt ?? ""}`}
                     alt="Profile"
-                    triggerClassName="h-24 w-24 rounded-md border border-white/10 bg-black/20 p-0 shadow-none"
+                    triggerClassName="h-24 w-24 max-h-24 max-w-24 rounded-md border border-white/10 bg-black/20 p-0 shadow-none"
                     triggerImgClassName="h-full w-full object-cover"
                   />
                 ) : null}

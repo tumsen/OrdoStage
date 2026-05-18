@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 const boxBase =
@@ -366,7 +367,31 @@ type RemoteImageHoverPreviewProps = {
   title?: string;
 };
 
-/** Larger image on hover (profile photos, logos) — same timing and panel styling as document previews. */
+function RemoteImagePreviewTrigger({
+  src,
+  alt,
+  triggerClassName,
+  triggerImgClassName,
+  title,
+}: RemoteImageHoverPreviewProps) {
+  return (
+    <span
+      title={title ?? alt}
+      className={cn(
+        "relative block shrink-0 overflow-hidden border border-white/10 bg-white/[0.04]",
+        triggerClassName,
+      )}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className={cn("block h-full w-full max-h-full max-w-full object-cover", triggerImgClassName)}
+      />
+    </span>
+  );
+}
+
+/** Larger image on hover (profile photos, logos) — disabled on mobile to avoid a full-screen preview on tap. */
 export function RemoteImageHoverPreview({
   src,
   alt,
@@ -374,6 +399,20 @@ export function RemoteImageHoverPreview({
   triggerImgClassName,
   title,
 }: RemoteImageHoverPreviewProps) {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <RemoteImagePreviewTrigger
+        src={src}
+        alt={alt}
+        triggerClassName={triggerClassName}
+        triggerImgClassName={triggerImgClassName}
+        title={title}
+      />
+    );
+  }
+
   return (
     <HoverCard openDelay={100} closeDelay={280}>
       <HoverCardTrigger asChild>

@@ -157,7 +157,7 @@ export default function VenueDetail() {
   return (
     <>
       {/* One full scrollport band (like Schedule): strip is a sibling below so it does not steal flex height from fitHoursVertically. */}
-      <div className="flex h-full min-h-0 w-full shrink-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
+      <div className="app-page-fill md:app-page-fill w-full shrink-0 flex flex-col gap-4 p-4 md:p-6 max-md:app-page-fill-mobile">
         <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3">
           <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white gap-1 -ml-2 shrink-0">
             <Link to="/venues">

@@ -1153,10 +1153,13 @@ export default function TimeTracking() {
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden",
+        "flex w-full flex-1 flex-col min-h-0 max-md:h-auto max-md:overflow-visible md:h-full md:overflow-hidden",
         mode === "week" && section === "time"
           ? "gap-2 p-2 sm:p-3 md:p-4"
-          : "gap-4 p-4 md:p-6"
+          : "gap-4 p-4 md:p-6",
+        isMobile && mode === "week" && section === "time"
+          ? "max-md:min-h-[min(70dvh,32rem)] max-md:max-h-[min(85dvh,40rem)]"
+          : ""
       )}
     >
       <div className="relative z-20 shrink-0 flex flex-col gap-4 bg-[#0a0a0f] pb-0 lg:flex-row lg:items-center lg:justify-between">
