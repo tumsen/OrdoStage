@@ -303,13 +303,18 @@ export default function TimeTracking() {
     setSelectedDayIndex(idx >= 0 ? idx : 0);
   }, [weekStartKey, weekDayYmds]);
 
+  const mobileDaySchedule = isMobile && section === "time" && mode === "week";
+
   const gridDays = useMemo(() => {
+    if (mobileDaySchedule) {
+      return [new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate())];
+    }
     if (isMobile && mode === "week") {
       const day = weekDays[selectedDayIndex];
       return day ? [day] : weekDays.length > 0 ? [weekDays[0]!] : [];
     }
     return weekDays;
-  }, [isMobile, mode, weekDays, selectedDayIndex]);
+  }, [mobileDaySchedule, anchor, isMobile, mode, weekDays, selectedDayIndex]);
 
   const weekGridTemplateColumns = useMemo(
     () => `56px repeat(${gridDays.length}, minmax(0, 1fr))`,
@@ -317,8 +322,16 @@ export default function TimeTracking() {
   );
 
   const gridWeekIndex = useCallback(
-    (gridIdx: number) => (isMobile && mode === "week" ? selectedDayIndex : gridIdx),
-    [isMobile, mode, selectedDayIndex]
+    (gridIdx: number) => {
+      if (mobileDaySchedule) {
+        const ymd = format(gridDays[gridIdx]!, "yyyy-MM-dd");
+        const idx = weekDayYmds.indexOf(ymd);
+        return idx >= 0 ? idx : 0;
+      }
+      if (isMobile && mode === "week") return selectedDayIndex;
+      return gridIdx;
+    },
+    [mobileDaySchedule, gridDays, weekDayYmds, isMobile, mode, selectedDayIndex]
   );
   const rangeFrom = format(mode === "week" ? weekStart : startOfMonth(anchor), "yyyy-MM-dd");
   const rangeTo = format(mode === "week" ? weekEnd : endOfMonth(anchor), "yyyy-MM-dd");
@@ -1153,15 +1166,29 @@ export default function TimeTracking() {
   return (
     <div
       className={cn(
-        "flex w-full flex-1 flex-col min-h-0 max-md:h-auto max-md:overflow-visible md:h-full md:overflow-hidden",
-        mode === "week" && section === "time"
-          ? "gap-2 p-2 sm:p-3 md:p-4"
-          : "gap-4 p-4 md:p-6",
-        isMobile && mode === "week" && section === "time"
-          ? "max-md:min-h-[min(70dvh,32rem)] max-md:max-h-[min(85dvh,40rem)]"
-          : ""
+        "flex w-full flex-1 flex-col min-h-0 md:h-full md:overflow-hidden",
+        mobileDaySchedule
+          ? "h-full overflow-hidden gap-0 p-0"
+          : "max-md:h-auto max-md:overflow-visible",
+        !mobileDaySchedule &&
+          (mode === "week" && section === "time"
+            ? "gap-2 p-2 sm:p-3 md:p-4"
+            : "gap-4 p-4 md:p-6")
       )}
     >
+      {mobileDaySchedule ? (
+        <div className="relative z-20 shrink-0 flex items-center justify-center border-b border-white/10 bg-[#0a0a0f] px-3 py-2">
+          <DateInputWithWeekday
+            value={format(anchor, "yyyy-MM-dd")}
+            onChange={(value) => {
+              const next = dateFromISODate(value);
+              if (next) {
+                setAnchor(new Date(next.getFullYear(), next.getMonth(), next.getDate()));
+              }
+            }}
+          />
+        </div>
+      ) : (
       <div className="relative z-20 shrink-0 flex flex-col gap-4 bg-[#0a0a0f] pb-0 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
@@ -1510,6 +1537,7 @@ export default function TimeTracking() {
           ) : null}
         </div>
       </div>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col">
       {section === "travel" ? (
@@ -1543,12 +1571,22 @@ export default function TimeTracking() {
           </div>
         </div>
       ) : (
-        <div className="relative z-0 flex min-h-0 flex-1 flex-col gap-2 pr-0.5">
-          <div className={CALENDAR_PANEL_SHELL_CLASS}>
+        <div className={cn("relative z-0 flex min-h-0 flex-1 flex-col pr-0.5", mobileDaySchedule ? "gap-0" : "gap-2")}>
+          <div
+            className={cn(
+              CALENDAR_PANEL_SHELL_CLASS,
+              mobileDaySchedule && "min-h-0 flex-1 rounded-none p-0"
+            )}
+          >
             <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
-              <div className={CALENDAR_GRID_SCROLLER_CLASS}>
+              <div
+                className={cn(
+                  CALENDAR_GRID_SCROLLER_CLASS,
+                  mobileDaySchedule && "min-h-0 flex-1 rounded-none border-x-0 border-t-0"
+                )}
+              >
             <div className={cn(!isMobile && "min-w-[720px]")}>
-              {isMobile && mode === "week" ? (
+              {isMobile && mode === "week" && !mobileDaySchedule ? (
                 <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2 py-2">
                   <Button
                     type="button"
@@ -2201,7 +2239,8 @@ export default function TimeTracking() {
             </div>
           </div>
 
-          {(hasUpcomingUnlogged ||
+          {!mobileDaySchedule &&
+          (hasUpcomingUnlogged ||
             (canManageTimeCatalog && mode === "week" && section === "time") ||
             (canEditVisiblePeriod && mode === "week" && section === "time")) ? (
             <Collapsible open={weekBottomOpen} onOpenChange={setWeekBottomOpen} className="shrink-0">

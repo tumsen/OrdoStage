@@ -345,8 +345,11 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const isMobile = useIsMobile();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t } = useI18n();
+  /** Mobile /time week grid: no billing or job banners; page fills viewport. */
+  const mobileTimeDayFocus = isMobile && location.pathname === "/time";
 
   useEffect(() => {
     document.title = "OrdoStage";
@@ -394,9 +397,9 @@ export function Layout({ children }: LayoutProps) {
         ) : null}
 
         {/* Billing warning banner */}
-        <BillingBanner />
+        {!mobileTimeDayFocus ? <BillingBanner /> : null}
 
-        <WorkAnnouncementBar />
+        {!mobileTimeDayFocus ? <WorkAnnouncementBar /> : null}
 
         {/* Page content */}
         <main
@@ -404,10 +407,16 @@ export function Layout({ children }: LayoutProps) {
           tabIndex={-1}
           className={cn(
             "flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/15",
-            isMobile ? "touch-scroll-y overflow-x-hidden" : "overflow-hidden"
+            mobileTimeDayFocus
+              ? "overflow-hidden"
+              : isMobile
+                ? "touch-scroll-y overflow-x-hidden"
+                : "overflow-hidden"
           )}
         >
-          {isMobile ? (
+          {mobileTimeDayFocus ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+          ) : isMobile ? (
             children
           ) : (
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain">
