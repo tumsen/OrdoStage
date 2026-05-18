@@ -674,9 +674,18 @@ export default function TimeTracking() {
   /** One HTMLElement per week column — same pattern as `OutlookTimeGrid` column refs. */
   const weekColumnRefs = useRef<(HTMLElement | null)[]>([]);
 
-  useEffect(() => {
-    weekColumnRefs.current = [];
-  }, [anchor, mobileDaySchedule]);
+  const registerDayColumnRef = useCallback(
+    (colEl: Element | null, dayYmd: string) => {
+      const colIdx = columnIndexForDayYmd(dayYmd);
+      if (colEl instanceof HTMLElement) {
+        weekColumnRefs.current[colIdx] = colEl;
+        activeColElRef.current = colEl;
+      } else {
+        activeColElRef.current = null;
+      }
+    },
+    [columnIndexForDayYmd]
+  );
 
   const editingEntry = useMemo(
     () => (entries ?? []).find((x) => x.id === editingEntryId) ?? null,
@@ -931,7 +940,7 @@ export default function TimeTracking() {
       const cur = entryDragRef.current;
       if (!cur) return;
       const idx = findGridColumnIndexAtX(ev.clientX, cur.startDayIndex);
-      const col = weekColumnRefs.current[idx];
+      const col = weekColumnRefs.current[idx] ?? activeColElRef.current;
       if (!col) return;
       activeColElRef.current = col;
       const mSnap = minutesFromY(ev.clientY, col);
@@ -1003,7 +1012,7 @@ export default function TimeTracking() {
       }
 
       const idx = findGridColumnIndexAtX(ev.clientX, d.startDayIndex);
-      const col = weekColumnRefs.current[idx];
+      const col = weekColumnRefs.current[idx] ?? activeColElRef.current;
       const ymd = dayYmdForColumnIndex(idx);
       const m = col ? minutesFromY(ev.clientY, col) : null;
 
@@ -2002,6 +2011,10 @@ export default function TimeTracking() {
                           className="absolute inset-0 z-[1] cursor-crosshair touch-none"
                           onPointerDown={(ev) => {
                             ev.preventDefault();
+                            registerDayColumnRef(
+                              (ev.currentTarget as HTMLElement).closest("[data-day-col]"),
+                              dayYmd
+                            );
                             attachCreateDragListeners(dayYmd, ev.clientX, ev.clientY);
                           }}
                         />
@@ -2174,8 +2187,11 @@ export default function TimeTracking() {
                               if (!canEditVisiblePeriod) return;
                               if (isLocked) return;
                               if ((ev.target as HTMLElement).closest("[data-handle]")) return;
-                              const col = (ev.currentTarget as HTMLElement).closest("[data-day-col]");
-                              activeColElRef.current = col instanceof HTMLElement ? col : null;
+                              ev.preventDefault();
+                              registerDayColumnRef(
+                                (ev.currentTarget as HTMLElement).closest("[data-day-col]"),
+                                dayYmd
+                              );
                               const sWin = minutesFromWindowStart(start, dayYmd, displayStartHour);
                               entryDragRef.current = {
                                 entryId: e.id,
@@ -2313,10 +2329,10 @@ export default function TimeTracking() {
                                   onPointerDown={(ev) => {
                                     if (isLocked) return;
                                     ev.stopPropagation();
-                                    const col = (ev.currentTarget as HTMLElement).closest(
-                                      "[data-day-col]"
+                                    registerDayColumnRef(
+                                      (ev.currentTarget as HTMLElement).closest("[data-day-col]"),
+                                      dayYmd
                                     );
-                                    activeColElRef.current = col instanceof HTMLElement ? col : null;
                                     const sWin = minutesFromWindowStart(start, dayYmd, displayStartHour);
                                     entryDragRef.current = {
                                       entryId: e.id,
@@ -2340,10 +2356,10 @@ export default function TimeTracking() {
                                   onPointerDown={(ev) => {
                                     if (isLocked) return;
                                     ev.stopPropagation();
-                                    const col = (ev.currentTarget as HTMLElement).closest(
-                                      "[data-day-col]"
+                                    registerDayColumnRef(
+                                      (ev.currentTarget as HTMLElement).closest("[data-day-col]"),
+                                      dayYmd
                                     );
-                                    activeColElRef.current = col instanceof HTMLElement ? col : null;
                                     const sWin = minutesFromWindowStart(start, dayYmd, displayStartHour);
                                     entryDragRef.current = {
                                       entryId: e.id,
@@ -2371,6 +2387,7 @@ export default function TimeTracking() {
             })}
                 </div>
 
+                {!mobileDaySchedule ? (
                 <div
                   className="grid min-w-0"
                   style={{ gridTemplateColumns: weekGridTemplateColumns }}
@@ -2385,6 +2402,7 @@ export default function TimeTracking() {
                   );
                   })}
                 </div>
+                ) : null}
             </div>
               </div>
             </div>
