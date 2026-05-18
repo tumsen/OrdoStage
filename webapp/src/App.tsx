@@ -56,9 +56,9 @@ const ROUTER_FUTURE = {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
       <Sonner />
       <BrowserRouter future={ROUTER_FUTURE}>
+        <Toaster />
         <AppErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
         <Routes>
