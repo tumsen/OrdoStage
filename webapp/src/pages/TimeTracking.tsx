@@ -52,7 +52,7 @@ import {
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useI18n } from "@/lib/i18n";
-import { toast } from "@/hooks/use-toast";
+import { toast, useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { timeCategoryMessageId } from "@/lib/timeCategoryI18n";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
@@ -303,32 +303,56 @@ export default function TimeTracking() {
   }, [weekStartKey, weekDayYmds]);
 
   const mobileDaySchedule = isMobile && section === "time" && mode === "week";
+  const mobileTimeGridTopPad = 4;
 
-  const [mobilePxPerHour, setMobilePxPerHour] = useState(PX_PER_HOUR);
-  const mobileGridBodyRef = useRef<HTMLDivElement>(null);
+  const [mobilePxPerHour, setMobilePxPerHour] = useState(10);
+  const [mobileGridAreaPx, setMobileGridAreaPx] = useState(0);
+  const mobileCalendarPanelRef = useRef<HTMLDivElement>(null);
+  const mobileDayHeaderRef = useRef<HTMLDivElement>(null);
   const columnHeightPxRef = useRef(COLUMN_HEIGHT_PX);
 
+  const effectiveTopPad = mobileDaySchedule ? mobileTimeGridTopPad : CALENDAR_TIME_GRID_TOP_PAD_PX;
   const effectivePxPerHour = mobileDaySchedule ? mobilePxPerHour : PX_PER_HOUR;
   const effectiveColumnHeightPx = (MINUTES_PER_DAY / 60) * effectivePxPerHour;
-  const effectiveColumnFrameHeightPx = effectiveColumnHeightPx + CALENDAR_TIME_GRID_TOP_PAD_PX;
+  const effectiveColumnFrameHeightPx =
+    mobileDaySchedule && mobileGridAreaPx > 0
+      ? mobileGridAreaPx
+      : effectiveColumnHeightPx + effectiveTopPad;
 
   columnHeightPxRef.current = effectiveColumnHeightPx;
 
+  const { dismiss: dismissToasts } = useToast();
+
+  const timeNotify = useCallback(
+    (props: Parameters<typeof toast>[0]) => {
+      if (mobileDaySchedule && props.variant !== "destructive") return;
+      toast(props);
+    },
+    [mobileDaySchedule]
+  );
+
+  useEffect(() => {
+    if (mobileDaySchedule) dismissToasts();
+  }, [mobileDaySchedule]); // eslint-disable-line react-hooks/exhaustive-deps -- dismiss once when entering mobile day view
+
   useLayoutEffect(() => {
     if (!mobileDaySchedule) return;
-    const el = mobileGridBodyRef.current;
-    if (!el) return;
+    const panel = mobileCalendarPanelRef.current;
+    if (!panel) return;
     const measure = () => {
-      const available = el.clientHeight - CALENDAR_TIME_GRID_TOP_PAD_PX;
-      if (available > 0) {
-        setMobilePxPerHour(Math.max(6, Math.floor(available / 24)));
+      const headerH = mobileDayHeaderRef.current?.offsetHeight ?? 0;
+      const gridArea = panel.clientHeight - headerH;
+      const available = gridArea - mobileTimeGridTopPad;
+      if (available > 0 && gridArea > 0) {
+        setMobilePxPerHour(Math.max(4, Math.floor(available / 24)));
+        setMobileGridAreaPx(gridArea);
       }
     };
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
+    ro.observe(panel);
     return () => ro.disconnect();
-  }, [mobileDaySchedule, anchor]);
+  }, [mobileDaySchedule, anchor, mobileTimeGridTopPad]);
 
   const shiftMobileDay = useCallback((delta: number) => {
     setAnchor((d) => addDays(new Date(d.getFullYear(), d.getMonth(), d.getDate()), delta));
@@ -570,7 +594,7 @@ export default function TimeTracking() {
       });
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       queryClient.invalidateQueries({ queryKey: ["time-jobs-upcoming"] });
-      toast({ title: t("time.entryCreated") });
+      timeNotify({ title: t("time.entryCreated") });
     },
   });
 
@@ -579,7 +603,7 @@ export default function TimeTracking() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       queryClient.invalidateQueries({ queryKey: ["time-jobs-upcoming"] });
-      toast({ title: t("time.entryDeleted") });
+      timeNotify({ title: t("time.entryDeleted") });
       setEditingEntryId(null);
     },
     onError: () => toast({ title: t("time.deleteError"), variant: "destructive" }),
@@ -594,7 +618,7 @@ export default function TimeTracking() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-approvals"] });
-      toast({ title: "Timesheet approved" });
+      timeNotify({ title: "Timesheet approved" });
     },
     onError: () => toast({ title: "Could not approve timesheet", variant: "destructive" }),
   });
@@ -603,7 +627,7 @@ export default function TimeTracking() {
     mutationFn: (id: string) => api.post<TimesheetApproval>(`/api/time/approvals/${id}/reopen`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-approvals"] });
-      toast({ title: "Timesheet reopened" });
+      timeNotify({ title: "Timesheet reopened" });
     },
     onError: () => toast({ title: "Could not reopen timesheet", variant: "destructive" }),
   });
@@ -1604,6 +1628,7 @@ export default function TimeTracking() {
           >
             <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
               <div
+                ref={mobileDaySchedule ? mobileCalendarPanelRef : undefined}
                 className={cn(
                   mobileDaySchedule
                     ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-x-0 border-t-0 border-b border-white/10 bg-white/[0.02]"
@@ -1667,7 +1692,10 @@ export default function TimeTracking() {
                 </div>
               ) : null}
               {mobileScheduleDay ? (
-                <div className="shrink-0 border-b border-white/10 bg-white/[0.07] px-1 py-1.5">
+                <div
+                  ref={mobileDayHeaderRef}
+                  className="shrink-0 border-b border-white/10 bg-white/[0.07] px-1 py-1.5"
+                >
                   <div className="flex items-center gap-0.5">
                     <Button
                       type="button"
@@ -1836,9 +1864,16 @@ export default function TimeTracking() {
                 ) : null}
 
                 <div
-                  ref={mobileDaySchedule ? mobileGridBodyRef : undefined}
-                  className={cn("grid min-w-0", mobileDaySchedule && "min-h-0 flex-1")}
-                  style={{ gridTemplateColumns: weekGridTemplateColumns }}
+                  className={cn(
+                    "grid min-w-0",
+                    mobileDaySchedule && "min-h-0 flex-1 shrink overflow-hidden"
+                  )}
+                  style={{
+                    gridTemplateColumns: weekGridTemplateColumns,
+                    ...(mobileDaySchedule && mobileGridAreaPx > 0
+                      ? { height: mobileGridAreaPx, maxHeight: mobileGridAreaPx }
+                      : {}),
+                  }}
                 >
                   <div
                     className="relative box-border"
@@ -1847,7 +1882,7 @@ export default function TimeTracking() {
                     <div
                       className="pointer-events-none absolute inset-x-0 border-r border-white/10"
                       style={{
-                        top: CALENDAR_TIME_GRID_TOP_PAD_PX,
+                        top: effectiveTopPad,
                         height: effectiveColumnHeightPx,
                       }}
                     >
@@ -1856,16 +1891,23 @@ export default function TimeTracking() {
                         return (
                           <div
                             key={h}
-                            className="pointer-events-none absolute left-0 right-1 z-[1] flex -translate-y-1/2 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums"
+                            className={cn(
+                              "pointer-events-none absolute left-0 right-1 z-[1] flex items-end justify-end text-right text-white/50 tabular-nums",
+                              mobileDaySchedule
+                                ? "text-[8px] leading-[9px]"
+                                : "-translate-y-1/2 text-[9px] leading-[10px]"
+                            )}
                             style={{ top: h * effectivePxPerHour }}
                           >
                             {formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h")}
                           </div>
                         );
                       })}
-                      <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
-                        {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
-                      </span>
+                      {!mobileDaySchedule ? (
+                        <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
+                          {bottomBoundaryLabel(displayStartHour, timeFormat === "24h" ? "24h" : "12h")}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
             {gridDays.map((day, gridIdx) => {
@@ -1903,7 +1945,7 @@ export default function TimeTracking() {
                       col?.bg
                     )}
                     style={{
-                      top: CALENDAR_TIME_GRID_TOP_PAD_PX,
+                      top: effectiveTopPad,
                       height: effectiveColumnHeightPx,
                     }}
                   >
@@ -1917,7 +1959,9 @@ export default function TimeTracking() {
                         style={{ top: h * effectivePxPerHour }}
                       />
                     ))}
-                    <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1]" />
+                    {!mobileDaySchedule ? (
+                      <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1]" />
+                    ) : null}
                     {canEditVisiblePeriod ? (
                       <>
                         <div
@@ -2146,7 +2190,7 @@ export default function TimeTracking() {
                                       { id: e.id, body: { isLocked: !isLocked } },
                                       {
                                         onSuccess: () => {
-                                          toast({
+                                          timeNotify({
                                             title: !isLocked
                                               ? t("time.entryLocked")
                                               : t("time.entryUnlocked"),
@@ -2440,7 +2484,7 @@ export default function TimeTracking() {
             { id, body },
             {
               onSuccess: () => {
-                toast({ title: t("time.entryUpdated") });
+                timeNotify({ title: t("time.entryUpdated") });
               },
             }
           );
@@ -2450,7 +2494,7 @@ export default function TimeTracking() {
             { id, body: { isLocked: locked } },
             {
               onSuccess: () => {
-                toast({ title: locked ? t("time.entryLocked") : t("time.entryUnlocked") });
+                timeNotify({ title: locked ? t("time.entryLocked") : t("time.entryUnlocked") });
               },
             }
           );

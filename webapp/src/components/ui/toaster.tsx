@@ -1,8 +1,17 @@
+import { useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from "@/components/ui/toast";
 
 export function Toaster() {
   const { toasts } = useToast();
+  const isMobile = useIsMobile();
+  const location = useLocation();
+  const hideViewport =
+    isMobile &&
+    location.pathname === "/time" &&
+    !toasts.some((t) => t.open && t.variant === "destructive");
 
   return (
     <ToastProvider>
@@ -18,7 +27,7 @@ export function Toaster() {
           </Toast>
         );
       })}
-      <ToastViewport />
+      <ToastViewport className={cn(hideViewport && "hidden pointer-events-none")} />
     </ToastProvider>
   );
 }
