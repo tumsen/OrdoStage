@@ -101,10 +101,14 @@ export function WorkAnnouncementBar() {
               <span className="text-white/50 text-xs uppercase tracking-wide mr-2">Your next job</span>
               <span className="font-medium text-white">{nextAssignedJob.title}</span>
               <span className="text-white/55"> · {nextAssignedJob.eventTitle}</span>
-              <span className="text-white/45 text-xs sm:text-sm">
+              <span className="text-white/45 text-xs sm:text-sm hidden sm:inline">
                 {" "}
                 — {formatWhen(nextAssignedJob.jobDate, nextAssignedJob.startTime, locale, hour12)}
                 {nextAssignedJob.venueName ? ` · ${nextAssignedJob.venueName}` : ""}
+              </span>
+              <span className="text-white/45 text-xs sm:hidden">
+                {" "}
+                — {formatWhen(nextAssignedJob.jobDate, nextAssignedJob.startTime, locale, hour12)}
               </span>
             </span>
             <ChevronRight size={14} className="text-white/25 shrink-0 hidden sm:block" aria-hidden />
@@ -127,10 +131,14 @@ export function WorkAnnouncementBar() {
             <span className="min-w-0">
               <span className="text-white/50 text-xs uppercase tracking-wide mr-2">Next show</span>
               <span className="font-medium text-white">{nextOrgShow.eventTitle}</span>
-              <span className="text-white/45 text-xs sm:text-sm">
+              <span className="text-white/45 text-xs sm:text-sm hidden sm:inline">
                 {" "}
                 — {formatWhen(nextOrgShow.showDate, nextOrgShow.showTime, locale, hour12)}
                 {nextOrgShow.venueName ? ` · ${nextOrgShow.venueName}` : ""}
+              </span>
+              <span className="text-white/45 text-xs sm:hidden">
+                {" "}
+                — {formatWhen(nextOrgShow.showDate, nextOrgShow.showTime, locale, hour12)}
               </span>
               {nextOrgShow.status === "draft" ? (
                 <span className="ml-1.5 text-[10px] uppercase px-1.5 py-px rounded bg-ordo-yellow/25 text-ordo-yellow border border-ordo-yellow/40">

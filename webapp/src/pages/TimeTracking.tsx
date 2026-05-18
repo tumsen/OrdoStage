@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
 import {
   addDays,
@@ -24,6 +25,7 @@ import {
   ChevronRight,
   Lock,
   LockOpen,
+  MoreHorizontal,
   Pencil,
   BarChart2,
   Trash2,
@@ -31,6 +33,14 @@ import {
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -265,6 +275,8 @@ export default function TimeTracking() {
   const [weekBottomOpen, setWeekBottomOpen] = useState(false);
   const [displayStartHour, setDisplayStartHour] = useState(readDisplayStartHour);
   const displayStartHourRef = useRef(displayStartHour);
+  const isMobile = useIsMobile();
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
   useEffect(() => {
     window.localStorage.setItem(DISPLAY_START_STORAGE_KEY, String(displayStartHour));
@@ -284,9 +296,29 @@ export default function TimeTracking() {
     () => weekDays.map((d) => format(d, "yyyy-MM-dd")),
     [weekDays]
   );
+  const weekStartKey = format(weekStart, "yyyy-MM-dd");
+  useEffect(() => {
+    const todayYmd = format(new Date(), "yyyy-MM-dd");
+    const idx = weekDayYmds.indexOf(todayYmd);
+    setSelectedDayIndex(idx >= 0 ? idx : 0);
+  }, [weekStartKey, weekDayYmds]);
+
+  const gridDays = useMemo(() => {
+    if (isMobile && mode === "week") {
+      const day = weekDays[selectedDayIndex];
+      return day ? [day] : weekDays.length > 0 ? [weekDays[0]!] : [];
+    }
+    return weekDays;
+  }, [isMobile, mode, weekDays, selectedDayIndex]);
+
   const weekGridTemplateColumns = useMemo(
-    () => `56px repeat(${weekDays.length}, minmax(0, 1fr))`,
-    [weekDays.length]
+    () => `56px repeat(${gridDays.length}, minmax(0, 1fr))`,
+    [gridDays.length]
+  );
+
+  const gridWeekIndex = useCallback(
+    (gridIdx: number) => (isMobile && mode === "week" ? selectedDayIndex : gridIdx),
+    [isMobile, mode, selectedDayIndex]
   );
   const rangeFrom = format(mode === "week" ? weekStart : startOfMonth(anchor), "yyyy-MM-dd");
   const rangeTo = format(mode === "week" ? weekEnd : endOfMonth(anchor), "yyyy-MM-dd");
@@ -1131,7 +1163,8 @@ export default function TimeTracking() {
         <div>
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 whitespace-nowrap">
+        <div className="flex flex-col gap-2 w-full sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 lg:flex-nowrap lg:overflow-x-auto lg:pb-1">
+          <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
             <button
               type="button"
@@ -1185,7 +1218,7 @@ export default function TimeTracking() {
               {t("time.month")}
             </button>
           </div>
-          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">
+          <div className="hidden sm:flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">
             <Label className="text-[10px] uppercase tracking-wide text-white/45 whitespace-nowrap">
               {t("time.gridStartsAt")}
             </Label>
@@ -1205,6 +1238,7 @@ export default function TimeTracking() {
               </SelectContent>
             </Select>
           </div>
+          <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:gap-2">
           <Button
             type="button"
             variant="outline"
@@ -1313,8 +1347,9 @@ export default function TimeTracking() {
               </SelectContent>
             </Select>
           ) : null}
+          </div>
           {readAll && (
-            <Link to="/time/reports">
+            <Link to="/time/reports" className="hidden sm:inline-flex">
               <Button
                 type="button"
                 variant="outline"
@@ -1326,6 +1361,150 @@ export default function TimeTracking() {
               </Button>
             </Link>
           )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:hidden">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 min-h-9 min-w-9 border-white/15 text-white"
+            onClick={() =>
+              setAnchor((d) => (mode === "week" ? subWeeks(d, 1) : subMonths(d, 1)))
+            }
+            aria-label="Previous"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <DateInputWithWeekday
+            value={format(anchor, "yyyy-MM-dd")}
+            onChange={(value) => {
+              const next = dateFromISODate(value);
+              if (next) setAnchor(next);
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 min-h-9 min-w-9 border-white/15 text-white"
+            onClick={() =>
+              setAnchor((d) => (mode === "week" ? addWeeks(d, 1) : addMonths(d, 1)))
+            }
+            aria-label="Next"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-9 text-xs text-white/40 hover:text-white/70 hover:bg-white/5"
+            onClick={() => {
+              const today = new Date();
+              setAnchor(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+            }}
+          >
+            Today
+          </Button>
+          {mode === "week" ? (
+            <span className="text-xs text-white/60 tabular-nums">
+              Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
+              <span className="text-white/35"> · </span>
+              {formatTotalMinutesAsHHMM(weekTotalMinutes)}
+            </span>
+          ) : null}
+          </div>
+          {isMobile ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 min-h-9 min-w-9 border-white/15 text-white shrink-0"
+                  aria-label="More options"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-[#16161f] border-white/10 text-white w-56">
+                <DropdownMenuLabel className="text-white/50">{t("time.gridStartsAt")}</DropdownMenuLabel>
+                <div className="px-2 pb-2">
+                  <Select
+                    value={String(displayStartHour)}
+                    onValueChange={(v) => setDisplayStartHour(Number.parseInt(v, 10))}
+                  >
+                    <SelectTrigger className="h-9 w-full bg-white/5 border-white/10 text-white text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-60">
+                      {Array.from({ length: 24 }).map((_, h) => (
+                        <SelectItem key={h} value={String(h)}>
+                          {formatHourLabel(h, timeFormat === "24h" ? "24h" : "12h")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {mode === "week" ? (
+                  <>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    {approvedTimesheet ? (
+                      <DropdownMenuItem
+                        className="text-emerald-300 focus:bg-white/10 focus:text-emerald-200"
+                        onClick={() => readAll && reopenTimesheet.mutate(approvedTimesheet.id)}
+                        disabled={!readAll || reopenTimesheet.isPending}
+                      >
+                        Reopen approved week
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        className="focus:bg-white/10"
+                        onClick={() => approveTimesheet.mutate()}
+                        disabled={!canEdit || approveTimesheet.isPending}
+                      >
+                        Approve week
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                ) : null}
+                {readAll && peopleForFilter && peopleForFilter.length > 0 ? (
+                  <>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuLabel className="text-white/50">{t("time.personFilter")}</DropdownMenuLabel>
+                    <div className="px-2 pb-2">
+                      <Select
+                        value={selectedPersonId ?? mePerson.id}
+                        onValueChange={(v) => setSelectedPersonId(v === mePerson.id ? null : v)}
+                      >
+                        <SelectTrigger className="h-9 w-full bg-white/5 border-white/10 text-white text-sm">
+                          <SelectValue placeholder={t("time.personFilter")} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                          <SelectItem value={mePerson.id}>{t("time.me")}</SelectItem>
+                          {peopleForFilter
+                            .filter((p) => p.id !== mePerson.id)
+                            .map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                ) : null}
+                {readAll ? (
+                  <>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuItem asChild className="focus:bg-white/10">
+                      <Link to="/time/reports">{t("time.reportsLink")}</Link>
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </div>
       </div>
 
@@ -1365,14 +1544,70 @@ export default function TimeTracking() {
           <div className={CALENDAR_PANEL_SHELL_CLASS}>
             <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
               <div className={CALENDAR_GRID_SCROLLER_CLASS}>
-            <div className="min-w-[720px]">
+            <div className={cn(!isMobile && "min-w-[720px]")}>
+              {isMobile && mode === "week" ? (
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2 py-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 min-h-9 min-w-9 border-white/15 text-white shrink-0"
+                    disabled={selectedDayIndex <= 0}
+                    onClick={() => setSelectedDayIndex((i) => Math.max(0, i - 1))}
+                    aria-label="Previous day"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="min-w-0 flex-1 text-center">
+                    <div className="text-sm font-semibold text-white truncate">
+                      {weekDays[selectedDayIndex]
+                        ? format(weekDays[selectedDayIndex]!, "EEEE d MMM", { locale: dfLocale })
+                        : ""}
+                    </div>
+                    <div className="mt-1 flex justify-center gap-1">
+                      {weekDays.map((day, i) => {
+                        const ymd = format(day, "yyyy-MM-dd");
+                        const hasTime = (totalsByColumnDay.get(ymd) ?? 0) > 0;
+                        return (
+                          <button
+                            key={ymd}
+                            type="button"
+                            onClick={() => setSelectedDayIndex(i)}
+                            className={cn(
+                              "h-2 w-2 rounded-full transition-colors",
+                              i === selectedDayIndex
+                                ? "bg-ordo-yellow"
+                                : hasTime
+                                  ? "bg-white/45"
+                                  : "bg-white/15"
+                            )}
+                            aria-label={format(day, "EEEE", { locale: dfLocale })}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 min-h-9 min-w-9 border-white/15 text-white shrink-0"
+                    disabled={selectedDayIndex >= weekDays.length - 1}
+                    onClick={() => setSelectedDayIndex((i) => Math.min(weekDays.length - 1, i + 1))}
+                    aria-label="Next day"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : null}
                 <div className={cn(CALENDAR_STICKY_HEADER_CHROME, "border-b border-white/10")}>
                   <div
                     className="grid min-w-0"
                     style={{ gridTemplateColumns: weekGridTemplateColumns }}
                   >
                     <div className={cn(WEEK_GRID_HEADER_CLASS, "w-full border-b-0 border-r border-white/10 bg-white/[0.02]")} aria-hidden />
-                    {weekDays.map((day, dayIdx) => {
+                    {gridDays.map((day, gridIdx) => {
+                      const dayIdx = gridWeekIndex(gridIdx);
                       const dayYmd = format(day, "yyyy-MM-dd");
                       const dayTotalMinutes = totalsByColumnDay.get(dayYmd) ?? 0;
                       const runningMinutes = weekRunningTotalMinutes[dayIdx] ?? dayTotalMinutes;
@@ -1421,7 +1656,7 @@ export default function TimeTracking() {
                             "group",
                             WEEK_GRID_HEADER_CLASS,
                             "min-w-0 text-xs text-white/70",
-                            dayIdx > 0 && "border-l border-white/10",
+                            gridIdx > 0 && "border-l border-white/10",
                             col?.bg,
                             col ? `border-b ${col.border}` : "border-b border-white/10"
                           )}
@@ -1522,7 +1757,7 @@ export default function TimeTracking() {
                       </span>
                     </div>
                   </div>
-            {weekDays.map((day, dayIndex) => {
+            {gridDays.map((day, gridIdx) => {
               const dayYmd = format(day, "yyyy-MM-dd");
               const dayOffEntry = (entries ?? []).find(
                 (e) =>
@@ -1545,12 +1780,12 @@ export default function TimeTracking() {
                   <div className="relative box-border" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
                   <div
                     ref={(el) => {
-                      weekColumnRefs.current[dayIndex] = el;
+                      weekColumnRefs.current[gridIdx] = el;
                     }}
                     data-day-col={dayYmd}
                     className={cn(
                       "absolute inset-x-0 touch-none select-none",
-                      dayIndex > 0 && "border-l border-white/10",
+                      gridIdx > 0 && "border-l border-white/10",
                       col?.bg
                     )}
                     style={{
@@ -1949,12 +2184,14 @@ export default function TimeTracking() {
                   style={{ gridTemplateColumns: weekGridTemplateColumns }}
                 >
                   <div className="h-6 shrink-0 border-r border-white/10 bg-white/[0.02]" />
-                  {weekDays.map((day, dayIdx) => (
+                  {gridDays.map((day, gridIdx) => {
+                  return (
                     <div
                       key={`pad-${format(day, "yyyy-MM-dd")}`}
-                      className={cn("h-6 shrink-0", dayIdx > 0 && "border-l border-white/10")}
+                      className={cn("h-6 shrink-0", gridIdx > 0 && "border-l border-white/10")}
                     />
-                  ))}
+                  );
+                  })}
                 </div>
             </div>
               </div>

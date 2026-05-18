@@ -271,10 +271,12 @@ function BillingBanner() {
   if (!org) return null;
   if (org.isViewOnlyDueToBilling || org.billingStatus === "overdue_view_only") {
     return (
-      <div className="flex-shrink-0 bg-red-950/80 border-b border-red-800/50 px-4 py-2 flex items-center gap-2 text-sm">
-        <AlertTriangle size={14} className="text-red-400 flex-shrink-0" />
-        <span className="text-red-300">Billing overdue. Organization is view-only until invoice is paid.</span>
-        <Link to="/account#billing" className="ml-auto text-red-200 underline underline-offset-2 hover:text-white whitespace-nowrap">
+      <div className="billing-banner bg-red-950/80 border-b border-red-800/50">
+        <AlertTriangle size={14} className="text-red-400 flex-shrink-0 hidden sm:block" />
+        <span className="billing-banner-message text-red-300">
+          Billing overdue. Organization is view-only until invoice is paid.
+        </span>
+        <Link to="/account#billing" className="billing-banner-action text-red-200">
           Open billing
         </Link>
       </div>
@@ -288,13 +290,13 @@ function BillingBanner() {
       minute: "2-digit",
     });
     return (
-      <div className="flex-shrink-0 bg-amber-950/70 border-b border-amber-800/45 px-4 py-2 flex items-center gap-2 text-sm">
-        <AlertTriangle size={14} className="text-amber-300 flex-shrink-0" />
-        <span className="text-amber-100/95">
+      <div className="billing-banner bg-amber-950/70 border-b border-amber-800/45">
+        <AlertTriangle size={14} className="text-amber-300 flex-shrink-0 hidden sm:block" />
+        <span className="billing-banner-message text-amber-100/95">
           Invoice is past due. Read-only starts after <span className="font-medium text-amber-50">{until}</span> unless
           paid.
         </span>
-        <Link to="/account#billing" className="ml-auto text-amber-100 underline underline-offset-2 hover:text-white whitespace-nowrap">
+        <Link to="/account#billing" className="billing-banner-action text-amber-100">
           Open billing
         </Link>
       </div>
@@ -303,10 +305,12 @@ function BillingBanner() {
   if (org.billingOnTrial && org.trialEndsAt) {
     const end = new Date(org.trialEndsAt).toLocaleDateString();
     return (
-      <div className="flex-shrink-0 bg-emerald-950/50 border-b border-emerald-800/40 px-4 py-2 flex items-center gap-2 text-sm">
-        <AlertTriangle size={14} className="text-emerald-400 flex-shrink-0" />
-        <span className="text-emerald-100/90">Trial active until {end}. Unpaid invoices do not lock the workspace during the trial.</span>
-        <Link to="/account#billing" className="ml-auto text-emerald-100 underline underline-offset-2 hover:text-white whitespace-nowrap">
+      <div className="billing-banner bg-emerald-950/50 border-b border-emerald-800/40">
+        <AlertTriangle size={14} className="text-emerald-400 flex-shrink-0 hidden sm:block" />
+        <span className="billing-banner-message text-emerald-100/90">
+          Trial active until {end}. Unpaid invoices do not lock the workspace during the trial.
+        </span>
+        <Link to="/account#billing" className="billing-banner-action text-emerald-100">
           Billing
         </Link>
       </div>
@@ -317,10 +321,10 @@ function BillingBanner() {
     if (due.getTime() >= Date.now()) {
       const dueStr = due.toLocaleDateString();
       return (
-        <div className="flex-shrink-0 bg-ordo-orange/15 border-b border-ordo-yellow/35 px-4 py-2 flex items-center gap-2 text-sm">
-          <AlertTriangle size={14} className="text-ordo-yellow flex-shrink-0" />
-          <span className="text-ordo-yellow/95">Open invoice due on {dueStr}.</span>
-          <Link to="/account#billing" className="ml-auto text-ordo-yellow underline underline-offset-2 hover:text-white whitespace-nowrap">
+        <div className="billing-banner bg-ordo-orange/15 border-b border-ordo-yellow/35">
+          <AlertTriangle size={14} className="text-ordo-yellow flex-shrink-0 hidden sm:block" />
+          <span className="billing-banner-message text-ordo-yellow/95">Open invoice due on {dueStr}.</span>
+          <Link to="/account#billing" className="billing-banner-action text-ordo-yellow">
             Open billing
           </Link>
         </div>
@@ -363,16 +367,21 @@ export function Layout({ children }: LayoutProps) {
       <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", !isMobile && "pl-56")}>
         {/* Mobile header — only the hamburger, no title */}
         {isMobile ? (
-          <header className="flex-shrink-0 h-12 border-b border-ordo-violet/20 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3">
+          <header className="flex-shrink-0 min-h-12 border-b border-ordo-violet/20 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3 pt-[env(safe-area-inset-top)]">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-white/60 hover:text-white h-8 w-8">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white/60 hover:text-white h-9 w-9 min-h-9 min-w-9"
+                  aria-label="Open menu"
+                >
                   <Menu size={18} />
                 </Button>
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="p-0 w-56 bg-[#0d0d14] border-r border-white/10"
+                className="p-0 w-56 bg-[#0d0d14] border-r border-white/10 pb-[env(safe-area-inset-bottom)]"
               >
                 <SidebarContent onNav={() => setMobileOpen(false)} />
               </SheetContent>

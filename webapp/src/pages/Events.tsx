@@ -71,10 +71,10 @@ export default function Events() {
   });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="page-shell">
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
           <div className="flex items-center gap-2 text-white/40">
             <Filter size={14} />
             <span className="text-xs">Filter:</span>
@@ -147,7 +147,7 @@ export default function Events() {
               return (
               <div key={event.id} className="contents group">
                 <div
-                  className="px-5 py-3.5 border-b border-white/5 cursor-pointer"
+                  className="px-4 sm:px-5 py-3.5 border-b border-white/5 cursor-pointer"
                   onClick={() => navigate(`/events/${event.id}`)}
                 >
                   <div className="flex items-baseline gap-x-2 flex-wrap min-w-0">

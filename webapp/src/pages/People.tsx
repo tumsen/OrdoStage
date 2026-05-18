@@ -1088,16 +1088,15 @@ function PersonFormDialog({
               <p className="text-[11px] text-white/35">
                 Add passport, driver license, certificates, contracts, or other files.
               </p>
-              <div className="overflow-x-auto">
-                <div className="flex items-center gap-2 min-w-[980px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                   <Input
                     placeholder="Document name"
                     value={docName}
                     onChange={(e) => setDocName(e.target.value)}
-                    className="w-[220px] bg-white/5 border-white/10 text-white placeholder:text-white/25"
+                    className="w-full bg-white/5 border-white/10 text-white placeholder:text-white/25"
                   />
                   <Select value={docType} onValueChange={(v) => setDocType(v as PersonDocumentTypeKey)}>
-                    <SelectTrigger className="w-[170px] bg-white/5 border-white/10 text-white">
+                    <SelectTrigger className="w-full bg-white/5 border-white/10 text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-64">
@@ -1108,7 +1107,7 @@ function PersonFormDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  <label className="flex items-center gap-2 text-[11px] text-white/55 cursor-pointer whitespace-nowrap">
+                  <label className="flex items-center gap-2 sm:col-span-2 lg:col-span-1 text-[11px] text-white/55 cursor-pointer ">
                     <Checkbox
                       checked={docDoesNotExpire}
                       onCheckedChange={(v) => {
@@ -1123,11 +1122,11 @@ function PersonFormDialog({
                     value={docExpires}
                     disabled={docDoesNotExpire}
                     onChange={setDocExpires}
-                    className="h-9 w-[170px] rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs disabled:opacity-40"
+                    className="h-9 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs disabled:opacity-40"
                     weekdayClassName="text-sm text-white/45"
                   />
                   <div
-                    className="w-[230px] rounded-md border border-dashed border-white/20 bg-white/[0.02] p-1.5"
+                    className="w-full sm:col-span-2 rounded-md border border-dashed border-white/20 bg-white/[0.02] p-1.5"
                     onDragOver={(e) => {
                       e.preventDefault();
                     }}
@@ -1153,14 +1152,13 @@ function PersonFormDialog({
                     <Button
                       type="button"
                       size="sm"
-                      className="ml-auto bg-indigo-700 hover:bg-indigo-600 text-white whitespace-nowrap"
+                      className="w-full sm:col-span-2 lg:col-span-4 bg-indigo-700 hover:bg-indigo-600 text-white"
                       disabled={uploadDocMutation.isPending || !docFile}
                       onClick={() => uploadDocMutation.mutate()}
                     >
                       {uploadDocMutation.isPending ? "Uploading…" : "Upload document"}
                     </Button>
                   ) : null}
-                </div>
               </div>
               {!person ? (
                 <p className="text-[11px] text-white/35">

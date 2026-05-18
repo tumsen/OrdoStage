@@ -51,7 +51,7 @@ export function ScheduleFilters({
         <span className="text-xs text-white/40 uppercase tracking-wide">Filter:</span>
 
         <Select value={viewMode} onValueChange={(value) => onViewModeChange(value as ScheduleViewMode)}>
-          <SelectTrigger className="w-44 bg-white/5 border-white/10 text-white text-sm h-8">
+          <SelectTrigger className="w-full sm:w-44 bg-white/5 border-white/10 text-white text-sm h-8">
             <SelectValue placeholder="View mode" />
           </SelectTrigger>
           <SelectContent className="bg-[#16161f] border-white/10 text-white">
@@ -66,7 +66,7 @@ export function ScheduleFilters({
         </Select>
 
         <Select value={venueId} onValueChange={onVenueChange}>
-          <SelectTrigger className="w-44 bg-white/5 border-white/10 text-white text-sm h-8">
+          <SelectTrigger className="w-full sm:w-44 bg-white/5 border-white/10 text-white text-sm h-8">
             <SelectValue placeholder="All venues" />
           </SelectTrigger>
           <SelectContent className="bg-[#16161f] border-white/10 text-white">
@@ -80,7 +80,7 @@ export function ScheduleFilters({
         </Select>
 
         <Select value={personId} onValueChange={onPersonChange}>
-          <SelectTrigger className="w-44 bg-white/5 border-white/10 text-white text-sm h-8">
+          <SelectTrigger className="w-full sm:w-44 bg-white/5 border-white/10 text-white text-sm h-8">
             <SelectValue placeholder="All people" />
           </SelectTrigger>
           <SelectContent className="bg-[#16161f] border-white/10 text-white">

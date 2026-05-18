@@ -134,6 +134,24 @@ All colors MUST be HSL.
     overflow: hidden;
   }
 
+  .page-shell {
+    @apply p-4 sm:p-6 space-y-6;
+  }
+}
+
+@layer components {
+  .billing-banner {
+    @apply flex-shrink-0 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 text-sm;
+  }
+
+  .billing-banner-message {
+    @apply min-w-0 flex-1 leading-snug;
+  }
+
+  .billing-banner-action {
+    @apply shrink-0 underline underline-offset-2 hover:text-white sm:ml-auto;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

@@ -83,7 +83,7 @@ export default function ForgotPassword() {
                   id="email"
                   type="email"
                   placeholder="your@email.com"
-                  className="bg-gray-800 border-white/20 text-white placeholder:text-gray-500"
+                  className="bg-gray-800 border-white/20 text-white text-base placeholder:text-gray-500"
                   {...register("email")}
                 />
                 {errors.email ? <p className="text-red-400 text-xs">{errors.email.message}</p> : null}

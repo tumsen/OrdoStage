@@ -995,7 +995,7 @@ function DetailsTab({
             <SectionHeader>Technical</SectionHeader>
 
             <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-3">
-              <div className="flex flex-nowrap items-end gap-x-4 overflow-x-auto pb-0.5 -mx-0.5 px-0.5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-4 pb-0.5">
                 {(
                   [
                     { label: "Width", name: "stageWidth" as const },
@@ -2875,7 +2875,7 @@ function ShowsTab({
     <div className="space-y-4">
       {creating ? (
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
-          <div className="flex flex-nowrap items-end gap-3 min-w-0 overflow-x-auto pb-0.5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3 min-w-0 pb-0.5">
             <div className="shrink-0">
               <FieldLabel>Start date</FieldLabel>
               <EventStartDateInput
@@ -3535,7 +3535,7 @@ export default function EventDetailPage() {
   const ev = isNew ? null : (event as EventDetail);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="page-shell">
       <Button
         variant="ghost"
         size="sm"
@@ -3547,8 +3547,8 @@ export default function EventDetailPage() {
 
       <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="border-b border-white/10 px-6">
-            <TabsList className="bg-transparent h-12 gap-1 p-0">
+          <div className="border-b border-white/10 px-4 sm:px-6 overflow-x-auto">
+            <TabsList className="bg-transparent h-12 gap-1 p-0 flex-nowrap w-max min-w-full">
               <TabsTrigger
                 value="details"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
@@ -3563,9 +3563,10 @@ export default function EventDetailPage() {
               </TabsTrigger>
               <TabsTrigger
                 value="venue-booking"
-                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-4"
+                className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-red-500 text-white/40 rounded-none h-12 px-3 sm:px-4 text-sm"
               >
-                Venue booking
+                <span className="sm:hidden">Booking</span>
+                <span className="hidden sm:inline">Venue booking</span>
               </TabsTrigger>
               <TabsTrigger
                 value="teams"
@@ -3582,7 +3583,7 @@ export default function EventDetailPage() {
             </TabsList>
           </div>
 
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <TabsContent value="details" className="mt-0">
               <DetailsTab
                 key={isNew ? "new" : ev!.id}

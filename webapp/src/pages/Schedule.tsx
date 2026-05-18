@@ -444,8 +444,8 @@ export default function Schedule() {
       </div>
 
       {/* Calendar navigation */}
-      <div className="flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -483,7 +483,9 @@ export default function Schedule() {
           </Button>
         </div>
 
-        <ScheduleLegend />
+        <div className="self-start sm:self-center">
+          <ScheduleLegend />
+        </div>
       </div>
 
       {/* Calendar (inner views supply their own surface; no wrapper bg — avoids a lighter ring in the padding). */}

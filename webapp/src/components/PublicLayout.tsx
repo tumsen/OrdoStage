@@ -127,7 +127,7 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
 
       <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", !isMobile && "pl-56")}>
         {isMobile ? (
-          <header className="flex-shrink-0 h-12 border-b border-ordo-magenta/25 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3">
+          <header className="flex-shrink-0 min-h-12 border-b border-ordo-magenta/25 bg-[#0d0d14]/80 backdrop-blur flex items-center px-3 pt-[env(safe-area-inset-top)]">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-white/60 hover:text-white h-8 w-8">
