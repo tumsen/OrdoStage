@@ -386,6 +386,34 @@ export default function TimeTracking() {
     },
     [mobileDaySchedule, gridDays, weekDayYmds, isMobile, mode, selectedDayIndex]
   );
+
+  /** Mobile day view renders one grid column at index 0; drag code must not use week day index. */
+  const columnIndexForDayYmd = useCallback(
+    (dayYmd: string) => {
+      if (mobileDaySchedule) return 0;
+      return weekDayYmds.indexOf(dayYmd);
+    },
+    [mobileDaySchedule, weekDayYmds]
+  );
+
+  const dayYmdForColumnIndex = useCallback(
+    (colIdx: number) => {
+      if (mobileDaySchedule) {
+        return gridDays[0] ? format(gridDays[0], "yyyy-MM-dd") : undefined;
+      }
+      return weekDayYmds[colIdx];
+    },
+    [mobileDaySchedule, gridDays, weekDayYmds]
+  );
+
+  const findGridColumnIndexAtX = useCallback(
+    (clientX: number, fallbackIndex: number) => {
+      if (mobileDaySchedule) return 0;
+      return findColumnIndexAtX(weekColumnRefs.current, clientX, fallbackIndex);
+    },
+    [mobileDaySchedule]
+  );
+
   const rangeFrom = format(mode === "week" ? weekStart : startOfMonth(anchor), "yyyy-MM-dd");
   const rangeTo = format(mode === "week" ? weekEnd : endOfMonth(anchor), "yyyy-MM-dd");
   const approvalPeriodStart = useMemo(() => {
@@ -646,6 +674,10 @@ export default function TimeTracking() {
   /** One HTMLElement per week column — same pattern as `OutlookTimeGrid` column refs. */
   const weekColumnRefs = useRef<(HTMLElement | null)[]>([]);
 
+  useEffect(() => {
+    weekColumnRefs.current = [];
+  }, [anchor, mobileDaySchedule]);
+
   const editingEntry = useMemo(
     () => (entries ?? []).find((x) => x.id === editingEntryId) ?? null,
     [entries, editingEntryId]
@@ -739,8 +771,8 @@ export default function TimeTracking() {
 
   const attachCreateDragListeners = useCallback(
     (dayYmd: string, startClientX: number, startClientY: number) => {
-      const startDayIndex = weekDayYmds.indexOf(dayYmd);
-      if (startDayIndex === -1) return;
+      const startDayIndex = columnIndexForDayYmd(dayYmd);
+      if (startDayIndex < 0) return;
 
       createDragRef.current = {
         startDayIndex,
@@ -774,8 +806,8 @@ export default function TimeTracking() {
             columnHeightPxRef.current
           )
         );
-        const dayA = weekDayYmds[c.startDayIndex];
-        const dayB = weekDayYmds[c.currentDayIndex];
+        const dayA = dayYmdForColumnIndex(c.startDayIndex);
+        const dayB = dayYmdForColumnIndex(c.currentDayIndex);
         if (!dayA || !dayB) return;
         const sh = displayStartHourRef.current;
         const dtA = dateFromColumnAndWindowMinutes(dayA, winA, sh);
@@ -790,7 +822,7 @@ export default function TimeTracking() {
         if (!c) return;
         c.currentClientX = ev.clientX;
         c.currentClientY = ev.clientY;
-        c.currentDayIndex = findColumnIndexAtX(weekColumnRefs.current, ev.clientX, c.currentDayIndex);
+        c.currentDayIndex = findGridColumnIndexAtX(ev.clientX, c.currentDayIndex);
         const dx = ev.clientX - c.startClientX;
         const dy = ev.clientY - c.startClientY;
         if (!c.thresholdPassed && Math.hypot(dx, dy) < WEEK_GRID_MIN_DRAG_PX) return;
@@ -813,7 +845,7 @@ export default function TimeTracking() {
 
         c.currentClientX = ev.clientX;
         c.currentClientY = ev.clientY;
-        c.currentDayIndex = findColumnIndexAtX(weekColumnRefs.current, ev.clientX, c.currentDayIndex);
+        c.currentDayIndex = findGridColumnIndexAtX(ev.clientX, c.currentDayIndex);
 
         const startCol = weekColumnRefs.current[c.startDayIndex];
         const endCol = weekColumnRefs.current[c.currentDayIndex];
@@ -842,8 +874,8 @@ export default function TimeTracking() {
             columnHeightPxRef.current
           )
         );
-        const dayA = weekDayYmds[c.startDayIndex];
-        const dayB = weekDayYmds[c.currentDayIndex];
+        const dayA = dayYmdForColumnIndex(c.startDayIndex);
+        const dayB = dayYmdForColumnIndex(c.currentDayIndex);
         if (!dayA || !dayB) {
           hideAllCreateOverlays();
           return;
@@ -888,7 +920,9 @@ export default function TimeTracking() {
       hideAllCreateOverlays,
       setEditingEntryId,
       syncCreateDragPreview,
-      weekDayYmds,
+      columnIndexForDayYmd,
+      dayYmdForColumnIndex,
+      findGridColumnIndexAtX,
     ]
   );
 
@@ -896,14 +930,14 @@ export default function TimeTracking() {
     const onMove = (ev: PointerEvent) => {
       const cur = entryDragRef.current;
       if (!cur) return;
-      const idx = findColumnIndexAtX(weekColumnRefs.current, ev.clientX, cur.startDayIndex);
+      const idx = findGridColumnIndexAtX(ev.clientX, cur.startDayIndex);
       const col = weekColumnRefs.current[idx];
       if (!col) return;
       activeColElRef.current = col;
       const mSnap = minutesFromY(ev.clientY, col);
       if (mSnap === null) return;
       const sh = displayStartHourRef.current;
-      const ymd = weekDayYmds[idx];
+      const ymd = dayYmdForColumnIndex(idx);
       if (!ymd) return;
 
       if (cur.kind === "move") {
@@ -968,9 +1002,9 @@ export default function TimeTracking() {
         return;
       }
 
-      const idx = findColumnIndexAtX(weekColumnRefs.current, ev.clientX, d.startDayIndex);
+      const idx = findGridColumnIndexAtX(ev.clientX, d.startDayIndex);
       const col = weekColumnRefs.current[idx];
-      const ymd = weekDayYmds[idx];
+      const ymd = dayYmdForColumnIndex(idx);
       const m = col ? minutesFromY(ev.clientY, col) : null;
 
       if (d.kind === "move" && !d.moveThresholdPassed) {
@@ -1034,7 +1068,7 @@ export default function TimeTracking() {
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", finish);
-  }, [minutesFromY, updateEntry, setEditingEntryId, weekDayYmds]);
+  }, [minutesFromY, updateEntry, setEditingEntryId, dayYmdForColumnIndex, findGridColumnIndexAtX]);
 
   const entryByJobId = useMemo(() => {
     const m = new Map<string, TimeEntry>();
@@ -2149,7 +2183,7 @@ export default function TimeTracking() {
                                 origStartWinMin: sWin,
                                 origEndWinMin: sWin + entryDurMin,
                                 dayYmd,
-                                startDayIndex: weekDayYmds.indexOf(dayYmd),
+                                startDayIndex: columnIndexForDayYmd(dayYmd),
                                 origStartsAtIso: e.startsAt,
                                 origEndsAtIso: e.endsAt,
                                 durationMin: entryDurMin,
@@ -2290,7 +2324,7 @@ export default function TimeTracking() {
                                       origStartWinMin: sWin,
                                       origEndWinMin: sWin + entryDurMin,
                                       dayYmd,
-                                      startDayIndex: weekDayYmds.indexOf(dayYmd),
+                                      startDayIndex: columnIndexForDayYmd(dayYmd),
                                       origStartsAtIso: e.startsAt,
                                       origEndsAtIso: e.endsAt,
                                       durationMin: entryDurMin,
@@ -2317,7 +2351,7 @@ export default function TimeTracking() {
                                       origStartWinMin: sWin,
                                       origEndWinMin: sWin + entryDurMin,
                                       dayYmd,
-                                      startDayIndex: weekDayYmds.indexOf(dayYmd),
+                                      startDayIndex: columnIndexForDayYmd(dayYmd),
                                       origStartsAtIso: e.startsAt,
                                       origEndsAtIso: e.endsAt,
                                       durationMin: entryDurMin,
