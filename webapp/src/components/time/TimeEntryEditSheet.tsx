@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { format, parseISO } from "date-fns";
 import { ChevronsUpDown, Lock, LockOpen } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
@@ -74,6 +75,7 @@ export function TimeEntryEditSheet(props: {
   entrySummary?: string | null;
 }) {
   const { t } = useI18n();
+  const isMobile = useIsMobile();
   const { effective } = usePreferences();
   const timeFormat: TimeFormat = effective?.timeFormat ?? "24h";
   const {
@@ -218,26 +220,52 @@ export function TimeEntryEditSheet(props: {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="bg-[#0d0d14] border-white/10 text-white w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="text-white">{t("time.editEntry")}</SheetTitle>
-          <SheetDescription className="text-white/55">
+      <SheetContent
+        className={cn(
+          "bg-[#0d0d14] border-white/10 text-white w-full sm:max-w-md",
+          isMobile
+            ? "flex h-[100dvh] max-h-[100dvh] flex-col gap-0 overflow-hidden p-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            : "overflow-y-auto"
+        )}
+      >
+        <SheetHeader className={cn(isMobile && "shrink-0 space-y-0.5 text-left")}>
+          <SheetTitle className={cn("text-white", isMobile && "text-base")}>
+            {t("time.editEntry")}
+          </SheetTitle>
+          <SheetDescription
+            className={cn("text-white/55", isMobile && "text-xs leading-snug line-clamp-2")}
+          >
             {timeRangeLabel}
             {entrySummary ? (
-              <span className="block mt-1 text-white/70">{entrySummary}</span>
+              <span className="block mt-0.5 text-white/70 truncate">{entrySummary}</span>
             ) : null}
           </SheetDescription>
         </SheetHeader>
-        <div className="grid gap-4 py-4">
-          <div className="rounded-md border border-white/10 bg-white/[0.03] p-2.5 flex items-center justify-between gap-2">
-            <div className="text-xs text-white/65">
+        <div
+          className={cn(
+            "grid gap-4",
+            isMobile
+              ? "min-h-0 flex-1 grid-rows-[auto_auto_auto_auto_minmax(0,1fr)] gap-2 overflow-hidden py-2"
+              : "py-4"
+          )}
+        >
+          <div
+            className={cn(
+              "rounded-md border border-white/10 bg-white/[0.03] flex items-center justify-between gap-2",
+              isMobile ? "p-2" : "p-2.5"
+            )}
+          >
+            <div className={cn("text-white/65", isMobile ? "text-[10px] leading-tight" : "text-xs")}>
               {entry?.isLocked ? t("time.lockedEntryHint") : t("time.unlockedEntryHint")}
             </div>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="border-white/15 text-white/80 bg-transparent"
+              className={cn(
+                "border-white/15 text-white/80 bg-transparent shrink-0",
+                isMobile && "h-7 px-2 text-[10px]"
+              )}
               disabled={saving || !entry}
               onClick={() => {
                 if (!entry) return;
@@ -246,20 +274,20 @@ export function TimeEntryEditSheet(props: {
             >
               {entry?.isLocked ? (
                 <>
-                  <LockOpen className="h-3.5 w-3.5 mr-1" />
+                  <LockOpen className={cn("mr-1", isMobile ? "h-3 w-3" : "h-3.5 w-3.5")} />
                   {t("time.unlockEntry")}
                 </>
               ) : (
                 <>
-                  <Lock className="h-3.5 w-3.5 mr-1" />
+                  <Lock className={cn("mr-1", isMobile ? "h-3 w-3" : "h-3.5 w-3.5")} />
                   {t("time.lockEntry")}
                 </>
               )}
             </Button>
           </div>
-          <div className="grid gap-2">
-            <Label className="text-white/80">{t("time.categoryLabel")}</Label>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-1.5">
+            <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.categoryLabel")}</Label>
+            <div className={cn("grid gap-1.5", isMobile ? "grid-cols-5" : "grid-cols-2 gap-2")}>
               {categoryOptions.map((opt) => (
                 <button
                   key={opt.value}
@@ -267,47 +295,56 @@ export function TimeEntryEditSheet(props: {
                   disabled={entry?.isLocked}
                   onClick={() => setCategory(opt.value)}
                   className={cn(
-                    "rounded-md border px-3 py-2 text-sm font-medium transition-colors text-left",
+                    "rounded-md border font-medium transition-colors text-center",
+                    isMobile ? "px-1 py-1.5 text-[9px] leading-tight" : "px-3 py-2 text-sm text-left",
                     category === opt.value
                       ? "border-ordo-yellow bg-ordo-yellow/10 text-white"
                       : "border-white/10 bg-white/[0.03] text-white/60 hover:bg-white/[0.07]"
                   )}
                 >
-                  <span className={cn("block text-xs mb-0.5", opt.color)}>●</span>
+                  {!isMobile ? <span className={cn("block text-xs mb-0.5", opt.color)}>●</span> : null}
                   {opt.label}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-2">
-              <Label className="text-white/80">{t("time.startTimeLabel")}</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="grid gap-1">
+              <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.startTimeLabel")}</Label>
               <input
                 type="time"
                 step={60}
                 value={startHm}
                 onChange={(e) => setStartHm(e.target.value)}
                 disabled={entry?.isLocked}
-                className="h-10 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white [color-scheme:dark]"
+                className={cn(
+                  "rounded-md border border-white/10 bg-white/5 px-2 text-white [color-scheme:dark]",
+                  isMobile ? "h-8 text-xs" : "h-10 px-3 text-sm"
+                )}
               />
             </div>
-            <div className="grid gap-2">
-              <Label className="text-white/80">{t("time.endTimeLabel")}</Label>
+            <div className="grid gap-1">
+              <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.endTimeLabel")}</Label>
               <input
                 type="time"
                 step={60}
                 value={endHm}
                 onChange={(e) => setEndHm(e.target.value)}
                 disabled={entry?.isLocked}
-                className="h-10 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white [color-scheme:dark]"
+                className={cn(
+                  "rounded-md border border-white/10 bg-white/5 px-2 text-white [color-scheme:dark]",
+                  isMobile ? "h-8 text-xs" : "h-10 px-3 text-sm"
+                )}
               />
             </div>
           </div>
-          <p className="text-[11px] text-white/40 -mt-1">{t("time.editTimePreciseHint")}</p>
+          {!isMobile ? (
+            <p className="text-[11px] text-white/40 -mt-1">{t("time.editTimePreciseHint")}</p>
+          ) : null}
 
-          <div className="grid gap-2">
-            <Label className="text-white/80">{t("time.projectLabel")}</Label>
+          <div className="grid gap-1.5">
+            <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.projectLabel")}</Label>
             <Popover open={projectOpen} onOpenChange={setProjectOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -315,7 +352,10 @@ export function TimeEntryEditSheet(props: {
                   variant="outline"
                   aria-expanded={projectOpen}
                   disabled={entry?.isLocked}
-                  className="w-full justify-between bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white font-normal"
+                  className={cn(
+                    "w-full justify-between bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white font-normal",
+                    isMobile && "h-8 text-xs"
+                  )}
                 >
                   <span className="flex min-w-0 items-center gap-2 truncate text-left">
                     {selectedProjectColor ? (
@@ -381,9 +421,16 @@ export function TimeEntryEditSheet(props: {
               </PopoverContent>
             </Popover>
           </div>
-          <div className="grid gap-2">
-            <Label className="text-white/80">{t("time.tagsLabel")}</Label>
-            <div className="max-h-40 overflow-y-auto rounded-md border border-white/10 bg-white/[0.03] p-2 space-y-2">
+          <div className={cn("grid gap-1.5 min-h-0", isMobile && "overflow-hidden")}>
+            <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.tagsLabel")}</Label>
+            <div
+              className={cn(
+                "rounded-md border border-white/10 bg-white/[0.03] p-2",
+                isMobile
+                  ? "flex min-h-0 flex-1 flex-wrap gap-1.5 overflow-hidden content-start"
+                  : "max-h-40 space-y-2 overflow-y-auto"
+              )}
+            >
               {sortedTags.length === 0 ? (
                 <p className="text-xs text-white/45">{t("time.tagsEmpty")}</p>
               ) : (
@@ -392,7 +439,10 @@ export function TimeEntryEditSheet(props: {
                   return (
                     <label
                       key={tag.id}
-                      className="flex items-center gap-2 text-sm cursor-pointer rounded-md px-1 py-0.5 -mx-1"
+                      className={cn(
+                        "flex items-center gap-1.5 cursor-pointer rounded-md",
+                        isMobile ? "text-[10px] px-1 py-0.5 shrink-0" : "text-sm px-1 py-0.5 -mx-1 gap-2"
+                      )}
                       style={{ backgroundColor: hexToRgba(c, 0.12) }}
                     >
                       <Checkbox
@@ -416,18 +466,26 @@ export function TimeEntryEditSheet(props: {
               )}
             </div>
           </div>
-          <div className="grid gap-2">
-            <Label className="text-white/80">{t("time.noteLabel")}</Label>
+          <div className={cn("grid gap-1.5", isMobile && "min-h-0")}>
+            <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.noteLabel")}</Label>
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={t("time.notePlaceholder")}
               disabled={entry?.isLocked}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/35 min-h-[100px]"
+              className={cn(
+                "bg-white/5 border-white/10 text-white placeholder:text-white/35 resize-none",
+                isMobile ? "min-h-0 h-14 text-xs" : "min-h-[100px]"
+              )}
             />
           </div>
         </div>
-        <SheetFooter className="flex-col gap-2 sm:flex-col">
+        <SheetFooter
+          className={cn(
+            "flex-col gap-2 sm:flex-col",
+            isMobile && "shrink-0 border-t border-white/10 pt-2 mt-0"
+          )}
+        >
           <Button
             type="button"
             className="w-full bg-ordo-yellow text-[#0d0d14] hover:bg-ordo-yellow/90"

@@ -1,15 +1,25 @@
 ---
-description: Commit and push finished work so the user can test on deploy; never commit secrets.
+description: ALWAYS commit and push finished work to origin so the user can test on deploy; never commit secrets.
 alwaysApply: true
 ---
 
-# Push completed work
+# Push completed work (required)
 
-When a task is done or a coherent batch of changes is ready:
+**When implementation for a task is done, always commit and push** — do not wait for the user to ask. This overrides a generic "commit only when asked" preference unless the user explicitly said **local-only** or **do not push** for that task.
+
+## Steps (end of every implementation task)
 
 1. **Never stage or commit secrets** — do not add `**/.env`, credential files, or keys. If they show as modified, leave them unstaged (use `git restore --staged` after a broad add if needed).
-2. Before commit/push for code changes, run **`bun run verify`** from the repo root (webapp `lint` + `typecheck` + `vite build`, backend `tsc`). Fix any failures first.
-3. Review **`git status`**, stage the right paths, then **`git commit`** with a clear message (what changed and why).
-4. **`git push`** the current branch to **`origin`** so the user can test (CI/deploy). Do this by default after completing implementation work.
+2. Run **`bun run verify`** from the repo root. Fix failures before committing.
+3. Review **`git status`**, stage the right paths, **`git commit`** with a clear message (what changed and why).
+4. **`git push`** the current branch to **`origin`** (use `-u` if the branch has no upstream).
 
-Skip push only if the user asked for local-only changes, push fails (permissions/network), or there is nothing to commit.
+## Skip push only when
+
+- The user explicitly asked for **local-only** or **no push** for that work.
+- Push fails (permissions/network) — report the error and what was committed locally.
+- There is **nothing to commit** (already pushed).
+
+## After pushing
+
+Briefly tell the user the branch and commit (or that `main` was updated) so they can test on device/deploy.

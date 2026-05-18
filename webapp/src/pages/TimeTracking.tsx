@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
 import {
@@ -182,7 +182,6 @@ function plannedJobIsLogged(
   return entryByJobId.has(job.id);
 }
 const COLUMN_HEIGHT_PX = (MINUTES_PER_DAY / 60) * PX_PER_HOUR;
-const COLUMN_FRAME_HEIGHT_PX = COLUMN_HEIGHT_PX + CALENDAR_TIME_GRID_TOP_PAD_PX;
 /** Same height for corner spacer and day headers so the hour grid lines up with columns. */
 const WEEK_GRID_HEADER_CLASS =
   "min-h-[6.75rem] shrink-0 border-b border-white/10 box-border flex flex-col items-stretch justify-center gap-0.5 px-1.5 py-2";
@@ -304,6 +303,36 @@ export default function TimeTracking() {
   }, [weekStartKey, weekDayYmds]);
 
   const mobileDaySchedule = isMobile && section === "time" && mode === "week";
+
+  const [mobilePxPerHour, setMobilePxPerHour] = useState(PX_PER_HOUR);
+  const mobileGridBodyRef = useRef<HTMLDivElement>(null);
+  const columnHeightPxRef = useRef(COLUMN_HEIGHT_PX);
+
+  const effectivePxPerHour = mobileDaySchedule ? mobilePxPerHour : PX_PER_HOUR;
+  const effectiveColumnHeightPx = (MINUTES_PER_DAY / 60) * effectivePxPerHour;
+  const effectiveColumnFrameHeightPx = effectiveColumnHeightPx + CALENDAR_TIME_GRID_TOP_PAD_PX;
+
+  columnHeightPxRef.current = effectiveColumnHeightPx;
+
+  useLayoutEffect(() => {
+    if (!mobileDaySchedule) return;
+    const el = mobileGridBodyRef.current;
+    if (!el) return;
+    const measure = () => {
+      const available = el.clientHeight - CALENDAR_TIME_GRID_TOP_PAD_PX;
+      if (available > 0) {
+        setMobilePxPerHour(Math.max(6, Math.floor(available / 24)));
+      }
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mobileDaySchedule, anchor]);
+
+  const shiftMobileDay = useCallback((delta: number) => {
+    setAnchor((d) => addDays(new Date(d.getFullYear(), d.getMonth(), d.getDate()), delta));
+  }, []);
 
   const gridDays = useMemo(() => {
     if (mobileDaySchedule) {
@@ -621,7 +650,7 @@ export default function TimeTracking() {
   const minutesFromY = useCallback((clientY: number, colEl: HTMLElement | null) => {
     if (!colEl) return null;
     const rect = colEl.getBoundingClientRect();
-    const raw = rawWindowMinutesFromY(clientY, rect.top, COLUMN_HEIGHT_PX);
+    const raw = rawWindowMinutesFromY(clientY, rect.top, columnHeightPxRef.current);
     return snapWindowMinutes(raw);
   }, []);
 
@@ -711,14 +740,14 @@ export default function TimeTracking() {
           rawWindowMinutesFromY(
             c.startClientY,
             startCol.getBoundingClientRect().top,
-            COLUMN_HEIGHT_PX
+            columnHeightPxRef.current
           )
         );
         const winB = snapWindowMinutes(
           rawWindowMinutesFromY(
             c.currentClientY,
             endCol.getBoundingClientRect().top,
-            COLUMN_HEIGHT_PX
+            columnHeightPxRef.current
           )
         );
         const dayA = weekDayYmds[c.startDayIndex];
@@ -779,14 +808,14 @@ export default function TimeTracking() {
           rawWindowMinutesFromY(
             c.startClientY,
             startCol.getBoundingClientRect().top,
-            COLUMN_HEIGHT_PX
+            columnHeightPxRef.current
           )
         );
         const winB = snapWindowMinutes(
           rawWindowMinutesFromY(
             c.currentClientY,
             endCol.getBoundingClientRect().top,
-            COLUMN_HEIGHT_PX
+            columnHeightPxRef.current
           )
         );
         const dayA = weekDayYmds[c.startDayIndex];
@@ -1163,6 +1192,13 @@ export default function TimeTracking() {
     mode === "week" &&
     (upcomingJobs ?? []).some((j) => !plannedJobIsLogged(j, entryByJobId, entries));
 
+  const mobileScheduleDay = mobileDaySchedule && gridDays[0] ? gridDays[0] : null;
+  const mobileScheduleDayYmd = mobileScheduleDay ? format(mobileScheduleDay, "yyyy-MM-dd") : "";
+  const mobileScheduleDayTotalMinutes = totalsByColumnDay.get(mobileScheduleDayYmd) ?? 0;
+  const mobileScheduleRunningMinutes = mobileScheduleDay
+    ? (weekRunningTotalMinutes[gridWeekIndex(0)] ?? mobileScheduleDayTotalMinutes)
+    : 0;
+
   return (
     <div
       className={cn(
@@ -1176,19 +1212,7 @@ export default function TimeTracking() {
             : "gap-4 p-4 md:p-6")
       )}
     >
-      {mobileDaySchedule ? (
-        <div className="relative z-20 shrink-0 flex items-center justify-center border-b border-white/10 bg-[#0a0a0f] px-3 py-2">
-          <DateInputWithWeekday
-            value={format(anchor, "yyyy-MM-dd")}
-            onChange={(value) => {
-              const next = dateFromISODate(value);
-              if (next) {
-                setAnchor(new Date(next.getFullYear(), next.getMonth(), next.getDate()));
-              }
-            }}
-          />
-        </div>
-      ) : (
+      {!mobileDaySchedule ? (
       <div className="relative z-20 shrink-0 flex flex-col gap-4 bg-[#0a0a0f] pb-0 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
@@ -1537,7 +1561,7 @@ export default function TimeTracking() {
           ) : null}
         </div>
       </div>
-      )}
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col">
       {section === "travel" ? (
@@ -1581,11 +1605,12 @@ export default function TimeTracking() {
             <div className={CALENDAR_PANEL_FLEX_COLUMN_CLASS}>
               <div
                 className={cn(
-                  CALENDAR_GRID_SCROLLER_CLASS,
-                  mobileDaySchedule && "min-h-0 flex-1 rounded-none border-x-0 border-t-0"
+                  mobileDaySchedule
+                    ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-x-0 border-t-0 border-b border-white/10 bg-white/[0.02]"
+                    : CALENDAR_GRID_SCROLLER_CLASS
                 )}
               >
-            <div className={cn(!isMobile && "min-w-[720px]")}>
+            <div className={cn(!isMobile && "min-w-[720px]", mobileDaySchedule && "flex min-h-0 flex-1 flex-col")}>
               {isMobile && mode === "week" && !mobileDaySchedule ? (
                 <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2 py-2">
                   <Button
@@ -1641,6 +1666,46 @@ export default function TimeTracking() {
                   </Button>
                 </div>
               ) : null}
+              {mobileScheduleDay ? (
+                <div className="shrink-0 border-b border-white/10 bg-white/[0.07] px-1 py-1.5">
+                  <div className="flex items-center gap-0.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 min-h-8 min-w-8 shrink-0 border-white/15 text-white"
+                      onClick={() => shiftMobileDay(-1)}
+                      aria-label="Previous day"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <p className="min-w-0 flex-1 text-center text-[11px] font-medium leading-tight text-white">
+                      {format(mobileScheduleDay, "EEEE d MMMM yyyy", { locale: dfLocale })} week{" "}
+                      {getISOWeek(mobileScheduleDay)}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 min-h-8 min-w-8 shrink-0 border-white/15 text-white"
+                      onClick={() => shiftMobileDay(1)}
+                      aria-label="Next day"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="mt-0.5 text-center text-[10px] leading-tight tabular-nums text-white/55">
+                    <span className="text-white/40">{t("time.weekColumnDayHours")}</span>{" "}
+                    {formatOneDecimalHour(mobileScheduleDayTotalMinutes / 60, commaDec)}{" "}
+                    {formatTotalMinutesAsHHMM(mobileScheduleDayTotalMinutes)}
+                    <span className="mx-1.5 text-white/20">·</span>
+                    <span className="text-white/40">{t("time.weekColumnRunningHours")}</span>{" "}
+                    {formatOneDecimalHour(mobileScheduleRunningMinutes / 60, commaDec)}{" "}
+                    {formatTotalMinutesAsHHMM(mobileScheduleRunningMinutes)}
+                  </p>
+                </div>
+              ) : null}
+                {!mobileDaySchedule ? (
                 <div className={cn(CALENDAR_STICKY_HEADER_CHROME, "border-b border-white/10")}>
                   <div
                     className="grid min-w-0"
@@ -1768,17 +1833,22 @@ export default function TimeTracking() {
                     })}
                   </div>
                 </div>
+                ) : null}
 
                 <div
-                  className="grid min-w-0"
+                  ref={mobileDaySchedule ? mobileGridBodyRef : undefined}
+                  className={cn("grid min-w-0", mobileDaySchedule && "min-h-0 flex-1")}
                   style={{ gridTemplateColumns: weekGridTemplateColumns }}
                 >
-                  <div className="relative box-border" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
+                  <div
+                    className="relative box-border"
+                    style={{ height: effectiveColumnFrameHeightPx }}
+                  >
                     <div
                       className="pointer-events-none absolute inset-x-0 border-r border-white/10"
                       style={{
                         top: CALENDAR_TIME_GRID_TOP_PAD_PX,
-                        height: COLUMN_HEIGHT_PX,
+                        height: effectiveColumnHeightPx,
                       }}
                     >
                       {Array.from({ length: 24 }).map((_, h) => {
@@ -1787,7 +1857,7 @@ export default function TimeTracking() {
                           <div
                             key={h}
                             className="pointer-events-none absolute left-0 right-1 z-[1] flex -translate-y-1/2 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums"
-                            style={{ top: h * PX_PER_HOUR }}
+                            style={{ top: h * effectivePxPerHour }}
                           >
                             {formatHourLabel(hour24, timeFormat === "24h" ? "24h" : "12h")}
                           </div>
@@ -1818,7 +1888,10 @@ export default function TimeTracking() {
                   key={dayYmd}
                   className="group relative min-h-0 min-w-0"
                 >
-                  <div className="relative box-border" style={{ height: COLUMN_FRAME_HEIGHT_PX }}>
+                  <div
+                    className="relative box-border"
+                    style={{ height: effectiveColumnFrameHeightPx }}
+                  >
                   <div
                     ref={(el) => {
                       weekColumnRefs.current[gridIdx] = el;
@@ -1831,7 +1904,7 @@ export default function TimeTracking() {
                     )}
                     style={{
                       top: CALENDAR_TIME_GRID_TOP_PAD_PX,
-                      height: COLUMN_HEIGHT_PX,
+                      height: effectiveColumnHeightPx,
                     }}
                   >
                     {col && (
@@ -1841,7 +1914,7 @@ export default function TimeTracking() {
                       <div
                         key={h}
                         className="pointer-events-none absolute left-0 right-0 z-0 border-t border-white/[0.1]"
-                        style={{ top: h * PX_PER_HOUR }}
+                        style={{ top: h * effectivePxPerHour }}
                       />
                     ))}
                     <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1]" />
