@@ -89,27 +89,38 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
           const venueName = calendarItemVenueName(item);
           const backingSummary = backing ? calendarVenueBookingSummaryLine(backing) : "";
           return (
-            <CalendarItemHoverCard key={item.id} item={item} locale={locale} hour12={hour12} side="right">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onItemClick(item);
-                }}
-                className={cn(
-                  "relative w-full text-left text-[11px] px-1.5 py-0.5 rounded font-medium transition-opacity hover:opacity-80 overflow-hidden",
-                  itemColor(item),
-                  backing && "ring-2 ring-rose-300/70 shadow-[0_0_0_2px_rgba(244,63,94,0.22)]"
-                )}
-              >
+            <button
+              key={item.id}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onItemClick(item);
+              }}
+              className={cn(
+                "relative w-full text-left text-[11px] px-1.5 py-0.5 rounded font-medium transition-opacity hover:opacity-80 overflow-hidden",
+                itemColor(item),
+                backing && "ring-2 ring-rose-300/70 shadow-[0_0_0_2px_rgba(244,63,94,0.22)]"
+              )}
+            >
               {backing ? (
                 <span className="absolute inset-0 bg-rose-500/20 pointer-events-none" aria-hidden="true" />
               ) : null}
               <span className="relative block truncate">
-                {item.title}
-                {venueName ? (
-                  <span className="font-normal opacity-70"> @ {venueName}</span>
-                ) : null}
+                <CalendarItemHoverCard
+                  item={item}
+                  locale={locale}
+                  hour12={hour12}
+                  side="right"
+                  label={
+                    <>
+                      {item.title}
+                      {venueName ? (
+                        <span className="font-normal opacity-70"> @ {venueName}</span>
+                      ) : null}
+                    </>
+                  }
+                  labelClassName="truncate"
+                />
               </span>
               {backing ? (
                 <span className="relative block text-[9px] text-rose-100/95 truncate leading-tight mt-0.5">
@@ -152,8 +163,7 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
                   by {(item.raw as InternalBookingDetail).createdBy!.name}
                 </span>
               ) : null}
-              </button>
-            </CalendarItemHoverCard>
+            </button>
           );
         })}
         {overflow > 0 ? (

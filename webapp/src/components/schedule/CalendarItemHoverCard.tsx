@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { EventDetail, InternalBookingDetail, TourDetail } from "../../../../backend/src/types";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { cn } from "@/lib/utils";
 import {
   getItemTimeRange,
   internalBookingDisplayTitle,
@@ -223,7 +224,8 @@ function CalendarItemHoverBody({
 }
 
 /**
- * Rich hover details for a schedule block (Outlook week/day grid, all-day chips, etc.).
+ * Rich hover details for a schedule block. Only the name label opens the card so stacked
+ * entries stay independently hoverable.
  */
 export function CalendarItemHoverCard({
   item,
@@ -231,18 +233,31 @@ export function CalendarItemHoverCard({
   hour12,
   side = "right",
   align = "start",
-  children,
+  label,
+  labelClassName,
 }: {
   item: CalendarItem;
   locale: string;
   hour12: boolean;
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
-  children: ReactNode;
+  label: ReactNode;
+  labelClassName?: string;
 }) {
   return (
     <HoverCard openDelay={200} closeDelay={100}>
-      <HoverCardTrigger asChild>{children}</HoverCardTrigger>
+      <HoverCardTrigger asChild>
+        <span
+          data-entry-name-label
+          className={cn(
+            "pointer-events-auto inline-block min-w-0 max-w-full cursor-default",
+            labelClassName,
+          )}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {label}
+        </span>
+      </HoverCardTrigger>
       <HoverCardContent
         side={side}
         align={align}

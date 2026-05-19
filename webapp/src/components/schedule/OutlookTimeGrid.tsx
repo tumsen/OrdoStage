@@ -622,22 +622,32 @@ export function OutlookTimeGrid({
                       const isDisabled = item.disabled === true;
                       return (
                         <div key={item.id} className="group/all relative flex items-center">
-                          <CalendarItemHoverCard item={item} locale={locale} hour12={hour12}>
-                            <button
-                              type="button"
-                              data-booking-block
-                              onClick={() => {
-                                if (!isDisabled) onItemClick(item);
-                              }}
-                              className={`flex-1 text-left text-[10px] px-1.5 py-0.5 rounded font-medium truncate ${itemColor(item)} ${
-                                isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
-                              }`}
-                            >
-                              {item.title}
-                              {eventVenueName ? <span className="opacity-70"> @ {eventVenueName}</span> : null}{" "}
-                              <StatusLabel status={item.status} />
-                            </button>
-                          </CalendarItemHoverCard>
+                          <button
+                            type="button"
+                            data-booking-block
+                            onClick={() => {
+                              if (!isDisabled) onItemClick(item);
+                            }}
+                            className={`flex-1 text-left text-[10px] px-1.5 py-0.5 rounded font-medium truncate ${itemColor(item)} ${
+                              isDisabled ? "opacity-40 saturate-50 cursor-not-allowed" : ""
+                            }`}
+                          >
+                            <CalendarItemHoverCard
+                              item={item}
+                              locale={locale}
+                              hour12={hour12}
+                              label={
+                                <>
+                                  {item.title}
+                                  {eventVenueName ? (
+                                    <span className="opacity-70"> @ {eventVenueName}</span>
+                                  ) : null}
+                                </>
+                              }
+                              labelClassName="truncate"
+                            />{" "}
+                            <StatusLabel status={item.status} />
+                          </button>
                           {onDeleteItem && !readOnly && (item.kind === "job" || item.kind === "tour" || isDisabled ? null : (
                             <button
                               data-booking-block
@@ -939,36 +949,37 @@ export function OutlookTimeGrid({
                         width: target ? `calc(${widthPct}% - ${gapPx * 2}px)` : `calc(100% - ${gapPx * 2}px)`,
                       }}
                     >
-                      <CalendarItemHoverCard item={item} locale={locale} hour12={hour12}>
-                        <div
-                          data-booking-block
-                          className={`absolute inset-0 rounded-lg border-2 border-rose-300/80 bg-rose-500/20 shadow-[0_0_0_1px_rgba(244,63,94,0.35)] ${
-                            canDrag ? "cursor-grab active:cursor-grabbing" : ""
-                          }`}
-                          style={{ zIndex: 4 }}
-                          onPointerDown={(e) => {
-                            if ((e.target as HTMLElement).closest("[data-handle]")) return;
-                            if (canDrag) startMoveDrag(item, dayIndex, "move", e);
-                          }}
-                          onClick={(e) => {
-                            if ((e.target as HTMLElement).closest("[data-handle]")) return;
-                            if (canDrag) return;
-                            e.stopPropagation();
-                            onItemClick(item);
-                          }}
-                        />
-                      </CalendarItemHoverCard>
+                      <div
+                        data-booking-block
+                        className={`absolute inset-0 rounded-lg border-2 border-rose-300/80 bg-rose-500/20 shadow-[0_0_0_1px_rgba(244,63,94,0.35)] ${
+                          canDrag ? "cursor-grab active:cursor-grabbing" : ""
+                        }`}
+                        style={{ zIndex: 4 }}
+                        onPointerDown={(e) => {
+                          if ((e.target as HTMLElement).closest("[data-handle]")) return;
+                          if (canDrag) startMoveDrag(item, dayIndex, "move", e);
+                        }}
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).closest("[data-handle]")) return;
+                          if (canDrag) return;
+                          e.stopPropagation();
+                          onItemClick(item);
+                        }}
+                      />
 
                       <div
                         className={cn(
                           "pointer-events-none absolute inset-0 z-[5] flex min-h-0 flex-col justify-end overflow-hidden px-1",
                           height < 40 ? "justify-center pb-1 pt-1" : "pb-7 pr-7 pt-6"
                         )}
-                        aria-hidden
                       >
-                        <div className="truncate text-[10px] font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.92)]">
-                          {item.title}
-                        </div>
+                        <CalendarItemHoverCard
+                          item={item}
+                          locale={locale}
+                          hour12={hour12}
+                          label={item.title}
+                          labelClassName="truncate text-[10px] font-semibold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.92)]"
+                        />
                         <div className="mt-0.5 truncate text-[9px] leading-tight text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.92)]">
                           {[venueNm && `@ ${venueNm}`, timeLabel].filter(Boolean).join(" · ")}
                         </div>
@@ -1100,9 +1111,8 @@ export function OutlookTimeGrid({
                         zIndex: 10 + colIndex,
                       }}
                     >
-                      <CalendarItemHoverCard item={item} locale={locale} hour12={hour12}>
-                        <div
-                          data-booking-block
+                      <div
+                        data-booking-block
                           role="button"
                           tabIndex={0}
                           onPointerDown={(e) => {
@@ -1126,17 +1136,38 @@ export function OutlookTimeGrid({
                             className="w-full h-full flex items-center px-1 overflow-hidden"
                             style={{ writingMode: height < 22 ? "vertical-rl" : undefined }}
                           >
-                            <span className="truncate font-semibold text-[9px] leading-tight whitespace-nowrap">
-                              {item.title}
-                              {venueName ? ` · ${venueName}` : ""}
-                            </span>
+                            <CalendarItemHoverCard
+                              item={item}
+                              locale={locale}
+                              hour12={hour12}
+                              label={
+                                <>
+                                  {item.title}
+                                  {venueName ? ` · ${venueName}` : ""}
+                                </>
+                              }
+                              labelClassName="truncate font-semibold text-[9px] leading-tight whitespace-nowrap"
+                            />
                           </div>
                         ) : (
                           <div className="flex flex-col h-full px-1.5 py-1 overflow-hidden">
-                            <div className={cn("truncate font-semibold text-[11px] leading-tight shrink-0", readOnly ? "pr-1" : "pr-9")}>
-                              {item.title}
-                              {venueName ? <span className="font-normal opacity-75"> @ {venueName}</span> : null}
-                            </div>
+                            <CalendarItemHoverCard
+                              item={item}
+                              locale={locale}
+                              hour12={hour12}
+                              label={
+                                <>
+                                  {item.title}
+                                  {venueName ? (
+                                    <span className="font-normal opacity-75"> @ {venueName}</span>
+                                  ) : null}
+                                </>
+                              }
+                              labelClassName={cn(
+                                "truncate font-semibold text-[11px] leading-tight shrink-0",
+                                readOnly ? "pr-1" : "pr-9",
+                              )}
+                            />
                             <div
                               className={cn(
                                 "flex items-center gap-1 text-[10px] leading-tight mt-0.5 opacity-90 flex-1 min-h-0 overflow-hidden",
@@ -1152,7 +1183,6 @@ export function OutlookTimeGrid({
                           </div>
                         )}
                       </div>
-                      </CalendarItemHoverCard>
 
                       {/* Locked badge (bottom-left) */}
                       {isBooking && isLocked && !isThin ? (
@@ -1291,31 +1321,37 @@ export function OutlookTimeGrid({
                         zIndex: 15 + zOffset,
                       }}
                     >
-                      <CalendarItemHoverCard item={item} locale={locale} hour12={hour12}>
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isDisabled) onItemClick(item);
-                          }}
-                          className={cn(
-                            "h-full w-full rounded-md px-1.5 py-1 text-left overflow-hidden shadow-sm",
-                            stackedJobOnBookingColor(item),
-                            isDisabled ? "cursor-default" : "cursor-pointer",
-                          )}
-                        >
-                          <div className="truncate text-[11px] font-semibold leading-tight">
-                            {item.title}
-                            {venueName ? (
-                              <span className="font-normal opacity-75"> @ {venueName}</span>
-                            ) : null}
-                          </div>
-                          <div className="mt-0.5 truncate text-[10px] leading-tight opacity-90">
-                            {timeLabel}
-                          </div>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isDisabled) onItemClick(item);
+                        }}
+                        className={cn(
+                          "h-full w-full rounded-md px-1.5 py-1 text-left overflow-hidden shadow-sm",
+                          stackedJobOnBookingColor(item),
+                          isDisabled ? "cursor-default" : "cursor-pointer",
+                        )}
+                      >
+                        <CalendarItemHoverCard
+                          item={item}
+                          locale={locale}
+                          hour12={hour12}
+                          label={
+                            <>
+                              {item.title}
+                              {venueName ? (
+                                <span className="font-normal opacity-75"> @ {venueName}</span>
+                              ) : null}
+                            </>
+                          }
+                          labelClassName="truncate text-[11px] font-semibold leading-tight"
+                        />
+                        <div className="mt-0.5 truncate text-[10px] leading-tight opacity-90">
+                          {timeLabel}
                         </div>
-                      </CalendarItemHoverCard>
+                      </div>
                     </div>
                   );
                 })}
