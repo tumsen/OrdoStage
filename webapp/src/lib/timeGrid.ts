@@ -144,3 +144,97 @@ export function rangeMetricsInColumn(
   if (heightPct <= 0.01) return null;
   return { topPct, heightPct };
 }
+
+/** Interval overlap (touching endpoints do not count). */
+export function timeRangesOverlap(
+  aStart: Date,
+  aEnd: Date,
+  bStart: Date,
+  bEnd: Date
+): boolean {
+  return aStart.getTime() < bEnd.getTime() && aEnd.getTime() > bStart.getTime();
+}
+
+export type TimeEntryLayoutInput<T> = {
+  id: string;
+  timeProjectId: string | null;
+  start: Date;
+  end: Date;
+  topPct: number;
+  heightPct: number;
+  data: T;
+};
+
+export type LaidOutTimeEntry<T> = TimeEntryLayoutInput<T> & {
+  colIndex: number;
+  totalCols: number;
+  stackIndex: number;
+  stackCount: number;
+};
+
+function timeProjectLayoutKey(timeProjectId: string | null): string {
+  return timeProjectId ?? "__none__";
+}
+
+function mergeOverlapClusters<T extends { start: Date; end: Date }>(blocks: T[]): T[][] {
+  if (blocks.length === 0) return [];
+  const parent = blocks.map((_, i) => i);
+  const find = (i: number): number => {
+    if (parent[i] !== i) parent[i] = find(parent[i]!);
+    return parent[i]!;
+  };
+  const unite = (a: number, b: number) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[ra] = rb;
+  };
+  for (let i = 0; i < blocks.length; i++) {
+    for (let j = i + 1; j < blocks.length; j++) {
+      if (timeRangesOverlap(blocks[i]!.start, blocks[i]!.end, blocks[j]!.start, blocks[j]!.end)) {
+        unite(i, j);
+      }
+    }
+  }
+  const groups = new Map<number, T[]>();
+  blocks.forEach((block, i) => {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root)!.push(block);
+  });
+  return [...groups.values()];
+}
+
+/**
+ * Overlapping entries with the same time project stack in one column (transparent layers).
+ * Different projects in the same overlap window render side-by-side.
+ */
+export function layoutTimeEntryBlocks<T>(blocks: TimeEntryLayoutInput<T>[]): LaidOutTimeEntry<T>[] {
+  if (blocks.length === 0) return [];
+
+  const clusters = mergeOverlapClusters(blocks);
+  const laidOut: LaidOutTimeEntry<T>[] = [];
+
+  for (const cluster of clusters) {
+    const byProject = new Map<string, TimeEntryLayoutInput<T>[]>();
+    for (const block of cluster) {
+      const key = timeProjectLayoutKey(block.timeProjectId);
+      const list = byProject.get(key) ?? [];
+      list.push(block);
+      byProject.set(key, list);
+    }
+
+    const projectGroups = [...byProject.values()].map((group) =>
+      [...group].sort((a, b) => a.start.getTime() - b.start.getTime())
+    );
+    const totalCols = projectGroups.length;
+
+    projectGroups.forEach((group, colIndex) => {
+      const stackCount = group.length;
+      group.forEach((block, stackIndex) => {
+        laidOut.push({ ...block, colIndex, totalCols, stackIndex, stackCount });
+      });
+    });
+  }
+
+  return laidOut.sort((a, b) => a.start.getTime() - b.start.getTime() || a.stackIndex - b.stackIndex);
+}

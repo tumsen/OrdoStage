@@ -85,6 +85,7 @@ import {
   formatOneDecimalHour,
   formatTotalMinutesAsHHMM,
   minutesFromWindowStart,
+  layoutTimeEntryBlocks,
   rangeMetricsInColumn,
   rangeOverlapsColumnWindow,
   rawWindowMinutesFromY,
@@ -118,6 +119,44 @@ function plannedJobKeyFromEntry(e: TimeEntry): string | null {
     return `${IBOOKP_PREFIX}${e.internalBookingPersonId}:${e.internalBookingDayKey}`;
   }
   return null;
+}
+
+/** Fill/border strength: stacked layers behind the top entry are more transparent (venue-booking style). */
+function timeEntryBlockSurfaceClass(
+  cat: TimeCategory,
+  isJob: boolean,
+  stackIndex: number,
+  stackCount: number
+): string {
+  const behind = stackCount > 1 && stackIndex < stackCount - 1;
+  if (cat === "vacation") {
+    return behind
+      ? "border-emerald-400/30 bg-emerald-500/12 text-emerald-50/85"
+      : "border-emerald-400/60 bg-emerald-500/30 text-emerald-50";
+  }
+  if (cat === "sick") {
+    return behind
+      ? "border-orange-400/30 bg-orange-500/12 text-orange-50/85"
+      : "border-orange-400/60 bg-orange-500/30 text-orange-50";
+  }
+  if (cat === "holiday") {
+    return behind
+      ? "border-purple-400/30 bg-purple-500/12 text-purple-50/85"
+      : "border-purple-400/60 bg-purple-500/30 text-purple-50";
+  }
+  if (cat === "travel_allowance") {
+    return behind
+      ? "border-amber-400/30 bg-amber-500/10 text-amber-50/85"
+      : "border-amber-400/60 bg-amber-500/25 text-amber-50";
+  }
+  if (isJob) {
+    return behind
+      ? "border-emerald-400/35 bg-emerald-500/12 text-emerald-50/85"
+      : "border-emerald-400/50 bg-emerald-500/25 text-emerald-50";
+  }
+  return behind
+    ? "border-sky-400/35 bg-sky-500/12 text-sky-50/85"
+    : "border-sky-400/50 bg-sky-500/25 text-sky-50";
 }
 
 /**
@@ -2086,16 +2125,46 @@ export default function TimeTracking() {
                           </div>
                         );
                       })}
-                    {(entries ?? [])
-                      .filter((e) =>
-                        rangeOverlapsColumnWindow(
-                          parseISO(e.startsAt),
-                          parseISO(e.endsAt),
-                          dayYmd,
-                          displayStartHour
+                    {layoutTimeEntryBlocks(
+                      (entries ?? [])
+                        .filter((e) =>
+                          rangeOverlapsColumnWindow(
+                            parseISO(e.startsAt),
+                            parseISO(e.endsAt),
+                            dayYmd,
+                            displayStartHour
+                          )
                         )
-                      )
-                      .map((e) => {
+                        .map((e) => {
+                          const preview =
+                            dragOverride?.entryId === e.id
+                              ? {
+                                  start: parseISO(dragOverride.startsAt),
+                                  end: parseISO(dragOverride.endsAt),
+                                }
+                              : null;
+                          const spanStart = preview?.start ?? parseISO(e.startsAt);
+                          const spanEnd = preview?.end ?? parseISO(e.endsAt);
+                          const segment = rangeMetricsInColumn(
+                            spanStart,
+                            spanEnd,
+                            dayYmd,
+                            displayStartHour
+                          );
+                          if (!segment) return null;
+                          return {
+                            id: e.id,
+                            timeProjectId: e.timeProjectId,
+                            start: spanStart,
+                            end: spanEnd,
+                            topPct: segment.topPct,
+                            heightPct: Math.max(segment.heightPct, 0.35),
+                            data: e,
+                          };
+                        })
+                        .filter((row): row is NonNullable<typeof row> => row != null)
+                    ).map((layout) => {
+                        const e = layout.data;
                         const preview =
                           dragOverride?.entryId === e.id
                             ? {
@@ -2103,17 +2172,10 @@ export default function TimeTracking() {
                                 end: parseISO(dragOverride.endsAt),
                               }
                             : null;
-                        const spanStart = preview?.start ?? parseISO(e.startsAt);
-                        const spanEnd = preview?.end ?? parseISO(e.endsAt);
-                        const segment = rangeMetricsInColumn(
-                          spanStart,
-                          spanEnd,
-                          dayYmd,
-                          displayStartHour
-                        );
-                        if (!segment) return null;
-                        const topPct = segment.topPct;
-                        const heightPct = Math.max(segment.heightPct, 0.35);
+                        const spanStart = preview?.start ?? layout.start;
+                        const spanEnd = preview?.end ?? layout.end;
+                        const topPct = layout.topPct;
+                        const heightPct = layout.heightPct;
                         const start = parseISO(e.startsAt);
                         const end = parseISO(e.endsAt);
                         const entryDurMin = (end.getTime() - start.getTime()) / 60000;
@@ -2156,29 +2218,24 @@ export default function TimeTracking() {
                           Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
                         );
                         const durationLabel = formatDurationShort(durForLabel);
+                        const gapPx = 2;
+                        const leftPct = (layout.colIndex / layout.totalCols) * 100;
+                        const widthPct = (1 / layout.totalCols) * 100;
                         return (
                           <div
-                            key={`${e.id}-${dayYmd}`}
+                            key={`${e.id}-${dayYmd}-${layout.colIndex}-${layout.stackIndex}`}
                             className={cn(
-                              "absolute left-0.5 right-0.5 rounded border px-1 pt-1 pb-2 text-[10px] overflow-hidden shadow-sm select-none",
-                              cat === "vacation"
-                                ? "border-emerald-400/60 bg-emerald-500/30 text-emerald-50"
-                                : cat === "sick"
-                                ? "border-orange-400/60 bg-orange-500/30 text-orange-50"
-                                : cat === "holiday"
-                                ? "border-purple-400/60 bg-purple-500/30 text-purple-50"
-                                : cat === "travel_allowance"
-                                ? "border-amber-400/60 bg-amber-500/25 text-amber-50"
-                                : isJob
-                                ? "border-emerald-400/50 bg-emerald-500/25 text-emerald-50"
-                                : "border-sky-400/50 bg-sky-500/25 text-sky-50",
+                              "absolute rounded border px-1 pt-1 pb-2 text-[10px] overflow-hidden shadow-sm select-none",
+                              timeEntryBlockSurfaceClass(cat, isJob, layout.stackIndex, layout.stackCount),
                               isLocked ? "opacity-90" : ""
                             )}
                             data-entry-block={e.id}
                             style={{
                               top: `${Math.max(0, topPct)}%`,
                               height: `${Math.max(4, heightPct)}%`,
-                              zIndex: 2,
+                              left: `calc(${leftPct}% + ${gapPx}px)`,
+                              width: `calc(${widthPct}% - ${gapPx * 2}px)`,
+                              zIndex: 2 + layout.stackIndex,
                               ...(projStripe
                                 ? { boxShadow: `inset 4px 0 0 0 ${projStripe}` }
                                 : {}),
