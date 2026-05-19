@@ -9,7 +9,11 @@ import {
   layoutTimedBlockInDay,
   computeOverlapLayout,
   calendarItemVenueName,
+  calendarBlocksOverlap,
+  columnAnchorForStackedJob,
+  jobStacksOnEventVenueBooking,
   selectionOverlapsExplicitTimedItems,
+  stackedJobOnBookingColor,
 } from "./scheduleUtils";
 import { usePreferences } from "@/hooks/usePreferences";
 import {
@@ -696,7 +700,29 @@ export function OutlookTimeGrid({
 
             const backgroundRaw = timedRaw.filter(({ item }) => item.renderBehind === true);
             const foregroundRaw = timedRaw.filter(({ item }) => item.renderBehind !== true);
-            const laidOut = computeOverlapLayout(foregroundRaw);
+            const stackedJobRaw = foregroundRaw.filter((entry) =>
+              jobStacksOnEventVenueBooking(entry, backgroundRaw)
+            );
+            const stackableJobIds = new Set(stackedJobRaw.map((e) => e.item.id));
+            const foregroundForLayout = foregroundRaw.filter((e) => !stackableJobIds.has(e.item.id));
+            const laidOut = computeOverlapLayout(foregroundForLayout);
+            const stackedJobLayers = stackedJobRaw.map((entry) => {
+              const anchor = columnAnchorForStackedJob(entry, laidOut, backgroundRaw);
+              let zOffset = 0;
+              for (const other of stackedJobRaw) {
+                if (other.item.id === entry.item.id) continue;
+                const otherAnchor = columnAnchorForStackedJob(other, laidOut, backgroundRaw);
+                if (
+                  otherAnchor.colIndex === anchor.colIndex &&
+                  otherAnchor.totalCols === anchor.totalCols &&
+                  calendarBlocksOverlap(entry.start, entry.end, other.start, other.end) &&
+                  other.start.getTime() < entry.start.getTime()
+                ) {
+                  zOffset += 1;
+                }
+              }
+              return { ...entry, anchor, zOffset };
+            });
 
             // Create-drag selection overlay (faded red rectangle).
             let selectionOverlay: React.ReactNode = null;
@@ -1229,6 +1255,67 @@ export function OutlookTimeGrid({
                           <Trash2 size={9} />
                         </button>
                       )}
+                    </div>
+                  );
+                })}
+
+                {stackedJobLayers.map(({ item, start, end, anchor, zOffset }) => {
+                  const jobLayout = layoutTimedBlockInDay(day, start, end, hourHeightPx);
+                  if (!jobLayout) return null;
+                  const { top, height, clippedStart, clippedEnd } = jobLayout;
+                  const isDisabled = item.disabled === true;
+                  const gapPx = 2;
+                  const leftPct = (anchor.colIndex / anchor.totalCols) * 100;
+                  const widthPct = (1 / anchor.totalCols) * 100;
+                  const venueName = calendarItemVenueName(item);
+                  const hour12Job = effective?.timeFormat === "12h";
+                  const timeLabel = `${clippedStart.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: hour12Job,
+                  })}–${clippedEnd.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: hour12Job,
+                  })}`;
+
+                  return (
+                    <div
+                      key={`stacked-job-${item.id}`}
+                      className={cn("absolute", isDisabled && "opacity-50 saturate-75")}
+                      style={{
+                        top,
+                        height: Math.max(height, 16),
+                        left: `calc(${leftPct}% + ${gapPx}px)`,
+                        width: `calc(${widthPct}% - ${gapPx * 2}px)`,
+                        zIndex: 15 + zOffset,
+                      }}
+                    >
+                      <CalendarItemHoverCard item={item} locale={locale} hour12={hour12}>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isDisabled) onItemClick(item);
+                          }}
+                          className={cn(
+                            "h-full w-full rounded-md px-1.5 py-1 text-left overflow-hidden shadow-sm",
+                            stackedJobOnBookingColor(item),
+                            isDisabled ? "cursor-default" : "cursor-pointer",
+                          )}
+                        >
+                          <div className="truncate text-[11px] font-semibold leading-tight">
+                            {item.title}
+                            {venueName ? (
+                              <span className="font-normal opacity-75"> @ {venueName}</span>
+                            ) : null}
+                          </div>
+                          <div className="mt-0.5 truncate text-[10px] leading-tight opacity-90">
+                            {timeLabel}
+                          </div>
+                        </div>
+                      </CalendarItemHoverCard>
                     </div>
                   );
                 })}

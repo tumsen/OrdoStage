@@ -523,12 +523,89 @@ export function calendarVenueBookingSummaryLine(item: CalendarItem): string {
   return [item.title, v && `@ ${v}`, t].filter(Boolean).join(" · ");
 }
 
+export function calendarBlocksOverlap(
+  aStart: Date,
+  aEnd: Date,
+  bStart: Date,
+  bEnd: Date
+): boolean {
+  return aStart.getTime() < bEnd.getTime() && aEnd.getTime() > bStart.getTime();
+}
+
+export function eventShowIdFromJobCalendarItem(item: CalendarItem): string | null {
+  if (item.kind !== "job") return null;
+  const m = /^[^:]+:show:([^:]+):job:/.exec(item.id);
+  return m?.[1] ?? null;
+}
+
+export function eventIdFromEventCalendarItem(item: CalendarItem): string | null {
+  if (item.kind !== "event" && item.kind !== "job") return null;
+  return (item.raw as EventDetail).id ?? null;
+}
+
+/** Show jobs that overlap an event-linked venue booking stack on that booking, not in a side column. */
+export function jobStacksOnEventVenueBooking(
+  job: TimedBlock,
+  backgroundItems: TimedBlock[]
+): boolean {
+  if (job.item.kind !== "job") return false;
+  const eventId = eventIdFromEventCalendarItem(job.item);
+  if (!eventId) return false;
+  return backgroundItems.some((bg) => {
+    if (bg.item.renderBehind !== true || bg.item.kind !== "booking") return false;
+    const booking = bg.item.raw as InternalBookingDetail & { eventId?: string | null };
+    if (booking.eventId !== eventId) return false;
+    return calendarBlocksOverlap(job.start, job.end, bg.start, bg.end);
+  });
+}
+
+/** Share the show/event overlap column so jobs sit on top of the venue booking band. */
+export function columnAnchorForStackedJob(
+  job: TimedBlock,
+  laidOut: LaidOutBlock[],
+  _backgroundItems: TimedBlock[]
+): { colIndex: number; totalCols: number } {
+  const eventId = eventIdFromEventCalendarItem(job.item);
+  if (!eventId) return { colIndex: 0, totalCols: 1 };
+
+  const showId = eventShowIdFromJobCalendarItem(job.item);
+  if (showId) {
+    const showPill = laidOut.find(
+      (fg) => fg.item.kind === "event" && fg.item.id === `${eventId}:show:${showId}`
+    );
+    if (showPill) return { colIndex: showPill.colIndex, totalCols: showPill.totalCols };
+  }
+
+  const overlappingShow = laidOut.find(
+    (fg) =>
+      fg.item.kind === "event" &&
+      eventIdFromEventCalendarItem(fg.item) === eventId &&
+      calendarBlocksOverlap(job.start, job.end, fg.start, fg.end)
+  );
+  if (overlappingShow) {
+    return { colIndex: overlappingShow.colIndex, totalCols: overlappingShow.totalCols };
+  }
+
+  const sameEventShow = laidOut.find(
+    (fg) => fg.item.kind === "event" && eventIdFromEventCalendarItem(fg.item) === eventId
+  );
+  if (sameEventShow) {
+    return { colIndex: sameEventShow.colIndex, totalCols: sameEventShow.totalCols };
+  }
+
+  return { colIndex: 0, totalCols: 1 };
+}
+
+export function stackedJobOnBookingColor(_item: CalendarItem): string {
+  return "bg-teal-600/50 text-teal-50 border border-teal-400/45 shadow-sm";
+}
+
 /** Venue booking row linked to this calendar event (same `eventId`, overlapping times). */
 export function backingVenueBookingForEvent(
   item: CalendarItem,
   candidates: CalendarItem[]
 ): CalendarItem | null {
-  if (item.kind !== "event") return null;
+  if (item.kind !== "event" && item.kind !== "job") return null;
   const eventId = (item.raw as EventDetail).id;
   const itemStart = new Date(item.startDate);
   const itemEnd = item.endDate ? new Date(item.endDate) : new Date(itemStart.getTime() + 60 * 60 * 1000);
@@ -550,8 +627,8 @@ export function backingVenueBookingForEvent(
 }
 
 /**
- * Event-linked venue bookings (`renderBehind`) that do not overlap any foreground **event** pill
- * this day — they still need their own chip (e.g. booking extends beyond the show date).
+ * Event-linked venue bookings (`renderBehind`) that do not overlap any foreground **event** or **job**
+ * pill this day — they still need their own chip (e.g. booking extends beyond the show date).
  */
 export function orphanBackingVenueBookings(
   foregroundItems: CalendarItem[],
