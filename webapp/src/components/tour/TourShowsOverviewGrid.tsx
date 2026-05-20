@@ -70,30 +70,44 @@ function TourDayTypeBadge({
   );
 }
 
-function PerformanceLineList({
-  lines,
-  field,
-  className,
-  title,
-}: {
-  lines: TourPerformanceLine[];
-  field: "time" | "venue";
-  className?: string;
-  title?: string;
-}) {
+function PerformanceTimeLines({ lines, className }: { lines: TourPerformanceLine[]; className?: string }) {
   if (lines.length === 0) {
     return <span className={className}>—</span>;
   }
   return (
-    <div className={cn("flex flex-col gap-0.5", className)} title={title}>
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      {lines.map((line, i) => {
+        const label = line.timeEnd ? `${line.timeStart} – ${line.timeEnd}` : line.timeStart;
+        return (
+          <div
+            key={`time-${i}-${label}`}
+            className="flex flex-col gap-px leading-tight tabular-nums whitespace-nowrap"
+            title={label}
+          >
+            <span>{line.timeStart}</span>
+            {line.timeEnd ? <span className="text-white/55">{line.timeEnd}</span> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PerformanceVenueLines({ lines, className }: { lines: TourPerformanceLine[]; className?: string }) {
+  if (lines.length === 0) {
+    return <span className={className}>—</span>;
+  }
+  return (
+    <div className={cn("flex flex-col gap-1.5", className)}>
       {lines.map((line, i) => (
-        <span
-          key={`${field}-${i}-${line[field]}`}
-          className={cn("truncate block", field === "time" && "tabular-nums")}
-          title={line[field]}
+        <div
+          key={`venue-${i}-${line.venue}`}
+          className={cn("flex items-start", line.timeEnd && "min-h-[2.1rem]")}
         >
-          {line[field]}
-        </span>
+          <span className="block min-w-0 truncate leading-tight" title={line.venue}>
+            {line.venue}
+          </span>
+        </div>
       ))}
     </div>
   );
@@ -166,11 +180,11 @@ export function TourShowsOverviewGrid({
   return (
     <div className={cn("mt-1 overflow-x-auto -mx-1 px-1", className)}>
       <ul
-        className="min-w-[min(100%,38rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
+        className="min-w-[min(100%,38rem)] grid items-start gap-x-2 gap-y-1.5 text-[10px] leading-snug"
         style={{
           gridTemplateColumns: hour12
-            ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content minmax(0,1fr)"
-            : "auto 10ch max-content 6ch max-content max-content max-content minmax(0,1fr)",
+            ? "auto 10ch max-content minmax(8rem,11ch) minmax(4.5rem,max-content) minmax(6rem,1fr) max-content max-content minmax(0,1fr)"
+            : "auto 10ch max-content minmax(8rem,11ch) minmax(4.25rem,max-content) minmax(6rem,1fr) max-content max-content minmax(0,1fr)",
         }}
       >
         {sorted.map((show) => {
@@ -199,10 +213,9 @@ export function TourShowsOverviewGrid({
                 {when.dateOnlyLabel}
               </span>
               {show.type === "show" ? (
-                <PerformanceLineList
+                <PerformanceTimeLines
                   lines={performanceLines}
-                  field="time"
-                  className={cn("justify-self-start pl-0.5 pr-1 text-left", rowTone, whenTone)}
+                  className={cn("justify-self-start pl-0.5 text-left", rowTone, whenTone)}
                 />
               ) : (
                 <span
@@ -216,9 +229,8 @@ export function TourShowsOverviewGrid({
                 </span>
               )}
               {show.type === "show" ? (
-                <PerformanceLineList
+                <PerformanceVenueLines
                   lines={performanceLines}
-                  field="venue"
                   className={cn("min-w-0 pr-2 text-left", rowTone, venueTone)}
                 />
               ) : (
