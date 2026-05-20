@@ -1,5 +1,12 @@
 import type { TourShowListRow } from "../../../backend/src/types";
-import { sortedTourScheduleEvents } from "@/lib/tourScheduleDisplay";
+import {
+  formatScheduleEventTimes,
+  sortedTourScheduleEvents,
+  tourShowPrimaryTime,
+} from "@/lib/tourScheduleDisplay";
+import { normalizeTimeHHMM } from "@/lib/showTiming";
+
+export type TourPerformanceLine = { time: string; venue: string };
 
 function dayKeyForShow(show: TourShowListRow): string {
   return (show.dayKey || show.date).slice(0, 10);
@@ -18,6 +25,50 @@ export function tourPerformanceCountOnDay(shows: TourShowListRow[], dayKey: stri
     }
   }
   return total;
+}
+
+function formatTourListTime(
+  timeRaw: string | null,
+  dayKey: string,
+  locale: string,
+  hour12: boolean,
+): string {
+  const normalized = timeRaw ? normalizeTimeHHMM(timeRaw) : null;
+  if (!normalized) return "—";
+  const base = new Date(`${dayKey}T12:00:00`);
+  const [hh, mm] = normalized.split(":").map((x) => Number(x));
+  if (Number.isFinite(hh) && Number.isFinite(mm)) base.setHours(hh, mm, 0, 0);
+  return base.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12 });
+}
+
+/** Each scheduled show performance on a calendar day (time + venue per line). */
+export function tourPerformanceLinesOnDay(
+  shows: TourShowListRow[],
+  dayKey: string,
+  locale: string,
+  hour12: boolean,
+): TourPerformanceLine[] {
+  const lines: TourPerformanceLine[] = [];
+  for (const s of shows) {
+    if (dayKeyForShow(s) !== dayKey || s.type !== "show") continue;
+    const venue = tourShowVenueLabel(s);
+    const showEvents = sortedTourScheduleEvents(s).filter((e) => e.kind === "show");
+    if (showEvents.length > 0) {
+      for (const ev of showEvents) {
+        const range = formatScheduleEventTimes(ev);
+        const time = range.includes("–")
+          ? range
+          : formatTourListTime(range || ev.startTime, dayKey, locale, hour12);
+        lines.push({ time: time || "—", venue });
+      }
+    } else {
+      lines.push({
+        time: formatTourListTime(tourShowPrimaryTime(s), dayKey, locale, hour12),
+        venue,
+      });
+    }
+  }
+  return lines;
 }
 
 export function tourShowVenueLabel(show: TourShowListRow): string {

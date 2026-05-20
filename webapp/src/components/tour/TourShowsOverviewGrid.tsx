@@ -7,7 +7,9 @@ import { tourShowPrimaryTime } from "@/lib/tourScheduleDisplay";
 import {
   computeTourShowCrewStats,
   tourPerformanceCountOnDay,
+  tourPerformanceLinesOnDay,
   tourShowVenueLabel,
+  type TourPerformanceLine,
 } from "@/lib/tourShowListStats";
 import { Badge } from "@/components/ui/badge";
 
@@ -40,13 +42,9 @@ function formatTourListWhenParts(
 function TourDayTypeBadge({
   show,
   allShows,
-  locale,
-  hour12,
 }: {
   show: TourShowListRow;
   allShows: TourShowListRow[];
-  locale: string;
-  hour12: boolean;
 }) {
   if (show.type === "travel") {
     return (
@@ -64,21 +62,40 @@ function TourDayTypeBadge({
   }
   const dayKey = (show.dayKey || show.date).slice(0, 10);
   const performanceCount = tourPerformanceCountOnDay(allShows, dayKey);
-  const when = formatTourListWhenParts(show, locale, hour12);
-  const venue = tourShowVenueLabel(show);
-  const labelParts = [
-    performanceCount > 1 ? `${performanceCount} shows` : "Show",
-    when.timeLabel !== "—" ? when.timeLabel : null,
-    venue !== "Venue TBD" ? venue : null,
-  ].filter((p): p is string => Boolean(p));
-  const label = labelParts.join(" · ");
+  const label = performanceCount === 1 ? "1 Show" : `${performanceCount} Shows`;
   return (
-    <Badge
-      className="max-w-[min(14rem,42vw)] truncate text-[10px] py-px px-1.5 font-medium bg-emerald-900/40 text-emerald-300 border-emerald-700/40 hover:bg-emerald-900/40"
-      title={label}
-    >
+    <Badge className="text-[10px] py-px px-1.5 font-medium bg-emerald-900/40 text-emerald-300 border-emerald-700/40 hover:bg-emerald-900/40">
       {label}
     </Badge>
+  );
+}
+
+function PerformanceLineList({
+  lines,
+  field,
+  className,
+  title,
+}: {
+  lines: TourPerformanceLine[];
+  field: "time" | "venue";
+  className?: string;
+  title?: string;
+}) {
+  if (lines.length === 0) {
+    return <span className={className}>—</span>;
+  }
+  return (
+    <div className={cn("flex flex-col gap-0.5", className)} title={title}>
+      {lines.map((line, i) => (
+        <span
+          key={`${field}-${i}-${line[field]}`}
+          className={cn("truncate block", field === "time" && "tabular-nums")}
+          title={line[field]}
+        >
+          {line[field]}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -152,12 +169,17 @@ export function TourShowsOverviewGrid({
         className="min-w-[min(100%,38rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
         style={{
           gridTemplateColumns: hour12
-            ? "minmax(9rem,14rem) 10ch max-content minmax(8rem,11ch) max-content max-content max-content minmax(0,1fr)"
-            : "minmax(9rem,14rem) 10ch max-content 6ch max-content max-content max-content minmax(0,1fr)",
+            ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content minmax(0,1fr)"
+            : "auto 10ch max-content 6ch max-content max-content max-content minmax(0,1fr)",
         }}
       >
         {sorted.map((show) => {
           const stats = computeTourShowCrewStats(show, tourHandsNeeded, tourPeopleCount);
+          const dayKey = (show.dayKey || show.date).slice(0, 10);
+          const performanceLines =
+            show.type === "show"
+              ? tourPerformanceLinesOnDay(sorted, dayKey, prefsLocale, hour12)
+              : [];
           const venueName = tourShowVenueLabel(show);
           const when = formatTourListWhenParts(show, prefsLocale, hour12);
           const muted = show.type === "day_off";
@@ -168,12 +190,7 @@ export function TourShowsOverviewGrid({
           return (
             <li key={show.id} className="contents">
               <div className="justify-self-start pr-2">
-                <TourDayTypeBadge
-                  show={show}
-                  allShows={sorted}
-                  locale={prefsLocale}
-                  hour12={hour12}
-                />
+                <TourDayTypeBadge show={show} allShows={sorted} />
               </div>
               <span className={cn("min-w-0 truncate text-left", rowTone, whenTone)} title={when.weekdayLabel}>
                 {when.weekdayLabel}
@@ -181,18 +198,34 @@ export function TourShowsOverviewGrid({
               <span className={cn("min-w-0 truncate pl-2 text-left", rowTone, whenTone)} title={when.dateOnlyLabel}>
                 {when.dateOnlyLabel}
               </span>
-              <span
-                className={cn(
-                  "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
-                  rowTone,
-                  whenTone,
-                )}
-              >
-                {when.timeLabel}
-              </span>
-              <span className={cn("min-w-0 truncate pr-2", rowTone, venueTone)} title={venueName}>
-                {venueName}
-              </span>
+              {show.type === "show" ? (
+                <PerformanceLineList
+                  lines={performanceLines}
+                  field="time"
+                  className={cn("justify-self-start pl-0.5 pr-1 text-left", rowTone, whenTone)}
+                />
+              ) : (
+                <span
+                  className={cn(
+                    "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
+                    rowTone,
+                    whenTone,
+                  )}
+                >
+                  {when.timeLabel}
+                </span>
+              )}
+              {show.type === "show" ? (
+                <PerformanceLineList
+                  lines={performanceLines}
+                  field="venue"
+                  className={cn("min-w-0 pr-2 text-left", rowTone, venueTone)}
+                />
+              ) : (
+                <span className={cn("min-w-0 truncate pr-2", rowTone, venueTone)} title={venueName}>
+                  {venueName}
+                </span>
+              )}
               <div className="min-w-0 truncate pr-4">
                 <TourListCrewHint people={stats.people} needed={stats.needed} muted={muted} />
               </div>
