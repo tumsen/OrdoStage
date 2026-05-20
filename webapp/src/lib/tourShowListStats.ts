@@ -1,8 +1,12 @@
 import type { TourShowListRow } from "../../../backend/src/types";
-import { sortedTourScheduleEvents, tourShowPrimaryTime } from "@/lib/tourScheduleDisplay";
+import {
+  formatScheduleEventTimes,
+  sortedTourScheduleEvents,
+  tourShowPrimaryTime,
+} from "@/lib/tourScheduleDisplay";
 import { normalizeTimeHHMM } from "@/lib/showTiming";
 
-export type TourPerformanceLine = { timeStart: string; timeEnd: string | null; venue: string };
+export type TourPerformanceLine = { time: string; venue: string };
 
 function dayKeyForShow(show: TourShowListRow): string {
   return (show.dayKey || show.date).slice(0, 10);
@@ -51,19 +55,15 @@ export function tourPerformanceLinesOnDay(
     const showEvents = sortedTourScheduleEvents(s).filter((e) => e.kind === "show");
     if (showEvents.length > 0) {
       for (const ev of showEvents) {
-        const startRaw = normalizeTimeHHMM(ev.startTime);
-        const endRaw = normalizeTimeHHMM(ev.endTime);
-        const timeStart = formatTourListTime(startRaw, dayKey, locale, hour12);
-        const timeEnd =
-          endRaw && startRaw && endRaw !== startRaw
-            ? formatTourListTime(endRaw, dayKey, locale, hour12)
-            : null;
-        lines.push({ timeStart, timeEnd, venue });
+        const range = formatScheduleEventTimes(ev);
+        const time = range.includes("–")
+          ? range
+          : formatTourListTime(range || ev.startTime, dayKey, locale, hour12);
+        lines.push({ time: time || "—", venue });
       }
     } else {
       lines.push({
-        timeStart: formatTourListTime(tourShowPrimaryTime(s), dayKey, locale, hour12),
-        timeEnd: null,
+        time: formatTourListTime(tourShowPrimaryTime(s), dayKey, locale, hour12),
         venue,
       });
     }
