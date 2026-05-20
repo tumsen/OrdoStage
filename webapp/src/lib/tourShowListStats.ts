@@ -1,4 +1,24 @@
 import type { TourShowListRow } from "../../../backend/src/types";
+import { sortedTourScheduleEvents } from "@/lib/tourScheduleDisplay";
+
+function dayKeyForShow(show: TourShowListRow): string {
+  return (show.dayKey || show.date).slice(0, 10);
+}
+
+/** Scheduled performances on one calendar day (show events, or one per show-type day row). */
+export function tourPerformanceCountOnDay(shows: TourShowListRow[], dayKey: string): number {
+  let total = 0;
+  for (const s of shows) {
+    if (dayKeyForShow(s) !== dayKey) continue;
+    const scheduled = sortedTourScheduleEvents(s).filter((e) => e.kind === "show").length;
+    if (scheduled > 0) {
+      total += scheduled;
+    } else if (s.type === "show") {
+      total += 1;
+    }
+  }
+  return total;
+}
 
 export function tourShowVenueLabel(show: TourShowListRow): string {
   if (show.type === "travel") {

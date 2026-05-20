@@ -6,6 +6,7 @@ import { localeForLanguage } from "@/lib/preferences";
 import { tourShowPrimaryTime } from "@/lib/tourScheduleDisplay";
 import {
   computeTourShowCrewStats,
+  tourPerformanceCountOnDay,
   tourShowVenueLabel,
 } from "@/lib/tourShowListStats";
 import { Badge } from "@/components/ui/badge";
@@ -36,24 +37,47 @@ function formatTourListWhenParts(
   return { weekdayLabel, dateOnlyLabel, timeLabel };
 }
 
-function TourDayTypeBadge({ type }: { type: TourShowListRow["type"] }) {
-  if (type === "travel") {
+function TourDayTypeBadge({
+  show,
+  allShows,
+  locale,
+  hour12,
+}: {
+  show: TourShowListRow;
+  allShows: TourShowListRow[];
+  locale: string;
+  hour12: boolean;
+}) {
+  if (show.type === "travel") {
     return (
       <Badge className="text-[10px] py-px px-1.5 font-medium bg-blue-900/40 text-blue-300 border-blue-700/40 hover:bg-blue-900/40">
         Travel
       </Badge>
     );
   }
-  if (type === "day_off") {
+  if (show.type === "day_off") {
     return (
       <Badge className="text-[10px] py-px px-1.5 font-medium bg-white/5 text-white/40 border-white/10 hover:bg-white/5">
         Day off
       </Badge>
     );
   }
+  const dayKey = (show.dayKey || show.date).slice(0, 10);
+  const performanceCount = tourPerformanceCountOnDay(allShows, dayKey);
+  const when = formatTourListWhenParts(show, locale, hour12);
+  const venue = tourShowVenueLabel(show);
+  const labelParts = [
+    performanceCount > 1 ? `${performanceCount} shows` : "Show",
+    when.timeLabel !== "—" ? when.timeLabel : null,
+    venue !== "Venue TBD" ? venue : null,
+  ].filter((p): p is string => Boolean(p));
+  const label = labelParts.join(" · ");
   return (
-    <Badge className="text-[10px] py-px px-1.5 font-medium bg-emerald-900/40 text-emerald-300 border-emerald-700/40 hover:bg-emerald-900/40">
-      Show
+    <Badge
+      className="max-w-[min(14rem,42vw)] truncate text-[10px] py-px px-1.5 font-medium bg-emerald-900/40 text-emerald-300 border-emerald-700/40 hover:bg-emerald-900/40"
+      title={label}
+    >
+      {label}
     </Badge>
   );
 }
@@ -128,8 +152,8 @@ export function TourShowsOverviewGrid({
         className="min-w-[min(100%,38rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
         style={{
           gridTemplateColumns: hour12
-            ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content minmax(0,1fr)"
-            : "auto 10ch max-content 6ch max-content max-content max-content minmax(0,1fr)",
+            ? "minmax(9rem,14rem) 10ch max-content minmax(8rem,11ch) max-content max-content max-content minmax(0,1fr)"
+            : "minmax(9rem,14rem) 10ch max-content 6ch max-content max-content max-content minmax(0,1fr)",
         }}
       >
         {sorted.map((show) => {
@@ -144,7 +168,12 @@ export function TourShowsOverviewGrid({
           return (
             <li key={show.id} className="contents">
               <div className="justify-self-start pr-2">
-                <TourDayTypeBadge type={show.type} />
+                <TourDayTypeBadge
+                  show={show}
+                  allShows={sorted}
+                  locale={prefsLocale}
+                  hour12={hour12}
+                />
               </div>
               <span className={cn("min-w-0 truncate text-left", rowTone, whenTone)} title={when.weekdayLabel}>
                 {when.weekdayLabel}
