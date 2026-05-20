@@ -4,7 +4,9 @@ import { useState } from "react";
 import { Plus, Trash2, Eye, Route } from "lucide-react";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import type { Tour, CreateTour } from "../../../backend/src/types";
+import type { Tour, CreateTour, TourListItem } from "../../../backend/src/types";
+import { TourShowsOverviewGrid } from "@/components/tour/TourShowsOverviewGrid";
+import { computeTourCrewTotals } from "@/lib/tourShowListStats";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,9 +37,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-
-// Tour has _count from the list endpoint
-type TourWithCount = Tour & { _count: { shows: number; people: number } };
 
 function TourStatusBadge({ status }: { status: Tour["status"] }) {
   if (status === "active") {
@@ -241,7 +240,7 @@ export default function Tours() {
 
   const { data: tours, isLoading, error } = useQuery({
     queryKey: ["tours"],
-    queryFn: () => api.get<TourWithCount[]>("/api/tours"),
+    queryFn: () => api.get<TourListItem[]>("/api/tours"),
   });
 
   const deleteMutation = useMutation({
@@ -255,18 +254,18 @@ export default function Tours() {
   const tourToDelete = (tours ?? []).find((t) => t.id === deleteId);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="page-shell">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 text-white/40">
-          <Route size={15} />
+          <Route size={14} />
           <span className="text-sm">
             {isLoading ? "Loading..." : `${(tours ?? []).length} tour${(tours ?? []).length !== 1 ? "s" : ""}`}
           </span>
         </div>
         <Button
           onClick={() => setNewOpen(true)}
-          className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2"
+          className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 flex-shrink-0"
         >
           <Plus size={14} /> New Tour
         </Button>
@@ -274,31 +273,26 @@ export default function Tours() {
 
       {/* List */}
       <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-0">
-          {/* Header */}
-          <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">
-            Tour
+        <div className="grid grid-cols-[1fr_auto] gap-0">
+          <div className="contents">
+            <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">
+              Tour
+            </div>
+            <div className="px-5 py-3 border-b border-white/10" />
           </div>
-          <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10 hidden sm:block">
-            Shows
-          </div>
-          <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">
-            Status
-          </div>
-          <div className="px-5 py-3 border-b border-white/10" />
 
           {isLoading ? (
-            <div className="col-span-4 p-5 space-y-3">
+            <div className="col-span-2 p-5 space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full rounded bg-white/5" />
               ))}
             </div>
           ) : error ? (
-            <div className="col-span-4 py-10 text-center text-red-400 text-sm">
+            <div className="col-span-2 py-10 text-center text-red-400 text-sm">
               Failed to load tours.
             </div>
           ) : (tours ?? []).length === 0 ? (
-            <div className="col-span-4 py-16 text-center">
+            <div className="col-span-2 py-16 text-center">
               <Route size={28} className="text-white/15 mx-auto mb-3" />
               <p className="text-white/30 text-sm">No tours yet.</p>
               <p className="text-white/20 text-xs mt-1">Create your first tour to get started.</p>
@@ -312,42 +306,45 @@ export default function Tours() {
               </Button>
             </div>
           ) : (
-            (tours ?? []).map((tour) => (
+            (tours ?? []).map((tour) => {
+              const crewTotals = computeTourCrewTotals(
+                tour.shows,
+                tour.handsNeeded,
+                tour.tourPeopleCount,
+              );
+              return (
               <div key={tour.id} className="contents group">
                 <div
-                  className="px-5 py-4 border-b border-white/5 cursor-pointer"
+                  className="px-4 sm:px-5 py-3.5 border-b border-white/5 cursor-pointer"
                   onClick={() => navigate(`/tours/${tour.id}`)}
                 >
-                  <div className="text-sm font-medium text-white/90 group-hover:text-white transition-colors">
-                    {tour.name}
-                  </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    {tour.tourManagerName ? (
-                      <span className="text-xs text-white/35">
-                        Manager: {tour.tourManagerName}
+                  <div className="flex items-baseline gap-x-2 flex-wrap min-w-0">
+                    <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
+                      {tour.name}
+                    </span>
+                    <TourStatusBadge status={tour.status} />
+                    {tour.shows.length > 0 ? (
+                      <span
+                        className="text-[10px] tabular-nums text-white/40 shrink-0"
+                        title="Crew on busiest day (tour roster when a day has no custom roster)"
+                      >
+                        {crewTotals.people} crew
+                        {crewTotals.handsNeeded != null ? ` · ${crewTotals.handsNeeded} needed` : ""}
                       </span>
                     ) : null}
-                    {tour._count.people > 0 ? (
-                      <span className="text-xs text-white/30">
-                        {tour._count.people} {tour._count.people === 1 ? "person" : "people"}
-                      </span>
-                    ) : null}
                   </div>
+                  {tour.tourManagerName ? (
+                    <p className="text-[11px] text-white/35 mt-0.5 truncate">
+                      Manager: {tour.tourManagerName}
+                    </p>
+                  ) : null}
+                  <TourShowsOverviewGrid
+                    shows={tour.shows}
+                    tourHandsNeeded={tour.handsNeeded}
+                    tourPeopleCount={tour.tourPeopleCount}
+                  />
                 </div>
-                <div
-                  className="px-5 py-4 border-b border-white/5 text-sm text-white/50 hidden sm:flex items-center cursor-pointer"
-                  onClick={() => navigate(`/tours/${tour.id}`)}
-                >
-                  <span className="tabular-nums">{tour._count.shows}</span>
-                  <span className="text-white/25 ml-1">show{tour._count.shows !== 1 ? "s" : ""}</span>
-                </div>
-                <div
-                  className="px-5 py-4 border-b border-white/5 flex items-center cursor-pointer"
-                  onClick={() => navigate(`/tours/${tour.id}`)}
-                >
-                  <TourStatusBadge status={tour.status} />
-                </div>
-                <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
+                <div className="px-5 py-3.5 border-b border-white/5 flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -366,7 +363,8 @@ export default function Tours() {
                   </Button>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

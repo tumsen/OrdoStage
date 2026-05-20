@@ -1010,6 +1010,35 @@ export const TourDetailSchema = TourSchema.extend({
   personNotes: z.array(TourPersonNoteSchema),
 });
 
+/** Lean tour day row for list/overview (no nested person payloads). */
+export const TourShowListRowSchema = z.object({
+  id: z.string(),
+  tourId: z.string(),
+  date: z.string(),
+  dayKey: z.string(),
+  type: z.enum(["show", "travel", "day_off"]),
+  fromLocation: z.string().nullable(),
+  toLocation: z.string().nullable(),
+  showTime: z.string().nullable(),
+  venueName: z.string().nullable(),
+  venueCity: z.string().nullable(),
+  venueCountry: z.string().nullable(),
+  handsNeeded: z.number().nullable(),
+  order: z.number(),
+  scheduleEvents: z.array(TourScheduleEventSchema),
+  showPeopleCount: z.number(),
+  techRiderSentAt: z.string().nullable(),
+});
+
+export const TourListItemSchema = TourSchema.extend({
+  shows: z.array(TourShowListRowSchema),
+  tourPeopleCount: z.number(),
+  _count: z.object({
+    shows: z.number(),
+    people: z.number(),
+  }),
+});
+
 export const AssignTourTeamSchema = z.object({
   teamId: z.string(),
 });
@@ -1397,6 +1426,8 @@ export type TourTeam = z.infer<typeof TourTeamSchema>;
 export type TourShowPerson = z.infer<typeof TourShowPersonSchema>;
 export type Tour = z.infer<typeof TourSchema>;
 export type TourDetail = z.infer<typeof TourDetailSchema>;
+export type TourListItem = z.infer<typeof TourListItemSchema>;
+export type TourShowListRow = z.infer<typeof TourShowListRowSchema>;
 export type CreateTour = z.infer<typeof CreateTourSchema>;
 export type UpdateTour = z.infer<typeof UpdateTourSchema>;
 export type AssignTourTeam = z.infer<typeof AssignTourTeamSchema>;

@@ -105,6 +105,33 @@ function isoDate(d: unknown): string {
   return d instanceof Date ? d.toISOString() : String(d);
 }
 
+export function serializeTourShowListRow(show: any) {
+  const dk =
+    show.dayKey ??
+    dayKeyFromDateInput(show.date instanceof Date ? show.date.toISOString() : String(show.date));
+  return {
+    id: show.id,
+    tourId: show.tourId,
+    date: show.date instanceof Date ? show.date.toISOString() : show.date,
+    dayKey: dk,
+    type: show.type ?? "show",
+    fromLocation: show.fromLocation,
+    toLocation: show.toLocation,
+    showTime: show.showTime,
+    venueName: show.venueName,
+    venueCity: show.venueCity,
+    venueCountry: show.venueCountry,
+    handsNeeded: show.handsNeeded ?? null,
+    order: show.order ?? 0,
+    scheduleEvents: mergedScheduleEvents(show),
+    showPeopleCount: show._count?.showPeople ?? show.showPeople?.length ?? 0,
+    techRiderSentAt:
+      show.techRiderSentAt instanceof Date
+        ? show.techRiderSentAt.toISOString()
+        : (show.techRiderSentAt ?? null),
+  };
+}
+
 export function serializeTourShow(show: any) {
   const dk =
     show.dayKey ??
@@ -234,12 +261,21 @@ toursRouter.get("/tours", async (c) => {
       _count: {
         select: { shows: true, people: true },
       },
+      shows: {
+        orderBy: [{ date: "asc" }, { order: "asc" }],
+        include: {
+          scheduleEvents: { orderBy: { sortOrder: "asc" } },
+          _count: { select: { showPeople: true } },
+        },
+      },
     },
   });
 
   return c.json({
     data: tours.map((tour) => ({
       ...serializeTour(tour),
+      shows: tour.shows.map(serializeTourShowListRow),
+      tourPeopleCount: tour._count.people,
       _count: tour._count,
     })),
   });

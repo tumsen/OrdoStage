@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { CalendarDays, MapPin, CheckCircle2, Plus, ArrowRight, TrendingUp, Route, ChevronLeft, ChevronRight, Coffee, Truck, Receipt } from "lucide-react";
 import { api } from "@/lib/api";
 import type { EventDetail, Venue } from "@/lib/types";
-import type { TourDetail } from "../../../backend/src/types";
+import type { TourDetail, TourListItem } from "../../../backend/src/types";
 import { tourShowPrimaryTime } from "@/lib/tourScheduleDisplay";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, eventStartsOnOrAfterToday } from "@/lib/dateUtils";
@@ -16,14 +16,6 @@ import { usePermissions } from "@/hooks/usePermissions";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-
-// Tour type from list (has _count, no shows)
-type TourListItem = {
-  id: string;
-  name: string;
-  status: string;
-  _count: { shows: number; people: number };
-};
 
 function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: number | string; color: string }) {
   return (

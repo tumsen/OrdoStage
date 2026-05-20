@@ -49,11 +49,11 @@ interface OrgData {
 
 const navItems: { to: string; labelKey: string; icon: LucideIcon; view: string }[] = [
   { to: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard, view: "dashboard" },
-  { to: "/events", labelKey: "nav.events", icon: CalendarDays, view: "events" },
   { to: "/schedule", labelKey: "nav.schedule", icon: CalendarRange, view: "schedule" },
-  { to: "/staffing", labelKey: "nav.staffing", icon: ClipboardList, view: "staffing" },
-  { to: "/time", labelKey: "nav.time", icon: Timer, view: "time" },
+  { to: "/events", labelKey: "nav.events", icon: CalendarDays, view: "events" },
   { to: "/tours", labelKey: "nav.tours", icon: Route, view: "tours" },
+  { to: "/time", labelKey: "nav.time", icon: Timer, view: "time" },
+  { to: "/staffing", labelKey: "nav.staffing", icon: ClipboardList, view: "staffing" },
   { to: "/venues", labelKey: "nav.venues", icon: MapPin, view: "venues" },
   { to: "/people", labelKey: "nav.people", icon: Users, view: "people" },
   { to: "/teams", labelKey: "nav.team", icon: UsersRound, view: "team" },
