@@ -39,6 +39,10 @@ function formatTourListWhenParts(
   return { weekdayLabel, dateOnlyLabel, timeLabel };
 }
 
+/** Fixed width so Travel, Day off, and up to “99 Shows” align in the tour list grid. */
+const TOUR_DAY_BADGE_LAYOUT =
+  "inline-flex h-[1.125rem] w-[4.85rem] min-w-[4.85rem] max-w-[4.85rem] shrink-0 items-center justify-center px-1 py-px text-[10px] font-medium leading-none tabular-nums whitespace-nowrap";
+
 function TourDayTypeBadge({
   show,
   allShows,
@@ -48,14 +52,24 @@ function TourDayTypeBadge({
 }) {
   if (show.type === "travel") {
     return (
-      <Badge className="text-[10px] py-px px-1.5 font-medium bg-blue-900/40 text-blue-300 border-blue-700/40 hover:bg-blue-900/40">
+      <Badge
+        className={cn(
+          TOUR_DAY_BADGE_LAYOUT,
+          "bg-blue-900/40 text-blue-300 border-blue-700/40 hover:bg-blue-900/40",
+        )}
+      >
         Travel
       </Badge>
     );
   }
   if (show.type === "day_off") {
     return (
-      <Badge className="text-[10px] py-px px-1.5 font-medium bg-white/5 text-white/40 border-white/10 hover:bg-white/5">
+      <Badge
+        className={cn(
+          TOUR_DAY_BADGE_LAYOUT,
+          "bg-white/5 text-white/40 border-white/10 hover:bg-white/5",
+        )}
+      >
         Day off
       </Badge>
     );
@@ -64,7 +78,12 @@ function TourDayTypeBadge({
   const performanceCount = tourPerformanceCountOnDay(allShows, dayKey);
   const label = performanceCount === 1 ? "1 Show" : `${performanceCount} Shows`;
   return (
-    <Badge className="text-[10px] py-px px-1.5 font-medium bg-emerald-900/40 text-emerald-300 border-emerald-700/40 hover:bg-emerald-900/40">
+    <Badge
+      className={cn(
+        TOUR_DAY_BADGE_LAYOUT,
+        "bg-emerald-900/40 text-emerald-300 border-emerald-700/40 hover:bg-emerald-900/40",
+      )}
+    >
       {label}
     </Badge>
   );
