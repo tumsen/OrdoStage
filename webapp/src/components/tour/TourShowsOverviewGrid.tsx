@@ -214,19 +214,19 @@ export function TourShowsOverviewGrid({
               <span className={cn("min-w-0 truncate text-left", rowTone, whenTone)} title={when.weekdayLabel}>
                 {when.weekdayLabel}
               </span>
-              <span className={cn("min-w-0 truncate pl-2 text-left", rowTone, whenTone)} title={when.dateOnlyLabel}>
+              <span className={cn("min-w-0 truncate pl-2 pr-[5mm] text-left", rowTone, whenTone)} title={when.dateOnlyLabel}>
                 {when.dateOnlyLabel}
               </span>
               {show.type === "show" ? (
                 <PerformanceLineList
                   lines={performanceLines}
                   field="time"
-                  className={cn("justify-self-start pl-0.5 pr-1 text-left", rowTone, whenTone)}
+                  className={cn("justify-self-start pr-1 text-left", rowTone, whenTone)}
                 />
               ) : (
                 <span
                   className={cn(
-                    "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
+                    "justify-self-start whitespace-nowrap text-left tabular-nums pr-1",
                     rowTone,
                     whenTone,
                   )}
