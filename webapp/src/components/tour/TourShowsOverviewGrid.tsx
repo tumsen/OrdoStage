@@ -219,10 +219,10 @@ export function TourShowsOverviewGrid({
                 <PerformanceLineList
                   lines={performanceLines}
                   field="venue"
-                  className={cn("min-w-0 pl-[5mm] pr-2 text-left", rowTone, venueTone)}
+                  className={cn("min-w-0 pl-[1cm] pr-2 text-left", rowTone, venueTone)}
                 />
               ) : (
-                <span className={cn("min-w-0 truncate pl-[5mm] pr-2", rowTone, venueTone)} title={venueName}>
+                <span className={cn("min-w-0 truncate pl-[1cm] pr-2", rowTone, venueTone)} title={venueName}>
                   {venueName}
                 </span>
               )}
