@@ -110,8 +110,12 @@ export function isStaffingRequirementFilled(req: {
   personIds?: string[];
   personId?: string | null;
   peopleNeeded?: number;
+  slotPersonIds?: (string | null)[];
 }): boolean {
   const needed = Math.max(1, Math.min(MAX_JOB_PEOPLE_NEEDED, req.peopleNeeded ?? 1));
+  if (req.slotPersonIds) {
+    return req.slotPersonIds.filter(Boolean).length >= needed;
+  }
   const filled =
     req.personIds && req.personIds.length > 0
       ? req.personIds.length

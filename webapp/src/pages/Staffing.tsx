@@ -1,17 +1,18 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { addDays, format, parseISO } from "date-fns";
-import { AlertTriangle, CheckCircle2, Clock, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { addDays, format } from "date-fns";
+import { AlertTriangle, Clock, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { StaffingJobCard } from "@/components/staffing/StaffingJobCard";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
-import { isStaffingRequirementFilled, staffingRequirementBorderClass } from "@/lib/eventShowStaffing";
+import { isStaffingRequirementFilled } from "@/lib/eventShowStaffing";
+import type { StaffingRequirementRow } from "@/lib/staffingPageContext";
 import { cn } from "@/lib/utils";
+import type { Person } from "@/lib/types";
 
 type StaffingPerson = {
   id: string;
@@ -23,29 +24,9 @@ type StaffingPerson = {
   jobs: number;
 };
 
-type StaffingRequirement = {
-  id: string;
-  title: string;
-  eventId: string;
-  eventTitle: string;
-  showId: string;
-  startsAt: string;
-  endsAt: string;
-  durationMinutes: number;
-  venueName: string;
-  departmentName: string | null;
-  personId: string | null;
-  personName: string | null;
-  personIds?: string[];
-  personNames?: string[];
-  peopleNeeded?: number;
-  actualMinutes: number;
-  hasConflict: boolean;
-};
-
 type StaffingResponse = {
   people: StaffingPerson[];
-  requirements: StaffingRequirement[];
+  requirements: StaffingRequirementRow[];
   summary: {
     total: number;
     unassigned: number;
@@ -70,9 +51,6 @@ function hours(minutes: number): string {
 }
 
 export default function Staffing() {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [anchor, setAnchor] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -91,19 +69,13 @@ export default function Staffing() {
         : api.get<StaffingResponse>(`/api/staffing?from=${rangeFrom}&to=${rangeTo}`),
   });
 
-  const assignPerson = useMutation({
-    mutationFn: ({ jobId, personId }: { jobId: string; personId: string | null }) =>
-      api.patch(`/api/staffing/jobs/${jobId}`, { personId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staffing"] });
-      queryClient.invalidateQueries({ queryKey: ["schedule"] });
-      queryClient.invalidateQueries({ queryKey: ["time-jobs"] });
-      toast({ title: "Staffing updated" });
-    },
-    onError: () => toast({ title: "Could not update staffing", variant: "destructive" }),
+  const { data: roster = [] } = useQuery({
+    queryKey: ["people"],
+    queryFn: () => api.get<Person[]>("/api/people"),
   });
 
   const people = data?.people ?? [];
+  const allRequirements = useMemo(() => data?.requirements ?? [], [data?.requirements]);
   const summaryCards: Array<{ label: string; value: string | number; icon: LucideIcon }> = [
     { label: "Requirements", value: data?.summary.total ?? 0, icon: Users },
     { label: "Unassigned", value: data?.summary.unassigned ?? 0, icon: AlertTriangle },
@@ -115,12 +87,13 @@ export default function Staffing() {
     },
   ];
   const requirements = useMemo(() => {
-    const rows = data?.requirements ?? [];
-    if (personFilter === "all") return rows;
-    if (personFilter === "unassigned") return rows.filter((r) => !r.personId);
-    if (personFilter === "conflicts") return rows.filter((r) => r.hasConflict);
-    return rows.filter((r) => r.personId === personFilter);
-  }, [data?.requirements, personFilter]);
+    if (personFilter === "all") return allRequirements;
+    if (personFilter === "unassigned") {
+      return allRequirements.filter((r) => !isStaffingRequirementFilled(r));
+    }
+    if (personFilter === "conflicts") return allRequirements.filter((r) => r.hasConflict);
+    return allRequirements.filter((r) => r.personIds.includes(personFilter) || r.slotPersonIds.includes(personFilter));
+  }, [allRequirements, personFilter]);
 
   return (
     <div className="app-page-fill md:app-page-fill flex flex-col gap-4 p-4 md:p-6 max-md:app-page-fill-mobile">
@@ -128,7 +101,7 @@ export default function Staffing() {
         <div>
           <h1 className="text-xl font-semibold text-white">Staffing</h1>
           <p className="mt-1 text-sm text-white/45">
-            Assign people to show jobs from one overview. Events and shows still define the requirements.
+            Expand a job to assign people here, or open it in the event for full job settings.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -239,92 +212,17 @@ export default function Staffing() {
               {listMode === "upcoming" ? (
                 <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/45">
                   Showing the next {requirements.length} job assignments from {format(anchor, "d MMM yyyy")} onward.
+                  Expand a row to assign people.
                 </div>
               ) : null}
               {requirements.map((req) => (
-                <div
+                <StaffingJobCard
                   key={req.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() =>
-                    navigate(
-                      `/events/${req.eventId}?tab=shows&show=${encodeURIComponent(req.showId)}&job=${encodeURIComponent(req.id)}`
-                    )
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      navigate(
-                        `/events/${req.eventId}?tab=shows&show=${encodeURIComponent(req.showId)}&job=${encodeURIComponent(req.id)}`
-                      );
-                    }
-                  }}
-                  className={cn(
-                    "rounded-lg border bg-white/[0.03] p-3 cursor-pointer transition hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/70",
-                    staffingRequirementBorderClass(req)
-                  )}
-                >
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-white">{req.title}</p>
-                        {req.departmentName ? (
-                          <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/55">
-                            {req.departmentName}
-                          </span>
-                        ) : null}
-                        {req.hasConflict ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-200">
-                            <AlertTriangle className="h-3 w-3" />
-                            Conflict
-                          </span>
-                        ) : isStaffingRequirementFilled(req) ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Staffing OK
-                          </span>
-                        ) : (
-                          <span className="rounded bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-200">
-                            Needs people
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 truncate text-xs text-white/45">
-                        {req.eventTitle} · {format(parseISO(req.startsAt), "EEE d MMM HH:mm")}-
-                        {format(parseISO(req.endsAt), "HH:mm")} · {req.venueName}
-                      </p>
-                      <p className="mt-1 text-xs text-white/45">
-                        Planned {hours(req.durationMinutes)} · Actual {hours(req.actualMinutes)}
-                      </p>
-                    </div>
-                    <div
-                      className="shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    >
-                    <Select
-                      value={req.personId ?? "__unassigned__"}
-                      onValueChange={(value) =>
-                        assignPerson.mutate({ jobId: req.id, personId: value === "__unassigned__" ? null : value })
-                      }
-                      disabled={assignPerson.isPending}
-                    >
-                      <SelectTrigger className="w-full border-white/10 bg-white/5 text-white lg:w-[260px]">
-                        <SelectValue placeholder="Assign person" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-72 border-white/10 bg-[#16161f] text-white">
-                        <SelectItem value="__unassigned__">Unassigned</SelectItem>
-                        {people.map((person) => (
-                          <SelectItem key={person.id} value={person.id}>
-                            {person.name}
-                            {person.conflicts > 0 ? ` · ${person.conflicts} conflict${person.conflicts === 1 ? "" : "s"}` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    </div>
-                  </div>
-                </div>
+                  req={req}
+                  allRequirements={allRequirements}
+                  roster={roster}
+                  defaultOpen={!isStaffingRequirementFilled(req)}
+                />
               ))}
             </div>
           )}

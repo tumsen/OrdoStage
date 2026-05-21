@@ -10,7 +10,13 @@ import {
   startOfLocalCalendarDayInZone,
   wallClockInstantFromDateIsoAndHHMM,
 } from "../clientWallClock";
-import { setJobAssignees, syncJobToSchedule } from "../lib/eventShowJobAssignees";
+import {
+  normalizePeopleNeeded,
+  setJobAssignees,
+  setJobSlotPersonIds,
+  syncJobToSchedule,
+} from "../lib/eventShowJobAssignees";
+import { syncShowStaffingOkFromJobs } from "../lib/eventShowStaffingOk";
 
 const staffingRouter = new Hono<{
   Variables: {
@@ -37,9 +43,14 @@ function addDays(date: Date, days: number): Date {
 
 const toDateTimeFromDateAndTime = wallClockInstantFromDateIsoAndHHMM;
 
-const AssignStaffingJobSchema = z.object({
-  personId: z.string().nullable(),
-});
+const AssignStaffingJobSchema = z
+  .object({
+    personId: z.string().nullable().optional(),
+    slotPersonIds: z.array(z.string().nullable()).optional(),
+  })
+  .refine((b) => b.personId !== undefined || b.slotPersonIds !== undefined, {
+    message: "personId or slotPersonIds required",
+  });
 
 staffingRouter.get("/staffing", async (c) => {
   const user = c.get("user");
@@ -154,6 +165,11 @@ staffingRouter.get("/staffing", async (c) => {
   const requirements = intervals.map(({ job, start, end }) => {
     const assignees = job.assignments.map((a) => a.person);
     const primary = assignees[0] ?? job.person;
+    const needed = normalizePeopleNeeded(job.peopleNeeded);
+    const slotPersonIds: (string | null)[] = Array.from({ length: needed }, () => null);
+    for (const a of job.assignments) {
+      if (a.slotIndex >= 0 && a.slotIndex < needed) slotPersonIds[a.slotIndex] = a.personId;
+    }
     return {
       id: job.id,
       title: job.title,
@@ -163,6 +179,8 @@ staffingRouter.get("/staffing", async (c) => {
       showDate: iso(job.show.showDate),
       showTime: job.show.showTime,
       showStatus: job.show.status,
+      jobDate: iso(job.jobDate),
+      startTime: job.startTime,
       startsAt: iso(start),
       endsAt: iso(end),
       durationMinutes: job.durationMinutes,
@@ -175,7 +193,8 @@ staffingRouter.get("/staffing", async (c) => {
       personName: primary?.name ?? null,
       personNames: assignees.map((p) => p.name),
       personIds: assignees.map((p) => p.id),
-      peopleNeeded: job.peopleNeeded ?? 1,
+      slotPersonIds,
+      peopleNeeded: needed,
       actualMinutes: actualMinutesByJob.get(job.id) ?? 0,
       hasConflict: conflictIds.has(job.id),
     };
@@ -201,7 +220,9 @@ staffingRouter.get("/staffing", async (c) => {
       requirements,
       summary: {
         total: requirements.length,
-        unassigned: requirements.filter((r) => r.personIds.length < (r.peopleNeeded ?? 1)).length,
+        unassigned: requirements.filter(
+          (r) => r.slotPersonIds.filter(Boolean).length < r.peopleNeeded
+        ).length,
         conflicts: requirements.filter((r) => r.hasConflict).length,
         plannedMinutes: requirements.reduce((sum, r) => sum + r.durationMinutes, 0),
         actualMinutes: requirements.reduce((sum, r) => sum + r.actualMinutes, 0),
@@ -222,19 +243,44 @@ staffingRouter.patch("/staffing/jobs/:jobId", zValidator("json", AssignStaffingJ
   const body = c.req.valid("json");
   const job = await prisma.eventShowJob.findFirst({
     where: { id: jobId, show: { event: { organizationId: user.organizationId } } },
-    select: { id: true },
+    select: { id: true, showId: true, peopleNeeded: true },
   });
   if (!job) return c.json({ error: { message: "Job not found", code: "NOT_FOUND" } }, 404);
-  if (body.personId) {
-    const person = await prisma.person.findFirst({
-      where: { id: body.personId, organizationId: user.organizationId, isActive: true },
-      select: { id: true },
+
+  const idsToValidate = body.slotPersonIds
+    ? body.slotPersonIds.filter((id): id is string => Boolean(id))
+    : body.personId
+      ? [body.personId]
+      : [];
+  if (idsToValidate.length > 0) {
+    const count = await prisma.person.count({
+      where: { organizationId: user.organizationId, id: { in: idsToValidate } },
     });
-    if (!person) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+    if (count !== idsToValidate.length) {
+      return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+    }
   }
-  const personIds = body.personId ? [body.personId] : [];
-  await setJobAssignees(jobId, personIds, user.organizationId);
+
+  try {
+    if (body.slotPersonIds) {
+      const needed = normalizePeopleNeeded(job.peopleNeeded);
+      if (body.slotPersonIds.length !== needed) {
+        return c.json(
+          { error: { message: "slotPersonIds length must match peopleNeeded", code: "BAD_REQUEST" } },
+          400
+        );
+      }
+      await setJobSlotPersonIds(jobId, body.slotPersonIds, user.organizationId);
+    } else {
+      const personIds = body.personId ? [body.personId] : [];
+      await setJobAssignees(jobId, personIds, user.organizationId);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Invalid assignments";
+    return c.json({ error: { message: msg, code: "BAD_REQUEST" } }, 400);
+  }
   await syncJobToSchedule(jobId);
+  await syncShowStaffingOkFromJobs(job.showId);
   return c.json({ data: { ok: true } });
 });
 
