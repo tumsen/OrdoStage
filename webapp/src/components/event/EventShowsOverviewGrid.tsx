@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
-import { computeShowStaffingStats } from "@/lib/eventShowStaffing";
-import type { EventShow, EventTeam } from "@/lib/types";
+import { computeShowStaffingStats, sortEventShowJobs } from "@/lib/eventShowStaffing";
+import type { EventShow, EventShowJob, EventTeam } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -17,6 +17,12 @@ export function formatPlannedHoursShort(jobHours: number): string {
   return jobHours >= 10 ? jobHours.toFixed(1) : jobHours.toFixed(2);
 }
 
+function overviewGridColumns(hour12: boolean): string {
+  return hour12
+    ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content max-content minmax(0,1fr)"
+    : "auto 10ch max-content 6ch max-content max-content max-content max-content minmax(0,1fr)";
+}
+
 function formatEventListWhenParts(
   show: EventShow,
   locale: string,
@@ -26,6 +32,35 @@ function formatEventListWhenParts(
   const [hh, mm] = show.showTime.split(":").map((x) => Number(x));
   if (Number.isFinite(hh) && Number.isFinite(mm)) {
     base.setHours(hh, mm, 0, 0);
+  }
+  const weekdayLabel = base.toLocaleDateString(locale, { weekday: "long" });
+  const dateOnlyLabel = base.toLocaleDateString(locale, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const timeLabel = base.toLocaleTimeString(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12,
+  });
+  return { weekdayLabel, dateOnlyLabel, timeLabel };
+}
+
+function formatJobListWhenParts(
+  job: EventShowJob,
+  locale: string,
+  hour12: boolean
+): { weekdayLabel: string; dateOnlyLabel: string; timeLabel: string } {
+  const raw = job.jobDate ?? "";
+  const dKey = typeof raw === "string" && raw.length >= 10 ? raw.slice(0, 10) : "";
+  const base = dKey ? new Date(dKey) : new Date(NaN);
+  const [hh, mm] = (job.startTime ?? "").split(":").map((x) => Number(x));
+  if (Number.isFinite(hh) && Number.isFinite(mm)) {
+    base.setHours(hh, mm, 0, 0);
+  }
+  if (Number.isNaN(base.getTime())) {
+    return { weekdayLabel: "", dateOnlyLabel: "", timeLabel: job.startTime ?? "" };
   }
   const weekdayLabel = base.toLocaleDateString(locale, { weekday: "long" });
   const dateOnlyLabel = base.toLocaleDateString(locale, {
@@ -110,16 +145,11 @@ export function EventShowsOverviewGrid({
     return <p className="text-[11px] text-white/35">No shows scheduled</p>;
   }
 
+  const gridCols = overviewGridColumns(hour12);
+
   return (
     <div className={cn("mt-1 overflow-x-auto -mx-1 px-1", className)}>
-      <ul
-        className="min-w-[min(100%,42rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
-        style={{
-          gridTemplateColumns: hour12
-            ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content max-content minmax(0,1fr)"
-            : "auto 10ch max-content 6ch max-content max-content max-content max-content minmax(0,1fr)",
-        }}
-      >
+      <ul className="min-w-[min(100%,42rem)] flex flex-col gap-y-1.5 text-[10px] leading-snug">
         {sorted.map((show) => {
           const stats = computeShowStaffingStats(show, teams);
           const { ok, total } = stats;
@@ -134,63 +164,111 @@ export function EventShowsOverviewGrid({
             : "text-white/50";
           const whenTone = showOff ? undefined : "text-white/[0.82]";
           const venueTone = showOff ? undefined : "text-white/55";
+          const showJobs = sortEventShowJobs(show.jobs ?? []);
+          const jobRowTone = showOff ? "text-white/25 line-through decoration-white/20" : "text-white/40";
+          const jobWhenTone = showOff ? undefined : "text-white/60";
+          const jobTitleTone = showOff ? undefined : "text-white/55";
+
           return (
-            <li key={show.id} className="contents">
-              <div className="justify-self-start pr-2">
-                <StatusBadge
-                  status={showStatus}
-                  className={cn("text-[10px] py-px px-1.5 font-medium", showOff && "opacity-50")}
-                />
+            <li key={show.id} className="space-y-0.5">
+              <div className="grid items-center gap-x-0" style={{ gridTemplateColumns: gridCols }}>
+                <div className="justify-self-start pr-2">
+                  <StatusBadge
+                    status={showStatus}
+                    className={cn("text-[10px] py-px px-1.5 font-medium", showOff && "opacity-50")}
+                  />
+                </div>
+                <span className={cn("min-w-0 truncate text-left", rowTone, whenTone)} title={when.weekdayLabel}>
+                  {when.weekdayLabel}
+                </span>
+                <span className={cn("min-w-0 truncate pl-2 text-left", rowTone, whenTone)} title={when.dateOnlyLabel}>
+                  {when.dateOnlyLabel}
+                </span>
+                <span
+                  className={cn(
+                    "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
+                    rowTone,
+                    whenTone
+                  )}
+                >
+                  {when.timeLabel}
+                </span>
+                <span className={cn("min-w-0 truncate pr-2", rowTone, venueTone)} title={venueName}>
+                  {venueName}
+                </span>
+                <div className="min-w-0 truncate pr-4">
+                  <EventListStaffingHint ok={ok} total={total} muted={showOff} />
+                </div>
+                <span
+                  className={cn(
+                    "block whitespace-nowrap pr-3 text-right tabular-nums",
+                    showOff ? "text-white/25 line-through decoration-white/20" : "text-white/45"
+                  )}
+                  title={`${stats.people} people on this show`}
+                >
+                  {stats.people}
+                </span>
+                <span
+                  className={cn(
+                    "block whitespace-nowrap pl-2 pr-2 text-right tabular-nums",
+                    showOff ? "text-white/25 line-through decoration-white/20" : "text-white/45"
+                  )}
+                  title="Total planned hours for this show"
+                >
+                  {hoursLabel} h
+                </span>
+                <div
+                  className={cn(
+                    "min-w-0 truncate pl-2 text-right sm:text-left",
+                    ticketBits ? (showOff ? "text-white/35" : "text-white/45") : "text-white/25",
+                    showOff && "line-through decoration-white/20"
+                  )}
+                  title={ticketBits ?? undefined}
+                >
+                  {ticketBits ?? "—"}
+                </div>
               </div>
-              <span className={cn("min-w-0 truncate text-left", rowTone, whenTone)} title={when.weekdayLabel}>
-                {when.weekdayLabel}
-              </span>
-              <span className={cn("min-w-0 truncate pl-2 text-left", rowTone, whenTone)} title={when.dateOnlyLabel}>
-                {when.dateOnlyLabel}
-              </span>
-              <span
-                className={cn(
-                  "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
-                  rowTone,
-                  whenTone
-                )}
-              >
-                {when.timeLabel}
-              </span>
-              <span className={cn("min-w-0 truncate pr-2", rowTone, venueTone)} title={venueName}>
-                {venueName}
-              </span>
-              <div className="min-w-0 truncate pr-4">
-                <EventListStaffingHint ok={ok} total={total} muted={showOff} />
-              </div>
-              <span
-                className={cn(
-                  "block whitespace-nowrap pr-3 text-right tabular-nums",
-                  showOff ? "text-white/25 line-through decoration-white/20" : "text-white/45"
-                )}
-                title={`${stats.people} people on this show`}
-              >
-                {stats.people}
-              </span>
-              <span
-                className={cn(
-                  "block whitespace-nowrap pl-2 pr-2 text-right tabular-nums",
-                  showOff ? "text-white/25 line-through decoration-white/20" : "text-white/45"
-                )}
-                title="Total planned hours for this show"
-              >
-                {hoursLabel} h
-              </span>
-              <div
-                className={cn(
-                  "min-w-0 truncate pl-2 text-right sm:text-left",
-                  ticketBits ? (showOff ? "text-white/35" : "text-white/45") : "text-white/25",
-                  showOff && "line-through decoration-white/20"
-                )}
-                title={ticketBits ?? undefined}
-              >
-                {ticketBits ?? "—"}
-              </div>
+              {showJobs.map((job) => {
+                const jobWhen = formatJobListWhenParts(job, prefsLocale, hour12);
+                const assignee = job.person?.name ?? "Unassigned";
+                const title = job.title?.trim() || "Job";
+                return (
+                  <div
+                    key={job.id}
+                    className="grid items-center gap-x-0 pl-3 sm:pl-4"
+                    style={{ gridTemplateColumns: gridCols }}
+                    title={`${title} · ${assignee}`}
+                  >
+                    <span className="pr-2 text-white/25" aria-hidden>
+                      ·
+                    </span>
+                    <span className={cn("min-w-0 truncate text-left", jobRowTone, jobWhenTone)} title={jobWhen.weekdayLabel}>
+                      {jobWhen.weekdayLabel}
+                    </span>
+                    <span className={cn("min-w-0 truncate pl-2 text-left", jobRowTone, jobWhenTone)} title={jobWhen.dateOnlyLabel}>
+                      {jobWhen.dateOnlyLabel}
+                    </span>
+                    <span
+                      className={cn(
+                        "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
+                        jobRowTone,
+                        jobWhenTone
+                      )}
+                    >
+                      {jobWhen.timeLabel}
+                    </span>
+                    <span className={cn("min-w-0 truncate pr-2 font-medium", jobRowTone, jobTitleTone)} title={title}>
+                      {title}
+                    </span>
+                    <span className={cn("min-w-0 truncate pr-4", jobRowTone, jobTitleTone)} title={assignee}>
+                      {assignee}
+                    </span>
+                    <span className="text-white/20">—</span>
+                    <span className="text-white/20">—</span>
+                    <span className="text-white/20 pl-2">—</span>
+                  </div>
+                );
+              })}
             </li>
           );
         })}

@@ -56,7 +56,12 @@ import {
 } from "@/components/schedule/scheduleUtils";
 import { addMinutesToUtcIso, wallClockYmdHhMmToUtcIso } from "@/lib/browserUserTime";
 import { dateToBookingApiIso, durationMinutesBetween, endTimeFromStartAndDuration } from "@/lib/showTiming";
-import { computeEventWorkTotals, computeShowStaffingStats, parseStaffingOkMap } from "@/lib/eventShowStaffing";
+import {
+  computeEventWorkTotals,
+  computeShowStaffingStats,
+  parseStaffingOkMap,
+  sortEventShowJobs,
+} from "@/lib/eventShowStaffing";
 import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -2143,6 +2148,7 @@ function ShowEventCard({
   const staffingLabel =
     stats.total > 0 ? `${stats.ok}/${stats.total} teams OK` : "No event teams";
   const hoursLabel = stats.jobHours >= 10 ? stats.jobHours.toFixed(1) : stats.jobHours.toFixed(2);
+  const sortedJobs = sortEventShowJobs(show.jobs ?? []);
 
   return (
     <Collapsible open={cardOpen} onOpenChange={setCardOpen} className="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
@@ -2168,6 +2174,24 @@ function ShowEventCard({
                 <span>{stats.people} people</span>
                 <span>{hoursLabel} h jobs</span>
               </p>
+              {sortedJobs.length > 0 ? (
+                <ul className="text-[11px] text-white/40 space-y-0.5 pt-0.5">
+                  {sortedJobs.map((j) => {
+                    const time = (j.startTime ?? "").slice(0, 5);
+                    const title = j.title?.trim() || "Job";
+                    const assignee = j.person?.name ?? "Unassigned";
+                    return (
+                      <li key={j.id} className="min-w-0 truncate" title={`${title} · ${assignee}`}>
+                        {time ? <span className="tabular-nums text-white/35">{time}</span> : null}
+                        {time ? " " : null}
+                        <span className="text-white/50">{title}</span>
+                        <span className="text-white/30"> · </span>
+                        <span>{assignee}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
             </div>
           </button>
         </CollapsibleTrigger>

@@ -470,6 +470,20 @@ async function removeJobFromSchedule(jobId: string, organizationId: string): Pro
   await prisma.internalBooking.delete({ where: { id: booking.id } });
 }
 
+/** Persist sortOrder so jobs list in chronological order (date, then start time). */
+async function recomputeEventShowJobSortOrders(showId: string): Promise<void> {
+  const jobs = await prismaAny.eventShowJob.findMany({
+    where: { showId },
+    orderBy: [{ jobDate: "asc" }, { startTime: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  await Promise.all(
+    jobs.map((job: { id: string }, index: number) =>
+      prismaAny.eventShowJob.update({ where: { id: job.id }, data: { sortOrder: index } })
+    )
+  );
+}
+
 const eventInclude: any = {
   venue: true,
   people: {
@@ -492,7 +506,7 @@ const eventInclude: any = {
       teamResponsible: true,
       jobs: {
         include: { venue: true, person: true },
-        orderBy: { sortOrder: "asc" as const },
+        orderBy: [{ jobDate: "asc" as const }, { startTime: "asc" as const }, { sortOrder: "asc" as const }],
       },
       staffing: {
         include: {
@@ -1724,11 +1738,6 @@ eventsRouter.post(
         );
       }
     }
-    const max = await prismaAny.eventShowJob.aggregate({
-      where: { showId },
-      _max: { sortOrder: true },
-    });
-    const sortOrder = body.sortOrder ?? (max._max.sortOrder == null ? 0 : max._max.sortOrder + 1);
     const job = await prismaAny.eventShowJob.create({
       data: {
         showId,
@@ -1739,9 +1748,12 @@ eventsRouter.post(
         venueId: body.venueId,
         departmentId: body.departmentId ?? null,
         personId: body.personId ?? null,
-        sortOrder,
+        sortOrder: body.sortOrder ?? 0,
       },
     });
+    if (body.sortOrder === undefined) {
+      await recomputeEventShowJobSortOrders(showId);
+    }
     await syncJobToSchedule(job.id);
     return c.json({ data: { id: job.id } }, 201);
   }
@@ -1819,6 +1831,10 @@ eventsRouter.put(
         ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
       },
     });
+    const timingChanged = body.jobDate !== undefined || body.startTime !== undefined;
+    if (timingChanged && body.sortOrder === undefined) {
+      await recomputeEventShowJobSortOrders(showId);
+    }
     await syncJobToSchedule(jobId);
     return c.json({ data: { ok: true } });
   }
@@ -1850,6 +1866,7 @@ eventsRouter.delete("/events/:id/shows/:showId/jobs/:jobId", async (c) => {
   }
   await removeJobFromSchedule(job.id, user.organizationId);
   await prismaAny.eventShowJob.delete({ where: { id: jobId } });
+  await recomputeEventShowJobSortOrders(showId);
   return new Response(null, { status: 204 });
 });
 

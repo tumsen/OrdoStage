@@ -1,4 +1,17 @@
-import type { EventShow, EventTeam } from "@/lib/types";
+import type { EventShow, EventShowJob, EventTeam } from "@/lib/types";
+
+/** Chronological order for show jobs (date, then start time, then sortOrder). */
+export function sortEventShowJobs(jobs: EventShowJob[]): EventShowJob[] {
+  return [...jobs].sort((a, b) => {
+    const da = (a.jobDate ?? "").slice(0, 10);
+    const db = (b.jobDate ?? "").slice(0, 10);
+    if (da !== db) return da.localeCompare(db);
+    const ta = a.startTime ?? "";
+    const tb = b.startTime ?? "";
+    if (ta !== tb) return ta.localeCompare(tb);
+    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+  });
+}
 
 export function parseStaffingOkMap(raw: unknown): Record<string, boolean> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};

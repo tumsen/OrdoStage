@@ -18,6 +18,7 @@ import {
   parseDatetimeLocal,
   toDatetimeLocalString,
 } from "@/lib/showTiming";
+import { sortEventShowJobs } from "@/lib/eventShowStaffing";
 import type { EventShow, EventShowJob, Person } from "@/lib/types";
 
 function jobWindow(j: EventShowJob, show: EventShow): { startValue: string; endValue: string } {
@@ -63,8 +64,10 @@ export function ShowJobsEditor({
   highlightJobId?: string | null;
 }) {
   const queryClient = useQueryClient();
-  const jobs = (show.jobs ?? []).filter((j) =>
-    departmentId === undefined ? true : (j.departmentId ?? null) === departmentId
+  const jobs = sortEventShowJobs(
+    (show.jobs ?? []).filter((j) =>
+      departmentId === undefined ? true : (j.departmentId ?? null) === departmentId
+    )
   );
   const [draft, setDraft] = useState<{
     title: string;
