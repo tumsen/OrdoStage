@@ -60,6 +60,7 @@ import {
   computeEventWorkTotals,
   computeShowStaffingStats,
   parseStaffingOkMap,
+  formatJobAssigneesLabel,
   sortEventShowJobs,
 } from "@/lib/eventShowStaffing";
 import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
@@ -2179,7 +2180,7 @@ function ShowEventCard({
                   {sortedJobs.map((j) => {
                     const time = (j.startTime ?? "").slice(0, 5);
                     const title = j.title?.trim() || "Job";
-                    const assignee = j.person?.name ?? "Unassigned";
+                    const assignee = formatJobAssigneesLabel(j);
                     return (
                       <li key={j.id} className="min-w-0 truncate" title={`${title} · ${assignee}`}>
                         {time ? <span className="tabular-nums text-white/35">{time}</span> : null}

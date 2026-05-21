@@ -192,7 +192,13 @@ export function toCalendarItems(
   for (const e of events) {
     for (const show of e.shows ?? []) {
       for (const job of show.jobs ?? []) {
-        if (personJobFilter && job.personId !== personJobFilter) continue;
+        if (
+          personJobFilter &&
+          job.personId !== personJobFilter &&
+          !(job.people ?? []).some((p) => p.id === personJobFilter)
+        ) {
+          continue;
+        }
         const day = typeof job.jobDate === "string" ? job.jobDate.slice(0, 10) : "";
         if (!day) continue;
         const hasTime = /^\d{2}:\d{2}$/.test(job.startTime);

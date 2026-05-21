@@ -6,6 +6,8 @@ import {
   CreateEventSchema,
   CreateEventShowSchema,
   CreateEventShowJobSchema,
+  AddEventShowJobPersonSchema,
+  CopyEventShowJobSchema,
   UpdateEventSchema,
   UpdateEventShowSchema,
   UpdateEventShowJobSchema,
@@ -18,9 +20,27 @@ import {
 import { canAction } from "../requestRole";
 import { parseIncomingDateTime } from "../parseIncomingDateTime";
 import { wallClockInstantFromDateIsoAndHHMM } from "../clientWallClock";
+import {
+  addJobAssignee,
+  copyJobAssignees,
+  removeJobAssignee,
+  setJobAssignees,
+  syncJobToSchedule,
+} from "../lib/eventShowJobAssignees";
 
 const eventsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 const prismaAny = prisma as any;
+
+function assigneeIdsFromJobBody(body: {
+  personId?: string | null;
+  personIds?: string[];
+}): string[] {
+  if (body.personIds && body.personIds.length > 0) {
+    return [...new Set(body.personIds.filter(Boolean))];
+  }
+  if (body.personId) return [body.personId];
+  return [];
+}
 
 function normalizeStaffingOkByDepartmentJson(json: unknown): Record<string, boolean> | null {
   if (json == null) return null;
@@ -380,68 +400,26 @@ async function syncStaffingToSchedule(staffingId: string): Promise<void> {
   });
 }
 
-async function syncJobToSchedule(jobId: string): Promise<void> {
-  const job = await prismaAny.eventShowJob.findUnique({
-    where: { id: jobId },
-    include: {
-      person: { select: { id: true, organizationId: true, name: true } },
-      show: { include: { event: true } },
-    },
-  });
-  if (!job) return;
-  const marker = `[event-show-job:${job.id}]`;
-  const existing = await prisma.internalBooking.findFirst({
-    where: {
-      organizationId: job.show.event.organizationId,
-      title: { startsWith: marker },
-    },
-    select: { id: true },
-  });
-
-  // No assigned person => remove any mirrored booking.
-  if (!job.personId || !job.person) {
-    if (existing?.id) {
-      await prisma.internalBooking.delete({ where: { id: existing.id } });
-    }
-    return;
-  }
-
-  const startDate = toDateTimeFromDateAndTime(job.jobDate.toISOString(), job.startTime);
-  if (!startDate) return;
-  const endDate = new Date(startDate.getTime() + job.durationMinutes * 60 * 1000);
-  const title = `${marker} ${job.show.event.title} - ${job.title} - ${job.person.name}`;
-
-  const bookingId =
-    existing?.id ??
-    (
-      await prisma.internalBooking.create({
-        data: {
-          organizationId: job.person.organizationId,
-          title,
-          description: null,
-          startDate,
-          endDate,
-          type: "other",
-          venueId: job.venueId || null,
-        },
-        select: { id: true },
-      })
-    ).id;
-
-  await prisma.internalBooking.update({
-    where: { id: bookingId },
-    data: {
-      title,
-      description: null,
-      startDate,
-      endDate,
-      venueId: job.venueId || null,
-    },
-  });
-  await prisma.internalBookingPerson.deleteMany({ where: { bookingId } });
-  await prisma.internalBookingPerson.create({
-    data: { bookingId, personId: job.personId, role: null },
-  });
+function serializeEventShowJob(job: any) {
+  const people = (job.assignments ?? []).map((a: any) => serializePerson(a.person));
+  const primary = people[0] ?? (job.person ? serializePerson(job.person) : null);
+  return {
+    id: job.id,
+    showId: job.showId,
+    title: job.title,
+    jobDate: job.jobDate.toISOString(),
+    startTime: job.startTime,
+    durationMinutes: job.durationMinutes,
+    venueId: job.venueId,
+    venue: serializeVenue(job.venue)!,
+    departmentId: job.departmentId ?? null,
+    personId: primary?.id ?? job.personId ?? null,
+    person: primary,
+    people,
+    sortOrder: job.sortOrder,
+    createdAt: job.createdAt.toISOString(),
+    updatedAt: job.updatedAt.toISOString(),
+  };
 }
 
 async function removeStaffingFromSchedule(staffingId: string, organizationId: string): Promise<void> {
@@ -505,7 +483,14 @@ const eventInclude: any = {
       venue: true,
       teamResponsible: true,
       jobs: {
-        include: { venue: true, person: true },
+        include: {
+          venue: true,
+          person: true,
+          assignments: {
+            orderBy: { createdAt: "asc" as const },
+            include: { person: true },
+          },
+        },
         orderBy: [{ jobDate: "asc" as const }, { startTime: "asc" as const }, { sortOrder: "asc" as const }],
       },
       staffing: {
@@ -573,22 +558,7 @@ function serializeFullEvent(event: any) {
       soldTicketsRecordedAt: show.soldTicketsRecordedAt
         ? show.soldTicketsRecordedAt.toISOString()
         : null,
-      jobs: (show.jobs ?? []).map((job: any) => ({
-        id: job.id,
-        showId: job.showId,
-        title: job.title,
-        jobDate: job.jobDate.toISOString(),
-        startTime: job.startTime,
-        durationMinutes: job.durationMinutes,
-        venueId: job.venueId,
-        venue: serializeVenue(job.venue)!,
-        departmentId: job.departmentId ?? null,
-        personId: job.personId,
-        person: job.person ? serializePerson(job.person) : null,
-        sortOrder: job.sortOrder,
-        createdAt: job.createdAt.toISOString(),
-        updatedAt: job.updatedAt.toISOString(),
-      })),
+      jobs: (show.jobs ?? []).map(serializeEventShowJob),
       staffing: show.staffing.map((s: any) => ({
         id: s.id,
         showId: s.showId,
@@ -1714,12 +1684,14 @@ eventsRouter.post(
       where: { id: body.venueId, organizationId: user.organizationId },
     });
     if (!venue) return c.json({ error: { message: "Venue not found", code: "NOT_FOUND" } }, 404);
-    if (body.personId) {
-      const p = await prisma.person.findUnique({
-        where: { id: body.personId, organizationId: user.organizationId },
-        select: { id: true },
+    const assigneeIds = assigneeIdsFromJobBody(body);
+    if (assigneeIds.length > 0) {
+      const count = await prisma.person.count({
+        where: { organizationId: user.organizationId, id: { in: assigneeIds } },
       });
-      if (!p) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+      if (count !== assigneeIds.length) {
+        return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+      }
     }
     if (body.departmentId) {
       const dept = await prisma.department.findUnique({
@@ -1747,10 +1719,13 @@ eventsRouter.post(
         durationMinutes: body.durationMinutes,
         venueId: body.venueId,
         departmentId: body.departmentId ?? null,
-        personId: body.personId ?? null,
+        personId: assigneeIds[0] ?? null,
         sortOrder: body.sortOrder ?? 0,
       },
     });
+    if (assigneeIds.length > 0) {
+      await setJobAssignees(job.id, assigneeIds, user.organizationId);
+    }
     if (body.sortOrder === undefined) {
       await recomputeEventShowJobSortOrders(showId);
     }
@@ -1794,12 +1769,17 @@ eventsRouter.put(
       });
       if (!venue) return c.json({ error: { message: "Venue not found", code: "NOT_FOUND" } }, 404);
     }
-    if (body.personId) {
-      const p = await prisma.person.findUnique({
-        where: { id: body.personId, organizationId: user.organizationId },
-        select: { id: true },
+    const assigneeIds =
+      body.personIds !== undefined || body.personId !== undefined
+        ? assigneeIdsFromJobBody(body)
+        : null;
+    if (assigneeIds && assigneeIds.length > 0) {
+      const count = await prisma.person.count({
+        where: { organizationId: user.organizationId, id: { in: assigneeIds } },
       });
-      if (!p) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+      if (count !== assigneeIds.length) {
+        return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+      }
     }
     if (body.departmentId) {
       const dept = await prisma.department.findUnique({
@@ -1827,10 +1807,12 @@ eventsRouter.put(
         ...(body.durationMinutes !== undefined && { durationMinutes: body.durationMinutes }),
         ...(body.venueId !== undefined && { venueId: body.venueId }),
         ...(body.departmentId !== undefined && { departmentId: body.departmentId ?? null }),
-        ...(body.personId !== undefined && { personId: body.personId ?? null }),
         ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
       },
     });
+    if (assigneeIds !== null) {
+      await setJobAssignees(jobId, assigneeIds, user.organizationId);
+    }
     const timingChanged = body.jobDate !== undefined || body.startTime !== undefined;
     if (timingChanged && body.sortOrder === undefined) {
       await recomputeEventShowJobSortOrders(showId);
@@ -1839,6 +1821,128 @@ eventsRouter.put(
     return c.json({ data: { ok: true } });
   }
 );
+
+// POST /api/events/:id/shows/:showId/jobs/:jobId/copy
+eventsRouter.post(
+  "/events/:id/shows/:showId/jobs/:jobId/copy",
+  zValidator("json", CopyEventShowJobSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId)
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    const { id: eventId, showId, jobId } = c.req.param();
+    const body = c.req.valid("json");
+    const source = await prismaAny.eventShowJob.findFirst({
+      where: { id: jobId, showId, show: { id: showId, eventId, event: { organizationId: user.organizationId } } },
+    });
+    if (!source) return c.json({ error: { message: "Job not found", code: "NOT_FOUND" } }, 404);
+    const canEditAssignments = await canManageShowAssignments({
+      organizationId: user.organizationId,
+      userId: user.id,
+      userEmail: user.email,
+      eventId,
+      showId,
+      departmentId: source.departmentId ?? null,
+    });
+    if (!canEditAssignments) {
+      return c.json(
+        { error: { message: "Only owner team or show department lead can edit jobs", code: "FORBIDDEN" } },
+        403
+      );
+    }
+    const copy = await prismaAny.eventShowJob.create({
+      data: {
+        showId,
+        title: source.title,
+        jobDate: source.jobDate,
+        startTime: source.startTime,
+        durationMinutes: source.durationMinutes,
+        venueId: source.venueId,
+        departmentId: source.departmentId,
+        personId: null,
+        sortOrder: 0,
+      },
+    });
+    if (body.keepPeople) {
+      await copyJobAssignees(source.id, copy.id);
+    }
+    await recomputeEventShowJobSortOrders(showId);
+    await syncJobToSchedule(copy.id);
+    return c.json({ data: { id: copy.id } }, 201);
+  }
+);
+
+// POST /api/events/:id/shows/:showId/jobs/:jobId/people
+eventsRouter.post(
+  "/events/:id/shows/:showId/jobs/:jobId/people",
+  zValidator("json", AddEventShowJobPersonSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId)
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    const { id: eventId, showId, jobId } = c.req.param();
+    const body = c.req.valid("json");
+    const job = await prismaAny.eventShowJob.findFirst({
+      where: { id: jobId, showId, show: { id: showId, eventId, event: { organizationId: user.organizationId } } },
+    });
+    if (!job) return c.json({ error: { message: "Job not found", code: "NOT_FOUND" } }, 404);
+    const canEditAssignments = await canManageShowAssignments({
+      organizationId: user.organizationId,
+      userId: user.id,
+      userEmail: user.email,
+      eventId,
+      showId,
+      departmentId: job.departmentId ?? null,
+    });
+    if (!canEditAssignments) {
+      return c.json(
+        { error: { message: "Only owner team or show department lead can edit jobs", code: "FORBIDDEN" } },
+        403
+      );
+    }
+    const p = await prisma.person.findUnique({
+      where: { id: body.personId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!p) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+    try {
+      await addJobAssignee(jobId, body.personId, user.organizationId);
+    } catch {
+      return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+    }
+    await syncJobToSchedule(jobId);
+    return c.json({ data: { ok: true } }, 201);
+  }
+);
+
+// DELETE /api/events/:id/shows/:showId/jobs/:jobId/people/:personId
+eventsRouter.delete("/events/:id/shows/:showId/jobs/:jobId/people/:personId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId)
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  const { id: eventId, showId, jobId, personId } = c.req.param();
+  const job = await prismaAny.eventShowJob.findFirst({
+    where: { id: jobId, showId, show: { id: showId, eventId, event: { organizationId: user.organizationId } } },
+  });
+  if (!job) return c.json({ error: { message: "Job not found", code: "NOT_FOUND" } }, 404);
+  const canEditAssignments = await canManageShowAssignments({
+    organizationId: user.organizationId,
+    userId: user.id,
+    userEmail: user.email,
+    eventId,
+    showId,
+    departmentId: job.departmentId ?? null,
+  });
+  if (!canEditAssignments) {
+    return c.json(
+      { error: { message: "Only owner team or show department lead can edit jobs", code: "FORBIDDEN" } },
+      403
+    );
+  }
+  await removeJobAssignee(jobId, personId);
+  await syncJobToSchedule(jobId);
+  return new Response(null, { status: 204 });
+});
 
 // DELETE /api/events/:id/shows/:showId/jobs/:jobId
 eventsRouter.delete("/events/:id/shows/:showId/jobs/:jobId", async (c) => {

@@ -1,4 +1,16 @@
-import type { EventShow, EventShowJob, EventTeam } from "@/lib/types";
+import type { EventShow, EventShowJob, EventTeam, Person } from "@/lib/types";
+
+/** People assigned to a show job (supports legacy single personId). */
+export function jobAssignees(job: EventShowJob): Person[] {
+  if (job.people?.length) return job.people;
+  if (job.person) return [job.person];
+  return [];
+}
+
+export function formatJobAssigneesLabel(job: EventShowJob): string {
+  const names = jobAssignees(job).map((p) => p.name);
+  return names.length > 0 ? names.join(", ") : "Unassigned";
+}
 
 /** Chronological order for show jobs (date, then start time, then sortOrder). */
 export function sortEventShowJobs(jobs: EventShowJob[]): EventShowJob[] {
@@ -31,7 +43,7 @@ export function computeShowStaffingStats(show: EventShow, eventTeams: EventTeam[
   }
   const people = new Set<string>();
   for (const j of show.jobs ?? []) {
-    if (j.personId) people.add(j.personId);
+    for (const p of jobAssignees(j)) people.add(p.id);
   }
   for (const s of show.staffing ?? []) people.add(s.personId);
   let jobMinutes = 0;
@@ -51,7 +63,7 @@ export function computeEventWorkTotals(shows: EventShow[]) {
   for (const show of shows) {
     for (const j of show.jobs ?? []) {
       jobMinutes += j.durationMinutes ?? 0;
-      if (j.personId) people.add(j.personId);
+      for (const p of jobAssignees(j)) people.add(p.id);
     }
     for (const s of show.staffing ?? []) {
       people.add(s.personId);

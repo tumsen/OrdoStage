@@ -250,6 +250,12 @@ scheduleRouter.get("/schedule", async (c) => {
                     name: true,
                   },
                 },
+                assignments: {
+                  orderBy: { createdAt: "asc" },
+                  include: {
+                    person: { select: { id: true, name: true } },
+                  },
+                },
               },
               orderBy: [{ jobDate: "asc" }, { startTime: "asc" }, { sortOrder: "asc" }],
             },
@@ -366,27 +372,30 @@ scheduleRouter.get("/schedule", async (c) => {
       status: show.status ?? "draft",
       venueId: show.venueId,
       venue: serializeVenue(show.venue),
-      jobs: show.jobs.map((job) => ({
-        id: job.id,
-        showId: job.showId,
-        title: job.title,
-        jobDate: serializeDate(job.jobDate),
-        startTime: job.startTime,
-        durationMinutes: job.durationMinutes,
-        venueId: job.venueId,
-        venue: serializeVenue(job.venue)!,
-        departmentId: job.departmentId,
-        personId: job.personId,
-        person: job.person
-          ? {
-              id: job.person.id,
-              name: job.person.name,
-            }
-          : null,
-        sortOrder: job.sortOrder,
-        createdAt: serializeDate(job.createdAt),
-        updatedAt: serializeDate(job.updatedAt),
-      })),
+      jobs: show.jobs.map((job) => {
+        const people = (job.assignments ?? []).map((a) => ({
+          id: a.person.id,
+          name: a.person.name,
+        }));
+        const primary = people[0] ?? (job.person ? { id: job.person.id, name: job.person.name } : null);
+        return {
+          id: job.id,
+          showId: job.showId,
+          title: job.title,
+          jobDate: serializeDate(job.jobDate),
+          startTime: job.startTime,
+          durationMinutes: job.durationMinutes,
+          venueId: job.venueId,
+          venue: serializeVenue(job.venue)!,
+          departmentId: job.departmentId,
+          personId: primary?.id ?? job.personId,
+          person: primary,
+          people,
+          sortOrder: job.sortOrder,
+          createdAt: serializeDate(job.createdAt),
+          updatedAt: serializeDate(job.updatedAt),
+        };
+      }),
     })),
   }));
 

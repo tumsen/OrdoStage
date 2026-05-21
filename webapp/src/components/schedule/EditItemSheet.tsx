@@ -172,7 +172,12 @@ function EventScheduleSummary({
                       }`}
                     >
                       <span className="min-w-0 truncate">
-                        {job.title} - <span className="text-white/95">{job.person?.name ?? "Unassigned"}</span>
+                        {job.title} -{" "}
+                        <span className="text-white/95">
+                          {(job.people?.length
+                            ? job.people.map((p) => p.name).join(", ")
+                            : job.person?.name) ?? "Unassigned"}
+                        </span>
                       </span>
                       <span className="shrink-0 text-white/55">{formatJobTimeRange(job)}</span>
                     </div>

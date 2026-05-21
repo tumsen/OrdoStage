@@ -456,8 +456,13 @@ function EventJobBody({ item, locale }: { item: CalendarItem; locale: string }) 
             {job.startTime ? ` · ${job.startTime}` : ""}
             {job.durationMinutes ? ` · ${job.durationMinutes} min` : ""}
           </div>
-          {job.person ? (
-            <div className="text-xs text-white/45 mt-1">Assigned: {job.person.name}</div>
+          {(job.people?.length ?? 0) > 0 || job.person ? (
+            <div className="text-xs text-white/45 mt-1">
+              Assigned:{" "}
+              {(job.people?.length
+                ? job.people.map((p) => p.name).join(", ")
+                : job.person?.name) ?? "—"}
+            </div>
           ) : null}
           {job.venue ? (
             <div className="text-xs text-white/45 mt-1">At: {job.venue.name}</div>

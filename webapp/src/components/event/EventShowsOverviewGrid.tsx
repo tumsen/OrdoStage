@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { computeShowStaffingStats, sortEventShowJobs } from "@/lib/eventShowStaffing";
+import { computeShowStaffingStats, formatJobAssigneesLabel, sortEventShowJobs } from "@/lib/eventShowStaffing";
 import type { EventShow, EventShowJob, EventTeam } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -230,7 +230,7 @@ export function EventShowsOverviewGrid({
               </div>
               {showJobs.map((job) => {
                 const jobWhen = formatJobListWhenParts(job, prefsLocale, hour12);
-                const assignee = job.person?.name ?? "Unassigned";
+                const assignee = formatJobAssigneesLabel(job);
                 const title = job.title?.trim() || "Job";
                 return (
                   <div

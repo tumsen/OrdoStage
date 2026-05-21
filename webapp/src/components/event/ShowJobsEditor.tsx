@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { Copy, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
@@ -18,6 +18,7 @@ import {
   parseDatetimeLocal,
   toDatetimeLocalString,
 } from "@/lib/showTiming";
+import { JobPeopleAssignees } from "@/components/event/JobPeopleAssignees";
 import { sortEventShowJobs } from "@/lib/eventShowStaffing";
 import type { EventShow, EventShowJob, Person } from "@/lib/types";
 
@@ -74,7 +75,8 @@ export function ShowJobsEditor({
     startValue: string;
     endValue: string;
     venueId: string;
-    personId: string;
+    personIds: string[];
+    pickPersonId: string;
   } | null>(null);
   const [windowOverrides, setWindowOverrides] = useState<
     Record<string, { startValue: string; endValue: string }>
@@ -103,6 +105,15 @@ export function ShowJobsEditor({
     onSuccess: invalidate,
   });
 
+  const copyJob = useMutation({
+    mutationFn: (jobId: string) =>
+      api.post<{ data: { id: string } }>(
+        `/api/events/${eventId}/shows/${show.id}/jobs/${jobId}/copy`,
+        { keepPeople: true }
+      ),
+    onSuccess: invalidate,
+  });
+
   const startAdd = () => {
     const d = show.showDate.slice(0, 10);
     const st = show.showTime || "19:00";
@@ -115,7 +126,8 @@ export function ShowJobsEditor({
       startValue,
       endValue,
       venueId: show.venueId,
-      personId: "",
+      personIds: [],
+      pickPersonId: "",
     });
   };
 
@@ -128,7 +140,7 @@ export function ShowJobsEditor({
       ...body,
       venueId: draft.venueId,
       departmentId: departmentId ?? null,
-      personId: draft.personId || null,
+      personIds: draft.personIds.length > 0 ? draft.personIds : undefined,
     });
     setDraft(null);
   };
@@ -138,9 +150,6 @@ export function ShowJobsEditor({
 
   const selectTriggerClass =
     "bg-white/5 border-white/10 text-white h-10 w-[7.5rem] min-w-[7.5rem] sm:w-36 sm:min-w-[9rem]";
-  const personSelectTriggerClass =
-    "bg-white/5 border-white/10 text-white h-10 w-[10.5rem] min-w-[10.5rem] sm:w-56 sm:min-w-[14rem]";
-
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -258,54 +267,26 @@ export function ShowJobsEditor({
                 </SelectContent>
               </Select>
             </div>
-            <div className="shrink-0">
-              <Label className={scheduleFieldLabelClass}>Person</Label>
-              <Select
-                value={j.personId ?? "__none__"}
-                onValueChange={(v) =>
-                  updateJob.mutate({ jobId: j.id, body: { personId: v === "__none__" ? null : v } })
-                }
-                disabled={!canEdit}
-              >
-                <SelectTrigger className={personSelectTriggerClass}>
-                  <SelectValue placeholder="Unassigned" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                  <SelectItem value="__none__">Unassigned</SelectItem>
-                  {(people ?? []).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <JobPeopleAssignees
+              eventId={eventId}
+              showId={show.id}
+              job={j}
+              people={people}
+              canEdit={canEdit}
+              onChanged={invalidate}
+            />
             <div className="flex shrink-0 items-center gap-0.5 self-end pb-[2px]">
               <Button
                 type="button"
                 size="icon"
                 variant="ghost"
                 className="h-10 w-10 text-white/40 hover:text-white"
-                title="Copy job (clear person)"
+                title="Copy job (same time, venue, and people)"
                 onClick={() => {
                   if (!canEdit) return;
-                  const { startValue, endValue } = w;
-                  const durationMinutes = durationMinutesForwardBetweenDatetimes(startValue, endValue);
-                  if (durationMinutes == null) return;
-                  createJob.mutate({
-                    title: j.title,
-                    jobDate: calendarDateKeyFromJobDate(
-                      j.jobDate ? String(j.jobDate) : show.showDate,
-                      show.showDate.slice(0, 10)
-                    ),
-                    startTime: j.startTime,
-                    durationMinutes,
-                    venueId: j.venueId,
-                    departmentId: departmentId ?? j.departmentId ?? null,
-                    personId: null,
-                  });
+                  copyJob.mutate(j.id);
                 }}
-                disabled={!canEdit}
+                disabled={!canEdit || copyJob.isPending}
               >
                 <Copy size={14} />
               </Button>
@@ -367,27 +348,84 @@ export function ShowJobsEditor({
               </SelectContent>
             </Select>
           </div>
-          <div className="shrink-0">
-            <Label className={scheduleFieldLabelClass}>Person</Label>
-            <Select
-              value={draft.personId || "__none__"}
-              onValueChange={(personId) =>
-                setDraft((d) => (d ? { ...d, personId: personId === "__none__" ? "" : personId } : d))
-              }
-              disabled={!canEdit}
-            >
-              <SelectTrigger className={personSelectTriggerClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                <SelectItem value="__none__">Unassigned</SelectItem>
-                {(people ?? []).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="shrink-0 min-w-[10.5rem] sm:min-w-[14rem]">
+            <Label className={scheduleFieldLabelClass}>People</Label>
+            <div className="space-y-1.5">
+              {draft.personIds.length > 0 ? (
+                <ul className="flex flex-col gap-1">
+                  {draft.personIds.map((pid) => {
+                    const name = (people ?? []).find((p) => p.id === pid)?.name ?? pid;
+                    return (
+                      <li
+                        key={pid}
+                        className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-sm text-white/85"
+                      >
+                        <span className="min-w-0 truncate flex-1">{name}</span>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0 text-white/40 hover:text-red-400"
+                          onClick={() =>
+                            setDraft((d) =>
+                              d ? { ...d, personIds: d.personIds.filter((id) => id !== pid) } : d
+                            )
+                          }
+                        >
+                          <X size={14} />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-xs text-white/35">Optional — add after save or below</p>
+              )}
+              {(people ?? []).filter((p) => !draft.personIds.includes(p.id)).length > 0 ? (
+                <div className="flex items-center gap-1">
+                  <Select
+                    value={draft.pickPersonId || "__pick__"}
+                    onValueChange={(v) =>
+                      setDraft((d) => (d ? { ...d, pickPersonId: v === "__pick__" ? "" : v } : d))
+                    }
+                  >
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white h-10 w-full min-w-[10rem]">
+                      <SelectValue placeholder="Add person…" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                      <SelectItem value="__pick__">Add person…</SelectItem>
+                      {(people ?? [])
+                        .filter((p) => !draft.personIds.includes(p.id))
+                        .map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-10 w-10 shrink-0 border-white/10"
+                    disabled={!draft.pickPersonId}
+                    onClick={() =>
+                      setDraft((d) =>
+                        d && d.pickPersonId
+                          ? {
+                              ...d,
+                              personIds: [...d.personIds, d.pickPersonId],
+                              pickPersonId: "",
+                            }
+                          : d
+                      )
+                    }
+                  >
+                    <Plus size={14} />
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1 self-end pb-[2px]">
             <Button

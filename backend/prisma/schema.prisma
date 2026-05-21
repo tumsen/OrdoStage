@@ -366,6 +366,7 @@ model Person {
   responsibleShows EventShow[]              @relation("EventShowResponsible")
   showStaffing     EventShowStaffing[]      @relation("EventShowStaffingPerson")
   showJobs         EventShowJob[]
+  eventShowJobAssignments EventShowJobPerson[] @relation("EventShowJobPersonAssignee")
   /** App access for users linked by email uses this permission group (RoleDefinition). */
   permissionGroupId String?
   permissionGroup   RoleDefinition?        @relation(fields: [permissionGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -586,6 +587,7 @@ model EventShowJob {
   department      Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   personId        String?
   person          Person?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+  assignments     EventShowJobPerson[]
   sortOrder       Int       @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -594,6 +596,18 @@ model EventShowJob {
   @@index([showId, sortOrder])
   @@index([venueId])
   @@index([departmentId])
+}
+
+model EventShowJobPerson {
+  id        String       @id @default(cuid())
+  jobId     String
+  job       EventShowJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  personId  String
+  person    Person       @relation("EventShowJobPersonAssignee", fields: [personId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@unique([jobId, personId])
+  @@index([personId])
 }
 
 model EventShowStaffing {

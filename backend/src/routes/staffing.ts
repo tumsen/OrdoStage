@@ -10,6 +10,7 @@ import {
   startOfLocalCalendarDayInZone,
   wallClockInstantFromDateIsoAndHHMM,
 } from "../clientWallClock";
+import { setJobAssignees, syncJobToSchedule } from "../lib/eventShowJobAssignees";
 
 const staffingRouter = new Hono<{
   Variables: {
@@ -35,58 +36,6 @@ function addDays(date: Date, days: number): Date {
 }
 
 const toDateTimeFromDateAndTime = wallClockInstantFromDateIsoAndHHMM;
-
-async function syncJobToSchedule(jobId: string): Promise<void> {
-  const job = await prisma.eventShowJob.findUnique({
-    where: { id: jobId },
-    include: {
-      person: { select: { id: true, organizationId: true, name: true } },
-      show: { include: { event: true } },
-    },
-  });
-  if (!job) return;
-  const marker = `[event-show-job:${job.id}]`;
-  const existing = await prisma.internalBooking.findFirst({
-    where: {
-      organizationId: job.show.event.organizationId,
-      title: { startsWith: marker },
-    },
-    select: { id: true },
-  });
-
-  if (!job.personId || !job.person) {
-    if (existing?.id) await prisma.internalBooking.delete({ where: { id: existing.id } });
-    return;
-  }
-
-  const startDate = toDateTimeFromDateAndTime(job.jobDate.toISOString(), job.startTime);
-  if (!startDate) return;
-  const endDate = new Date(startDate.getTime() + job.durationMinutes * 60_000);
-  const title = `${marker} ${job.show.event.title} - ${job.title} - ${job.person.name}`;
-  const bookingId =
-    existing?.id ??
-    (
-      await prisma.internalBooking.create({
-        data: {
-          organizationId: job.person.organizationId,
-          title,
-          description: null,
-          startDate,
-          endDate,
-          type: "other",
-          venueId: job.venueId || null,
-        },
-        select: { id: true },
-      })
-    ).id;
-
-  await prisma.internalBooking.update({
-    where: { id: bookingId },
-    data: { title, description: null, startDate, endDate, venueId: job.venueId || null },
-  });
-  await prisma.internalBookingPerson.deleteMany({ where: { bookingId } });
-  await prisma.internalBookingPerson.create({ data: { bookingId, personId: job.personId, role: null } });
-}
 
 const AssignStaffingJobSchema = z.object({
   personId: z.string().nullable(),
@@ -121,6 +70,10 @@ staffingRouter.get("/staffing", async (c) => {
       },
       include: {
         person: { select: { id: true, name: true, email: true } },
+        assignments: {
+          orderBy: { createdAt: "asc" },
+          include: { person: { select: { id: true, name: true, email: true } } },
+        },
         department: { select: { id: true, name: true, color: true } },
         venue: { select: { id: true, name: true } },
         show: {
@@ -174,13 +127,23 @@ staffingRouter.get("/staffing", async (c) => {
     })
     .filter((x): x is NonNullable<typeof x> => Boolean(x));
 
+  const jobPersonIds = (job: (typeof jobs)[0]) =>
+    job.assignments.length > 0
+      ? job.assignments.map((a) => a.personId)
+      : job.personId
+        ? [job.personId]
+        : [];
+
   const conflictIds = new Set<string>();
   for (let i = 0; i < intervals.length; i++) {
     const a = intervals[i]!;
-    if (!a.job.personId) continue;
+    const aPeople = jobPersonIds(a.job);
+    if (aPeople.length === 0) continue;
     for (let j = i + 1; j < intervals.length; j++) {
       const b = intervals[j]!;
-      if (a.job.personId !== b.job.personId) continue;
+      const bPeople = jobPersonIds(b.job);
+      const shared = aPeople.some((pid) => bPeople.includes(pid));
+      if (!shared) continue;
       if (a.start.getTime() < b.end.getTime() && b.start.getTime() < a.end.getTime()) {
         conflictIds.add(a.job.id);
         conflictIds.add(b.job.id);
@@ -188,39 +151,47 @@ staffingRouter.get("/staffing", async (c) => {
     }
   }
 
-  const requirements = intervals.map(({ job, start, end }) => ({
-    id: job.id,
-    title: job.title,
-    eventId: job.show.event.id,
-    eventTitle: job.show.event.title,
-    showId: job.show.id,
-    showDate: iso(job.show.showDate),
-    showTime: job.show.showTime,
-    showStatus: job.show.status,
-    startsAt: iso(start),
-    endsAt: iso(end),
-    durationMinutes: job.durationMinutes,
-    venueId: job.venueId,
-    venueName: job.venue.name,
-    departmentId: job.departmentId,
-    departmentName: job.department?.name ?? null,
-    departmentColor: job.department?.color ?? null,
-    personId: job.personId,
-    personName: job.person?.name ?? null,
-    actualMinutes: actualMinutesByJob.get(job.id) ?? 0,
-    hasConflict: conflictIds.has(job.id),
-  }));
+  const requirements = intervals.map(({ job, start, end }) => {
+    const assignees = job.assignments.map((a) => a.person);
+    const primary = assignees[0] ?? job.person;
+    return {
+      id: job.id,
+      title: job.title,
+      eventId: job.show.event.id,
+      eventTitle: job.show.event.title,
+      showId: job.show.id,
+      showDate: iso(job.show.showDate),
+      showTime: job.show.showTime,
+      showStatus: job.show.status,
+      startsAt: iso(start),
+      endsAt: iso(end),
+      durationMinutes: job.durationMinutes,
+      venueId: job.venueId,
+      venueName: job.venue.name,
+      departmentId: job.departmentId,
+      departmentName: job.department?.name ?? null,
+      departmentColor: job.department?.color ?? null,
+      personId: primary?.id ?? null,
+      personName: primary?.name ?? null,
+      personNames: assignees.map((p) => p.name),
+      personIds: assignees.map((p) => p.id),
+      actualMinutes: actualMinutesByJob.get(job.id) ?? 0,
+      hasConflict: conflictIds.has(job.id),
+    };
+  });
 
   const workloadByPerson = new Map<string, { planned: number; actual: number; conflicts: number; jobs: number }>();
   for (const person of people) workloadByPerson.set(person.id, { planned: 0, actual: 0, conflicts: 0, jobs: 0 });
   for (const req of requirements) {
-    if (!req.personId) continue;
-    const row = workloadByPerson.get(req.personId) ?? { planned: 0, actual: 0, conflicts: 0, jobs: 0 };
-    row.planned += req.durationMinutes;
-    row.actual += req.actualMinutes;
-    row.jobs += 1;
-    if (req.hasConflict) row.conflicts += 1;
-    workloadByPerson.set(req.personId, row);
+    const ids = req.personIds.length > 0 ? req.personIds : req.personId ? [req.personId] : [];
+    for (const pid of ids) {
+      const row = workloadByPerson.get(pid) ?? { planned: 0, actual: 0, conflicts: 0, jobs: 0 };
+      row.planned += req.durationMinutes;
+      row.actual += req.actualMinutes;
+      row.jobs += 1;
+      if (req.hasConflict) row.conflicts += 1;
+      workloadByPerson.set(pid, row);
+    }
   }
 
   return c.json({
@@ -229,7 +200,7 @@ staffingRouter.get("/staffing", async (c) => {
       requirements,
       summary: {
         total: requirements.length,
-        unassigned: requirements.filter((r) => !r.personId).length,
+        unassigned: requirements.filter((r) => r.personIds.length === 0 && !r.personId).length,
         conflicts: requirements.filter((r) => r.hasConflict).length,
         plannedMinutes: requirements.reduce((sum, r) => sum + r.durationMinutes, 0),
         actualMinutes: requirements.reduce((sum, r) => sum + r.actualMinutes, 0),
@@ -260,10 +231,8 @@ staffingRouter.patch("/staffing/jobs/:jobId", zValidator("json", AssignStaffingJ
     });
     if (!person) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
   }
-  await prisma.eventShowJob.update({
-    where: { id: jobId },
-    data: { personId: body.personId },
-  });
+  const personIds = body.personId ? [body.personId] : [];
+  await setJobAssignees(jobId, personIds, user.organizationId);
   await syncJobToSchedule(jobId);
   return c.json({ data: { ok: true } });
 });

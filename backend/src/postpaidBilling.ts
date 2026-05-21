@@ -220,11 +220,12 @@ export async function countBillableMemberUserIdsInUtcRange(
     if (memberIds.has(uid)) billable.add(uid);
   }
 
-  const jobPeople = await prisma.eventShowJob.findMany({
+  const jobPeople = await prisma.eventShowJobPerson.findMany({
     where: {
-      personId: { not: null },
-      jobDate: { gte: rangeStart, lt: rangeEndExclusive },
-      show: { event: { organizationId } },
+      job: {
+        jobDate: { gte: rangeStart, lt: rangeEndExclusive },
+        show: { event: { organizationId } },
+      },
     },
     select: { personId: true },
   });
