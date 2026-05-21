@@ -1,6 +1,8 @@
 import type { EventShow, EventShowJob, EventTeam, Person } from "@/lib/types";
 
-export const MAX_JOB_PEOPLE_NEEDED = 50;
+export const MAX_JOB_PEOPLE_NEEDED = 99;
+
+export const MIN_JOB_PEOPLE_NEEDED = 1;
 
 export function jobPeopleNeeded(job: EventShowJob): number {
   return Math.max(1, Math.min(MAX_JOB_PEOPLE_NEEDED, job.peopleNeeded ?? 1));

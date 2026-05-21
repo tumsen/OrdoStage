@@ -1,12 +1,26 @@
+import { useEffect, useState } from "react";
+
 import { scheduleFieldLabelClass } from "@/components/ScheduleTimeRow";
 import { JobPersonSlotPicker } from "@/components/event/JobPersonSlotPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MAX_JOB_PEOPLE_NEEDED } from "@/lib/eventShowStaffing";
+import {
+  MAX_JOB_PEOPLE_NEEDED,
+  MIN_JOB_PEOPLE_NEEDED,
+} from "@/lib/eventShowStaffing";
 import { cn } from "@/lib/utils";
 import type { Person } from "@/lib/types";
 
-/** Headcount field for job editor top row (after venue). */
+/** Parse Needed field text: empty → fallback; 0 or invalid → 1; cap at 99. */
+export function parseJobPeopleNeededInput(raw: string, fallback = MIN_JOB_PEOPLE_NEEDED): number {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return fallback;
+  const n = Number.parseInt(digits, 10);
+  if (!Number.isFinite(n) || n < MIN_JOB_PEOPLE_NEEDED) return MIN_JOB_PEOPLE_NEEDED;
+  return Math.min(MAX_JOB_PEOPLE_NEEDED, n);
+}
+
+/** Headcount field for job editor top row (after venue). Plain digits only, no spinner arrows. */
 export function JobNeededField({
   value,
   filled,
@@ -20,24 +34,43 @@ export function JobNeededField({
   onChange: (n: number) => void;
   className?: string;
 }) {
-  const setFromRaw = (raw: string) => {
-    const n = Math.min(MAX_JOB_PEOPLE_NEEDED, Math.max(1, Number.parseInt(raw, 10) || 1));
-    onChange(n);
+  const [text, setText] = useState(String(value));
+
+  useEffect(() => {
+    setText(String(value));
+  }, [value]);
+
+  const commit = (raw: string) => {
+    const n = parseJobPeopleNeededInput(raw, value || MIN_JOB_PEOPLE_NEEDED);
+    setText(String(n));
+    if (n !== value) onChange(n);
   };
 
   return (
     <div className={cn("shrink-0 w-14", className)}>
       <Label className={scheduleFieldLabelClass}>Needed</Label>
       <Input
-        type="number"
-        min={1}
-        max={MAX_JOB_PEOPLE_NEEDED}
-        value={value}
-        onChange={(e) => setFromRaw(e.target.value)}
-        onBlur={(e) => setFromRaw(e.target.value)}
-        className="bg-white/5 border-white/10 text-white h-10 tabular-nums px-2"
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={2}
+        value={text}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, "").slice(0, 2);
+          setText(digits);
+        }}
+        onBlur={() => commit(text)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit(text);
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        className="bg-white/5 border-white/10 text-white h-10 tabular-nums px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         disabled={disabled}
-        title={`${filled} of ${value} slots filled`}
+        title={`${filled} of ${value} people · enter 1–${MAX_JOB_PEOPLE_NEEDED}`}
+        aria-label={`People needed, ${filled} of ${value} assigned`}
       />
     </div>
   );
@@ -60,8 +93,7 @@ export function JobPersonSlotsRow({
   className?: string;
 }) {
   const filled = slotPersonIds.filter(Boolean).length;
-
-  if (peopleNeeded <= 0) return null;
+  const slots = Math.max(MIN_JOB_PEOPLE_NEEDED, peopleNeeded);
 
   return (
     <div
@@ -70,7 +102,7 @@ export function JobPersonSlotsRow({
         className
       )}
     >
-      {Array.from({ length: peopleNeeded }, (_, slotIndex) => {
+      {Array.from({ length: slots }, (_, slotIndex) => {
         const takenElsewhere = new Set(
           slotPersonIds.flatMap((id, i) => (i !== slotIndex && id ? [id] : []))
         );
@@ -87,7 +119,7 @@ export function JobPersonSlotsRow({
         );
       })}
       <p className="text-[10px] text-white/35 self-center pb-2.5 shrink-0">
-        {filled}/{peopleNeeded} filled
+        {filled}/{slots} filled
       </p>
     </div>
   );

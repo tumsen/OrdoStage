@@ -3,12 +3,14 @@ import { wallClockInstantFromDateIsoAndHHMM } from "../clientWallClock";
 
 const toDateTimeFromDateAndTime = wallClockInstantFromDateIsoAndHHMM;
 
-export const MAX_JOB_PEOPLE_NEEDED = 50;
+export const MAX_JOB_PEOPLE_NEEDED = 99;
 
-export function normalizePeopleNeeded(value: unknown, fallback = 1): number {
+export const MIN_JOB_PEOPLE_NEEDED = 1;
+
+export function normalizePeopleNeeded(value: unknown, fallback = MIN_JOB_PEOPLE_NEEDED): number {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return fallback;
-  return Math.min(MAX_JOB_PEOPLE_NEEDED, Math.max(1, Math.round(n)));
+  return Math.min(MAX_JOB_PEOPLE_NEEDED, Math.max(MIN_JOB_PEOPLE_NEEDED, Math.round(n)));
 }
 
 export async function validateOrgPeople(organizationId: string, personIds: string[]): Promise<boolean> {

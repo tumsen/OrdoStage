@@ -472,7 +472,7 @@ export const CreateEventShowJobSchema = z.object({
   departmentId: z.string().nullable().optional(),
   personId: z.string().nullable().optional(),
   personIds: z.array(z.string().min(1)).optional(),
-  peopleNeeded: z.number().int().min(1).max(50).optional(),
+  peopleNeeded: z.number().int().min(1).max(99).optional(),
   slotPersonIds: z.array(z.string().nullable()).optional(),
   sortOrder: z.number().int().optional(),
 });

@@ -1,5 +1,4 @@
-import { JobNeededField, JobPersonSlotsRow } from "@/components/event/JobPeopleFields";
-import { MAX_JOB_PEOPLE_NEEDED } from "@/lib/eventShowStaffing";
+import { JobNeededField, JobPersonSlotsRow, parseJobPeopleNeededInput } from "@/components/event/JobPeopleFields";
 import type { Person } from "@/lib/types";
 
 export function JobNeededDraft({
@@ -14,7 +13,7 @@ export function JobNeededDraft({
   onPeopleNeededChange: (n: number, slots: (string | null)[]) => void;
 }) {
   const changeNeeded = (n: number) => {
-    const capped = Math.min(MAX_JOB_PEOPLE_NEEDED, Math.max(1, n));
+    const capped = parseJobPeopleNeededInput(String(n), peopleNeeded);
     const nextSlots: (string | null)[] = Array.from({ length: capped }, (_, i) => slotPersonIds[i] ?? null);
     onPeopleNeededChange(capped, nextSlots);
   };
