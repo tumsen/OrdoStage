@@ -124,11 +124,14 @@ export function EventShowsOverviewGrid({
   shows,
   teams,
   className,
+  includeJobs = true,
 }: {
   shows: EventShow[];
   teams: EventTeam[];
   /** Extra classes on the outer scroll wrapper (e.g. mt-0). */
   className?: string;
+  /** When false, only show rows are listed (no per-job lines). */
+  includeJobs?: boolean;
 }) {
   const { effective } = usePreferences();
   const prefsLocale = localeForLanguage(effective?.language ?? "en");
@@ -228,7 +231,8 @@ export function EventShowsOverviewGrid({
                   {ticketBits ?? "—"}
                 </div>
               </div>
-              {showJobs.map((job) => {
+              {includeJobs
+                ? showJobs.map((job) => {
                 const jobWhen = formatJobListWhenParts(job, prefsLocale, hour12);
                 const assignee = formatJobAssigneesLabel(job);
                 const title = job.title?.trim() || "Job";
@@ -268,7 +272,8 @@ export function EventShowsOverviewGrid({
                     <span className="text-white/20 pl-2">—</span>
                   </div>
                 );
-              })}
+              })
+                : null}
             </li>
           );
         })}

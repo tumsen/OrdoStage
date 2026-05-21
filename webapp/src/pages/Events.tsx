@@ -1,12 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { Plus, Trash2, Eye, Filter } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Plus, Trash2, Filter } from "lucide-react";
 import { api } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { computeEventWorkTotals } from "@/lib/eventShowStaffing";
-import type { EventDetail } from "@/lib/types";
+import type { EventDetail, EventShow, EventTeam } from "@/lib/types";
 import {
   EventShowsOverviewGrid,
   effectiveShowStatus,
@@ -16,6 +16,7 @@ import { eventMatchesDateRange } from "@/components/schedule/scheduleUtils";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -33,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
 type StatusFilter = "all" | "draft" | "confirmed" | "cancelled";
 
 function eventPassesShowStatusFilter(event: EventDetail, filter: StatusFilter): boolean {
@@ -40,6 +42,93 @@ function eventPassesShowStatusFilter(event: EventDetail, filter: StatusFilter): 
   const shows = event.shows ?? [];
   if (shows.length === 0) return filter === "draft";
   return shows.some((s) => effectiveShowStatus(s) === filter);
+}
+
+function EventListRow({
+  event,
+  shows,
+  teams,
+  onDelete,
+}: {
+  event: EventDetail;
+  shows: EventShow[];
+  teams: EventTeam[];
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const eventWorkTotals = computeEventWorkTotals(event.shows ?? []);
+  const jobCount = (event.shows ?? []).reduce((n, s) => n + (s.jobs?.length ?? 0), 0);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="border-b border-white/5">
+      <div className="flex items-start gap-2 px-4 sm:px-5 py-3.5">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-start gap-2 text-left rounded-md py-0.5 -my-0.5 px-1 -mx-1 hover:bg-white/[0.04]"
+          >
+            {open ? (
+              <ChevronDown size={16} className="text-white/45 shrink-0 mt-0.5" />
+            ) : (
+              <ChevronRight size={16} className="text-white/45 shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-x-2 flex-wrap min-w-0">
+                <span className="text-sm font-medium text-white/90">{event.title}</span>
+                {(event.shows?.length ?? 0) > 0 ? (
+                  <span
+                    className="text-[10px] tabular-nums text-white/40 shrink-0"
+                    title="People and planned hours (all shows on this event)"
+                  >
+                    {eventWorkTotals.people} p · {formatPlannedHoursShort(eventWorkTotals.jobHours)} h
+                  </span>
+                ) : null}
+                {jobCount > 0 && !open ? (
+                  <span className="text-[10px] text-white/35">
+                    {jobCount} job{jobCount === 1 ? "" : "s"} · expand to view
+                  </span>
+                ) : null}
+              </div>
+              <EventShowsOverviewGrid
+                shows={shows}
+                teams={teams}
+                includeJobs={open}
+                className="mt-1.5"
+              />
+            </div>
+          </button>
+        </CollapsibleTrigger>
+        <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-7 border-white/15 text-white hover:bg-white/10"
+          >
+            <Link
+              to={`/events/${event.id}`}
+              className="inline-flex items-center gap-1.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Go to event
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-white/30 hover:text-red-400"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Trash2 size={14} />
+          </Button>
+        </div>
+      </div>
+    </Collapsible>
+  );
 }
 
 export default function Events() {
@@ -105,89 +194,51 @@ export default function Events() {
         </Button>
       </div>
 
-      {/* Table */}
+      {/* List */}
       <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto] gap-0">
-          {/* Header */}
-          <div className="contents">
-            <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">Title</div>
-            <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10"></div>
-          </div>
-
-          {isLoading ? (
-            <div className="col-span-2 p-5 space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full rounded bg-white/5" />
-              ))}
-            </div>
-          ) : error ? (
-            <div className="col-span-2 py-10 text-center text-red-400 text-sm">
-              Failed to load events.
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="col-span-2 py-12 text-center text-white/30 text-sm">
-              {(events ?? []).length === 0
-                ? "No events yet. Create your first one!"
-                : "No events match your filters."}
-            </div>
-          ) : (
-            filtered.map((event) => {
-              const teams = event.teams ?? [];
-              const showsSorted = [...(event.shows ?? [])].sort((a, b) => {
-                const da = a.showDate.slice(0, 10);
-                const db = b.showDate.slice(0, 10);
-                if (da !== db) return da.localeCompare(db);
-                return a.showTime.localeCompare(b.showTime);
-              });
-              const shows =
-                statusFilter === "all"
-                  ? showsSorted
-                  : showsSorted.filter((s) => effectiveShowStatus(s) === statusFilter);
-              const eventWorkTotals = computeEventWorkTotals(event.shows ?? []);
-              return (
-              <div key={event.id} className="contents group">
-                <div
-                  className="px-4 sm:px-5 py-3.5 border-b border-white/5 cursor-pointer"
-                  onClick={() => navigate(`/events/${event.id}`)}
-                >
-                  <div className="flex items-baseline gap-x-2 flex-wrap min-w-0">
-                    <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
-                      {event.title}
-                    </span>
-                    {(event.shows?.length ?? 0) > 0 ? (
-                      <span
-                        className="text-[10px] tabular-nums text-white/40 shrink-0"
-                        title="People and planned hours (all shows on this event)"
-                      >
-                        {eventWorkTotals.people} p · {formatPlannedHoursShort(eventWorkTotals.jobHours)} h
-                      </span>
-                    ) : null}
-                  </div>
-                  <EventShowsOverviewGrid shows={shows} teams={teams} />
-                </div>
-                <div className="px-5 py-3.5 border-b border-white/5 flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-white/30 hover:text-white"
-                    onClick={() => navigate(`/events/${event.id}`)}
-                  >
-                    <Eye size={14} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-white/30 hover:text-red-400"
-                    onClick={() => setDeleteId(event.id)}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              </div>
-              );
-            })
-          )}
+        <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">
+          Events
         </div>
+
+        {isLoading ? (
+          <div className="p-5 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded bg-white/5" />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="py-10 text-center text-red-400 text-sm">Failed to load events.</div>
+        ) : filtered.length === 0 ? (
+          <div className="py-12 text-center text-white/30 text-sm">
+            {(events ?? []).length === 0
+              ? "No events yet. Create your first one!"
+              : "No events match your filters."}
+          </div>
+        ) : (
+          filtered.map((event) => {
+            const teams = event.teams ?? [];
+            const showsSorted = [...(event.shows ?? [])].sort((a, b) => {
+              const da = a.showDate.slice(0, 10);
+              const db = b.showDate.slice(0, 10);
+              if (da !== db) return da.localeCompare(db);
+              return a.showTime.localeCompare(b.showTime);
+            });
+            const shows =
+              statusFilter === "all"
+                ? showsSorted
+                : showsSorted.filter((s) => effectiveShowStatus(s) === statusFilter);
+
+            return (
+              <EventListRow
+                key={event.id}
+                event={event}
+                shows={shows}
+                teams={teams}
+                onDelete={() => setDeleteId(event.id)}
+              />
+            );
+          })
+        )}
       </div>
 
       {/* Delete dialog */}
