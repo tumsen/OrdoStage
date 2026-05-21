@@ -1940,24 +1940,7 @@ function ShowStaffingSections({
   people: Person[];
   highlightJobId?: string | null;
 }) {
-  const queryClient = useQueryClient();
   const [openDeptIds, setOpenDeptIds] = useState<Record<string, boolean>>({});
-
-  const upsertStaffing = useMutation({
-    mutationFn: (args: { personId: string; departmentId: string; isLead?: boolean }) =>
-      api.post(`/api/events/${eventId}/shows/${show.id}/staffing`, {
-        personId: args.personId,
-        departmentId: args.departmentId,
-        isLead: args.isLead ?? false,
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", eventId] }),
-  });
-
-  const removeStaffing = useMutation({
-    mutationFn: (personId: string) =>
-      api.delete(`/api/events/${eventId}/shows/${show.id}/staffing/${personId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["event", eventId] }),
-  });
 
   const departments = eventTeams.map((t) => t.team);
   const staffingOkByDept = useMemo(
@@ -1981,9 +1964,6 @@ function ShowStaffingSections({
       ) : (
         <div className="space-y-3">
           {departments.map((dept) => {
-            const deptStaffing = (show.staffing ?? []).filter((s) => s.departmentId === dept.id);
-            const lead = deptStaffing.find((s) => s.isLead) ?? null;
-            const leadValue = lead?.personId ?? "__none__";
             const isOpen = openDeptIds[dept.id] ?? true;
             const ok = staffingOkByDept[dept.id] ?? false;
             const deptJobCount = (show.jobs ?? []).filter((j) => j.departmentId === dept.id).length;
@@ -2023,33 +2003,6 @@ function ShowStaffingSections({
 
                 {isOpen ? (
                   <>
-                    <div className="flex flex-wrap items-end gap-3">
-                      <div className="min-w-[14rem]">
-                        <FieldLabel>{dept.name} lead</FieldLabel>
-                        <Select
-                          value={leadValue}
-                          onValueChange={(personId) => {
-                            if (personId === "__none__") {
-                              if (lead) removeStaffing.mutate(lead.personId);
-                              return;
-                            }
-                            upsertStaffing.mutate({ personId, departmentId: dept.id, isLead: true });
-                          }}
-                        >
-                          <SelectTrigger className="bg-white/5 border-white/10 text-white h-10">
-                            <SelectValue placeholder="Unassigned lead" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                            <SelectItem value="__none__">Unassigned lead</SelectItem>
-                            {people.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
                     <ShowJobsEditor
                       eventId={eventId}
                       show={show}

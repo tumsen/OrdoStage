@@ -47,7 +47,9 @@ export function JobPersonSlotPicker({
 
   return (
     <div className="min-w-0 w-full">
-      <Label className={cn(scheduleFieldLabelClass, "text-[10px]")}>Person {slotIndex + 1}</Label>
+      <Label className={cn(scheduleFieldLabelClass, "text-[10px]")}>
+        {slotIndex === 0 ? "Lead" : `Person ${slotIndex + 1}`}
+      </Label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
