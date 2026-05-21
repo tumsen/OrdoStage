@@ -71,7 +71,7 @@ staffingRouter.get("/staffing", async (c) => {
       include: {
         person: { select: { id: true, name: true, email: true } },
         assignments: {
-          orderBy: { createdAt: "asc" },
+          orderBy: { slotIndex: "asc" },
           include: { person: { select: { id: true, name: true, email: true } } },
         },
         department: { select: { id: true, name: true, color: true } },
@@ -175,6 +175,7 @@ staffingRouter.get("/staffing", async (c) => {
       personName: primary?.name ?? null,
       personNames: assignees.map((p) => p.name),
       personIds: assignees.map((p) => p.id),
+      peopleNeeded: job.peopleNeeded ?? 1,
       actualMinutes: actualMinutesByJob.get(job.id) ?? 0,
       hasConflict: conflictIds.has(job.id),
     };
@@ -200,7 +201,7 @@ staffingRouter.get("/staffing", async (c) => {
       requirements,
       summary: {
         total: requirements.length,
-        unassigned: requirements.filter((r) => r.personIds.length === 0 && !r.personId).length,
+        unassigned: requirements.filter((r) => r.personIds.length < (r.peopleNeeded ?? 1)).length,
         conflicts: requirements.filter((r) => r.hasConflict).length,
         plannedMinutes: requirements.reduce((sum, r) => sum + r.durationMinutes, 0),
         actualMinutes: requirements.reduce((sum, r) => sum + r.actualMinutes, 0),

@@ -452,8 +452,12 @@ export const EventShowJobSchema = z.object({
   departmentId: z.string().nullable().optional(),
   personId: z.string().nullable(),
   person: PersonSchema.nullable().optional(),
-  /** All people assigned to this job (chronological). */
+  /** All people assigned to this job (by slot index). */
   people: z.array(PersonSchema).optional(),
+  /** Required headcount; UI shows this many assignment dropdowns. */
+  peopleNeeded: z.number().int().min(1),
+  /** Person id per slot (length = peopleNeeded); null = empty slot. */
+  slotPersonIds: z.array(z.string().nullable()).optional(),
   sortOrder: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -468,6 +472,8 @@ export const CreateEventShowJobSchema = z.object({
   departmentId: z.string().nullable().optional(),
   personId: z.string().nullable().optional(),
   personIds: z.array(z.string().min(1)).optional(),
+  peopleNeeded: z.number().int().min(1).max(50).optional(),
+  slotPersonIds: z.array(z.string().nullable()).optional(),
   sortOrder: z.number().int().optional(),
 });
 

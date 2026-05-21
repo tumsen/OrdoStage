@@ -250,8 +250,9 @@ scheduleRouter.get("/schedule", async (c) => {
                     name: true,
                   },
                 },
+                peopleNeeded: true,
                 assignments: {
-                  orderBy: { createdAt: "asc" },
+                  orderBy: { slotIndex: "asc" },
                   include: {
                     person: { select: { id: true, name: true } },
                   },
@@ -373,7 +374,13 @@ scheduleRouter.get("/schedule", async (c) => {
       venueId: show.venueId,
       venue: serializeVenue(show.venue),
       jobs: show.jobs.map((job) => {
-        const people = (job.assignments ?? []).map((a) => ({
+        const assignments = [...(job.assignments ?? [])].sort((a, b) => a.slotIndex - b.slotIndex);
+        const peopleNeeded = Math.max(1, job.peopleNeeded ?? 1);
+        const slotPersonIds: (string | null)[] = Array.from({ length: peopleNeeded }, (_, slotIndex) => {
+          const row = assignments.find((a) => a.slotIndex === slotIndex);
+          return row?.personId ?? null;
+        });
+        const people = assignments.map((a) => ({
           id: a.person.id,
           name: a.person.name,
         }));
@@ -391,6 +398,8 @@ scheduleRouter.get("/schedule", async (c) => {
           personId: primary?.id ?? job.personId,
           person: primary,
           people,
+          peopleNeeded,
+          slotPersonIds,
           sortOrder: job.sortOrder,
           createdAt: serializeDate(job.createdAt),
           updatedAt: serializeDate(job.updatedAt),

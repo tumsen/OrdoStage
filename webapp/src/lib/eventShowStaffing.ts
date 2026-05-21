@@ -1,15 +1,40 @@
 import type { EventShow, EventShowJob, EventTeam, Person } from "@/lib/types";
 
-/** People assigned to a show job (supports legacy single personId). */
+export const MAX_JOB_PEOPLE_NEEDED = 50;
+
+export function jobPeopleNeeded(job: EventShowJob): number {
+  return Math.max(1, Math.min(MAX_JOB_PEOPLE_NEEDED, job.peopleNeeded ?? 1));
+}
+
+/** Person id per assignment slot (length = peopleNeeded). */
+export function jobSlotPersonIds(job: EventShowJob): (string | null)[] {
+  const n = jobPeopleNeeded(job);
+  if (job.slotPersonIds && job.slotPersonIds.length === n) return [...job.slotPersonIds];
+  const slots: (string | null)[] = Array.from({ length: n }, () => null);
+  const list = job.people?.length ? job.people : job.person ? [job.person] : [];
+  list.forEach((p, i) => {
+    if (i < n) slots[i] = p.id;
+  });
+  return slots;
+}
+
+/** People assigned to a show job (filled slots only, in slot order). */
 export function jobAssignees(job: EventShowJob): Person[] {
-  if (job.people?.length) return job.people;
-  if (job.person) return [job.person];
-  return [];
+  const slots = jobSlotPersonIds(job);
+  const byId = new Map((job.people ?? (job.person ? [job.person] : [])).map((p) => [p.id, p]));
+  return slots
+    .map((id) => (id ? byId.get(id) : null))
+    .filter((p): p is Person => Boolean(p));
 }
 
 export function formatJobAssigneesLabel(job: EventShowJob): string {
+  const needed = jobPeopleNeeded(job);
+  const slots = jobSlotPersonIds(job);
+  const filled = slots.filter(Boolean).length;
+  if (filled === 0) return needed > 1 ? `0/${needed}` : "Unassigned";
   const names = jobAssignees(job).map((p) => p.name);
-  return names.length > 0 ? names.join(", ") : "Unassigned";
+  if (filled < needed) return `${names.join(", ")} (${filled}/${needed})`;
+  return names.join(", ");
 }
 
 /** Chronological order for show jobs (date, then start time, then sortOrder). */

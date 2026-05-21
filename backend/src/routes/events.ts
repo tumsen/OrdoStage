@@ -23,8 +23,11 @@ import { wallClockInstantFromDateIsoAndHHMM } from "../clientWallClock";
 import {
   addJobAssignee,
   copyJobAssignees,
+  normalizePeopleNeeded,
   removeJobAssignee,
   setJobAssignees,
+  setJobPeopleNeeded,
+  setJobSlotPersonIds,
   syncJobToSchedule,
 } from "../lib/eventShowJobAssignees";
 
@@ -401,7 +404,17 @@ async function syncStaffingToSchedule(staffingId: string): Promise<void> {
 }
 
 function serializeEventShowJob(job: any) {
-  const people = (job.assignments ?? []).map((a: any) => serializePerson(a.person));
+  const assignments = [...(job.assignments ?? [])].sort(
+    (a: { slotIndex: number }, b: { slotIndex: number }) => a.slotIndex - b.slotIndex
+  );
+  const peopleNeeded = normalizePeopleNeeded(job.peopleNeeded, Math.max(1, assignments.length));
+  const slotPersonIds: (string | null)[] = Array.from({ length: peopleNeeded }, (_, slotIndex) => {
+    const row = assignments.find((a: { slotIndex: number }) => a.slotIndex === slotIndex);
+    return row?.personId ?? null;
+  });
+  const people = assignments.map((a: { person: Parameters<typeof serializePerson>[0] }) =>
+    serializePerson(a.person)
+  );
   const primary = people[0] ?? (job.person ? serializePerson(job.person) : null);
   return {
     id: job.id,
@@ -416,6 +429,8 @@ function serializeEventShowJob(job: any) {
     personId: primary?.id ?? job.personId ?? null,
     person: primary,
     people,
+    peopleNeeded,
+    slotPersonIds,
     sortOrder: job.sortOrder,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
@@ -487,7 +502,7 @@ const eventInclude: any = {
           venue: true,
           person: true,
           assignments: {
-            orderBy: { createdAt: "asc" as const },
+            orderBy: { slotIndex: "asc" as const },
             include: { person: true },
           },
         },
@@ -1685,11 +1700,24 @@ eventsRouter.post(
     });
     if (!venue) return c.json({ error: { message: "Venue not found", code: "NOT_FOUND" } }, 404);
     const assigneeIds = assigneeIdsFromJobBody(body);
-    if (assigneeIds.length > 0) {
+    const peopleNeeded = normalizePeopleNeeded(
+      body.peopleNeeded,
+      body.slotPersonIds?.length ?? (assigneeIds.length || 1)
+    );
+    if (body.slotPersonIds && body.slotPersonIds.length !== peopleNeeded) {
+      return c.json(
+        { error: { message: "slotPersonIds length must match peopleNeeded", code: "BAD_REQUEST" } },
+        400
+      );
+    }
+    const idsToValidate = body.slotPersonIds
+      ? body.slotPersonIds.filter((id): id is string => Boolean(id))
+      : assigneeIds;
+    if (idsToValidate.length > 0) {
       const count = await prisma.person.count({
-        where: { organizationId: user.organizationId, id: { in: assigneeIds } },
+        where: { organizationId: user.organizationId, id: { in: idsToValidate } },
       });
-      if (count !== assigneeIds.length) {
+      if (count !== idsToValidate.length) {
         return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
       }
     }
@@ -1719,12 +1747,24 @@ eventsRouter.post(
         durationMinutes: body.durationMinutes,
         venueId: body.venueId,
         departmentId: body.departmentId ?? null,
-        personId: assigneeIds[0] ?? null,
+        personId: null,
+        peopleNeeded,
         sortOrder: body.sortOrder ?? 0,
       },
     });
-    if (assigneeIds.length > 0) {
-      await setJobAssignees(job.id, assigneeIds, user.organizationId);
+    try {
+      if (body.slotPersonIds) {
+        await setJobSlotPersonIds(job.id, body.slotPersonIds, user.organizationId);
+      } else if (assigneeIds.length > 0) {
+        await setJobAssignees(job.id, assigneeIds, user.organizationId);
+      }
+    } catch (e) {
+      await prismaAny.eventShowJob.delete({ where: { id: job.id } });
+      const msg = e instanceof Error ? e.message : "Invalid assignments";
+      if (msg.includes("duplicate")) {
+        return c.json({ error: { message: "Same person cannot fill multiple slots", code: "BAD_REQUEST" } }, 400);
+      }
+      return c.json({ error: { message: msg, code: "BAD_REQUEST" } }, 400);
     }
     if (body.sortOrder === undefined) {
       await recomputeEventShowJobSortOrders(showId);
@@ -1773,11 +1813,28 @@ eventsRouter.put(
       body.personIds !== undefined || body.personId !== undefined
         ? assigneeIdsFromJobBody(body)
         : null;
-    if (assigneeIds && assigneeIds.length > 0) {
+    const nextPeopleNeeded =
+      body.peopleNeeded !== undefined ? normalizePeopleNeeded(body.peopleNeeded, job.peopleNeeded) : null;
+    if (body.slotPersonIds && nextPeopleNeeded !== null && body.slotPersonIds.length !== nextPeopleNeeded) {
+      return c.json(
+        { error: { message: "slotPersonIds length must match peopleNeeded", code: "BAD_REQUEST" } },
+        400
+      );
+    }
+    if (body.slotPersonIds && body.peopleNeeded === undefined && body.slotPersonIds.length !== job.peopleNeeded) {
+      return c.json(
+        { error: { message: "slotPersonIds length must match peopleNeeded", code: "BAD_REQUEST" } },
+        400
+      );
+    }
+    const idsToValidate = body.slotPersonIds
+      ? body.slotPersonIds.filter((id): id is string => Boolean(id))
+      : assigneeIds ?? [];
+    if (idsToValidate.length > 0) {
       const count = await prisma.person.count({
-        where: { organizationId: user.organizationId, id: { in: assigneeIds } },
+        where: { organizationId: user.organizationId, id: { in: idsToValidate } },
       });
-      if (count !== assigneeIds.length) {
+      if (count !== idsToValidate.length) {
         return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
       }
     }
@@ -1807,11 +1864,25 @@ eventsRouter.put(
         ...(body.durationMinutes !== undefined && { durationMinutes: body.durationMinutes }),
         ...(body.venueId !== undefined && { venueId: body.venueId }),
         ...(body.departmentId !== undefined && { departmentId: body.departmentId ?? null }),
+        ...(nextPeopleNeeded !== null && { peopleNeeded: nextPeopleNeeded }),
         ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
       },
     });
-    if (assigneeIds !== null) {
-      await setJobAssignees(jobId, assigneeIds, user.organizationId);
+    if (nextPeopleNeeded !== null && body.slotPersonIds === undefined) {
+      await setJobPeopleNeeded(jobId, nextPeopleNeeded);
+    }
+    try {
+      if (body.slotPersonIds) {
+        await setJobSlotPersonIds(jobId, body.slotPersonIds, user.organizationId);
+      } else if (assigneeIds !== null) {
+        await setJobAssignees(jobId, assigneeIds, user.organizationId);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Invalid assignments";
+      if (msg.includes("duplicate")) {
+        return c.json({ error: { message: "Same person cannot fill multiple slots", code: "BAD_REQUEST" } }, 400);
+      }
+      return c.json({ error: { message: msg, code: "BAD_REQUEST" } }, 400);
     }
     const timingChanged = body.jobDate !== undefined || body.startTime !== undefined;
     if (timingChanged && body.sortOrder === undefined) {
@@ -1860,6 +1931,7 @@ eventsRouter.post(
         venueId: source.venueId,
         departmentId: source.departmentId,
         personId: null,
+        peopleNeeded: source.peopleNeeded,
         sortOrder: 0,
       },
     });
@@ -1939,7 +2011,7 @@ eventsRouter.delete("/events/:id/shows/:showId/jobs/:jobId/people/:personId", as
       403
     );
   }
-  await removeJobAssignee(jobId, personId);
+  await removeJobAssignee(jobId, personId, user.organizationId);
   await syncJobToSchedule(jobId);
   return new Response(null, { status: 204 });
 });

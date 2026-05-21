@@ -587,6 +587,8 @@ model EventShowJob {
   department      Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   personId        String?
   person          Person?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+  /** How many people are required for this job (drives assignment slot count in UI). */
+  peopleNeeded    Int       @default(1)
   assignments     EventShowJobPerson[]
   sortOrder       Int       @default(0)
   createdAt       DateTime  @default(now())
@@ -604,9 +606,11 @@ model EventShowJobPerson {
   job       EventShowJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
   personId  String
   person    Person       @relation("EventShowJobPersonAssignee", fields: [personId], references: [id], onDelete: Cascade)
+  slotIndex Int          @default(0)
   createdAt DateTime     @default(now())
 
   @@unique([jobId, personId])
+  @@unique([jobId, slotIndex])
   @@index([personId])
 }
 
