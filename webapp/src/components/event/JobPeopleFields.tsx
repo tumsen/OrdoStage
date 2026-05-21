@@ -106,28 +106,30 @@ export function JobPersonSlotsRow({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-end gap-x-2 gap-y-2 mt-1 pt-5 border-t border-white/[0.06]",
+        "mt-1 pt-5 border-t border-white/[0.06] space-y-2",
         className
       )}
     >
-      {Array.from({ length: slots }, (_, slotIndex) => {
-        const takenElsewhere = new Set(
-          slotPersonIds.flatMap((id, i) => (i !== slotIndex && id ? [id] : []))
-        );
-        return (
-          <JobPersonSlotPicker
-            key={slotIndex}
-            slotIndex={slotIndex}
-            value={slotPersonIds[slotIndex] ?? null}
-            roster={roster}
-            takenElsewhere={takenElsewhere}
-            overlapBusy={busy}
-            disabled={disabled}
-            onChange={(personId) => onSlotChange(slotIndex, personId)}
-          />
-        );
-      })}
-      <p className="text-[10px] text-white/35 self-center pb-2.5 shrink-0">
+      <div className="grid grid-cols-5 gap-2 sm:gap-3 items-end min-w-0">
+        {Array.from({ length: slots }, (_, slotIndex) => {
+          const takenElsewhere = new Set(
+            slotPersonIds.flatMap((id, i) => (i !== slotIndex && id ? [id] : []))
+          );
+          return (
+            <JobPersonSlotPicker
+              key={slotIndex}
+              slotIndex={slotIndex}
+              value={slotPersonIds[slotIndex] ?? null}
+              roster={roster}
+              takenElsewhere={takenElsewhere}
+              overlapBusy={busy}
+              disabled={disabled}
+              onChange={(personId) => onSlotChange(slotIndex, personId)}
+            />
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-white/35">
         {filled}/{slots} filled
       </p>
     </div>

@@ -57,7 +57,10 @@ function rangeToJobBody(startValue: string, endValue: string) {
 type VenueOpt = { id: string; name: string };
 
 const jobCardBaseClass =
-  "w-full min-w-0 rounded-lg border bg-white/[0.03] pl-5 pr-3 py-2.5 space-y-0";
+  "w-full min-w-0 rounded-lg border bg-white/[0.03] px-3 py-2.5 space-y-0";
+
+/** Vertical gap between job cards — matches section/card horizontal padding (p-3). */
+const jobListGapClass = "space-y-3";
 
 /** Left padding keeps the first field’s focus ring from clipping in overflow-x-auto. */
 const jobSettingsScrollClass =
@@ -248,7 +251,7 @@ export function ShowJobsEditor({
   };
 
   return (
-    <div className="space-y-2">
+    <div className={jobListGapClass}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs uppercase tracking-wide text-white/45">{title ?? "Jobs for this show"}</p>
         <Button

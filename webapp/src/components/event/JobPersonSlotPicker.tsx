@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import type { Person } from "@/lib/types";
 
 const triggerClass =
-  "h-10 w-full min-w-[9rem] max-w-[14rem] justify-between bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white font-normal text-sm";
+  "h-10 w-full min-w-0 max-w-none justify-between bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white font-normal text-sm";
 
 export function JobPersonSlotPicker({
   slotIndex,
@@ -46,7 +46,7 @@ export function JobPersonSlotPicker({
   );
 
   return (
-    <div className="shrink-0 w-[9.5rem] sm:w-[11rem] min-w-[9rem]">
+    <div className="min-w-0 w-full">
       <Label className={cn(scheduleFieldLabelClass, "text-[10px]")}>Person {slotIndex + 1}</Label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
