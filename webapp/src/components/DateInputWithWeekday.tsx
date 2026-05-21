@@ -37,6 +37,14 @@ export const eventScheduleDateInputClassName = timeNavDateInputClassName;
 
 export const eventScheduleDateWeekdayClassName = timeNavDateWeekdayClassName;
 
+/** Matches `h-10` inputs in job editor rows (title, venue, person slots). */
+export const jobScheduleDateInputClassName = cn(
+  "h-10 min-h-10 border-white/10 bg-white/5 text-sm [color-scheme:dark]",
+  DATE_INPUT_WITH_WEEKDAY_LAYOUT_CLASS,
+);
+
+export const jobScheduleDateWeekdayClassName = "text-sm text-white/45";
+
 const DEFAULT_WEEKDAY_CLASS = timeNavDateWeekdayClassName;
 
 const CALENDAR_POPOVER_CLASS =

@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
-import { EventStartDateInput } from "@/components/DateInputWithWeekday";
+import {
+  EventStartDateInput,
+  eventScheduleDateInputClassName,
+  eventScheduleDateWeekdayClassName,
+} from "@/components/DateInputWithWeekday";
 import { Label } from "@/components/ui/label";
 import {
   buildDatetimeLocal,
@@ -21,12 +25,17 @@ export function DatetimeScheduleFields({
   onStartChange,
   onEndChange,
   className,
+  dateInputClassName = eventScheduleDateInputClassName,
+  dateWeekdayClassName = eventScheduleDateWeekdayClassName,
 }: {
   startValue: string;
   endValue: string;
   onStartChange: (v: string) => void;
   onEndChange: (v: string) => void;
   className?: string;
+  /** Date trigger height/styling (use `jobScheduleDateInputClassName` in job rows). */
+  dateInputClassName?: string;
+  dateWeekdayClassName?: string;
 }) {
   const refSt = useRef<SplitTimeFieldHandle>(null);
   const refEn = useRef<SplitTimeFieldHandle>(null);
@@ -99,7 +108,12 @@ export function DatetimeScheduleFields({
     <ScheduleTimeRow className={className}>
       <div className="shrink-0">
         <Label className={scheduleFieldLabelClass}>Start date</Label>
-        <EventStartDateInput value={date} onChange={setDate} />
+        <EventStartDateInput
+          value={date}
+          onChange={setDate}
+          className={dateInputClassName}
+          weekdayClassName={dateWeekdayClassName}
+        />
       </div>
       <div className="shrink-0">
         <Label className={scheduleFieldLabelClass}>Start</Label>

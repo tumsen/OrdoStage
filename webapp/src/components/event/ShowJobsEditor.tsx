@@ -3,6 +3,12 @@ import { Copy, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
+import {
+  jobScheduleDateInputClassName,
+  jobScheduleDateWeekdayClassName,
+} from "@/components/DateInputWithWeekday";
+import { JobNeededControl, JobPeopleAssignees } from "@/components/event/JobPeopleAssignees";
+import { JobNeededDraft, JobPeopleSlotsDraftRow } from "@/components/event/JobPeopleSlotsDraft";
 import { scheduleFieldLabelClass } from "@/components/ScheduleTimeRow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,8 +24,6 @@ import {
   parseDatetimeLocal,
   toDatetimeLocalString,
 } from "@/lib/showTiming";
-import { JobPeopleAssignees } from "@/components/event/JobPeopleAssignees";
-import { JobPeopleSlotsDraft } from "@/components/event/JobPeopleSlotsDraft";
 import { sortEventShowJobs } from "@/lib/eventShowStaffing";
 import type { EventShow, EventShowJob, Person } from "@/lib/types";
 
@@ -45,6 +49,20 @@ function rangeToJobBody(startValue: string, endValue: string) {
 }
 
 type VenueOpt = { id: string; name: string };
+
+const jobCardClass =
+  "w-full min-w-0 rounded-lg border border-white/10 bg-white/[0.03] p-2 space-y-0";
+
+const jobSettingsRowClass =
+  "flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 overflow-x-auto pb-0.5";
+
+const selectTriggerClass =
+  "bg-white/5 border-white/10 text-white h-10 w-[7.5rem] min-w-[7.5rem] sm:w-36 sm:min-w-[9rem]";
+
+const scheduleDateProps = {
+  dateInputClassName: jobScheduleDateInputClassName,
+  dateWeekdayClassName: jobScheduleDateWeekdayClassName,
+};
 
 export function ShowJobsEditor({
   eventId,
@@ -147,11 +165,6 @@ export function ShowJobsEditor({
     setDraft(null);
   };
 
-  const jobRowClass =
-    "w-full flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 overflow-x-auto pb-0.5 rounded-lg border border-white/10 bg-white/[0.03] p-2";
-
-  const selectTriggerClass =
-    "bg-white/5 border-white/10 text-white h-10 w-[7.5rem] min-w-[7.5rem] sm:w-36 sm:min-w-[9rem]";
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -179,82 +192,175 @@ export function ShowJobsEditor({
             key={j.id}
             id={`show-job-${j.id}`}
             className={cn(
-              jobRowClass,
+              jobCardClass,
               isHighlight && "ring-2 ring-red-500/55 ring-offset-2 ring-offset-[#0c0c12]"
             )}
           >
+            <div className={jobSettingsRowClass}>
+              <div className="shrink-0 w-28 min-w-28 sm:w-36 sm:min-w-36">
+                <Label className={scheduleFieldLabelClass}>Title</Label>
+                <Input
+                  defaultValue={j.title}
+                  onBlur={(e) => {
+                    if (!canEdit) return;
+                    const v = e.target.value.trim();
+                    if (v && v !== j.title) updateJob.mutate({ jobId: j.id, body: { title: v } });
+                  }}
+                  className="bg-white/5 border-white/10 text-white h-10 w-full"
+                  disabled={!canEdit}
+                />
+              </div>
+              <div className="shrink-0">
+                <DatetimeScheduleFields
+                  {...scheduleDateProps}
+                  startValue={w.startValue}
+                  endValue={w.endValue}
+                  onStartChange={(ns) => {
+                    if (!canEdit) return;
+                    const ne = toDatetimeLocalString(
+                      new Date(new Date(ns).getTime() + j.durationMinutes * 60_000)
+                    );
+                    setWindowOverrides((prev) => ({
+                      ...prev,
+                      [j.id]: { startValue: ns, endValue: ne },
+                    }));
+                    const body = rangeToJobBody(ns, ne);
+                    if (body) {
+                      updateJob.mutate(
+                        { jobId: j.id, body },
+                        {
+                          onSettled: () => {
+                            setWindowOverrides((prev) => {
+                              const next = { ...prev };
+                              delete next[j.id];
+                              return next;
+                            });
+                          },
+                        }
+                      );
+                    }
+                  }}
+                  onEndChange={(ne) => {
+                    if (!canEdit) return;
+                    setWindowOverrides((prev) => ({
+                      ...prev,
+                      [j.id]: { startValue: w.startValue, endValue: ne },
+                    }));
+                    const body = rangeToJobBody(w.startValue, ne);
+                    if (body) {
+                      updateJob.mutate(
+                        { jobId: j.id, body },
+                        {
+                          onSettled: () => {
+                            setWindowOverrides((prev) => {
+                              const next = { ...prev };
+                              delete next[j.id];
+                              return next;
+                            });
+                          },
+                        }
+                      );
+                    }
+                  }}
+                  className={!canEdit ? "pointer-events-none opacity-70" : undefined}
+                />
+              </div>
+              <div className="shrink-0">
+                <Label className={scheduleFieldLabelClass}>Venue</Label>
+                <Select
+                  value={j.venueId}
+                  onValueChange={(venueId) => updateJob.mutate({ jobId: j.id, body: { venueId } })}
+                  disabled={!canEdit}
+                >
+                  <SelectTrigger className={selectTriggerClass}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                    {(venues ?? []).map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <JobNeededControl
+                eventId={eventId}
+                showId={show.id}
+                job={j}
+                canEdit={canEdit}
+                onChanged={invalidate}
+              />
+              <div className="flex shrink-0 items-center gap-0.5 self-end pb-[2px] ml-auto">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-10 w-10 text-white/40 hover:text-white"
+                  title="Copy job (same time, venue, and people)"
+                  onClick={() => {
+                    if (!canEdit) return;
+                    copyJob.mutate(j.id);
+                  }}
+                  disabled={!canEdit || copyJob.isPending}
+                >
+                  <Copy size={14} />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-10 w-10 text-white/40 hover:text-red-400"
+                  onClick={() => {
+                    if (!canEdit) return;
+                    if (!confirm("Delete this job?")) return;
+                    deleteJob.mutate(j.id);
+                  }}
+                  disabled={!canEdit}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              </div>
+            </div>
+            <JobPeopleAssignees
+              eventId={eventId}
+              showId={show.id}
+              job={j}
+              people={people}
+              canEdit={canEdit}
+              onChanged={invalidate}
+            />
+          </div>
+        );
+      })}
+
+      {draft ? (
+        <div className={cn(jobCardClass, "border-dashed")}>
+          <div className={jobSettingsRowClass}>
             <div className="shrink-0 w-28 min-w-28 sm:w-36 sm:min-w-36">
               <Label className={scheduleFieldLabelClass}>Title</Label>
               <Input
-                defaultValue={j.title}
-                onBlur={(e) => {
-                  if (!canEdit) return;
-                  const v = e.target.value.trim();
-                  if (v && v !== j.title) updateJob.mutate({ jobId: j.id, body: { title: v } });
-                }}
+                value={draft.title}
+                onChange={(e) => setDraft((d) => (d ? { ...d, title: e.target.value } : d))}
                 className="bg-white/5 border-white/10 text-white h-10 w-full"
                 disabled={!canEdit}
               />
             </div>
             <div className="shrink-0">
               <DatetimeScheduleFields
-                startValue={w.startValue}
-                endValue={w.endValue}
-                onStartChange={(ns) => {
-                  if (!canEdit) return;
-                  const ne = toDatetimeLocalString(
-                    new Date(new Date(ns).getTime() + j.durationMinutes * 60_000)
-                  );
-                  setWindowOverrides((prev) => ({
-                    ...prev,
-                    [j.id]: { startValue: ns, endValue: ne },
-                  }));
-                  const body = rangeToJobBody(ns, ne);
-                  if (body) {
-                    updateJob.mutate(
-                      { jobId: j.id, body },
-                      {
-                        onSettled: () => {
-                          setWindowOverrides((prev) => {
-                            const next = { ...prev };
-                            delete next[j.id];
-                            return next;
-                          });
-                        },
-                      }
-                    );
-                  }
-                }}
-                onEndChange={(ne) => {
-                  if (!canEdit) return;
-                  setWindowOverrides((prev) => ({
-                    ...prev,
-                    [j.id]: { startValue: w.startValue, endValue: ne },
-                  }));
-                  const body = rangeToJobBody(w.startValue, ne);
-                  if (body) {
-                    updateJob.mutate(
-                      { jobId: j.id, body },
-                      {
-                        onSettled: () => {
-                          setWindowOverrides((prev) => {
-                            const next = { ...prev };
-                            delete next[j.id];
-                            return next;
-                          });
-                        },
-                      }
-                    );
-                  }
-                }}
+                {...scheduleDateProps}
+                startValue={draft.startValue}
+                endValue={draft.endValue}
+                onStartChange={(v) => setDraft((d) => (d ? { ...d, startValue: v } : d))}
+                onEndChange={(v) => setDraft((d) => (d ? { ...d, endValue: v } : d))}
                 className={!canEdit ? "pointer-events-none opacity-70" : undefined}
               />
             </div>
             <div className="shrink-0">
               <Label className={scheduleFieldLabelClass}>Venue</Label>
               <Select
-                value={j.venueId}
-                onValueChange={(venueId) => updateJob.mutate({ jobId: j.id, body: { venueId } })}
+                value={draft.venueId}
+                onValueChange={(venueId) => setDraft((d) => (d ? { ...d, venueId } : d))}
                 disabled={!canEdit}
               >
                 <SelectTrigger className={selectTriggerClass}>
@@ -269,111 +375,43 @@ export function ShowJobsEditor({
                 </SelectContent>
               </Select>
             </div>
-            <JobPeopleAssignees
-              eventId={eventId}
-              showId={show.id}
-              job={j}
-              people={people}
-              canEdit={canEdit}
-              onChanged={invalidate}
+            <JobNeededDraft
+              peopleNeeded={draft.peopleNeeded}
+              slotPersonIds={draft.slotPersonIds}
+              disabled={!canEdit || createJob.isPending}
+              onPeopleNeededChange={(peopleNeeded, slotPersonIds) =>
+                setDraft((d) => (d ? { ...d, peopleNeeded, slotPersonIds } : d))
+              }
             />
-            <div className="flex shrink-0 items-center gap-0.5 self-end pb-[2px]">
+            <div className="flex shrink-0 items-center gap-1 self-end pb-[2px] ml-auto">
               <Button
                 type="button"
-                size="icon"
-                variant="ghost"
-                className="h-10 w-10 text-white/40 hover:text-white"
-                title="Copy job (same time, venue, and people)"
-                onClick={() => {
-                  if (!canEdit) return;
-                  copyJob.mutate(j.id);
-                }}
-                disabled={!canEdit || copyJob.isPending}
+                size="sm"
+                className="h-10 bg-red-900 hover:bg-red-800"
+                onClick={saveDraft}
+                disabled={!canEdit || createJob.isPending}
               >
-                <Copy size={14} />
+                Save
               </Button>
               <Button
                 type="button"
-                size="icon"
+                size="sm"
                 variant="ghost"
-                className="h-10 w-10 text-white/40 hover:text-red-400"
-                onClick={() => {
-                  if (!canEdit) return;
-                  if (!confirm("Delete this job?")) return;
-                  deleteJob.mutate(j.id);
-                }}
+                className="h-10"
+                onClick={() => setDraft(null)}
                 disabled={!canEdit}
               >
-                <Trash2 size={14} />
+                Cancel
               </Button>
             </div>
           </div>
-        );
-      })}
-
-      {draft ? (
-        <div className={cn(jobRowClass, "border-dashed")}>
-          <div className="shrink-0 w-28 min-w-28 sm:w-36 sm:min-w-36">
-            <Label className={scheduleFieldLabelClass}>Title</Label>
-            <Input
-              value={draft.title}
-              onChange={(e) => setDraft((d) => (d ? { ...d, title: e.target.value } : d))}
-              className="bg-white/5 border-white/10 text-white h-10 w-full"
-              disabled={!canEdit}
-            />
-          </div>
-          <div className="shrink-0">
-            <DatetimeScheduleFields
-              startValue={draft.startValue}
-              endValue={draft.endValue}
-              onStartChange={(v) => setDraft((d) => (d ? { ...d, startValue: v } : d))}
-              onEndChange={(v) => setDraft((d) => (d ? { ...d, endValue: v } : d))}
-              className={!canEdit ? "pointer-events-none opacity-70" : undefined}
-            />
-          </div>
-          <div className="shrink-0">
-            <Label className={scheduleFieldLabelClass}>Venue</Label>
-            <Select
-              value={draft.venueId}
-              onValueChange={(venueId) => setDraft((d) => (d ? { ...d, venueId } : d))}
-              disabled={!canEdit}
-            >
-              <SelectTrigger className={selectTriggerClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                {(venues ?? []).map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <JobPeopleSlotsDraft
+          <JobPeopleSlotsDraftRow
             peopleNeeded={draft.peopleNeeded}
             slotPersonIds={draft.slotPersonIds}
             roster={people ?? []}
             disabled={!canEdit || createJob.isPending}
-            onPeopleNeededChange={(peopleNeeded, slotPersonIds) =>
-              setDraft((d) => (d ? { ...d, peopleNeeded, slotPersonIds } : d))
-            }
             onSlotChange={(slotPersonIds) => setDraft((d) => (d ? { ...d, slotPersonIds } : d))}
           />
-          <div className="flex shrink-0 items-center gap-1 self-end pb-[2px]">
-            <Button
-              type="button"
-              size="sm"
-              className="h-10 bg-red-900 hover:bg-red-800"
-              onClick={saveDraft}
-              disabled={!canEdit || createJob.isPending}
-            >
-              Save
-            </Button>
-            <Button type="button" size="sm" variant="ghost" className="h-10" onClick={() => setDraft(null)} disabled={!canEdit}>
-              Cancel
-            </Button>
-          </div>
         </div>
       ) : null}
     </div>
