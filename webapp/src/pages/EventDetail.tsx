@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useNavigate, useMatch, useSearchParams } from "react-router-dom";
+import { Link, useParams, useNavigate, useMatch, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -14,6 +14,7 @@ import {
   Plus,
   X,
   Download,
+  ExternalLink,
   Upload,
 } from "lucide-react";
 import { api, isApiError } from "@/lib/api";
@@ -65,8 +66,6 @@ import {
   computeShowStaffingStats,
   computeStaffingOkByDepartmentFromJobs,
   departmentStaffingBorderClass,
-  formatJobAssigneesLabel,
-  sortEventShowJobs,
 } from "@/lib/eventShowStaffing";
 import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
 import { Button } from "@/components/ui/button";
@@ -2026,7 +2025,7 @@ function ShowStaffingSections({
 function ShowEventCard({
   eventId,
   show,
-  showIndex,
+  showIndex: _showIndex,
   eventTeams,
   venues,
   people,
@@ -2052,7 +2051,7 @@ function ShowEventCard({
   const jobInThisShow = Boolean(
     scrollToJobId && (show.jobs ?? []).some((j) => j.id === scrollToJobId)
   );
-  const [cardOpen, setCardOpen] = useState(showIndex === 0 || Boolean(preferOpen) || jobInThisShow);
+  const [cardOpen, setCardOpen] = useState(Boolean(preferOpen) || jobInThisShow);
 
   useEffect(() => {
     if (preferOpen || jobInThisShow) setCardOpen(true);
@@ -2111,7 +2110,8 @@ function ShowEventCard({
   const staffingLabel =
     stats.total > 0 ? `${stats.ok}/${stats.total} teams OK` : "No event teams";
   const hoursLabel = stats.jobHours >= 10 ? stats.jobHours.toFixed(1) : stats.jobHours.toFixed(2);
-  const sortedJobs = sortEventShowJobs(show.jobs ?? []);
+  const showDeepLink = `/events/${eventId}?tab=shows&show=${encodeURIComponent(show.id)}`;
+  const jobCount = (show.jobs ?? []).length;
 
   return (
     <Collapsible open={cardOpen} onOpenChange={setCardOpen} className="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
@@ -2136,29 +2136,32 @@ function ShowEventCard({
                 </span>
                 <span>{stats.people} people</span>
                 <span>{hoursLabel} h jobs</span>
+                {jobCount > 0 ? (
+                  <span className="text-white/35">
+                    {jobCount} job{jobCount === 1 ? "" : "s"}
+                    {!cardOpen ? " · expand for jobs" : null}
+                  </span>
+                ) : null}
               </p>
-              {sortedJobs.length > 0 ? (
-                <ul className="text-[11px] text-white/40 space-y-0.5 pt-0.5">
-                  {sortedJobs.map((j) => {
-                    const time = (j.startTime ?? "").slice(0, 5);
-                    const title = j.title?.trim() || "Job";
-                    const assignee = formatJobAssigneesLabel(j);
-                    return (
-                      <li key={j.id} className="min-w-0 truncate" title={`${title} · ${assignee}`}>
-                        {time ? <span className="tabular-nums text-white/35">{time}</span> : null}
-                        {time ? " " : null}
-                        <span className="text-white/50">{title}</span>
-                        <span className="text-white/30"> · </span>
-                        <span>{assignee}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
             </div>
           </button>
         </CollapsibleTrigger>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-7 border-white/15 text-white hover:bg-white/10"
+          >
+            <Link
+              to={showDeepLink}
+              className="inline-flex items-center gap-1.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Go to event
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
           <Button
             type="button"
             variant="ghost"
@@ -2186,46 +2189,48 @@ function ShowEventCard({
         </div>
       </div>
 
-      <CollapsibleContent className="p-4 pt-3 space-y-3">
-      <ShowTimeEditor
-        show={show}
-        venues={venues}
-        onUpdate={patch}
-        tickets={{
-          onSaleValue: ticketsOnSaleInput,
-          onSaleChange: setTicketsOnSaleInput,
-          onSaleBlur: () => {
-            const raw = ticketsOnSaleInput.trim();
-            if (raw === "") {
-              patch({ ticketsOnSale: null });
-              return;
-            }
-            const n = Number.parseInt(raw, 10);
-            if (!Number.isFinite(n) || n < 0) {
-              setTicketsOnSaleInput(show.ticketsOnSale != null ? String(show.ticketsOnSale) : "");
-              return;
-            }
-            patch({ ticketsOnSale: n });
-          },
-          soldValue: soldTicketsInput,
-          soldChange: setSoldTicketsInput,
-          soldBlur: () => {
-            const raw = soldTicketsInput.trim();
-            if (raw === "") {
-              patch({ soldTickets: null });
-              return;
-            }
-            const n = Number.parseInt(raw, 10);
-            if (!Number.isFinite(n) || n < 0) {
-              setSoldTicketsInput(show.soldTickets != null ? String(show.soldTickets) : "");
-              return;
-            }
-            patch({ soldTickets: n });
-          },
-          soldRecordedAt: show.soldTicketsRecordedAt,
-        }}
-      />
+      <div className="p-4 pt-3 border-b border-white/[0.06]">
+        <ShowTimeEditor
+          show={show}
+          venues={venues}
+          onUpdate={patch}
+          tickets={{
+            onSaleValue: ticketsOnSaleInput,
+            onSaleChange: setTicketsOnSaleInput,
+            onSaleBlur: () => {
+              const raw = ticketsOnSaleInput.trim();
+              if (raw === "") {
+                patch({ ticketsOnSale: null });
+                return;
+              }
+              const n = Number.parseInt(raw, 10);
+              if (!Number.isFinite(n) || n < 0) {
+                setTicketsOnSaleInput(show.ticketsOnSale != null ? String(show.ticketsOnSale) : "");
+                return;
+              }
+              patch({ ticketsOnSale: n });
+            },
+            soldValue: soldTicketsInput,
+            soldChange: setSoldTicketsInput,
+            soldBlur: () => {
+              const raw = soldTicketsInput.trim();
+              if (raw === "") {
+                patch({ soldTickets: null });
+                return;
+              }
+              const n = Number.parseInt(raw, 10);
+              if (!Number.isFinite(n) || n < 0) {
+                setSoldTicketsInput(show.soldTickets != null ? String(show.soldTickets) : "");
+                return;
+              }
+              patch({ soldTickets: n });
+            },
+            soldRecordedAt: show.soldTicketsRecordedAt,
+          }}
+        />
+      </div>
 
+      <CollapsibleContent className="p-4 pt-3 space-y-3 border-t border-white/[0.06]">
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <FieldLabel>Technical tab notes</FieldLabel>
