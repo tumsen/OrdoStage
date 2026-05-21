@@ -59,6 +59,9 @@ const jobCardBaseClass =
 const jobSettingsRowClass =
   "flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 overflow-x-auto pb-0.5";
 
+const jobTitleFieldClass =
+  "bg-white/5 border-white/10 text-white h-10 w-full py-0 leading-none";
+
 const selectTriggerClass =
   "bg-white/5 border-white/10 text-white h-10 w-[7.5rem] min-w-[7.5rem] sm:w-36 sm:min-w-[9rem]";
 
@@ -253,7 +256,7 @@ export function ShowJobsEditor({
             )}
           >
             <div className={jobSettingsRowClass}>
-              <div className="shrink-0 w-28 min-w-28 sm:w-36 sm:min-w-36">
+              <div className="flex shrink-0 flex-col w-28 min-w-28 sm:w-36 sm:min-w-36">
                 <Label className={scheduleFieldLabelClass}>Title</Label>
                 <Input
                   defaultValue={j.title}
@@ -262,7 +265,7 @@ export function ShowJobsEditor({
                     const v = e.target.value.trim();
                     if (v && v !== j.title) updateJob.mutate({ jobId: j.id, body: { title: v } });
                   }}
-                  className="bg-white/5 border-white/10 text-white h-10 w-full"
+                  className={jobTitleFieldClass}
                   disabled={!canEdit}
                 />
               </div>
@@ -394,12 +397,12 @@ export function ShowJobsEditor({
       {draft ? (
         <div className={cn(jobCardBaseClass, "border-dashed border-white/20")}>
           <div className={jobSettingsRowClass}>
-            <div className="shrink-0 w-28 min-w-28 sm:w-36 sm:min-w-36">
+            <div className="flex shrink-0 flex-col w-28 min-w-28 sm:w-36 sm:min-w-36">
               <Label className={scheduleFieldLabelClass}>Title</Label>
               <Input
                 value={draft.title}
                 onChange={(e) => setDraft((d) => (d ? { ...d, title: e.target.value } : d))}
-                className="bg-white/5 border-white/10 text-white h-10 w-full"
+                className={jobTitleFieldClass}
                 disabled={!canEdit}
               />
             </div>

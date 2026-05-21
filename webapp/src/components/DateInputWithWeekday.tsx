@@ -99,20 +99,25 @@ function DateDisplay({
   value: string;
   weekdayClassName?: string;
 }) {
+  const textSize = weekdayClassName?.includes("text-sm") ? "text-sm" : "text-xs";
   const weekdayClass = cn("shrink-0 whitespace-nowrap", weekdayClassName ?? DEFAULT_WEEKDAY_CLASS);
+  const valueClass = cn(
+    "shrink-0 font-mono tabular-nums tracking-tight text-white/90",
+    textSize
+  );
 
   return (
-    <div className="inline-grid text-xs">
+    <div className={cn("inline-grid", textSize)}>
       <div
         className="col-start-1 row-start-1 flex items-center gap-2 invisible pointer-events-none"
         aria-hidden
       >
         <span className={weekdayClass}>{DATE_INPUT_SIZING_WEEKDAY}</span>
-        <span className={timeNavDateValueClassName}>{DATE_INPUT_SIZING_DATE}</span>
+        <span className={valueClass}>{DATE_INPUT_SIZING_DATE}</span>
       </div>
       <div className="col-start-1 row-start-1 flex items-center gap-2">
         <span className={weekdayClass}>{formatWeekdayOnly(value)}</span>
-        <span className={timeNavDateValueClassName}>{formatDdMmYyyy(value)}</span>
+        <span className={valueClass}>{formatDdMmYyyy(value)}</span>
       </div>
     </div>
   );

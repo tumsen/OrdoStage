@@ -103,7 +103,7 @@ export function formatDdMmYyyy(value: string | null | undefined): string {
 export function isoDatePrefix(value: string | null | undefined): string {
   if (!value) return "";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
-  return m ? m[1]! : "";
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
 }
 
 export function todayIsoDate(): string {

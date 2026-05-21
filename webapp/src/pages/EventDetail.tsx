@@ -42,7 +42,11 @@ import { cn } from "@/lib/utils";
 import type { Department } from "../../../backend/src/types";
 import { formatDate, isoDatePrefix } from "@/lib/dateUtils";
 import { DocumentListThumbnail, LocalFileThumbnail } from "@/components/DocumentListThumbnail";
-import { EventStartDateInput } from "@/components/DateInputWithWeekday";
+import {
+  EventStartDateInput,
+  jobScheduleDateInputClassName,
+  jobScheduleDateWeekdayClassName,
+} from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
@@ -1427,6 +1431,8 @@ function ShowTimeEditor({
             setShowDate(v);
             onUpdate({ showDate: v });
           }}
+          className={jobScheduleDateInputClassName}
+          weekdayClassName={jobScheduleDateWeekdayClassName}
         />
       </div>
       <div>
@@ -2908,6 +2914,8 @@ function ShowsTab({
               <EventStartDateInput
                 value={newShow.showDate}
                 onChange={(v) => setNewShow((s) => mergeNewShowState(s, { showDate: v }))}
+                className={jobScheduleDateInputClassName}
+                weekdayClassName={jobScheduleDateWeekdayClassName}
               />
             </div>
             <div>
