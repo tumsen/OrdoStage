@@ -279,7 +279,8 @@ export function ShowJobsEditor({
             className={cn(
               jobCardBaseClass,
               jobStaffingBorderClass(j),
-              isHighlight && "ring-2 ring-red-500/55 ring-offset-2 ring-offset-[#0c0c12]"
+              isHighlight &&
+                "ring-2 ring-amber-400/70 ring-offset-2 ring-offset-[#0c0c12] shadow-[0_0_0_1px_rgba(251,191,36,0.2)]"
             )}
           >
             <div className={jobSettingsScrollClass}>

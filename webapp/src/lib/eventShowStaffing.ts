@@ -105,6 +105,33 @@ export function departmentStaffingBorderClass(hasJobs: boolean, staffingOk: bool
   return staffingOk ? STAFFING_BORDER_COMPLETE : STAFFING_BORDER_INCOMPLETE;
 }
 
+/** Staffing overview row: all slots filled on the job (ignores schedule conflicts). */
+export function isStaffingRequirementFilled(req: {
+  personIds?: string[];
+  personId?: string | null;
+  peopleNeeded?: number;
+}): boolean {
+  const needed = Math.max(1, Math.min(MAX_JOB_PEOPLE_NEEDED, req.peopleNeeded ?? 1));
+  const filled =
+    req.personIds && req.personIds.length > 0
+      ? req.personIds.length
+      : req.personId
+        ? 1
+        : 0;
+  return filled >= needed;
+}
+
+/** Red when unfilled or overlapping assignments; green when fully staffed and no conflict. */
+export function staffingRequirementBorderClass(req: {
+  personIds?: string[];
+  personId?: string | null;
+  peopleNeeded?: number;
+  hasConflict?: boolean;
+}): string {
+  if (req.hasConflict || !isStaffingRequirementFilled(req)) return STAFFING_BORDER_INCOMPLETE;
+  return STAFFING_BORDER_COMPLETE;
+}
+
 /** Staffing OK per event team when all department jobs are fully assigned (or none). */
 export function computeStaffingOkByDepartmentFromJobs(
   show: EventShow,

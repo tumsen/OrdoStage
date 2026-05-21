@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { isStaffingRequirementFilled, staffingRequirementBorderClass } from "@/lib/eventShowStaffing";
 import { cn } from "@/lib/utils";
 
 type StaffingPerson = {
@@ -35,6 +36,9 @@ type StaffingRequirement = {
   departmentName: string | null;
   personId: string | null;
   personName: string | null;
+  personIds?: string[];
+  personNames?: string[];
+  peopleNeeded?: number;
   actualMinutes: number;
   hasConflict: boolean;
 };
@@ -256,12 +260,8 @@ export default function Staffing() {
                     }
                   }}
                   className={cn(
-                    "rounded-lg border bg-white/[0.03] p-3 cursor-pointer transition hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500/80",
-                    req.hasConflict
-                      ? "border-red-400/40 shadow-[0_0_0_1px_rgba(248,113,113,0.15)]"
-                      : req.personId
-                        ? "border-white/10"
-                        : "border-amber-400/30"
+                    "rounded-lg border bg-white/[0.03] p-3 cursor-pointer transition hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/70",
+                    staffingRequirementBorderClass(req)
                   )}
                 >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -278,14 +278,14 @@ export default function Staffing() {
                             <AlertTriangle className="h-3 w-3" />
                             Conflict
                           </span>
-                        ) : req.personId ? (
+                        ) : isStaffingRequirementFilled(req) ? (
                           <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
                             <CheckCircle2 className="h-3 w-3" />
-                            Assigned
+                            Staffing OK
                           </span>
                         ) : (
-                          <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
-                            Missing
+                          <span className="rounded bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-200">
+                            Needs people
                           </span>
                         )}
                       </div>
