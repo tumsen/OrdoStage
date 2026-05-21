@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, ExternalLink } 
 import { Link } from "react-router-dom";
 
 import { JobPersonSlotsRow } from "@/components/event/JobPeopleFields";
+import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { api } from "@/lib/api";
 import { overlappingPersonIdsForJob, wouldPersonOverlapOnJob } from "@/lib/eventJobConflicts";
@@ -94,72 +95,79 @@ export function StaffingJobCard({
           staffingRequirementBorderClass(req)
         )}
       >
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="flex w-full items-start gap-2 p-3 text-left hover:bg-white/[0.04] rounded-lg"
-          >
-            {open ? (
-              <ChevronDown className="h-4 w-4 text-white/50 shrink-0 mt-0.5" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-white/50 shrink-0 mt-0.5" />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium text-white">{req.title}</p>
-                {req.departmentName ? (
-                  <span
-                    className="rounded px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/55"
-                    style={
-                      req.departmentColor
-                        ? { backgroundColor: `${req.departmentColor}22`, color: req.departmentColor }
-                        : undefined
-                    }
-                  >
-                    {req.departmentName}
-                  </span>
-                ) : null}
-                {req.hasConflict ? (
-                  <span className="inline-flex items-center gap-1 rounded bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-200">
-                    <AlertTriangle className="h-3 w-3" />
-                    Conflict
-                  </span>
-                ) : isStaffingRequirementFilled(req) ? (
-                  <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Staffing OK
-                  </span>
-                ) : (
-                  <span className="rounded bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-200">
-                    Needs people · {filled}/{needed}
-                  </span>
-                )}
+        <div className="flex items-start gap-2 p-3">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-start gap-2 text-left hover:bg-white/[0.04] rounded-md -m-1 p-1"
+            >
+              {open ? (
+                <ChevronDown className="h-4 w-4 text-white/50 shrink-0 mt-0.5" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-white/50 shrink-0 mt-0.5" />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium text-white">{req.title}</p>
+                  {req.departmentName ? (
+                    <span
+                      className="rounded px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/55"
+                      style={
+                        req.departmentColor
+                          ? { backgroundColor: `${req.departmentColor}22`, color: req.departmentColor }
+                          : undefined
+                      }
+                    >
+                      {req.departmentName}
+                    </span>
+                  ) : null}
+                  {req.hasConflict ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-200">
+                      <AlertTriangle className="h-3 w-3" />
+                      Conflict
+                    </span>
+                  ) : isStaffingRequirementFilled(req) ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Staffing OK
+                    </span>
+                  ) : (
+                    <span className="rounded bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-200">
+                      Needs people · {filled}/{needed}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-white/45">
+                  {req.eventTitle} · {format(parseISO(req.startsAt), "EEE d MMM HH:mm")}–
+                  {format(parseISO(req.endsAt), "HH:mm")} · {req.venueName}
+                </p>
+                <p className="mt-0.5 text-xs text-white/40">
+                  Planned {hours(req.durationMinutes)} · {needed} needed
+                  {!open ? " · expand to assign" : null}
+                </p>
               </div>
-              <p className="mt-1 text-xs text-white/45">
-                {req.eventTitle} · {format(parseISO(req.startsAt), "EEE d MMM HH:mm")}–
-                {format(parseISO(req.endsAt), "HH:mm")} · {req.venueName}
-              </p>
-              <p className="mt-0.5 text-xs text-white/40">
-                Planned {hours(req.durationMinutes)} · {needed} needed
-                {!open ? " · expand to assign" : null}
-              </p>
-            </div>
-          </button>
-        </CollapsibleTrigger>
+            </button>
+          </CollapsibleTrigger>
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="shrink-0 border-white/15 text-white hover:bg-white/10"
+          >
+            <Link
+              to={eventJobUrl}
+              className="inline-flex items-center gap-1.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Go to job
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
 
         <CollapsibleContent>
           <div className="border-t border-white/[0.06] px-3 pb-3 pt-2 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] text-white/40">Assign people for this job</p>
-              <Link
-                to={eventJobUrl}
-                className="inline-flex items-center gap-1 text-[11px] text-white/55 hover:text-white"
-                onClick={(e) => e.stopPropagation()}
-              >
-                Open in event
-                <ExternalLink className="h-3 w-3" />
-              </Link>
-            </div>
+            <p className="text-[11px] text-white/40">Assign people for this job</p>
             <JobPersonSlotsRow
               peopleNeeded={needed}
               slotPersonIds={slots}
