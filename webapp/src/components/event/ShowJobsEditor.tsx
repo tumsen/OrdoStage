@@ -57,10 +57,11 @@ function rangeToJobBody(startValue: string, endValue: string) {
 type VenueOpt = { id: string; name: string };
 
 const jobCardBaseClass =
-  "w-full min-w-0 rounded-lg border bg-white/[0.03] pl-4 pr-3 py-2.5 space-y-0";
+  "w-full min-w-0 rounded-lg border bg-white/[0.03] pl-5 pr-3 py-2.5 space-y-0";
 
+/** Left padding keeps the first field’s focus ring from clipping in overflow-x-auto. */
 const jobSettingsScrollClass =
-  "min-w-0 overflow-x-auto overflow-y-visible py-0.5 pr-0.5";
+  "min-w-0 overflow-x-auto overflow-y-visible py-0.5 pl-1.5 pr-0.5";
 
 const jobSettingsRowClass =
   "flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 pb-3";
