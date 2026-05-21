@@ -9,7 +9,10 @@ import {
 } from "@/components/DateInputWithWeekday";
 import { JobNeededControl, JobPeopleAssignees } from "@/components/event/JobPeopleAssignees";
 import { JobNeededDraft, JobPeopleSlotsDraftRow } from "@/components/event/JobPeopleSlotsDraft";
-import { scheduleFieldLabelClass } from "@/components/ScheduleTimeRow";
+import {
+  jobEditorFieldFocusClass,
+  scheduleFieldLabelClass,
+} from "@/components/ScheduleTimeRow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,13 +57,33 @@ function rangeToJobBody(startValue: string, endValue: string) {
 type VenueOpt = { id: string; name: string };
 
 const jobCardBaseClass =
-  "w-full min-w-0 rounded-lg border bg-white/[0.03] p-2 space-y-0";
+  "w-full min-w-0 rounded-lg border bg-white/[0.03] pl-4 pr-3 py-2.5 space-y-0";
+
+const jobSettingsScrollClass =
+  "min-w-0 overflow-x-auto overflow-y-visible py-0.5 pr-0.5";
 
 const jobSettingsRowClass =
-  "flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 overflow-x-auto pb-0.5";
+  "flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 pb-3";
 
-const jobTitleFieldClass =
-  "bg-white/5 border-white/10 text-white h-10 w-full py-0 leading-none";
+const jobFieldCellClass = "flex shrink-0 flex-col";
+
+const jobTitleCellClass = "w-[7.5rem] min-w-[7.5rem] sm:w-36 sm:min-w-[9rem]";
+
+const jobTitleFieldClass = cn(
+  "block h-10 min-h-10 w-full rounded-md border bg-white/5 border-white/10 px-3 text-sm text-white",
+  "py-0 leading-10 shadow-none",
+  jobEditorFieldFocusClass
+);
+
+function JobEditorFieldCell({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return <div className={cn(jobFieldCellClass, className)}>{children}</div>;
+}
 
 const selectTriggerClass =
   "bg-white/5 border-white/10 text-white h-10 w-[7.5rem] min-w-[7.5rem] sm:w-36 sm:min-w-[9rem]";
@@ -255,8 +278,9 @@ export function ShowJobsEditor({
               isHighlight && "ring-2 ring-red-500/55 ring-offset-2 ring-offset-[#0c0c12]"
             )}
           >
-            <div className={jobSettingsRowClass}>
-              <div className="flex shrink-0 flex-col w-28 min-w-28 sm:w-36 sm:min-w-36">
+            <div className={jobSettingsScrollClass}>
+              <div className={jobSettingsRowClass}>
+              <JobEditorFieldCell className={jobTitleCellClass}>
                 <Label className={scheduleFieldLabelClass}>Title</Label>
                 <Input
                   defaultValue={j.title}
@@ -268,8 +292,8 @@ export function ShowJobsEditor({
                   className={jobTitleFieldClass}
                   disabled={!canEdit}
                 />
-              </div>
-              <div className="shrink-0">
+              </JobEditorFieldCell>
+              <JobEditorFieldCell>
                 <DatetimeScheduleFields
                   {...scheduleDateProps}
                   startValue={w.startValue}
@@ -321,10 +345,13 @@ export function ShowJobsEditor({
                       );
                     }
                   }}
-                  className={!canEdit ? "pointer-events-none opacity-70" : undefined}
+                  className={cn(
+                    "!overflow-visible pb-0",
+                    !canEdit && "pointer-events-none opacity-70"
+                  )}
                 />
-              </div>
-              <div className="shrink-0">
+              </JobEditorFieldCell>
+              <JobEditorFieldCell>
                 <Label className={scheduleFieldLabelClass}>Venue</Label>
                 <Select
                   value={j.venueId}
@@ -342,7 +369,7 @@ export function ShowJobsEditor({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </JobEditorFieldCell>
               <JobNeededControl
                 eventId={eventId}
                 showId={show.id}
@@ -380,6 +407,7 @@ export function ShowJobsEditor({
                   <Trash2 size={14} />
                 </Button>
               </div>
+              </div>
             </div>
             <JobPeopleAssignees
               eventId={eventId}
@@ -396,8 +424,9 @@ export function ShowJobsEditor({
 
       {draft ? (
         <div className={cn(jobCardBaseClass, "border-dashed border-white/20")}>
-          <div className={jobSettingsRowClass}>
-            <div className="flex shrink-0 flex-col w-28 min-w-28 sm:w-36 sm:min-w-36">
+          <div className={jobSettingsScrollClass}>
+            <div className={jobSettingsRowClass}>
+            <JobEditorFieldCell className={jobTitleCellClass}>
               <Label className={scheduleFieldLabelClass}>Title</Label>
               <Input
                 value={draft.title}
@@ -405,18 +434,21 @@ export function ShowJobsEditor({
                 className={jobTitleFieldClass}
                 disabled={!canEdit}
               />
-            </div>
-            <div className="shrink-0">
+            </JobEditorFieldCell>
+            <JobEditorFieldCell>
               <DatetimeScheduleFields
                 {...scheduleDateProps}
                 startValue={draft.startValue}
                 endValue={draft.endValue}
                 onStartChange={(v) => setDraft((d) => (d ? { ...d, startValue: v } : d))}
                 onEndChange={(v) => setDraft((d) => (d ? { ...d, endValue: v } : d))}
-                className={!canEdit ? "pointer-events-none opacity-70" : undefined}
+                className={cn(
+                  "!overflow-visible pb-0",
+                  !canEdit && "pointer-events-none opacity-70"
+                )}
               />
-            </div>
-            <div className="shrink-0">
+            </JobEditorFieldCell>
+            <JobEditorFieldCell>
               <Label className={scheduleFieldLabelClass}>Venue</Label>
               <Select
                 value={draft.venueId}
@@ -434,7 +466,7 @@ export function ShowJobsEditor({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </JobEditorFieldCell>
             <JobNeededDraft
               peopleNeeded={draft.peopleNeeded}
               slotPersonIds={draft.slotPersonIds}
@@ -463,6 +495,7 @@ export function ShowJobsEditor({
               >
                 Cancel
               </Button>
+            </div>
             </div>
           </div>
           <JobPeopleSlotsDraftRow

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { scheduleFieldLabelClass } from "@/components/ScheduleTimeRow";
+import { jobEditorFieldFocusClass, scheduleFieldLabelClass } from "@/components/ScheduleTimeRow";
 import { JobPersonSlotPicker } from "@/components/event/JobPersonSlotPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,7 +68,11 @@ export function JobNeededField({
             (e.target as HTMLInputElement).blur();
           }
         }}
-        className="bg-white/5 border-white/10 text-white h-10 tabular-nums px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        className={cn(
+          "block h-10 min-h-10 bg-white/5 border-white/10 text-white text-sm tabular-nums px-2 py-0 leading-none",
+          jobEditorFieldFocusClass,
+          "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        )}
         disabled={disabled}
         title={`${filled} of ${value} people · enter 1–${MAX_JOB_PEOPLE_NEEDED}`}
         aria-label={`People needed, ${filled} of ${value} assigned`}
@@ -102,7 +106,7 @@ export function JobPersonSlotsRow({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-end gap-x-2 gap-y-2 mt-3 pt-4 border-t border-white/[0.06] -mx-0.5 px-0.5",
+        "flex flex-wrap items-end gap-x-2 gap-y-2 mt-1 pt-5 border-t border-white/[0.06]",
         className
       )}
     >
