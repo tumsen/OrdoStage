@@ -61,6 +61,30 @@ export function parseStaffingOkMap(raw: unknown): Record<string, boolean> {
   return out;
 }
 
+/** Resize slot list when peopleNeeded changes; lists assignees dropped past the new cap. */
+export function slotsAfterPeopleNeededChange(
+  currentSlots: (string | null)[],
+  newNeeded: number
+): { slotPersonIds: (string | null)[]; removedAssigneeIds: string[] } {
+  const capped = Math.max(MIN_JOB_PEOPLE_NEEDED, Math.min(MAX_JOB_PEOPLE_NEEDED, newNeeded));
+  const slotPersonIds = Array.from({ length: capped }, (_, i) => currentSlots[i] ?? null);
+  const removedAssigneeIds = currentSlots
+    .slice(capped)
+    .filter((id): id is string => Boolean(id));
+  return { slotPersonIds, removedAssigneeIds };
+}
+
+export function confirmRemoveAssigneesOnNeededReduction(
+  fromNeeded: number,
+  toNeeded: number,
+  removedCount: number
+): boolean {
+  const plural = removedCount === 1 ? "" : "s";
+  return window.confirm(
+    `Reduce people needed from ${fromNeeded} to ${toNeeded}? This will remove ${removedCount} assigned person${plural}.`
+  );
+}
+
 export function isJobFullyAssigned(job: EventShowJob): boolean {
   const needed = jobPeopleNeeded(job);
   const filled = jobSlotPersonIds(job).filter(Boolean).length;

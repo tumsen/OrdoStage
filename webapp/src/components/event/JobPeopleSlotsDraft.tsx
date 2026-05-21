@@ -1,4 +1,8 @@
 import { JobNeededField, JobPersonSlotsRow, parseJobPeopleNeededInput } from "@/components/event/JobPeopleFields";
+import {
+  confirmRemoveAssigneesOnNeededReduction,
+  slotsAfterPeopleNeededChange,
+} from "@/lib/eventShowStaffing";
 import type { Person } from "@/lib/types";
 
 export function JobNeededDraft({
@@ -14,7 +18,16 @@ export function JobNeededDraft({
 }) {
   const changeNeeded = (n: number) => {
     const capped = parseJobPeopleNeededInput(String(n), peopleNeeded);
-    const nextSlots: (string | null)[] = Array.from({ length: capped }, (_, i) => slotPersonIds[i] ?? null);
+    if (capped === peopleNeeded) return;
+    const { slotPersonIds: nextSlots, removedAssigneeIds } = slotsAfterPeopleNeededChange(
+      slotPersonIds,
+      capped
+    );
+    if (removedAssigneeIds.length > 0) {
+      if (!confirmRemoveAssigneesOnNeededReduction(peopleNeeded, capped, removedAssigneeIds.length)) {
+        return;
+      }
+    }
     onPeopleNeededChange(capped, nextSlots);
   };
 
@@ -23,7 +36,7 @@ export function JobNeededDraft({
       value={peopleNeeded}
       filled={slotPersonIds.filter(Boolean).length}
       disabled={disabled}
-      onChange={changeNeeded}
+      onChange={(n) => changeNeeded(n)}
     />
   );
 }

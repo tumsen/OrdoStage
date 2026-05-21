@@ -1,10 +1,15 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { JobNeededField, JobPersonSlotsRow } from "@/components/event/JobPeopleFields";
 import { api } from "@/lib/api";
 import { overlappingPersonIdsForJob, wouldPersonOverlapOnJob } from "@/lib/eventJobConflicts";
-import { jobPeopleNeeded, jobSlotPersonIds } from "@/lib/eventShowStaffing";
+import {
+  confirmRemoveAssigneesOnNeededReduction,
+  jobPeopleNeeded,
+  jobSlotPersonIds,
+  slotsAfterPeopleNeededChange,
+} from "@/lib/eventShowStaffing";
 import { toast } from "@/hooks/use-toast";
 import type { EventShow, EventShowJob, Person } from "@/lib/types";
 
@@ -22,6 +27,7 @@ export function JobNeededControl({
   canEdit: boolean;
   onChanged: () => void;
 }) {
+  const queryClient = useQueryClient();
   const needed = jobPeopleNeeded(job);
   const slots = jobSlotPersonIds(job);
 
@@ -31,9 +37,28 @@ export function JobNeededControl({
     onSuccess: onChanged,
   });
 
-  const changeNeeded = (n: number) => {
-    const nextSlots: (string | null)[] = Array.from({ length: n }, (_, i) => slots[i] ?? null);
-    updateJob.mutate({ peopleNeeded: n, slotPersonIds: nextSlots });
+  const changeNeeded = (n: number, options?: { viaEnter?: boolean }) => {
+    if (n === needed) {
+      if (options?.viaEnter) {
+        void queryClient.refetchQueries({ queryKey: ["event", eventId] });
+      }
+      return;
+    }
+    const { slotPersonIds: nextSlots, removedAssigneeIds } = slotsAfterPeopleNeededChange(slots, n);
+    if (removedAssigneeIds.length > 0) {
+      if (!confirmRemoveAssigneesOnNeededReduction(needed, n, removedAssigneeIds.length)) return;
+    }
+    updateJob.mutate(
+      { peopleNeeded: n, slotPersonIds: nextSlots },
+      {
+        onSuccess: () => {
+          onChanged();
+          if (options?.viaEnter) {
+            void queryClient.refetchQueries({ queryKey: ["event", eventId] });
+          }
+        },
+      }
+    );
   };
 
   return (

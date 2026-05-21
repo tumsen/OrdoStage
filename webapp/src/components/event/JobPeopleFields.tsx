@@ -31,7 +31,7 @@ export function JobNeededField({
   value: number;
   filled: number;
   disabled?: boolean;
-  onChange: (n: number) => void;
+  onChange: (n: number, options?: { viaEnter?: boolean }) => void;
   className?: string;
 }) {
   const [text, setText] = useState(String(value));
@@ -40,10 +40,11 @@ export function JobNeededField({
     setText(String(value));
   }, [value]);
 
-  const commit = (raw: string) => {
+  const commit = (raw: string, viaEnter?: boolean) => {
     const n = parseJobPeopleNeededInput(raw, value || MIN_JOB_PEOPLE_NEEDED);
     setText(String(n));
-    if (n !== value) onChange(n);
+    if (n !== value) onChange(n, { viaEnter });
+    else if (viaEnter) onChange(n, { viaEnter });
   };
 
   return (
@@ -59,11 +60,11 @@ export function JobNeededField({
           const digits = e.target.value.replace(/\D/g, "").slice(0, 2);
           setText(digits);
         }}
-        onBlur={() => commit(text)}
+        onBlur={() => commit(text, false)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            commit(text);
+            commit(text, true);
             (e.target as HTMLInputElement).blur();
           }
         }}
@@ -101,7 +102,7 @@ export function JobPersonSlotsRow({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-end gap-x-2 gap-y-2 pt-2 border-t border-white/[0.06] -mx-0.5 px-0.5",
+        "flex flex-wrap items-end gap-x-2 gap-y-2 mt-3 pt-4 border-t border-white/[0.06] -mx-0.5 px-0.5",
         className
       )}
     >
