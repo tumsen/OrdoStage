@@ -1,79 +1,18 @@
 import { useMemo } from "react";
-import { Check } from "lucide-react";
+import { AlertTriangle, Check } from "lucide-react";
 
-import { computeShowTeamStaffingRows, type ShowTeamStaffingRow } from "@/lib/eventShowStaffing";
+import { computeShowStaffingStats, computeShowTeamStaffingRows } from "@/lib/eventShowStaffing";
 import type { EventShow, EventTeam } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-function TeamNameChip({
-  row,
-  variant,
-  muted,
-}: {
-  row: ShowTeamStaffingRow;
-  variant: "ok" | "incomplete" | "no_jobs";
-  muted?: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded px-1 py-px max-w-full",
-        variant === "ok" && (muted ? "text-emerald-400/50" : "text-emerald-300/95"),
-        variant === "incomplete" && (muted ? "text-amber-400/45" : "text-amber-300/95"),
-        variant === "no_jobs" && (muted ? "text-white/25" : "text-white/40")
-      )}
-      title={row.name}
-    >
-      {row.color ? (
-        <span
-          className="h-1.5 w-1.5 rounded-full shrink-0"
-          style={{ backgroundColor: row.color }}
-          aria-hidden
-        />
-      ) : null}
-      <span className="truncate">{row.name}</span>
-    </span>
-  );
-}
-
-function StaffingGroup({
-  label,
-  rows,
-  variant,
-  muted,
-  showCheck,
-}: {
-  label: string;
-  rows: ShowTeamStaffingRow[];
-  variant: "ok" | "incomplete" | "no_jobs";
-  muted?: boolean;
-  showCheck?: boolean;
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
-      <span
-        className={cn(
-          "text-[10px] uppercase tracking-wide shrink-0",
-          variant === "ok" && (muted ? "text-emerald-400/45" : "text-emerald-400/75"),
-          variant === "incomplete" && (muted ? "text-amber-400/45" : "text-amber-400/75"),
-          variant === "no_jobs" && "text-white/30"
-        )}
-      >
-        {showCheck ? (
-          <span className="inline-flex items-center gap-0.5 normal-case tracking-normal">
-            <Check size={10} className="shrink-0" aria-hidden />
-            {label}
-          </span>
-        ) : (
-          label
-        )}
-      </span>
-      {rows.map((row) => (
-        <TeamNameChip key={row.teamId} row={row} variant={variant} muted={muted} />
-      ))}
-    </div>
-  );
+function teamStaffingTooltip(rows: ReturnType<typeof computeShowTeamStaffingRows>): string {
+  return rows
+    .map((r) => {
+      const status =
+        r.state === "ok" ? "staffing OK" : r.state === "incomplete" ? "needs staff" : "no jobs";
+      return `${r.name}: ${status}`;
+    })
+    .join(" · ");
 }
 
 export function ShowTeamStaffingSummary({
@@ -88,33 +27,43 @@ export function ShowTeamStaffingSummary({
   className?: string;
 }) {
   const rows = useMemo(() => computeShowTeamStaffingRows(show, teams), [show, teams]);
-  const ok = rows.filter((r) => r.state === "ok");
-  const incomplete = rows.filter((r) => r.state === "incomplete");
-  const noJobs = rows.filter((r) => r.state === "no_jobs");
+  const { ok, total } = useMemo(() => computeShowStaffingStats(show, teams), [show, teams]);
 
-  if (rows.length === 0) {
-    return <span className={cn("text-white/35", muted && "text-white/25", className)}>No teams</span>;
+  if (total === 0) {
+    return <span className={cn("text-[10px] text-white/35", muted && "text-white/25", className)}>No teams</span>;
   }
 
-  const fullyStaffed = incomplete.length === 0 && ok.length > 0 && noJobs.length === 0;
+  const allOk = ok === total;
 
   return (
-    <div className={cn("flex flex-col gap-1 min-w-0", className)} title={rows.map((r) => `${r.name}: ${r.state}`).join(", ")}>
-      {fullyStaffed ? (
-        <StaffingGroup label="Staffing OK" rows={ok} variant="ok" muted={muted} showCheck />
+    <span
+      className={cn("inline-flex items-center gap-1 min-w-0", className)}
+      title={teamStaffingTooltip(rows)}
+    >
+      <span className={cn("text-[10px] text-white/45 shrink-0", muted && "text-white/30")}>
+        Team Staffing
+      </span>
+      {allOk ? (
+        <Check
+          size={12}
+          className={cn("shrink-0 text-emerald-400", muted && "text-emerald-400/50")}
+          aria-hidden
+        />
       ) : (
-        <>
-          <StaffingGroup
-            label="OK"
-            rows={ok}
-            variant="ok"
-            muted={muted}
-            showCheck={incomplete.length === 0 && ok.length > 0}
-          />
-          <StaffingGroup label="Needs staff" rows={incomplete} variant="incomplete" muted={muted} />
-          <StaffingGroup label="No jobs" rows={noJobs} variant="no_jobs" muted={muted} />
-        </>
+        <AlertTriangle
+          size={12}
+          className={cn("shrink-0 text-amber-400", muted && "text-amber-400/50")}
+          aria-hidden
+        />
       )}
-    </div>
+      <span
+        className={cn(
+          "tabular-nums text-[10px] font-medium shrink-0",
+          allOk ? (muted ? "text-emerald-400/55" : "text-emerald-300/95") : muted ? "text-amber-400/55" : "text-amber-300/95"
+        )}
+      >
+        {ok}/{total}
+      </span>
+    </span>
   );
 }
