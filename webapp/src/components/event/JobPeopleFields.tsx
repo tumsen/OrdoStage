@@ -81,6 +81,7 @@ export function JobPersonSlotsRow({
   peopleNeeded,
   slotPersonIds,
   roster,
+  overlapBusy,
   disabled,
   onSlotChange,
   className,
@@ -88,12 +89,14 @@ export function JobPersonSlotsRow({
   peopleNeeded: number;
   slotPersonIds: (string | null)[];
   roster: Person[];
+  overlapBusy?: Set<string>;
   disabled?: boolean;
   onSlotChange: (slotIndex: number, personId: string | null) => void;
   className?: string;
 }) {
   const filled = slotPersonIds.filter(Boolean).length;
   const slots = Math.max(MIN_JOB_PEOPLE_NEEDED, peopleNeeded);
+  const busy = overlapBusy ?? new Set<string>();
 
   return (
     <div
@@ -113,6 +116,7 @@ export function JobPersonSlotsRow({
             value={slotPersonIds[slotIndex] ?? null}
             roster={roster}
             takenElsewhere={takenElsewhere}
+            overlapBusy={busy}
             disabled={disabled}
             onChange={(personId) => onSlotChange(slotIndex, personId)}
           />

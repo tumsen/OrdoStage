@@ -32,12 +32,14 @@ export function JobPeopleSlotsDraftRow({
   peopleNeeded,
   slotPersonIds,
   roster,
+  overlapBusy,
   disabled,
   onSlotChange,
 }: {
   peopleNeeded: number;
   slotPersonIds: (string | null)[];
   roster: Person[];
+  overlapBusy?: Set<string>;
   disabled?: boolean;
   onSlotChange: (slots: (string | null)[]) => void;
 }) {
@@ -46,6 +48,7 @@ export function JobPeopleSlotsDraftRow({
       peopleNeeded={peopleNeeded}
       slotPersonIds={slotPersonIds}
       roster={roster}
+      overlapBusy={overlapBusy}
       disabled={disabled}
       onSlotChange={(slotIndex, personId) => {
         const next = [...slotPersonIds];

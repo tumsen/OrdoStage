@@ -30,6 +30,8 @@ import {
   setJobSlotPersonIds,
   syncJobToSchedule,
 } from "../lib/eventShowJobAssignees";
+import { JOB_ASSIGNMENT_OVERLAP_MESSAGE } from "../lib/eventShowJobConflicts";
+import { syncShowStaffingOkFromJobs } from "../lib/eventShowStaffingOk";
 
 const eventsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 const prismaAny = prisma as any;
@@ -43,6 +45,15 @@ function assigneeIdsFromJobBody(body: {
   }
   if (body.personId) return [body.personId];
   return [];
+}
+
+function jobAssignmentErrorMessage(e: unknown): string {
+  const msg = e instanceof Error ? e.message : "Invalid assignments";
+  if (msg.includes("duplicate")) return "Same person cannot fill multiple slots";
+  if (msg === JOB_ASSIGNMENT_OVERLAP_MESSAGE || msg.includes("overlapping")) {
+    return JOB_ASSIGNMENT_OVERLAP_MESSAGE;
+  }
+  return msg;
 }
 
 function normalizeStaffingOkByDepartmentJson(json: unknown): Record<string, boolean> | null {
@@ -1760,16 +1771,13 @@ eventsRouter.post(
       }
     } catch (e) {
       await prismaAny.eventShowJob.delete({ where: { id: job.id } });
-      const msg = e instanceof Error ? e.message : "Invalid assignments";
-      if (msg.includes("duplicate")) {
-        return c.json({ error: { message: "Same person cannot fill multiple slots", code: "BAD_REQUEST" } }, 400);
-      }
-      return c.json({ error: { message: msg, code: "BAD_REQUEST" } }, 400);
+      return c.json({ error: { message: jobAssignmentErrorMessage(e), code: "BAD_REQUEST" } }, 400);
     }
     if (body.sortOrder === undefined) {
       await recomputeEventShowJobSortOrders(showId);
     }
     await syncJobToSchedule(job.id);
+    await syncShowStaffingOkFromJobs(showId);
     return c.json({ data: { id: job.id } }, 201);
   }
 );
@@ -1878,17 +1886,14 @@ eventsRouter.put(
         await setJobAssignees(jobId, assigneeIds, user.organizationId);
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Invalid assignments";
-      if (msg.includes("duplicate")) {
-        return c.json({ error: { message: "Same person cannot fill multiple slots", code: "BAD_REQUEST" } }, 400);
-      }
-      return c.json({ error: { message: msg, code: "BAD_REQUEST" } }, 400);
+      return c.json({ error: { message: jobAssignmentErrorMessage(e), code: "BAD_REQUEST" } }, 400);
     }
     const timingChanged = body.jobDate !== undefined || body.startTime !== undefined;
     if (timingChanged && body.sortOrder === undefined) {
       await recomputeEventShowJobSortOrders(showId);
     }
     await syncJobToSchedule(jobId);
+    await syncShowStaffingOkFromJobs(showId);
     return c.json({ data: { ok: true } });
   }
 );
@@ -1936,10 +1941,15 @@ eventsRouter.post(
       },
     });
     if (body.keepPeople) {
-      await copyJobAssignees(source.id, copy.id);
+      try {
+        await copyJobAssignees(source.id, copy.id);
+      } catch (e) {
+        return c.json({ error: { message: jobAssignmentErrorMessage(e), code: "BAD_REQUEST" } }, 400);
+      }
     }
     await recomputeEventShowJobSortOrders(showId);
     await syncJobToSchedule(copy.id);
+    await syncShowStaffingOkFromJobs(showId);
     return c.json({ data: { id: copy.id } }, 201);
   }
 );
@@ -1979,10 +1989,15 @@ eventsRouter.post(
     if (!p) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
     try {
       await addJobAssignee(jobId, body.personId, user.organizationId);
-    } catch {
+    } catch (e) {
+      const msg = jobAssignmentErrorMessage(e);
+      if (msg !== "Person not found" && !msg.includes("not found")) {
+        return c.json({ error: { message: msg, code: "BAD_REQUEST" } }, 400);
+      }
       return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
     }
     await syncJobToSchedule(jobId);
+    await syncShowStaffingOkFromJobs(showId);
     return c.json({ data: { ok: true } }, 201);
   }
 );
@@ -2011,8 +2026,13 @@ eventsRouter.delete("/events/:id/shows/:showId/jobs/:jobId/people/:personId", as
       403
     );
   }
-  await removeJobAssignee(jobId, personId, user.organizationId);
+  try {
+    await removeJobAssignee(jobId, personId, user.organizationId);
+  } catch (e) {
+    return c.json({ error: { message: jobAssignmentErrorMessage(e), code: "BAD_REQUEST" } }, 400);
+  }
   await syncJobToSchedule(jobId);
+  await syncShowStaffingOkFromJobs(showId);
   return new Response(null, { status: 204 });
 });
 
@@ -2043,6 +2063,7 @@ eventsRouter.delete("/events/:id/shows/:showId/jobs/:jobId", async (c) => {
   await removeJobFromSchedule(job.id, user.organizationId);
   await prismaAny.eventShowJob.delete({ where: { id: jobId } });
   await recomputeEventShowJobSortOrders(showId);
+  await syncShowStaffingOkFromJobs(showId);
   return new Response(null, { status: 204 });
 });
 

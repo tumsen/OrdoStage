@@ -1,5 +1,6 @@
 import { prisma } from "../prisma";
 import { wallClockInstantFromDateIsoAndHHMM } from "../clientWallClock";
+import { assertJobAssignmentsNoOverlap } from "./eventShowJobConflicts";
 
 const toDateTimeFromDateAndTime = wallClockInstantFromDateIsoAndHHMM;
 
@@ -67,6 +68,13 @@ export async function setJobSlotPersonIds(
   if (unique.size !== filled.length) throw new Error("duplicate person in slots");
   const ok = await validateOrgPeople(organizationId, filled);
   if (!ok) throw new Error("Person not found");
+
+  const showRow = await prisma.eventShowJob.findUnique({
+    where: { id: jobId },
+    select: { showId: true },
+  });
+  if (!showRow) throw new Error("Job not found");
+  await assertJobAssignmentsNoOverlap(showRow.showId, jobId, slotPersonIds);
 
   await prisma.eventShowJobPerson.deleteMany({ where: { jobId } });
   const rows = slotPersonIds

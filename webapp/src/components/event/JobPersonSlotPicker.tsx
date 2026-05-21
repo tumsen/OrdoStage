@@ -24,6 +24,7 @@ export function JobPersonSlotPicker({
   value,
   roster,
   takenElsewhere,
+  overlapBusy,
   disabled,
   onChange,
 }: {
@@ -31,11 +32,14 @@ export function JobPersonSlotPicker({
   value: string | null;
   roster: Person[];
   takenElsewhere: Set<string>;
+  /** Assigned to another job on this show that overlaps this job's time. */
+  overlapBusy?: Set<string>;
   disabled?: boolean;
   onChange: (personId: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const selected = roster.find((p) => p.id === value);
+  const busy = overlapBusy ?? new Set<string>();
   const options = useMemo(
     () => roster.filter((p) => p.id === value || !takenElsewhere.has(p.id)),
     [roster, value, takenElsewhere]
@@ -83,22 +87,30 @@ export function JobPersonSlotPicker({
                   <Check className={cn("mr-2 h-3.5 w-3.5", value ? "opacity-0" : "opacity-100")} />
                   Unassigned
                 </CommandItem>
-                {options.map((p) => (
-                  <CommandItem
-                    key={p.id}
-                    value={`${p.name} ${p.email ?? ""} ${p.id}`}
-                    onSelect={() => {
-                      onChange(p.id);
-                      setOpen(false);
-                    }}
-                    className="text-white aria-selected:bg-white/10"
-                  >
-                    <Check
-                      className={cn("mr-2 h-3.5 w-3.5", value === p.id ? "opacity-100" : "opacity-0")}
-                    />
-                    <span className="truncate">{p.name}</span>
-                  </CommandItem>
-                ))}
+                {options.map((p) => {
+                  const overlaps = busy.has(p.id) && p.id !== value;
+                  return (
+                    <CommandItem
+                      key={p.id}
+                      value={`${p.name} ${p.email ?? ""} ${p.id}`}
+                      onSelect={() => {
+                        if (overlaps) return;
+                        onChange(p.id);
+                        setOpen(false);
+                      }}
+                      disabled={overlaps}
+                      className={cn(
+                        "text-white aria-selected:bg-white/10",
+                        overlaps && "text-red-400 opacity-100 cursor-not-allowed"
+                      )}
+                    >
+                      <Check
+                        className={cn("mr-2 h-3.5 w-3.5", value === p.id ? "opacity-100" : "opacity-0")}
+                      />
+                      <span className="truncate">{p.name}</span>
+                    </CommandItem>
+                  );
+                })}
               </CommandGroup>
             </CommandList>
           </Command>

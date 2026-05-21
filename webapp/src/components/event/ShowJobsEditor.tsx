@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Copy, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { DatetimeScheduleFields } from "@/components/DatetimeScheduleFields";
 import {
@@ -24,7 +24,10 @@ import {
   parseDatetimeLocal,
   toDatetimeLocalString,
 } from "@/lib/showTiming";
+import { overlappingPersonIdsForJob, wouldPersonOverlapOnJob } from "@/lib/eventJobConflicts";
+import type { JobAssignmentContext } from "@/lib/eventJobConflicts";
 import { sortEventShowJobs } from "@/lib/eventShowStaffing";
+import { toast } from "@/hooks/use-toast";
 import type { EventShow, EventShowJob, Person } from "@/lib/types";
 
 function jobWindow(j: EventShowJob, show: EventShow): { startValue: string; endValue: string } {
@@ -107,10 +110,19 @@ export function ShowJobsEditor({
     void invalidateWorkAnnouncementBar(queryClient);
   };
 
+  const DRAFT_JOB_ID = "__draft__";
+
   const createJob = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       api.post<{ data: { id: string } }>(`/api/events/${eventId}/shows/${show.id}/jobs`, body),
     onSuccess: invalidate,
+    onError: (err: Error) => {
+      toast({
+        title: "Could not create job",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const updateJob = useMutation({
@@ -128,7 +140,7 @@ export function ShowJobsEditor({
     mutationFn: (jobId: string) =>
       api.post<{ data: { id: string } }>(
         `/api/events/${eventId}/shows/${show.id}/jobs/${jobId}/copy`,
-        { keepPeople: true }
+        { keepPeople: false }
       ),
     onSuccess: invalidate,
   });
@@ -150,10 +162,53 @@ export function ShowJobsEditor({
     });
   };
 
+  const draftJob = useMemo((): EventShowJob | null => {
+    if (!draft) return null;
+    const body = rangeToJobBody(draft.startValue, draft.endValue);
+    if (!body) return null;
+    return {
+      id: DRAFT_JOB_ID,
+      showId: show.id,
+      title: draft.title,
+      jobDate: body.jobDate,
+      startTime: body.startTime,
+      durationMinutes: body.durationMinutes,
+      venueId: draft.venueId,
+      departmentId: departmentId ?? null,
+      personId: null,
+      peopleNeeded: draft.peopleNeeded,
+      slotPersonIds: draft.slotPersonIds,
+      sortOrder: 0,
+    } as EventShowJob;
+  }, [draft, show.id, departmentId]);
+
+  const draftAssignmentCtx = useMemo((): JobAssignmentContext | undefined => {
+    if (!draftJob || !draft) return undefined;
+    return {
+      jobs: [...(show.jobs ?? []), draftJob],
+      slotPersonIdsByJobId: { [DRAFT_JOB_ID]: draft.slotPersonIds },
+    };
+  }, [show.jobs, draftJob, draft]);
+
+  const draftOverlapBusy = useMemo(() => {
+    if (!draftJob) return new Set<string>();
+    return overlappingPersonIdsForJob(show, DRAFT_JOB_ID, draftAssignmentCtx);
+  }, [show, draftJob, draftAssignmentCtx]);
+
   const saveDraft = () => {
     if (!draft) return;
     const body = rangeToJobBody(draft.startValue, draft.endValue);
     if (!body) return;
+    for (const pid of draft.slotPersonIds) {
+      if (pid && wouldPersonOverlapOnJob(show, DRAFT_JOB_ID, pid, draftAssignmentCtx)) {
+        toast({
+          title: "Overlapping assignment",
+          description: "Remove people who are already on another job at this time.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     createJob.mutate({
       title: draft.title.trim() || "Job",
       ...body,
@@ -297,7 +352,7 @@ export function ShowJobsEditor({
                   size="icon"
                   variant="ghost"
                   className="h-10 w-10 text-white/40 hover:text-white"
-                  title="Copy job (same time, venue, and people)"
+                  title="Copy job (same time and venue)"
                   onClick={() => {
                     if (!canEdit) return;
                     copyJob.mutate(j.id);
@@ -325,6 +380,7 @@ export function ShowJobsEditor({
             <JobPeopleAssignees
               eventId={eventId}
               showId={show.id}
+              show={show}
               job={j}
               people={people}
               canEdit={canEdit}
@@ -409,8 +465,28 @@ export function ShowJobsEditor({
             peopleNeeded={draft.peopleNeeded}
             slotPersonIds={draft.slotPersonIds}
             roster={people ?? []}
+            overlapBusy={draftOverlapBusy}
             disabled={!canEdit || createJob.isPending}
-            onSlotChange={(slotPersonIds) => setDraft((d) => (d ? { ...d, slotPersonIds } : d))}
+            onSlotChange={(slotPersonIds) => {
+              const changed = slotPersonIds.find(
+                (id, i) => id && id !== (draft.slotPersonIds[i] ?? null)
+              );
+              if (
+                changed &&
+                wouldPersonOverlapOnJob(show, DRAFT_JOB_ID, changed, {
+                  ...draftAssignmentCtx,
+                  slotPersonIdsByJobId: { [DRAFT_JOB_ID]: slotPersonIds },
+                })
+              ) {
+                toast({
+                  title: "Overlapping assignment",
+                  description: "This person is already assigned to another job at the same time.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              setDraft((d) => (d ? { ...d, slotPersonIds } : d));
+            }}
           />
         </div>
       ) : null}

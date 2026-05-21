@@ -59,7 +59,7 @@ import { dateToBookingApiIso, durationMinutesBetween, endTimeFromStartAndDuratio
 import {
   computeEventWorkTotals,
   computeShowStaffingStats,
-  parseStaffingOkMap,
+  computeStaffingOkByDepartmentFromJobs,
   formatJobAssigneesLabel,
   sortEventShowJobs,
 } from "@/lib/eventShowStaffing";
@@ -1924,7 +1924,6 @@ function ShowStaffingSections({
   eventTeams,
   venues,
   people,
-  onPatchShow,
   highlightJobId,
 }: {
   eventId: string;
@@ -1932,7 +1931,6 @@ function ShowStaffingSections({
   eventTeams: EventTeam[];
   venues: { id: string; name: string }[] | undefined;
   people: Person[];
-  onPatchShow: (body: Record<string, unknown>) => void;
   highlightJobId?: string | null;
 }) {
   const queryClient = useQueryClient();
@@ -1955,22 +1953,20 @@ function ShowStaffingSections({
   });
 
   const departments = eventTeams.map((t) => t.team);
-  const staffingOk = parseStaffingOkMap(show.staffingOkByDepartment);
+  const staffingOkByDept = useMemo(
+    () => computeStaffingOkByDepartmentFromJobs(show, eventTeams),
+    [show, eventTeams]
+  );
 
   function setDeptOpen(deptId: string, open: boolean) {
     setOpenDeptIds((prev) => ({ ...prev, [deptId]: open }));
-  }
-
-  function setStaffingOk(deptId: string, ok: boolean) {
-    const next = { ...staffingOk, [deptId]: ok };
-    onPatchShow({ staffingOkByDepartment: next });
   }
 
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3">
       <p className="text-xs uppercase tracking-wide text-white/45">Show staffing</p>
       <p className="text-[11px] text-white/35 -mt-1">
-        One row per event team. Mark <span className="text-white/55">Staffing OK</span> when that department is staffed for this show.
+        One row per event team. <span className="text-white/55">Staffing OK</span> when every job in that department is fully assigned.
       </p>
 
       {departments.length === 0 ? (
@@ -1982,7 +1978,8 @@ function ShowStaffingSections({
             const lead = deptStaffing.find((s) => s.isLead) ?? null;
             const leadValue = lead?.personId ?? "__none__";
             const isOpen = openDeptIds[dept.id] ?? true;
-            const ok = staffingOk[dept.id] ?? false;
+            const ok = staffingOkByDept[dept.id] ?? false;
+            const deptJobCount = (show.jobs ?? []).filter((j) => j.departmentId === dept.id).length;
 
             return (
               <div key={dept.id} className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3">
@@ -1997,19 +1994,18 @@ function ShowStaffingSections({
                       <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: dept.color }} />
                       <span className="text-sm font-medium text-white/85 truncate">{dept.name}</span>
                     </div>
-                    <span className="text-xs text-white/45 shrink-0">
-                      {(show.jobs ?? []).filter((j) => j.departmentId === dept.id).length} jobs
-                    </span>
+                    <span className="text-xs text-white/45 shrink-0">{deptJobCount} jobs</span>
                   </button>
-                  <label className="flex items-center gap-2 text-xs text-white/70 cursor-pointer shrink-0 select-none">
-                    <input
-                      type="checkbox"
-                      className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-emerald-500"
-                      checked={ok}
-                      onChange={(e) => setStaffingOk(dept.id, e.target.checked)}
-                    />
-                    <span className="text-white/55">Staffing OK</span>
-                  </label>
+                  {deptJobCount === 0 ? (
+                    <span className="text-xs text-white/35 shrink-0">No jobs</span>
+                  ) : ok ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-emerald-400 shrink-0">
+                      <Check size={12} className="shrink-0" aria-hidden />
+                      Staffing OK
+                    </span>
+                  ) : (
+                    <span className="text-xs text-amber-400/90 shrink-0">Jobs incomplete</span>
+                  )}
                 </div>
 
                 {isOpen ? (
@@ -2321,7 +2317,6 @@ function ShowEventCard({
         eventTeams={eventTeams}
         venues={venues}
         people={people}
-        onPatchShow={patch}
         highlightJobId={scrollToJobId}
       />
       </CollapsibleContent>

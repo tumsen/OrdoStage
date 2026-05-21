@@ -61,9 +61,29 @@ export function parseStaffingOkMap(raw: unknown): Record<string, boolean> {
   return out;
 }
 
+export function isJobFullyAssigned(job: EventShowJob): boolean {
+  const needed = jobPeopleNeeded(job);
+  const filled = jobSlotPersonIds(job).filter(Boolean).length;
+  return filled >= needed;
+}
+
+/** Staffing OK per event team when all department jobs are fully assigned (or none). */
+export function computeStaffingOkByDepartmentFromJobs(
+  show: EventShow,
+  eventTeams: EventTeam[]
+): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const t of eventTeams) {
+    const deptId = t.team.id;
+    const deptJobs = (show.jobs ?? []).filter((j) => (j.departmentId ?? null) === deptId);
+    out[deptId] = deptJobs.length === 0 || deptJobs.every(isJobFullyAssigned);
+  }
+  return out;
+}
+
 export function computeShowStaffingStats(show: EventShow, eventTeams: EventTeam[]) {
   const teamIds = eventTeams.map((t) => t.team.id);
-  const okMap = parseStaffingOkMap(show.staffingOkByDepartment);
+  const okMap = computeStaffingOkByDepartmentFromJobs(show, eventTeams);
   let ok = 0;
   for (const id of teamIds) {
     if (okMap[id]) ok++;
