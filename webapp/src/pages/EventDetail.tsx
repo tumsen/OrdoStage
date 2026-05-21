@@ -60,6 +60,7 @@ import {
   computeEventWorkTotals,
   computeShowStaffingStats,
   computeStaffingOkByDepartmentFromJobs,
+  departmentStaffingBorderClass,
   formatJobAssigneesLabel,
   sortEventShowJobs,
 } from "@/lib/eventShowStaffing";
@@ -1982,7 +1983,13 @@ function ShowStaffingSections({
             const deptJobCount = (show.jobs ?? []).filter((j) => j.departmentId === dept.id).length;
 
             return (
-              <div key={dept.id} className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3">
+              <div
+                key={dept.id}
+                className={cn(
+                  "rounded-md border bg-white/[0.02] p-3 space-y-3",
+                  departmentStaffingBorderClass(deptJobCount > 0, ok)
+                )}
+              >
                 <div className="flex flex-wrap items-center gap-2 justify-between">
                   <button
                     type="button"

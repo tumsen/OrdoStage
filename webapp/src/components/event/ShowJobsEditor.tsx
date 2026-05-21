@@ -26,7 +26,7 @@ import {
 } from "@/lib/showTiming";
 import { overlappingPersonIdsForJob, wouldPersonOverlapOnJob } from "@/lib/eventJobConflicts";
 import type { JobAssignmentContext } from "@/lib/eventJobConflicts";
-import { sortEventShowJobs } from "@/lib/eventShowStaffing";
+import { jobStaffingBorderClass, sortEventShowJobs } from "@/lib/eventShowStaffing";
 import { toast } from "@/hooks/use-toast";
 import type { EventShow, EventShowJob, Person } from "@/lib/types";
 
@@ -53,8 +53,8 @@ function rangeToJobBody(startValue: string, endValue: string) {
 
 type VenueOpt = { id: string; name: string };
 
-const jobCardClass =
-  "w-full min-w-0 rounded-lg border border-white/10 bg-white/[0.03] p-2 space-y-0";
+const jobCardBaseClass =
+  "w-full min-w-0 rounded-lg border bg-white/[0.03] p-2 space-y-0";
 
 const jobSettingsRowClass =
   "flex flex-nowrap items-end gap-2 sm:gap-3 min-w-0 overflow-x-auto pb-0.5";
@@ -247,7 +247,8 @@ export function ShowJobsEditor({
             key={j.id}
             id={`show-job-${j.id}`}
             className={cn(
-              jobCardClass,
+              jobCardBaseClass,
+              jobStaffingBorderClass(j),
               isHighlight && "ring-2 ring-red-500/55 ring-offset-2 ring-offset-[#0c0c12]"
             )}
           >
@@ -391,7 +392,7 @@ export function ShowJobsEditor({
       })}
 
       {draft ? (
-        <div className={cn(jobCardClass, "border-dashed")}>
+        <div className={cn(jobCardBaseClass, "border-dashed border-white/20")}>
           <div className={jobSettingsRowClass}>
             <div className="shrink-0 w-28 min-w-28 sm:w-36 sm:min-w-36">
               <Label className={scheduleFieldLabelClass}>Title</Label>

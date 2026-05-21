@@ -91,6 +91,20 @@ export function isJobFullyAssigned(job: EventShowJob): boolean {
   return filled >= needed;
 }
 
+export const STAFFING_BORDER_NEUTRAL = "border-white/10";
+export const STAFFING_BORDER_COMPLETE = "border-emerald-500/55";
+export const STAFFING_BORDER_INCOMPLETE = "border-red-500/55";
+
+export function jobStaffingBorderClass(job: EventShowJob): string {
+  return isJobFullyAssigned(job) ? STAFFING_BORDER_COMPLETE : STAFFING_BORDER_INCOMPLETE;
+}
+
+/** Green when all dept jobs filled; red when any job needs people; neutral when no jobs. */
+export function departmentStaffingBorderClass(hasJobs: boolean, staffingOk: boolean): string {
+  if (!hasJobs) return STAFFING_BORDER_NEUTRAL;
+  return staffingOk ? STAFFING_BORDER_COMPLETE : STAFFING_BORDER_INCOMPLETE;
+}
+
 /** Staffing OK per event team when all department jobs are fully assigned (or none). */
 export function computeStaffingOkByDepartmentFromJobs(
   show: EventShow,
