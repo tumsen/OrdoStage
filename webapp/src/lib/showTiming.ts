@@ -37,6 +37,26 @@ export function endTimeFromStartAndDuration(start: string, durationMinutes: numb
   return minutesToTime(s + durationMinutes);
 }
 
+/**
+ * Build `datetime-local` end from start calendar day + wall-clock times.
+ * When end clock is at or before start clock, end is on the **next calendar day**.
+ */
+export function endDatetimeLocalFromStartAndWallEnd(
+  startDate: string,
+  startTime: string,
+  endTime: string
+): string | null {
+  const sm = timeToMinutes(startTime);
+  const em = timeToMinutes(endTime);
+  if (!startDate || sm === null || em === null) return null;
+  const start = buildDatetimeLocal(startDate, normalizeTimeHHMM(startTime) || "00:00");
+  const startMs = new Date(start).getTime();
+  if (!Number.isFinite(startMs)) return null;
+  let dur = em - sm;
+  if (dur <= 0) dur += 24 * 60;
+  return toDatetimeLocalString(new Date(startMs + dur * 60_000));
+}
+
 /** Duration in minutes; if end < start, assumes next day. */
 export function durationMinutesBetween(start: string, end: string): number | null {
   const a = timeToMinutes(start);
@@ -170,9 +190,12 @@ export function durationMinutesBetweenDatetimesUncapped(
   startValue: string,
   endValue: string
 ): number | null {
+  const forward = durationMinutesForwardBetweenDatetimes(startValue, endValue);
+  if (forward != null) return forward;
   const a = new Date(startValue).getTime();
-  const b = new Date(endValue).getTime();
+  let b = new Date(endValue).getTime();
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  if (b <= a) b += 24 * 60 * 60 * 1000;
   const raw = Math.round((b - a) / 60_000);
   return raw > 0 ? raw : null;
 }

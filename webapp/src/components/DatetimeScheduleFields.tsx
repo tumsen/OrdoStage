@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import {
   buildDatetimeLocal,
   durationMinutesForwardBetweenDatetimes,
+  endDatetimeLocalFromStartAndWallEnd,
   parseDatetimeLocal,
   toDatetimeLocalString,
 } from "@/lib/showTiming";
@@ -18,6 +19,7 @@ import { ScheduleTimeRow, scheduleFieldLabelClass } from "./ScheduleTimeRow";
 
 /**
  * Event / booking style: **Date — Start — End — Duration** in one row (local `datetime-local` values).
+ * End time may be earlier on the clock than start (counts toward the next calendar day).
  */
 export function DatetimeScheduleFields({
   startValue,
@@ -48,6 +50,7 @@ export function DatetimeScheduleFields({
   const startT = sd.time;
   const endT = ed.time;
   const hasStartTime = /^\d{2}:\d{2}$/.test(startT);
+  const endSpansNextDay = Boolean(sd.date && ed.date && ed.date > sd.date);
 
   useEffect(() => {
     setLocalDate(parsedDate);
@@ -58,38 +61,44 @@ export function DatetimeScheduleFields({
     return durationMinutesForwardBetweenDatetimes(startValue, endValue) ?? 0;
   }, [startValue, endValue]);
 
+  const applyDurationFromStart = (newStart: string, dur: number) => {
+    const s = new Date(newStart);
+    if (!Number.isFinite(s.getTime()) || dur <= 0) return;
+    onEndChange(toDatetimeLocalString(new Date(s.getTime() + dur * 60_000)));
+  };
+
   const setDate = (d: string) => {
     setLocalDate(d);
-    const dur = durationMin;
     const st = startT || "00:00";
     const newStart = buildDatetimeLocal(d, st);
     onStartChange(newStart);
-    if (dur > 0) {
-      const ns = new Date(newStart);
-      onEndChange(toDatetimeLocalString(new Date(ns.getTime() + dur * 60000)));
-    } else if (endValue) {
-      const ed2 = parseDatetimeLocal(endValue);
-      onEndChange(buildDatetimeLocal(d, ed2.time || "00:00"));
+    if (durationMin > 0) {
+      applyDurationFromStart(newStart, durationMin);
+    } else if (hasStartTime && /^\d{2}:\d{2}$/.test(endT)) {
+      const next = endDatetimeLocalFromStartAndWallEnd(d, st, endT);
+      if (next) onEndChange(next);
     }
   };
 
   const onStartT = (v: string) => {
     const d0 = date || sd.date;
     if (!d0) return;
-    onStartChange(buildDatetimeLocal(d0, v));
+    const newStart = buildDatetimeLocal(d0, v);
+    onStartChange(newStart);
+    if (durationMin > 0) {
+      applyDurationFromStart(newStart, durationMin);
+    } else if (/^\d{2}:\d{2}$/.test(endT)) {
+      const next = endDatetimeLocalFromStartAndWallEnd(d0, v, endT);
+      if (next) onEndChange(next);
+    }
   };
 
   const onEndT = (v: string) => {
     if (!hasStartTime) return;
-    const d0 = ed.date || sd.date;
+    const d0 = date || sd.date;
     if (!d0) return;
-    let end = new Date(buildDatetimeLocal(d0, v));
-    const start = new Date(startValue);
-    if (!Number.isFinite(end.getTime()) || !Number.isFinite(start.getTime())) return;
-    if (end <= start) {
-      end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
-    }
-    onEndChange(toDatetimeLocalString(end));
+    const next = endDatetimeLocalFromStartAndWallEnd(d0, startT, v);
+    if (next) onEndChange(next);
   };
 
   const onDur = (m: number) => {
@@ -126,7 +135,12 @@ export function DatetimeScheduleFields({
         />
       </div>
       <div className="shrink-0">
-        <Label className={scheduleFieldLabelClass}>End</Label>
+        <Label className={scheduleFieldLabelClass}>
+          End
+          {endSpansNextDay ? (
+            <span className="normal-case text-white/40 font-normal tracking-normal"> (next day)</span>
+          ) : null}
+        </Label>
         <SplitTimeInput
           ref={refEn}
           value={endT}

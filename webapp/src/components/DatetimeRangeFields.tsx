@@ -124,7 +124,7 @@ export function DatetimeRangeFields({
         <p className="mt-2 text-[11px] text-white/40 tabular-nums">Duration · {durationHint}</p>
       ) : (
         <p className="mt-2 text-[11px] text-white/35">
-          Set start and end so the end is after the start (end date can differ from start date).
+          Set start and end times. End may be earlier on the clock (next calendar day).
         </p>
       )}
     </div>
