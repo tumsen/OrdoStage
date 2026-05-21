@@ -68,6 +68,7 @@ import {
   departmentStaffingBorderClass,
 } from "@/lib/eventShowStaffing";
 import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
+import { ShowTeamStaffingSummary } from "@/components/event/ShowTeamStaffingSummary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -2107,8 +2108,6 @@ function ShowEventCard({
   );
 
   const summaryLine = formatShowCardSummaryLine(show);
-  const staffingLabel =
-    stats.total > 0 ? `${stats.ok}/${stats.total} teams OK` : "No event teams";
   const hoursLabel = stats.jobHours >= 10 ? stats.jobHours.toFixed(1) : stats.jobHours.toFixed(2);
   const showDeepLink = `/events/${eventId}?tab=shows&show=${encodeURIComponent(show.id)}`;
   const jobCount = (show.jobs ?? []).length;
@@ -2128,12 +2127,6 @@ function ShowEventCard({
                 <p className="text-sm font-medium text-white/90 leading-snug min-w-0">{summaryLine}</p>
               </div>
               <p className="text-[11px] text-white/45 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                <span className="inline-flex items-center gap-1">
-                  {stats.total > 0 && stats.ok === stats.total ? (
-                    <Check size={12} className="text-emerald-400 shrink-0" aria-hidden />
-                  ) : null}
-                  Staffing {staffingLabel}
-                </span>
                 <span>{stats.people} people</span>
                 <span>{hoursLabel} h jobs</span>
                 {jobCount > 0 ? (
@@ -2143,6 +2136,11 @@ function ShowEventCard({
                   </span>
                 ) : null}
               </p>
+              <ShowTeamStaffingSummary
+                show={show}
+                teams={eventTeams}
+                className="text-[10px]"
+              />
             </div>
           </button>
         </CollapsibleTrigger>

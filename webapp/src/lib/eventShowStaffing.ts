@@ -150,6 +150,37 @@ export function computeStaffingOkByDepartmentFromJobs(
   return out;
 }
 
+export type ShowTeamStaffingState = "ok" | "incomplete" | "no_jobs";
+
+export type ShowTeamStaffingRow = {
+  teamId: string;
+  name: string;
+  color: string | null;
+  state: ShowTeamStaffingState;
+};
+
+/** Per event team: staffing OK, jobs still need people, or no jobs in that department. */
+export function computeShowTeamStaffingRows(
+  show: EventShow,
+  eventTeams: EventTeam[]
+): ShowTeamStaffingRow[] {
+  const okMap = computeStaffingOkByDepartmentFromJobs(show, eventTeams);
+  return eventTeams.map((et) => {
+    const teamId = et.team.id;
+    const deptJobs = (show.jobs ?? []).filter((j) => (j.departmentId ?? null) === teamId);
+    let state: ShowTeamStaffingState;
+    if (deptJobs.length === 0) state = "no_jobs";
+    else if (okMap[teamId]) state = "ok";
+    else state = "incomplete";
+    return {
+      teamId,
+      name: et.team.name,
+      color: et.team.color ?? null,
+      state,
+    };
+  });
+}
+
 export function computeShowStaffingStats(show: EventShow, eventTeams: EventTeam[]) {
   const teamIds = eventTeams.map((t) => t.team.id);
   const okMap = computeStaffingOkByDepartmentFromJobs(show, eventTeams);

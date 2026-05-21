@@ -1,5 +1,5 @@
-import { Check } from "lucide-react";
 import { computeShowStaffingStats, formatJobAssigneesLabel, sortEventShowJobs } from "@/lib/eventShowStaffing";
+import { ShowTeamStaffingSummary } from "@/components/event/ShowTeamStaffingSummary";
 import type { EventShow, EventShowJob, EventTeam } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -93,33 +93,6 @@ function formatEventListTicketBits(show: EventShow, locale: string, hour12: bool
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-function EventListStaffingHint({
-  ok,
-  total,
-  muted,
-}: {
-  ok: number;
-  total: number;
-  muted?: boolean;
-}) {
-  if (total === 0) {
-    return <span className={cn("text-white/35", muted && "text-white/25")}>No teams</span>;
-  }
-  if (ok === total) {
-    return (
-      <span
-        className={cn("inline-flex items-center gap-0.5 text-emerald-400", muted && "text-emerald-400/50")}
-      >
-        <Check size={10} className="shrink-0" aria-hidden />
-        Staffing OK
-      </span>
-    );
-  }
-  return (
-    <span className={cn("text-amber-400/90", muted && "text-amber-400/40")}>{ok}/{total} teams OK</span>
-  );
-}
-
 export function EventShowsOverviewGrid({
   shows,
   teams,
@@ -155,7 +128,6 @@ export function EventShowsOverviewGrid({
       <ul className="min-w-[min(100%,42rem)] flex flex-col gap-y-1.5 text-[10px] leading-snug">
         {sorted.map((show) => {
           const stats = computeShowStaffingStats(show, teams);
-          const { ok, total } = stats;
           const showOff = effectiveShowStatus(show) === "cancelled";
           const venueName = show.venue?.name ?? "Venue";
           const ticketBits = formatEventListTicketBits(show, prefsLocale, hour12);
@@ -199,8 +171,8 @@ export function EventShowsOverviewGrid({
                 <span className={cn("min-w-0 truncate pr-2", rowTone, venueTone)} title={venueName}>
                   {venueName}
                 </span>
-                <div className="min-w-0 truncate pr-4">
-                  <EventListStaffingHint ok={ok} total={total} muted={showOff} />
+                <div className="min-w-0 pr-4 self-center">
+                  <ShowTeamStaffingSummary show={show} teams={teams} muted={showOff} />
                 </div>
                 <span
                   className={cn(
