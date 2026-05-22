@@ -398,16 +398,14 @@ function splitGeneralEventFields(fields: EventCustomField[]): {
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
+/** Matches venue edit: label above a single bordered panel on the page background. */
+const DETAIL_FIELD_LABEL_CLASS = "text-white/50 text-xs uppercase tracking-wide";
+const DETAIL_CARD_CLASS =
+  "flex min-h-0 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6";
+
 function SectionHeader({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div
-      className={cn(
-        "text-[10px] text-white/40 uppercase tracking-widest mb-2 mt-4 pb-1.5 border-b border-white/[0.06]",
-        className
-      )}
-    >
-      {children}
-    </div>
+    <Label className={cn(DETAIL_FIELD_LABEL_CLASS, "block", className)}>{children}</Label>
   );
 }
 
@@ -427,8 +425,6 @@ function DetailsTab({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [descriptionOpen, setDescriptionOpen] = useState(true);
-
   const eventId = event?.id ?? null;
   const customFieldsRaw = event?.customFields ?? null;
 
@@ -675,7 +671,7 @@ function DetailsTab({
       <h2 className="text-base font-semibold text-white">{isNew ? "New event" : "Details"}</h2>
       {!isNew && event && (event.shows?.length ?? 0) > 0 ? <EventStaffingOverviewBanner event={event} /> : null}
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-8">
           {/* ── Core fields ── */}
             <FormField
               control={form.control}
@@ -694,7 +690,7 @@ function DetailsTab({
             <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-5">
               <div className="min-w-0 flex flex-col gap-3">
                 <SectionHeader>Company</SectionHeader>
-                <div className="flex min-h-0 flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
+                <div className={cn(DETAIL_CARD_CLASS, "gap-4")}>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <FormField
                       control={form.control}
@@ -731,8 +727,8 @@ function DetailsTab({
                       )}
                     />
                   </div>
-                  <div className="space-y-3 border-t border-white/10 pt-4">
-                    <Label className="text-white/60 text-xs uppercase tracking-wide">Address</Label>
+                  <div className="space-y-3">
+                    <Label className="text-white/45 text-[10px] uppercase tracking-wide">Address</Label>
                     <AddressFields
                     value={{
                       street: form.watch("companyStreet") ?? "",
@@ -753,8 +749,8 @@ function DetailsTab({
                   />
                   </div>
                 </div>
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contract contact</FormLabel>
+                <Label className={DETAIL_FIELD_LABEL_CLASS}>Contract contact</Label>
+                <div className={DETAIL_CARD_CLASS}>
                   <ContactFieldsOneRowNote
                     row={{
                       role: form.watch("primaryContactRole") ?? "",
@@ -772,22 +768,24 @@ function DetailsTab({
                     }}
                     notePlaceholder="Booking lead: availability, preferred channel…"
                   />
-                </FormItem>
+                </div>
                 <FormField
                   control={form.control}
                   name="contractNotes"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contract &amp; booking notes</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          value={field.value ?? ""}
-                          placeholder="Deal terms, references, special clauses…"
-                          className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
-                          rows={3}
-                        />
-                      </FormControl>
+                    <FormItem className="space-y-3">
+                      <FormLabel className={DETAIL_FIELD_LABEL_CLASS}>Contract &amp; booking notes</FormLabel>
+                      <div className={DETAIL_CARD_CLASS}>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            value={field.value ?? ""}
+                            placeholder="Deal terms, references, special clauses…"
+                            className="min-h-[4.5rem] w-full resize-y bg-white/5 border-white/10 text-white text-sm placeholder:text-white/25 focus:border-white/30"
+                            rows={3}
+                          />
+                        </FormControl>
+                      </div>
                     </FormItem>
                   )}
                 />
@@ -798,35 +796,20 @@ function DetailsTab({
                   control={form.control}
                   name="description"
                   render={({ field }) => (
-                    <FormItem className="flex min-h-0 flex-1 flex-col">
-                      <Collapsible open={descriptionOpen} onOpenChange={setDescriptionOpen} className="flex min-h-0 flex-1 flex-col">
-                        <CollapsibleTrigger asChild>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.06]"
-                          >
-                            <span className="text-white/60 text-xs uppercase tracking-wide">Description</span>
-                            <ChevronDown
-                              className={cn(
-                                "h-4 w-4 shrink-0 text-white/45 transition-transform",
-                                descriptionOpen && "rotate-180"
-                              )}
-                            />
-                          </button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="pt-2 flex-1 min-h-0">
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              value={field.value ?? ""}
-                              id="event-description"
-                              className="bg-white/5 border-white/10 text-white focus:border-white/30 resize-y min-h-[200px] md:min-h-[280px] text-sm leading-relaxed"
-                              rows={12}
-                              placeholder="Show summary, audience, notes for the team…"
-                            />
-                          </FormControl>
-                        </CollapsibleContent>
-                      </Collapsible>
+                    <FormItem className="space-y-3">
+                      <FormLabel className={DETAIL_FIELD_LABEL_CLASS}>Description</FormLabel>
+                      <div className={cn(DETAIL_CARD_CLASS, "flex-1")}>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            value={field.value ?? ""}
+                            id="event-description"
+                            className="min-h-[200px] md:min-h-[280px] w-full resize-y bg-white/5 border-white/10 text-white text-sm leading-relaxed placeholder:text-white/25 focus:border-white/30"
+                            rows={12}
+                            placeholder="Show summary, audience, notes for the team…"
+                          />
+                        </FormControl>
+                      </div>
                     </FormItem>
                   )}
                 />
@@ -835,8 +818,8 @@ function DetailsTab({
 
             <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-5">
               <div className="min-w-0 flex flex-col gap-3">
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical contact</FormLabel>
+                <Label className={DETAIL_FIELD_LABEL_CLASS}>Technical contact</Label>
+                <div className={DETAIL_CARD_CLASS}>
                   <ContactFieldsOneRowNote
                     row={{
                       role: form.watch("technicalContactRole") ?? "",
@@ -854,12 +837,12 @@ function DetailsTab({
                     }}
                     notePlaceholder="Technical lead on booker side: channel, rider links…"
                   />
-                </FormItem>
+                </div>
               </div>
 
               <div className="min-w-0 flex flex-col gap-3">
                 <SectionHeader>Technical</SectionHeader>
-            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-3">
+            <div className={cn(DETAIL_CARD_CLASS, "gap-4")}>
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-4 pb-0.5">
                 {(
                   [
@@ -1045,19 +1028,21 @@ function DetailsTab({
               />
             </div>
 
-            <SectionHeader>FOH</SectionHeader>
+            <div className="space-y-3 border-t border-white/10 pt-4">
+            <Label className="text-white/45 text-[10px] uppercase tracking-wide">FOH</Label>
             <FormField
               control={form.control}
               name="fohNotes"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">FOH Notes</FormLabel>
+                <FormItem className="space-y-1.5">
+                  <FormLabel className="text-white/45 text-[10px] uppercase tracking-wide">FOH notes</FormLabel>
                   <FormControl>
                     <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
                   </FormControl>
                 </FormItem>
               )}
             />
+            </div>
             {(form.watch("smokeFx") || form.watch("hazeFx") || form.watch("strobeFx")) ? (
               <p className="text-xs rounded border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-amber-100/95">
                 FOH audience announcement note will be added automatically when saving.
@@ -1066,14 +1051,13 @@ function DetailsTab({
               </div>
             </div>
 
-            <div className="space-y-3 pt-2 border-t border-white/10">
+            <div className="space-y-3">
             <p className="text-xs text-white/40">
               Schedule and duration are per show on the Shows tab. Default venue is for reference; each show can use a different venue.
               Draft / confirmed / cancelled is set on each show, not here.
             </p>
             {!isNew && event ? (
-              <div className="rounded-md border border-white/10 bg-white/[0.02] p-2.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-white/55">Create an editable venue booking based on show timings.</p>
                   <Button
                     type="button"
@@ -1087,7 +1071,6 @@ function DetailsTab({
                     Venue booking
                   </Button>
                 </div>
-              </div>
             ) : null}
             <FormField
               control={form.control}
@@ -1135,6 +1118,7 @@ function DetailsTab({
             ) : null}
 
             <SectionHeader>Production</SectionHeader>
+            <div className={cn(DETAIL_CARD_CLASS, "gap-4")}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormField
               control={form.control}
@@ -1190,11 +1174,12 @@ function DetailsTab({
                 </FormItem>
               )}
             />
+            </div>
 
             <div className="space-y-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] text-white/50 uppercase tracking-wide">Contact persons</p>
+                  <Label className={DETAIL_FIELD_LABEL_CLASS}>Contact persons</Label>
                   <p className="text-xs text-white/40 mt-0.5">
                     Add as many people as you need for this event (e.g. tour manager, agent, production).
                   </p>
@@ -3593,9 +3578,8 @@ export default function EventDetailPage() {
         <ArrowLeft size={14} /> Back to Events
       </Button>
 
-      <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="border-b border-white/10 px-4 sm:px-6 overflow-x-auto">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
+          <div className="border-b border-white/10 overflow-x-auto">
             <TabsList className="bg-transparent h-12 gap-1 p-0 flex-nowrap w-max min-w-full">
               <TabsTrigger
                 value="details"
@@ -3631,7 +3615,7 @@ export default function EventDetailPage() {
             </TabsList>
           </div>
 
-          <div className="p-4 sm:p-6">
+          <div className="pt-4 sm:pt-6">
             <TabsContent value="details" className="mt-0">
               <DetailsTab
                 key={isNew ? "new" : ev!.id}
@@ -3675,7 +3659,6 @@ export default function EventDetailPage() {
             </TabsContent>
           </div>
         </Tabs>
-      </div>
     </div>
   );
 }
