@@ -13,7 +13,7 @@ type Props = {
   notePlaceholder?: string;
 };
 
-/** Role, name, phone, email on one row (responsive) with labels; note textarea below. */
+/** Role + name on first row, phone + email on second; note textarea below. */
 export function ContactFieldsOneRowNote({ row, onChange, notePlaceholder }: Props) {
   const uid = useId();
   const roleId = `${uid}-role`;
@@ -24,7 +24,7 @@ export function ContactFieldsOneRowNote({ row, onChange, notePlaceholder }: Prop
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-2 gap-y-3">
+      <div className="grid grid-cols-2 gap-x-2 gap-y-3">
         <div className="space-y-1.5 min-w-0">
           <Label htmlFor={roleId} className={lbl}>
             Role
