@@ -400,6 +400,8 @@ function splitGeneralEventFields(fields: EventCustomField[]): {
 
 /** Matches venue edit: label above a single bordered panel on the page background. */
 const DETAIL_FIELD_LABEL_CLASS = "text-white/50 text-xs uppercase tracking-wide";
+/** In-card field labels (same as AddressFields / contact rows — not FormLabel defaults). */
+const DETAIL_IN_CARD_FIELD_LABEL_CLASS = "block text-xs font-normal text-white/40 mb-1";
 const DETAIL_CARD_CLASS =
   "flex min-h-0 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6";
 
@@ -697,7 +699,7 @@ function DetailsTab({
                       name="companyLegalName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Legal name</FormLabel>
+                          <FormLabel className={DETAIL_IN_CARD_FIELD_LABEL_CLASS}>Legal name</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -714,7 +716,7 @@ function DetailsTab({
                       name="companyVat"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-white/60 text-xs uppercase tracking-wide">VAT / org number</FormLabel>
+                          <FormLabel className={DETAIL_IN_CARD_FIELD_LABEL_CLASS}>VAT / org number</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
