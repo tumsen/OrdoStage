@@ -342,6 +342,8 @@ export default function Tours() {
                     shows={tour.shows}
                     tourHandsNeeded={tour.handsNeeded}
                     tourPeopleCount={tour.tourPeopleCount}
+                    showColumnHeaders
+                    className="mt-1.5"
                   />
                 </div>
                 <div className="px-5 py-3.5 border-b border-white/5 flex items-center gap-2">

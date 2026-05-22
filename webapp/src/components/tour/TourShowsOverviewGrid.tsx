@@ -156,16 +156,58 @@ function tourListExtraColumn(show: TourShowListRow): string | null {
   return null;
 }
 
+function tourOverviewGridColumns(hour12: boolean): string {
+  return hour12
+    ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content minmax(0,1fr)"
+    : "auto 10ch max-content 6ch max-content max-content max-content minmax(0,1fr)";
+}
+
+const tourOverviewHeaderCellClass =
+  "text-[10px] uppercase tracking-wide text-white/35 font-medium leading-snug";
+
+/** Shared padding/alignment for header and data cells so columns line up. */
+const tourOverviewCol = {
+  type: "pr-2 justify-self-start",
+  day: "min-w-0 truncate text-left",
+  date: "min-w-0 truncate pl-2 pr-[5mm] text-left",
+  time: "justify-self-start text-left pr-1 min-w-0",
+  venue: "min-w-0 pl-[1cm] pr-2 text-left",
+  crew: "min-w-0 pr-4",
+  people: "whitespace-nowrap pr-3 text-right tabular-nums",
+  extra: "min-w-0 truncate pl-2 text-right sm:text-left",
+} as const;
+
+const tourOverviewSubgridRowClass = "col-span-full grid items-center [grid-template-columns:subgrid]";
+
+function TourShowsOverviewHeaderCells() {
+  const headerBorder = "border-b border-white/[0.08] pb-1.5";
+  return (
+    <li className={cn(tourOverviewSubgridRowClass, "items-end")}>
+      <span className={cn(tourOverviewHeaderCellClass, tourOverviewCol.type, headerBorder)}>Type</span>
+      <span className={cn(tourOverviewHeaderCellClass, tourOverviewCol.day, headerBorder)}>Day</span>
+      <span className={cn(tourOverviewHeaderCellClass, tourOverviewCol.date, headerBorder)}>Date</span>
+      <span className={cn(tourOverviewHeaderCellClass, tourOverviewCol.time, headerBorder)}>Time</span>
+      <span className={cn(tourOverviewHeaderCellClass, tourOverviewCol.venue, headerBorder)}>Venue</span>
+      <span className={cn(tourOverviewHeaderCellClass, tourOverviewCol.crew, headerBorder)}>Crew</span>
+      <span className={cn(tourOverviewHeaderCellClass, tourOverviewCol.people, headerBorder)}>People</span>
+      <span className={cn(tourOverviewHeaderCellClass, tourOverviewCol.extra, headerBorder)}>Rider</span>
+    </li>
+  );
+}
+
 export function TourShowsOverviewGrid({
   shows,
   tourHandsNeeded,
   tourPeopleCount,
   className,
+  showColumnHeaders = false,
 }: {
   shows: TourShowListRow[];
   tourHandsNeeded: number | null;
   tourPeopleCount: number;
   className?: string;
+  /** Column labels aligned with the tour list grid (Tours page). */
+  showColumnHeaders?: boolean;
 }) {
   const { effective } = usePreferences();
   const prefsLocale = localeForLanguage(effective?.language ?? "en");
@@ -182,16 +224,15 @@ export function TourShowsOverviewGrid({
     return <p className="text-[11px] text-white/35">No days on this tour</p>;
   }
 
+  const gridCols = tourOverviewGridColumns(hour12);
+
   return (
     <div className={cn("mt-1 overflow-x-auto -mx-1 px-1", className)}>
       <ul
         className="min-w-[min(100%,38rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
-        style={{
-          gridTemplateColumns: hour12
-            ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content minmax(0,1fr)"
-            : "auto 10ch max-content 6ch max-content max-content max-content minmax(0,1fr)",
-        }}
+        style={{ gridTemplateColumns: gridCols }}
       >
+        {showColumnHeaders ? <TourShowsOverviewHeaderCells /> : null}
         {sorted.map((show) => {
           const stats = computeTourShowCrewStats(show, tourHandsNeeded, tourPeopleCount);
           const dayKey = (show.dayKey || show.date).slice(0, 10);
@@ -207,30 +248,24 @@ export function TourShowsOverviewGrid({
           const venueTone = muted ? undefined : "text-white/55";
           const extra = tourListExtraColumn(show);
           return (
-            <li key={show.id} className="contents">
-              <div className="justify-self-start pr-2">
+            <li key={show.id} className={tourOverviewSubgridRowClass}>
+              <div className={tourOverviewCol.type}>
                 <TourDayTypeBadge show={show} allShows={sorted} />
               </div>
-              <span className={cn("min-w-0 truncate text-left", rowTone, whenTone)} title={when.weekdayLabel}>
+              <span className={cn(tourOverviewCol.day, rowTone, whenTone)} title={when.weekdayLabel}>
                 {when.weekdayLabel}
               </span>
-              <span className={cn("min-w-0 truncate pl-2 pr-[5mm] text-left", rowTone, whenTone)} title={when.dateOnlyLabel}>
+              <span className={cn(tourOverviewCol.date, rowTone, whenTone)} title={when.dateOnlyLabel}>
                 {when.dateOnlyLabel}
               </span>
               {show.type === "show" ? (
                 <PerformanceLineList
                   lines={performanceLines}
                   field="time"
-                  className={cn("justify-self-start pr-1 text-left", rowTone, whenTone)}
+                  className={cn(tourOverviewCol.time, rowTone, whenTone)}
                 />
               ) : (
-                <span
-                  className={cn(
-                    "justify-self-start whitespace-nowrap text-left tabular-nums pr-1",
-                    rowTone,
-                    whenTone,
-                  )}
-                >
+                <span className={cn(tourOverviewCol.time, "whitespace-nowrap tabular-nums", rowTone, whenTone)}>
                   {when.timeLabel}
                 </span>
               )}
@@ -238,20 +273,20 @@ export function TourShowsOverviewGrid({
                 <PerformanceLineList
                   lines={performanceLines}
                   field="venue"
-                  className={cn("min-w-0 pl-[1cm] pr-2 text-left", rowTone, venueTone)}
+                  className={cn(tourOverviewCol.venue, rowTone, venueTone)}
                 />
               ) : (
-                <span className={cn("min-w-0 truncate pl-[1cm] pr-2", rowTone, venueTone)} title={venueName}>
+                <span className={cn(tourOverviewCol.venue, "truncate", rowTone, venueTone)} title={venueName}>
                   {venueName}
                 </span>
               )}
-              <div className="min-w-0 truncate pr-4">
+              <div className={tourOverviewCol.crew}>
                 <TourListCrewHint people={stats.people} needed={stats.needed} muted={muted} />
               </div>
               <span
                 className={cn(
-                  "block whitespace-nowrap pr-3 text-right tabular-nums",
-                  muted ? "text-white/25" : "text-white/45",
+                  tourOverviewCol.people,
+                  muted ? "text-white/25" : "text-white/45"
                 )}
                 title={`${stats.people} people on this day`}
               >
@@ -259,8 +294,8 @@ export function TourShowsOverviewGrid({
               </span>
               <div
                 className={cn(
-                  "min-w-0 truncate pl-2 text-right sm:text-left",
-                  extra ? (muted ? "text-white/35" : "text-white/45") : "text-white/25",
+                  tourOverviewCol.extra,
+                  extra ? (muted ? "text-white/35" : "text-white/45") : "text-white/25"
                 )}
                 title={extra ?? undefined}
               >
