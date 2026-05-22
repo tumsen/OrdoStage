@@ -9,128 +9,48 @@ import {
 import type { EventShow, EventTeam } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-function TeamNameChip({
-  row,
-  variant,
-  muted,
-}: {
-  row: ShowTeamStaffingRow;
-  variant: "ok" | "incomplete" | "no_jobs";
-  muted?: boolean;
-}) {
+function teamStaffingStatusLabel(row: ShowTeamStaffingRow): string {
+  if (row.state === "ok") return `${row.name}: staffing OK`;
+  if (row.state === "incomplete") return `${row.name}: needs staff`;
+  return `${row.name}: no jobs`;
+}
+
+function TeamStaffingBadge({ row, muted }: { row: ShowTeamStaffingRow; muted?: boolean }) {
+  const isOk = row.state === "ok";
+  const needsStaff = row.state === "incomplete";
+
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 max-w-full",
-        variant === "ok" && (muted ? "text-emerald-400/50" : "text-emerald-300/90"),
-        variant === "incomplete" && (muted ? "text-amber-400/45" : "text-amber-300/90"),
-        variant === "no_jobs" && (muted ? "text-white/25" : "text-white/40")
+        "inline-flex items-center gap-0.5 rounded border px-1.5 py-px text-[10px] font-medium max-w-[9rem] shrink-0",
+        muted && "opacity-60"
       )}
-      title={row.name}
+      style={
+        row.color
+          ? {
+              backgroundColor: `${row.color}22`,
+              borderColor: `${row.color}55`,
+              color: row.color,
+            }
+          : {
+              backgroundColor: "rgba(255,255,255,0.06)",
+              borderColor: "rgba(255,255,255,0.12)",
+              color: "rgba(255,255,255,0.75)",
+            }
+      }
+      title={teamStaffingStatusLabel(row)}
     >
-      {row.color ? (
-        <span
-          className="h-1.5 w-1.5 rounded-full shrink-0"
-          style={{ backgroundColor: row.color }}
-          aria-hidden
-        />
-      ) : null}
+      {isOk ? (
+        <Check size={10} className="shrink-0 text-emerald-400" aria-hidden />
+      ) : needsStaff ? (
+        <AlertTriangle size={10} className="shrink-0 text-amber-400" aria-hidden />
+      ) : (
+        <span className="w-2.5 text-center text-white/35 shrink-0" aria-hidden>
+          ·
+        </span>
+      )}
       <span className="truncate">{row.name}</span>
     </span>
-  );
-}
-
-function StaffingHeader({
-  ok,
-  total,
-  allOk,
-  muted,
-}: {
-  ok: number;
-  total: number;
-  allOk: boolean;
-  muted?: boolean;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1 min-w-0">
-      <span className={cn("text-[10px] text-white/45 shrink-0", muted && "text-white/30")}>
-        Team Staffing
-      </span>
-      {allOk ? (
-        <Check
-          size={12}
-          className={cn("shrink-0 text-emerald-400", muted && "text-emerald-400/50")}
-          aria-hidden
-        />
-      ) : (
-        <AlertTriangle
-          size={12}
-          className={cn("shrink-0 text-amber-400", muted && "text-amber-400/50")}
-          aria-hidden
-        />
-      )}
-      <span
-        className={cn(
-          "tabular-nums text-[10px] font-medium shrink-0",
-          allOk
-            ? muted
-              ? "text-emerald-400/55"
-              : "text-emerald-300/95"
-            : muted
-              ? "text-amber-400/55"
-              : "text-amber-300/95"
-        )}
-      >
-        {ok}/{total}
-      </span>
-    </span>
-  );
-}
-
-function TeamStaffingLists({
-  rows,
-  muted,
-}: {
-  rows: ShowTeamStaffingRow[];
-  muted?: boolean;
-}) {
-  const done = rows.filter((r) => r.state === "ok");
-  const notDone = rows.filter((r) => r.state === "incomplete");
-  const noJobs = rows.filter((r) => r.state === "no_jobs");
-
-  return (
-    <div className="flex flex-col gap-1 min-w-0">
-      {done.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-          <span className={cn("text-[10px] text-emerald-400/70 shrink-0", muted && "text-emerald-400/40")}>
-            Done
-          </span>
-          {done.map((row) => (
-            <TeamNameChip key={row.teamId} row={row} variant="ok" muted={muted} />
-          ))}
-        </div>
-      ) : null}
-      {notDone.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-          <span className={cn("text-[10px] text-amber-400/70 shrink-0", muted && "text-amber-400/40")}>
-            Not done
-          </span>
-          {notDone.map((row) => (
-            <TeamNameChip key={row.teamId} row={row} variant="incomplete" muted={muted} />
-          ))}
-        </div>
-      ) : null}
-      {noJobs.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-          <span className={cn("text-[10px] text-white/35 shrink-0", muted && "text-white/25")}>
-            No jobs
-          </span>
-          {noJobs.map((row) => (
-            <TeamNameChip key={row.teamId} row={row} variant="no_jobs" muted={muted} />
-          ))}
-        </div>
-      ) : null}
-    </div>
   );
 }
 
@@ -145,7 +65,7 @@ export function ShowTeamStaffingSummary({
   teams: EventTeam[];
   muted?: boolean;
   className?: string;
-  /** Events overview: list team names under the summary. */
+  /** Events overview: per-team icon + colored badge on one line. */
   detailed?: boolean;
 }) {
   const rows = useMemo(() => computeShowTeamStaffingRows(show, teams), [show, teams]);
@@ -160,15 +80,65 @@ export function ShowTeamStaffingSummary({
   if (!detailed) {
     return (
       <span className={cn("inline-flex items-center gap-1 min-w-0", className)}>
-        <StaffingHeader ok={ok} total={total} allOk={allOk} muted={muted} />
+        <span className={cn("text-[10px] text-white/45 shrink-0", muted && "text-white/30")}>
+          Team Staffing
+        </span>
+        {allOk ? (
+          <Check
+            size={12}
+            className={cn("shrink-0 text-emerald-400", muted && "text-emerald-400/50")}
+            aria-hidden
+          />
+        ) : (
+          <AlertTriangle
+            size={12}
+            className={cn("shrink-0 text-amber-400", muted && "text-amber-400/50")}
+            aria-hidden
+          />
+        )}
+        <span
+          className={cn(
+            "tabular-nums text-[10px] font-medium shrink-0",
+            allOk
+              ? muted
+                ? "text-emerald-400/55"
+                : "text-emerald-300/95"
+              : muted
+                ? "text-amber-400/55"
+                : "text-amber-300/95"
+          )}
+        >
+          {ok}/{total}
+        </span>
       </span>
     );
   }
 
   return (
-    <div className={cn("min-w-0 space-y-1", className)}>
-      <StaffingHeader ok={ok} total={total} allOk={allOk} muted={muted} />
-      <TeamStaffingLists rows={rows} muted={muted} />
-    </div>
+    <span
+      className={cn("inline-flex flex-wrap items-center gap-1 min-w-0", className)}
+      title={rows.map(teamStaffingStatusLabel).join(" · ")}
+    >
+      <span className={cn("text-[10px] text-white/45 shrink-0", muted && "text-white/30")}>
+        Team Staffing
+      </span>
+      <span
+        className={cn(
+          "tabular-nums text-[10px] font-medium shrink-0",
+          allOk
+            ? muted
+              ? "text-emerald-400/55"
+              : "text-emerald-300/95"
+            : muted
+              ? "text-amber-400/55"
+              : "text-amber-300/95"
+        )}
+      >
+        {ok}/{total}
+      </span>
+      {rows.map((row) => (
+        <TeamStaffingBadge key={row.teamId} row={row} muted={muted} />
+      ))}
+    </span>
   );
 }
