@@ -1,5 +1,5 @@
 import type { TourScheduleEvent, TourScheduleEventKind } from "../../../backend/src/types";
-import { durationMinutesBetween, normalizeTimeHHMM } from "./showTiming";
+import { durationMinutesBetween, normalizeTimeHHMM, totalMinutesToDurationHhMm } from "./showTiming";
 
 /** Payloads that carry merged `scheduleEvents` and optional legacy columns (public API may omit empty arrays). */
 export type TourShowScheduleSource = {
@@ -38,6 +38,30 @@ export function formatScheduleEventTimes(ev: TourScheduleEvent): string {
   if (!s) return "";
   if (e && e !== s) return `${s}–${e}`;
   return s;
+}
+
+function formatScheduleWallClockTime(raw: string, locale: string, hour12: boolean): string {
+  const n = normalizeTimeHHMM(raw);
+  if (!n) return "—";
+  const [hh, mm] = n.split(":").map((x) => Number(x));
+  const base = new Date(2000, 0, 1, hh, mm, 0, 0);
+  return base.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12 });
+}
+
+/** Expanded tour/event list rows: labeled start, end, and duration (same fields as day schedule editor). */
+export function formatScheduleEventStartEndDuration(
+  ev: TourScheduleEvent,
+  locale: string,
+  hour12: boolean
+): { start: string; end: string; duration: string } {
+  const startNorm = normalizeTimeHHMM(ev.startTime);
+  const endNorm = normalizeTimeHHMM(ev.endTime);
+  const mins = startNorm && endNorm ? durationMinutesBetween(startNorm, endNorm) : null;
+  return {
+    start: formatScheduleWallClockTime(ev.startTime, locale, hour12),
+    end: formatScheduleWallClockTime(ev.endTime, locale, hour12),
+    duration: mins != null && mins > 0 ? totalMinutesToDurationHhMm(mins) : "—",
+  };
 }
 
 export function tourShowHasScheduleTimeline(show: TourShowScheduleSource): boolean {

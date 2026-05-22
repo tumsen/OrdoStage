@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { usePreferences } from "@/hooks/usePreferences";
 import { localeForLanguage } from "@/lib/preferences";
 import {
-  formatScheduleEventTimes,
+  formatScheduleEventStartEndDuration,
   scheduleEventLabel,
   sortedTourScheduleEvents,
   tourShowPrimaryTime,
@@ -318,25 +318,42 @@ export function TourShowsOverviewGrid({
               </li>
               {scheduleEvents.map((ev) => {
                 const label = scheduleEventLabel(ev);
-                const times = formatScheduleEventTimes(ev);
+                const { start, end, duration } = formatScheduleEventStartEndDuration(
+                  ev,
+                  prefsLocale,
+                  hour12
+                );
                 return (
                   <li
                     key={ev.id}
                     className={cn(tourOverviewSubgridRowClass, "pl-3 sm:pl-4")}
-                    title={`${label} · ${times}`}
+                    title={`${label} · Start ${start} · End ${end} · Duration ${duration}`}
                   >
                     <span className={cn(tourOverviewCol.type, "text-white/25")} aria-hidden>
                       ·
                     </span>
                     <span className={cn(tourOverviewCol.day, jobRowTone)} />
                     <span className={cn(tourOverviewCol.date, jobRowTone)} />
-                    <span className={cn(tourOverviewCol.time, "tabular-nums", jobRowTone)}>{times || "—"}</span>
-                    <span className={cn(tourOverviewCol.venue, "font-medium truncate", jobRowTone)} title={label}>
-                      {label}
-                    </span>
-                    <span className={cn(tourOverviewCol.crew, "text-white/20")}>—</span>
-                    <span className={cn(tourOverviewCol.people, "text-white/20")}>—</span>
-                    <span className={cn(tourOverviewCol.extra, "text-white/20")}>—</span>
+                    <div
+                      className={cn(
+                        "flex flex-wrap items-center gap-x-3 gap-y-0.5 min-w-0 tabular-nums",
+                        jobRowTone
+                      )}
+                      style={{ gridColumn: "4 / -1" }}
+                    >
+                      <span className="font-medium truncate shrink-0 max-w-[40%] sm:max-w-none" title={label}>
+                        {label}
+                      </span>
+                      <span className="whitespace-nowrap">
+                        <span className="text-white/35">Start</span> {start}
+                      </span>
+                      <span className="whitespace-nowrap">
+                        <span className="text-white/35">End</span> {end}
+                      </span>
+                      <span className="whitespace-nowrap">
+                        <span className="text-white/35">Duration</span> {duration}
+                      </span>
+                    </div>
                   </li>
                 );
               })}
