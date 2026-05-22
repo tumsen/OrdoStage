@@ -694,43 +694,46 @@ function DetailsTab({
             <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-5">
               <div className="min-w-0 flex flex-col gap-3">
                 <SectionHeader>Company</SectionHeader>
-                <FormField
-                  control={form.control}
-                  name="companyLegalName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Legal name</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          value={field.value ?? ""}
-                          placeholder="Registered company name"
-                          className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="companyVat"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">VAT / org number</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          value={field.value ?? ""}
-                          placeholder="VAT, CVR, EIN…"
-                          className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
-                  <Label className="text-white/60 text-xs uppercase tracking-wide">Address</Label>
-                  <AddressFields
+                <div className="flex min-h-0 flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="companyLegalName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Legal name</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value ?? ""}
+                              placeholder="Registered company name"
+                              className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="companyVat"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white/60 text-xs uppercase tracking-wide">VAT / org number</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value ?? ""}
+                              placeholder="VAT, CVR, EIN…"
+                              className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="space-y-3 border-t border-white/10 pt-4">
+                    <Label className="text-white/60 text-xs uppercase tracking-wide">Address</Label>
+                    <AddressFields
                     value={{
                       street: form.watch("companyStreet") ?? "",
                       number: form.watch("companyNumber") ?? "",
@@ -748,6 +751,7 @@ function DetailsTab({
                       form.setValue("companyCountry", addr.country);
                     }}
                   />
+                  </div>
                 </div>
                 <FormItem>
                   <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contract contact</FormLabel>
