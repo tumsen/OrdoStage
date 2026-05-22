@@ -157,6 +157,10 @@ export type ShowTeamStaffingRow = {
   name: string;
   color: string | null;
   state: ShowTeamStaffingState;
+  /** Filled person slots across this team's jobs on the show. */
+  slotsFilled: number;
+  /** Required person slots across this team's jobs. */
+  slotsNeeded: number;
 };
 
 /** Per event team: staffing OK, jobs still need people, or no jobs in that department. */
@@ -168,6 +172,12 @@ export function computeShowTeamStaffingRows(
   return eventTeams.map((et) => {
     const teamId = et.team.id;
     const deptJobs = (show.jobs ?? []).filter((j) => (j.departmentId ?? null) === teamId);
+    let slotsFilled = 0;
+    let slotsNeeded = 0;
+    for (const job of deptJobs) {
+      slotsNeeded += jobPeopleNeeded(job);
+      slotsFilled += jobSlotPersonIds(job).filter(Boolean).length;
+    }
     let state: ShowTeamStaffingState;
     if (deptJobs.length === 0) state = "no_jobs";
     else if (okMap[teamId]) state = "ok";
@@ -177,6 +187,8 @@ export function computeShowTeamStaffingRows(
       name: et.team.name,
       color: et.team.color ?? null,
       state,
+      slotsFilled,
+      slotsNeeded,
     };
   });
 }

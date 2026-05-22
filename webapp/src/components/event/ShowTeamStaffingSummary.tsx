@@ -10,8 +10,10 @@ import type { EventShow, EventTeam } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function teamStaffingStatusLabel(row: ShowTeamStaffingRow): string {
-  if (row.state === "ok") return `${row.name}: staffing OK`;
-  if (row.state === "incomplete") return `${row.name}: needs staff`;
+  const slots =
+    row.slotsNeeded > 0 ? ` · ${row.slotsFilled}/${row.slotsNeeded} slots` : "";
+  if (row.state === "ok") return `${row.name}: staffing OK${slots}`;
+  if (row.state === "incomplete") return `${row.name}: needs staff${slots}`;
   return `${row.name}: no jobs`;
 }
 
@@ -22,7 +24,7 @@ function TeamStaffingBadge({ row, muted }: { row: ShowTeamStaffingRow; muted?: b
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-0.5 rounded border px-1.5 py-px text-[10px] font-medium max-w-[9rem] shrink-0",
+        "inline-flex items-center gap-0.5 rounded border px-1.5 py-px text-[10px] font-medium max-w-[10rem] shrink-0",
         muted && "opacity-60"
       )}
       style={
@@ -49,6 +51,11 @@ function TeamStaffingBadge({ row, muted }: { row: ShowTeamStaffingRow; muted?: b
           ·
         </span>
       )}
+      {row.slotsNeeded > 0 ? (
+        <span className="tabular-nums shrink-0 opacity-90">
+          {row.slotsFilled}/{row.slotsNeeded}
+        </span>
+      ) : null}
       <span className="truncate">{row.name}</span>
     </span>
   );
