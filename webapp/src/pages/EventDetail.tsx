@@ -690,6 +690,9 @@ function DetailsTab({
                 </FormItem>
               )}
             />
+
+            <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-5">
+              <div className="min-w-0 flex flex-col gap-3">
             <FormField
               control={form.control}
               name="description"
@@ -853,198 +856,6 @@ function DetailsTab({
               )}
             />
 
-            {/* ── Booking & contract ── */}
-            <SectionHeader>Booking &amp; contract</SectionHeader>
-            <p className="text-xs text-white/45 -mt-1 mb-2">
-              Company and booking party, contract contact, technical liaison, and contract notes for confirming the engagement.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="companyLegalName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Company legal name</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        placeholder="Registered company name"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="companyVat"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">VAT / org number</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        placeholder="VAT, CVR, EIN…"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-white/60 text-xs uppercase tracking-wide">Company address</Label>
-              <AddressFields
-                value={{
-                  street: form.watch("companyStreet") ?? "",
-                  number: form.watch("companyNumber") ?? "",
-                  zip: form.watch("companyZip") ?? "",
-                  city: form.watch("companyCity") ?? "",
-                  state: form.watch("companyState") ?? "",
-                  country: form.watch("companyCountry") ?? "",
-                }}
-                onChange={(addr) => {
-                  form.setValue("companyStreet", addr.street);
-                  form.setValue("companyNumber", addr.number);
-                  form.setValue("companyZip", addr.zip);
-                  form.setValue("companyCity", addr.city);
-                  form.setValue("companyState", addr.state);
-                  form.setValue("companyCountry", addr.country);
-                }}
-              />
-            </div>
-
-            <FormItem>
-              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Primary / contract contact</FormLabel>
-              <ContactFieldsOneRowNote
-                row={{
-                  role: form.watch("primaryContactRole") ?? "",
-                  name: form.watch("primaryContactName") ?? "",
-                  phone: form.watch("primaryContactPhone") ?? "",
-                  email: form.watch("primaryContactEmail") ?? "",
-                  note: form.watch("primaryContactNote") ?? "",
-                }}
-                onChange={(patch) => {
-                  if (patch.role !== undefined) form.setValue("primaryContactRole", patch.role);
-                  if (patch.name !== undefined) form.setValue("primaryContactName", patch.name);
-                  if (patch.phone !== undefined) form.setValue("primaryContactPhone", patch.phone);
-                  if (patch.email !== undefined) form.setValue("primaryContactEmail", patch.email);
-                  if (patch.note !== undefined) form.setValue("primaryContactNote", patch.note);
-                }}
-                notePlaceholder="Booking lead: availability, preferred channel…"
-              />
-            </FormItem>
-
-            <FormItem>
-              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical contact</FormLabel>
-              <ContactFieldsOneRowNote
-                row={{
-                  role: form.watch("technicalContactRole") ?? "",
-                  name: form.watch("technicalContactName") ?? "",
-                  phone: form.watch("technicalContactPhone") ?? "",
-                  email: form.watch("technicalContactEmail") ?? "",
-                  note: form.watch("technicalContactNote") ?? "",
-                }}
-                onChange={(patch) => {
-                  if (patch.role !== undefined) form.setValue("technicalContactRole", patch.role);
-                  if (patch.name !== undefined) form.setValue("technicalContactName", patch.name);
-                  if (patch.phone !== undefined) form.setValue("technicalContactPhone", patch.phone);
-                  if (patch.email !== undefined) form.setValue("technicalContactEmail", patch.email);
-                  if (patch.note !== undefined) form.setValue("technicalContactNote", patch.note);
-                }}
-                notePlaceholder="Technical lead on booker side: channel, rider links…"
-              />
-            </FormItem>
-
-            <FormField
-              control={form.control}
-              name="contractNotes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contract &amp; booking notes</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      value={field.value ?? ""}
-                      placeholder="Deal terms, references, special clauses…"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
-                      rows={3}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] text-white/50 uppercase tracking-wide">Contact persons</p>
-                  <p className="text-xs text-white/40 mt-0.5 max-w-md">
-                    Add as many people as you need for this event (e.g. tour manager, agent, production). Use the
-                    button for each new person.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={addContact}
-                  className="shrink-0 bg-ordo-violet/30 hover:bg-ordo-violet/40 text-white border border-white/10"
-                >
-                  <Plus size={15} className="mr-1.5" />
-                  Add contact person
-                </Button>
-              </div>
-
-              {contacts.length === 0 ? (
-                <p className="text-sm text-white/35 rounded-md border border-dashed border-white/15 bg-white/[0.02] px-3 py-4 text-center">
-                  No contact persons yet. Click &ldquo;Add contact person&rdquo; to add the first one.
-                </p>
-              ) : null}
-
-              {contacts.map((row, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-white/50">Person {idx + 1}</p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeContact(idx)}
-                      className="h-7 text-red-400/80 hover:text-red-400 hover:bg-red-500/10 -mr-1"
-                    >
-                      <X size={14} className="mr-1" />
-                      Remove
-                    </Button>
-                  </div>
-                  <ContactFieldsOneRowNote
-                    row={row}
-                    onChange={(patch) => updateContact(idx, patch)}
-                    notePlaceholder="Availability, preferred channel, extra context…"
-                  />
-                </div>
-              ))}
-
-              {contacts.length > 0 ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="w-full sm:w-auto border-white/15 text-white/85 hover:bg-white/[0.06]"
-                  onClick={addContact}
-                >
-                  <Plus size={15} className="mr-1.5" />
-                  Add another contact person
-                </Button>
-              ) : null}
-            </div>
-
             {/* ── Technical ── */}
             <SectionHeader>Technical</SectionHeader>
 
@@ -1140,7 +951,7 @@ function DetailsTab({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-[auto_auto_auto_auto] gap-3 items-end">
+            <div className="flex flex-wrap gap-3 items-end">
               <FormField
                 control={form.control}
                 name="getInDate"
@@ -1252,8 +1063,202 @@ function DetailsTab({
                 FOH audience announcement note will be added automatically when saving.
               </p>
             ) : null}
+              </div>
+
+              <div className="min-w-0 flex flex-col gap-3">
+            <SectionHeader>Booking &amp; contract</SectionHeader>
+            <p className="text-xs text-white/45 -mt-1 mb-2">
+              Company and booking party, contract contact, technical liaison, and contract notes for confirming the engagement.
+            </p>
+
+            <div className="grid grid-cols-1 gap-3">
+              <FormField
+                control={form.control}
+                name="companyLegalName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Company legal name</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value ?? ""}
+                        placeholder="Registered company name"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="companyVat"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">VAT / org number</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value ?? ""}
+                        placeholder="VAT, CVR, EIN…"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
+              <Label className="text-white/60 text-xs uppercase tracking-wide">Company address</Label>
+              <AddressFields
+                value={{
+                  street: form.watch("companyStreet") ?? "",
+                  number: form.watch("companyNumber") ?? "",
+                  zip: form.watch("companyZip") ?? "",
+                  city: form.watch("companyCity") ?? "",
+                  state: form.watch("companyState") ?? "",
+                  country: form.watch("companyCountry") ?? "",
+                }}
+                onChange={(addr) => {
+                  form.setValue("companyStreet", addr.street);
+                  form.setValue("companyNumber", addr.number);
+                  form.setValue("companyZip", addr.zip);
+                  form.setValue("companyCity", addr.city);
+                  form.setValue("companyState", addr.state);
+                  form.setValue("companyCountry", addr.country);
+                }}
+              />
+            </div>
+
+            <FormItem>
+              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Primary / contract contact</FormLabel>
+              <ContactFieldsOneRowNote
+                row={{
+                  role: form.watch("primaryContactRole") ?? "",
+                  name: form.watch("primaryContactName") ?? "",
+                  phone: form.watch("primaryContactPhone") ?? "",
+                  email: form.watch("primaryContactEmail") ?? "",
+                  note: form.watch("primaryContactNote") ?? "",
+                }}
+                onChange={(patch) => {
+                  if (patch.role !== undefined) form.setValue("primaryContactRole", patch.role);
+                  if (patch.name !== undefined) form.setValue("primaryContactName", patch.name);
+                  if (patch.phone !== undefined) form.setValue("primaryContactPhone", patch.phone);
+                  if (patch.email !== undefined) form.setValue("primaryContactEmail", patch.email);
+                  if (patch.note !== undefined) form.setValue("primaryContactNote", patch.note);
+                }}
+                notePlaceholder="Booking lead: availability, preferred channel…"
+              />
+            </FormItem>
+
+            <FormItem>
+              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical contact</FormLabel>
+              <ContactFieldsOneRowNote
+                row={{
+                  role: form.watch("technicalContactRole") ?? "",
+                  name: form.watch("technicalContactName") ?? "",
+                  phone: form.watch("technicalContactPhone") ?? "",
+                  email: form.watch("technicalContactEmail") ?? "",
+                  note: form.watch("technicalContactNote") ?? "",
+                }}
+                onChange={(patch) => {
+                  if (patch.role !== undefined) form.setValue("technicalContactRole", patch.role);
+                  if (patch.name !== undefined) form.setValue("technicalContactName", patch.name);
+                  if (patch.phone !== undefined) form.setValue("technicalContactPhone", patch.phone);
+                  if (patch.email !== undefined) form.setValue("technicalContactEmail", patch.email);
+                  if (patch.note !== undefined) form.setValue("technicalContactNote", patch.note);
+                }}
+                notePlaceholder="Technical lead on booker side: channel, rider links…"
+              />
+            </FormItem>
+
+            <FormField
+              control={form.control}
+              name="contractNotes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contract &amp; booking notes</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      value={field.value ?? ""}
+                      placeholder="Deal terms, references, special clauses…"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
+                      rows={3}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] text-white/50 uppercase tracking-wide">Contact persons</p>
+                  <p className="text-xs text-white/40 mt-0.5">
+                    Add as many people as you need for this event (e.g. tour manager, agent, production).
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={addContact}
+                  className="shrink-0 bg-ordo-violet/30 hover:bg-ordo-violet/40 text-white border border-white/10"
+                >
+                  <Plus size={15} className="mr-1.5" />
+                  Add contact person
+                </Button>
+              </div>
+
+              {contacts.length === 0 ? (
+                <p className="text-sm text-white/35 rounded-md border border-dashed border-white/15 bg-white/[0.02] px-3 py-4 text-center">
+                  No contact persons yet. Click &ldquo;Add contact person&rdquo; to add the first one.
+                </p>
+              ) : null}
+
+              {contacts.map((row, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-white/50">Person {idx + 1}</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeContact(idx)}
+                      className="h-7 text-red-400/80 hover:text-red-400 hover:bg-red-500/10 -mr-1"
+                    >
+                      <X size={14} className="mr-1" />
+                      Remove
+                    </Button>
+                  </div>
+                  <ContactFieldsOneRowNote
+                    row={row}
+                    onChange={(patch) => updateContact(idx, patch)}
+                    notePlaceholder="Availability, preferred channel, extra context…"
+                  />
+                </div>
+              ))}
+
+              {contacts.length > 0 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-white/15 text-white/85 hover:bg-white/[0.06]"
+                  onClick={addContact}
+                >
+                  <Plus size={15} className="mr-1.5" />
+                  Add another contact person
+                </Button>
+              ) : null}
+            </div>
 
             {!isNew && event ? <EventDocumentsSection event={event} /> : null}
+              </div>
+            </div>
 
             {saveError ? (
               <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
