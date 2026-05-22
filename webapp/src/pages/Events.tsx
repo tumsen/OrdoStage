@@ -97,6 +97,7 @@ function EventListRow({
                   teams={teams}
                   includeJobs={open}
                   showTeamStaffingDetail
+                  showColumnHeaders
                   className="mt-1.5"
                 />
               </EventTeamBadgeWidthScope>

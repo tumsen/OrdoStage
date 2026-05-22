@@ -23,6 +23,29 @@ function overviewGridColumns(hour12: boolean): string {
     : "auto 10ch max-content 6ch max-content max-content max-content max-content minmax(0,1fr)";
 }
 
+const overviewHeaderCellClass =
+  "text-[10px] uppercase tracking-wide text-white/35 font-medium leading-snug";
+
+function EventShowsOverviewHeaderRow({ gridCols }: { gridCols: string }) {
+  return (
+    <li className="border-b border-white/[0.08] pb-1.5 mb-0.5">
+      <div className="grid items-end gap-x-0" style={{ gridTemplateColumns: gridCols }}>
+        <span className={cn(overviewHeaderCellClass, "pr-2 justify-self-start")}>Status</span>
+        <span className={cn(overviewHeaderCellClass, "text-left")}>Day</span>
+        <span className={cn(overviewHeaderCellClass, "pl-2 text-left")}>Date</span>
+        <span className={cn(overviewHeaderCellClass, "pl-0.5 pr-1 text-left whitespace-nowrap")}>
+          Time
+        </span>
+        <span className={cn(overviewHeaderCellClass, "pr-2 text-left")}>Venue</span>
+        <span className={cn(overviewHeaderCellClass, "pr-4 text-left min-w-0")}>Team staffing</span>
+        <span className={cn(overviewHeaderCellClass, "pr-3 text-right whitespace-nowrap")}>People</span>
+        <span className={cn(overviewHeaderCellClass, "pr-2 text-right whitespace-nowrap")}>Hours</span>
+        <span className={cn(overviewHeaderCellClass, "pl-2 text-right sm:text-left min-w-0")}>Tickets</span>
+      </div>
+    </li>
+  );
+}
+
 function formatEventListWhenParts(
   show: EventShow,
   locale: string,
@@ -99,6 +122,7 @@ export function EventShowsOverviewGrid({
   className,
   includeJobs = true,
   showTeamStaffingDetail = false,
+  showColumnHeaders = false,
 }: {
   shows: EventShow[];
   teams: EventTeam[];
@@ -108,6 +132,8 @@ export function EventShowsOverviewGrid({
   includeJobs?: boolean;
   /** List which teams are done / not done with staffing (Events overview). */
   showTeamStaffingDetail?: boolean;
+  /** Column labels aligned with the show grid (Events list overview). */
+  showColumnHeaders?: boolean;
 }) {
   const { effective } = usePreferences();
   const prefsLocale = localeForLanguage(effective?.language ?? "en");
@@ -129,6 +155,7 @@ export function EventShowsOverviewGrid({
   return (
     <div className={cn("mt-1 overflow-x-auto -mx-1 px-1", className)}>
       <ul className="min-w-[min(100%,42rem)] flex flex-col gap-y-1.5 text-[10px] leading-snug">
+        {showColumnHeaders ? <EventShowsOverviewHeaderRow gridCols={gridCols} /> : null}
         {sorted.map((show) => {
           const stats = computeShowStaffingStats(show, teams);
           const showOff = effectiveShowStatus(show) === "cancelled";
