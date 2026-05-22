@@ -94,6 +94,7 @@ function EventListRow({
                 shows={shows}
                 teams={teams}
                 includeJobs={open}
+                showTeamStaffingDetail
                 className="mt-1.5"
               />
             </div>

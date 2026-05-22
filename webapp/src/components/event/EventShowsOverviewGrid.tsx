@@ -98,6 +98,7 @@ export function EventShowsOverviewGrid({
   teams,
   className,
   includeJobs = true,
+  showTeamStaffingDetail = false,
 }: {
   shows: EventShow[];
   teams: EventTeam[];
@@ -105,6 +106,8 @@ export function EventShowsOverviewGrid({
   className?: string;
   /** When false, only show rows are listed (no per-job lines). */
   includeJobs?: boolean;
+  /** List which teams are done / not done with staffing (Events overview). */
+  showTeamStaffingDetail?: boolean;
 }) {
   const { effective } = usePreferences();
   const prefsLocale = localeForLanguage(effective?.language ?? "en");
@@ -172,7 +175,13 @@ export function EventShowsOverviewGrid({
                   {venueName}
                 </span>
                 <div className="min-w-0 pr-4 self-center">
-                  <ShowTeamStaffingSummary show={show} teams={teams} muted={showOff} />
+                  {!showTeamStaffingDetail ? (
+                    <ShowTeamStaffingSummary show={show} teams={teams} muted={showOff} />
+                  ) : (
+                    <span className="text-white/25" aria-hidden>
+                      —
+                    </span>
+                  )}
                 </div>
                 <span
                   className={cn(
@@ -203,6 +212,16 @@ export function EventShowsOverviewGrid({
                   {ticketBits ?? "—"}
                 </div>
               </div>
+              {showTeamStaffingDetail ? (
+                <div className="mt-1 ml-3 border-l border-white/10 pl-3 pb-0.5">
+                  <ShowTeamStaffingSummary
+                    show={show}
+                    teams={teams}
+                    muted={showOff}
+                    detailed
+                  />
+                </div>
+              ) : null}
               {includeJobs
                 ? showJobs.map((job) => {
                 const jobWhen = formatJobListWhenParts(job, prefsLocale, hour12);
