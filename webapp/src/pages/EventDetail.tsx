@@ -689,8 +689,8 @@ function DetailsTab({
 
             <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-5">
               <div className="min-w-0 flex flex-col gap-3">
-                <SectionHeader>Company</SectionHeader>
                 <div className={cn(DETAIL_CARD_CLASS, "gap-4")}>
+                  <SectionHeader>Company</SectionHeader>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <FormField
                       control={form.control}
@@ -727,9 +727,7 @@ function DetailsTab({
                       )}
                     />
                   </div>
-                  <div className="space-y-3">
-                    <Label className="text-white/45 text-[10px] uppercase tracking-wide">Address</Label>
-                    <AddressFields
+                  <AddressFields
                     value={{
                       street: form.watch("companyStreet") ?? "",
                       number: form.watch("companyNumber") ?? "",
@@ -747,10 +745,9 @@ function DetailsTab({
                       form.setValue("companyCountry", addr.country);
                     }}
                   />
-                  </div>
                 </div>
-                <Label className={DETAIL_FIELD_LABEL_CLASS}>Contract contact</Label>
                 <div className={DETAIL_CARD_CLASS}>
+                  <SectionHeader>Contract contact</SectionHeader>
                   <ContactFieldsOneRowNote
                     row={{
                       role: form.watch("primaryContactRole") ?? "",
@@ -773,9 +770,9 @@ function DetailsTab({
                   control={form.control}
                   name="contractNotes"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel className={DETAIL_FIELD_LABEL_CLASS}>Contract &amp; booking notes</FormLabel>
+                    <FormItem>
                       <div className={DETAIL_CARD_CLASS}>
+                        <SectionHeader>Contract &amp; booking notes</SectionHeader>
                         <FormControl>
                           <Textarea
                             {...field}
@@ -796,9 +793,9 @@ function DetailsTab({
                   control={form.control}
                   name="description"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel className={DETAIL_FIELD_LABEL_CLASS}>Description</FormLabel>
+                    <FormItem>
                       <div className={cn(DETAIL_CARD_CLASS, "flex-1")}>
+                        <SectionHeader>Description</SectionHeader>
                         <FormControl>
                           <Textarea
                             {...field}
@@ -818,8 +815,8 @@ function DetailsTab({
 
             <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-5">
               <div className="min-w-0 flex flex-col gap-3">
-                <Label className={DETAIL_FIELD_LABEL_CLASS}>Technical contact</Label>
                 <div className={DETAIL_CARD_CLASS}>
+                  <SectionHeader>Technical contact</SectionHeader>
                   <ContactFieldsOneRowNote
                     row={{
                       role: form.watch("technicalContactRole") ?? "",
@@ -841,8 +838,8 @@ function DetailsTab({
               </div>
 
               <div className="min-w-0 flex flex-col gap-3">
-                <SectionHeader>Technical</SectionHeader>
             <div className={cn(DETAIL_CARD_CLASS, "gap-4")}>
+              <SectionHeader>Technical</SectionHeader>
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-4 pb-0.5">
                 {(
                   [
@@ -1029,7 +1026,6 @@ function DetailsTab({
             </div>
 
             <div className="space-y-3 border-t border-white/10 pt-4">
-            <Label className="text-white/45 text-[10px] uppercase tracking-wide">FOH</Label>
             <FormField
               control={form.control}
               name="fohNotes"
@@ -1117,8 +1113,8 @@ function DetailsTab({
               </div>
             ) : null}
 
-            <SectionHeader>Production</SectionHeader>
             <div className={cn(DETAIL_CARD_CLASS, "gap-4")}>
+            <SectionHeader>Production</SectionHeader>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormField
               control={form.control}
