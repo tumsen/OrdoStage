@@ -67,8 +67,12 @@ import {
   computeStaffingOkByDepartmentFromJobs,
   departmentStaffingBorderClass,
 } from "@/lib/eventShowStaffing";
-import { EventShowsOverviewGrid, formatPlannedHoursShort } from "@/components/event/EventShowsOverviewGrid";
-import { ShowTeamStaffingSummary } from "@/components/event/ShowTeamStaffingSummary";
+import {
+  EventShowsOverviewGrid,
+  effectiveShowStatus,
+  formatPlannedHoursShort,
+} from "@/components/event/EventShowsOverviewGrid";
+import { EventTeamBadgeWidthScope, ShowTeamStaffingSummary } from "@/components/event/ShowTeamStaffingSummary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -2155,6 +2159,7 @@ function ShowEventCard({
   const hoursLabel = stats.jobHours >= 10 ? stats.jobHours.toFixed(1) : stats.jobHours.toFixed(2);
   const showDeepLink = `/events/${eventId}?tab=shows&show=${encodeURIComponent(show.id)}`;
   const jobCount = (show.jobs ?? []).length;
+  const showOff = effectiveShowStatus(show) === "cancelled";
 
   return (
     <Collapsible open={cardOpen} onOpenChange={setCardOpen} className="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
@@ -2184,6 +2189,8 @@ function ShowEventCard({
                 show={show}
                 teams={eventTeams}
                 className="text-[10px]"
+                detailed
+                muted={showOff}
               />
             </div>
           </button>
@@ -2984,26 +2991,28 @@ function ShowsTab({
       {sortedShows.length === 0 ? (
         <div className="text-center text-white/35 text-sm py-10">No shows yet. Add the first show to start planning technical, FOH, and team staffing.</div>
       ) : (
-        <div className="space-y-3">
-          {sortedShows.map((show: EventShow, idx: number) => (
-            <ShowEventCard
-              key={show.id}
-              eventId={event.id}
-              show={show}
-              showIndex={idx}
-              eventTeams={event.teams ?? []}
-              venues={venues}
-              people={availablePeople}
-              updateShow={updateShow}
-              deleteShow={deleteShow}
-              onCreateVenueBooking={(targetShow) => setBookingShowId(targetShow.id)}
-              preferOpen={resolvedFocusShowId === show.id}
-              scrollToJobId={
-                resolvedFocusShowId === show.id && focusJobId ? focusJobId : null
-              }
-            />
-          ))}
-        </div>
+        <EventTeamBadgeWidthScope shows={sortedShows} teams={event.teams ?? []}>
+          <div className="space-y-3">
+            {sortedShows.map((show: EventShow, idx: number) => (
+              <ShowEventCard
+                key={show.id}
+                eventId={event.id}
+                show={show}
+                showIndex={idx}
+                eventTeams={event.teams ?? []}
+                venues={venues}
+                people={availablePeople}
+                updateShow={updateShow}
+                deleteShow={deleteShow}
+                onCreateVenueBooking={(targetShow) => setBookingShowId(targetShow.id)}
+                preferOpen={resolvedFocusShowId === show.id}
+                scrollToJobId={
+                  resolvedFocusShowId === show.id && focusJobId ? focusJobId : null
+                }
+              />
+            ))}
+          </div>
+        </EventTeamBadgeWidthScope>
       )}
       <NewBookingDialog
         open={bookingShow != null}
