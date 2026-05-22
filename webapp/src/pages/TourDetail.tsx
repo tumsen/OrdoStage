@@ -9,7 +9,7 @@ import {
   Trash2,
   X,
   ChevronDown,
-  ChevronUp,
+  ChevronRight,
   FileDown,
   Loader2,
   Users,
@@ -82,6 +82,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
@@ -1419,7 +1420,7 @@ function ShowCard({
   tour: TourDetail;
 }) {
   const queryClient = useQueryClient();
-  const [expanded, setExpanded] = useState(false);
+  const [cardOpen, setCardOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [riderOpen, setRiderOpen] = useState(false);
@@ -1444,35 +1445,54 @@ function ShowCard({
     .slice(0, 4)
     .map((e) => `${scheduleEventLabel(e)} ${formatScheduleEventTimes(e)}`.trim());
 
+  const isCustomRoster = show.showPeople.length > 0;
+  const effectivePeopleCount = isCustomRoster ? show.showPeople.length : tour.people.length;
+  const handsNeeded = show.handsNeeded ?? tour.handsNeeded;
+
   return (
     <>
-      <div className={cn(
-        "border rounded-xl overflow-hidden",
-        show.type === "travel"
-          ? "bg-blue-950/20 border-blue-900/30"
-          : show.type === "day_off"
-          ? "bg-zinc-950/25 border-zinc-800/35"
-          : "bg-white/[0.03] border-white/8"
-      )}>
-        {/* Card header - always visible */}
-        <div className="flex items-start gap-3 px-4 py-4">
-          <div className={cn(
-            "flex-shrink-0 w-10 h-10 rounded-lg border flex items-center justify-center",
-            show.type === "travel"
-              ? "bg-blue-900/30 border-blue-700/30"
-              : show.type === "day_off"
-              ? "bg-zinc-800/40 border-zinc-700/35"
-              : "bg-emerald-950/35 border-emerald-800/35"
-          )}>
-            {show.type === "travel" ? (
-              <Truck size={14} className="text-blue-400/70" />
-            ) : show.type === "day_off" ? (
-              <Coffee size={14} className="text-zinc-400/80" />
-            ) : (
-              <span className="text-xs font-bold text-emerald-400/90">{dayNumber}</span>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
+      <Collapsible
+        open={cardOpen}
+        onOpenChange={setCardOpen}
+        className={cn(
+          "border rounded-xl overflow-hidden",
+          show.type === "travel"
+            ? "bg-blue-950/20 border-blue-900/30"
+            : show.type === "day_off"
+              ? "bg-zinc-950/25 border-zinc-800/35"
+              : "bg-white/[0.03] border-white/8"
+        )}
+      >
+        <div className="flex items-start gap-2 px-4 py-4">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-start gap-2 text-left rounded-md py-0.5 -my-0.5 px-1 -mx-1 hover:bg-white/[0.04]"
+            >
+              {cardOpen ? (
+                <ChevronDown size={16} className="text-white/45 shrink-0 mt-1" />
+              ) : (
+                <ChevronRight size={16} className="text-white/45 shrink-0 mt-1" />
+              )}
+              <div
+                className={cn(
+                  "flex-shrink-0 w-10 h-10 rounded-lg border flex items-center justify-center",
+                  show.type === "travel"
+                    ? "bg-blue-900/30 border-blue-700/30"
+                    : show.type === "day_off"
+                      ? "bg-zinc-800/40 border-zinc-700/35"
+                      : "bg-emerald-950/35 border-emerald-800/35"
+                )}
+              >
+                {show.type === "travel" ? (
+                  <Truck size={14} className="text-blue-400/70" />
+                ) : show.type === "day_off" ? (
+                  <Coffee size={14} className="text-zinc-400/80" />
+                ) : (
+                  <span className="text-xs font-bold text-emerald-400/90">{dayNumber}</span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {show.type === "show" ? (
                 tourDayHasShowScheduleEntry(show) ? (
@@ -1538,15 +1558,34 @@ function ShowCard({
                 </>
               )}
             </div>
+            <p className="text-[11px] text-white/45 flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+              <span title={isCustomRoster ? "Custom roster for this day" : "Tour roster from People tab"}>
+                {effectivePeopleCount} people
+                {!isCustomRoster && tour.people.length > 0 ? (
+                  <span className="text-white/35"> (tour roster)</span>
+                ) : null}
+              </span>
+              {handsNeeded != null && handsNeeded > 0 ? (
+                <span className="text-white/40 tabular-nums">
+                  {effectivePeopleCount >= handsNeeded
+                    ? "Crew OK"
+                    : `${effectivePeopleCount}/${handsNeeded} crew`}
+                </span>
+              ) : null}
+              {!cardOpen ? <span className="text-white/35">expand for schedule &amp; people</span> : null}
+            </p>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
+            </button>
+          </CollapsibleTrigger>
+          <div className="flex items-center gap-1 flex-shrink-0 pt-0.5">
             {show.type !== "travel" && show.type !== "day_off" ? (
               <div className="relative">
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 text-white/30 hover:text-white"
-                  onClick={async () => {
+                  onClick={async (e) => {
+                    e.stopPropagation();
                     setVenuePdfLoading(true);
                     try { await downloadVenueTechRider(tour, show); }
                     finally { setVenuePdfLoading(false); }
@@ -1568,7 +1607,10 @@ function ShowCard({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-white/30 hover:text-blue-400"
-                onClick={() => setRiderOpen(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRiderOpen(true);
+                }}
                 title="Send tech rider"
               >
                 <Mail size={13} />
@@ -1578,7 +1620,10 @@ function ShowCard({
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-white/30 hover:text-white"
-              onClick={() => setEditOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditOpen(true);
+              }}
             >
               <Edit2 size={13} />
             </Button>
@@ -1586,23 +1631,17 @@ function ShowCard({
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-white/30 hover:text-red-400"
-              onClick={() => setDeleteOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteOpen(true);
+              }}
             >
               <Trash2 size={13} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-white/30 hover:text-white"
-              onClick={() => setExpanded(!expanded)}
-            >
-              {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
             </Button>
           </div>
         </div>
 
-        {/* Expanded details */}
-        {expanded ? (
+        <CollapsibleContent>
           <div className="border-t border-white/[0.06] px-4 py-4 space-y-4">
             <TourDayScheduleEditor tourId={tourId} show={show} />
             {show.type === "travel" && (show.fromLocation || show.toLocation) ? (
@@ -1896,8 +1935,8 @@ function ShowCard({
               ) : null}
             </div>
           </div>
-        ) : null}
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       <ShowFormDialog
         tourId={tourId}
@@ -2181,18 +2220,24 @@ function ShowPeopleSection({ show, tour }: { show: TourShow; tour: TourDetail })
     queryFn: () => api.get<Person[]>("/api/people"),
   });
 
-  const isOverridden = show.showPeople.length > 0;
-  // Effective people: show-level if overridden, otherwise tour defaults
-  const effectivePeople = isOverridden
-    ? show.showPeople
-    : tour.people;
+  const isCustomRoster = show.showPeople.length > 0;
+  const listRows = isCustomRoster ? show.showPeople : tour.people;
 
   const addMutation = useMutation({
-    mutationFn: ({ personId, role }: { personId: string; role?: string }) =>
-      api.post<TourShowPerson>(`/api/tours/${tour.id}/shows/${show.id}/people`, {
+    mutationFn: async ({ personId, role }: { personId: string; role?: string }) => {
+      if (!isCustomRoster && tour.people.length > 0) {
+        for (const tp of tour.people) {
+          await api.post<TourShowPerson>(`/api/tours/${tour.id}/shows/${show.id}/people`, {
+            personId: tp.personId,
+            role: tp.role || undefined,
+          });
+        }
+      }
+      return api.post<TourShowPerson>(`/api/tours/${tour.id}/shows/${show.id}/people`, {
         personId,
         role: role || undefined,
-      }),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
       setAddOpen(false);
@@ -2209,22 +2254,6 @@ function ShowPeopleSection({ show, tour }: { show: TourShow; tour: TourDetail })
     },
   });
 
-  // "Customize" = copy tour people into show-level people (one by one)
-  const customizeMutation = useMutation({
-    mutationFn: async () => {
-      for (const tp of tour.people) {
-        await api.post<TourShowPerson>(`/api/tours/${tour.id}/shows/${show.id}/people`, {
-          personId: tp.personId,
-          role: tp.role || undefined,
-        });
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
-    },
-  });
-
-  // "Reset" = delete all show-level people
   const resetMutation = useMutation({
     mutationFn: async () => {
       for (const sp of show.showPeople) {
@@ -2236,95 +2265,89 @@ function ShowPeopleSection({ show, tour }: { show: TourShow; tour: TourDetail })
     },
   });
 
-  // Available to add: all org people not already in the effective list
   const effectivePersonIds = new Set(
-    isOverridden
+    isCustomRoster
       ? show.showPeople.map((sp) => sp.personId)
       : tour.people.map((tp) => tp.personId)
   );
   const available = (allPeople ?? []).filter((p) => !effectivePersonIds.has(p.id));
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-xs text-white/35 uppercase tracking-wide flex items-center gap-2">
-          People
-          {!isOverridden ? (
-            <span className="normal-case tracking-normal text-white/20 text-[10px]">tour defaults</span>
-          ) : (
-            <span className="normal-case tracking-normal text-amber-400/50 text-[10px]">custom roster</span>
-          )}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <span className="text-xs text-white/40">
+            {listRows.length} on this day
+            {!isCustomRoster && tour.people.length > 0 ? " (from tour roster)" : ""}
+          </span>
+          {!isCustomRoster && tour.people.length > 0 ? (
+            <p className="text-[10px] text-white/30 mt-0.5 max-w-xl">
+              Same as Tour → People. Add or remove someone here to customize only this day.
+            </p>
+          ) : isCustomRoster ? (
+            <p className="text-[10px] text-white/30 mt-0.5 max-w-xl">
+              Custom roster for this day. New tour-level people are added here automatically.
+            </p>
+          ) : null}
         </div>
-        <div className="flex items-center gap-1">
-          {isOverridden ? (
+        <div className="flex items-center gap-2 shrink-0">
+          {isCustomRoster ? (
             <Button
               size="sm"
-              variant="ghost"
+              variant="outline"
               onClick={() => resetMutation.mutate()}
               disabled={resetMutation.isPending}
-              className="h-6 px-2 text-[10px] text-white/25 hover:text-white/60"
+              className="h-8 border-white/10 text-white/50 hover:text-white bg-transparent text-xs"
             >
-              Reset to defaults
-            </Button>
-          ) : tour.people.length > 0 ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => customizeMutation.mutate()}
-              disabled={customizeMutation.isPending}
-              className="h-6 px-2 text-[10px] text-white/25 hover:text-white/60"
-            >
-              {customizeMutation.isPending ? "Copying..." : "Customize"}
+              Use tour roster
             </Button>
           ) : null}
           <Button
             size="sm"
-            variant="ghost"
             onClick={() => setAddOpen(true)}
-            className="h-6 px-2 text-[10px] text-white/25 hover:text-white/60 gap-1"
+            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 gap-2 h-8"
           >
-            <Plus size={10} /> Add
+            <Plus size={13} /> Add Person
           </Button>
         </div>
       </div>
 
-      <p className="text-[10px] text-white/25 mb-2 leading-snug max-w-xl">
-        {isOverridden
-          ? "This day has its own roster. New people added under Tour → People are added here automatically; you can still change this list."
-          : "Uses the tour roster from the People tab. Choose Customize to edit only this day; then new tour-level people are added to this day automatically."}
-      </p>
-
-      {effectivePeople.length === 0 ? (
-        <div className="text-xs text-white/20 italic py-1">No people assigned to this tour yet.</div>
+      {listRows.length === 0 ? (
+        <div className="py-6 text-center text-white/30 text-sm rounded-lg border border-white/10 border-dashed bg-white/[0.02]">
+          No people on this day yet. Add people on the tour People tab, or add someone here.
+        </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {effectivePeople.map((p) => {
-            const person = "person" in p ? p.person : null;
-            const name = person?.name ?? "";
-            const roleLabel = (p.role ?? person?.role) || null;
+        <div className="space-y-2">
+          {listRows.map((row) => {
+            const person = row.person;
+            const name = person.name;
+            const roleLabel = row.role ?? person.role ?? "No role";
+            const canRemove = isCustomRoster;
             return (
               <div
-                key={p.id}
-                className="flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.07] rounded-md px-2.5 py-1"
+                key={row.id}
+                className="flex items-center justify-between bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3"
               >
                 <div>
-                  <span className="text-xs text-white/70">{name}</span>
-                  {roleLabel ? (
-                    <span className="text-[10px] text-white/35 ml-1.5">{roleLabel}</span>
-                  ) : null}
+                  <div className="text-sm font-medium text-white/90">{name}</div>
+                  <div className="text-xs text-white/40 mt-0.5">{roleLabel}</div>
                 </div>
-                {isOverridden ? (
-                  <button
+                {canRemove ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => {
-                      if (!confirmDeleteAction(`show assignment "${name}"`)) return;
-                      removeMutation.mutate(p.id);
+                      if (!confirmDeleteAction(`person assignment "${name}"`)) return;
+                      removeMutation.mutate(row.id);
                     }}
+                    className="h-7 w-7 text-white/25 hover:text-red-400"
                     disabled={removeMutation.isPending}
-                    className="text-white/20 hover:text-red-400 ml-1"
                   >
-                    <X size={10} />
-                  </button>
-                ) : null}
+                    <X size={13} />
+                  </Button>
+                ) : (
+                  <span className="text-[10px] text-white/25 pr-1">Tour roster</span>
+                )}
               </div>
             );
           })}
@@ -2334,7 +2357,7 @@ function ShowPeopleSection({ show, tour }: { show: TourShow; tour: TourDetail })
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="bg-[#16161f] border-white/10 text-white">
           <DialogHeader>
-            <DialogTitle>Add Person to This Show</DialogTitle>
+            <DialogTitle>Add Person to This Day</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
