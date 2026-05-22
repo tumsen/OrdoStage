@@ -1,9 +1,15 @@
+import { Fragment } from "react";
 import { Check } from "lucide-react";
 import type { TourShowListRow } from "../../../../backend/src/types";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/hooks/usePreferences";
 import { localeForLanguage } from "@/lib/preferences";
-import { tourShowPrimaryTime } from "@/lib/tourScheduleDisplay";
+import {
+  formatScheduleEventTimes,
+  scheduleEventLabel,
+  sortedTourScheduleEvents,
+  tourShowPrimaryTime,
+} from "@/lib/tourScheduleDisplay";
 import {
   computeTourShowCrewStats,
   tourPerformanceCountOnDay,
@@ -201,6 +207,7 @@ export function TourShowsOverviewGrid({
   tourPeopleCount,
   className,
   showColumnHeaders = false,
+  includeScheduleEvents = false,
 }: {
   shows: TourShowListRow[];
   tourHandsNeeded: number | null;
@@ -208,6 +215,8 @@ export function TourShowsOverviewGrid({
   className?: string;
   /** Column labels aligned with the tour list grid (Tours page). */
   showColumnHeaders?: boolean;
+  /** When true, indented schedule lines appear under each show day (expanded tour list row). */
+  includeScheduleEvents?: boolean;
 }) {
   const { effective } = usePreferences();
   const prefsLocale = localeForLanguage(effective?.language ?? "en");
@@ -236,8 +245,9 @@ export function TourShowsOverviewGrid({
         {sorted.map((show) => {
           const stats = computeTourShowCrewStats(show, tourHandsNeeded, tourPeopleCount);
           const dayKey = (show.dayKey || show.date).slice(0, 10);
+          const usePerformanceLines = show.type === "show" && !includeScheduleEvents;
           const performanceLines =
-            show.type === "show"
+            usePerformanceLines
               ? tourPerformanceLinesOnDay(sorted, dayKey, prefsLocale, hour12)
               : [];
           const venueName = tourShowVenueLabel(show);
@@ -247,61 +257,90 @@ export function TourShowsOverviewGrid({
           const whenTone = muted ? undefined : "text-white/[0.82]";
           const venueTone = muted ? undefined : "text-white/55";
           const extra = tourListExtraColumn(show);
+          const jobRowTone = muted ? "text-white/25 line-through decoration-white/20" : "text-white/40";
+          const scheduleEvents =
+            includeScheduleEvents && show.type === "show"
+              ? sortedTourScheduleEvents(show)
+              : [];
+
           return (
-            <li key={show.id} className={tourOverviewSubgridRowClass}>
-              <div className={tourOverviewCol.type}>
-                <TourDayTypeBadge show={show} allShows={sorted} />
-              </div>
-              <span className={cn(tourOverviewCol.day, rowTone, whenTone)} title={when.weekdayLabel}>
-                {when.weekdayLabel}
-              </span>
-              <span className={cn(tourOverviewCol.date, rowTone, whenTone)} title={when.dateOnlyLabel}>
-                {when.dateOnlyLabel}
-              </span>
-              {show.type === "show" ? (
-                <PerformanceLineList
-                  lines={performanceLines}
-                  field="time"
-                  className={cn(tourOverviewCol.time, rowTone, whenTone)}
-                />
-              ) : (
-                <span className={cn(tourOverviewCol.time, "whitespace-nowrap tabular-nums", rowTone, whenTone)}>
-                  {when.timeLabel}
+            <Fragment key={show.id}>
+              <li className={tourOverviewSubgridRowClass}>
+                <div className={tourOverviewCol.type}>
+                  <TourDayTypeBadge show={show} allShows={sorted} />
+                </div>
+                <span className={cn(tourOverviewCol.day, rowTone, whenTone)} title={when.weekdayLabel}>
+                  {when.weekdayLabel}
                 </span>
-              )}
-              {show.type === "show" ? (
-                <PerformanceLineList
-                  lines={performanceLines}
-                  field="venue"
-                  className={cn(tourOverviewCol.venue, rowTone, venueTone)}
-                />
-              ) : (
-                <span className={cn(tourOverviewCol.venue, "truncate", rowTone, venueTone)} title={venueName}>
-                  {venueName}
+                <span className={cn(tourOverviewCol.date, rowTone, whenTone)} title={when.dateOnlyLabel}>
+                  {when.dateOnlyLabel}
                 </span>
-              )}
-              <div className={tourOverviewCol.crew}>
-                <TourListCrewHint people={stats.people} needed={stats.needed} muted={muted} />
-              </div>
-              <span
-                className={cn(
-                  tourOverviewCol.people,
-                  muted ? "text-white/25" : "text-white/45"
+                {usePerformanceLines ? (
+                  <PerformanceLineList
+                    lines={performanceLines}
+                    field="time"
+                    className={cn(tourOverviewCol.time, rowTone, whenTone)}
+                  />
+                ) : (
+                  <span className={cn(tourOverviewCol.time, "whitespace-nowrap tabular-nums", rowTone, whenTone)}>
+                    {when.timeLabel}
+                  </span>
                 )}
-                title={`${stats.people} people on this day`}
-              >
-                {stats.people}
-              </span>
-              <div
-                className={cn(
-                  tourOverviewCol.extra,
-                  extra ? (muted ? "text-white/35" : "text-white/45") : "text-white/25"
+                {usePerformanceLines ? (
+                  <PerformanceLineList
+                    lines={performanceLines}
+                    field="venue"
+                    className={cn(tourOverviewCol.venue, rowTone, venueTone)}
+                  />
+                ) : (
+                  <span className={cn(tourOverviewCol.venue, "truncate", rowTone, venueTone)} title={venueName}>
+                    {venueName}
+                  </span>
                 )}
-                title={extra ?? undefined}
-              >
-                {extra ?? "—"}
-              </div>
-            </li>
+                <div className={tourOverviewCol.crew}>
+                  <TourListCrewHint people={stats.people} needed={stats.needed} muted={muted} />
+                </div>
+                <span
+                  className={cn(tourOverviewCol.people, muted ? "text-white/25" : "text-white/45")}
+                  title={`${stats.people} people on this day`}
+                >
+                  {stats.people}
+                </span>
+                <div
+                  className={cn(
+                    tourOverviewCol.extra,
+                    extra ? (muted ? "text-white/35" : "text-white/45") : "text-white/25"
+                  )}
+                  title={extra ?? undefined}
+                >
+                  {extra ?? "—"}
+                </div>
+              </li>
+              {scheduleEvents.map((ev) => {
+                const label = scheduleEventLabel(ev);
+                const times = formatScheduleEventTimes(ev);
+                return (
+                  <li
+                    key={ev.id}
+                    className={cn(tourOverviewSubgridRowClass, "pl-3 sm:pl-4")}
+                    title={`${label} · ${times}`}
+                  >
+                    <span className={cn(tourOverviewCol.type, "text-white/25")} aria-hidden>
+                      ·
+                    </span>
+                    <span className={cn(tourOverviewCol.day, jobRowTone)} />
+                    <span className={cn(tourOverviewCol.date, jobRowTone)} />
+                    <span className={cn(tourOverviewCol.time, "tabular-nums", jobRowTone)}>{times || "—"}</span>
+                    <span className={cn(tourOverviewCol.venue, "font-medium truncate", jobRowTone)} title={label}>
+                      {label}
+                    </span>
+                    <span className={cn(tourOverviewCol.crew, "text-white/20")}>—</span>
+                    <span className={cn(tourOverviewCol.people, "text-white/20")}>—</span>
+                    <span className={cn(tourOverviewCol.extra, "text-white/20")}>—</span>
+                  </li>
+                );
+              })}
+            </Fragment>
           );
         })}
       </ul>

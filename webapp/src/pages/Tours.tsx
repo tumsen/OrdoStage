@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { Plus, Trash2, Eye, Route } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Plus, Trash2, Route } from "lucide-react";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Tour, CreateTour, TourListItem } from "../../../backend/src/types";
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -37,6 +39,102 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+
+function TourListRow({
+  tour,
+  onDelete,
+}: {
+  tour: TourListItem;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const crewTotals = computeTourCrewTotals(tour.shows, tour.handsNeeded, tour.tourPeopleCount);
+  const dayCount = tour.shows.length;
+  const scheduleEventCount = tour.shows.reduce(
+    (n, s) => n + (s.scheduleEvents?.length ?? 0),
+    0
+  );
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="border-b border-white/5">
+      <div className="flex items-start gap-2 px-4 sm:px-5 py-3.5">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-start gap-2 text-left rounded-md py-0.5 -my-0.5 px-1 -mx-1 hover:bg-white/[0.04]"
+          >
+            {open ? (
+              <ChevronDown size={16} className="text-white/45 shrink-0 mt-0.5" />
+            ) : (
+              <ChevronRight size={16} className="text-white/45 shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-x-2 flex-wrap min-w-0">
+                <span className="text-sm font-medium text-white/90">{tour.name}</span>
+                <TourStatusBadge status={tour.status} />
+                {dayCount > 0 ? (
+                  <span
+                    className="text-[10px] tabular-nums text-white/40 shrink-0"
+                    title="Crew on busiest day (tour roster when a day has no custom roster)"
+                  >
+                    {crewTotals.people} crew
+                    {crewTotals.handsNeeded != null ? ` · ${crewTotals.handsNeeded} needed` : ""}
+                  </span>
+                ) : null}
+                {scheduleEventCount > 0 && !open ? (
+                  <span className="text-[10px] text-white/35">
+                    {scheduleEventCount} schedule block{scheduleEventCount === 1 ? "" : "s"} · expand to view
+                  </span>
+                ) : null}
+              </div>
+              {tour.tourManagerName ? (
+                <p className="text-[11px] text-white/35 mt-0.5 truncate">
+                  Manager: {tour.tourManagerName}
+                </p>
+              ) : null}
+              <TourShowsOverviewGrid
+                shows={tour.shows}
+                tourHandsNeeded={tour.handsNeeded}
+                tourPeopleCount={tour.tourPeopleCount}
+                showColumnHeaders
+                includeScheduleEvents={open}
+                className="mt-1.5"
+              />
+            </div>
+          </button>
+        </CollapsibleTrigger>
+        <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-7 border-white/15 text-white hover:bg-white/10"
+          >
+            <Link
+              to={`/tours/${tour.id}`}
+              className="inline-flex items-center gap-1.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Go to tour
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-white/30 hover:text-red-400"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Trash2 size={14} />
+          </Button>
+        </div>
+      </div>
+    </Collapsible>
+  );
+}
 
 function TourStatusBadge({ status }: { status: Tour["status"] }) {
   if (status === "active") {
@@ -233,7 +331,6 @@ function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
 }
 
 export default function Tours() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [newOpen, setNewOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -273,102 +370,37 @@ export default function Tours() {
 
       {/* List */}
       <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto] gap-0">
-          <div className="contents">
-            <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">
-              Tour
-            </div>
-            <div className="px-5 py-3 border-b border-white/10" />
-          </div>
-
-          {isLoading ? (
-            <div className="col-span-2 p-5 space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full rounded bg-white/5" />
-              ))}
-            </div>
-          ) : error ? (
-            <div className="col-span-2 py-10 text-center text-red-400 text-sm">
-              Failed to load tours.
-            </div>
-          ) : (tours ?? []).length === 0 ? (
-            <div className="col-span-2 py-16 text-center">
-              <Route size={28} className="text-white/15 mx-auto mb-3" />
-              <p className="text-white/30 text-sm">No tours yet.</p>
-              <p className="text-white/20 text-xs mt-1">Create your first tour to get started.</p>
-              <Button
-                onClick={() => setNewOpen(true)}
-                variant="outline"
-                size="sm"
-                className="mt-4 border-white/10 text-white/50 hover:text-white bg-transparent gap-2"
-              >
-                <Plus size={12} /> New Tour
-              </Button>
-            </div>
-          ) : (
-            (tours ?? []).map((tour) => {
-              const crewTotals = computeTourCrewTotals(
-                tour.shows,
-                tour.handsNeeded,
-                tour.tourPeopleCount,
-              );
-              return (
-              <div key={tour.id} className="contents group">
-                <div
-                  className="px-4 sm:px-5 py-3.5 border-b border-white/5 cursor-pointer"
-                  onClick={() => navigate(`/tours/${tour.id}`)}
-                >
-                  <div className="flex items-baseline gap-x-2 flex-wrap min-w-0">
-                    <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
-                      {tour.name}
-                    </span>
-                    <TourStatusBadge status={tour.status} />
-                    {tour.shows.length > 0 ? (
-                      <span
-                        className="text-[10px] tabular-nums text-white/40 shrink-0"
-                        title="Crew on busiest day (tour roster when a day has no custom roster)"
-                      >
-                        {crewTotals.people} crew
-                        {crewTotals.handsNeeded != null ? ` · ${crewTotals.handsNeeded} needed` : ""}
-                      </span>
-                    ) : null}
-                  </div>
-                  {tour.tourManagerName ? (
-                    <p className="text-[11px] text-white/35 mt-0.5 truncate">
-                      Manager: {tour.tourManagerName}
-                    </p>
-                  ) : null}
-                  <TourShowsOverviewGrid
-                    shows={tour.shows}
-                    tourHandsNeeded={tour.handsNeeded}
-                    tourPeopleCount={tour.tourPeopleCount}
-                    showColumnHeaders
-                    className="mt-1.5"
-                  />
-                </div>
-                <div className="px-5 py-3.5 border-b border-white/5 flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-white/30 hover:text-white"
-                    onClick={() => navigate(`/tours/${tour.id}`)}
-                  >
-                    <Eye size={14} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-white/30 hover:text-red-400"
-                    onClick={() => setDeleteId(tour.id)}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              </div>
-              );
-            })
-          )}
+        <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">
+          Tours
         </div>
+
+        {isLoading ? (
+          <div className="p-5 space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded bg-white/5" />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="py-10 text-center text-red-400 text-sm">Failed to load tours.</div>
+        ) : (tours ?? []).length === 0 ? (
+          <div className="py-16 text-center">
+            <Route size={28} className="text-white/15 mx-auto mb-3" />
+            <p className="text-white/30 text-sm">No tours yet.</p>
+            <p className="text-white/20 text-xs mt-1">Create your first tour to get started.</p>
+            <Button
+              onClick={() => setNewOpen(true)}
+              variant="outline"
+              size="sm"
+              className="mt-4 border-white/10 text-white/50 hover:text-white bg-transparent gap-2"
+            >
+              <Plus size={12} /> New Tour
+            </Button>
+          </div>
+        ) : (
+          (tours ?? []).map((tour) => (
+            <TourListRow key={tour.id} tour={tour} onDelete={() => setDeleteId(tour.id)} />
+          ))
+        )}
       </div>
 
       <NewTourDialog open={newOpen} onOpenChange={setNewOpen} />
