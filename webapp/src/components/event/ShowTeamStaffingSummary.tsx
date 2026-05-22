@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { forwardRef, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 
 import {
@@ -71,17 +71,27 @@ function JobsStaffingFraction({
   );
 }
 
-function TeamStaffingBadge({ row, muted }: { row: ShowTeamStaffingRow; muted?: boolean }) {
+const TeamStaffingBadge = forwardRef<
+  HTMLSpanElement,
+  {
+    row: ShowTeamStaffingRow;
+    muted?: boolean;
+    uniformWidth?: number;
+  }
+>(function TeamStaffingBadge({ row, muted, uniformWidth }, ref) {
   const isOk = row.state === "ok";
   const needsStaff = row.state === "incomplete";
+
   return (
     <span
+      ref={ref}
       className={cn(
-        "inline-flex items-center gap-0.5 rounded border px-1.5 py-px text-[10px] font-medium whitespace-nowrap w-auto shrink-0",
+        "inline-flex items-center gap-0.5 rounded border px-1.5 py-px text-[10px] font-medium whitespace-nowrap shrink-0 box-border",
+        uniformWidth != null ? "justify-center" : "w-auto",
         muted && "opacity-60"
       )}
-      style={
-        row.color
+      style={{
+        ...(row.color
           ? {
               backgroundColor: `${row.color}22`,
               borderColor: `${row.color}55`,
@@ -91,8 +101,11 @@ function TeamStaffingBadge({ row, muted }: { row: ShowTeamStaffingRow; muted?: b
               backgroundColor: "rgba(255,255,255,0.06)",
               borderColor: "rgba(255,255,255,0.12)",
               color: "rgba(255,255,255,0.75)",
-            }
-      }
+            }),
+        ...(uniformWidth != null
+          ? { width: uniformWidth, minWidth: uniformWidth, maxWidth: uniformWidth }
+          : {}),
+      }}
       title={teamStaffingStatusLabel(row)}
     >
       {isOk ? (
@@ -111,6 +124,39 @@ function TeamStaffingBadge({ row, muted }: { row: ShowTeamStaffingRow; muted?: b
       ) : null}
       <span>{row.name}</span>
     </span>
+  );
+});
+
+/** All team badges on one show share the width of the widest badge. */
+function TeamStaffingBadgesRow({ rows, muted }: { rows: ShowTeamStaffingRow[]; muted?: boolean }) {
+  const refs = useRef<(HTMLSpanElement | null)[]>([]);
+  const [uniformWidth, setUniformWidth] = useState<number | undefined>(undefined);
+  const rowKey = useMemo(() => rows.map((r) => `${r.teamId}:${r.state}:${r.slotsFilled}/${r.slotsNeeded}:${r.name}`).join("|"), [rows]);
+
+  useLayoutEffect(() => {
+    refs.current = refs.current.slice(0, rows.length);
+    let max = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const w = refs.current[i]?.offsetWidth ?? 0;
+      if (w > max) max = w;
+    }
+    setUniformWidth(max > 0 ? max : undefined);
+  }, [rowKey, rows.length]);
+
+  return (
+    <>
+      {rows.map((row, index) => (
+        <TeamStaffingBadge
+          key={row.teamId}
+          ref={(el) => {
+            refs.current[index] = el;
+          }}
+          row={row}
+          muted={muted}
+          uniformWidth={uniformWidth}
+        />
+      ))}
+    </>
   );
 }
 
@@ -159,9 +205,7 @@ export function ShowTeamStaffingSummary({
         Team Staffing
       </span>
       <JobsStaffingFraction jobsStaffed={jobsStaffed} jobsTotal={jobsTotal} muted={muted} />
-      {rows.map((row) => (
-        <TeamStaffingBadge key={row.teamId} row={row} muted={muted} />
-      ))}
+      <TeamStaffingBadgesRow rows={rows} muted={muted} />
     </span>
   );
 }
