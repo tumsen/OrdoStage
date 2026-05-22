@@ -693,172 +693,168 @@ function DetailsTab({
 
             <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-5">
               <div className="min-w-0 flex flex-col gap-3">
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <Collapsible open={descriptionOpen} onOpenChange={setDescriptionOpen}>
-                    <CollapsibleTrigger asChild>
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.06]"
-                      >
-                        <span className="text-white/60 text-xs uppercase tracking-wide">Description</span>
-                        <ChevronDown
-                          className={cn(
-                            "h-4 w-4 shrink-0 text-white/45 transition-transform",
-                            descriptionOpen && "rotate-180"
-                          )}
+                <SectionHeader>Company</SectionHeader>
+                <FormField
+                  control={form.control}
+                  name="companyLegalName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Legal name</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value ?? ""}
+                          placeholder="Registered company name"
+                          className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
                         />
-                      </button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-2">
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="companyVat"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">VAT / org number</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value ?? ""}
+                          placeholder="VAT, CVR, EIN…"
+                          className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
+                  <Label className="text-white/60 text-xs uppercase tracking-wide">Address</Label>
+                  <AddressFields
+                    value={{
+                      street: form.watch("companyStreet") ?? "",
+                      number: form.watch("companyNumber") ?? "",
+                      zip: form.watch("companyZip") ?? "",
+                      city: form.watch("companyCity") ?? "",
+                      state: form.watch("companyState") ?? "",
+                      country: form.watch("companyCountry") ?? "",
+                    }}
+                    onChange={(addr) => {
+                      form.setValue("companyStreet", addr.street);
+                      form.setValue("companyNumber", addr.number);
+                      form.setValue("companyZip", addr.zip);
+                      form.setValue("companyCity", addr.city);
+                      form.setValue("companyState", addr.state);
+                      form.setValue("companyCountry", addr.country);
+                    }}
+                  />
+                </div>
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contract contact</FormLabel>
+                  <ContactFieldsOneRowNote
+                    row={{
+                      role: form.watch("primaryContactRole") ?? "",
+                      name: form.watch("primaryContactName") ?? "",
+                      phone: form.watch("primaryContactPhone") ?? "",
+                      email: form.watch("primaryContactEmail") ?? "",
+                      note: form.watch("primaryContactNote") ?? "",
+                    }}
+                    onChange={(patch) => {
+                      if (patch.role !== undefined) form.setValue("primaryContactRole", patch.role);
+                      if (patch.name !== undefined) form.setValue("primaryContactName", patch.name);
+                      if (patch.phone !== undefined) form.setValue("primaryContactPhone", patch.phone);
+                      if (patch.email !== undefined) form.setValue("primaryContactEmail", patch.email);
+                      if (patch.note !== undefined) form.setValue("primaryContactNote", patch.note);
+                    }}
+                    notePlaceholder="Booking lead: availability, preferred channel…"
+                  />
+                </FormItem>
+                <FormField
+                  control={form.control}
+                  name="contractNotes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contract &amp; booking notes</FormLabel>
                       <FormControl>
                         <Textarea
                           {...field}
                           value={field.value ?? ""}
-                          id="event-description"
-                          className="bg-white/5 border-white/10 text-white focus:border-white/30 resize-y min-h-[200px] text-sm leading-relaxed"
-                          rows={12}
-                          placeholder="Show summary, audience, notes for the team…"
+                          placeholder="Deal terms, references, special clauses…"
+                          className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
+                          rows={3}
                         />
                       </FormControl>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </FormItem>
-              )}
-            />
-            <p className="text-xs text-white/40">
-              Schedule and duration are per show (below). Default venue is for reference; each show can use a different venue.
-              Draft / confirmed / cancelled is set on each show below, not here.
-            </p>
-            {!isNew && event ? (
-              <div className="rounded-md border border-white/10 bg-white/[0.02] p-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-white/55">Create an editable venue booking based on show timings.</p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="border-white/10 bg-transparent text-white/85"
-                    onClick={() => setVenueBookingOpen(true)}
-                    disabled={!eventBookingSlot}
-                    title={!eventBookingSlot ? "Add at least one timed show first." : undefined}
-                  >
-                    Venue booking
-                  </Button>
-                </div>
+                    </FormItem>
+                  )}
+                />
               </div>
-            ) : null}
-            <FormField
-              control={form.control}
-              name="venueId"
-              render={({ field }) => {
-                const vid = field.value ?? "";
-                const venueIds = new Set((venues ?? []).map((x) => x.id));
-                const orphan =
-                  Boolean(vid && vid !== "__none__" && !venueIds.has(vid));
-                const selectValue = orphan ? vid : vid || "__none__";
-                return (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Venue</FormLabel>
-                    <Select onValueChange={field.onChange} value={selectValue}>
-                      <FormControl>
-                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                          <SelectValue placeholder="No venue" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                        <SelectItem value="__none__">No venue</SelectItem>
-                        {orphan ? (
-                          <SelectItem value={vid}>Unavailable venue (re-select or clear)</SelectItem>
-                        ) : null}
-                        {(venues ?? []).map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                );
-              }}
-            />
-            {venueSizeWarnings && venueSizeWarnings.length > 0 ? (
-              <div
-                role="status"
-                className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100/95 space-y-0.5"
-              >
-                {venueSizeWarnings.map((line) => (
-                  <p key={line}>{line}</p>
-                ))}
+
+              <div className="min-w-0 flex flex-col gap-3">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="flex min-h-0 flex-1 flex-col">
+                      <Collapsible open={descriptionOpen} onOpenChange={setDescriptionOpen} className="flex min-h-0 flex-1 flex-col">
+                        <CollapsibleTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.06]"
+                          >
+                            <span className="text-white/60 text-xs uppercase tracking-wide">Description</span>
+                            <ChevronDown
+                              className={cn(
+                                "h-4 w-4 shrink-0 text-white/45 transition-transform",
+                                descriptionOpen && "rotate-180"
+                              )}
+                            />
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="pt-2 flex-1 min-h-0">
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              value={field.value ?? ""}
+                              id="event-description"
+                              className="bg-white/5 border-white/10 text-white focus:border-white/30 resize-y min-h-[200px] md:min-h-[280px] text-sm leading-relaxed"
+                              rows={12}
+                              placeholder="Show summary, audience, notes for the team…"
+                            />
+                          </FormControl>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </FormItem>
+                  )}
+                />
               </div>
-            ) : null}
+            </div>
 
-            {/* ── Production Info ── */}
-            <SectionHeader>Production Info</SectionHeader>
-
-            <FormField
-              control={form.control}
-              name="leadPersonId"
-              render={({ field }) => (
+            <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-5">
+              <div className="min-w-0 flex flex-col gap-3">
                 <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Event lead</FormLabel>
-                  <Select value={field.value || "__none__"} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white focus:border-white/30">
-                        <SelectValue placeholder="No event lead" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-[#1a1a1a] border-white/10 text-white max-h-64">
-                      <SelectItem value="__none__">No event lead</SelectItem>
-                      {[...people]
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-white/40 mt-1">
-                    Who coordinates this event. They can still be assigned to jobs; the lead role alone does not
-                    count as a job assignment.
-                  </p>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical contact</FormLabel>
+                  <ContactFieldsOneRowNote
+                    row={{
+                      role: form.watch("technicalContactRole") ?? "",
+                      name: form.watch("technicalContactName") ?? "",
+                      phone: form.watch("technicalContactPhone") ?? "",
+                      email: form.watch("technicalContactEmail") ?? "",
+                      note: form.watch("technicalContactNote") ?? "",
+                    }}
+                    onChange={(patch) => {
+                      if (patch.role !== undefined) form.setValue("technicalContactRole", patch.role);
+                      if (patch.name !== undefined) form.setValue("technicalContactName", patch.name);
+                      if (patch.phone !== undefined) form.setValue("technicalContactPhone", patch.phone);
+                      if (patch.email !== undefined) form.setValue("technicalContactEmail", patch.email);
+                      if (patch.note !== undefined) form.setValue("technicalContactNote", patch.note);
+                    }}
+                    notePlaceholder="Technical lead on booker side: channel, rider links…"
+                  />
                 </FormItem>
-              )}
-            />
+              </div>
 
-            <FormField
-              control={form.control}
-              name="actorCount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Actor Count</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value ?? ""} type="number" min={0} placeholder="e.g. 12" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="allergies"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Allergies / Dietary Requirements</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} value={field.value ?? ""} placeholder="Any allergies or dietary requirements" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-none" rows={2} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            {/* ── Technical ── */}
-            <SectionHeader>Technical</SectionHeader>
-
+              <div className="min-w-0 flex flex-col gap-3">
+                <SectionHeader>Technical</SectionHeader>
             <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-4 pb-0.5">
                 {(
@@ -1064,128 +1060,128 @@ function DetailsTab({
               </p>
             ) : null}
               </div>
+            </div>
 
-              <div className="min-w-0 flex flex-col gap-3">
-            <SectionHeader>Booking &amp; contract</SectionHeader>
-            <p className="text-xs text-white/45 -mt-1 mb-2">
-              Company and booking party, contract contact, technical liaison, and contract notes for confirming the engagement.
+            <div className="space-y-3 pt-2 border-t border-white/10">
+            <p className="text-xs text-white/40">
+              Schedule and duration are per show on the Shows tab. Default venue is for reference; each show can use a different venue.
+              Draft / confirmed / cancelled is set on each show, not here.
             </p>
-
-            <div className="grid grid-cols-1 gap-3">
-              <FormField
-                control={form.control}
-                name="companyLegalName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Company legal name</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        placeholder="Registered company name"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="companyVat"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">VAT / org number</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        placeholder="VAT, CVR, EIN…"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
-              <Label className="text-white/60 text-xs uppercase tracking-wide">Company address</Label>
-              <AddressFields
-                value={{
-                  street: form.watch("companyStreet") ?? "",
-                  number: form.watch("companyNumber") ?? "",
-                  zip: form.watch("companyZip") ?? "",
-                  city: form.watch("companyCity") ?? "",
-                  state: form.watch("companyState") ?? "",
-                  country: form.watch("companyCountry") ?? "",
-                }}
-                onChange={(addr) => {
-                  form.setValue("companyStreet", addr.street);
-                  form.setValue("companyNumber", addr.number);
-                  form.setValue("companyZip", addr.zip);
-                  form.setValue("companyCity", addr.city);
-                  form.setValue("companyState", addr.state);
-                  form.setValue("companyCountry", addr.country);
-                }}
-              />
-            </div>
-
-            <FormItem>
-              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Primary / contract contact</FormLabel>
-              <ContactFieldsOneRowNote
-                row={{
-                  role: form.watch("primaryContactRole") ?? "",
-                  name: form.watch("primaryContactName") ?? "",
-                  phone: form.watch("primaryContactPhone") ?? "",
-                  email: form.watch("primaryContactEmail") ?? "",
-                  note: form.watch("primaryContactNote") ?? "",
-                }}
-                onChange={(patch) => {
-                  if (patch.role !== undefined) form.setValue("primaryContactRole", patch.role);
-                  if (patch.name !== undefined) form.setValue("primaryContactName", patch.name);
-                  if (patch.phone !== undefined) form.setValue("primaryContactPhone", patch.phone);
-                  if (patch.email !== undefined) form.setValue("primaryContactEmail", patch.email);
-                  if (patch.note !== undefined) form.setValue("primaryContactNote", patch.note);
-                }}
-                notePlaceholder="Booking lead: availability, preferred channel…"
-              />
-            </FormItem>
-
-            <FormItem>
-              <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Technical contact</FormLabel>
-              <ContactFieldsOneRowNote
-                row={{
-                  role: form.watch("technicalContactRole") ?? "",
-                  name: form.watch("technicalContactName") ?? "",
-                  phone: form.watch("technicalContactPhone") ?? "",
-                  email: form.watch("technicalContactEmail") ?? "",
-                  note: form.watch("technicalContactNote") ?? "",
-                }}
-                onChange={(patch) => {
-                  if (patch.role !== undefined) form.setValue("technicalContactRole", patch.role);
-                  if (patch.name !== undefined) form.setValue("technicalContactName", patch.name);
-                  if (patch.phone !== undefined) form.setValue("technicalContactPhone", patch.phone);
-                  if (patch.email !== undefined) form.setValue("technicalContactEmail", patch.email);
-                  if (patch.note !== undefined) form.setValue("technicalContactNote", patch.note);
-                }}
-                notePlaceholder="Technical lead on booker side: channel, rider links…"
-              />
-            </FormItem>
-
+            {!isNew && event ? (
+              <div className="rounded-md border border-white/10 bg-white/[0.02] p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-white/55">Create an editable venue booking based on show timings.</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-white/10 bg-transparent text-white/85"
+                    onClick={() => setVenueBookingOpen(true)}
+                    disabled={!eventBookingSlot}
+                    title={!eventBookingSlot ? "Add at least one timed show first." : undefined}
+                  >
+                    Venue booking
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             <FormField
               control={form.control}
-              name="contractNotes"
+              name="venueId"
+              render={({ field }) => {
+                const vid = field.value ?? "";
+                const venueIds = new Set((venues ?? []).map((x) => x.id));
+                const orphan =
+                  Boolean(vid && vid !== "__none__" && !venueIds.has(vid));
+                const selectValue = orphan ? vid : vid || "__none__";
+                return (
+                  <FormItem>
+                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Default venue</FormLabel>
+                    <Select onValueChange={field.onChange} value={selectValue}>
+                      <FormControl>
+                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                          <SelectValue placeholder="No venue" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                        <SelectItem value="__none__">No venue</SelectItem>
+                        {orphan ? (
+                          <SelectItem value={vid}>Unavailable venue (re-select or clear)</SelectItem>
+                        ) : null}
+                        {(venues ?? []).map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                );
+              }}
+            />
+            {venueSizeWarnings && venueSizeWarnings.length > 0 ? (
+              <div
+                role="status"
+                className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100/95 space-y-0.5"
+              >
+                {venueSizeWarnings.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            ) : null}
+
+            <SectionHeader>Production</SectionHeader>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="leadPersonId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Contract &amp; booking notes</FormLabel>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Event lead</FormLabel>
+                  <Select value={field.value || "__none__"} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="bg-white/5 border-white/10 text-white focus:border-white/30">
+                        <SelectValue placeholder="No event lead" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="bg-[#1a1a1a] border-white/10 text-white max-h-64">
+                      <SelectItem value="__none__">No event lead</SelectItem>
+                      {[...people]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-white/40 mt-1">
+                    Coordinates this event; lead alone does not count as a job assignment.
+                  </p>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="actorCount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Actor count</FormLabel>
                   <FormControl>
-                    <Textarea
-                      {...field}
-                      value={field.value ?? ""}
-                      placeholder="Deal terms, references, special clauses…"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-y min-h-[72px]"
-                      rows={3}
-                    />
+                    <Input {...field} value={field.value ?? ""} type="number" min={0} placeholder="e.g. 12" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            </div>
+            <FormField
+              control={form.control}
+              name="allergies"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Allergies / dietary</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} value={field.value ?? ""} placeholder="Any allergies or dietary requirements" className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 resize-none" rows={2} />
                   </FormControl>
                 </FormItem>
               )}
@@ -1257,7 +1253,6 @@ function DetailsTab({
             </div>
 
             {!isNew && event ? <EventDocumentsSection event={event} /> : null}
-              </div>
             </div>
 
             {saveError ? (
