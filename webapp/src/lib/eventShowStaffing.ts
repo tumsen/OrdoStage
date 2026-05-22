@@ -164,6 +164,17 @@ export type ShowTeamStaffingRow = {
 };
 
 /** Per event team: staffing OK, jobs still need people, or no jobs in that department. */
+/** Fully staffed jobs vs total jobs on a show. */
+export function computeShowJobStaffingStats(show: EventShow): {
+  jobsStaffed: number;
+  jobsTotal: number;
+} {
+  const jobs = show.jobs ?? [];
+  const jobsTotal = jobs.length;
+  const jobsStaffed = jobs.filter(isJobFullyAssigned).length;
+  return { jobsStaffed, jobsTotal };
+}
+
 export function computeShowTeamStaffingRows(
   show: EventShow,
   eventTeams: EventTeam[]
