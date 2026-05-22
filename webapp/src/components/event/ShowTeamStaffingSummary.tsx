@@ -211,6 +211,7 @@ export function ShowTeamStaffingSummary({
   muted,
   className,
   detailed = false,
+  omitSectionLabel = false,
 }: {
   show: EventShow;
   teams: EventTeam[];
@@ -218,6 +219,8 @@ export function ShowTeamStaffingSummary({
   className?: string;
   /** Events overview: jobs fraction + per-team badges on one line. */
   detailed?: boolean;
+  /** Hide "Team Staffing" when the overview grid column header carries the label. */
+  omitSectionLabel?: boolean;
 }) {
   const rows = useMemo(() => computeShowTeamStaffingRows(show, teams), [show, teams]);
   const { total } = useMemo(() => computeShowStaffingStats(show, teams), [show, teams]);
@@ -227,12 +230,14 @@ export function ShowTeamStaffingSummary({
     return <span className={cn("text-[10px] text-white/35", muted && "text-white/25", className)}>No teams</span>;
   }
 
+  const sectionLabel = omitSectionLabel ? null : (
+    <span className={cn("text-[10px] text-white/45 shrink-0", muted && "text-white/30")}>Team Staffing</span>
+  );
+
   if (!detailed) {
     return (
       <span className={cn("inline-flex items-center gap-1 min-w-0", className)}>
-        <span className={cn("text-[10px] text-white/45 shrink-0", muted && "text-white/30")}>
-          Team Staffing
-        </span>
+        {sectionLabel}
         <JobsStaffingFraction jobsStaffed={jobsStaffed} jobsTotal={jobsTotal} muted={muted} />
       </span>
     );
@@ -246,9 +251,7 @@ export function ShowTeamStaffingSummary({
         ...rows.map(teamStaffingStatusLabel),
       ].join(" · ")}
     >
-      <span className={cn("text-[10px] text-white/45 shrink-0", muted && "text-white/30")}>
-        Team Staffing
-      </span>
+      {sectionLabel}
       <JobsStaffingFraction jobsStaffed={jobsStaffed} jobsTotal={jobsTotal} muted={muted} />
       <TeamStaffingBadgesRow rows={rows} muted={muted} />
     </span>

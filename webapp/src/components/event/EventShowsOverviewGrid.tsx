@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { computeShowStaffingStats, formatJobAssigneesLabel, sortEventShowJobs } from "@/lib/eventShowStaffing";
 import { ShowTeamStaffingSummary } from "@/components/event/ShowTeamStaffingSummary";
 import type { EventShow, EventShowJob, EventTeam } from "@/lib/types";
@@ -26,22 +27,34 @@ function overviewGridColumns(hour12: boolean): string {
 const overviewHeaderCellClass =
   "text-[10px] uppercase tracking-wide text-white/35 font-medium leading-snug";
 
-function EventShowsOverviewHeaderRow({ gridCols }: { gridCols: string }) {
+/** Shared padding/alignment for header and data cells so columns line up. */
+const overviewCol = {
+  status: "pr-2 justify-self-start",
+  day: "min-w-0 truncate text-left",
+  date: "min-w-0 truncate pl-2 text-left",
+  time: "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
+  venue: "min-w-0 truncate pr-2 text-left",
+  staffing: "min-w-0 pr-4 self-center",
+  people: "whitespace-nowrap pr-3 text-right tabular-nums",
+  hours: "whitespace-nowrap pl-2 pr-2 text-right tabular-nums",
+  tickets: "min-w-0 truncate pl-2 text-right sm:text-left",
+} as const;
+
+const overviewSubgridRowClass = "col-span-full grid items-center [grid-template-columns:subgrid]";
+
+function EventShowsOverviewHeaderCells() {
+  const headerBorder = "border-b border-white/[0.08] pb-1.5";
   return (
-    <li className="border-b border-white/[0.08] pb-1.5 mb-0.5">
-      <div className="grid items-end gap-x-0" style={{ gridTemplateColumns: gridCols }}>
-        <span className={cn(overviewHeaderCellClass, "pr-2 justify-self-start")}>Status</span>
-        <span className={cn(overviewHeaderCellClass, "text-left")}>Day</span>
-        <span className={cn(overviewHeaderCellClass, "pl-2 text-left")}>Date</span>
-        <span className={cn(overviewHeaderCellClass, "pl-0.5 pr-1 text-left whitespace-nowrap")}>
-          Time
-        </span>
-        <span className={cn(overviewHeaderCellClass, "pr-2 text-left")}>Venue</span>
-        <span className={cn(overviewHeaderCellClass, "pr-4 text-left min-w-0")}>Team staffing</span>
-        <span className={cn(overviewHeaderCellClass, "pr-3 text-right whitespace-nowrap")}>People</span>
-        <span className={cn(overviewHeaderCellClass, "pr-2 text-right whitespace-nowrap")}>Hours</span>
-        <span className={cn(overviewHeaderCellClass, "pl-2 text-right sm:text-left min-w-0")}>Tickets</span>
-      </div>
+    <li className={cn(overviewSubgridRowClass, "items-end")}>
+      <span className={cn(overviewHeaderCellClass, overviewCol.status, headerBorder)}>Status</span>
+      <span className={cn(overviewHeaderCellClass, overviewCol.day, headerBorder)}>Day</span>
+      <span className={cn(overviewHeaderCellClass, overviewCol.date, headerBorder)}>Date</span>
+      <span className={cn(overviewHeaderCellClass, overviewCol.time, headerBorder)}>Time</span>
+      <span className={cn(overviewHeaderCellClass, overviewCol.venue, headerBorder)}>Venue</span>
+      <span className={cn(overviewHeaderCellClass, overviewCol.staffing, headerBorder)}>Team staffing</span>
+      <span className={cn(overviewHeaderCellClass, overviewCol.people, headerBorder)}>People</span>
+      <span className={cn(overviewHeaderCellClass, overviewCol.hours, headerBorder)}>Hours</span>
+      <span className={cn(overviewHeaderCellClass, overviewCol.tickets, headerBorder)}>Tickets</span>
     </li>
   );
 }
@@ -154,8 +167,11 @@ export function EventShowsOverviewGrid({
 
   return (
     <div className={cn("mt-1 overflow-x-auto -mx-1 px-1", className)}>
-      <ul className="min-w-[min(100%,42rem)] flex flex-col gap-y-1.5 text-[10px] leading-snug">
-        {showColumnHeaders ? <EventShowsOverviewHeaderRow gridCols={gridCols} /> : null}
+      <ul
+        className="min-w-[min(100%,42rem)] grid items-center gap-x-0 gap-y-1.5 text-[10px] leading-snug"
+        style={{ gridTemplateColumns: gridCols }}
+      >
+        {showColumnHeaders ? <EventShowsOverviewHeaderCells /> : null}
         {sorted.map((show) => {
           const stats = computeShowStaffingStats(show, teams);
           const showOff = effectiveShowStatus(show) === "cancelled";
@@ -175,43 +191,36 @@ export function EventShowsOverviewGrid({
           const jobTitleTone = showOff ? undefined : "text-white/55";
 
           return (
-            <li key={show.id} className="space-y-0.5">
-              <div className="grid items-center gap-x-0" style={{ gridTemplateColumns: gridCols }}>
-                <div className="justify-self-start pr-2">
+            <Fragment key={show.id}>
+              <li className={overviewSubgridRowClass}>
+                <div className={overviewCol.status}>
                   <StatusBadge
                     status={showStatus}
                     className={cn("text-[10px] py-px px-1.5 font-medium", showOff && "opacity-50")}
                   />
                 </div>
-                <span className={cn("min-w-0 truncate text-left", rowTone, whenTone)} title={when.weekdayLabel}>
+                <span className={cn(overviewCol.day, rowTone, whenTone)} title={when.weekdayLabel}>
                   {when.weekdayLabel}
                 </span>
-                <span className={cn("min-w-0 truncate pl-2 text-left", rowTone, whenTone)} title={when.dateOnlyLabel}>
+                <span className={cn(overviewCol.date, rowTone, whenTone)} title={when.dateOnlyLabel}>
                   {when.dateOnlyLabel}
                 </span>
-                <span
-                  className={cn(
-                    "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
-                    rowTone,
-                    whenTone
-                  )}
-                >
-                  {when.timeLabel}
-                </span>
-                <span className={cn("min-w-0 truncate pr-2", rowTone, venueTone)} title={venueName}>
+                <span className={cn(overviewCol.time, rowTone, whenTone)}>{when.timeLabel}</span>
+                <span className={cn(overviewCol.venue, rowTone, venueTone)} title={venueName}>
                   {venueName}
                 </span>
-                <div className="min-w-0 pr-4 self-center">
+                <div className={overviewCol.staffing}>
                   <ShowTeamStaffingSummary
                     show={show}
                     teams={teams}
                     muted={showOff}
                     detailed={showTeamStaffingDetail}
+                    omitSectionLabel={showColumnHeaders}
                   />
                 </div>
                 <span
                   className={cn(
-                    "block whitespace-nowrap pr-3 text-right tabular-nums",
+                    overviewCol.people,
                     showOff ? "text-white/25 line-through decoration-white/20" : "text-white/45"
                   )}
                   title={`${stats.people} people on this show`}
@@ -220,7 +229,7 @@ export function EventShowsOverviewGrid({
                 </span>
                 <span
                   className={cn(
-                    "block whitespace-nowrap pl-2 pr-2 text-right tabular-nums",
+                    overviewCol.hours,
                     showOff ? "text-white/25 line-through decoration-white/20" : "text-white/45"
                   )}
                   title="Total planned hours for this show"
@@ -229,7 +238,7 @@ export function EventShowsOverviewGrid({
                 </span>
                 <div
                   className={cn(
-                    "min-w-0 truncate pl-2 text-right sm:text-left",
+                    overviewCol.tickets,
                     ticketBits ? (showOff ? "text-white/35" : "text-white/45") : "text-white/25",
                     showOff && "line-through decoration-white/20"
                   )}
@@ -237,51 +246,48 @@ export function EventShowsOverviewGrid({
                 >
                   {ticketBits ?? "—"}
                 </div>
-              </div>
+              </li>
               {includeJobs
                 ? showJobs.map((job) => {
-                const jobWhen = formatJobListWhenParts(job, prefsLocale, hour12);
-                const assignee = formatJobAssigneesLabel(job);
-                const title = job.title?.trim() || "Job";
-                return (
-                  <div
-                    key={job.id}
-                    className="grid items-center gap-x-0 pl-3 sm:pl-4"
-                    style={{ gridTemplateColumns: gridCols }}
-                    title={`${title} · ${assignee}`}
-                  >
-                    <span className="pr-2 text-white/25" aria-hidden>
-                      ·
-                    </span>
-                    <span className={cn("min-w-0 truncate text-left", jobRowTone, jobWhenTone)} title={jobWhen.weekdayLabel}>
-                      {jobWhen.weekdayLabel}
-                    </span>
-                    <span className={cn("min-w-0 truncate pl-2 text-left", jobRowTone, jobWhenTone)} title={jobWhen.dateOnlyLabel}>
-                      {jobWhen.dateOnlyLabel}
-                    </span>
-                    <span
-                      className={cn(
-                        "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
-                        jobRowTone,
-                        jobWhenTone
-                      )}
-                    >
-                      {jobWhen.timeLabel}
-                    </span>
-                    <span className={cn("min-w-0 truncate pr-2 font-medium", jobRowTone, jobTitleTone)} title={title}>
-                      {title}
-                    </span>
-                    <span className={cn("min-w-0 truncate pr-4", jobRowTone, jobTitleTone)} title={assignee}>
-                      {assignee}
-                    </span>
-                    <span className="text-white/20">—</span>
-                    <span className="text-white/20">—</span>
-                    <span className="text-white/20 pl-2">—</span>
-                  </div>
-                );
-              })
+                    const jobWhen = formatJobListWhenParts(job, prefsLocale, hour12);
+                    const assignee = formatJobAssigneesLabel(job);
+                    const title = job.title?.trim() || "Job";
+                    return (
+                      <li
+                        key={job.id}
+                        className={cn(overviewSubgridRowClass, "pl-3 sm:pl-4")}
+                        title={`${title} · ${assignee}`}
+                      >
+                        <span className={cn(overviewCol.status, "text-white/25")} aria-hidden>
+                          ·
+                        </span>
+                        <span
+                          className={cn(overviewCol.day, jobRowTone, jobWhenTone)}
+                          title={jobWhen.weekdayLabel}
+                        >
+                          {jobWhen.weekdayLabel}
+                        </span>
+                        <span
+                          className={cn(overviewCol.date, jobRowTone, jobWhenTone)}
+                          title={jobWhen.dateOnlyLabel}
+                        >
+                          {jobWhen.dateOnlyLabel}
+                        </span>
+                        <span className={cn(overviewCol.time, jobRowTone, jobWhenTone)}>{jobWhen.timeLabel}</span>
+                        <span className={cn(overviewCol.venue, "font-medium", jobRowTone, jobTitleTone)} title={title}>
+                          {title}
+                        </span>
+                        <span className={cn(overviewCol.staffing, jobRowTone, jobTitleTone)} title={assignee}>
+                          {assignee}
+                        </span>
+                        <span className={cn(overviewCol.people, "text-white/20")}>—</span>
+                        <span className={cn(overviewCol.hours, "text-white/20")}>—</span>
+                        <span className={cn(overviewCol.tickets, "text-white/20")}>—</span>
+                      </li>
+                    );
+                  })
                 : null}
-            </li>
+            </Fragment>
           );
         })}
       </ul>
