@@ -840,212 +840,217 @@ function DetailsTab({
               </div>
 
               <div className="min-w-0 flex flex-col gap-3">
-            <div className={cn(DETAIL_CARD_CLASS, "gap-4")}>
-              <SectionHeader>Technical</SectionHeader>
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-4 pb-0.5">
-                {(
-                  [
-                    { label: "Width", name: "stageWidth" as const },
-                    { label: "Depth", name: "stageDepth" as const },
-                    { label: "Height", name: "stageHeight" as const },
-                  ] as const
-                ).map((row) => (
-                  <FormField
-                    key={row.name}
-                    control={form.control}
-                    name={row.name}
-                    render={({ field }) => (
-                      <FormItem className="shrink-0 space-y-1.5 w-[5.75rem]">
-                        <FormLabel className="text-white/60 text-xs uppercase tracking-wide">{row.label}</FormLabel>
-                        <div className="flex items-center gap-1.5">
+                <div className={cn(DETAIL_CARD_CLASS, "gap-4")}>
+                  <SectionHeader>Technical</SectionHeader>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-4">
+                    {(
+                      [
+                        { label: "Width", name: "stageWidth" as const },
+                        { label: "Depth", name: "stageDepth" as const },
+                        { label: "Height", name: "stageHeight" as const },
+                      ] as const
+                    ).map((row) => (
+                      <FormField
+                        key={row.name}
+                        control={form.control}
+                        name={row.name}
+                        render={({ field }) => (
+                          <FormItem className="shrink-0 space-y-1.5 w-[5.75rem]">
+                            <FormLabel className={DETAIL_IN_CARD_FIELD_LABEL_CLASS}>{row.label}</FormLabel>
+                            <div className="flex items-center gap-1.5">
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  inputMode="decimal"
+                                  maxLength={7}
+                                  placeholder="0"
+                                  autoComplete="off"
+                                  aria-label={`Stage ${row.label.toLowerCase()} (m)`}
+                                  className="h-9 w-[4.5rem] min-w-[4.5rem] bg-white/5 border-white/10 text-white tabular-nums text-sm"
+                                />
+                              </FormControl>
+                              <span className="text-[10px] text-white/35 shrink-0">m</span>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 pt-4">
+                    <Label className="text-[10px] text-white/45 uppercase tracking-wide shrink-0">Effects</Label>
+                    <FormField
+                      control={form.control}
+                      name="smokeFx"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center gap-1.5 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-ordo-yellow"
+                              checked={Boolean(field.value)}
+                              onChange={(e) => field.onChange(e.target.checked)}
+                            />
+                          </FormControl>
+                          <FormLabel className="text-white/70 text-xs font-normal cursor-pointer">Smoke</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="hazeFx"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center gap-1.5 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-ordo-yellow"
+                              checked={Boolean(field.value)}
+                              onChange={(e) => field.onChange(e.target.checked)}
+                            />
+                          </FormControl>
+                          <FormLabel className="text-white/70 text-xs font-normal cursor-pointer">Haze</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="strobeFx"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center gap-1.5 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-ordo-yellow"
+                              checked={Boolean(field.value)}
+                              onChange={(e) => field.onChange(e.target.checked)}
+                            />
+                          </FormControl>
+                          <FormLabel className="text-white/70 text-xs font-normal cursor-pointer">Strobe</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="space-y-3 border-t border-white/10 pt-4">
+                    <FormField
+                      control={form.control}
+                      name="getInDate"
+                      render={({ field }) => (
+                        <FormItem className="shrink-0 max-w-full">
+                          <FormLabel className={DETAIL_IN_CARD_FIELD_LABEL_CLASS}>Get-in date</FormLabel>
+                          <FormControl>
+                            <EventStartDateInput value={field.value ?? ""} onChange={field.onChange} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex flex-wrap gap-3 items-end">
+                      <FormField
+                        control={form.control}
+                        name="getInStart"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className={DETAIL_IN_CARD_FIELD_LABEL_CLASS}>Start</FormLabel>
+                            <FormControl>
+                              <SplitTimeInput
+                                value={field.value ?? ""}
+                                nextFieldRef={getInEndFieldRef}
+                                aria-label="Get-in start"
+                                onChange={(v) => {
+                                  field.onChange(v);
+                                  const d = Number(form.getValues("getInDuration"));
+                                  if (!Number.isNaN(d) && d >= 1 && v) {
+                                    form.setValue("getInEnd", endTimeFromStartAndDuration(v, d));
+                                  } else {
+                                    const end = form.getValues("getInEnd");
+                                    if (v && end) {
+                                      const dm = durationMinutesBetween(v, end);
+                                      if (dm) form.setValue("getInDuration", String(dm));
+                                    }
+                                  }
+                                }}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="getInEnd"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className={DETAIL_IN_CARD_FIELD_LABEL_CLASS}>End</FormLabel>
+                            <FormControl>
+                              <SplitTimeInput
+                                ref={getInEndFieldRef}
+                                value={field.value ?? ""}
+                                nextFieldRef={getInDurFieldRef}
+                                aria-label="Get-in end"
+                                disabled={!/^\d{2}:\d{2}$/.test(form.getValues("getInStart") || "")}
+                                onChange={(v) => {
+                                  field.onChange(v);
+                                  const start = form.getValues("getInStart");
+                                  if (start && v) {
+                                    const dm = durationMinutesBetween(start, v);
+                                    if (dm) form.setValue("getInDuration", String(dm));
+                                  }
+                                }}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="getInDuration"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className={DETAIL_IN_CARD_FIELD_LABEL_CLASS}>Duration</FormLabel>
+                            <FormControl>
+                              <SplitDurationHhMmInput
+                                ref={getInDurFieldRef}
+                                valueMinutes={Number(field.value) || 0}
+                                aria-label="Get-in duration"
+                                disabled={!/^\d{2}:\d{2}$/.test(form.getValues("getInStart") || "")}
+                                onChangeMinutes={(m) => {
+                                  field.onChange(String(m));
+                                  const start = form.getValues("getInStart");
+                                  if (m >= 1 && start) form.setValue("getInEnd", endTimeFromStartAndDuration(start, m));
+                                }}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 border-t border-white/10 pt-4">
+                    <FormField
+                      control={form.control}
+                      name="fohNotes"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                          <FormLabel className={DETAIL_IN_CARD_FIELD_LABEL_CLASS}>FOH notes</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
                               value={field.value ?? ""}
-                              inputMode="decimal"
-                              maxLength={7}
-                              placeholder="0"
-                              autoComplete="off"
-                              aria-label={`Stage ${row.label.toLowerCase()} (m)`}
-                              className="h-9 w-[4.5rem] min-w-[4.5rem] bg-white/5 border-white/10 text-white tabular-nums text-sm"
+                              className="bg-white/5 border-white/10 text-white focus:border-white/30"
                             />
                           </FormControl>
-                          <span className="text-[10px] text-white/35 shrink-0">m</span>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                ))}
-              </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 border-t border-white/[0.06]">
-                <Label className="text-white/60 text-xs uppercase tracking-wide shrink-0">Effects</Label>
-                <FormField
-                  control={form.control}
-                  name="smokeFx"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-1.5 space-y-0">
-                      <FormControl>
-                        <input
-                          type="checkbox"
-                          className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-ordo-yellow"
-                          checked={Boolean(field.value)}
-                          onChange={(e) => field.onChange(e.target.checked)}
-                        />
-                      </FormControl>
-                      <FormLabel className="text-white/70 text-xs font-normal cursor-pointer">Smoke</FormLabel>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="hazeFx"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-1.5 space-y-0">
-                      <FormControl>
-                        <input
-                          type="checkbox"
-                          className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-ordo-yellow"
-                          checked={Boolean(field.value)}
-                          onChange={(e) => field.onChange(e.target.checked)}
-                        />
-                      </FormControl>
-                      <FormLabel className="text-white/70 text-xs font-normal cursor-pointer">Haze</FormLabel>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="strobeFx"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center gap-1.5 space-y-0">
-                      <FormControl>
-                        <input
-                          type="checkbox"
-                          className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-ordo-yellow"
-                          checked={Boolean(field.value)}
-                          onChange={(e) => field.onChange(e.target.checked)}
-                        />
-                      </FormControl>
-                      <FormLabel className="text-white/70 text-xs font-normal cursor-pointer">Strobe</FormLabel>
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3 items-end">
-              <FormField
-                control={form.control}
-                name="getInDate"
-                render={({ field }) => (
-                  <FormItem className="shrink-0">
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Get-in date</FormLabel>
-                    <FormControl>
-                      <div className="shrink-0">
-                        <EventStartDateInput value={field.value ?? ""} onChange={field.onChange} />
-                      </div>
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="getInStart"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Start</FormLabel>
-                    <FormControl>
-                      <SplitTimeInput
-                        value={field.value ?? ""}
-                        nextFieldRef={getInEndFieldRef}
-                        aria-label="Get-in start"
-                        onChange={(v) => {
-                          field.onChange(v);
-                          const d = Number(form.getValues("getInDuration"));
-                          if (!Number.isNaN(d) && d >= 1 && v) {
-                            form.setValue("getInEnd", endTimeFromStartAndDuration(v, d));
-                          } else {
-                            const end = form.getValues("getInEnd");
-                            if (v && end) {
-                              const dm = durationMinutesBetween(v, end);
-                              if (dm) form.setValue("getInDuration", String(dm));
-                            }
-                          }
-                        }}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="getInEnd"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">End</FormLabel>
-                    <FormControl>
-                      <SplitTimeInput
-                        ref={getInEndFieldRef}
-                        value={field.value ?? ""}
-                        nextFieldRef={getInDurFieldRef}
-                        aria-label="Get-in end"
-                        disabled={!/^\d{2}:\d{2}$/.test(form.getValues("getInStart") || "")}
-                        onChange={(v) => {
-                          field.onChange(v);
-                          const start = form.getValues("getInStart");
-                          if (start && v) {
-                            const dm = durationMinutesBetween(start, v);
-                            if (dm) form.setValue("getInDuration", String(dm));
-                          }
-                        }}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="getInDuration"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Duration</FormLabel>
-                    <FormControl>
-                      <SplitDurationHhMmInput
-                        ref={getInDurFieldRef}
-                        valueMinutes={Number(field.value) || 0}
-                        aria-label="Get-in duration"
-                        disabled={!/^\d{2}:\d{2}$/.test(form.getValues("getInStart") || "")}
-                        onChangeMinutes={(m) => {
-                          field.onChange(String(m));
-                          const start = form.getValues("getInStart");
-                          if (m >= 1 && start) form.setValue("getInEnd", endTimeFromStartAndDuration(start, m));
-                        }}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="space-y-3 border-t border-white/10 pt-4">
-            <FormField
-              control={form.control}
-              name="fohNotes"
-              render={({ field }) => (
-                <FormItem className="space-y-1.5">
-                  <FormLabel className="text-white/45 text-[10px] uppercase tracking-wide">FOH notes</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value ?? ""} className="bg-white/5 border-white/10 text-white focus:border-white/30" />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            </div>
-            {(form.watch("smokeFx") || form.watch("hazeFx") || form.watch("strobeFx")) ? (
-              <p className="text-xs rounded border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-amber-100/95">
-                FOH audience announcement note will be added automatically when saving.
-              </p>
-            ) : null}
+                        </FormItem>
+                      )}
+                    />
+                    {(form.watch("smokeFx") || form.watch("hazeFx") || form.watch("strobeFx")) ? (
+                      <p className="text-xs rounded border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-amber-100/95">
+                        FOH audience announcement note will be added automatically when saving.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </div>
 
