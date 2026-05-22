@@ -13,6 +13,7 @@ import {
   effectiveShowStatus,
   formatPlannedHoursShort,
 } from "@/components/event/EventShowsOverviewGrid";
+import { EventTeamBadgeWidthScope } from "@/components/event/ShowTeamStaffingSummary";
 import { eventMatchesDateRange } from "@/components/schedule/scheduleUtils";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Button } from "@/components/ui/button";
@@ -90,13 +91,15 @@ function EventListRow({
                   </span>
                 ) : null}
               </div>
-              <EventShowsOverviewGrid
-                shows={shows}
-                teams={teams}
-                includeJobs={open}
-                showTeamStaffingDetail
-                className="mt-1.5"
-              />
+              <EventTeamBadgeWidthScope shows={shows} teams={teams}>
+                <EventShowsOverviewGrid
+                  shows={shows}
+                  teams={teams}
+                  includeJobs={open}
+                  showTeamStaffingDetail
+                  className="mt-1.5"
+                />
+              </EventTeamBadgeWidthScope>
             </div>
           </button>
         </CollapsibleTrigger>
