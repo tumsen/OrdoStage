@@ -387,6 +387,7 @@ export const EventSchema = z.object({
   allergies: z.string().nullable(),
   customFields: z.string().nullable(),
   ownerTeamId: z.string().nullable().optional(),
+  leadPersonId: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -586,6 +587,7 @@ export const CreateEventSchema = z.object({
   allergies: z.string().optional(),
   customFields: z.string().optional(),
   ownerTeamId: z.string().optional(),
+  leadPersonId: z.string().nullable().optional(),
   teamIds: z.array(z.string()).optional(),
 });
 
@@ -644,6 +646,7 @@ export const PatchCalendarSchema = z
 // Full event with relations
 export const EventDetailSchema = EventSchema.extend({
   venue: VenueSchema.nullable(),
+  leadPerson: PersonSchema.nullable().optional(),
   people: z.array(EventPersonSchema),
   documents: z.array(DocumentSchema),
   teams: z.array(EventTeamSchema).optional(),

@@ -77,12 +77,20 @@ function EventListRow({
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-x-2 flex-wrap min-w-0">
                 <span className="text-sm font-medium text-white/90">{event.title}</span>
+                {event.leadPerson ? (
+                  <span
+                    className="text-[10px] text-white/50 shrink-0"
+                    title="Event lead (coordination; not counted as a job assignment)"
+                  >
+                    Lead: {event.leadPerson.name}
+                  </span>
+                ) : null}
                 {(event.shows?.length ?? 0) > 0 ? (
                   <span
                     className="text-[10px] tabular-nums text-white/40 shrink-0"
-                    title="People and planned hours (all shows on this event)"
+                    title="Planned job hours (all shows on this event)"
                   >
-                    {eventWorkTotals.people} p · {formatPlannedHoursShort(eventWorkTotals.jobHours)} h
+                    {formatPlannedHoursShort(eventWorkTotals.jobHours)} h
                   </span>
                 ) : null}
                 {jobCount > 0 && !open ? (

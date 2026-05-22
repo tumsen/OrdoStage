@@ -145,6 +145,7 @@ const EventEditSchema = z.object({
   primaryContactEmail: z.string().optional(),
   primaryContactNote: z.string().optional(),
   actorCount: z.string().optional(),
+  leadPersonId: z.string().optional(),
   allergies: z.string().optional(),
   stageWidth: z.string().optional(),
   stageDepth: z.string().optional(),
@@ -186,6 +187,7 @@ function emptyEventFormValues(): EventEditValues {
     primaryContactEmail: "",
     primaryContactNote: "",
     actorCount: "",
+    leadPersonId: "",
     allergies: "",
     ...decodeToFormFields(null),
     getInDate: "",
@@ -251,6 +253,7 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
     primaryContactEmail: primary.email,
     primaryContactNote: primary.note,
     actorCount: e.actorCount != null ? String(e.actorCount) : "",
+    leadPersonId: e.leadPersonId ?? e.leadPerson?.id ?? "",
     allergies: e.allergies ?? "",
     ...decodeToFormFields(e.stageSize),
     getInDate: isoDatePrefix(g.getInDate) || g.getInDate,
@@ -613,6 +616,9 @@ function DetailsTab({
       if (values.getInStart) payload.getInTime = values.getInStart;
       if (values.getInDuration) payload.setupTime = values.getInDuration;
       if (values.actorCount) payload.actorCount = Number(values.actorCount);
+      if (values.leadPersonId && values.leadPersonId !== "__none__") {
+        payload.leadPersonId = values.leadPersonId;
+      }
       if (mergedCustomFields.length > 0) payload.customFields = JSON.stringify(mergedCustomFields);
       createMutation.mutate(payload);
       return;
@@ -632,6 +638,8 @@ function DetailsTab({
     if (values.getInStart) payload.getInTime = values.getInStart;
     if (values.getInDuration) payload.setupTime = values.getInDuration;
     if (values.actorCount) payload.actorCount = Number(values.actorCount);
+    payload.leadPersonId =
+      values.leadPersonId && values.leadPersonId !== "__none__" ? values.leadPersonId : null;
     payload.customFields = mergedCustomFields.length > 0 ? JSON.stringify(mergedCustomFields) : undefined;
     updateMutation.mutate(payload);
   }
@@ -783,6 +791,37 @@ function DetailsTab({
 
             {/* ── Production Info ── */}
             <SectionHeader>Production Info</SectionHeader>
+
+            <FormField
+              control={form.control}
+              name="leadPersonId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">Event lead</FormLabel>
+                  <Select value={field.value || "__none__"} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="bg-white/5 border-white/10 text-white focus:border-white/30">
+                        <SelectValue placeholder="No event lead" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="bg-[#1a1a1a] border-white/10 text-white max-h-64">
+                      <SelectItem value="__none__">No event lead</SelectItem>
+                      {[...people]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-white/40 mt-1">
+                    Who coordinates this event. They can still be assigned to jobs; the lead role alone does not
+                    count as a job assignment.
+                  </p>
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
@@ -1342,12 +1381,17 @@ function EventStaffingOverviewBanner({ event }: { event: EventDetail }) {
     <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 space-y-1.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 min-w-0">
         <p className="text-[10px] text-white/40 uppercase tracking-wide shrink-0">Shows &amp; staffing overview</p>
+        {event.leadPerson ? (
+          <span className="text-[10px] text-white/50 shrink-0" title="Event lead">
+            Lead: {event.leadPerson.name}
+          </span>
+        ) : null}
         {shows.length > 0 ? (
           <span
             className="text-[10px] tabular-nums text-white/40 shrink-0"
-            title="People and planned hours (all shows on this event)"
+            title="Planned job hours (all shows on this event)"
           >
-            {eventWorkTotals.people} p · {formatPlannedHoursShort(eventWorkTotals.jobHours)} h
+            {formatPlannedHoursShort(eventWorkTotals.jobHours)} h
           </span>
         ) : null}
       </div>

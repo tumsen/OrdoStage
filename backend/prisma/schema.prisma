@@ -367,6 +367,7 @@ model Person {
   showStaffing     EventShowStaffing[]      @relation("EventShowStaffingPerson")
   showJobs         EventShowJob[]
   eventShowJobAssignments EventShowJobPerson[] @relation("EventShowJobPersonAssignee")
+  eventsAsLead            Event[]                  @relation("EventLeadPerson")
   /** App access for users linked by email uses this permission group (RoleDefinition). */
   permissionGroupId String?
   permissionGroup   RoleDefinition?        @relation(fields: [permissionGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -450,6 +451,9 @@ model Event {
   customFields   String?
   ownerTeamId    String?
   ownerTeam      Department?   @relation("EventOwnerTeam", fields: [ownerTeamId], references: [id], onDelete: SetNull)
+  /** Overall event lead (coordination role; does not count as a job assignment). */
+  leadPersonId   String?
+  leadPerson     Person?       @relation("EventLeadPerson", fields: [leadPersonId], references: [id], onDelete: SetNull)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   shows          EventShow[]

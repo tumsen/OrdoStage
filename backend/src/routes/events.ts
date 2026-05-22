@@ -265,6 +265,7 @@ function serializeEvent(event: {
   allergies: string | null;
   customFields: string | null;
   ownerTeamId?: string | null;
+  leadPersonId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -285,6 +286,7 @@ function serializeEvent(event: {
     allergies: event.allergies,
     customFields: event.customFields,
     ownerTeamId: event.ownerTeamId ?? null,
+    leadPersonId: event.leadPersonId ?? null,
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
   };
@@ -490,6 +492,7 @@ async function recomputeEventShowJobSortOrders(showId: string): Promise<void> {
 
 const eventInclude: any = {
   venue: true,
+  leadPerson: true,
   people: {
     include: { person: true },
   },
@@ -544,6 +547,7 @@ function serializeFullEvent(event: any) {
   return {
     ...serializeEvent(event),
     venue: serializeVenue(event.venue),
+    leadPerson: event.leadPerson ? serializePerson(event.leadPerson) : null,
     people: event.people.map((ep: any) => ({
       id: ep.id,
       eventId: ep.eventId,
@@ -669,6 +673,15 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
   }
 
   const body = c.req.valid("json");
+  if (body.leadPersonId) {
+    const lead = await prisma.person.findFirst({
+      where: { id: body.leadPersonId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!lead) {
+      return c.json({ error: { message: "Event lead person not found", code: "NOT_FOUND" } }, 404);
+    }
+  }
   const event = await prismaAny.event.create({
     data: {
       title: body.title,
@@ -686,6 +699,8 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
       allergies: body.allergies ?? null,
       customFields: body.customFields ?? null,
       ownerTeamId: null,
+      leadPersonId:
+        body.leadPersonId && body.leadPersonId !== "" ? body.leadPersonId : null,
       organizationId: user.organizationId,
     },
     include: eventInclude,
@@ -773,6 +788,16 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
     return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
 
+  if (body.leadPersonId !== undefined && body.leadPersonId !== null) {
+    const lead = await prisma.person.findFirst({
+      where: { id: body.leadPersonId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!lead) {
+      return c.json({ error: { message: "Event lead person not found", code: "NOT_FOUND" } }, 404);
+    }
+  }
+
   const event = await prisma.event.update({
     where: { id },
     data: {
@@ -794,6 +819,9 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
       ...(body.actorCount !== undefined && { actorCount: body.actorCount }),
       ...(body.allergies !== undefined && { allergies: body.allergies }),
       ...(body.customFields !== undefined && { customFields: body.customFields }),
+      ...(body.leadPersonId !== undefined && {
+        leadPersonId: body.leadPersonId === null || body.leadPersonId === "" ? null : body.leadPersonId,
+      }),
     },
     include: eventInclude,
   });

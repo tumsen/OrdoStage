@@ -20,8 +20,8 @@ export function formatPlannedHoursShort(jobHours: number): string {
 
 function overviewGridColumns(hour12: boolean): string {
   return hour12
-    ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content max-content minmax(0,1fr)"
-    : "auto 10ch max-content 6ch max-content max-content max-content max-content minmax(0,1fr)";
+    ? "auto 10ch max-content minmax(8rem,11ch) max-content max-content max-content minmax(0,1fr)"
+    : "auto 10ch max-content 6ch max-content max-content max-content minmax(0,1fr)";
 }
 
 const overviewHeaderCellClass =
@@ -35,7 +35,6 @@ const overviewCol = {
   time: "justify-self-start whitespace-nowrap pl-0.5 text-left tabular-nums pr-1",
   venue: "min-w-0 truncate pr-2 text-left",
   staffing: "min-w-0 pr-4 self-center",
-  people: "whitespace-nowrap pr-3 text-right tabular-nums",
   hours: "whitespace-nowrap pl-2 pr-2 text-right tabular-nums",
   tickets: "min-w-0 truncate pl-2 text-right sm:text-left",
 } as const;
@@ -52,7 +51,6 @@ function EventShowsOverviewHeaderCells() {
       <span className={cn(overviewHeaderCellClass, overviewCol.time, headerBorder)}>Time</span>
       <span className={cn(overviewHeaderCellClass, overviewCol.venue, headerBorder)}>Venue</span>
       <span className={cn(overviewHeaderCellClass, overviewCol.staffing, headerBorder)}>Team staffing</span>
-      <span className={cn(overviewHeaderCellClass, overviewCol.people, headerBorder)}>People</span>
       <span className={cn(overviewHeaderCellClass, overviewCol.hours, headerBorder)}>Hours</span>
       <span className={cn(overviewHeaderCellClass, overviewCol.tickets, headerBorder)}>Tickets</span>
     </li>
@@ -220,15 +218,6 @@ export function EventShowsOverviewGrid({
                 </div>
                 <span
                   className={cn(
-                    overviewCol.people,
-                    showOff ? "text-white/25 line-through decoration-white/20" : "text-white/45"
-                  )}
-                  title={`${stats.people} people on this show`}
-                >
-                  {stats.people}
-                </span>
-                <span
-                  className={cn(
                     overviewCol.hours,
                     showOff ? "text-white/25 line-through decoration-white/20" : "text-white/45"
                   )}
@@ -280,7 +269,6 @@ export function EventShowsOverviewGrid({
                         <span className={cn(overviewCol.staffing, jobRowTone, jobTitleTone)} title={assignee}>
                           {assignee}
                         </span>
-                        <span className={cn(overviewCol.people, "text-white/20")}>—</span>
                         <span className={cn(overviewCol.hours, "text-white/20")}>—</span>
                         <span className={cn(overviewCol.tickets, "text-white/20")}>—</span>
                       </li>
