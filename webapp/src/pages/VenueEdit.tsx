@@ -142,7 +142,7 @@ export default function VenueEdit() {
 
       <div className="flex-1 overflow-y-auto p-6">
         <input type="hidden" {...form.register("customFieldsText")} />
-        <div className="w-full space-y-8 pb-24">
+        <div className="w-full space-y-8 pb-24" onBlurCapture={autoSave.onBlurCapture}>
           <section className="space-y-3">
             <Label htmlFor="venue-name" className="text-white/50 text-xs uppercase tracking-wide">
               Name

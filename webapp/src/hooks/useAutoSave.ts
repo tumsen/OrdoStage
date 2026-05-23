@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { FocusEvent } from "react";
 import { snapshotsEqual } from "@/lib/stableJson";
+
+/** Debounced save when focus leaves an input/select inside a container. */
+export function autoSaveBlurCapture(schedule: () => void, enabled = true) {
+  return (e: FocusEvent<HTMLElement>) => {
+    if (!enabled) return;
+    const target = e.target as HTMLElement;
+    if (!target.matches("input, textarea, select, button[role='combobox']")) return;
+    schedule();
+  };
+}
 
 export type AutoSaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
 

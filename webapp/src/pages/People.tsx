@@ -823,11 +823,6 @@ function PersonFormDialog({
   });
 
   useEffect(() => {
-    if (!person?.id || !canManageContracts) return;
-    contractAutoSave.schedule();
-  }, [person?.id, canManageContracts, contractWeeklyHours, contractVacationDays, contractAutoSave]);
-
-  useEffect(() => {
     if (!asPage || !onAutoSaveState) return;
     const status =
       autoSave.status === "error" || contractAutoSave.status === "error"
@@ -943,7 +938,10 @@ function PersonFormDialog({
   );
 
   const formBody = (
-        <div className={asPage ? "w-full space-y-6 pb-4" : "space-y-4 py-1"}>
+        <div
+          className={asPage ? "w-full space-y-6 pb-4" : "space-y-4 py-1"}
+          onBlurCapture={autoSave.onBlurCapture}
+        >
           <div className={asPage ? "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start" : "contents"}>
             <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "contents"}>
               {asPage ? <p className={sectionTitle}>Profile & access</p> : null}
@@ -967,7 +965,13 @@ function PersonFormDialog({
                 control={form.control}
                 name="affiliation"
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      if (person?.id) autoSave.schedule();
+                    }}
+                  >
                     <SelectTrigger className="bg-white/5 border-white/10 text-white mt-1">
                       <SelectValue placeholder="Select…" />
                     </SelectTrigger>
@@ -1041,7 +1045,10 @@ function PersonFormDialog({
               render={({ field }) => (
                 <Select
                   value={field.value ?? ""}
-                  onValueChange={field.onChange}
+                  onValueChange={(v) => {
+                    field.onChange(v);
+                    if (person?.id) autoSave.schedule();
+                  }}
                   disabled={!canWriteOrg}
                 >
                   <SelectTrigger className="bg-white/5 border-white/10 text-white">
@@ -1278,6 +1285,7 @@ function PersonFormDialog({
                       step="0.5"
                       value={contractWeeklyHours}
                       onChange={(e) => setContractWeeklyHours(e.target.value)}
+                      onBlur={() => contractAutoSave.schedule()}
                       placeholder="e.g. 37"
                       className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                     />
@@ -1291,6 +1299,7 @@ function PersonFormDialog({
                       step="0.5"
                       value={contractVacationDays}
                       onChange={(e) => setContractVacationDays(e.target.value)}
+                      onBlur={() => contractAutoSave.schedule()}
                       placeholder="e.g. 25"
                       className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                     />
@@ -1563,6 +1572,7 @@ function PersonFormDialog({
                   step="0.5"
                   value={contractWeeklyHours}
                   onChange={(e) => setContractWeeklyHours(e.target.value)}
+                  onBlur={() => contractAutoSave.schedule()}
                   placeholder="e.g. 37"
                   className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                 />
@@ -1576,6 +1586,7 @@ function PersonFormDialog({
                   step="0.5"
                   value={contractVacationDays}
                   onChange={(e) => setContractVacationDays(e.target.value)}
+                  onBlur={() => contractAutoSave.schedule()}
                   placeholder="e.g. 25"
                   className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                 />

@@ -103,7 +103,6 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
     enabled: canEdit,
     resetKey: doc.id,
     getSnapshot: () => ({ name, docType, doesNotExpire, expires }),
-    watchDeps: [name, docType, doesNotExpire, expires],
     save: async () => {
       const n = name.trim();
       if (!n) throw new Error("Document name is required");
@@ -124,7 +123,10 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
   );
 
   return (
-    <div className="flex flex-col gap-2 px-2 py-2 text-xs border-b border-white/5 last:border-0 w-full min-w-0 sm:flex-row sm:items-center sm:gap-2">
+    <div
+      className="flex flex-col gap-2 px-2 py-2 text-xs border-b border-white/5 last:border-0 w-full min-w-0 sm:flex-row sm:items-center sm:gap-2"
+      onBlurCapture={rowAutoSave.onBlurCapture}
+    >
       <DocumentListThumbnail
         downloadUrl={`${backendBase()}/api/people/documents/${doc.id}/download`}
         mimeType={doc.mimeType}

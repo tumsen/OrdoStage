@@ -355,7 +355,6 @@ function BookingForm({ booking, venues, people, onClose }: BookingFormProps) {
     enabled: true,
     resetKey: booking.id,
     getSnapshot: () => ({ title, description, startDate, endDate, type, venueId, assignedPeople }),
-    watchDeps: [title, description, startDate, endDate, type, venueId, assignedPeople],
     save: persistBooking,
   });
 
@@ -365,7 +364,7 @@ function BookingForm({ booking, venues, people, onClose }: BookingFormProps) {
   const lbl = "text-white/50 text-xs uppercase tracking-wide";
 
   return (
-    <div className="space-y-5 mt-4 pb-8">
+    <div className="space-y-5 mt-4 pb-8" onBlurCapture={bookingAutoSave.onBlurCapture}>
       <AutoSaveStatus status={bookingAutoSave.status} error={bookingAutoSave.error} />
       <div>
         <Label className={lbl}>Title</Label>

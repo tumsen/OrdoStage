@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
+import type { FocusEvent } from "react";
 import type { FieldValues, UseFormReturn } from "react-hook-form";
-import { useAutoSave, type AutoSaveStatus } from "@/hooks/useAutoSave";
+import { autoSaveBlurCapture, useAutoSave, type AutoSaveStatus } from "@/hooks/useAutoSave";
 import { stableStringify } from "@/lib/stableJson";
 
 export interface UseAutoSaveFormOptions<T extends FieldValues> {
@@ -13,6 +14,10 @@ export interface UseAutoSaveFormOptions<T extends FieldValues> {
   validate?: (values: T) => boolean | Promise<boolean>;
   save: (values: T) => void | Promise<void>;
   saveOnUnmount?: boolean;
+  /** Debounced save on every form value change. Default false — use blur instead. */
+  saveOnChange?: boolean;
+  /** Debounced save when focus leaves a field inside the form. Default true. */
+  saveOnBlur?: boolean;
 }
 
 export function useAutoSaveForm<T extends FieldValues>({
@@ -24,11 +29,16 @@ export function useAutoSaveForm<T extends FieldValues>({
   validate,
   save,
   saveOnUnmount = true,
+  saveOnChange = false,
+  saveOnBlur = true,
 }: UseAutoSaveFormOptions<T>): {
   status: AutoSaveStatus;
   error: string | null;
+  schedule: () => void;
   flush: () => Promise<void>;
   markSaved: () => void;
+  /** Attach to the form root (or wrapping div). */
+  onBlurCapture: (e: FocusEvent<HTMLElement>) => void;
 } {
   const getSnapshot = useCallback(
     () => ({
@@ -55,10 +65,10 @@ export function useAutoSaveForm<T extends FieldValues>({
   });
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !saveOnChange) return;
     const sub = form.watch(() => schedule());
     return () => sub.unsubscribe();
-  }, [enabled, form, schedule]);
+  }, [enabled, saveOnChange, form, schedule]);
 
   const extraFingerprint = useMemo(
     () => (extraSnapshot ? stableStringify(extraSnapshot()) : ""),
@@ -66,14 +76,24 @@ export function useAutoSaveForm<T extends FieldValues>({
   );
 
   useEffect(() => {
-    if (!enabled || !extraSnapshot) return;
+    if (!enabled || !saveOnChange || !extraSnapshot) return;
     schedule();
-  }, [enabled, extraFingerprint, extraSnapshot, schedule]);
+  }, [enabled, saveOnChange, extraFingerprint, extraSnapshot, schedule]);
+
+  const onBlurCapture = useCallback(
+    (e: FocusEvent<HTMLElement>) => {
+      if (!saveOnBlur) return;
+      autoSaveBlurCapture(schedule, enabled)(e);
+    },
+    [enabled, saveOnBlur, schedule]
+  );
 
   return {
     status,
     error,
+    schedule,
     flush,
     markSaved: () => markSaved(getSnapshot()),
+    onBlurCapture,
   };
 }

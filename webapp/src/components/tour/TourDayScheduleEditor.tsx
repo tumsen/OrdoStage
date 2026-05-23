@@ -200,7 +200,6 @@ export function TourDayScheduleEditor({
     enabled: drafts.length > 0,
     resetKey: `${show.id}-${scheduleEventsContentKey}`,
     getSnapshot: () => drafts,
-    watchDeps: [drafts],
     save: async () => {
       await saveMutation.mutateAsync(drafts);
     },
@@ -233,7 +232,10 @@ export function TourDayScheduleEditor({
   };
 
   return (
-    <div className={cn("rounded-lg border border-white/10 bg-white/[0.02] px-2 py-2 sm:p-2.5", className)}>
+    <div
+      className={cn("rounded-lg border border-white/10 bg-white/[0.02] px-2 py-2 sm:p-2.5", className)}
+      onBlurCapture={scheduleAutoSave.onBlurCapture}
+    >
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <p className="text-xs uppercase tracking-wide text-white/45 shrink-0">Day schedule</p>
         <AutoSaveStatus status={scheduleAutoSave.status} error={scheduleAutoSave.error} />

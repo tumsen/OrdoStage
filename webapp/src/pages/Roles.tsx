@@ -139,7 +139,6 @@ export default function Roles() {
       canManageGroups,
     resetKey: editRow?.id,
     getSnapshot: () => ({ draftName, draftViews, draftActions }),
-    watchDeps: [draftName, draftViews, draftActions],
     save: async () => {
       if (!editRow) return;
       await api.patch(`/api/org/role-definitions/${editRow.id}`, {
@@ -351,7 +350,10 @@ export default function Roles() {
           }
         }}
       >
-        <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-lg max-h-[90vh] flex flex-col">
+        <DialogContent
+          className="bg-[#16161f] border-white/10 text-white max-w-lg max-h-[90vh] flex flex-col"
+          onBlurCapture={roleAutoSave.onBlurCapture}
+        >
           <DialogHeader>
             <DialogTitle>{mode === "new" ? "New role" : `Edit ${editRow?.name ?? ""}`}</DialogTitle>
             {mode === "edit" && !isEditingOwner ? (

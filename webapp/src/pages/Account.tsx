@@ -24,7 +24,7 @@ import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/AddressFields";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { usePermissions } from "@/hooks/usePermissions";
-import { useAutoSave } from "@/hooks/useAutoSave";
+import { autoSaveBlurCapture, useAutoSave } from "@/hooks/useAutoSave";
 import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import Billing from "@/pages/Billing";
@@ -332,17 +332,16 @@ export default function Account() {
     save: () => saveProfileMutation.mutateAsync(),
   });
 
-  useEffect(() => {
-    if (!mePerson?.id) return;
-    profileAutoSave.schedule();
-  }, [mePerson?.id, profileDraft, profileAutoSave]);
-
   const companyAutoSave = useAutoSaveDraft({
     enabled: canManageBranding,
     getSnapshot: () => ({ companyDraft, companyAddress, companyLogoFile: companyLogoFile?.name ?? null }),
-    watchDeps: [companyDraft, companyAddress, companyLogoFile],
     save: () => saveCompanyMutation.mutateAsync(),
   });
+
+  const onProfileBlurCapture = autoSaveBlurCapture(
+    () => profileAutoSave.schedule(),
+    Boolean(mePerson?.id)
+  );
 
   const uploadPhotoMutation = useMutation({
     mutationFn: (file: File) => uploadPersonPhoto(mePerson!.id, file),
@@ -600,7 +599,10 @@ export default function Account() {
       </div>
 
       {canManageBranding ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+        <div
+          className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4"
+          onBlurCapture={companyAutoSave.onBlurCapture}
+        >
           <div>
             <p className="text-sm font-medium text-white">Company information & branding</p>
             <p className="text-xs text-white/50 mt-1">
@@ -741,7 +743,7 @@ export default function Account() {
           </p>
         ) : (
           <>
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="grid sm:grid-cols-2 gap-3" onBlurCapture={onProfileBlurCapture}>
               <div className="space-y-2">
                 <Label className="text-white/70 text-xs uppercase tracking-wide">Name</Label>
                 <Input

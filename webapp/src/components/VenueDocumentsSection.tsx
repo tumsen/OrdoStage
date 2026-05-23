@@ -104,7 +104,6 @@ function VenueDocRow({
     enabled: editable,
     resetKey: doc.id,
     getSnapshot: () => ({ name, kind }),
-    watchDeps: [name, kind],
     save: async () => {
       const n = name.trim();
       if (!n) throw new Error("File label is required");
@@ -117,7 +116,10 @@ function VenueDocRow({
   });
 
   return (
-    <li className="flex flex-col gap-2 rounded-md border border-white/5 bg-white/[0.02] px-2 py-2 text-[11px] sm:flex-row sm:items-center">
+    <li
+      className="flex flex-col gap-2 rounded-md border border-white/5 bg-white/[0.02] px-2 py-2 text-[11px] sm:flex-row sm:items-center"
+      onBlurCapture={rowAutoSave.onBlurCapture}
+    >
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <DocumentListThumbnail
           downloadUrl={venueDocDownloadUrl(doc.id)}
@@ -127,7 +129,13 @@ function VenueDocRow({
           name={doc.name}
         />
         {editable ? (
-          <Select value={kind} onValueChange={(v) => setKind(v as VenueDocKind)}>
+          <Select
+            value={kind}
+            onValueChange={(v) => {
+              setKind(v as VenueDocKind);
+              rowAutoSave.schedule();
+            }}
+          >
             <SelectTrigger className="h-8 w-[8.5rem] shrink-0 bg-white/5 border-white/10 text-white text-[11px]">
               <SelectValue />
             </SelectTrigger>

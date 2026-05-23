@@ -214,7 +214,6 @@ export function TimeEntryEditSheet(props: {
       startHm,
       endHm,
     }),
-    watchDeps: [note, projectId, selectedTags, category, startHm, endHm],
     save: async () => {
       const body = buildPatchBody();
       if (!entry || !body) return;
@@ -277,6 +276,7 @@ export function TimeEntryEditSheet(props: {
               ? "min-h-0 flex-1 grid-rows-[auto_auto_auto_auto_minmax(0,1fr)] gap-2 overflow-hidden py-2"
               : "py-4"
           )}
+          onBlurCapture={entryAutoSave.onBlurCapture}
         >
           <div
             className={cn(

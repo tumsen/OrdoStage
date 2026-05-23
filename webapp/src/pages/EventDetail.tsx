@@ -850,6 +850,7 @@ function DetailsTab({
         <form
           onSubmit={isNew ? form.handleSubmit(onSubmit) : (e) => e.preventDefault()}
           className="w-full space-y-8"
+          onBlurCapture={isNew ? undefined : eventAutoSave.onBlurCapture}
         >
           {/* ── Core fields ── */}
             <FormField

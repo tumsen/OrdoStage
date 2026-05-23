@@ -319,23 +319,6 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
     enabled: open,
     resetKey: tour.id,
     getSnapshot: () => buildTourPayload(),
-    watchDeps: [
-      name,
-      description,
-      status,
-      tourManagerName,
-      tourManagerPhone,
-      tourManagerEmail,
-      notes,
-      showDuration,
-      handsNeeded,
-      stageRequirements,
-      soundRequirements,
-      lightingRequirements,
-      riderNotes,
-      customFields,
-      riderVisibility,
-    ],
     save: async () => {
       if (!name.trim()) throw new Error("Tour name is required");
       const updated = await updateMutation.mutateAsync(buildTourPayload());
@@ -353,7 +336,7 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
           <DialogTitle>Edit Tour</DialogTitle>
           <AutoSaveStatus status={tourAutoSave.status} error={tourAutoSave.error} className="mt-1" />
         </DialogHeader>
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2" onBlurCapture={tourAutoSave.onBlurCapture}>
           <div className="space-y-2">
             <Label className="text-white/60 text-xs uppercase tracking-wide">
               Tour Name <span className="text-red-400">*</span>
@@ -775,7 +758,6 @@ function ShowFormDialog({
     enabled: open && isEdit,
     resetKey: show?.id,
     getSnapshot: () => form,
-    watchDeps: [form],
     save: async () => {
       if (!form.date) throw new Error("Date is required");
       const updated = await updateMutation.mutateAsync(formToPayload(form));
@@ -822,7 +804,7 @@ function ShowFormDialog({
             <AutoSaveStatus status={showAutoSave.status} error={showAutoSave.error} className="mt-1" />
           ) : null}
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-5 py-2">
+        <form onSubmit={handleSubmit} className="space-y-5 py-2" onBlurCapture={showAutoSave.onBlurCapture}>
           {/* Type selector */}
           <div className="space-y-2">
             <Label className="text-white/60 text-xs uppercase tracking-wide">Day Type</Label>

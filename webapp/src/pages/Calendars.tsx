@@ -66,7 +66,6 @@ function FeedTimezoneDialog({
     enabled: open,
     resetKey: editZone?.id,
     getSnapshot: () => editZone?.value ?? "",
-    watchDeps: [editZone?.value],
     save: async () => {
       if (!editZone?.value.trim()) throw new Error("Timezone is required");
       await patchTimezoneMutation.mutateAsync({
@@ -87,7 +86,10 @@ function FeedTimezoneDialog({
         if (!o) onClose();
       }}
     >
-      <DialogContent className="bg-[#16161f] border-white/10 text-white">
+      <DialogContent
+        className="bg-[#16161f] border-white/10 text-white"
+        onBlurCapture={zoneAutoSave.onBlurCapture}
+      >
         <DialogHeader>
           <DialogTitle>Feed timezone</DialogTitle>
           <AutoSaveStatus status={zoneAutoSave.status} error={zoneAutoSave.error} className="mt-1" />

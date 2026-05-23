@@ -157,14 +157,13 @@ export default function SiteContentAdmin() {
     enabled: Object.keys(form).length > 0,
     resetKey: contentLanguage,
     getSnapshot: () => form,
-    watchDeps: [form, merged],
     save: async () => {
       await updateMutation.mutateAsync(merged);
     },
   });
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-6 space-y-4" onBlurCapture={contentAutoSave.onBlurCapture}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-white">{t("admin.siteContent.title")}</h2>
