@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { FileUp, Trash2 } from "lucide-react";
+import { FileUp, Loader2, Trash2 } from "lucide-react";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,8 +85,6 @@ function VenueDocRow({
     setKind(doc.kind);
   }, [doc.id, doc.name, doc.kind]);
 
-  const dirty = name.trim() !== doc.name || kind !== doc.kind;
-
   const patchMutation = useMutation({
     mutationFn: async (body: { name?: string; kind?: VenueDocKind }) => {
       await api.patch<VenueDocument>(`/api/venues/documents/${doc.id}`, body);
@@ -99,17 +98,23 @@ function VenueDocRow({
     },
   });
 
-  async function handleSave() {
-    const n = name.trim();
-    if (!n) return;
-    const body: { name?: string; kind?: VenueDocKind } = {};
-    if (n !== doc.name) body.name = n;
-    if (kind !== doc.kind) body.kind = kind;
-    if (Object.keys(body).length === 0) return;
-    await patchMutation.mutateAsync(body);
-  }
-
   const editable = canWrite && !readOnly;
+
+  const rowAutoSave = useAutoSaveDraft({
+    enabled: editable,
+    resetKey: doc.id,
+    getSnapshot: () => ({ name, kind }),
+    watchDeps: [name, kind],
+    save: async () => {
+      const n = name.trim();
+      if (!n) throw new Error("File label is required");
+      const body: { name?: string; kind?: VenueDocKind } = {};
+      if (n !== doc.name) body.name = n;
+      if (kind !== doc.kind) body.kind = kind;
+      if (Object.keys(body).length === 0) return;
+      await patchMutation.mutateAsync(body);
+    },
+  });
 
   return (
     <li className="flex flex-col gap-2 rounded-md border border-white/5 bg-white/[0.02] px-2 py-2 text-[11px] sm:flex-row sm:items-center">
@@ -153,17 +158,10 @@ function VenueDocRow({
         )}
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-        {editable ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            className="h-8 text-[11px] bg-white/10 hover:bg-white/15"
-            disabled={!dirty || !name.trim() || patchMutation.isPending}
-            onClick={() => void handleSave()}
-          >
-            {patchMutation.isPending ? "Saving…" : "Save"}
-          </Button>
+        {editable && (rowAutoSave.status === "saving" || patchMutation.isPending) ? (
+          <Loader2 size={12} className="animate-spin text-white/40 shrink-0" aria-label="Saving" />
+        ) : editable && rowAutoSave.status === "saved" ? (
+          <span className="text-[10px] text-emerald-400/80 shrink-0">Saved</span>
         ) : null}
         <a href={venueDocDownloadUrl(doc.id)} className="shrink-0 text-blue-300 hover:text-blue-200">
           Download

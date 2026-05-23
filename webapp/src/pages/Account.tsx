@@ -25,6 +25,7 @@ import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/Address
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAutoSave } from "@/hooks/useAutoSave";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import Billing from "@/pages/Billing";
 import {
@@ -337,6 +338,13 @@ export default function Account() {
     if (!mePerson?.id) return;
     profileAutoSave.schedule();
   }, [mePerson?.id, profileDraft, profileAutoSave]);
+
+  const companyAutoSave = useAutoSaveDraft({
+    enabled: canManageBranding,
+    getSnapshot: () => ({ companyDraft, companyAddress, companyLogoFile: companyLogoFile?.name ?? null }),
+    watchDeps: [companyDraft, companyAddress, companyLogoFile],
+    save: () => saveCompanyMutation.mutateAsync(),
+  });
 
   const removePhotoMutation = useMutation({
     mutationFn: () => api.delete(`/api/people/${mePerson!.id}/photo`),
@@ -666,14 +674,7 @@ export default function Account() {
             </div>
             {companyLogoStatus ? <p className="text-xs text-white/70">{companyLogoStatus}</p> : null}
           </div>
-          <Button
-            type="button"
-            className="bg-indigo-700 hover:bg-indigo-600"
-            disabled={saveCompanyMutation.isPending}
-            onClick={() => saveCompanyMutation.mutate()}
-          >
-            {saveCompanyMutation.isPending ? "Saving..." : "Save company information"}
-          </Button>
+          <AutoSaveStatus status={companyAutoSave.status} error={companyAutoSave.error} />
         </div>
       ) : null}
 

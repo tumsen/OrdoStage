@@ -2,13 +2,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { useAdminI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { SUPPORTED_LANGUAGES, type Language, languageLabel } from "@/lib/preferences";
@@ -152,10 +153,25 @@ export default function SiteContentAdmin() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  const contentAutoSave = useAutoSaveDraft({
+    enabled: Object.keys(form).length > 0,
+    resetKey: contentLanguage,
+    getSnapshot: () => form,
+    watchDeps: [form, merged],
+    save: async () => {
+      await updateMutation.mutateAsync(merged);
+    },
+  });
+
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-lg font-semibold text-white">{t("admin.siteContent.title")}</h2>
-      <p className="text-sm text-white/50">{t("admin.siteContent.subtitle")}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-white">{t("admin.siteContent.title")}</h2>
+          <p className="text-sm text-white/50">{t("admin.siteContent.subtitle")}</p>
+        </div>
+        <AutoSaveStatus status={contentAutoSave.status} error={contentAutoSave.error} />
+      </div>
 
       <div className="rounded-lg border border-ordo-magenta/30 bg-[#0d0d18] p-4 space-y-4 max-w-2xl">
         <div>
@@ -386,13 +402,6 @@ export default function SiteContentAdmin() {
         />
       </div>
 
-      <Button
-        onClick={() => updateMutation.mutate(merged)}
-        disabled={updateMutation.isPending}
-        className="bg-rose-700 hover:bg-rose-600"
-      >
-        {updateMutation.isPending ? t("admin.siteContent.saving") : t("admin.siteContent.save")}
-      </Button>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
 import { useAutoSave, type AutoSaveStatus } from "@/hooks/useAutoSave";
+import { AutoSaveStatus as AutoSaveIndicator } from "@/components/AutoSaveStatus";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
@@ -392,7 +393,6 @@ function PersonFormDialog({
   // Work contract state (separate from main form — saved independently)
   const [contractWeeklyHours, setContractWeeklyHours] = useState<string>("");
   const [contractVacationDays, setContractVacationDays] = useState<string>("");
-  const [contractSaving, setContractSaving] = useState(false);
   const { data: teams } = useQuery({
     queryKey: ["departments"],
     queryFn: () => api.get<Team[]>("/api/departments"),
@@ -734,14 +734,14 @@ function PersonFormDialog({
 
   const autoSave = useAutoSaveForm({
     form,
-    enabled: asPage && Boolean(person?.id),
+    enabled: Boolean(person?.id),
     resetKey: person?.id,
     validate: async (values) => PersonFormSchema.safeParse(values).success,
     save: (values) => persistPerson(values, { silent: true }),
   });
 
   const contractAutoSave = useAutoSave({
-    enabled: asPage && Boolean(person?.id) && canManageContracts,
+    enabled: Boolean(person?.id) && canManageContracts,
     resetKey: person?.id ? `${person.id}-contract` : null,
     getSnapshot: () => ({ contractWeeklyHours, contractVacationDays }),
     save: async () => {
@@ -756,9 +756,9 @@ function PersonFormDialog({
   });
 
   useEffect(() => {
-    if (!asPage || !person?.id || !canManageContracts) return;
+    if (!person?.id || !canManageContracts) return;
     contractAutoSave.schedule();
-  }, [asPage, person?.id, canManageContracts, contractWeeklyHours, contractVacationDays, contractAutoSave]);
+  }, [person?.id, canManageContracts, contractWeeklyHours, contractVacationDays, contractAutoSave]);
 
   useEffect(() => {
     if (!asPage || !onAutoSaveState) return;
@@ -814,22 +814,26 @@ function PersonFormDialog({
         </Button>
       ) : null}
       {!asPage ? (
-      <div className="flex gap-2 ml-auto">
+      <div className="flex flex-wrap items-center gap-2 ml-auto">
+        {!person ? (
+          <Button
+            type="button"
+            disabled={mutation.isPending}
+            onClick={() => form.handleSubmit(handleSubmit)()}
+            className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+          >
+            {mutation.isPending ? "Adding…" : "Add Person"}
+          </Button>
+        ) : (
+          <AutoSaveIndicator status={autoSave.status} error={autoSave.error} />
+        )}
         <Button
           type="button"
           variant="outline"
           onClick={handleCancel}
           className="border-white/10 text-white/60 hover:text-white bg-transparent"
         >
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          disabled={mutation.isPending}
-          onClick={() => form.handleSubmit(handleSubmit)()}
-          className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-        >
-          {mutation.isPending ? "Saving..." : person ? "Save changes" : "Add Person"}
+          {person ? "Close" : "Cancel"}
         </Button>
       </div>
       ) : null}
@@ -1199,35 +1203,6 @@ function PersonFormDialog({
                     ))}
                   </div>
                 ) : null}
-                {!asPage ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="border-white/15 text-white/70 hover:bg-white/5 h-8"
-                  disabled={contractSaving}
-                  onClick={async () => {
-                    setContractSaving(true);
-                    try {
-                      const wh = contractWeeklyHours.trim() === "" ? null : parseFloat(contractWeeklyHours);
-                      const vd = contractVacationDays.trim() === "" ? null : parseFloat(contractVacationDays);
-                      await api.patch(`/api/time/person-contract/${person.id}`, {
-                        weeklyContractHours: wh,
-                        vacationDaysPerYear: vd,
-                      });
-                      queryClient.invalidateQueries({ queryKey: ["people"] });
-                      queryClient.invalidateQueries({ queryKey: ["time-people"] });
-                      toast({ title: "Contract saved" });
-                    } catch {
-                      toast({ title: "Could not save contract", variant: "destructive" });
-                    } finally {
-                      setContractSaving(false);
-                    }
-                  }}
-                >
-                  {contractSaving ? "Saving…" : "Save contract"}
-                </Button>
-                ) : null}
               </div>
             ) : null}
             {asPage && person && !canManageContracts ? (
@@ -1542,35 +1517,6 @@ function PersonFormDialog({
                 ))}
               </div>
             )}
-            {!asPage ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="border-white/15 text-white/70 hover:bg-white/5 h-8"
-              disabled={contractSaving}
-              onClick={async () => {
-                setContractSaving(true);
-                try {
-                  const wh = contractWeeklyHours.trim() === "" ? null : parseFloat(contractWeeklyHours);
-                  const vd = contractVacationDays.trim() === "" ? null : parseFloat(contractVacationDays);
-                  await api.patch(`/api/time/person-contract/${person.id}`, {
-                    weeklyContractHours: wh,
-                    vacationDaysPerYear: vd,
-                  });
-                  queryClient.invalidateQueries({ queryKey: ["people"] });
-                  queryClient.invalidateQueries({ queryKey: ["time-people"] });
-                  toast({ title: "Contract saved" });
-                } catch {
-                  toast({ title: "Could not save contract", variant: "destructive" });
-                } finally {
-                  setContractSaving(false);
-                }
-              }}
-            >
-              {contractSaving ? "Saving…" : "Save contract"}
-            </Button>
-            ) : null}
           </div>
         ) : null}
         </div>

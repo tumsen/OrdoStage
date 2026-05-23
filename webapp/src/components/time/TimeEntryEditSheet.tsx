@@ -29,6 +29,8 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 
 type PatchBody = {
@@ -182,8 +184,8 @@ export function TimeEntryEditSheet(props: {
     });
   }
 
-  function handleSave() {
-    if (!entry) return;
+  function buildPatchBody(): PatchBody | null {
+    if (!entry) return null;
     const startBase = parseISO(entry.startsAt);
     const endBase = parseISO(entry.endsAt);
     const newStart = applyExactHm(startBase, startHm);
@@ -191,15 +193,42 @@ export function TimeEntryEditSheet(props: {
     if (newEnd.getTime() <= newStart.getTime()) {
       newEnd = new Date(newEnd.getTime() + 24 * 60 * 60 * 1000);
     }
-    onSave(entry.id, {
+    return {
       note: note.trim() ? note.trim() : null,
       timeProjectId: projectId,
       tagIds: [...selectedTags],
       category,
       startsAt: newStart.toISOString(),
       endsAt: newEnd.toISOString(),
-    });
+    };
   }
+
+  const entryAutoSave = useAutoSaveDraft({
+    enabled: open && Boolean(entry) && !entry?.isLocked,
+    resetKey: entry?.id,
+    getSnapshot: () => ({
+      note,
+      projectId,
+      tagIds: [...selectedTags].sort(),
+      category,
+      startHm,
+      endHm,
+    }),
+    watchDeps: [note, projectId, selectedTags, category, startHm, endHm],
+    save: async () => {
+      const body = buildPatchBody();
+      if (!entry || !body) return;
+      onSave(entry.id, body);
+    },
+  });
+
+  const sheetOnOpenChange = (next: boolean) => {
+    if (!next && open) {
+      void entryAutoSave.flush().finally(() => onOpenChange(false));
+      return;
+    }
+    onOpenChange(next);
+  };
 
   function handleDelete() {
     if (!entry) return;
@@ -219,7 +248,7 @@ export function TimeEntryEditSheet(props: {
   ];
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={sheetOnOpenChange}>
       <SheetContent
         className={cn(
           "bg-[#0d0d14] border-white/10 text-white w-full sm:max-w-md",
@@ -486,14 +515,11 @@ export function TimeEntryEditSheet(props: {
             isMobile && "shrink-0 border-t border-white/10 pt-2 mt-0"
           )}
         >
-          <Button
-            type="button"
-            className="w-full bg-ordo-yellow text-[#0d0d14] hover:bg-ordo-yellow/90"
-            disabled={saving || !entry || entry.isLocked}
-            onClick={handleSave}
-          >
-            {saving ? t("time.saving") : t("time.saveEntry")}
-          </Button>
+          <AutoSaveStatus
+            status={saving ? "saving" : entryAutoSave.status}
+            error={entryAutoSave.error}
+            className="w-full justify-center"
+          />
           <Button
             type="button"
             variant="outline"

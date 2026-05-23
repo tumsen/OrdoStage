@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -20,6 +22,7 @@ import {
   timeToMinutes,
 } from "@/lib/showTiming";
 import type {
+  TourDetail,
   TourScheduleEvent,
   TourScheduleEventKind,
   TourShow,
@@ -182,8 +185,24 @@ export function TourDayScheduleEditor({
         { events: payload }
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour", tourId] });
+    onSuccess: (updated) => {
+      queryClient.setQueryData<TourDetail>(["tour", tourId], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          shows: old.shows.map((s) => (s.id === show.id ? { ...s, ...updated } : s)),
+        };
+      });
+    },
+  });
+
+  const scheduleAutoSave = useAutoSaveDraft({
+    enabled: drafts.length > 0,
+    resetKey: `${show.id}-${scheduleEventsContentKey}`,
+    getSnapshot: () => drafts,
+    watchDeps: [drafts],
+    save: async () => {
+      await saveMutation.mutateAsync(drafts);
     },
   });
 
@@ -217,15 +236,7 @@ export function TourDayScheduleEditor({
     <div className={cn("rounded-lg border border-white/10 bg-white/[0.02] px-2 py-2 sm:p-2.5", className)}>
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <p className="text-xs uppercase tracking-wide text-white/45 shrink-0">Day schedule</p>
-        <Button
-          type="button"
-          size="sm"
-          className="bg-emerald-900/50 hover:bg-emerald-800/60 text-emerald-100 border border-emerald-700/40 h-8 shrink-0"
-          disabled={saveMutation.isPending || drafts.length === 0}
-          onClick={() => saveMutation.mutate(drafts)}
-        >
-          {saveMutation.isPending ? "Saving…" : "Save schedule"}
-        </Button>
+        <AutoSaveStatus status={scheduleAutoSave.status} error={scheduleAutoSave.error} />
       </div>
       <p className="text-[10px] text-white/30 mt-1 mb-2 hidden sm:block">
         Start, end, and duration use the same controls as event show jobs (24h HH:mm).

@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,6 +45,86 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+function FeedTimezoneDialog({
+  editZone,
+  setEditZone,
+  onClose,
+  patchTimezoneMutation,
+}: {
+  editZone: { id: string; value: string } | null;
+  setEditZone: Dispatch<SetStateAction<{ id: string; value: string } | null>>;
+  onClose: () => void;
+  patchTimezoneMutation: {
+    mutateAsync: (args: { id: string; icsWallClockZone: string }) => Promise<Calendar>;
+    isError: boolean;
+    error: Error | null;
+  };
+}) {
+  const open = editZone !== null;
+  const zoneAutoSave = useAutoSaveDraft({
+    enabled: open,
+    resetKey: editZone?.id,
+    getSnapshot: () => editZone?.value ?? "",
+    watchDeps: [editZone?.value],
+    save: async () => {
+      if (!editZone?.value.trim()) throw new Error("Timezone is required");
+      await patchTimezoneMutation.mutateAsync({
+        id: editZone.id,
+        icsWallClockZone: editZone.value.trim(),
+      });
+    },
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o && open) {
+          void zoneAutoSave.flush().finally(onClose);
+          return;
+        }
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="bg-[#16161f] border-white/10 text-white">
+        <DialogHeader>
+          <DialogTitle>Feed timezone</DialogTitle>
+          <AutoSaveStatus status={zoneAutoSave.status} error={zoneAutoSave.error} className="mt-1" />
+        </DialogHeader>
+        <p className="text-sm text-white/45">
+          IANA name (e.g. <code className="text-white/60">Europe/Copenhagen</code>). Used when Google or Apple fetches this URL — they do not send your browser timezone.
+        </p>
+        <Input
+          value={editZone?.value ?? ""}
+          onChange={(e) => setEditZone((z) => (z ? { ...z, value: e.target.value } : z))}
+          placeholder="Europe/Copenhagen"
+          className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 font-mono text-sm"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+        />
+        {patchTimezoneMutation.isError ? (
+          <div className="text-red-400 text-sm">
+            {patchTimezoneMutation.error instanceof Error
+              ? patchTimezoneMutation.error.message
+              : "Failed to save."}
+          </div>
+        ) : null}
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="border-white/10 text-white/60 hover:text-white bg-transparent"
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const CalendarFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -122,7 +204,6 @@ export default function Calendars() {
       api.patch<Calendar>(`/api/calendars/${id}`, { icsWallClockZone }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["calendars"] });
-      setEditZone(null);
     },
   });
 
@@ -311,56 +392,12 @@ export default function Calendars() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={editZone !== null} onOpenChange={(o) => { if (!o) setEditZone(null); }}>
-        <DialogContent className="bg-[#16161f] border-white/10 text-white">
-          <DialogHeader>
-            <DialogTitle>Feed timezone</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-white/45">
-            IANA name (e.g. <code className="text-white/60">Europe/Copenhagen</code>). Used when Google or Apple fetches this URL — they do not send your browser timezone.
-          </p>
-          <Input
-            value={editZone?.value ?? ""}
-            onChange={(e) => setEditZone((z) => (z ? { ...z, value: e.target.value } : z))}
-            placeholder="Europe/Copenhagen"
-            className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 font-mono text-sm"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-          />
-          {patchTimezoneMutation.isError && (
-            <div className="text-red-400 text-sm">
-              {patchTimezoneMutation.error instanceof Error
-                ? patchTimezoneMutation.error.message
-                : "Failed to save."}
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setEditZone(null)}
-              className="border-white/10 text-white/60 hover:text-white bg-transparent"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={patchTimezoneMutation.isPending || !editZone?.value.trim()}
-              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-              onClick={() => {
-                if (!editZone?.value.trim()) return;
-                patchTimezoneMutation.mutate({
-                  id: editZone.id,
-                  icsWallClockZone: editZone.value.trim(),
-                });
-              }}
-            >
-              {patchTimezoneMutation.isPending ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <FeedTimezoneDialog
+        editZone={editZone}
+        setEditZone={setEditZone}
+        onClose={() => setEditZone(null)}
+        patchTimezoneMutation={patchTimezoneMutation}
+      />
 
       {/* Delete confirm */}
       <AlertDialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>

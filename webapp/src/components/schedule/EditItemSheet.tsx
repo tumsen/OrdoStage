@@ -1,4 +1,6 @@
 import { useRef, useState } from "react";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -287,7 +289,7 @@ interface BookingFormProps {
   onClose: () => void;
 }
 
-function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormProps) {
+function BookingForm({ booking, venues, people, onClose }: BookingFormProps) {
   const queryClient = useQueryClient();
 
   const { marker, displayTitle: titleInitial } = splitInternalBookingSyncMarker(booking.title);
@@ -332,10 +334,29 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
       void invalidateWorkAnnouncementBar(queryClient);
-      toast({ title: "Booking saved" });
-      onSaved();
     },
     onError: () => toast({ title: "Failed to save booking", variant: "destructive" }),
+  });
+
+  async function persistBooking() {
+    if (!title.trim()) throw new Error("Title is required");
+    if (type === "venue_booking") {
+      if (!endDate.trim()) throw new Error("End date and time required");
+      const a = new Date(startDate).getTime();
+      const b = new Date(endDate).getTime();
+      if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) {
+        throw new Error("End must be after the start");
+      }
+    }
+    await saveMutation.mutateAsync();
+  }
+
+  const bookingAutoSave = useAutoSaveDraft({
+    enabled: true,
+    resetKey: booking.id,
+    getSnapshot: () => ({ title, description, startDate, endDate, type, venueId, assignedPeople }),
+    watchDeps: [title, description, startDate, endDate, type, venueId, assignedPeople],
+    save: persistBooking,
   });
 
   const unassigned = people.filter((p) => !assignedPeople.some((ap) => ap.personId === p.id));
@@ -345,6 +366,7 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
 
   return (
     <div className="space-y-5 mt-4 pb-8">
+      <AutoSaveStatus status={bookingAutoSave.status} error={bookingAutoSave.error} />
       <div>
         <Label className={lbl}>Title</Label>
         <Input className={`${inp} mt-1`} value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -453,33 +475,13 @@ function BookingForm({ booking, venues, people, onSaved, onClose }: BookingFormP
               onClick={() => setShowDelete(true)}>
               <Trash2 size={13} /> Delete booking
             </Button>
-            <div className="flex gap-2">
-              <Button variant="ghost" className="text-white/50 hover:text-white" onClick={onClose}>Cancel</Button>
-              <Button className="bg-amber-700 hover:bg-amber-600 text-white border-0" disabled={saveMutation.isPending || !title.trim()}
-                onClick={() => {
-                  if (type === "venue_booking") {
-                    if (!endDate.trim()) {
-                      toast({
-                        title: "End date and time required",
-                        description: "Venue bookings need a start and end (they can span multiple days).",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    const a = new Date(startDate).getTime();
-                    const b = new Date(endDate).getTime();
-                    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) {
-                      toast({
-                        title: "Invalid time range",
-                        description: "End must be after the start.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                  }
-                  saveMutation.mutate();
-                }}>
-                {saveMutation.isPending ? "Saving…" : "Save booking"}
+            <div className="flex gap-2 items-center">
+              <Button
+                variant="ghost"
+                className="text-white/50 hover:text-white"
+                onClick={() => void bookingAutoSave.flush().finally(onClose)}
+              >
+                Close
               </Button>
             </div>
           </div>

@@ -93,6 +93,8 @@ import { downloadVenueTechRider, printVenueTechRider, uploadVenueTechRiderForSha
 import { TourCalendarView } from "@/components/TourCalendarView";
 import { TourDayScheduleEditor } from "@/components/tour/TourDayScheduleEditor";
 import { useToast } from "@/hooks/use-toast";
+import { useAutoSaveDraft, dialogCloseWithAutoSave } from "@/hooks/useAutoSaveDraft";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { usePreferences } from "@/hooks/usePreferences";
 import { formatDistanceKm } from "@/lib/preferences";
 import { SplitTimeInput } from "@/components/SplitTimeField";
@@ -291,17 +293,10 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
 
   const updateMutation = useMutation({
     mutationFn: (data: UpdateTour) => api.put<TourDetail>(`/api/tours/${tour.id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
-      queryClient.invalidateQueries({ queryKey: ["tours"] });
-      onOpenChange(false);
-    },
   });
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-    const payload: UpdateTour = {
+  function buildTourPayload(): UpdateTour {
+    return {
       name: name.trim(),
       status,
       description: description.trim() || undefined,
@@ -318,16 +313,47 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
       customFields: customFields.filter((field) => field.key.trim().length > 0),
       riderVisibility,
     };
-    updateMutation.mutate(payload);
   }
 
+  const tourAutoSave = useAutoSaveDraft({
+    enabled: open,
+    resetKey: tour.id,
+    getSnapshot: () => buildTourPayload(),
+    watchDeps: [
+      name,
+      description,
+      status,
+      tourManagerName,
+      tourManagerPhone,
+      tourManagerEmail,
+      notes,
+      showDuration,
+      handsNeeded,
+      stageRequirements,
+      soundRequirements,
+      lightingRequirements,
+      riderNotes,
+      customFields,
+      riderVisibility,
+    ],
+    save: async () => {
+      if (!name.trim()) throw new Error("Tour name is required");
+      const updated = await updateMutation.mutateAsync(buildTourPayload());
+      queryClient.setQueryData(["tour", tour.id], updated);
+      queryClient.setQueryData<TourDetail[]>(["tours"], (old) =>
+        !old ? old : old.map((t) => (t.id === tour.id ? { ...t, ...updated } : t))
+      );
+    },
+  });
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={dialogCloseWithAutoSave(open, onOpenChange, tourAutoSave)}>
       <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Tour</DialogTitle>
+          <AutoSaveStatus status={tourAutoSave.status} error={tourAutoSave.error} className="mt-1" />
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+        <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label className="text-white/60 text-xs uppercase tracking-wide">
               Tour Name <span className="text-red-400">*</span>
@@ -519,17 +545,10 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
               onClick={() => onOpenChange(false)}
               className="border-white/10 text-white/60 hover:text-white bg-transparent"
             >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={!name.trim() || updateMutation.isPending}
-              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-            >
-              {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              Close
             </Button>
           </DialogFooter>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -750,9 +769,23 @@ function ShowFormDialog({
   const updateMutation = useMutation({
     mutationFn: (data: CreateTourShow) =>
       api.put<TourShow>(`/api/tours/${tourId}/shows/${show?.id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour", tourId] });
-      onOpenChange(false);
+  });
+
+  const showAutoSave = useAutoSaveDraft({
+    enabled: open && isEdit,
+    resetKey: show?.id,
+    getSnapshot: () => form,
+    watchDeps: [form],
+    save: async () => {
+      if (!form.date) throw new Error("Date is required");
+      const updated = await updateMutation.mutateAsync(formToPayload(form));
+      queryClient.setQueryData<TourDetail>(["tour", tourId], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          shows: old.shows.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)),
+        };
+      });
     },
   });
 
@@ -764,17 +797,18 @@ function ShowFormDialog({
     e.preventDefault();
     if (!form.date) return;
     const payload = formToPayload(form);
-    if (isEdit) {
-      updateMutation.mutate(payload);
-    } else {
-      createMutation.mutate(payload);
-    }
+    if (isEdit) return;
+    createMutation.mutate(payload);
   }
 
   const fieldCls = "bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-white/30 h-9";
 
+  const dialogOnOpenChange = isEdit
+    ? dialogCloseWithAutoSave(open, onOpenChange, showAutoSave)
+    : onOpenChange;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={dialogOnOpenChange}>
       <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
@@ -784,6 +818,9 @@ function ShowFormDialog({
                 ? "Add show"
                 : "Add Tour Day"}
           </DialogTitle>
+          {isEdit ? (
+            <AutoSaveStatus status={showAutoSave.status} error={showAutoSave.error} className="mt-1" />
+          ) : null}
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 py-2">
           {/* Type selector */}
@@ -1137,15 +1174,17 @@ function ShowFormDialog({
               onClick={() => onOpenChange(false)}
               className="border-white/10 text-white/60 hover:text-white bg-transparent"
             >
-              Cancel
+              {isEdit ? "Close" : "Cancel"}
             </Button>
-            <Button
-              type="submit"
-              disabled={!form.date || isPending}
-              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-            >
-              {isPending ? "Saving..." : isEdit ? "Save Changes" : "Add Day"}
-            </Button>
+            {!isEdit ? (
+              <Button
+                type="submit"
+                disabled={!form.date || isPending}
+                className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+              >
+                {isPending ? "Adding…" : "Add Day"}
+              </Button>
+            ) : null}
           </DialogFooter>
         </form>
       </DialogContent>

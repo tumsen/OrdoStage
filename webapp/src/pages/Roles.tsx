@@ -15,6 +15,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 
 type Catalog = {
@@ -115,15 +117,40 @@ export default function Roles() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["role-definitions"] });
       queryClient.invalidateQueries({ queryKey: ["me", "permissions"] });
-      setMode("closed");
-      setEditRow(null);
-      toast({ title: "Saved" });
+      if (mode === "new") {
+        setMode("closed");
+        setEditRow(null);
+        toast({ title: "Role created" });
+      }
     },
     onError: (e: unknown) => {
       toast({
         title: isApiError(e) ? e.message : "Could not save",
         variant: "destructive",
       });
+    },
+  });
+
+  const roleAutoSave = useAutoSaveDraft({
+    enabled:
+      mode === "edit" &&
+      Boolean(editRow) &&
+      editRow?.slug !== "owner" &&
+      canManageGroups,
+    resetKey: editRow?.id,
+    getSnapshot: () => ({ draftName, draftViews, draftActions }),
+    watchDeps: [draftName, draftViews, draftActions],
+    save: async () => {
+      if (!editRow) return;
+      await api.patch(`/api/org/role-definitions/${editRow.id}`, {
+        name: draftName.trim() || editRow.slug,
+        description: editRow.description,
+        views: draftViews,
+        actions: draftActions,
+        sortOrder: editRow.sortOrder,
+      });
+      queryClient.invalidateQueries({ queryKey: ["role-definitions"] });
+      queryClient.invalidateQueries({ queryKey: ["me", "permissions"] });
     },
   });
 
@@ -311,6 +338,13 @@ export default function Roles() {
       <Dialog
         open={dialogOpen}
         onOpenChange={(o) => {
+          if (!o && mode === "edit") {
+            void roleAutoSave.flush().finally(() => {
+              setMode("closed");
+              setEditRow(null);
+            });
+            return;
+          }
           if (!o) {
             setMode("closed");
             setEditRow(null);
@@ -320,6 +354,9 @@ export default function Roles() {
         <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{mode === "new" ? "New role" : `Edit ${editRow?.name ?? ""}`}</DialogTitle>
+            {mode === "edit" && !isEditingOwner ? (
+              <AutoSaveStatus status={roleAutoSave.status} error={roleAutoSave.error} className="mt-1" />
+            ) : null}
           </DialogHeader>
 
           {mode === "new" ? (
@@ -370,13 +407,13 @@ export default function Roles() {
             >
               Cancel
             </Button>
-            {canManageGroups ? (
+            {canManageGroups && mode === "new" ? (
               <Button
                 className="bg-red-900 hover:bg-red-800"
-                disabled={isEditingOwner || saveMutation.isPending || (mode === "new" && !newName.trim())}
+                disabled={saveMutation.isPending || !newName.trim()}
                 onClick={() => saveMutation.mutate()}
               >
-                {saveMutation.isPending ? "Saving…" : "Save"}
+                {saveMutation.isPending ? "Creating…" : "Create role"}
               </Button>
             ) : null}
           </DialogFooter>

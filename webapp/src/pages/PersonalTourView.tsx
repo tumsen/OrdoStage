@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Loader2, BedDouble, Truck, Coffee, CheckCircle2, StickyNote } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { TourScheduleEvent } from "../../../backend/src/types";
@@ -112,6 +111,14 @@ function ShowNoteCard({
   function handleSaveNote() {
     saveMutation.mutate({ note: note || undefined, needsHotel });
   }
+
+  useEffect(() => {
+    const baseline = show.myNote?.note ?? "";
+    if (note === baseline) return;
+    const t = window.setTimeout(() => handleSaveNote(), 600);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce note only; hotel saves immediately
+  }, [note, show.id]);
 
   const dateObj = new Date(show.date);
   const dateLabel = dateObj.toLocaleDateString("en-GB", {
@@ -232,24 +239,22 @@ function ShowNoteCard({
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            onBlur={handleSaveNote}
             placeholder="Add any notes, questions, or special requests..."
             className="text-sm resize-none bg-white border-gray-200 focus:border-indigo-300 text-gray-800 placeholder:text-gray-300 min-h-[70px]"
             rows={3}
           />
           <div className="flex items-center justify-between mt-1.5">
-            <span className="text-[10px] text-gray-300">Auto-saves when you click away</span>
-            <div className="flex items-center gap-2">
-              {saved ? <span className="text-[11px] text-green-500 font-medium">Saved</span> : null}
-              <Button
-                size="sm"
-                onClick={handleSaveNote}
-                disabled={saveMutation.isPending}
-                className="h-6 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                {saveMutation.isPending ? <Loader2 size={10} className="animate-spin" /> : "Save"}
-              </Button>
-            </div>
+            <span className="text-[10px] text-gray-400">
+              {saveMutation.isPending ? (
+                <span className="inline-flex items-center gap-1">
+                  <Loader2 size={10} className="animate-spin" /> Saving…
+                </span>
+              ) : saved ? (
+                <span className="text-green-600 font-medium">Saved</span>
+              ) : (
+                "Changes save automatically"
+              )}
+            </span>
           </div>
         </div>
       </div>

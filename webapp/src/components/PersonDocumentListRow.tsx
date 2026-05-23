@@ -1,4 +1,6 @@
 import { useState, useEffect, useImperativeHandle, forwardRef } from "react";
+import { Loader2 } from "lucide-react";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,17 +99,28 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
     doesNotExpire !== docDne ||
     localExp !== docExp;
 
+  const rowAutoSave = useAutoSaveDraft({
+    enabled: canEdit,
+    resetKey: doc.id,
+    getSnapshot: () => ({ name, docType, doesNotExpire, expires }),
+    watchDeps: [name, docType, doesNotExpire, expires],
+    save: async () => {
+      const n = name.trim();
+      if (!n) throw new Error("Document name is required");
+      await onSave(doc.id, buildSaveBody(n, docType, doesNotExpire, expires));
+    },
+  });
+
   useImperativeHandle(
     ref,
     () => ({
       async saveIfDirty() {
         if (!canEdit) return;
-        if (!name.trim() || isSaving) return;
         if (!dirty) return;
-        await onSave(doc.id, buildSaveBody(name, docType, doesNotExpire, expires));
+        await rowAutoSave.flush();
       },
     }),
-    [canEdit, dirty, name, docType, doesNotExpire, expires, isSaving, doc.id, onSave]
+    [canEdit, dirty, rowAutoSave]
   );
 
   return (
@@ -207,23 +220,13 @@ export const PersonDocumentListRow = forwardRef<PersonDocumentListRowHandle, Pro
             Expires {formatDateForDateInput(doc.expiresAt) || "—"}
           </span>
         ) : null}
-        {canEdit && (
-          <Button
-            type="button"
-            size="sm"
-            className="h-7 text-[11px] bg-white/10 hover:bg-white/15"
-            disabled={!dirty || !name.trim() || isSaving}
-            onClick={async (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const n = name.trim();
-              if (!n || isSaving) return;
-              await onSave(doc.id, buildSaveBody(n, docType, doesNotExpire, expires));
-            }}
-          >
-            {isSaving ? "Saving…" : "Save"}
-          </Button>
-        )}
+        {canEdit ? (
+          rowAutoSave.status === "saving" || isSaving ? (
+            <Loader2 size={12} className="animate-spin text-white/40 shrink-0" aria-label="Saving" />
+          ) : rowAutoSave.status === "saved" ? (
+            <span className="text-[10px] text-emerald-400/80 shrink-0">Saved</span>
+          ) : null
+        ) : null}
         <a
           href={`${backendBase()}/api/people/documents/${doc.id}/download`}
           className="text-blue-300 hover:text-blue-200"
