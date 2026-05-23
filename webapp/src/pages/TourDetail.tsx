@@ -39,6 +39,7 @@ import {
   tourShowGetInTimeHHMM,
 } from "@/lib/tourScheduleDisplay";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
+import { PersonAssignmentCard } from "@/components/person/PersonAssignmentCard";
 import type {
   TourDetail,
   TourShow,
@@ -2552,26 +2553,16 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
         ) : (
           <div className="space-y-2">
             {tour.people.map((tp: TourPerson) => (
-              <div
+              <PersonAssignmentCard
                 key={tp.id}
-                className="flex items-center justify-between bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3"
-              >
-                <div>
-                  <div className="text-sm font-medium text-white/90">{tp.person.name}</div>
-                  <div className="text-xs text-white/40 mt-0.5">
-                    {tp.role ? tp.role : tp.person.role ? tp.person.role : "No role"}
-                  </div>
-                  {tp.person.phone || tp.person.email ? (
-                    <div className="text-xs text-white/30 mt-0.5">
-                      {[tp.person.phone, tp.person.email].filter(Boolean).join(" · ")}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
+                person={tp.person}
+                assignmentRole={tp.role}
+                headerExtra={
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       await navigator.clipboard.writeText(`${window.location.origin}/p/${tp.personalToken}`);
                       setCopiedId(tp.id);
                       setTimeout(() => setCopiedId(null), 2000);
@@ -2581,21 +2572,13 @@ function PeopleTab({ tour }: { tour: TourDetail }) {
                   >
                     {copiedId === tp.id ? <Check size={13} className="text-green-400" /> : <Link2 size={13} />}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-white/25 hover:text-red-400"
-                    title="Remove from tour"
-                    onClick={() => {
-                      if (!confirmDeleteAction(`"${tp.person.name}" from this tour`)) return;
-                      removePersonMutation.mutate(tp.personId);
-                    }}
-                    disabled={removePersonMutation.isPending}
-                  >
-                    <X size={13} />
-                  </Button>
-                </div>
-              </div>
+                }
+                onRemove={() => {
+                  if (!confirmDeleteAction(`"${tp.person.name}" from this tour`)) return;
+                  removePersonMutation.mutate(tp.personId);
+                }}
+                removeDisabled={removePersonMutation.isPending}
+              />
             ))}
           </div>
         )}

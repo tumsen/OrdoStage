@@ -116,6 +116,7 @@ import { toast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { AddressFields, type Address } from "@/components/AddressFields";
 import { ContactFieldsOneRowNote } from "@/components/event/ContactFieldsOneRowNote";
+import { PersonAssignmentCard } from "@/components/person/PersonAssignmentCard";
 import {
   emptyContactRowFields,
   migrateContactRowFields,
@@ -408,6 +409,75 @@ const DETAIL_CARD_CLASS =
 function SectionHeader({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <Label className={cn(DETAIL_FIELD_LABEL_CLASS, "block", className)}>{children}</Label>
+  );
+}
+
+function ContactPersonCard({
+  idx,
+  row,
+  onChange,
+  onRemove,
+}: {
+  idx: number;
+  row: ContactRow;
+  onChange: (patch: Partial<ContactRow>) => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const title =
+    row.name?.trim() || row.role?.trim()
+      ? [row.name?.trim(), row.role?.trim()].filter(Boolean).join(" · ")
+      : `Person ${idx + 1}`;
+  const collapsedHint = [row.phone?.trim(), row.email?.trim()].filter(Boolean).join(" · ");
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="rounded-md border border-white/10 bg-white/[0.02] overflow-hidden"
+    >
+      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-2 text-left rounded-md py-0.5 -my-0.5 px-1 -mx-1 hover:bg-white/[0.04]"
+          >
+            {open ? (
+              <ChevronDown size={16} className="text-white/45 shrink-0" />
+            ) : (
+              <ChevronRight size={16} className="text-white/45 shrink-0" />
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white/90 truncate">{title}</p>
+              {!open && collapsedHint ? (
+                <p className="text-xs text-white/35 mt-0.5 truncate">{collapsedHint}</p>
+              ) : null}
+              {!open ? <p className="text-[10px] text-white/30 mt-0.5">Expand to edit details</p> : null}
+            </div>
+          </button>
+        </CollapsibleTrigger>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="h-7 text-red-400/80 hover:text-red-400 hover:bg-red-500/10 -mr-1 shrink-0"
+        >
+          <X size={14} className="mr-1" />
+          Remove
+        </Button>
+      </div>
+      <CollapsibleContent className="border-t border-white/[0.06] px-3 py-3">
+        <ContactFieldsOneRowNote
+          row={row}
+          onChange={onChange}
+          notePlaceholder="Availability, preferred channel, extra context…"
+        />
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -1205,29 +1275,13 @@ function DetailsTab({
               ) : null}
 
               {contacts.map((row, idx) => (
-                <div
+                <ContactPersonCard
                   key={idx}
-                  className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-white/50">Person {idx + 1}</p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeContact(idx)}
-                      className="h-7 text-red-400/80 hover:text-red-400 hover:bg-red-500/10 -mr-1"
-                    >
-                      <X size={14} className="mr-1" />
-                      Remove
-                    </Button>
-                  </div>
-                  <ContactFieldsOneRowNote
-                    row={row}
-                    onChange={(patch) => updateContact(idx, patch)}
-                    notePlaceholder="Availability, preferred channel, extra context…"
-                  />
-                </div>
+                  idx={idx}
+                  row={row}
+                  onChange={(patch) => updateContact(idx, patch)}
+                  onRemove={() => removeContact(idx)}
+                />
               ))}
 
               {contacts.length > 0 ? (
@@ -1675,25 +1729,16 @@ function PeopleTab({ event }: { event: EventDetail }) {
       ) : (
         <div className="space-y-2">
           {event.people.map((ep: EventPerson) => (
-            <div key={ep.id} className="flex items-center justify-between bg-white/[0.03] border border-white/8 rounded-lg px-4 py-3">
-              <div>
-                <div className="text-sm font-medium text-white/90">{ep.person.name}</div>
-                <div className="text-xs text-white/40 mt-0.5">
-                  {ep.role ? ep.role : ep.person.role ? ep.person.role : "No role"}
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  if (!confirmDeleteAction(`person assignment "${ep.person.name}"`)) return;
-                  removeMutation.mutate(ep.id);
-                }}
-                className="h-7 w-7 text-white/25 hover:text-red-400"
-              >
-                <X size={13} />
-              </Button>
-            </div>
+            <PersonAssignmentCard
+              key={ep.id}
+              person={ep.person}
+              assignmentRole={ep.role}
+              onRemove={() => {
+                if (!confirmDeleteAction(`person assignment "${ep.person.name}"`)) return;
+                removeMutation.mutate(ep.id);
+              }}
+              removeDisabled={removeMutation.isPending}
+            />
           ))}
         </div>
       )}
