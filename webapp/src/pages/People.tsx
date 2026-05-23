@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -366,13 +366,18 @@ function PersonFormDialog({
   person,
   onSuccess,
   onPersonUpdated,
+  asPage = false,
+  onCancel,
 }: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
   person?: Person;
   onSuccess?: () => void;
   /** Called after a successful **edit** save (dialog stays open). */
   onPersonUpdated?: (p: Person) => void;
+  /** Full-page edit layout (no dialog). Requires `person`. */
+  asPage?: boolean;
+  onCancel?: () => void;
 }) {
   const documentRowHandleMap = useRef(new Map<string, PersonDocumentListRowHandle>());
   const queryClient = useQueryClient();
@@ -392,12 +397,12 @@ function PersonFormDialog({
   const { data: permissionGroupRows = [] } = useQuery({
     queryKey: ["role-definitions"],
     queryFn: () => api.get<RoleDefRow[]>("/api/org/role-definitions"),
-    enabled: open,
+    enabled: asPage || Boolean(open),
   });
   const { data: mePerson } = useQuery<Person | null>({
     queryKey: ["people", "me"],
     queryFn: () => api.get<Person | null>("/api/people/me"),
-    enabled: open,
+    enabled: asPage || Boolean(open),
   });
 
   const form = useForm<PersonFormValues>({
@@ -498,7 +503,7 @@ function PersonFormDialog({
 
   // Sync contract fields when editing a person
   useEffect(() => {
-    if (!open) return;
+    if (asPage || open) return;
     setContractWeeklyHours(person?.weeklyContractHours != null ? String(person.weeklyContractHours) : "");
     setContractVacationDays(person?.vacationDaysPerYear != null ? String(person.vacationDaysPerYear) : "");
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -599,7 +604,7 @@ function PersonFormDialog({
         onPersonUpdated?.(result as Person);
         toast({ title: "Changes saved" });
       } else {
-        onOpenChange(false);
+        onOpenChange?.(false);
         form.reset();
       }
       onSuccess?.();
@@ -704,14 +709,62 @@ function PersonFormDialog({
     mutation.mutate(values);
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#16161f] border-white/10 text-white w-[95vw] max-w-[1200px] max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{person ? "Edit Person" : "Add Person"}</DialogTitle>
-        </DialogHeader>
+  const cardClass = "rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6";
+  const sectionTitle = "text-xs font-semibold uppercase tracking-wider text-white/50";
 
-        <div className="space-y-4 py-1">
+  function handleCancel() {
+    if (asPage) {
+      onCancel?.();
+      return;
+    }
+    onOpenChange?.(false);
+  }
+
+  const formFooter = (
+    <div
+      className={
+        asPage
+          ? "flex flex-wrap items-center gap-3 pt-4 border-t border-white/10"
+          : "flex flex-wrap items-center justify-between gap-2 sm:justify-end"
+      }
+    >
+      {canResendAppAccess ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="border-white/10 text-white/80 hover:text-white bg-transparent mr-auto"
+          disabled={resendAppAccessMutation.isPending || mutation.isPending}
+          onClick={() => resendAppAccessMutation.mutate()}
+        >
+          {resendAppAccessMutation.isPending ? "Sending…" : "Resend login email"}
+        </Button>
+      ) : null}
+      <div className="flex gap-2 ml-auto">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleCancel}
+          className="border-white/10 text-white/60 hover:text-white bg-transparent"
+        >
+          Cancel
+        </Button>
+        <Button
+          type={asPage ? "submit" : "button"}
+          disabled={mutation.isPending}
+          onClick={asPage ? undefined : () => form.handleSubmit(handleSubmit)()}
+          className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+        >
+          {mutation.isPending ? "Saving..." : person ? "Save changes" : "Add Person"}
+        </Button>
+      </div>
+    </div>
+  );
+
+  const formBody = (
+        <div className={asPage ? "w-full space-y-6 pb-4" : "space-y-4 py-1"}>
+          <div className={asPage ? "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start" : "contents"}>
+            <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "contents"}>
+              {asPage ? <p className={sectionTitle}>Profile & access</p> : null}
           {/* Name + affiliation + Role */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -830,9 +883,50 @@ function PersonFormDialog({
             ) : null}
           </div>
 
+            {asPage ? (
+              <div className={`${cardClass} space-y-3`}>
+                <p className={sectionTitle}>Profile image</p>
+                <p className="text-[11px] text-white/35">
+                  Upload a profile image (jpg/png/webp).
+                </p>
+                {person?.hasPhoto ? (
+                  <RemoteImageHoverPreview
+                    src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
+                    alt={`${person.name} profile`}
+                    triggerClassName="h-24 w-24 rounded-md border border-white/10 bg-black/20 p-0 shadow-none"
+                    triggerImgClassName="h-full w-full object-cover"
+                  />
+                ) : null}
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+                  className="bg-white/5 border-white/10 text-white file:text-white"
+                />
+                {person?.hasPhoto ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-white/15 text-white/70"
+                    disabled={removePhotoMutation.isPending}
+                    onClick={() => removePhotoMutation.mutate()}
+                  >
+                    {removePhotoMutation.isPending ? "Deleting…" : "Delete image"}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            </div>
+
+            <div className={asPage ? "flex flex-col gap-5 min-w-0" : "contents"}>
+              <div className={asPage ? `${cardClass} space-y-3` : "contents"}>
+                {asPage ? <p className={sectionTitle}>Address</p> : null}
           {/* Address */}
-          <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">Address</Label>
+          <div className={asPage ? "contents" : "space-y-1.5"}>
+            {asPage ? null : (
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Address</Label>
+            )}
             <AddressFields
               value={{
                 street:  form.watch("addressStreet")  ?? "",
@@ -852,12 +946,21 @@ function PersonFormDialog({
               }}
             />
           </div>
+              </div>
 
+              <div className={asPage ? `${cardClass} space-y-3` : "contents"}>
+                {asPage ? (
+                  <p className={`${sectionTitle} flex items-center gap-1.5`}>
+                    <ShieldAlert size={11} className="text-amber-400/60" /> Emergency contact
+                  </p>
+                ) : null}
           {/* Emergency contact */}
-          <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide flex items-center gap-1.5">
-              <ShieldAlert size={11} className="text-amber-400/60" /> Emergency Contact
-            </Label>
+          <div className={asPage ? "contents" : "space-y-1.5"}>
+            {asPage ? null : (
+              <Label className="text-white/50 text-xs uppercase tracking-wide flex items-center gap-1.5">
+                <ShieldAlert size={11} className="text-amber-400/60" /> Emergency Contact
+              </Label>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Input
                 {...form.register("emergencyContactName")}
@@ -871,18 +974,35 @@ function PersonFormDialog({
               />
             </div>
           </div>
+              </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
+              <div className={asPage ? `${cardClass} space-y-3 flex-1 flex flex-col min-h-[10rem]` : "contents"}>
+                {asPage ? <p className={sectionTitle}>Notes</p> : null}
+          <div className={asPage ? "contents flex-1 flex flex-col" : "space-y-1.5"}>
+            {asPage ? null : (
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
+            )}
             <textarea
               {...form.register("notes")}
               placeholder="Notes about this person..."
-              className="min-h-[90px] w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/30"
+              className={
+                asPage
+                  ? "min-h-[8rem] w-full flex-1 resize-y rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/30"
+                  : "min-h-[90px] w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/30"
+              }
             />
           </div>
+              </div>
+            </div>
+          </div>
 
-          <div className="space-y-2">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">Teams</Label>
+          <div className={asPage ? "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start" : "contents"}>
+            <div className={asPage ? `${cardClass} space-y-2 min-w-0` : "contents"}>
+              {asPage ? <p className={sectionTitle}>Teams</p> : null}
+          <div className={asPage ? "contents space-y-2" : "space-y-2"}>
+            {asPage ? null : (
+              <Label className="text-white/50 text-xs uppercase tracking-wide">Teams</Label>
+            )}
             {canWriteOrg ? (
               <>
                 <p className="text-[11px] text-white/35">
@@ -951,6 +1071,89 @@ function PersonFormDialog({
             )}
             {form.formState.errors.teamAssignments ? (
               <p className="text-red-400 text-xs">{form.formState.errors.teamAssignments.message}</p>
+            ) : null}
+          </div>
+            </div>
+
+            {asPage && person && canManageContracts ? (
+              <div className={`${cardClass} space-y-4 min-w-0`}>
+                <p className={sectionTitle}>Work contract</p>
+                <p className="text-[11px] text-white/30">
+                  Used for overtime and vacation tracking in time reports.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-white/55 text-xs">Weekly hours</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="168"
+                      step="0.5"
+                      value={contractWeeklyHours}
+                      onChange={(e) => setContractWeeklyHours(e.target.value)}
+                      placeholder="e.g. 37"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-white/55 text-xs">Vacation days / year</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="365"
+                      step="0.5"
+                      value={contractVacationDays}
+                      onChange={(e) => setContractVacationDays(e.target.value)}
+                      placeholder="e.g. 25"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) ? (
+                  <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
+                    {[
+                      { label: "Hours/day", value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
+                      { label: "Monthly", value: `${((parseFloat(contractWeeklyHours) * 52) / 12).toFixed(0)} h` },
+                      { label: "Yearly", value: `${(parseFloat(contractWeeklyHours) * 52).toFixed(0)} h` },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
+                        <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
+                        <p className="font-semibold text-white/70 mt-0.5">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="border-white/15 text-white/70 hover:bg-white/5 h-8"
+                  disabled={contractSaving}
+                  onClick={async () => {
+                    setContractSaving(true);
+                    try {
+                      const wh = contractWeeklyHours.trim() === "" ? null : parseFloat(contractWeeklyHours);
+                      const vd = contractVacationDays.trim() === "" ? null : parseFloat(contractVacationDays);
+                      await api.patch(`/api/time/person-contract/${person.id}`, {
+                        weeklyContractHours: wh,
+                        vacationDaysPerYear: vd,
+                      });
+                      queryClient.invalidateQueries({ queryKey: ["people"] });
+                      queryClient.invalidateQueries({ queryKey: ["time-people"] });
+                      toast({ title: "Contract saved" });
+                    } catch {
+                      toast({ title: "Could not save contract", variant: "destructive" });
+                    } finally {
+                      setContractSaving(false);
+                    }
+                  }}
+                >
+                  {contractSaving ? "Saving…" : "Save contract"}
+                </Button>
+              </div>
+            ) : null}
+            {asPage && person && !canManageContracts ? (
+              <div className="hidden md:block" aria-hidden />
             ) : null}
           </div>
 
@@ -1049,7 +1252,16 @@ function PersonFormDialog({
             </DialogContent>
           </Dialog>
 
-          <div className="flex flex-col gap-4 w-full min-w-0">
+          <div className={asPage ? "w-full min-w-0 space-y-3" : "contents"}>
+            {asPage ? <p className={sectionTitle}>Documents</p> : null}
+            <div
+              className={
+                asPage
+                  ? `${cardClass} space-y-3 w-full min-w-0`
+                  : "flex flex-col gap-4 w-full min-w-0"
+              }
+            >
+            {!asPage ? (
             <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3 w-full max-w-md">
               <Label className="text-white/50 text-xs uppercase tracking-wide">Profile image</Label>
               <p className="text-[11px] text-white/35">
@@ -1082,9 +1294,12 @@ function PersonFormDialog({
                 </Button>
               ) : null}
             </div>
+            ) : null}
 
-            <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3 w-full min-w-0">
+            <div className={asPage ? "contents space-y-2 w-full min-w-0" : "space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3 w-full min-w-0"}>
+              {asPage ? null : (
               <Label className="text-white/50 text-xs uppercase tracking-wide">Documents</Label>
+              )}
               <p className="text-[11px] text-white/35">
                 Add passport, driver license, certificates, contracts, or other files.
               </p>
@@ -1191,17 +1406,17 @@ function PersonFormDialog({
                 </div>
               ) : null}
             </div>
+            </div>
           </div>
           {uploadError ? (
             <p className="text-red-400 text-xs">{uploadError}</p>
           ) : null}
-        </div>
 
-        {/* Work contract — shown to admins with time.read_all, only in edit mode */}
-        {person && canManageContracts && (
+        {/* Work contract — dialog layout only (page layout uses column in teams row) */}
+        {!asPage && person && canManageContracts ? (
           <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Work contract</p>
+              <p className={sectionTitle}>Work contract</p>
               <p className="text-[11px] text-white/30 mt-0.5">
                 Used for overtime and vacation tracking in time reports.
               </p>
@@ -1277,43 +1492,36 @@ function PersonFormDialog({
               {contractSaving ? "Saving…" : "Save contract"}
             </Button>
           </div>
-        )}
+        ) : null}
+        </div>
+  );
 
-        <DialogFooter className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
-          {canResendAppAccess ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="border-white/10 text-white/80 hover:text-white bg-transparent mr-auto"
-              disabled={resendAppAccessMutation.isPending || mutation.isPending}
-              onClick={() => resendAppAccessMutation.mutate()}
-            >
-              {resendAppAccessMutation.isPending ? "Sending…" : "Resend login email"}
-            </Button>
-          ) : null}
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="border-white/10 text-white/60 hover:text-white bg-transparent"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={mutation.isPending}
-              onClick={form.handleSubmit(handleSubmit)}
-              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-            >
-              {mutation.isPending ? "Saving..." : person ? "Save Changes" : "Add Person"}
-            </Button>
-          </div>
-        </DialogFooter>
+  if (asPage) {
+    return (
+      <form
+        className="flex-1 overflow-y-auto p-6"
+        onSubmit={form.handleSubmit(handleSubmit)}
+      >
+        {formBody}
+        {formFooter}
+      </form>
+    );
+  }
+
+  return (
+    <Dialog open={Boolean(open)} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-[#16161f] border-white/10 text-white w-[95vw] max-w-[1200px] max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{person ? "Edit Person" : "Add Person"}</DialogTitle>
+        </DialogHeader>
+        {formBody}
+        <DialogFooter>{formFooter}</DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
+export { PersonFormDialog };
 
 // ── Person card (list item) ───────────────────────────────────────────────────
 
@@ -1535,8 +1743,8 @@ function PersonCard({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function People() {
+  const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
-  const [editPerson, setEditPerson] = useState<Person | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<PeopleSortMode>("alphabetical");
   const queryClient = useQueryClient();
@@ -1637,7 +1845,7 @@ export default function People() {
               <PersonCard
                 key={person.id}
                 person={person}
-                onEdit={() => setEditPerson(person)}
+                onEdit={() => navigate(`/people/${person.id}/edit`)}
                 onDelete={() => setDeleteId(person.id)}
                 canEditPerson={canEditPerson}
                 canDeletePerson={canDeletePerson}
@@ -1660,16 +1868,6 @@ export default function People() {
 
       {/* Add dialog */}
       <PersonFormDialog open={addOpen} onOpenChange={setAddOpen} />
-
-      {/* Edit dialog */}
-      {editPerson ? (
-        <PersonFormDialog
-          open={!!editPerson}
-          onOpenChange={(v) => { if (!v) setEditPerson(null); }}
-          person={editPerson}
-          onPersonUpdated={setEditPerson}
-        />
-      ) : null}
 
       {/* Delete confirm */}
       <AlertDialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>

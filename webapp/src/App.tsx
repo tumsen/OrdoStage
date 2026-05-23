@@ -20,6 +20,7 @@ const Venues = lazy(() => import("./pages/Venues"));
 const VenueEdit = lazy(() => import("./pages/VenueEdit"));
 const VenueDetail = lazy(() => import("./pages/VenueDetail"));
 const People = lazy(() => import("./pages/People"));
+const PersonEdit = lazy(() => import("./pages/PersonEdit"));
 const Team = lazy(() => import("./pages/Team"));
 const Calendars = lazy(() => import("./pages/Calendars"));
 const Schedule = lazy(() => import("./pages/Schedule"));
@@ -224,6 +225,16 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <People />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/people/:id/edit"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PersonEdit />
                 </Layout>
               </ProtectedRoute>
             }
