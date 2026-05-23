@@ -5,10 +5,8 @@ import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  Plus, Edit2, Trash2, ChevronDown, ChevronRight, ShieldAlert, User,
+  Plus, Edit2, Trash2, Phone, Mail, MapPin, ShieldAlert, User,
 } from "lucide-react";
-import { PersonDetailGrid } from "@/components/person/PersonAssignmentCard";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "@/hooks/use-toast";
@@ -22,7 +20,7 @@ import {
   type PersonDocumentTypeKey,
 } from "@/lib/personDocumentTypes";
 import type { Person, PersonDocument } from "../../../backend/src/types";
-import { AddressFields, type Address } from "@/components/AddressFields";
+import { AddressFields, appleMapsUrl, formatAddress, googleMapsUrl, type Address } from "@/components/AddressFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1336,7 +1334,6 @@ function PersonCard({
 }) {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
-  const [open, setOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
 
   const activeMutation = useMutation({
@@ -1369,97 +1366,142 @@ function PersonCard({
     setDeactivateOpen(true);
   }
 
-  const collapsedHint = [person.phone?.trim(), person.email?.trim()].filter(Boolean).join(" · ");
-
   return (
-    <Collapsible
-      open={open}
-      onOpenChange={setOpen}
-      className={`border-b border-white/5 group hover:bg-white/[0.02] transition-colors ${
+    <div
+      className={`flex items-start gap-4 px-5 py-4 border-b border-white/5 group hover:bg-white/[0.02] transition-colors ${
         !isActive ? "opacity-70" : ""
       }`}
     >
-      <div className="flex items-start gap-4 px-5 py-4">
-        {/* Avatar */}
-        <div className="w-14 h-14 rounded-full overflow-hidden bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-          {person.hasPhoto ? (
-            <RemoteImageHoverPreview
-              src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
-              alt={person.name}
-              triggerClassName="h-14 w-14 max-h-14 max-w-14 rounded-full border-0 bg-transparent p-0 ring-0 shadow-none"
-              triggerImgClassName="h-full w-full object-cover"
-              title={person.name}
-            />
-          ) : (
-            <User size={21} className="text-white/30" />
-          )}
-        </div>
-
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="flex min-w-0 flex-1 items-start gap-2 text-left rounded-md py-0.5 -my-0.5 px-1 -mx-1 hover:bg-white/[0.04]"
-          >
-            {open ? (
-              <ChevronDown size={16} className="text-white/45 shrink-0 mt-1" />
-            ) : (
-              <ChevronRight size={16} className="text-white/45 shrink-0 mt-1" />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium text-white/90">{person.name}</span>
-                <AffiliationBadge affiliation={person.affiliation ?? "internal"} />
-                <RoleBadge role={person.role} />
-                {!isActive ? (
-                  <span className="text-[10px] uppercase tracking-wide text-white/35 border border-white/10 rounded px-1.5 py-0">
-                    Inactive
-                  </span>
-                ) : null}
-              </div>
-              {!open && collapsedHint ? (
-                <div className="text-xs text-white/30 mt-1 truncate">{collapsedHint}</div>
-              ) : null}
-              {!open ? (
-                <div className="text-[10px] text-white/30 mt-0.5">Expand for full details</div>
-              ) : null}
-            </div>
-          </button>
-        </CollapsibleTrigger>
-
-        {/* Active + actions */}
-        <div className="flex flex-col items-end gap-2 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-white/35 uppercase tracking-wide hidden sm:inline">Active</span>
-            <Switch
-              checked={isActive}
-              disabled={!canWrite || activeMutation.isPending}
-              onCheckedChange={onActiveSwitch}
-              aria-label={isActive ? "Deactivate person" : "Activate person"}
-            />
-          </div>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {canEditPerson ? (
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-white" onClick={onEdit}>
-                <Edit2 size={13} />
-              </Button>
-            ) : null}
-            {canDeletePerson ? (
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-red-400" onClick={onDelete}>
-                <Trash2 size={13} />
-              </Button>
-            ) : null}
-          </div>
-        </div>
+      {/* Avatar */}
+      <div className="w-14 h-14 rounded-full overflow-hidden bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+        {person.hasPhoto ? (
+          <RemoteImageHoverPreview
+            src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
+            alt={person.name}
+            triggerClassName="h-14 w-14 max-h-14 max-w-14 rounded-full border-0 bg-transparent p-0 ring-0 shadow-none"
+            triggerImgClassName="h-full w-full object-cover"
+            title={person.name}
+          />
+        ) : (
+          <User size={21} className="text-white/30" />
+        )}
       </div>
 
-      <CollapsibleContent className="px-5 pb-4 pl-[4.75rem] sm:pl-[5.25rem]">
-        <PersonDetailGrid person={person} />
-        {canSeeDocumentSummaries ? (
-          <div className="mt-3">
-            <PersonListDocumentChips items={person.documentSummaries} />
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-white/90">{person.name}</span>
+          <AffiliationBadge affiliation={person.affiliation ?? "internal"} />
+          <RoleBadge role={person.role} />
+          {!isActive ? (
+            <span className="text-[10px] uppercase tracking-wide text-white/35 border border-white/10 rounded px-1.5 py-0">
+              Inactive
+            </span>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
+          {person.teams && person.teams.length > 0 ? (
+            <span className="text-xs text-white/35">
+              Teams: {person.teams.map((team) => {
+                const membership = person.teamMemberships?.find((entry) => entry.teamId === team.id);
+                return membership?.role ? `${team.name} (${membership.role})` : team.name;
+              }).join(", ")}
+            </span>
+          ) : null}
+          {person.email ? (
+            <a href={`mailto:${person.email}`} className="text-xs text-white/40 hover:text-blue-400 flex items-center gap-1 transition-colors">
+              <Mail size={10} />{person.email}
+            </a>
+          ) : null}
+          {person.phone ? (
+            <a href={`tel:${person.phone}`} className="text-xs text-white/40 hover:text-blue-400 flex items-center gap-1 transition-colors">
+              <Phone size={10} />{person.phone}
+            </a>
+          ) : null}
+          {(person.addressStreet || person.addressCity || person.addressCountry) ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/30">
+              <span className="flex items-center gap-1">
+                <MapPin size={10} />
+                {formatAddress({
+                  street: person.addressStreet,
+                  number: person.addressNumber,
+                  zip: person.addressZip,
+                  city: person.addressCity,
+                  state: person.addressState,
+                  country: person.addressCountry,
+                })}
+              </span>
+              <a
+                href={googleMapsUrl({
+                  street: person.addressStreet,
+                  number: person.addressNumber,
+                  zip: person.addressZip,
+                  city: person.addressCity,
+                  state: person.addressState,
+                  country: person.addressCountry,
+                })}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-300 hover:text-blue-200"
+              >
+                Google Maps
+              </a>
+              <a
+                href={appleMapsUrl({
+                  street: person.addressStreet,
+                  number: person.addressNumber,
+                  zip: person.addressZip,
+                  city: person.addressCity,
+                  state: person.addressState,
+                  country: person.addressCountry,
+                })}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-300 hover:text-blue-200"
+              >
+                Apple Maps
+              </a>
+            </div>
+          ) : null}
+        </div>
+        {(person.emergencyContactName || person.emergencyContactPhone) ? (
+          <div className="mt-1 text-xs text-white/25 flex items-center gap-1.5">
+            <ShieldAlert size={10} className="text-amber-400/40" />
+            Emergency: {[person.emergencyContactName, person.emergencyContactPhone].filter(Boolean).join(" · ")}
           </div>
         ) : null}
-      </CollapsibleContent>
+        {person.notes ? (
+          <div className="mt-1 text-xs text-white/35 line-clamp-2">
+            Notes: {person.notes}
+          </div>
+        ) : null}
+        {canSeeDocumentSummaries ? <PersonListDocumentChips items={person.documentSummaries} /> : null}
+      </div>
+
+      {/* Active + actions */}
+      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-white/35 uppercase tracking-wide hidden sm:inline">Active</span>
+          <Switch
+            checked={isActive}
+            disabled={!canWrite || activeMutation.isPending}
+            onCheckedChange={onActiveSwitch}
+            aria-label={isActive ? "Deactivate person" : "Activate person"}
+          />
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {canEditPerson ? (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-white" onClick={onEdit}>
+              <Edit2 size={13} />
+            </Button>
+          ) : null}
+          {canDeletePerson ? (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-white/30 hover:text-red-400" onClick={onDelete}>
+              <Trash2 size={13} />
+            </Button>
+          ) : null}
+        </div>
+      </div>
 
       <AlertDialog open={deactivateOpen} onOpenChange={setDeactivateOpen}>
         <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">
@@ -1486,7 +1528,7 @@ function PersonCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Collapsible>
+    </div>
   );
 }
 
