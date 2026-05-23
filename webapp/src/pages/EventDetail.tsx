@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { api, isApiError } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
+import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type {
   Event,
@@ -578,13 +580,112 @@ function DetailsTab({
   const updateMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => {
       if (!event) throw new Error("Event missing");
-      return api.put(`/api/events/${event.id}`, data);
+      return api.put<EventDetail>(`/api/events/${event.id}`, data);
     },
-    onSuccess: () => {
-      if (event) {
-        queryClient.invalidateQueries({ queryKey: ["event", event.id] });
-        void invalidateWorkAnnouncementBar(queryClient);
-      }
+  });
+
+  function buildUpdatePayload(values: EventEditValues): Record<string, unknown> {
+    const normalizedCustomFields = customFields.filter((f) => f.key.trim() || f.value.trim());
+    const validContacts = contacts
+      .map((row) => ({
+        role: row.role.trim(),
+        name: row.name.trim(),
+        phone: row.phone.trim(),
+        email: row.email.trim(),
+        note: row.note.trim(),
+      }))
+      .filter((row) => row.role || row.name || row.phone || row.email || row.note);
+    const audienceFxNote =
+      values.smokeFx || values.hazeFx || values.strobeFx
+        ? "Audience announcement required: This performance uses smoke/haze/strobe effects."
+        : "";
+    const baseFoh = (values.fohNotes ?? "").trim();
+    const mergedFohNotes =
+      audienceFxNote && !baseFoh.includes(audienceFxNote)
+        ? [baseFoh, audienceFxNote].filter(Boolean).join("\n")
+        : baseFoh;
+    const generalFields = [
+      { key: "Use smoke fx", value: values.smokeFx ? "true" : "false" },
+      { key: "Use haze fx", value: values.hazeFx ? "true" : "false" },
+      { key: "Use strobe fx", value: values.strobeFx ? "true" : "false" },
+      { key: "FOH notes", value: mergedFohNotes },
+      { key: "Contacts", value: validContacts.length > 0 ? JSON.stringify(validContacts) : "" },
+      { key: "Get-in date", value: values.getInDate?.trim() || "" },
+      { key: "Get-in start", value: values.getInStart?.trim() || "" },
+      { key: "Get-in end", value: values.getInEnd?.trim() || "" },
+      { key: "Get-in duration", value: values.getInDuration?.trim() || "" },
+      {
+        key: "Technical contact info",
+        value: serializeContactRow({
+          role: values.technicalContactRole ?? "",
+          name: values.technicalContactName ?? "",
+          phone: values.technicalContactPhone ?? "",
+          email: values.technicalContactEmail ?? "",
+          note: values.technicalContactNote ?? "",
+        }),
+      },
+      { key: "Company legal name", value: values.companyLegalName?.trim() || "" },
+      { key: "Company VAT", value: values.companyVat?.trim() || "" },
+      {
+        key: "Company address",
+        value: (() => {
+          const a = {
+            street: values.companyStreet?.trim() ?? "",
+            number: values.companyNumber?.trim() ?? "",
+            zip: values.companyZip?.trim() ?? "",
+            city: values.companyCity?.trim() ?? "",
+            state: values.companyState?.trim() ?? "",
+            country: values.companyCountry?.trim() ?? "",
+          };
+          return Object.values(a).some(Boolean) ? JSON.stringify(a) : "";
+        })(),
+      },
+      { key: "Contract booking notes", value: values.contractNotes?.trim() || "" },
+    ]
+      .filter((row) => row.value)
+      .map((row) => ({ ...row, departments: [] as string[] }));
+    const mergedCustomFields = [...normalizedCustomFields, ...generalFields];
+    const stageEnc = formDimsToStageSize({
+      stageWidth: values.stageWidth ?? "",
+      stageDepth: values.stageDepth ?? "",
+      stageHeight: values.stageHeight ?? "",
+    });
+    const primaryContactSerialized = serializeContactRow({
+      role: values.primaryContactRole ?? "",
+      name: values.primaryContactName ?? "",
+      phone: values.primaryContactPhone ?? "",
+      email: values.primaryContactEmail ?? "",
+      note: values.primaryContactNote ?? "",
+    });
+    const payload: Record<string, unknown> = { title: values.title };
+    payload.startDate = null;
+    payload.endDate = null;
+    if (values.venueId && values.venueId !== "__none__") payload.venueId = values.venueId;
+    else payload.venueId = undefined;
+    if (values.description) payload.description = values.description;
+    if (primaryContactSerialized) payload.contactPerson = primaryContactSerialized;
+    if (values.allergies) payload.allergies = values.allergies;
+    payload.stageSize = stageEnc ?? null;
+    if (values.getInStart) payload.getInTime = values.getInStart;
+    if (values.getInDuration) payload.setupTime = values.getInDuration;
+    if (values.actorCount) payload.actorCount = Number(values.actorCount);
+    payload.leadPersonId =
+      values.leadPersonId && values.leadPersonId !== "__none__" ? values.leadPersonId : null;
+    payload.customFields = mergedCustomFields.length > 0 ? JSON.stringify(mergedCustomFields) : undefined;
+    return payload;
+  }
+
+  const eventAutoSave = useAutoSaveForm({
+    form,
+    enabled: !isNew && Boolean(event?.id),
+    resetKey: event?.id,
+    extraSnapshot: () => contacts,
+    validate: async (values) => EventEditSchema.safeParse(values).success,
+    save: async (values) => {
+      if (!event?.id) return;
+      const updated = await updateMutation.mutateAsync(buildUpdatePayload(values));
+      queryClient.setQueryData(["event", event.id], updated);
+      void invalidateWorkAnnouncementBar(queryClient);
     },
   });
 
@@ -728,22 +829,28 @@ function DetailsTab({
     setContacts((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   }
 
-  const saving = createMutation.isPending || updateMutation.isPending;
-  const saveError = isNew ? createMutation.isError : updateMutation.isError;
+  const saving = isNew ? createMutation.isPending : eventAutoSave.status === "saving";
+  const saveError = isNew ? createMutation.isError : eventAutoSave.status === "error";
   const saveErrorMsg = isNew
     ? createMutation.error instanceof Error
       ? createMutation.error.message
       : "Failed to create event."
-    : updateMutation.error instanceof Error
-      ? updateMutation.error.message
-      : "Failed to save changes.";
+    : eventAutoSave.error ?? "Failed to save changes.";
 
   return (
     <div className="space-y-4">
-      <h2 className="text-base font-semibold text-white">{isNew ? "New event" : "Details"}</h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-base font-semibold text-white">{isNew ? "New event" : "Details"}</h2>
+        {!isNew ? (
+          <AutoSaveStatus status={eventAutoSave.status} error={eventAutoSave.error} />
+        ) : null}
+      </div>
       {!isNew && event && (event.shows?.length ?? 0) > 0 ? <EventStaffingOverviewBanner event={event} /> : null}
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-8">
+        <form
+          onSubmit={isNew ? form.handleSubmit(onSubmit) : (e) => e.preventDefault()}
+          className="w-full space-y-8"
+        >
           {/* ── Core fields ── */}
             <FormField
               control={form.control}
@@ -1307,16 +1414,16 @@ function DetailsTab({
               </div>
             ) : null}
 
+            {isNew ? (
             <div className="flex flex-wrap gap-3">
               <Button type="submit" disabled={saving} className="bg-red-900 hover:bg-red-800 text-white border-red-700/50">
-                {isNew ? (saving ? "Creating…" : "Create event") : saving ? "Saving…" : "Save"}
+                {saving ? "Creating…" : "Create event"}
               </Button>
-              {isNew ? (
-                <Button type="button" variant="outline" onClick={() => navigate("/events")} className="border-white/10 text-white/60 hover:text-white bg-transparent">
-                  Cancel
-                </Button>
-              ) : null}
+              <Button type="button" variant="outline" onClick={() => navigate("/events")} className="border-white/10 text-white/60 hover:text-white bg-transparent">
+                Cancel
+              </Button>
             </div>
+            ) : null}
           </form>
         </Form>
 

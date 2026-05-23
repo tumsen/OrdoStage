@@ -24,6 +24,8 @@ import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/AddressFields";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useAutoSave } from "@/hooks/useAutoSave";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import Billing from "@/pages/Billing";
 import {
   PersonDocumentListRow,
@@ -312,19 +314,29 @@ export default function Account() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["people", "me"] });
       if (mePerson?.id) queryClient.invalidateQueries({ queryKey: ["people", mePerson.id, "documents"] });
-      queryClient.invalidateQueries({ queryKey: ["people"] });
       setPhotoFile(null);
       setDocFile(null);
       setDocName("");
       setDocExpires("");
       setDocDoesNotExpire(false);
       setDocType("other");
-      setProfileMessage("Profile saved.");
     },
-    onError: (e: Error) => {
-      setProfileMessage(e.message || "Could not save profile.");
+    onError: () => {
+      /* surfaced via AutoSaveStatus */
     },
   });
+
+  const profileAutoSave = useAutoSave({
+    enabled: Boolean(mePerson?.id),
+    resetKey: mePerson?.id,
+    getSnapshot: () => profileDraft,
+    save: () => saveProfileMutation.mutateAsync(),
+  });
+
+  useEffect(() => {
+    if (!mePerson?.id) return;
+    profileAutoSave.schedule();
+  }, [mePerson?.id, profileDraft, profileAutoSave]);
 
   const removePhotoMutation = useMutation({
     mutationFn: () => api.delete(`/api/people/${mePerson!.id}/photo`),
@@ -677,7 +689,12 @@ export default function Account() {
 
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
         <div>
-          <p className="text-sm font-medium text-white">My profile</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium text-white">My profile</p>
+            {mePerson ? (
+              <AutoSaveStatus status={profileAutoSave.status} error={profileAutoSave.error} />
+            ) : null}
+          </div>
           <p className="text-xs text-white/50 mt-1">
             Edit your person profile, image, and personal documents here.
           </p>
@@ -856,14 +873,6 @@ export default function Account() {
             </div>
 
             {profileMessage ? <p className="text-xs text-white/60">{profileMessage}</p> : null}
-            <Button
-              type="button"
-              className="bg-indigo-700 hover:bg-indigo-600"
-              disabled={saveProfileMutation.isPending}
-              onClick={() => saveProfileMutation.mutate()}
-            >
-              {saveProfileMutation.isPending ? "Saving..." : "Save profile"}
-            </Button>
           </>
         )}
       </div>

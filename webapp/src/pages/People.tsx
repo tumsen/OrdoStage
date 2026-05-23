@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
+import { useAutoSave, type AutoSaveStatus } from "@/hooks/useAutoSave";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
@@ -368,6 +370,7 @@ function PersonFormDialog({
   onPersonUpdated,
   asPage = false,
   onCancel,
+  onAutoSaveState,
 }: {
   open?: boolean;
   onOpenChange?: (v: boolean) => void;
@@ -378,6 +381,7 @@ function PersonFormDialog({
   /** Full-page edit layout (no dialog). Requires `person`. */
   asPage?: boolean;
   onCancel?: () => void;
+  onAutoSaveState?: (state: { status: AutoSaveStatus; error: string | null }) => void;
 }) {
   const documentRowHandleMap = useRef(new Map<string, PersonDocumentListRowHandle>());
   const queryClient = useQueryClient();
@@ -588,8 +592,10 @@ function PersonFormDialog({
           { expiresAtYmd: docExpires, doesNotExpire: docDoesNotExpire }
         );
       }
-      queryClient.invalidateQueries({ queryKey: ["people"] });
       queryClient.invalidateQueries({ queryKey: ["people", "me"] });
+      if (personId && !asPage) {
+        queryClient.invalidateQueries({ queryKey: ["people"] });
+      }
       if (personId) {
         queryClient.invalidateQueries({ queryKey: ["people", personId, "documents"] });
       }
@@ -602,7 +608,7 @@ function PersonFormDialog({
       setUploadError(null);
       if (person) {
         onPersonUpdated?.(result as Person);
-        toast({ title: "Changes saved" });
+        if (!asPage) toast({ title: "Changes saved" });
       } else {
         onOpenChange?.(false);
         form.reset();
@@ -612,7 +618,9 @@ function PersonFormDialog({
     onError: (e: Error) => {
       const friendly = toFriendlyPeopleSaveError(e.message || "");
       setUploadError(friendly);
-      toast({ title: "Could not save person", description: friendly, variant: "destructive" });
+      if (!asPage) {
+        toast({ title: "Could not save person", description: friendly, variant: "destructive" });
+      }
     },
   });
 
@@ -694,20 +702,86 @@ function PersonFormDialog({
     },
   });
 
-  async function handleSubmit(values: PersonFormValues) {
+  async function persistPerson(values: PersonFormValues, options?: { silent?: boolean }) {
+    const silent = options?.silent ?? false;
     setUploadError(null);
     if (documentRowHandleMap.current.size > 0) {
       const handles = [...documentRowHandleMap.current.values()];
-      try {
-        await Promise.all(handles.map((h) => h.saveIfDirty()));
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "Could not update document(s)";
-        toast({ title: msg, variant: "destructive" });
-        return;
-      }
+      await Promise.all(handles.map((h) => h.saveIfDirty()));
     }
-    mutation.mutate(values);
+    const result = (await mutation.mutateAsync(values)) as Person;
+    if (person?.id) {
+      queryClient.setQueryData(["people", person.id], result);
+      queryClient.setQueryData<Person[]>(["people"], (old) =>
+        !old ? old : old.map((p) => (p.id === person.id ? { ...p, ...result } : p))
+      );
+      onPersonUpdated?.(result);
+      if (!silent) toast({ title: "Changes saved" });
+    }
   }
+
+  async function handleSubmit(values: PersonFormValues) {
+    try {
+      await persistPerson(values);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not save person";
+      if (!asPage) {
+        toast({ title: toFriendlyPeopleSaveError(msg), variant: "destructive" });
+      }
+      throw e;
+    }
+  }
+
+  const autoSave = useAutoSaveForm({
+    form,
+    enabled: asPage && Boolean(person?.id),
+    resetKey: person?.id,
+    validate: async (values) => PersonFormSchema.safeParse(values).success,
+    save: (values) => persistPerson(values, { silent: true }),
+  });
+
+  const contractAutoSave = useAutoSave({
+    enabled: asPage && Boolean(person?.id) && canManageContracts,
+    resetKey: person?.id ? `${person.id}-contract` : null,
+    getSnapshot: () => ({ contractWeeklyHours, contractVacationDays }),
+    save: async () => {
+      if (!person?.id) return;
+      const wh = contractWeeklyHours.trim() === "" ? null : parseFloat(contractWeeklyHours);
+      const vd = contractVacationDays.trim() === "" ? null : parseFloat(contractVacationDays);
+      await api.patch(`/api/time/person-contract/${person.id}`, {
+        weeklyContractHours: wh,
+        vacationDaysPerYear: vd,
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (!asPage || !person?.id || !canManageContracts) return;
+    contractAutoSave.schedule();
+  }, [asPage, person?.id, canManageContracts, contractWeeklyHours, contractVacationDays, contractAutoSave]);
+
+  useEffect(() => {
+    if (!asPage || !onAutoSaveState) return;
+    const status =
+      autoSave.status === "error" || contractAutoSave.status === "error"
+        ? "error"
+        : autoSave.status === "saving" || contractAutoSave.status === "saving"
+          ? "saving"
+          : autoSave.status === "pending" || contractAutoSave.status === "pending"
+            ? "pending"
+            : autoSave.status === "saved" || contractAutoSave.status === "saved"
+              ? "saved"
+              : "idle";
+    const error = autoSave.error ?? contractAutoSave.error;
+    onAutoSaveState({ status, error });
+  }, [
+    asPage,
+    onAutoSaveState,
+    autoSave.status,
+    autoSave.error,
+    contractAutoSave.status,
+    contractAutoSave.error,
+  ]);
 
   const cardClass = "rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6";
   const sectionTitle = "text-xs font-semibold uppercase tracking-wider text-white/50";
@@ -739,6 +813,7 @@ function PersonFormDialog({
           {resendAppAccessMutation.isPending ? "Sending…" : "Resend login email"}
         </Button>
       ) : null}
+      {!asPage ? (
       <div className="flex gap-2 ml-auto">
         <Button
           type="button"
@@ -749,14 +824,15 @@ function PersonFormDialog({
           Cancel
         </Button>
         <Button
-          type={asPage ? "submit" : "button"}
+          type="button"
           disabled={mutation.isPending}
-          onClick={asPage ? undefined : () => form.handleSubmit(handleSubmit)()}
+          onClick={() => form.handleSubmit(handleSubmit)()}
           className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
         >
           {mutation.isPending ? "Saving..." : person ? "Save changes" : "Add Person"}
         </Button>
       </div>
+      ) : null}
     </div>
   );
 
@@ -1123,6 +1199,7 @@ function PersonFormDialog({
                     ))}
                   </div>
                 ) : null}
+                {!asPage ? (
                 <Button
                   type="button"
                   size="sm"
@@ -1150,6 +1227,7 @@ function PersonFormDialog({
                 >
                   {contractSaving ? "Saving…" : "Save contract"}
                 </Button>
+                ) : null}
               </div>
             ) : null}
             {asPage && person && !canManageContracts ? (
@@ -1464,6 +1542,7 @@ function PersonFormDialog({
                 ))}
               </div>
             )}
+            {!asPage ? (
             <Button
               type="button"
               size="sm"
@@ -1491,6 +1570,7 @@ function PersonFormDialog({
             >
               {contractSaving ? "Saving…" : "Save contract"}
             </Button>
+            ) : null}
           </div>
         ) : null}
         </div>
@@ -1498,13 +1578,10 @@ function PersonFormDialog({
 
   if (asPage) {
     return (
-      <form
-        className="flex-1 overflow-y-auto p-6"
-        onSubmit={form.handleSubmit(handleSubmit)}
-      >
+      <div className="flex-1 overflow-y-auto p-6">
         {formBody}
         {formFooter}
-      </form>
+      </div>
     );
   }
 

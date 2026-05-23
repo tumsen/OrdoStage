@@ -1,5 +1,6 @@
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, Navigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Person } from "@/lib/types";
@@ -7,12 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useSession } from "@/lib/auth-client";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
+import type { AutoSaveStatus as AutoSaveStatusType } from "@/hooks/useAutoSave";
 import { PersonFormDialog } from "./People";
 
 export default function PersonEdit() {
   const { id: personId = "" } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const [autoSaveState, setAutoSaveState] = useState<{
+    status: AutoSaveStatusType;
+    error: string | null;
+  }>({ status: "idle", error: null });
   const { canWrite } = usePermissions();
   const { data: session } = useSession();
 
@@ -86,6 +91,11 @@ export default function PersonEdit() {
           <div>
             <h1 className="text-lg font-semibold text-white tracking-tight">Edit person</h1>
             <p className="text-sm text-white/40 mt-0.5">{person.name}</p>
+            <AutoSaveStatus
+              status={autoSaveState.status}
+              error={autoSaveState.error}
+              className="mt-1"
+            />
           </div>
         </div>
       </div>
@@ -93,10 +103,7 @@ export default function PersonEdit() {
       <PersonFormDialog
         asPage
         person={person}
-        onCancel={() => navigate("/people")}
-        onPersonUpdated={() => {
-          queryClient.invalidateQueries({ queryKey: ["people", personId] });
-        }}
+        onAutoSaveState={setAutoSaveState}
       />
     </div>
   );

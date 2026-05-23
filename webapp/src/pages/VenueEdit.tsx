@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, CalendarDays } from "lucide-react";
@@ -11,8 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VenueDocumentsSection } from "@/components/VenueDocumentsSection";
-import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { AddressFields, type Address } from "@/components/AddressFields";
 import {
   VenueFormSchema,
@@ -26,9 +27,7 @@ import {
 
 export default function VenueEdit() {
   const { id: venueId = "" } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const { canWrite } = usePermissions();
 
   const {
@@ -48,15 +47,23 @@ export default function VenueEdit() {
 
   const updateMutation = useMutation({
     mutationFn: (data: VenueFormValues) =>
-      api.put(`/api/venues/${venueId}`, venueFormValuesToPayload(data)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["venues"] });
-      queryClient.invalidateQueries({ queryKey: ["venue", venueId] });
-      toast({ title: "Venue saved" });
-      navigate(`/venues/${venueId}`);
+      api.put<Venue>(`/api/venues/${venueId}`, venueFormValuesToPayload(data)),
+  });
+
+  const autoSave = useAutoSaveForm({
+    form,
+    enabled: Boolean(venue?.id),
+    resetKey: venue?.id,
+    validate: async (values) => {
+      const parsed = VenueFormSchema.safeParse(values);
+      return parsed.success;
     },
-    onError: (err: Error) => {
-      toast({ title: "Could not save venue", description: err.message, variant: "destructive" });
+    save: async (values) => {
+      const updated = await updateMutation.mutateAsync(values);
+      queryClient.setQueryData(["venue", venueId], updated);
+      queryClient.setQueryData<Venue[]>(["venues"], (old) =>
+        !old ? old : old.map((v) => (v.id === venueId ? { ...v, ...updated } : v))
+      );
     },
   });
 
@@ -116,6 +123,7 @@ export default function VenueEdit() {
             <div>
               <h1 className="text-lg font-semibold text-white tracking-tight">Edit venue</h1>
               <p className="text-sm text-white/40 mt-0.5">{venue.name}</p>
+              <AutoSaveStatus status={autoSave.status} error={autoSave.error} className="mt-1" />
             </div>
           </div>
           <Button
@@ -132,10 +140,7 @@ export default function VenueEdit() {
         </div>
       </div>
 
-      <form
-        className="flex-1 overflow-y-auto p-6"
-        onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))}
-      >
+      <div className="flex-1 overflow-y-auto p-6">
         <input type="hidden" {...form.register("customFieldsText")} />
         <div className="w-full space-y-8 pb-24">
           <section className="space-y-3">
@@ -219,26 +224,8 @@ export default function VenueEdit() {
             <Label className="text-white/50 text-xs uppercase tracking-wide">Files</Label>
             <VenueDocumentsSection venueId={venue.id} canWrite={canWrite} />
           </section>
-
-          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-white/10">
-            <Button
-              type="submit"
-              disabled={updateMutation.isPending}
-              className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-            >
-              {updateMutation.isPending ? "Saving…" : "Save changes"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="text-white/50 hover:text-white"
-              onClick={() => navigate("/venues")}
-            >
-              Cancel
-            </Button>
-          </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 }
