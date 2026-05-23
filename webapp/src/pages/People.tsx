@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { format, parseISO } from "date-fns";
 import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -520,18 +521,31 @@ function PersonFormDialog({
   const canResendAppAccess =
     canWriteOrg && Boolean(person?.id && form.watch("email")?.trim() && form.watch("permissionGroupId")?.trim());
 
-  const resendAppAccessMutation = useMutation({
+  const [loginEmailSentAt, setLoginEmailSentAt] = useState<string | null>(
+    person?.appLoginEmailSentAt ?? null
+  );
+
+  useEffect(() => {
+    setLoginEmailSentAt(person?.appLoginEmailSentAt ?? null);
+  }, [person?.id, person?.appLoginEmailSentAt]);
+
+  const sendAppLoginMutation = useMutation({
     mutationFn: () => {
       if (!person?.id) throw new Error("No person");
-      return api.post<{ accountSetupEmail: { status: "sent"; createdUser?: boolean } }>(
-        `/api/people/${person.id}/resend-app-access-email`
-      );
+      return api.post<Person>(`/api/people/${person.id}/resend-app-access-email`);
     },
-    onSuccess: () => {
-      toast({ title: "Login email sent", description: "They can set a password using the link we sent." });
+    onSuccess: (updated) => {
+      setLoginEmailSentAt(updated.appLoginEmailSentAt ?? null);
+      onPersonUpdated?.(updated);
+      queryClient.setQueryData(["people", updated.id], updated);
+      queryClient.invalidateQueries({ queryKey: ["people"] });
+      toast({
+        title: "Login email sent",
+        description: "They can set a password using the link in their inbox (valid about one hour).",
+      });
     },
     onError: (e: Error) => {
-      toast({ title: "Could not resend email", description: e.message, variant: "destructive" });
+      toast({ title: "Could not send login email", description: e.message, variant: "destructive" });
     },
   });
 
@@ -569,16 +583,6 @@ function PersonFormDialog({
         : api.post<Person>("/api/people", payload);
     },
     onSuccess: async (result) => {
-      const saved = result as Person & { accountSetupEmail?: { status: string; error?: string } };
-      if (saved.accountSetupEmail?.status === "sent") {
-        toast({ title: "Login email sent", description: "They can set a password from the link in their inbox (valid about one hour)." });
-      } else if (saved.accountSetupEmail?.status === "failed") {
-        toast({
-          title: "Account saved, but the login email failed to send",
-          description: saved.accountSetupEmail.error ?? "Try resend or check that email and Resend are configured.",
-          variant: "destructive",
-        });
-      }
       const personId = person?.id ?? (result as Person).id;
       if (personId && photoFile) {
         await uploadPersonPhoto(personId, photoFile);
@@ -802,17 +806,6 @@ function PersonFormDialog({
           : "flex flex-wrap items-center justify-between gap-2 sm:justify-end"
       }
     >
-      {canResendAppAccess ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="border-white/10 text-white/80 hover:text-white bg-transparent mr-auto"
-          disabled={resendAppAccessMutation.isPending || mutation.isPending}
-          onClick={() => resendAppAccessMutation.mutate()}
-        >
-          {resendAppAccessMutation.isPending ? "Sending…" : "Resend login email"}
-        </Button>
-      ) : null}
       {!asPage ? (
       <div className="flex flex-wrap items-center gap-2 ml-auto">
         {!person ? (
@@ -924,10 +917,10 @@ function PersonFormDialog({
           <div className="space-y-1.5">
             <Label className="text-white/50 text-xs uppercase tracking-wide">Permission group *</Label>
             <p className="text-[10px] text-white/30 leading-snug">
-              Every person must belong to one permission group. If they have an email, we send a
-              <strong className="text-white/50"> one-time link to set a password</strong> when you add them, or you can resend
-              it when editing. Sign-in also has <strong className="text-white/50">Forgot password</strong> for any time. Groups
-              and what they can do are edited only under{" "}
+              Every person must belong to one permission group. With an email on file, use{" "}
+              <strong className="text-white/50">Send account login information</strong> when you are ready — nothing is emailed
+              automatically when you add someone. Sign-in also has{" "}
+              <strong className="text-white/50">Forgot password</strong> for any time. Groups and what they can do are edited only under{" "}
               <Link to="/roles" className="text-rose-300/90 hover:underline">
                 Permission groups
               </Link>
@@ -962,6 +955,39 @@ function PersonFormDialog({
               <p className="text-red-400 text-xs">{form.formState.errors.permissionGroupId.message as string}</p>
             ) : null}
           </div>
+
+          {person?.id && canResendAppAccess ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 space-y-2">
+              <p className="text-[10px] uppercase tracking-wide text-white/40">App login invitation</p>
+              <p className="text-xs text-white/55">
+                {loginEmailSentAt ? (
+                  <>
+                    Login invitation sent{" "}
+                    <span className="text-white/75">
+                      {format(parseISO(loginEmailSentAt), "d MMM yyyy, HH:mm")}
+                    </span>
+                    .
+                  </>
+                ) : (
+                  <span className="text-amber-200/80">Login invitation has not been sent yet.</span>
+                )}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-white/15 text-white/85 hover:bg-white/5 h-8"
+                disabled={sendAppLoginMutation.isPending || mutation.isPending}
+                onClick={() => sendAppLoginMutation.mutate()}
+              >
+                {sendAppLoginMutation.isPending
+                  ? "Sending…"
+                  : loginEmailSentAt
+                    ? "Resend account login information"
+                    : "Send account login information"}
+              </Button>
+            </div>
+          ) : null}
 
             {asPage ? (
               <div className={`${cardClass} space-y-3`}>
@@ -1805,7 +1831,7 @@ export default function People() {
         <div>
           <p className="text-sm text-white/40">Cast, crew and contacts.</p>
           <p className="text-xs text-white/25 mt-1">
-            Add a person with an email and they will receive a login link automatically.
+            Add people first; send login invitations when you are ready from each person&apos;s profile.
           </p>
         </div>
         <Button

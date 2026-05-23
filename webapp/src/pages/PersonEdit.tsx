@@ -1,5 +1,5 @@
 import { Link, Navigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api";
@@ -13,6 +13,7 @@ import type { AutoSaveStatus as AutoSaveStatusType } from "@/hooks/useAutoSave";
 import { PersonFormDialog } from "./People";
 
 export default function PersonEdit() {
+  const queryClient = useQueryClient();
   const { id: personId = "" } = useParams<{ id: string }>();
   const [autoSaveState, setAutoSaveState] = useState<{
     status: AutoSaveStatusType;
@@ -104,6 +105,9 @@ export default function PersonEdit() {
         asPage
         person={person}
         onAutoSaveState={setAutoSaveState}
+        onPersonUpdated={(updated) => {
+          queryClient.setQueryData(["people", personId], updated);
+        }}
       />
     </div>
   );

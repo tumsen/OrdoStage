@@ -207,9 +207,11 @@ export const PersonSchema = z.object({
   /** Work contract — set by admins with time.read_all. */
   weeklyContractHours: z.number().nullable().optional(),
   vacationDaysPerYear: z.number().nullable().optional(),
+  /** ISO timestamp when login invitation email was last sent (null = never). */
+  appLoginEmailSentAt: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  /** Set on create/update when app-access provisioning runs (not stored in DB). */
+  /** Set on send-login endpoint response only (not stored in DB). */
   accountSetupEmail: z
     .object({
       status: z.enum(["sent", "failed", "skipped"]),
