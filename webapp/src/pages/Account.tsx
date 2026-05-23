@@ -108,7 +108,7 @@ export default function Account() {
   const [ownerPasswords, setOwnerPasswords] = useState<Record<string, string>>({});
   const [prefsError, setPrefsError] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
   const [docExpires, setDocExpires] = useState("");
@@ -305,7 +305,6 @@ export default function Account() {
         emergencyContactName: profileDraft.emergencyContactName.trim() || undefined,
         emergencyContactPhone: profileDraft.emergencyContactPhone.trim() || undefined,
       });
-      if (photoFile) await uploadPersonPhoto(mePerson.id, photoFile);
       if (docFile)
         await uploadPersonDocument(mePerson.id, docFile, docName, docType, {
           expiresAtYmd: docExpires,
@@ -315,7 +314,6 @@ export default function Account() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["people", "me"] });
       if (mePerson?.id) queryClient.invalidateQueries({ queryKey: ["people", mePerson.id, "documents"] });
-      setPhotoFile(null);
       setDocFile(null);
       setDocName("");
       setDocExpires("");
@@ -346,9 +344,46 @@ export default function Account() {
     save: () => saveCompanyMutation.mutateAsync(),
   });
 
+  const uploadPhotoMutation = useMutation({
+    mutationFn: (file: File) => uploadPersonPhoto(mePerson!.id, file),
+    onSuccess: () => {
+      setPhotoPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      queryClient.invalidateQueries({ queryKey: ["people", "me"] });
+      setProfileMessage("Profile image updated.");
+    },
+    onError: (e: Error) => {
+      const msg = e.message || "Could not upload profile image.";
+      setProfileMessage(msg);
+      toast({ title: "Could not upload profile image", description: msg, variant: "destructive" });
+    },
+  });
+
+  function handleProfilePhotoChange(file: File | null) {
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl);
+      setPhotoPreviewUrl(null);
+    }
+    if (!file) return;
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+    if (mePerson?.id) uploadPhotoMutation.mutate(file);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
+
   const removePhotoMutation = useMutation({
     mutationFn: () => api.delete(`/api/people/${mePerson!.id}/photo`),
     onSuccess: () => {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+        setPhotoPreviewUrl(null);
+      }
       queryClient.invalidateQueries({ queryKey: ["people", "me"] });
       setProfileMessage("Image deleted.");
     },
@@ -744,9 +779,16 @@ export default function Account() {
             <div className="flex flex-col gap-4 w-full min-w-0">
               <div className="space-y-2 w-full max-w-md">
                 <Label className="text-white/70 text-xs uppercase tracking-wide">Profile image</Label>
-                {mePerson.hasPhoto ? (
+                <p className="text-[11px] text-white/40">Uploads automatically when you choose a file.</p>
+                {(photoPreviewUrl ||
+                  (mePerson.hasPhoto
+                    ? `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${mePerson.id}/photo?ts=${mePerson.photoUpdatedAt ?? ""}`
+                    : null)) ? (
                   <RemoteImageHoverPreview
-                    src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${mePerson.id}/photo?ts=${mePerson.photoUpdatedAt ?? ""}`}
+                    src={
+                      photoPreviewUrl ??
+                      `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${mePerson.id}/photo?ts=${mePerson.photoUpdatedAt ?? ""}`
+                    }
                     alt="Profile"
                     triggerClassName="h-24 w-24 max-h-24 max-w-24 rounded-md border border-white/10 bg-black/20 p-0 shadow-none"
                     triggerImgClassName="h-full w-full object-cover"
@@ -755,9 +797,13 @@ export default function Account() {
                 <Input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+                  disabled={uploadPhotoMutation.isPending}
+                  onChange={(e) => handleProfilePhotoChange(e.target.files?.[0] ?? null)}
                   className="bg-white/5 border-white/10 text-white file:text-white"
                 />
+                {uploadPhotoMutation.isPending ? (
+                  <p className="text-xs text-white/45">Uploading profile image…</p>
+                ) : null}
                 {mePerson.hasPhoto ? (
                   <Button
                     type="button"

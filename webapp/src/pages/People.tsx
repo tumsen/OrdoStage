@@ -456,6 +456,7 @@ function PersonFormDialog({
   });
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
   const [docExpires, setDocExpires] = useState("");
@@ -584,7 +585,7 @@ function PersonFormDialog({
     },
     onSuccess: async (result) => {
       const personId = person?.id ?? (result as Person).id;
-      if (personId && photoFile) {
+      if (personId && photoFile && !person) {
         await uploadPersonPhoto(personId, photoFile);
       }
       if (personId && docFile) {
@@ -628,13 +629,75 @@ function PersonFormDialog({
     },
   });
 
-  const removePhotoMutation = useMutation({
-    mutationFn: () => api.delete(`/api/people/${person!.id}/photo`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["people"] });
-      queryClient.invalidateQueries({ queryKey: ["people", "me"] });
+  const uploadPhotoMutation = useMutation({
+    mutationFn: (file: File) => uploadPersonPhoto(person!.id, file),
+    onSuccess: async () => {
+      setPhotoFile(null);
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+        setPhotoPreviewUrl(null);
+      }
+      const id = person!.id;
+      await queryClient.invalidateQueries({ queryKey: ["people", id] });
+      await queryClient.invalidateQueries({ queryKey: ["people"] });
+      await queryClient.invalidateQueries({ queryKey: ["people", "me"] });
+      const updated = await api.get<Person>(`/api/people/${id}`);
+      queryClient.setQueryData(["people", id], updated);
+      onPersonUpdated?.(updated);
+    },
+    onError: (e: Error) => {
+      toast({
+        title: "Could not upload profile image",
+        description: e.message,
+        variant: "destructive",
+      });
     },
   });
+
+  const removePhotoMutation = useMutation({
+    mutationFn: () => api.delete(`/api/people/${person!.id}/photo`),
+    onSuccess: async () => {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+        setPhotoPreviewUrl(null);
+      }
+      setPhotoFile(null);
+      await queryClient.invalidateQueries({ queryKey: ["people"] });
+      await queryClient.invalidateQueries({ queryKey: ["people", "me"] });
+      if (person?.id) {
+        const updated = await api.get<Person>(`/api/people/${person.id}`);
+        queryClient.setQueryData(["people", person.id], updated);
+        onPersonUpdated?.(updated);
+      }
+    },
+  });
+
+  function handleProfilePhotoChange(file: File | null) {
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl);
+      setPhotoPreviewUrl(null);
+    }
+    setPhotoFile(file);
+    if (!file) return;
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+    if (person?.id) {
+      uploadPhotoMutation.mutate(file);
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
+
+  useEffect(() => {
+    setPhotoPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setPhotoFile(null);
+  }, [person?.id]);
 
   const uploadDocMutation = useMutation({
     mutationFn: async () => {
@@ -797,6 +860,52 @@ function PersonFormDialog({
     }
     onOpenChange?.(false);
   }
+
+  const profileImageSrc =
+    photoPreviewUrl ??
+    (person?.hasPhoto && person?.id
+      ? `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`
+      : null);
+
+  const profileImageFields = (
+    <>
+      <p className="text-[11px] text-white/35">
+        {person?.id
+          ? "Uploads automatically when you choose a file."
+          : "You can pick an image now; it uploads right after you click Add Person."}
+      </p>
+      {profileImageSrc ? (
+        <RemoteImageHoverPreview
+          src={profileImageSrc}
+          alt={person ? `${person.name} profile` : "Profile preview"}
+          triggerClassName="h-24 w-24 rounded-md border border-white/10 bg-black/20 p-0 shadow-none"
+          triggerImgClassName="h-full w-full object-cover"
+        />
+      ) : null}
+      <Input
+        type="file"
+        accept="image/*"
+        disabled={uploadPhotoMutation.isPending}
+        onChange={(e) => handleProfilePhotoChange(e.target.files?.[0] ?? null)}
+        className="bg-white/5 border-white/10 text-white file:text-white"
+      />
+      {uploadPhotoMutation.isPending ? (
+        <p className="text-xs text-white/45">Uploading profile image…</p>
+      ) : null}
+      {person?.hasPhoto && person?.id ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="border-white/15 text-white/70"
+          disabled={removePhotoMutation.isPending || uploadPhotoMutation.isPending}
+          onClick={() => removePhotoMutation.mutate()}
+        >
+          {removePhotoMutation.isPending ? "Deleting…" : "Delete image"}
+        </Button>
+      ) : null}
+    </>
+  );
 
   const formFooter = (
     <div
@@ -992,35 +1101,7 @@ function PersonFormDialog({
             {asPage ? (
               <div className={`${cardClass} space-y-3`}>
                 <p className={sectionTitle}>Profile image</p>
-                <p className="text-[11px] text-white/35">
-                  Upload a profile image (jpg/png/webp).
-                </p>
-                {person?.hasPhoto ? (
-                  <RemoteImageHoverPreview
-                    src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
-                    alt={`${person.name} profile`}
-                    triggerClassName="h-24 w-24 rounded-md border border-white/10 bg-black/20 p-0 shadow-none"
-                    triggerImgClassName="h-full w-full object-cover"
-                  />
-                ) : null}
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
-                  className="bg-white/5 border-white/10 text-white file:text-white"
-                />
-                {person?.hasPhoto ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-white/15 text-white/70"
-                    disabled={removePhotoMutation.isPending}
-                    onClick={() => removePhotoMutation.mutate()}
-                  >
-                    {removePhotoMutation.isPending ? "Deleting…" : "Delete image"}
-                  </Button>
-                ) : null}
+                {profileImageFields}
               </div>
             ) : null}
             </div>
@@ -1343,35 +1424,7 @@ function PersonFormDialog({
             {!asPage ? (
             <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3 w-full max-w-md">
               <Label className="text-white/50 text-xs uppercase tracking-wide">Profile image</Label>
-              <p className="text-[11px] text-white/35">
-                Upload a profile image (jpg/png/webp). For new people, the image is uploaded right after you click Add Person.
-              </p>
-              {person?.hasPhoto ? (
-                <RemoteImageHoverPreview
-                  src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
-                  alt={`${person.name} profile`}
-                  triggerClassName="h-24 w-24 rounded-md border border-white/10 bg-black/20 p-0 shadow-none"
-                  triggerImgClassName="h-full w-full object-cover"
-                />
-              ) : null}
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
-                className="bg-white/5 border-white/10 text-white file:text-white"
-              />
-              {person?.hasPhoto ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="border-white/15 text-white/70"
-                  disabled={removePhotoMutation.isPending}
-                  onClick={() => removePhotoMutation.mutate()}
-                >
-                  {removePhotoMutation.isPending ? "Deleting…" : "Delete image"}
-                </Button>
-              ) : null}
+              {profileImageFields}
             </div>
             ) : null}
 
