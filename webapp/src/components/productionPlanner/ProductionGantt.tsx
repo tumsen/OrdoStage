@@ -1,9 +1,11 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
 import { format, parseISO, differenceInCalendarDays, isToday, isWeekend } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { ProductionPlannerRow, ProductionPlannerTask } from "@/lib/types";
-import { TASK_CATEGORY_COLORS } from "@/lib/productionPlannerTheme";
+import {
+  PRODUCTION_STATUS_LABELS,
+  taskCategoryColors,
+} from "@/lib/productionPlannerTheme";
 import { formatMoneyFromCents } from "@/lib/formatMoney";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -43,11 +45,13 @@ function taskBarStyle(
 
 function StatusDot({ status }: { status: string }) {
   const color =
-    status === "confirmed" || status === "active"
+    status === "premiered" || status === "on_tour"
       ? "bg-emerald-400"
-      : status === "cancelled"
-        ? "bg-red-400/70"
-        : "bg-white/30";
+      : status === "closed"
+        ? "bg-white/25"
+        : status === "in_progress" || status === "rehearsal" || status === "tech"
+          ? "bg-sky-400"
+          : "bg-amber-400/80";
   return <span className={cn("inline-block h-1.5 w-1.5 rounded-full shrink-0", color)} />;
 }
 
@@ -128,7 +132,7 @@ export function ProductionGantt({
         <div className="flex-1 overflow-auto">
           {rows.length === 0 ? (
             <p className="p-8 text-center text-sm text-white/40">
-              No productions in this date range. Adjust the range or add events and tours.
+              No productions in this date range. Create a new production or adjust the timeline.
             </p>
           ) : (
             rows.map((row) => {
@@ -149,25 +153,25 @@ export function ProductionGantt({
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <StatusDot status={row.status} />
-                      <Link
-                        to={row.href}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-sm font-medium text-white/90 truncate hover:text-white hover:underline"
-                      >
-                        {row.title}
-                      </Link>
+                      <span className="text-sm font-medium text-white/90 truncate">{row.title}</span>
                       <Badge
                         variant="outline"
                         className="text-[9px] px-1 py-0 h-4 border-white/15 text-white/45 shrink-0"
                       >
-                        {row.kind}
+                        {PRODUCTION_STATUS_LABELS[row.status] ?? row.status}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-[10px] text-white/35 pl-3.5 flex-wrap">
-                      {row.startDate && row.endDate ? (
+                      {row.premiereDate ? (
+                        <span>Premiere {row.premiereDate}</span>
+                      ) : row.startDate && row.endDate ? (
                         <span>
                           {row.startDate} → {row.endDate}
                         </span>
+                      ) : null}
+                      {row.venueLabel ? <span>{row.venueLabel}</span> : null}
+                      {row.linkedTourName ? (
+                        <span className="text-emerald-300/70">Tour: {row.linkedTourName}</span>
                       ) : null}
                       <span className="text-yellow-300/80 tabular-nums">
                         {formatMoneyFromCents(row.costSummary.plannedCents, currencyCode)} budget
@@ -207,12 +211,11 @@ export function ProductionGantt({
                       {row.tasks.map((task) => {
                         const pos = taskBarStyle(task, rangeStart, rangeEnd, dayCount);
                         if (!pos) return null;
-                        const colors = TASK_CATEGORY_COLORS[task.category];
+                        const colors = taskCategoryColors(task.category);
                         const tooltip = [
                           task.label,
-                          task.dayLabel,
-                          task.venueLabel,
                           task.assigneeName ? `Assigned: ${task.assigneeName}` : null,
+                          task.departmentName ? task.departmentName : null,
                           task.costPlannedCents != null
                             ? `Budget: ${formatMoneyFromCents(task.costPlannedCents, currencyCode)}`
                             : null,
@@ -228,7 +231,9 @@ export function ProductionGantt({
                                   "absolute rounded-md border px-1.5 flex items-center overflow-hidden shadow-sm",
                                   colors.bar,
                                   colors.border,
-                                  task.category === "cost" && "ring-1 ring-yellow-300/30"
+                                  task.category === "cost" && "ring-1 ring-yellow-300/30",
+                                  (task.phaseKind === "milestone" || task.phaseKind === "deadline") &&
+                                    "rounded-full min-w-[8px] px-0 justify-center"
                                 )}
                                 style={{
                                   left: pos.left,
@@ -239,11 +244,13 @@ export function ProductionGantt({
                                 }}
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <span
-                                  className={cn("text-[10px] font-medium truncate", colors.text)}
-                                >
-                                  {task.label}
-                                </span>
+                                {task.phaseKind !== "milestone" && task.phaseKind !== "deadline" ? (
+                                  <span
+                                    className={cn("text-[10px] font-medium truncate", colors.text)}
+                                  >
+                                    {task.label}
+                                  </span>
+                                ) : null}
                               </div>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs text-xs">

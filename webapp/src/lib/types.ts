@@ -22,4 +22,10 @@ export type {
   ProductionPlannerTask,
   ProductionPlannerRow,
   ProductionPlannerResponse,
+  Production,
+  ProductionPhase,
+  ProductionPhaseCategory,
+  CreateProduction,
+  CreateProductionPhase,
+  UpdateProductionPhase,
 } from "../../../backend/src/types";

@@ -134,6 +134,7 @@ model Organization {
   timeTags         TimeTag[]
   timeProjects     TimeProject[]
   timeEntries      TimeEntry[]
+  productions      Production[]
   productionCostLines ProductionCostLine[]
   timeTravelClaims TimeTravelClaim[]
   timesheetApprovals TimesheetApproval[]
@@ -314,6 +315,7 @@ model Venue {
   eventShows       EventShow[]
   eventShowJobs    EventShowJob[]
   documents        VenueDocument[]
+  productions      Production[]
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 }
@@ -386,6 +388,8 @@ model Person {
   timeEntries      TimeEntry[]
   timeTravelClaims TimeTravelClaim[]
   timesheetApprovals TimesheetApproval[]
+  productionsLed     Production[]            @relation("ProductionLeadPerson")
+  productionPhases   ProductionPhase[]       @relation("ProductionPhaseAssignee")
 }
 
 model PersonDocument {
@@ -465,8 +469,8 @@ model Event {
   teamDocuments  EventTeamDocument[]
   timeProjects   TimeProject[]
   timeEntries    TimeEntry[]
-  productionCostLines ProductionCostLine[]
   bookings       InternalBooking[]
+  production     Production?
 
   @@index([ownerTeamId])
   @@index([organizationId, startDate])
@@ -730,6 +734,7 @@ model Department {
   eventTeams     EventTeam[]
   showJobs       EventShowJob[]
   showStaffing   EventShowStaffing[]
+  productionPhases ProductionPhase[]
   createdAt      DateTime     @default(now())
 }
 
@@ -772,7 +777,7 @@ model Tour {
   people           TourPerson[]
   teams            TourTeam[]
   personNotes      TourPersonNote[]
-  productionCostLines ProductionCostLine[]
+  production       Production?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 }
@@ -1080,15 +1085,13 @@ model TimesheetApproval {
   @@index([organizationId, personId, status])
 }
 
-/** Budget / actual cost line for an event or tour production (shown on production planner). */
+/** Budget / actual cost line for a show production (shown on production planner). */
 model ProductionCostLine {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  eventId        String?
-  event          Event?       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  tourId         String?
-  tour           Tour?        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  productionId   String
+  production     Production   @relation(fields: [productionId], references: [id], onDelete: Cascade)
   /** labor | venue | equipment | travel | marketing | rights | contingency | revenue | other */
   category       String       @default("other")
   label          String
@@ -1103,7 +1106,65 @@ model ProductionCostLine {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  @@index([organizationId, eventId])
-  @@index([organizationId, tourId])
+  @@index([organizationId, productionId])
   @@index([organizationId, startDate])
+}
+
+/** A show being created from concept through premiere (and optionally onward to tour). */
+model Production {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  /** planning | in_progress | rehearsal | tech | preview | premiered | on_tour | closed */
+  status            String       @default("planning")
+  planningStartDate DateTime?
+  premiereDate      DateTime?
+  closedAt          DateTime?
+  homeVenueId       String?
+  homeVenue         Venue?       @relation(fields: [homeVenueId], references: [id], onDelete: SetNull)
+  leadPersonId      String?
+  leadPerson        Person?      @relation("ProductionLeadPerson", fields: [leadPersonId], references: [id], onDelete: SetNull)
+  /** Set when this production goes on tour with the show. */
+  tourId            String?      @unique
+  tour              Tour?        @relation(fields: [tourId], references: [id], onDelete: SetNull)
+  /** Optional link to a resident run at the home venue. */
+  eventId           String?      @unique
+  event             Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  notes             String?
+  phases            ProductionPhase[]
+  costLines         ProductionCostLine[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([organizationId, premiereDate])
+}
+
+/** Gantt bar, milestone, or deadline on a production timeline. */
+model ProductionPhase {
+  id               String       @id @default(cuid())
+  productionId     String
+  production       Production   @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  title            String
+  /** set_build | costume | props | design | rehearsal | tech | marketing | deadline | premiere | other */
+  category         String       @default("other")
+  /** span = date range; milestone | deadline = single date marker */
+  phaseKind        String       @default("span")
+  /** planned | in_progress | done | cancelled */
+  status           String       @default("planned")
+  startDate        DateTime
+  endDate          DateTime?
+  assigneePersonId String?
+  assigneePerson   Person?      @relation("ProductionPhaseAssignee", fields: [assigneePersonId], references: [id], onDelete: SetNull)
+  departmentId     String?
+  department       Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  notes            String?
+  sortOrder        Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([productionId, startDate])
+  @@index([productionId, sortOrder])
 }

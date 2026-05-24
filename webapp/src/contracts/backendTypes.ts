@@ -1533,7 +1533,40 @@ export const OrgBillingPlanSummarySchema = z.object({
   fixedAnnualRoundToTen: z.boolean(),
 });
 
-// —— Production planner (Gantt + cost management) ——
+// —— Production planner (show creation: set build → premiere → optional tour) ——
+
+export const ProductionStatusSchema = z.enum([
+  "planning",
+  "in_progress",
+  "rehearsal",
+  "tech",
+  "preview",
+  "premiered",
+  "on_tour",
+  "closed",
+]);
+
+export const ProductionPhaseCategorySchema = z.enum([
+  "set_build",
+  "costume",
+  "props",
+  "design",
+  "rehearsal",
+  "tech",
+  "marketing",
+  "deadline",
+  "premiere",
+  "other",
+]);
+
+export const ProductionPhaseKindSchema = z.enum(["span", "milestone", "deadline"]);
+
+export const ProductionPhaseStatusSchema = z.enum([
+  "planned",
+  "in_progress",
+  "done",
+  "cancelled",
+]);
 
 export const ProductionCostCategorySchema = z.enum([
   "labor",
@@ -1547,11 +1580,108 @@ export const ProductionCostCategorySchema = z.enum([
   "other",
 ]);
 
+export const ProductionPhaseSchema = z.object({
+  id: z.string(),
+  productionId: z.string(),
+  title: z.string(),
+  category: ProductionPhaseCategorySchema,
+  phaseKind: ProductionPhaseKindSchema,
+  status: ProductionPhaseStatusSchema,
+  startDate: z.string(),
+  endDate: z.string().nullable(),
+  assigneePersonId: z.string().nullable(),
+  assigneeName: z.string().nullable().optional(),
+  departmentId: z.string().nullable(),
+  departmentName: z.string().nullable().optional(),
+  notes: z.string().nullable(),
+  sortOrder: z.number().int(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const ProductionSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: ProductionStatusSchema,
+  planningStartDate: z.string().nullable(),
+  premiereDate: z.string().nullable(),
+  closedAt: z.string().nullable(),
+  homeVenueId: z.string().nullable(),
+  homeVenueName: z.string().nullable().optional(),
+  leadPersonId: z.string().nullable(),
+  leadPersonName: z.string().nullable().optional(),
+  tourId: z.string().nullable(),
+  tourName: z.string().nullable().optional(),
+  eventId: z.string().nullable(),
+  eventTitle: z.string().nullable().optional(),
+  notes: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const CreateProductionSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  status: ProductionStatusSchema.optional(),
+  planningStartDate: z.string().nullable().optional(),
+  premiereDate: z.string().nullable().optional(),
+  homeVenueId: z.string().nullable().optional(),
+  leadPersonId: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  /** Seed default phases (set build, rehearsals, tech, premiere) when premiere date is set. */
+  useDefaultPhases: z.boolean().optional(),
+});
+
+export const UpdateProductionSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    description: z.string().nullable().optional(),
+    status: ProductionStatusSchema.optional(),
+    planningStartDate: z.string().nullable().optional(),
+    premiereDate: z.string().nullable().optional(),
+    closedAt: z.string().nullable().optional(),
+    homeVenueId: z.string().nullable().optional(),
+    leadPersonId: z.string().nullable().optional(),
+    tourId: z.string().nullable().optional(),
+    eventId: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: "No changes" });
+
+export const CreateProductionPhaseSchema = z.object({
+  title: z.string().min(1),
+  category: ProductionPhaseCategorySchema.default("other"),
+  phaseKind: ProductionPhaseKindSchema.default("span"),
+  status: ProductionPhaseStatusSchema.optional(),
+  startDate: z.string().min(1),
+  endDate: z.string().nullable().optional(),
+  assigneePersonId: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const UpdateProductionPhaseSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    category: ProductionPhaseCategorySchema.optional(),
+    phaseKind: ProductionPhaseKindSchema.optional(),
+    status: ProductionPhaseStatusSchema.optional(),
+    startDate: z.string().min(1).optional(),
+    endDate: z.string().nullable().optional(),
+    assigneePersonId: z.string().nullable().optional(),
+    departmentId: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: "No changes" });
+
 export const ProductionCostLineSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
-  eventId: z.string().nullable(),
-  tourId: z.string().nullable(),
+  productionId: z.string(),
   category: ProductionCostCategorySchema,
   label: z.string(),
   plannedCents: z.number().int(),
@@ -1565,23 +1695,18 @@ export const ProductionCostLineSchema = z.object({
   updatedAt: z.string(),
 });
 
-export const CreateProductionCostLineSchema = z
-  .object({
-    eventId: z.string().min(1).optional(),
-    tourId: z.string().min(1).optional(),
-    category: ProductionCostCategorySchema.default("other"),
-    label: z.string().min(1),
-    plannedCents: z.number().int().min(0).default(0),
-    actualCents: z.number().int().min(0).nullable().optional(),
-    currencyCode: z.string().min(3).max(3).optional(),
-    startDate: z.string().nullable().optional(),
-    endDate: z.string().nullable().optional(),
-    notes: z.string().nullable().optional(),
-    sortOrder: z.number().int().optional(),
-  })
-  .refine((b) => Boolean(b.eventId) !== Boolean(b.tourId), {
-    message: "Link cost to either an event or a tour, not both.",
-  });
+export const CreateProductionCostLineSchema = z.object({
+  productionId: z.string().min(1),
+  category: ProductionCostCategorySchema.default("other"),
+  label: z.string().min(1),
+  plannedCents: z.number().int().min(0).default(0),
+  actualCents: z.number().int().min(0).nullable().optional(),
+  currencyCode: z.string().min(3).max(3).optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
 
 export const UpdateProductionCostLineSchema = z
   .object({
@@ -1597,31 +1722,20 @@ export const UpdateProductionCostLineSchema = z
   })
   .refine((b) => Object.keys(b).length > 0, { message: "No changes" });
 
-export const ProductionPlannerTaskCategorySchema = z.enum([
-  "production_window",
-  "get_in",
-  "get_out",
-  "rehearsal",
-  "soundcheck",
-  "performance",
-  "travel",
-  "day_off",
-  "job",
-  "custom",
-  "cost",
-]);
+export const ProductionPlannerTaskCategorySchema = ProductionPhaseCategorySchema.or(
+  z.enum(["cost", "planning_window"])
+);
 
 export const ProductionPlannerTaskSchema = z.object({
   id: z.string(),
   label: z.string(),
-  category: ProductionPlannerTaskCategorySchema,
+  category: z.string(),
+  phaseKind: ProductionPhaseKindSchema.optional(),
   start: z.string(),
   end: z.string(),
   status: z.string().nullable().optional(),
-  dayLabel: z.string().nullable().optional(),
-  venueLabel: z.string().nullable().optional(),
-  departmentName: z.string().nullable().optional(),
   assigneeName: z.string().nullable().optional(),
+  departmentName: z.string().nullable().optional(),
   costPlannedCents: z.number().int().nullable().optional(),
   costActualCents: z.number().int().nullable().optional(),
 });
@@ -1643,12 +1757,18 @@ export const ProductionPlannerCostSummarySchema = z.object({
 
 export const ProductionPlannerRowSchema = z.object({
   id: z.string(),
-  kind: z.enum(["event", "tour"]),
+  kind: z.literal("production"),
   title: z.string(),
-  status: z.string(),
+  status: ProductionStatusSchema,
   startDate: z.string().nullable(),
   endDate: z.string().nullable(),
+  premiereDate: z.string().nullable(),
   venueLabel: z.string().nullable().optional(),
+  leadPersonName: z.string().nullable().optional(),
+  linkedTourId: z.string().nullable().optional(),
+  linkedTourName: z.string().nullable().optional(),
+  linkedEventId: z.string().nullable().optional(),
+  linkedEventTitle: z.string().nullable().optional(),
   href: z.string(),
   tasks: z.array(ProductionPlannerTaskSchema),
   costs: z.array(ProductionCostLineSchema),
@@ -1663,6 +1783,15 @@ export const ProductionPlannerResponseSchema = z.object({
   totals: ProductionPlannerCostSummarySchema,
 });
 
+export type ProductionStatus = z.infer<typeof ProductionStatusSchema>;
+export type ProductionPhaseCategory = z.infer<typeof ProductionPhaseCategorySchema>;
+export type ProductionPhaseKind = z.infer<typeof ProductionPhaseKindSchema>;
+export type ProductionPhase = z.infer<typeof ProductionPhaseSchema>;
+export type Production = z.infer<typeof ProductionSchema>;
+export type CreateProduction = z.infer<typeof CreateProductionSchema>;
+export type UpdateProduction = z.infer<typeof UpdateProductionSchema>;
+export type CreateProductionPhase = z.infer<typeof CreateProductionPhaseSchema>;
+export type UpdateProductionPhase = z.infer<typeof UpdateProductionPhaseSchema>;
 export type ProductionCostCategory = z.infer<typeof ProductionCostCategorySchema>;
 export type ProductionCostLine = z.infer<typeof ProductionCostLineSchema>;
 export type CreateProductionCostLine = z.infer<typeof CreateProductionCostLineSchema>;

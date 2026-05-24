@@ -124,7 +124,7 @@ export function ProductionCostPanel({
         startDate: form.startDate.trim() || null,
         endDate: form.endDate.trim() || null,
         notes: form.notes.trim() || null,
-        ...(row.kind === "event" ? { eventId: row.id } : { tourId: row.id }),
+        productionId: row.id,
       };
       if (editing) {
         return api.patch(`/api/production-planner/costs/${editing.id}`, {
