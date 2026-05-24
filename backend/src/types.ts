@@ -1593,6 +1593,8 @@ export const ProductionPhaseSchema = z.object({
   assigneeName: z.string().nullable().optional(),
   departmentId: z.string().nullable(),
   departmentName: z.string().nullable().optional(),
+  dependsOnPhaseId: z.string().nullable(),
+  dependsOnPhaseTitle: z.string().nullable().optional(),
   notes: z.string().nullable(),
   sortOrder: z.number().int(),
   createdAt: z.string(),
@@ -1659,6 +1661,7 @@ export const CreateProductionPhaseSchema = z.object({
   endDate: z.string().nullable().optional(),
   assigneePersonId: z.string().nullable().optional(),
   departmentId: z.string().nullable().optional(),
+  dependsOnPhaseId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
@@ -1673,6 +1676,7 @@ export const UpdateProductionPhaseSchema = z
     endDate: z.string().nullable().optional(),
     assigneePersonId: z.string().nullable().optional(),
     departmentId: z.string().nullable().optional(),
+    dependsOnPhaseId: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
     sortOrder: z.number().int().optional(),
   })
@@ -1728,6 +1732,7 @@ export const ProductionPlannerTaskCategorySchema = ProductionPhaseCategorySchema
 
 export const ProductionPlannerTaskSchema = z.object({
   id: z.string(),
+  phaseId: z.string().nullable().optional(),
   label: z.string(),
   category: z.string(),
   phaseKind: ProductionPhaseKindSchema.optional(),
@@ -1736,8 +1741,29 @@ export const ProductionPlannerTaskSchema = z.object({
   status: z.string().nullable().optional(),
   assigneeName: z.string().nullable().optional(),
   departmentName: z.string().nullable().optional(),
+  dependsOnPhaseId: z.string().nullable().optional(),
+  dependsOnLabel: z.string().nullable().optional(),
   costPlannedCents: z.number().int().nullable().optional(),
   costActualCents: z.number().int().nullable().optional(),
+});
+
+export const ProductionPlannerGanttLineKindSchema = z.enum([
+  "summary",
+  "phase",
+  "cost",
+]);
+
+export const ProductionPlannerGanttLineSchema = z.object({
+  lineId: z.string(),
+  kind: ProductionPlannerGanttLineKindSchema,
+  label: z.string(),
+  category: z.string(),
+  status: z.string().nullable().optional(),
+  assigneeName: z.string().nullable().optional(),
+  departmentName: z.string().nullable().optional(),
+  dependsOnPhaseId: z.string().nullable(),
+  dependsOnLabel: z.string().nullable().optional(),
+  task: ProductionPlannerTaskSchema,
 });
 
 export const ProductionPlannerCostSummarySchema = z.object({
@@ -1770,6 +1796,8 @@ export const ProductionPlannerRowSchema = z.object({
   linkedEventId: z.string().nullable().optional(),
   linkedEventTitle: z.string().nullable().optional(),
   href: z.string(),
+  /** One row per phase (and summary/cost lines) for Gantt display. */
+  ganttLines: z.array(ProductionPlannerGanttLineSchema),
   tasks: z.array(ProductionPlannerTaskSchema),
   costs: z.array(ProductionCostLineSchema),
   costSummary: ProductionPlannerCostSummarySchema,
@@ -1797,5 +1825,6 @@ export type ProductionCostLine = z.infer<typeof ProductionCostLineSchema>;
 export type CreateProductionCostLine = z.infer<typeof CreateProductionCostLineSchema>;
 export type UpdateProductionCostLine = z.infer<typeof UpdateProductionCostLineSchema>;
 export type ProductionPlannerTask = z.infer<typeof ProductionPlannerTaskSchema>;
+export type ProductionPlannerGanttLine = z.infer<typeof ProductionPlannerGanttLineSchema>;
 export type ProductionPlannerRow = z.infer<typeof ProductionPlannerRowSchema>;
 export type ProductionPlannerResponse = z.infer<typeof ProductionPlannerResponseSchema>;

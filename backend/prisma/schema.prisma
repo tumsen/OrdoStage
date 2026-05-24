@@ -1160,6 +1160,10 @@ model ProductionPhase {
   assigneePerson   Person?      @relation("ProductionPhaseAssignee", fields: [assigneePersonId], references: [id], onDelete: SetNull)
   departmentId     String?
   department       Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  /** Finish-to-start: this phase cannot start until the dependency ends. */
+  dependsOnPhaseId String?
+  dependsOnPhase   ProductionPhase?  @relation("ProductionPhaseDependency", fields: [dependsOnPhaseId], references: [id], onDelete: SetNull)
+  dependentPhases  ProductionPhase[] @relation("ProductionPhaseDependency")
   notes            String?
   sortOrder        Int          @default(0)
   createdAt        DateTime     @default(now())
@@ -1167,4 +1171,5 @@ model ProductionPhase {
 
   @@index([productionId, startDate])
   @@index([productionId, sortOrder])
+  @@index([dependsOnPhaseId])
 }

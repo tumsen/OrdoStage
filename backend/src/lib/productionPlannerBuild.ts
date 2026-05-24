@@ -1,6 +1,7 @@
 import type {
   ProductionCostCategory,
   ProductionCostLine,
+  ProductionPlannerGanttLine,
   ProductionPlannerRow,
   ProductionPlannerTask,
 } from "../types";
@@ -55,6 +56,8 @@ function phaseToTask(phase: {
   status: string;
   startDate: Date;
   endDate: Date | null;
+  dependsOnPhaseId?: string | null;
+  dependsOnPhase?: { id: string; title: string } | null;
   assigneePerson?: { name: string } | null;
   department?: { name: string } | null;
 }): ProductionPlannerTask {
@@ -65,6 +68,7 @@ function phaseToTask(phase: {
   }
   return {
     id: `phase:${phase.id}`,
+    phaseId: phase.id,
     label: phase.title,
     category: phase.category,
     phaseKind: phase.phaseKind as ProductionPlannerTask["phaseKind"],
@@ -73,25 +77,24 @@ function phaseToTask(phase: {
     status: phase.status,
     assigneeName: phase.assigneePerson?.name ?? null,
     departmentName: phase.department?.name ?? null,
+    dependsOnPhaseId: phase.dependsOnPhaseId ?? null,
+    dependsOnLabel: phase.dependsOnPhase?.title ?? null,
   };
 }
 
-function costTasksFromLines(lines: ProductionCostLine[]): ProductionPlannerTask[] {
-  return lines
-    .filter((l) => l.startDate)
-    .map((line) => {
-      const start = new Date(line.startDate!);
-      const end = line.endDate ? new Date(line.endDate) : dayEnd(start);
-      return {
-        id: `cost:${line.id}`,
-        label: line.label,
-        category: "cost",
-        start: iso(start),
-        end: iso(end),
-        costPlannedCents: line.plannedCents,
-        costActualCents: line.actualCents,
-      };
-    });
+function costTaskFromLine(line: ProductionCostLine): ProductionPlannerTask {
+  const start = new Date(line.startDate!);
+  const end = line.endDate ? new Date(line.endDate) : dayEnd(start);
+  return {
+    id: `cost:${line.id}`,
+    phaseId: null,
+    label: line.label,
+    category: "cost",
+    start: iso(start),
+    end: iso(end),
+    costPlannedCents: line.plannedCents,
+    costActualCents: line.actualCents,
+  };
 }
 
 export type ProductionWithRelations = {
@@ -115,27 +118,53 @@ export type ProductionWithRelations = {
     status: string;
     startDate: Date;
     endDate: Date | null;
+    dependsOnPhaseId: string | null;
+    dependsOnPhase: { id: string; title: string } | null;
     assigneePerson: { name: string } | null;
     department: { name: string } | null;
   }>;
 };
 
-export function buildProductionPlannerRow(
+export function buildGanttLines(
   production: ProductionWithRelations,
-  costLines: ProductionCostLine[],
-  loggedLaborMinutes: number,
-  currencyCode: string
-): ProductionPlannerRow {
-  const tasks: ProductionPlannerTask[] = production.phases.map(phaseToTask);
+  costLines: ProductionCostLine[]
+): ProductionPlannerGanttLine[] {
+  const lines: ProductionPlannerGanttLine[] = [];
 
   if (production.planningStartDate && production.premiereDate) {
-    tasks.unshift({
+    const task: ProductionPlannerTask = {
       id: `window:${production.id}`,
+      phaseId: null,
       label: "Production period",
       category: "planning_window",
       start: iso(production.planningStartDate),
       end: iso(production.premiereDate),
       status: production.status,
+    };
+    lines.push({
+      lineId: task.id,
+      kind: "summary",
+      label: task.label,
+      category: task.category,
+      status: production.status,
+      dependsOnPhaseId: null,
+      task,
+    });
+  }
+
+  for (const phase of production.phases) {
+    const task = phaseToTask(phase);
+    lines.push({
+      lineId: phase.id,
+      kind: "phase",
+      label: phase.title,
+      category: phase.category,
+      status: phase.status,
+      assigneeName: phase.assigneePerson?.name ?? null,
+      departmentName: phase.department?.name ?? null,
+      dependsOnPhaseId: phase.dependsOnPhaseId,
+      dependsOnLabel: phase.dependsOnPhase?.title ?? null,
+      task,
     });
   }
 
@@ -143,18 +172,50 @@ export function buildProductionPlannerRow(
     production.premiereDate &&
     !production.phases.some((p) => p.category === "premiere")
   ) {
-    tasks.push({
+    const task: ProductionPlannerTask = {
       id: `premiere:${production.id}`,
+      phaseId: null,
       label: "Premiere",
       category: "premiere",
       phaseKind: "milestone",
       start: iso(production.premiereDate),
       end: iso(dayEnd(production.premiereDate)),
       status: production.status,
+    };
+    lines.push({
+      lineId: task.id,
+      kind: "phase",
+      label: task.label,
+      category: task.category,
+      status: production.status,
+      dependsOnPhaseId: null,
+      task,
     });
   }
 
-  tasks.push(...costTasksFromLines(costLines));
+  for (const line of costLines.filter((l) => l.startDate)) {
+    const task = costTaskFromLine(line);
+    lines.push({
+      lineId: task.id,
+      kind: "cost",
+      label: line.label,
+      category: "cost",
+      dependsOnPhaseId: null,
+      task,
+    });
+  }
+
+  return lines;
+}
+
+export function buildProductionPlannerRow(
+  production: ProductionWithRelations,
+  costLines: ProductionCostLine[],
+  loggedLaborMinutes: number,
+  currencyCode: string
+): ProductionPlannerRow {
+  const ganttLines = buildGanttLines(production, costLines);
+  const tasks = ganttLines.map((l) => l.task);
 
   const phaseDates = production.phases.flatMap((p) => [
     p.startDate.getTime(),
@@ -194,6 +255,7 @@ export function buildProductionPlannerRow(
     linkedEventId: production.event?.id ?? production.eventId,
     linkedEventTitle: production.event?.title ?? null,
     href: `/production`,
+    ganttLines,
     tasks,
     costs: costLines,
     costSummary: summarizeCosts(costLines, currencyCode, loggedLaborMinutes),
@@ -241,6 +303,7 @@ export function defaultPhasesForPremiere(premiereDate: Date): Array<{
   startDate: Date;
   endDate: Date | null;
   sortOrder: number;
+  dependsOnSortOrder: number | null;
 }> {
   const premiere = new Date(premiereDate);
   premiere.setUTCHours(0, 0, 0, 0);
@@ -255,6 +318,7 @@ export function defaultPhasesForPremiere(premiereDate: Date): Array<{
       startDate: addDays(premiere, -56),
       endDate: addDays(premiere, -14),
       sortOrder: 0,
+      dependsOnSortOrder: null,
     },
     {
       title: "Rehearsals",
@@ -263,6 +327,7 @@ export function defaultPhasesForPremiere(premiereDate: Date): Array<{
       startDate: addDays(premiere, -28),
       endDate: addDays(premiere, -3),
       sortOrder: 1,
+      dependsOnSortOrder: 0,
     },
     {
       title: "Tech week",
@@ -271,6 +336,7 @@ export function defaultPhasesForPremiere(premiereDate: Date): Array<{
       startDate: addDays(premiere, -7),
       endDate: addDays(premiere, -1),
       sortOrder: 2,
+      dependsOnSortOrder: 1,
     },
     {
       title: "Premiere",
@@ -279,6 +345,7 @@ export function defaultPhasesForPremiere(premiereDate: Date): Array<{
       startDate: premiere,
       endDate: null,
       sortOrder: 3,
+      dependsOnSortOrder: 2,
     },
   ];
 }

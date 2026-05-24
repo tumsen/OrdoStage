@@ -1,16 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { addMonths, format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { addMonths, format, startOfMonth, endOfMonth, subMonths, parseISO } from "date-fns";
 import { ChevronLeft, ChevronRight, Clapperboard, Plus, ListPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatMoneyFromCents } from "@/lib/formatMoney";
 import type { Production, ProductionPlannerResponse } from "@/lib/types";
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePersistedViewMode } from "@/hooks/usePersistedViewMode";
+import {
+  usePersistedProductionId,
+  useSyncProductionSelection,
+} from "@/hooks/usePersistedProductionId";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductionGantt } from "@/components/productionPlanner/ProductionGantt";
 import { ProductionCostPanel } from "@/components/productionPlanner/ProductionCostPanel";
+import { ProductionSelector } from "@/components/productionPlanner/ProductionSelector";
 import { CreateProductionDialog } from "@/components/productionPlanner/CreateProductionDialog";
 import { AddProductionPhaseDialog } from "@/components/productionPlanner/AddProductionPhaseDialog";
 import { TASK_CATEGORY_COLORS, TASK_CATEGORY_LABELS } from "@/lib/productionPlannerTheme";
@@ -50,30 +55,62 @@ export default function ProductionPlanner() {
   const canAccess = canView("schedule") || canView("events");
   const canEdit = canAction("write.schedule") || canAction("write.events");
 
+  const { productionId, setProductionId } = usePersistedProductionId();
+  const { data: productionsList } = useQuery({
+    queryKey: ["productions"],
+    queryFn: () => api.get<Production[]>("/api/productions"),
+    enabled: canAccess,
+  });
+  const productionIds = useMemo(
+    () => (productionsList ?? []).map((p) => p.id),
+    [productionsList]
+  );
+  useSyncProductionSelection(productionId, setProductionId, productionIds);
+
   const [anchor, setAnchor] = useState(() => startOfMonth(new Date()));
   const [preset, setPreset] = usePersistedViewMode(
     "ordo.viewMode.productionPlanner",
     RANGE_PRESETS,
     "quarter"
   );
-  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState(false);
 
   const { from, to } = useMemo(() => rangeForPreset(anchor, preset), [anchor, preset]);
 
-  const queryKey = ["production-planner", { from, to }] as const;
+  const queryKey = ["production-planner", { from, to, productionId }] as const;
 
   const { data, isLoading, error } = useQuery({
     queryKey: [...queryKey],
-    queryFn: () =>
-      api.get<ProductionPlannerResponse>(
-        `/api/production-planner?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-      ),
-    enabled: canAccess,
+    queryFn: () => {
+      const params = new URLSearchParams({ from, to });
+      if (productionId) params.set("productionId", productionId);
+      return api.get<ProductionPlannerResponse>(`/api/production-planner?${params}`);
+    },
+    enabled: canAccess && !!productionId,
   });
 
-  const selectedRow = data?.rows.find((r) => r.id === selectedRowId) ?? data?.rows[0] ?? null;
+  const selectedRow = data?.rows[0] ?? null;
+
+  const existingPhases = useMemo(
+    () =>
+      (selectedRow?.ganttLines ?? [])
+        .filter((l) => l.kind === "phase" && l.task.phaseId)
+        .map((l) => ({ id: l.task.phaseId!, title: l.label })),
+    [selectedRow]
+  );
+
+  useEffect(() => {
+    if (!selectedRow?.ganttLines.length) {
+      setSelectedLineId(null);
+      return;
+    }
+    if (!selectedLineId || !selectedRow.ganttLines.some((l) => l.lineId === selectedLineId)) {
+      const firstPhase = selectedRow.ganttLines.find((l) => l.kind === "phase");
+      setSelectedLineId(firstPhase?.lineId ?? selectedRow.ganttLines[0]!.lineId);
+    }
+  }, [selectedRow, selectedLineId]);
 
   function shiftRange(dir: -1 | 1) {
     const months = preset === "month" ? 1 : preset === "quarter" ? 3 : 6;
@@ -85,8 +122,27 @@ export default function ProductionPlanner() {
   }
 
   function handleProductionCreated(production: Production) {
+    setProductionId(production.id);
     invalidatePlanner();
-    setSelectedRowId(production.id);
+    queryClient.invalidateQueries({ queryKey: ["productions"] });
+  }
+
+  function fitRangeToProduction() {
+    if (!selectedRow?.startDate || !selectedRow?.endDate) return;
+    try {
+      setAnchor(startOfMonth(parseISO(selectedRow.startDate)));
+      const start = parseISO(selectedRow.startDate);
+      const end = parseISO(selectedRow.endDate);
+      const months = Math.max(
+        1,
+        (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1
+      );
+      if (months <= 2) setPreset("month");
+      else if (months <= 4) setPreset("quarter");
+      else setPreset("season");
+    } catch {
+      /* ignore invalid dates */
+    }
   }
 
   if (!canAccess) {
@@ -109,8 +165,8 @@ export default function ProductionPlanner() {
             Production planner
           </h1>
           <p className="text-sm text-white/45 mt-1 max-w-xl">
-            Plan a new show from set building and rehearsals through tech week to premiere — with
-            deadlines and budget. When the show is ready, link it to a resident event or tour.
+            Gantt plan per show: each phase on its own row, with finish-to-start dependencies between
+            deadlines.
           </p>
         </div>
 
@@ -131,31 +187,44 @@ export default function ProductionPlanner() {
                 size="sm"
                 variant="outline"
                 className="h-9 border-white/10 text-white/80"
-                disabled={!selectedRow}
+                disabled={!productionId}
                 onClick={() => setPhaseOpen(true)}
               >
                 <ListPlus className="h-4 w-4 mr-1.5" />
-                Add phase
+                Add plan line
               </Button>
             </>
           ) : null}
-          {data ? (
-            <>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
-                <p className="text-[10px] uppercase text-white/40">Total budget</p>
-                <p className="text-sm font-semibold text-yellow-300/90 tabular-nums">
-                  {formatMoneyFromCents(data.totals.plannedCents, data.currencyCode)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
-                <p className="text-[10px] uppercase text-white/40">Total actual</p>
-                <p className="text-sm font-semibold text-white/80 tabular-nums">
-                  {formatMoneyFromCents(data.totals.actualCents, data.currencyCode)}
-                </p>
-              </div>
-            </>
+          {selectedRow ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
+              <p className="text-[10px] uppercase text-white/40">Production budget</p>
+              <p className="text-sm font-semibold text-yellow-300/90 tabular-nums">
+                {formatMoneyFromCents(
+                  selectedRow.costSummary.plannedCents,
+                  data?.currencyCode ?? "EUR"
+                )}
+              </p>
+            </div>
           ) : null}
         </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
+        <div className="space-y-1">
+          <p className="text-[10px] uppercase tracking-wide text-white/40">Production</p>
+          <ProductionSelector value={productionId} onChange={setProductionId} />
+        </div>
+        {selectedRow?.startDate && selectedRow?.endDate ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-xs text-white/45 sm:mt-5"
+            onClick={fitRangeToProduction}
+          >
+            Fit timeline to production
+          </Button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -222,34 +291,37 @@ export default function ProductionPlanner() {
             {TASK_CATEGORY_LABELS[cat] ?? cat.replace(/_/g, " ")}
           </span>
         ))}
+        <span className="text-[10px] text-white/30 ml-2">— arrows = depends on (finish → start)</span>
       </div>
 
-      {isLoading ? (
+      {!productionId ? (
+        <p className="text-sm text-white/40 py-8 text-center">Select or create a production.</p>
+      ) : isLoading ? (
         <Skeleton className="flex-1 min-h-[320px] rounded-xl bg-white/5" />
       ) : error ? (
         <p className="text-red-400 text-sm">Could not load production planner.</p>
-      ) : data ? (
+      ) : (
         <div className="flex flex-col xl:flex-row gap-4 flex-1 min-h-0">
           <div className="flex-1 min-h-[280px] xl:min-h-0 flex flex-col min-w-0">
             <ProductionGantt
-              rows={data.rows}
+              row={selectedRow}
               from={from}
               to={to}
-              currencyCode={data.currencyCode}
-              selectedRowId={selectedRow?.id ?? null}
-              onSelectRow={setSelectedRowId}
+              currencyCode={data?.currencyCode ?? "EUR"}
+              selectedLineId={selectedLineId}
+              onSelectLine={setSelectedLineId}
             />
           </div>
           <div className="xl:w-[340px] shrink-0 xl:max-h-full flex flex-col min-h-[240px]">
             <ProductionCostPanel
               row={selectedRow}
-              currencyCode={data.currencyCode}
+              currencyCode={data?.currencyCode ?? "EUR"}
               canEdit={canEdit}
               plannerQueryKey={[...queryKey]}
             />
           </div>
         </div>
-      ) : null}
+      )}
 
       <CreateProductionDialog
         open={createOpen}
@@ -257,8 +329,9 @@ export default function ProductionPlanner() {
         onCreated={handleProductionCreated}
       />
       <AddProductionPhaseDialog
-        productionId={selectedRow?.id ?? null}
+        productionId={productionId}
         productionName={selectedRow?.title ?? ""}
+        existingPhases={existingPhases}
         open={phaseOpen}
         onOpenChange={setPhaseOpen}
         onCreated={invalidatePlanner}

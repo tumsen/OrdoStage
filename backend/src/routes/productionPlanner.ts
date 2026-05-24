@@ -33,6 +33,7 @@ const productionInclude = {
     include: {
       assigneePerson: { select: { name: true } },
       department: { select: { name: true } },
+      dependsOnPhase: { select: { id: true, title: true } },
     },
   },
 };
@@ -48,12 +49,14 @@ function serializePhase(row: {
   endDate: Date | null;
   assigneePersonId: string | null;
   departmentId: string | null;
+  dependsOnPhaseId: string | null;
   notes: string | null;
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
   assigneePerson?: { name: string } | null;
   department?: { name: string } | null;
+  dependsOnPhase?: { id: string; title: string } | null;
 }): ProductionPhase {
   return {
     id: row.id,
@@ -68,6 +71,8 @@ function serializePhase(row: {
     assigneeName: row.assigneePerson?.name ?? null,
     departmentId: row.departmentId,
     departmentName: row.department?.name ?? null,
+    dependsOnPhaseId: row.dependsOnPhaseId,
+    dependsOnPhaseTitle: row.dependsOnPhase?.title ?? null,
     notes: row.notes,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
@@ -180,6 +185,40 @@ async function assertProductionInOrg(productionId: string, organizationId: strin
   });
 }
 
+async function assertDependsOnPhase(
+  dependsOnPhaseId: string | null | undefined,
+  productionId: string,
+  organizationId: string,
+  selfPhaseId?: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!dependsOnPhaseId) return { ok: true };
+  if (selfPhaseId && dependsOnPhaseId === selfPhaseId) {
+    return { ok: false, message: "A phase cannot depend on itself" };
+  }
+  const parent = await prisma.productionPhase.findFirst({
+    where: { id: dependsOnPhaseId, productionId, production: { organizationId } },
+    select: { id: true, dependsOnPhaseId: true },
+  });
+  if (!parent) return { ok: false, message: "Dependency phase not found" };
+
+  const seen = new Set<string>();
+  let cur: string | null = dependsOnPhaseId;
+  while (cur) {
+    if (selfPhaseId && cur === selfPhaseId) {
+      return { ok: false, message: "Circular dependency" };
+    }
+    if (seen.has(cur)) return { ok: false, message: "Circular dependency" };
+    seen.add(cur);
+    const nextPhase: { dependsOnPhaseId: string | null } | null =
+      await prisma.productionPhase.findFirst({
+        where: { id: cur, productionId },
+        select: { dependsOnPhaseId: true },
+      });
+    cur = nextPhase?.dependsOnPhaseId ?? null;
+  }
+  return { ok: true };
+}
+
 // GET /api/production-planner
 productionPlannerRouter.get("/production-planner", async (c) => {
   const user = c.get("user");
@@ -195,6 +234,7 @@ productionPlannerRouter.get("/production-planner", async (c) => {
     return c.json({ error: { message: r.error, code: "BAD_REQUEST" } }, 400);
   }
   const { from, to, fromDate, toDateExclusive } = r;
+  const productionId = c.req.query("productionId");
 
   const org = await prisma.organization.findUnique({
     where: { id: user.organizationId },
@@ -203,35 +243,37 @@ productionPlannerRouter.get("/production-planner", async (c) => {
   const currencyCode = org?.billingCurrencyCode ?? "EUR";
 
   const productions = await prisma.production.findMany({
-    where: {
-      organizationId: user.organizationId,
-      OR: [
-        { planningStartDate: { gte: fromDate, lt: toDateExclusive } },
-        { premiereDate: { gte: fromDate, lt: toDateExclusive } },
-        {
-          AND: [
-            { planningStartDate: { lte: fromDate } },
-            { premiereDate: { gte: toDateExclusive } },
-          ],
-        },
-        {
-          phases: {
-            some: {
-              OR: [
-                { startDate: { gte: fromDate, lt: toDateExclusive } },
-                { endDate: { gte: fromDate, lt: toDateExclusive } },
-                {
-                  AND: [
-                    { startDate: { lte: fromDate } },
-                    { endDate: { gte: toDateExclusive } },
-                  ],
-                },
+    where: productionId
+      ? { organizationId: user.organizationId, id: productionId }
+      : {
+          organizationId: user.organizationId,
+          OR: [
+            { planningStartDate: { gte: fromDate, lt: toDateExclusive } },
+            { premiereDate: { gte: fromDate, lt: toDateExclusive } },
+            {
+              AND: [
+                { planningStartDate: { lte: fromDate } },
+                { premiereDate: { gte: toDateExclusive } },
               ],
             },
-          },
+            {
+              phases: {
+                some: {
+                  OR: [
+                    { startDate: { gte: fromDate, lt: toDateExclusive } },
+                    { endDate: { gte: fromDate, lt: toDateExclusive } },
+                    {
+                      AND: [
+                        { startDate: { lte: fromDate } },
+                        { endDate: { gte: toDateExclusive } },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+          ],
         },
-      ],
-    },
     orderBy: [{ premiereDate: "asc" }, { name: "asc" }],
     include: productionInclude,
   });
@@ -329,7 +371,7 @@ productionPlannerRouter.post(
       if (!person) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
     }
 
-    const defaultPhases =
+    const defaultPhaseSpecs =
       body.useDefaultPhases && premiereDate ? defaultPhasesForPremiere(premiereDate) : [];
 
     const created = await prisma.production.create({
@@ -343,9 +385,6 @@ productionPlannerRouter.post(
         homeVenueId: body.homeVenueId ?? null,
         leadPersonId: body.leadPersonId ?? null,
         notes: body.notes ?? null,
-        phases: defaultPhases.length
-          ? { create: defaultPhases }
-          : undefined,
       },
       include: {
         homeVenue: { select: { name: true } },
@@ -354,6 +393,28 @@ productionPlannerRouter.post(
         event: { select: { id: true, title: true } },
       },
     });
+
+    if (defaultPhaseSpecs.length > 0) {
+      const idBySort = new Map<number, string>();
+      for (const spec of defaultPhaseSpecs) {
+        const phase = await prisma.productionPhase.create({
+          data: {
+            productionId: created.id,
+            title: spec.title,
+            category: spec.category,
+            phaseKind: spec.phaseKind,
+            startDate: spec.startDate,
+            endDate: spec.endDate,
+            sortOrder: spec.sortOrder,
+            dependsOnPhaseId:
+              spec.dependsOnSortOrder != null
+                ? (idBySort.get(spec.dependsOnSortOrder) ?? null)
+                : null,
+          },
+        });
+        idBySort.set(spec.sortOrder, phase.id);
+      }
+    }
 
     return c.json({ data: serializeProduction(created) }, 201);
   }
@@ -488,6 +549,15 @@ productionPlannerRouter.post(
       if (!dept) return c.json({ error: { message: "Department not found", code: "NOT_FOUND" } }, 404);
     }
 
+    const depCheck = await assertDependsOnPhase(
+      body.dependsOnPhaseId,
+      productionId,
+      user.organizationId
+    );
+    if (!depCheck.ok) {
+      return c.json({ error: { message: depCheck.message, code: "BAD_REQUEST" } }, 400);
+    }
+
     const created = await prisma.productionPhase.create({
       data: {
         productionId,
@@ -499,12 +569,14 @@ productionPlannerRouter.post(
         endDate: body.endDate ? parseIncomingDateTime(body.endDate) : null,
         assigneePersonId: body.assigneePersonId ?? null,
         departmentId: body.departmentId ?? null,
+        dependsOnPhaseId: body.dependsOnPhaseId ?? null,
         notes: body.notes ?? null,
         sortOrder: body.sortOrder ?? 0,
       },
       include: {
         assigneePerson: { select: { name: true } },
         department: { select: { name: true } },
+        dependsOnPhase: { select: { id: true, title: true } },
       },
     });
 
@@ -546,6 +618,18 @@ productionPlannerRouter.patch(
       if (!dept) return c.json({ error: { message: "Department not found", code: "NOT_FOUND" } }, 404);
     }
 
+    const dependsOnPhaseId =
+      body.dependsOnPhaseId === undefined ? existing.dependsOnPhaseId : body.dependsOnPhaseId;
+    const depCheck = await assertDependsOnPhase(
+      dependsOnPhaseId,
+      existing.productionId,
+      user.organizationId,
+      phaseId
+    );
+    if (!depCheck.ok) {
+      return c.json({ error: { message: depCheck.message, code: "BAD_REQUEST" } }, 400);
+    }
+
     const updated = await prisma.productionPhase.update({
       where: { id: phaseId },
       data: {
@@ -562,12 +646,14 @@ productionPlannerRouter.patch(
               : null,
         assigneePersonId: body.assigneePersonId,
         departmentId: body.departmentId,
+        dependsOnPhaseId: body.dependsOnPhaseId,
         notes: body.notes,
         sortOrder: body.sortOrder,
       },
       include: {
         assigneePerson: { select: { name: true } },
         department: { select: { name: true } },
+        dependsOnPhase: { select: { id: true, title: true } },
       },
     });
 
