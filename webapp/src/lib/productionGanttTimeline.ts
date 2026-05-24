@@ -84,8 +84,6 @@ export function headerHeightForScale(scale: GanttTimelineScale): number {
   return scale === "hours" ? 64 : 52;
 }
 
-export const HOUR_TICKS = [0, 6, 12, 18] as const;
-
 export function formatWeekHeader(weekStart: Date): { primary: string; secondary: string } {
   const weekEnd = addDays(endOfWeek(weekStart, { weekStartsOn: 1 }), 0);
   return {

@@ -38,7 +38,6 @@ import {
   columnWidthForScale,
   formatWeekHeader,
   headerHeightForScale,
-  HOUR_TICKS,
   resolveTimelineScale,
   type GanttTimelineScale,
 } from "@/lib/productionGanttTimeline";
@@ -248,12 +247,11 @@ function TimelineHeader({
                   {format(day, "d MMM")}
                 </p>
               </div>
-              <div className="relative h-[22px] mx-1">
-                {HOUR_TICKS.map((h) => (
+              <div className="relative flex h-[22px] mx-0.5">
+                {Array.from({ length: 24 }, (_, h) => (
                   <span
                     key={h}
-                    className="absolute bottom-0 text-[8px] tabular-nums text-white/30 -translate-x-1/2"
-                    style={{ left: `${(h / 24) * 100}%` }}
+                    className="flex-1 min-w-0 text-center text-[7px] leading-[22px] tabular-nums text-white/30"
                   >
                     {String(h).padStart(2, "0")}
                   </span>
