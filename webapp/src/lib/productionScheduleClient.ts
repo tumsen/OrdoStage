@@ -5,7 +5,9 @@ export {
   type SchedulePhaseInput,
   type ScheduleError,
   type ScheduleErrorCode,
-} from "../../../backend/src/lib/productionSchedule";
+} from "./productionSchedule";
+
+import type { SchedulePhaseInput } from "./productionSchedule";
 
 export function phaseInputFromGanttLine(line: {
   lineId: string;
@@ -16,7 +18,7 @@ export function phaseInputFromGanttLine(line: {
     end: string;
   };
   dependsOnPhaseId: string | null;
-}): import("../../../backend/src/lib/productionSchedule").SchedulePhaseInput {
+}): SchedulePhaseInput {
   const phaseKind = line.task.phaseKind ?? "span";
   const isSingle = phaseKind === "milestone" || phaseKind === "deadline";
   return {

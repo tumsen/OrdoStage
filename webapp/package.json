@@ -11,7 +11,7 @@
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "lint": "eslint . --max-warnings 0",
     "check": "bun run sync-contracts && bun run lint && bun run typecheck",
-    "sync-contracts": "cp ../backend/src/types.ts ./src/contracts/backendTypes.ts",
+    "sync-contracts": "cp ../backend/src/types.ts ./src/contracts/backendTypes.ts && cp ../backend/src/lib/productionSchedule.ts ./src/lib/productionSchedule.ts",
     "preview": "vite preview",
     "generate-favicons": "bun run scripts/generate-favicons.mjs"
   },
