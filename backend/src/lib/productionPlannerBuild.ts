@@ -1,9 +1,11 @@
 import type {
   ProductionCostCategory,
   ProductionCostLine,
+  ProductionPerson,
   ProductionPlannerGanttLine,
   ProductionPlannerRow,
   ProductionPlannerTask,
+  ProductionTeam,
 } from "../types";
 import { computeCriticalPath, type SchedulePhaseInput } from "./productionSchedule";
 
@@ -103,12 +105,14 @@ function costTaskFromLine(line: ProductionCostLine): ProductionPlannerTask {
 export type ProductionWithRelations = {
   id: string;
   name: string;
+  description: string | null;
   status: string;
   planningStartDate: Date | null;
   premiereDate: Date | null;
   notes: string | null;
   tourId: string | null;
   eventId: string | null;
+  leadPersonId: string | null;
   homeVenue: { name: string } | null;
   leadPerson: { name: string } | null;
   tour: { id: string; name: string } | null;
@@ -122,10 +126,25 @@ export type ProductionWithRelations = {
     progressPercent: number;
     startDate: Date;
     endDate: Date | null;
+    assigneePersonId: string | null;
+    departmentId: string | null;
     dependsOnPhaseId: string | null;
     dependsOnPhase: { id: string; title: string } | null;
     assigneePerson: { name: string } | null;
     department: { name: string } | null;
+  }>;
+  people?: Array<{
+    id: string;
+    productionId: string;
+    personId: string;
+    role: string | null;
+    person: { name: string; role: string | null; email: string | null; phone: string | null };
+  }>;
+  teams?: Array<{
+    id: string;
+    productionId: string;
+    departmentId: string;
+    department: { id: string; name: string; color: string; createdAt: Date };
   }>;
 };
 
@@ -176,7 +195,9 @@ export function buildGanttLines(
       label: phase.title,
       category: phase.category,
       status: phase.status,
+      assigneePersonId: phase.assigneePersonId,
       assigneeName: phase.assigneePerson?.name ?? null,
+      departmentId: phase.departmentId,
       departmentName: phase.department?.name ?? null,
       dependsOnPhaseId: phase.dependsOnPhaseId,
       dependsOnLabel: phase.dependsOnPhase?.title ?? null,
@@ -230,7 +251,8 @@ export function buildProductionPlannerRow(
   production: ProductionWithRelations,
   costLines: ProductionCostLine[],
   loggedLaborMinutes: number,
-  currencyCode: string
+  currencyCode: string,
+  roster?: { people: ProductionPerson[]; teams: ProductionTeam[] }
 ): ProductionPlannerRow {
   const ganttLines = buildGanttLines(production, costLines);
   const tasks = ganttLines.map((l) => l.task);
@@ -267,7 +289,10 @@ export function buildProductionPlannerRow(
     endDate,
     premiereDate: production.premiereDate ? ymd(production.premiereDate) : null,
     venueLabel: production.homeVenue?.name ?? null,
+    leadPersonId: production.leadPersonId,
     leadPersonName: production.leadPerson?.name ?? null,
+    description: production.description,
+    notes: production.notes,
     linkedTourId: production.tour?.id ?? production.tourId,
     linkedTourName: production.tour?.name ?? null,
     linkedEventId: production.event?.id ?? production.eventId,
@@ -277,6 +302,8 @@ export function buildProductionPlannerRow(
     tasks,
     costs: costLines,
     costSummary: summarizeCosts(costLines, currencyCode, loggedLaborMinutes),
+    people: roster?.people ?? [],
+    teams: roster?.teams ?? [],
   };
 }
 

@@ -390,6 +390,7 @@ model Person {
   timesheetApprovals TimesheetApproval[]
   productionsLed     Production[]            @relation("ProductionLeadPerson")
   productionPhases   ProductionPhase[]       @relation("ProductionPhaseAssignee")
+  productionAssignments ProductionPerson[]
 }
 
 model PersonDocument {
@@ -735,6 +736,7 @@ model Department {
   showJobs       EventShowJob[]
   showStaffing   EventShowStaffing[]
   productionPhases ProductionPhase[]
+  productionTeams  ProductionTeam[]
   createdAt      DateTime     @default(now())
 }
 
@@ -1135,6 +1137,8 @@ model Production {
   notes             String?
   phases            ProductionPhase[]
   costLines         ProductionCostLine[]
+  people            ProductionPerson[]
+  teams             ProductionTeam[]
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -1174,4 +1178,27 @@ model ProductionPhase {
   @@index([productionId, startDate])
   @@index([productionId, sortOrder])
   @@index([dependsOnPhaseId])
+}
+
+model ProductionPerson {
+  id           String     @id @default(cuid())
+  productionId String
+  production   Production @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  personId     String
+  person       Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+  role         String?
+  createdAt    DateTime   @default(now())
+
+  @@unique([productionId, personId])
+}
+
+model ProductionTeam {
+  id           String     @id @default(cuid())
+  productionId String
+  production   Production @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([productionId, departmentId])
 }

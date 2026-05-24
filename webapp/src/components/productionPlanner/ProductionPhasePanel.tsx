@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type {
+  Department,
+  Person,
   ProductionPhase,
   ProductionPhaseCategory,
   ProductionPhaseKind,
@@ -80,7 +82,19 @@ export function ProductionPhasePanel({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [dependsOn, setDependsOn] = useState(NONE);
+  const [assigneeId, setAssigneeId] = useState(NONE);
+  const [departmentId, setDepartmentId] = useState(NONE);
   const [notes, setNotes] = useState("");
+
+  const { data: allPeople } = useQuery({
+    queryKey: ["people"],
+    queryFn: () => api.get<Person[]>("/api/people"),
+  });
+
+  const { data: allTeams } = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => api.get<Department[]>("/api/departments"),
+  });
 
   const phaseId = selectedLine?.task.phaseId ?? null;
 
@@ -96,6 +110,8 @@ export function ProductionPhasePanel({
       selectedLine.task.phaseKind === "span" ? selectedLine.task.end.slice(0, 10) : ""
     );
     setDependsOn(selectedLine.dependsOnPhaseId ?? NONE);
+    setAssigneeId(selectedLine.assigneePersonId ?? NONE);
+    setDepartmentId(selectedLine.departmentId ?? NONE);
     setNotes("");
   }, [selectedLine?.lineId, isPhase, selectedLine]);
 
@@ -135,6 +151,8 @@ export function ProductionPhasePanel({
         endDate:
           phaseKind === "span" ? (endDate.trim() ? `${endDate}T12:00:00.000Z` : null) : null,
         dependsOnPhaseId: depId,
+        assigneePersonId: assigneeId === NONE ? null : assigneeId,
+        departmentId: departmentId === NONE ? null : departmentId,
         notes: notes.trim() || null,
       };
       return api.patch<ProductionPhase>(`/api/productions/phases/${phaseId}`, payload);
@@ -287,6 +305,40 @@ export function ProductionPhasePanel({
               disabled={!canEdit || status === "done"}
               className="bg-white/5 border-white/10"
             />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1.5">
+            <Label className="text-white/60 text-xs">Assignee</Label>
+            <Select value={assigneeId} onValueChange={setAssigneeId} disabled={!canEdit}>
+              <SelectTrigger className="bg-white/5 border-white/10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#16161f] border-white/10">
+                <SelectItem value={NONE}>None</SelectItem>
+                {(allPeople ?? []).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-white/60 text-xs">Team</Label>
+            <Select value={departmentId} onValueChange={setDepartmentId} disabled={!canEdit}>
+              <SelectTrigger className="bg-white/5 border-white/10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#16161f] border-white/10">
+                <SelectItem value={NONE}>None</SelectItem>
+                {(allTeams ?? []).map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="space-y-1.5">

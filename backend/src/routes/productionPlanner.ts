@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { auth } from "../auth";
 import { prisma } from "../prisma";
 import { canAction, canView } from "../requestRole";
 import {
+  AssignProductionTeamSchema,
   CreateProductionCostLineSchema,
   CreateProductionPhaseSchema,
   CreateProductionSchema,
@@ -12,7 +14,9 @@ import {
   UpdateProductionSchema,
   type Production,
   type ProductionCostLine,
+  type ProductionPerson,
   type ProductionPhase,
+  type ProductionTeam,
 } from "../types";
 import {
   buildProductionPlannerRow,
@@ -29,6 +33,20 @@ const productionInclude = {
   leadPerson: { select: { name: true } },
   tour: { select: { id: true, name: true } },
   event: { select: { id: true, title: true } },
+  people: {
+    orderBy: { createdAt: "asc" as const },
+    include: {
+      person: {
+        include: {
+          teamMemberships: { include: { department: true } },
+        },
+      },
+    },
+  },
+  teams: {
+    orderBy: { createdAt: "asc" as const },
+    include: { department: true },
+  },
   phases: {
     orderBy: [{ sortOrder: "asc" as const }, { startDate: "asc" as const }],
     include: {
@@ -38,6 +56,122 @@ const productionInclude = {
     },
   },
 };
+
+function serializeAssignmentPerson(person: {
+  id: string;
+  name: string;
+  role: string | null;
+  affiliation: string;
+  email: string | null;
+  phone: string | null;
+  addressStreet: string | null;
+  addressNumber: string | null;
+  addressZip: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressCountry: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  departmentId: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  teamMemberships?: Array<{
+    departmentId: string;
+    role: string | null;
+    department: { id: string; name: string; color: string; createdAt: Date };
+  }>;
+}) {
+  const memberships = person.teamMemberships ?? [];
+  return {
+    id: person.id,
+    name: person.name,
+    role: person.role,
+    affiliation: person.affiliation as "internal" | "external",
+    email: person.email,
+    phone: person.phone,
+    addressStreet: person.addressStreet,
+    addressNumber: person.addressNumber,
+    addressZip: person.addressZip,
+    addressCity: person.addressCity,
+    addressState: person.addressState,
+    addressCountry: person.addressCountry,
+    emergencyContactName: person.emergencyContactName,
+    emergencyContactPhone: person.emergencyContactPhone,
+    departmentId: person.departmentId,
+    teamIds: memberships.map((m) => m.departmentId),
+    teams: memberships.map((m) => ({
+      id: m.department.id,
+      name: m.department.name,
+      color: m.department.color,
+      createdAt: m.department.createdAt.toISOString(),
+    })),
+    teamMemberships: memberships.map((m) => ({
+      teamId: m.departmentId,
+      role: m.role ?? null,
+    })),
+    isActive: person.isActive,
+    createdAt: person.createdAt.toISOString(),
+    updatedAt: person.updatedAt.toISOString(),
+  };
+}
+
+function serializeProductionPerson(row: {
+  id: string;
+  productionId: string;
+  personId: string;
+  role: string | null;
+  person: Parameters<typeof serializeAssignmentPerson>[0];
+}): ProductionPerson {
+  return {
+    id: row.id,
+    productionId: row.productionId,
+    personId: row.personId,
+    role: row.role,
+    person: serializeAssignmentPerson(row.person),
+  };
+}
+
+function serializeProductionTeam(row: {
+  id: string;
+  productionId: string;
+  departmentId: string;
+  department: { id: string; name: string; color: string; createdAt: Date };
+}): ProductionTeam {
+  return {
+    id: row.id,
+    productionId: row.productionId,
+    teamId: row.departmentId,
+    team: {
+      id: row.department.id,
+      name: row.department.name,
+      color: row.department.color,
+      createdAt: row.department.createdAt.toISOString(),
+    },
+  };
+}
+
+function rosterFromProduction(production: {
+  id: string;
+  people: Array<{
+    id: string;
+    productionId: string;
+    personId: string;
+    role: string | null;
+    person: Parameters<typeof serializeAssignmentPerson>[0];
+  }>;
+  teams: Array<{
+    id: string;
+    productionId: string;
+    departmentId: string;
+    department: { id: string; name: string; color: string; createdAt: Date };
+  }>;
+}) {
+  return {
+    people: production.people.map(serializeProductionPerson),
+    teams: production.teams.map(serializeProductionTeam),
+  };
+}
 
 function serializePhase(row: {
   id: string;
@@ -337,7 +471,8 @@ productionPlannerRouter.get("/production-planner", async (c) => {
         p,
         costsByProduction.get(p.id) ?? [],
         0,
-        currencyCode
+        currencyCode,
+        rosterFromProduction(p)
       )
     )
     .sort((a, b) => (a.premiereDate ?? a.title).localeCompare(b.premiereDate ?? b.title));
@@ -882,6 +1017,206 @@ productionPlannerRouter.delete("/production-planner/costs/:id", async (c) => {
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
 
   await prisma.productionCostLine.delete({ where: { id } });
+  return c.body(null, 204);
+});
+
+// POST /api/productions/:id/teams — assign team; members become production people
+productionPlannerRouter.post(
+  "/productions/:id/teams",
+  zValidator("json", AssignProductionTeamSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId) {
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    }
+    if (!canWrite(c)) {
+      return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+    }
+
+    const { id } = c.req.param();
+    const body = c.req.valid("json");
+
+    const production = await prisma.production.findFirst({
+      where: { id, organizationId: user.organizationId },
+    });
+    if (!production) {
+      return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
+    }
+
+    const team = await prisma.department.findFirst({
+      where: { id: body.teamId, organizationId: user.organizationId },
+    });
+    if (!team) {
+      return c.json({ error: { message: "Team not found", code: "NOT_FOUND" } }, 404);
+    }
+
+    const assignment = await prisma.productionTeam.upsert({
+      where: { productionId_departmentId: { productionId: id, departmentId: body.teamId } },
+      update: {},
+      create: { productionId: id, departmentId: body.teamId },
+      include: { department: true },
+    });
+
+    const members = await prisma.personTeam.findMany({
+      where: {
+        departmentId: body.teamId,
+        person: { is: { organizationId: user.organizationId } },
+      },
+      select: { personId: true },
+    });
+
+    for (const member of members) {
+      await prisma.productionPerson.upsert({
+        where: { productionId_personId: { productionId: id, personId: member.personId } },
+        update: {},
+        create: { productionId: id, personId: member.personId },
+      });
+    }
+
+    return c.json({ data: serializeProductionTeam(assignment) }, 201);
+  }
+);
+
+productionPlannerRouter.delete("/productions/:id/teams/:teamId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canWrite(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+
+  const { id, teamId } = c.req.param();
+  const production = await prisma.production.findFirst({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!production) {
+    return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const existing = await prisma.productionTeam.findUnique({
+    where: { productionId_departmentId: { productionId: id, departmentId: teamId } },
+  });
+  if (!existing) {
+    return c.json({ error: { message: "Team assignment not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  await prisma.productionTeam.delete({
+    where: { productionId_departmentId: { productionId: id, departmentId: teamId } },
+  });
+
+  const remainingTeamIds = (
+    await prisma.productionTeam.findMany({
+      where: { productionId: id },
+      select: { departmentId: true },
+    })
+  ).map((t) => t.departmentId);
+
+  const remainingPersonIds = new Set(
+    remainingTeamIds.length === 0
+      ? []
+      : (
+          await prisma.personTeam.findMany({
+            where: { departmentId: { in: remainingTeamIds } },
+            select: { personId: true },
+          })
+        ).map((m) => m.personId)
+  );
+
+  const assignedPeople = await prisma.productionPerson.findMany({
+    where: { productionId: id },
+    select: { personId: true },
+  });
+  const peopleToRemove = assignedPeople
+    .map((a) => a.personId)
+    .filter((personId) => !remainingPersonIds.has(personId));
+
+  if (peopleToRemove.length > 0) {
+    await prisma.productionPerson.deleteMany({
+      where: { productionId: id, personId: { in: peopleToRemove } },
+    });
+  }
+
+  return c.body(null, 204);
+});
+
+// POST /api/productions/:id/people
+productionPlannerRouter.post(
+  "/productions/:id/people",
+  zValidator("json", z.object({ personId: z.string(), role: z.string().optional() })),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId) {
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    }
+    if (!canWrite(c)) {
+      return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+    }
+
+    const { id } = c.req.param();
+    const body = c.req.valid("json");
+
+    const production = await prisma.production.findFirst({
+      where: { id, organizationId: user.organizationId },
+    });
+    if (!production) {
+      return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
+    }
+
+    const person = await prisma.person.findFirst({
+      where: { id: body.personId, organizationId: user.organizationId },
+    });
+    if (!person) {
+      return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+    }
+
+    const row = await prisma.productionPerson.upsert({
+      where: { productionId_personId: { productionId: id, personId: body.personId } },
+      update: { role: body.role ?? null },
+      create: {
+        productionId: id,
+        personId: body.personId,
+        role: body.role ?? null,
+      },
+      include: {
+        person: {
+          include: { teamMemberships: { include: { department: true } } },
+        },
+      },
+    });
+
+    return c.json({ data: serializeProductionPerson(row) }, 201);
+  }
+);
+
+productionPlannerRouter.delete("/productions/:id/people/:personId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canWrite(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+
+  const { id, personId } = c.req.param();
+  const production = await prisma.production.findFirst({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!production) {
+    return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const existing = await prisma.productionPerson.findUnique({
+    where: { productionId_personId: { productionId: id, personId } },
+  });
+  if (!existing) {
+    return c.json({ error: { message: "Person assignment not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  await prisma.productionPerson.delete({
+    where: { productionId_personId: { productionId: id, personId } },
+  });
+
   return c.body(null, 204);
 });
 

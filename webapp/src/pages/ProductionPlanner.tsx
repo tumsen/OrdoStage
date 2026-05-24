@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Clapperboard, Plus, ListPlus } from "lucide-react";
+import { Clapperboard, Download, Plus, ListPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatMoneyFromCents } from "@/lib/formatMoney";
 import type { Production, ProductionPlannerResponse } from "@/lib/types";
@@ -15,6 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProductionGantt } from "@/components/productionPlanner/ProductionGantt";
 import { ProductionCostPanel } from "@/components/productionPlanner/ProductionCostPanel";
 import { ProductionPhasePanel } from "@/components/productionPlanner/ProductionPhasePanel";
+import { ProductionCrewPanel } from "@/components/productionPlanner/ProductionCrewPanel";
+import { downloadProductionPlanPDF } from "@/components/productionPlanner/ProductionPlanPDF";
 import { ProductionSelector } from "@/components/productionPlanner/ProductionSelector";
 import { CreateProductionDialog } from "@/components/productionPlanner/CreateProductionDialog";
 import { AddProductionPhaseDialog } from "@/components/productionPlanner/AddProductionPhaseDialog";
@@ -72,9 +74,10 @@ export default function ProductionPlanner() {
   }, []);
 
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
-  const [sideTab, setSideTab] = useState<"phase" | "budget">("phase");
+  const [sideTab, setSideTab] = useState<"phase" | "budget" | "crew">("phase");
   const [createOpen, setCreateOpen] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["production-planner", productionId],
@@ -217,6 +220,28 @@ export default function ProductionPlanner() {
             </>
           ) : null}
           {selectedRow ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-9 border-white/10 text-white/80"
+              disabled={pdfLoading}
+              onClick={async () => {
+                setPdfLoading(true);
+                try {
+                  await downloadProductionPlanPDF(selectedRow);
+                } catch {
+                  toast({ title: "Could not generate PDF", variant: "destructive" });
+                } finally {
+                  setPdfLoading(false);
+                }
+              }}
+            >
+              <Download className="h-4 w-4 mr-1.5" />
+              {pdfLoading ? "Generating…" : "Download PDF"}
+            </Button>
+          ) : null}
+          {selectedRow ? (
             <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
               <p className="text-[10px] uppercase text-white/40">Production budget</p>
               <p className="text-sm font-semibold text-yellow-300/90 tabular-nums">
@@ -321,12 +346,15 @@ export default function ProductionPlanner() {
           <div className="xl:w-[340px] shrink-0 xl:max-h-full flex flex-col min-h-[240px]">
             <Tabs
               value={sideTab}
-              onValueChange={(v) => setSideTab(v as "phase" | "budget")}
+              onValueChange={(v) => setSideTab(v as "phase" | "budget" | "crew")}
               className="flex flex-col min-h-0 flex-1"
             >
               <TabsList className="w-full bg-white/5 border border-white/10 shrink-0">
                 <TabsTrigger value="phase" className="flex-1 text-xs data-[state=active]:bg-white/10">
                   Phase
+                </TabsTrigger>
+                <TabsTrigger value="crew" className="flex-1 text-xs data-[state=active]:bg-white/10">
+                  Crew
                 </TabsTrigger>
                 <TabsTrigger value="budget" className="flex-1 text-xs data-[state=active]:bg-white/10">
                   Budget
@@ -342,6 +370,14 @@ export default function ProductionPlanner() {
                     const next = selectedRow?.ganttLines.find((l) => l.kind === "phase");
                     setSelectedLineId(next?.lineId ?? null);
                   }}
+                />
+              </TabsContent>
+              <TabsContent value="crew" className="flex-1 min-h-0 mt-2 flex flex-col data-[state=inactive]:hidden">
+                <ProductionCrewPanel
+                  row={selectedRow}
+                  productionId={productionId}
+                  plannerQueryKey={["production-planner", productionId]}
+                  canEdit={canEdit}
                 />
               </TabsContent>
               <TabsContent value="budget" className="flex-1 min-h-0 mt-2 flex flex-col data-[state=inactive]:hidden">
