@@ -92,6 +92,13 @@ export const PRODUCTION_STATUS_LABELS: Record<string, string> = {
   closed: "Closed",
 };
 
+export const CRITICAL_PATH_BAR_CLASS = "ring-2 ring-red-400/75 border-red-300/80";
+
+export const CRITICAL_PATH_LEGEND = {
+  bar: "bg-red-600/40",
+  border: "border-red-400/70",
+};
+
 export function taskCategoryColors(category: string) {
   return (
     TASK_CATEGORY_COLORS[category] ?? {

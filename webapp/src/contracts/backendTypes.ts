@@ -1587,6 +1587,7 @@ export const ProductionPhaseSchema = z.object({
   category: ProductionPhaseCategorySchema,
   phaseKind: ProductionPhaseKindSchema,
   status: ProductionPhaseStatusSchema,
+  progressPercent: z.number().int().min(0).max(100),
   startDate: z.string(),
   endDate: z.string().nullable(),
   assigneePersonId: z.string().nullable(),
@@ -1657,6 +1658,7 @@ export const CreateProductionPhaseSchema = z.object({
   category: ProductionPhaseCategorySchema.default("other"),
   phaseKind: ProductionPhaseKindSchema.default("span"),
   status: ProductionPhaseStatusSchema.optional(),
+  progressPercent: z.number().int().min(0).max(100).optional(),
   startDate: z.string().min(1),
   endDate: z.string().nullable().optional(),
   assigneePersonId: z.string().nullable().optional(),
@@ -1672,6 +1674,7 @@ export const UpdateProductionPhaseSchema = z
     category: ProductionPhaseCategorySchema.optional(),
     phaseKind: ProductionPhaseKindSchema.optional(),
     status: ProductionPhaseStatusSchema.optional(),
+    progressPercent: z.number().int().min(0).max(100).optional(),
     startDate: z.string().min(1).optional(),
     endDate: z.string().nullable().optional(),
     assigneePersonId: z.string().nullable().optional(),
@@ -1743,6 +1746,7 @@ export const ProductionPlannerTaskSchema = z.object({
   departmentName: z.string().nullable().optional(),
   dependsOnPhaseId: z.string().nullable().optional(),
   dependsOnLabel: z.string().nullable().optional(),
+  progressPercent: z.number().int().min(0).max(100).nullable().optional(),
   costPlannedCents: z.number().int().nullable().optional(),
   costActualCents: z.number().int().nullable().optional(),
 });
@@ -1763,6 +1767,8 @@ export const ProductionPlannerGanttLineSchema = z.object({
   departmentName: z.string().nullable().optional(),
   dependsOnPhaseId: z.string().nullable(),
   dependsOnLabel: z.string().nullable().optional(),
+  isCritical: z.boolean().optional(),
+  floatDays: z.number().int().optional(),
   task: ProductionPlannerTaskSchema,
 });
 

@@ -1154,6 +1154,8 @@ model ProductionPhase {
   phaseKind        String       @default("span")
   /** planned | in_progress | done | cancelled */
   status           String       @default("planned")
+  /** 0–100 completion for Gantt bar fill */
+  progressPercent  Int          @default(0)
   startDate        DateTime
   endDate          DateTime?
   assigneePersonId String?

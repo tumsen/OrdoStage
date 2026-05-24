@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { addMonths, format, startOfMonth, endOfMonth, subMonths, parseISO } from "date-fns";
 import { ChevronLeft, ChevronRight, Clapperboard, Plus, ListPlus } from "lucide-react";
 import { api } from "@/lib/api";
@@ -15,11 +15,14 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductionGantt } from "@/components/productionPlanner/ProductionGantt";
 import { ProductionCostPanel } from "@/components/productionPlanner/ProductionCostPanel";
+import { ProductionPhasePanel } from "@/components/productionPlanner/ProductionPhasePanel";
 import { ProductionSelector } from "@/components/productionPlanner/ProductionSelector";
 import { CreateProductionDialog } from "@/components/productionPlanner/CreateProductionDialog";
 import { AddProductionPhaseDialog } from "@/components/productionPlanner/AddProductionPhaseDialog";
-import { TASK_CATEGORY_COLORS, TASK_CATEGORY_LABELS } from "@/lib/productionPlannerTheme";
+import { TASK_CATEGORY_COLORS, TASK_CATEGORY_LABELS, CRITICAL_PATH_LEGEND } from "@/lib/productionPlannerTheme";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/hooks/use-toast";
 
 type RangePreset = "month" | "quarter" | "season";
 
@@ -74,6 +77,7 @@ export default function ProductionPlanner() {
     "quarter"
   );
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
+  const [sideTab, setSideTab] = useState<"phase" | "budget">("phase");
   const [createOpen, setCreateOpen] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState(false);
 
@@ -92,6 +96,10 @@ export default function ProductionPlanner() {
   });
 
   const selectedRow = data?.rows[0] ?? null;
+  const selectedLine = useMemo(
+    () => selectedRow?.ganttLines.find((l) => l.lineId === selectedLineId) ?? null,
+    [selectedRow, selectedLineId]
+  );
 
   const existingPhases = useMemo(
     () =>
@@ -112,13 +120,46 @@ export default function ProductionPlanner() {
     }
   }, [selectedRow, selectedLineId]);
 
+  useEffect(() => {
+    if (!selectedLine) return;
+    if (selectedLine.kind === "cost") setSideTab("budget");
+    else if (selectedLine.kind === "phase") setSideTab("phase");
+  }, [selectedLine]);
+
+  const invalidatePlanner = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["production-planner"] });
+  }, [queryClient]);
+
+  const rescheduleMutation = useMutation({
+    mutationFn: ({
+      phaseId,
+      startDate,
+      endDate,
+    }: {
+      phaseId: string;
+      startDate: string;
+      endDate: string | null;
+    }) =>
+      api.patch(`/api/productions/phases/${phaseId}`, { startDate, endDate }),
+    onSuccess: () => invalidatePlanner(),
+  });
+
+  const handlePhaseReschedule = useCallback(
+    async (phaseId: string, dates: { startDate: string; endDate: string | null }) => {
+      try {
+        await rescheduleMutation.mutateAsync({ phaseId, ...dates });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Could not reschedule phase";
+        toast({ title: msg, variant: "destructive" });
+        throw e;
+      }
+    },
+    [rescheduleMutation]
+  );
+
   function shiftRange(dir: -1 | 1) {
     const months = preset === "month" ? 1 : preset === "quarter" ? 3 : 6;
     setAnchor((d) => (dir === 1 ? addMonths(d, months) : subMonths(d, months)));
-  }
-
-  function invalidatePlanner() {
-    queryClient.invalidateQueries({ queryKey: ["production-planner"] });
   }
 
   function handleProductionCreated(production: Production) {
@@ -291,6 +332,16 @@ export default function ProductionPlanner() {
             {TASK_CATEGORY_LABELS[cat] ?? cat.replace(/_/g, " ")}
           </span>
         ))}
+        <span className="flex items-center gap-1.5 text-[10px] text-white/45">
+          <span
+            className={cn(
+              "h-2 w-4 rounded-sm border ring-1 ring-red-400/50",
+              CRITICAL_PATH_LEGEND.bar,
+              CRITICAL_PATH_LEGEND.border
+            )}
+          />
+          Critical path
+        </span>
         <span className="text-[10px] text-white/30 ml-2">— arrows = depends on (finish → start)</span>
       </div>
 
@@ -310,15 +361,45 @@ export default function ProductionPlanner() {
               currencyCode={data?.currencyCode ?? "EUR"}
               selectedLineId={selectedLineId}
               onSelectLine={setSelectedLineId}
+              canEdit={canEdit}
+              onPhaseReschedule={handlePhaseReschedule}
             />
           </div>
           <div className="xl:w-[340px] shrink-0 xl:max-h-full flex flex-col min-h-[240px]">
-            <ProductionCostPanel
-              row={selectedRow}
-              currencyCode={data?.currencyCode ?? "EUR"}
-              canEdit={canEdit}
-              plannerQueryKey={[...queryKey]}
-            />
+            <Tabs
+              value={sideTab}
+              onValueChange={(v) => setSideTab(v as "phase" | "budget")}
+              className="flex flex-col min-h-0 flex-1"
+            >
+              <TabsList className="w-full bg-white/5 border border-white/10 shrink-0">
+                <TabsTrigger value="phase" className="flex-1 text-xs data-[state=active]:bg-white/10">
+                  Phase
+                </TabsTrigger>
+                <TabsTrigger value="budget" className="flex-1 text-xs data-[state=active]:bg-white/10">
+                  Budget
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="phase" className="flex-1 min-h-0 mt-2 flex flex-col data-[state=inactive]:hidden">
+                <ProductionPhasePanel
+                  row={selectedRow}
+                  selectedLine={selectedLine}
+                  plannerQueryKey={[...queryKey]}
+                  canEdit={canEdit}
+                  onDeleted={() => {
+                    const next = selectedRow?.ganttLines.find((l) => l.kind === "phase");
+                    setSelectedLineId(next?.lineId ?? null);
+                  }}
+                />
+              </TabsContent>
+              <TabsContent value="budget" className="flex-1 min-h-0 mt-2 flex flex-col data-[state=inactive]:hidden">
+                <ProductionCostPanel
+                  row={selectedRow}
+                  currencyCode={data?.currencyCode ?? "EUR"}
+                  canEdit={canEdit}
+                  plannerQueryKey={[...queryKey]}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       )}

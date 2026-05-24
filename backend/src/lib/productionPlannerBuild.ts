@@ -5,6 +5,7 @@ import type {
   ProductionPlannerRow,
   ProductionPlannerTask,
 } from "../types";
+import { computeCriticalPath, type SchedulePhaseInput } from "./productionSchedule";
 
 function iso(d: Date): string {
   return d.toISOString();
@@ -54,6 +55,7 @@ function phaseToTask(phase: {
   category: string;
   phaseKind: string;
   status: string;
+  progressPercent?: number;
   startDate: Date;
   endDate: Date | null;
   dependsOnPhaseId?: string | null;
@@ -79,6 +81,7 @@ function phaseToTask(phase: {
     departmentName: phase.department?.name ?? null,
     dependsOnPhaseId: phase.dependsOnPhaseId ?? null,
     dependsOnLabel: phase.dependsOnPhase?.title ?? null,
+    progressPercent: phase.progressPercent ?? 0,
   };
 }
 
@@ -116,6 +119,7 @@ export type ProductionWithRelations = {
     category: string;
     phaseKind: string;
     status: string;
+    progressPercent: number;
     startDate: Date;
     endDate: Date | null;
     dependsOnPhaseId: string | null;
@@ -130,6 +134,18 @@ export function buildGanttLines(
   costLines: ProductionCostLine[]
 ): ProductionPlannerGanttLine[] {
   const lines: ProductionPlannerGanttLine[] = [];
+
+  const scheduleInputs: SchedulePhaseInput[] = production.phases.map((p) => ({
+    id: p.id,
+    phaseKind: p.phaseKind,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    dependsOnPhaseId: p.dependsOnPhaseId,
+  }));
+  const { isCritical, floatDays } = computeCriticalPath(
+    scheduleInputs,
+    production.premiereDate
+  );
 
   if (production.planningStartDate && production.premiereDate) {
     const task: ProductionPlannerTask = {
@@ -164,6 +180,8 @@ export function buildGanttLines(
       departmentName: phase.department?.name ?? null,
       dependsOnPhaseId: phase.dependsOnPhaseId,
       dependsOnLabel: phase.dependsOnPhase?.title ?? null,
+      isCritical: isCritical.get(phase.id) ?? false,
+      floatDays: floatDays.get(phase.id) ?? 0,
       task,
     });
   }

@@ -19,6 +19,7 @@ import {
   defaultPhasesForPremiere,
   mergePlannerTotals,
 } from "../lib/productionPlannerBuild";
+import { validatePhaseDates, type SchedulePhaseInput } from "../lib/productionSchedule";
 import { parseIncomingDateTime, parseIncomingDateTimeOrNull } from "../parseIncomingDateTime";
 
 const productionPlannerRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
@@ -45,6 +46,7 @@ function serializePhase(row: {
   category: string;
   phaseKind: string;
   status: string;
+  progressPercent: number;
   startDate: Date;
   endDate: Date | null;
   assigneePersonId: string | null;
@@ -65,6 +67,7 @@ function serializePhase(row: {
     category: row.category as ProductionPhase["category"],
     phaseKind: row.phaseKind as ProductionPhase["phaseKind"],
     status: row.status as ProductionPhase["status"],
+    progressPercent: row.progressPercent,
     startDate: row.startDate.toISOString(),
     endDate: row.endDate ? row.endDate.toISOString() : null,
     assigneePersonId: row.assigneePersonId,
@@ -216,6 +219,39 @@ async function assertDependsOnPhase(
       });
     cur = nextPhase?.dependsOnPhaseId ?? null;
   }
+  return { ok: true };
+}
+
+async function loadSchedulePhases(productionId: string): Promise<SchedulePhaseInput[]> {
+  const phases = await prisma.productionPhase.findMany({
+    where: { productionId },
+    select: {
+      id: true,
+      phaseKind: true,
+      startDate: true,
+      endDate: true,
+      dependsOnPhaseId: true,
+    },
+  });
+  return phases.map((p) => ({
+    id: p.id,
+    phaseKind: p.phaseKind,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    dependsOnPhaseId: p.dependsOnPhaseId,
+  }));
+}
+
+async function validatePhaseSchedule(
+  productionId: string,
+  candidate: SchedulePhaseInput
+): Promise<{ ok: true } | { ok: false; message: string; code: string }> {
+  const all = await loadSchedulePhases(productionId);
+  const merged = all.some((p) => p.id === candidate.id)
+    ? all.map((p) => (p.id === candidate.id ? candidate : p))
+    : [...all, candidate];
+  const err = validatePhaseDates(candidate, merged);
+  if (err) return { ok: false, message: err.message, code: err.code };
   return { ok: true };
 }
 
@@ -558,6 +594,23 @@ productionPlannerRouter.post(
       return c.json({ error: { message: depCheck.message, code: "BAD_REQUEST" } }, 400);
     }
 
+    const startDate = parseIncomingDateTime(body.startDate);
+    const endDate = body.endDate ? parseIncomingDateTime(body.endDate) : null;
+    const tempId = "new-phase";
+    const scheduleCheck = await validatePhaseSchedule(productionId, {
+      id: tempId,
+      phaseKind: body.phaseKind,
+      startDate,
+      endDate,
+      dependsOnPhaseId: body.dependsOnPhaseId ?? null,
+    });
+    if (!scheduleCheck.ok) {
+      return c.json(
+        { error: { message: scheduleCheck.message, code: scheduleCheck.code } },
+        400
+      );
+    }
+
     const created = await prisma.productionPhase.create({
       data: {
         productionId,
@@ -565,8 +618,9 @@ productionPlannerRouter.post(
         category: body.category,
         phaseKind: body.phaseKind,
         status: body.status ?? "planned",
-        startDate: parseIncomingDateTime(body.startDate),
-        endDate: body.endDate ? parseIncomingDateTime(body.endDate) : null,
+        progressPercent: body.progressPercent ?? 0,
+        startDate,
+        endDate,
         assigneePersonId: body.assigneePersonId ?? null,
         departmentId: body.departmentId ?? null,
         dependsOnPhaseId: body.dependsOnPhaseId ?? null,
@@ -630,6 +684,29 @@ productionPlannerRouter.patch(
       return c.json({ error: { message: depCheck.message, code: "BAD_REQUEST" } }, 400);
     }
 
+    const nextPhaseKind = body.phaseKind ?? existing.phaseKind;
+    const nextStart = body.startDate ? parseIncomingDateTime(body.startDate) : existing.startDate;
+    const nextEnd =
+      body.endDate === undefined
+        ? existing.endDate
+        : body.endDate
+          ? parseIncomingDateTime(body.endDate)
+          : null;
+
+    const scheduleCheck = await validatePhaseSchedule(existing.productionId, {
+      id: phaseId,
+      phaseKind: nextPhaseKind,
+      startDate: nextStart,
+      endDate: nextEnd,
+      dependsOnPhaseId: dependsOnPhaseId,
+    });
+    if (!scheduleCheck.ok) {
+      return c.json(
+        { error: { message: scheduleCheck.message, code: scheduleCheck.code } },
+        400
+      );
+    }
+
     const updated = await prisma.productionPhase.update({
       where: { id: phaseId },
       data: {
@@ -637,6 +714,7 @@ productionPlannerRouter.patch(
         category: body.category,
         phaseKind: body.phaseKind,
         status: body.status,
+        progressPercent: body.progressPercent,
         startDate: body.startDate ? parseIncomingDateTime(body.startDate) : undefined,
         endDate:
           body.endDate === undefined
@@ -676,6 +754,21 @@ productionPlannerRouter.delete("/productions/phases/:phaseId", async (c) => {
     where: { id: phaseId, production: { organizationId: user.organizationId } },
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  const dependents = await prisma.productionPhase.count({
+    where: { dependsOnPhaseId: phaseId },
+  });
+  if (dependents > 0) {
+    return c.json(
+      {
+        error: {
+          message: `${dependents} phase(s) depend on this one. Remove or reassign dependencies first.`,
+          code: "HAS_DEPENDENTS",
+        },
+      },
+      400
+    );
+  }
 
   await prisma.productionPhase.delete({ where: { id: phaseId } });
   return c.body(null, 204);
