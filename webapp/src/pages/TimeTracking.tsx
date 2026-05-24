@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { usePersistedViewMode } from "@/hooks/usePersistedViewMode";
 import { Link } from "react-router-dom";
 import {
   addDays,
@@ -238,6 +239,7 @@ function dateFromISODate(value: string): Date | null {
 }
 
 const DISPLAY_START_STORAGE_KEY = "timeGrid.displayStartHour";
+const TIME_TRACKING_VIEW_MODES = ["week", "month"] as const;
 
 function readDisplayStartHour(): number {
   if (typeof window === "undefined") return 0;
@@ -304,7 +306,11 @@ export default function TimeTracking() {
   const readAll = canAction("time.read_all");
   const canManageTimeCatalog = canAction("time.manage_catalog");
 
-  const [mode, setMode] = useState<"week" | "month">("week");
+  const [mode, setMode] = usePersistedViewMode(
+    "ordo.viewMode.timeTracking",
+    TIME_TRACKING_VIEW_MODES,
+    "week",
+  );
   const [section, setSection] = useState<"time" | "travel">("time");
   const [anchor, setAnchor] = useState(() => new Date());
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePersistedViewMode } from "@/hooks/usePersistedViewMode";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -305,6 +306,16 @@ function YearDiscView({ year, items }: { year: number; items: CalendarItem[] }) 
   );
 }
 
+const SCHEDULE_VIEW_MODES = [
+  "year",
+  "yeardisc",
+  "month",
+  "week",
+  "day",
+  "next7",
+  "venueocc",
+] as const satisfies readonly ScheduleViewMode[];
+
 export default function Schedule() {
   const queryClient = useQueryClient();
   const { effective } = usePreferences();
@@ -316,7 +327,11 @@ export default function Schedule() {
         : "en-US";
   const today = new Date();
   const [anchorDate, setAnchorDate] = useState(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
-  const [viewMode, setViewMode] = useState<ScheduleViewMode>("week");
+  const [viewMode, setViewMode] = usePersistedViewMode(
+    "ordo.viewMode.schedule",
+    SCHEDULE_VIEW_MODES,
+    "week",
+  );
   const [venueId, setVenueId] = useState("all");
   const [personId, setPersonId] = useState("all");
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);

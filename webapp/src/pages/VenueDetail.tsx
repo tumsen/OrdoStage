@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { usePersistedViewMode } from "@/hooks/usePersistedViewMode";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
@@ -74,6 +75,8 @@ function formatDayRangeLabel(start: Date, end: Date, locale: string): string {
 
 type VenueBookingCalendarView = "month" | "next31";
 
+const VENUE_CALENDAR_VIEWS = ["month", "next31"] as const satisfies readonly VenueBookingCalendarView[];
+
 export default function VenueDetail() {
   const { id: venueId = "" } = useParams<{ id: string }>();
   const { canWrite } = usePermissions();
@@ -85,7 +88,11 @@ export default function VenueDetail() {
     const t = new Date();
     return new Date(t.getFullYear(), t.getMonth(), 1);
   });
-  const [calendarView, setCalendarView] = useState<VenueBookingCalendarView>("month");
+  const [calendarView, setCalendarView] = usePersistedViewMode(
+    "ordo.viewMode.venueDetail",
+    VENUE_CALENDAR_VIEWS,
+    "month",
+  );
   const [next31Start, setNext31Start] = useState(() => startOfLocalDay(new Date()));
   const [detailItem, setDetailItem] = useState<CalendarItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
