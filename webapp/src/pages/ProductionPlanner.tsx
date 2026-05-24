@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { addMonths, format, startOfMonth, endOfMonth, subMonths, parseISO } from "date-fns";
+import { parseISO, startOfDay } from "date-fns";
 import { ChevronLeft, ChevronRight, Clapperboard, Plus, ListPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatMoneyFromCents } from "@/lib/formatMoney";
 import type { Production, ProductionPlannerResponse } from "@/lib/types";
 import { usePermissions } from "@/hooks/usePermissions";
-import { usePersistedViewMode } from "@/hooks/usePersistedViewMode";
 import {
   usePersistedProductionId,
   useSyncProductionSelection,
 } from "@/hooks/usePersistedProductionId";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductionGantt } from "@/components/productionPlanner/ProductionGantt";
 import { ProductionCostPanel } from "@/components/productionPlanner/ProductionCostPanel";
@@ -23,10 +24,27 @@ import { TASK_CATEGORY_COLORS, TASK_CATEGORY_LABELS, CRITICAL_PATH_LEGEND } from
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-
-type RangePreset = "month" | "quarter" | "season";
-
-const RANGE_PRESETS = ["month", "quarter", "season"] as const satisfies readonly RangePreset[];
+import {
+  clampGanttVisibleDays,
+  ganttRangeForProductionSpan,
+  ganttRangeFromStart,
+  GANTT_VISIBLE_DAY_PRESETS,
+  MAX_GANTT_VISIBLE_DAYS,
+  MIN_GANTT_VISIBLE_DAYS,
+  readPersistedGanttRangeStart,
+  readPersistedGanttVisibleDays,
+  shiftGanttRangeStart,
+  toYmd,
+  writePersistedGanttRangeStart,
+  writePersistedGanttVisibleDays,
+} from "@/lib/productionGanttRange";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const LEGEND_CATEGORIES = [
   "planning_window",
@@ -37,20 +55,6 @@ const LEGEND_CATEGORIES = [
   "deadline",
   "cost",
 ] as const;
-
-function toYmd(d: Date): string {
-  return format(d, "yyyy-MM-dd");
-}
-
-function rangeForPreset(anchor: Date, preset: RangePreset): { from: string; to: string } {
-  if (preset === "month") {
-    return { from: toYmd(startOfMonth(anchor)), to: toYmd(endOfMonth(anchor)) };
-  }
-  if (preset === "quarter") {
-    return { from: toYmd(startOfMonth(anchor)), to: toYmd(endOfMonth(addMonths(anchor, 2))) };
-  }
-  return { from: toYmd(startOfMonth(anchor)), to: toYmd(endOfMonth(addMonths(anchor, 5))) };
-}
 
 export default function ProductionPlanner() {
   const queryClient = useQueryClient();
@@ -70,18 +74,32 @@ export default function ProductionPlanner() {
   );
   useSyncProductionSelection(productionId, setProductionId, productionIds);
 
-  const [anchor, setAnchor] = useState(() => startOfMonth(new Date()));
-  const [preset, setPreset] = usePersistedViewMode(
-    "ordo.viewMode.productionPlanner",
-    RANGE_PRESETS,
-    "quarter"
+  const [rangeStart, setRangeStartState] = useState(() =>
+    readPersistedGanttRangeStart(startOfDay(new Date()))
   );
+  const [visibleDays, setVisibleDaysState] = useState(() => readPersistedGanttVisibleDays(90));
+
+  const setRangeStart = useCallback((d: Date) => {
+    const next = startOfDay(d);
+    setRangeStartState(next);
+    writePersistedGanttRangeStart(next);
+  }, []);
+
+  const setVisibleDays = useCallback((days: number) => {
+    const next = clampGanttVisibleDays(days);
+    setVisibleDaysState(next);
+    writePersistedGanttVisibleDays(next);
+  }, []);
+
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [sideTab, setSideTab] = useState<"phase" | "budget">("phase");
   const [createOpen, setCreateOpen] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState(false);
 
-  const { from, to } = useMemo(() => rangeForPreset(anchor, preset), [anchor, preset]);
+  const { from, to } = useMemo(
+    () => ganttRangeFromStart(rangeStart, visibleDays),
+    [rangeStart, visibleDays]
+  );
 
   const queryKey = ["production-planner", { from, to, productionId }] as const;
 
@@ -158,8 +176,7 @@ export default function ProductionPlanner() {
   );
 
   function shiftRange(dir: -1 | 1) {
-    const months = preset === "month" ? 1 : preset === "quarter" ? 3 : 6;
-    setAnchor((d) => (dir === 1 ? addMonths(d, months) : subMonths(d, months)));
+    setRangeStart(shiftGanttRangeStart(rangeStart, visibleDays, dir));
   }
 
   function handleProductionCreated(production: Production) {
@@ -171,20 +188,20 @@ export default function ProductionPlanner() {
   function fitRangeToProduction() {
     if (!selectedRow?.startDate || !selectedRow?.endDate) return;
     try {
-      setAnchor(startOfMonth(parseISO(selectedRow.startDate)));
-      const start = parseISO(selectedRow.startDate);
-      const end = parseISO(selectedRow.endDate);
-      const months = Math.max(
-        1,
-        (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1
+      const { start, visibleDays: days } = ganttRangeForProductionSpan(
+        selectedRow.startDate,
+        selectedRow.endDate
       );
-      if (months <= 2) setPreset("month");
-      else if (months <= 4) setPreset("quarter");
-      else setPreset("season");
+      setRangeStart(start);
+      setVisibleDays(days);
     } catch {
       /* ignore invalid dates */
     }
   }
+
+  const isPresetDayCount = GANTT_VISIBLE_DAY_PRESETS.includes(
+    visibleDays as (typeof GANTT_VISIBLE_DAY_PRESETS)[number]
+  );
 
   if (!canAccess) {
     return (
@@ -268,55 +285,97 @@ export default function ProductionPlanner() {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 shrink-0">
-        <div className="flex rounded-lg border border-white/10 bg-white/[0.03] p-0.5">
-          {(["month", "quarter", "season"] as RangePreset[]).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPreset(p)}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs capitalize",
-                preset === p ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"
-              )}
-            >
-              {p}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-end gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 border-white/10"
+            onClick={() => shiftRange(-1)}
+            aria-label="Previous period"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 border-white/10"
+            onClick={() => shiftRange(1)}
+            aria-label="Next period"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-xs text-white/45"
+            onClick={() => setRangeStart(startOfDay(new Date()))}
+          >
+            Today
+          </Button>
+          <span className="text-sm text-white/70 tabular-nums min-w-[140px] text-center">
+            {from} — {to}
+          </span>
+          <span className="text-[10px] text-white/35 tabular-nums">({visibleDays} days)</span>
         </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-9 w-9 border-white/10"
-          onClick={() => shiftRange(-1)}
-          aria-label="Previous period"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <span className="text-sm text-white/70 tabular-nums min-w-[140px] text-center">
-          {from} — {to}
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-9 w-9 border-white/10"
-          onClick={() => shiftRange(1)}
-          aria-label="Next period"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-xs text-white/45"
-          onClick={() => setAnchor(startOfMonth(new Date()))}
-        >
-          Today
-        </Button>
+        <div className="space-y-1">
+          <Label htmlFor="gantt-range-start" className="text-[10px] uppercase text-white/40">
+            Start day
+          </Label>
+          <Input
+            id="gantt-range-start"
+            type="date"
+            value={toYmd(rangeStart)}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              setRangeStart(parseISO(`${e.target.value}T00:00:00`));
+            }}
+            className="h-9 w-[148px] bg-white/5 border-white/10 text-sm"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="gantt-visible-days" className="text-[10px] uppercase text-white/40">
+            Days shown
+          </Label>
+          <div className="flex items-center gap-1.5">
+            <Input
+              id="gantt-visible-days"
+              type="number"
+              min={MIN_GANTT_VISIBLE_DAYS}
+              max={MAX_GANTT_VISIBLE_DAYS}
+              value={visibleDays}
+              onChange={(e) => setVisibleDays(Number(e.target.value))}
+              className="h-9 w-[72px] bg-white/5 border-white/10 text-sm tabular-nums"
+            />
+            <Select
+              value={isPresetDayCount ? String(visibleDays) : "custom"}
+              onValueChange={(v) => {
+                if (v !== "custom") setVisibleDays(Number(v));
+              }}
+            >
+              <SelectTrigger className="h-9 w-[88px] bg-white/5 border-white/10 text-xs">
+                <SelectValue placeholder="Preset" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#16161f] border-white/10">
+                {GANTT_VISIBLE_DAY_PRESETS.map((d) => (
+                  <SelectItem key={d} value={String(d)} className="text-xs">
+                    {d}d
+                  </SelectItem>
+                ))}
+                {!isPresetDayCount ? (
+                  <SelectItem value="custom" className="text-xs">
+                    {visibleDays}d (custom)
+                  </SelectItem>
+                ) : null}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1 shrink-0">
