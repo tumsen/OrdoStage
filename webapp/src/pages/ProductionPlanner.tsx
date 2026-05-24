@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { parseISO, startOfDay } from "date-fns";
-import { ChevronLeft, ChevronRight, Clapperboard, Plus, ListPlus } from "lucide-react";
+import { Clapperboard, Plus, ListPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatMoneyFromCents } from "@/lib/formatMoney";
 import type { Production, ProductionPlannerResponse } from "@/lib/types";
@@ -11,7 +10,6 @@ import {
   useSyncProductionSelection,
 } from "@/hooks/usePersistedProductionId";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductionGantt } from "@/components/productionPlanner/ProductionGantt";
@@ -25,26 +23,15 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import {
-  clampGanttVisibleDays,
-  ganttRangeForProductionSpan,
-  ganttRangeFromStart,
-  GANTT_VISIBLE_DAY_PRESETS,
-  MAX_GANTT_VISIBLE_DAYS,
-  MIN_GANTT_VISIBLE_DAYS,
-  readPersistedGanttRangeStart,
-  readPersistedGanttVisibleDays,
-  shiftGanttRangeStart,
-  toYmd,
-  writePersistedGanttRangeStart,
-  writePersistedGanttVisibleDays,
+  apiRangeForPlanner,
+  clampGanttZoom,
+  ganttTaskSpanFromLines,
+  MAX_GANTT_ZOOM,
+  MIN_GANTT_ZOOM,
+  readPersistedGanttZoom,
+  writePersistedGanttZoom,
+  zoomLabel,
 } from "@/lib/productionGanttRange";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const LEGEND_CATEGORIES = [
   "planning_window",
@@ -55,6 +42,8 @@ const LEGEND_CATEGORIES = [
   "deadline",
   "cost",
 ] as const;
+
+const INITIAL_API_RANGE = apiRangeForPlanner(undefined);
 
 export default function ProductionPlanner() {
   const queryClient = useQueryClient();
@@ -74,21 +63,11 @@ export default function ProductionPlanner() {
   );
   useSyncProductionSelection(productionId, setProductionId, productionIds);
 
-  const [rangeStart, setRangeStartState] = useState(() =>
-    readPersistedGanttRangeStart(startOfDay(new Date()))
-  );
-  const [visibleDays, setVisibleDaysState] = useState(() => readPersistedGanttVisibleDays(90));
-
-  const setRangeStart = useCallback((d: Date) => {
-    const next = startOfDay(d);
-    setRangeStartState(next);
-    writePersistedGanttRangeStart(next);
-  }, []);
-
-  const setVisibleDays = useCallback((days: number) => {
-    const next = clampGanttVisibleDays(days);
-    setVisibleDaysState(next);
-    writePersistedGanttVisibleDays(next);
+  const [zoom, setZoomState] = useState(() => readPersistedGanttZoom(0));
+  const setZoom = useCallback((value: number) => {
+    const next = clampGanttZoom(value);
+    setZoomState(next);
+    writePersistedGanttZoom(next);
   }, []);
 
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
@@ -96,17 +75,13 @@ export default function ProductionPlanner() {
   const [createOpen, setCreateOpen] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState(false);
 
-  const { from, to } = useMemo(
-    () => ganttRangeFromStart(rangeStart, visibleDays),
-    [rangeStart, visibleDays]
-  );
-
-  const queryKey = ["production-planner", { from, to, productionId }] as const;
-
   const { data, isLoading, error } = useQuery({
-    queryKey: [...queryKey],
+    queryKey: ["production-planner", productionId],
     queryFn: () => {
-      const params = new URLSearchParams({ from, to });
+      const params = new URLSearchParams({
+        from: INITIAL_API_RANGE.from,
+        to: INITIAL_API_RANGE.to,
+      });
       if (productionId) params.set("productionId", productionId);
       return api.get<ProductionPlannerResponse>(`/api/production-planner?${params}`);
     },
@@ -114,6 +89,15 @@ export default function ProductionPlanner() {
   });
 
   const selectedRow = data?.rows[0] ?? null;
+
+  const chartSpan = useMemo(
+    () => (selectedRow?.ganttLines.length ? ganttTaskSpanFromLines(selectedRow.ganttLines) : null),
+    [selectedRow?.ganttLines]
+  );
+
+  const from = chartSpan?.from ?? INITIAL_API_RANGE.from;
+  const to = chartSpan?.to ?? INITIAL_API_RANGE.to;
+
   const selectedLine = useMemo(
     () => selectedRow?.ganttLines.find((l) => l.lineId === selectedLineId) ?? null,
     [selectedRow, selectedLineId]
@@ -175,33 +159,11 @@ export default function ProductionPlanner() {
     [rescheduleMutation]
   );
 
-  function shiftRange(dir: -1 | 1) {
-    setRangeStart(shiftGanttRangeStart(rangeStart, visibleDays, dir));
-  }
-
   function handleProductionCreated(production: Production) {
     setProductionId(production.id);
     invalidatePlanner();
     queryClient.invalidateQueries({ queryKey: ["productions"] });
   }
-
-  function fitRangeToProduction() {
-    if (!selectedRow?.startDate || !selectedRow?.endDate) return;
-    try {
-      const { start, visibleDays: days } = ganttRangeForProductionSpan(
-        selectedRow.startDate,
-        selectedRow.endDate
-      );
-      setRangeStart(start);
-      setVisibleDays(days);
-    } catch {
-      /* ignore invalid dates */
-    }
-  }
-
-  const isPresetDayCount = GANTT_VISIBLE_DAY_PRESETS.includes(
-    visibleDays as (typeof GANTT_VISIBLE_DAY_PRESETS)[number]
-  );
 
   if (!canAccess) {
     return (
@@ -267,113 +229,41 @@ export default function ProductionPlanner() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-3 shrink-0">
         <div className="space-y-1">
           <p className="text-[10px] uppercase tracking-wide text-white/40">Production</p>
           <ProductionSelector value={productionId} onChange={setProductionId} />
         </div>
-        {selectedRow?.startDate && selectedRow?.endDate ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-xs text-white/45 sm:mt-5"
-            onClick={fitRangeToProduction}
-          >
-            Fit timeline to production
-          </Button>
-        ) : null}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 shrink-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 border-white/10"
-            onClick={() => shiftRange(-1)}
-            aria-label="Previous period"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 border-white/10"
-            onClick={() => shiftRange(1)}
-            aria-label="Next period"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-xs text-white/45"
-            onClick={() => setRangeStart(startOfDay(new Date()))}
-          >
-            Today
-          </Button>
-          <span className="text-sm text-white/70 tabular-nums min-w-[140px] text-center">
+      <div className="flex flex-wrap items-end gap-4 shrink-0">
+        {chartSpan ? (
+          <div className="text-sm text-white/70 tabular-nums">
             {from} — {to}
-          </span>
-          <span className="text-[10px] text-white/35 tabular-nums">({visibleDays} days)</span>
-        </div>
+            <span className="text-[10px] text-white/35 ml-2">({chartSpan.dayCount} days)</span>
+          </div>
+        ) : null}
 
-        <div className="space-y-1">
-          <Label htmlFor="gantt-range-start" className="text-[10px] uppercase text-white/40">
-            Start day
-          </Label>
-          <Input
-            id="gantt-range-start"
-            type="date"
-            value={toYmd(rangeStart)}
-            onChange={(e) => {
-              if (!e.target.value) return;
-              setRangeStart(parseISO(`${e.target.value}T00:00:00`));
-            }}
-            className="h-9 w-[148px] bg-white/5 border-white/10 text-sm"
+        <div className="flex-1 min-w-[200px] max-w-md space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="gantt-zoom" className="text-[10px] uppercase text-white/40">
+              Day resolution
+            </Label>
+            <span className="text-[10px] text-white/45">{zoomLabel(zoom)}</span>
+          </div>
+          <input
+            id="gantt-zoom"
+            type="range"
+            min={MIN_GANTT_ZOOM}
+            max={MAX_GANTT_ZOOM}
+            value={zoom}
+            onChange={(e) => setZoom(Number(e.target.value))}
+            className="w-full h-1.5 accent-red-500 cursor-pointer"
+            aria-label="Timeline day resolution"
           />
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="gantt-visible-days" className="text-[10px] uppercase text-white/40">
-            Days shown
-          </Label>
-          <div className="flex items-center gap-1.5">
-            <Input
-              id="gantt-visible-days"
-              type="number"
-              min={MIN_GANTT_VISIBLE_DAYS}
-              max={MAX_GANTT_VISIBLE_DAYS}
-              value={visibleDays}
-              onChange={(e) => setVisibleDays(Number(e.target.value))}
-              className="h-9 w-[72px] bg-white/5 border-white/10 text-sm tabular-nums"
-            />
-            <Select
-              value={isPresetDayCount ? String(visibleDays) : "custom"}
-              onValueChange={(v) => {
-                if (v !== "custom") setVisibleDays(Number(v));
-              }}
-            >
-              <SelectTrigger className="h-9 w-[88px] bg-white/5 border-white/10 text-xs">
-                <SelectValue placeholder="Preset" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10">
-                {GANTT_VISIBLE_DAY_PRESETS.map((d) => (
-                  <SelectItem key={d} value={String(d)} className="text-xs">
-                    {d}d
-                  </SelectItem>
-                ))}
-                {!isPresetDayCount ? (
-                  <SelectItem value="custom" className="text-xs">
-                    {visibleDays}d (custom)
-                  </SelectItem>
-                ) : null}
-              </SelectContent>
-            </Select>
+          <div className="flex justify-between text-[9px] text-white/30">
+            <span>Fit plan</span>
+            <span>1 day / screen</span>
           </div>
         </div>
       </div>
@@ -417,6 +307,7 @@ export default function ProductionPlanner() {
               row={selectedRow}
               from={from}
               to={to}
+              zoom={zoom}
               currencyCode={data?.currencyCode ?? "EUR"}
               selectedLineId={selectedLineId}
               onSelectLine={setSelectedLineId}
@@ -442,7 +333,7 @@ export default function ProductionPlanner() {
                 <ProductionPhasePanel
                   row={selectedRow}
                   selectedLine={selectedLine}
-                  plannerQueryKey={[...queryKey]}
+                  plannerQueryKey={["production-planner", productionId]}
                   canEdit={canEdit}
                   onDeleted={() => {
                     const next = selectedRow?.ganttLines.find((l) => l.kind === "phase");
@@ -455,7 +346,7 @@ export default function ProductionPlanner() {
                   row={selectedRow}
                   currencyCode={data?.currencyCode ?? "EUR"}
                   canEdit={canEdit}
-                  plannerQueryKey={[...queryKey]}
+                  plannerQueryKey={["production-planner", productionId]}
                 />
               </TabsContent>
             </Tabs>

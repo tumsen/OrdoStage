@@ -29,6 +29,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  pixelsPerDayForZoom,
+} from "@/lib/productionGanttRange";
 import { toast } from "@/hooks/use-toast";
 
 const ROW_HEIGHT = 40;
@@ -164,6 +167,7 @@ export function ProductionGantt({
   row,
   from,
   to,
+  zoom,
   currencyCode,
   selectedLineId,
   onSelectLine,
@@ -173,6 +177,7 @@ export function ProductionGantt({
   row: ProductionPlannerRow | null;
   from: string;
   to: string;
+  zoom: number;
   currencyCode: string;
   selectedLineId: string | null;
   onSelectLine: (lineId: string) => void;
@@ -183,8 +188,10 @@ export function ProductionGantt({
   ) => Promise<void>;
 }) {
   const timelineRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragPayload | null>(null);
   const [timelineWidth, setTimelineWidth] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(800);
   const [drag, setDrag] = useState<DragPayload | null>(null);
 
   const rangeStart = useMemo(() => parseISO(`${from}T00:00:00`), [from]);
@@ -205,7 +212,10 @@ export function ProductionGantt({
   }, [rangeStart, rangeEnd]);
 
   const dayCount = days.length;
-  const colMinWidth = dayCount > 90 ? 28 : dayCount > 45 ? 36 : 48;
+  const colMinWidth = useMemo(
+    () => pixelsPerDayForZoom(zoom, dayCount, viewportWidth),
+    [zoom, dayCount, viewportWidth]
+  );
   const timelineMinWidth = dayCount * colMinWidth;
 
   const todayLeft =
@@ -224,6 +234,16 @@ export function ProductionGantt({
     setTimelineWidth(el.clientWidth);
     return () => ro.disconnect();
   }, [lines.length, timelineMinWidth]);
+
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => setViewportWidth(Math.max(200, el.clientWidth - LABEL_WIDTH));
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, []);
 
   const allPhaseInputs = useMemo(
     () =>
@@ -371,7 +391,7 @@ export function ProductionGantt({
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto relative">
+        <div ref={viewportRef} className="flex-1 overflow-auto relative min-h-0">
           {!row || lines.length === 0 ? (
             <p className="p-8 text-center text-sm text-white/40">
               {!row

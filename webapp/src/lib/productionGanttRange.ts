@@ -1,111 +1,106 @@
-import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from "date-fns";
+import { addDays, differenceInCalendarDays, format, parseISO, startOfDay, subDays } from "date-fns";
 
-export const MIN_GANTT_VISIBLE_DAYS = 1;
-export const MAX_GANTT_VISIBLE_DAYS = 365;
+const STORAGE_ZOOM = "ordo.productionPlanner.zoom";
+const SPAN_PADDING_DAYS = 2;
+const API_PADDING_DAYS = 60;
 
-/** Quick picks for the visible-day selector (within 1–365). */
-export const GANTT_VISIBLE_DAY_PRESETS = [7, 14, 30, 60, 90, 180, 365] as const;
+export const MIN_GANTT_ZOOM = 0;
+export const MAX_GANTT_ZOOM = 100;
 
-const STORAGE_START = "ordo.productionPlanner.rangeStart";
-const STORAGE_DAYS = "ordo.productionPlanner.visibleDays";
+/** Minimum column width when fully compressed (fit-all mode). */
+export const MIN_PX_PER_DAY = 10;
+/** Floor for “one day fills the timeline” zoom. */
+export const MIN_ONE_DAY_PX = 120;
 
 export function toYmd(d: Date): string {
   return format(d, "yyyy-MM-dd");
 }
 
-export function clampGanttVisibleDays(days: number): number {
-  if (!Number.isFinite(days)) return 90;
-  return Math.min(MAX_GANTT_VISIBLE_DAYS, Math.max(MIN_GANTT_VISIBLE_DAYS, Math.round(days)));
+export function clampGanttZoom(zoom: number): number {
+  if (!Number.isFinite(zoom)) return 0;
+  return Math.min(MAX_GANTT_ZOOM, Math.max(MIN_GANTT_ZOOM, Math.round(zoom)));
 }
 
-/** Inclusive calendar-day span between two YYYY-MM-DD strings. */
-export function visibleDaysBetween(fromYmd: string, toYmd: string): number {
-  const start = parseISO(`${fromYmd}T00:00:00`);
-  const end = parseISO(`${toYmd}T00:00:00`);
-  return Math.max(MIN_GANTT_VISIBLE_DAYS, differenceInCalendarDays(end, start) + 1);
+export function readPersistedGanttZoom(fallback = 0): number {
+  if (typeof window === "undefined") return clampGanttZoom(fallback);
+  try {
+    const raw = window.localStorage.getItem(STORAGE_ZOOM);
+    if (raw !== null) {
+      const n = Number(raw);
+      if (Number.isFinite(n)) return clampGanttZoom(n);
+    }
+  } catch {
+    /* ignore */
+  }
+  return clampGanttZoom(fallback);
+}
+
+export function writePersistedGanttZoom(zoom: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_ZOOM, String(clampGanttZoom(zoom)));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Inclusive span from earliest task start to latest task end on the chart. */
+export function ganttTaskSpanFromLines(
+  lines: Array<{ task: { start: string; end: string } }>
+): { from: string; to: string; dayCount: number } | null {
+  if (lines.length === 0) return null;
+
+  let minMs = Infinity;
+  let maxMs = -Infinity;
+  for (const line of lines) {
+    const startMs = new Date(line.task.start).getTime();
+    const endMs = new Date(line.task.end).getTime();
+    if (!Number.isNaN(startMs)) minMs = Math.min(minMs, startMs);
+    if (!Number.isNaN(endMs)) maxMs = Math.max(maxMs, endMs);
+  }
+  if (!Number.isFinite(minMs) || !Number.isFinite(maxMs)) return null;
+
+  const fromDate = subDays(startOfDay(new Date(minMs)), SPAN_PADDING_DAYS);
+  const toDate = addDays(startOfDay(new Date(maxMs)), SPAN_PADDING_DAYS);
+  const dayCount = differenceInCalendarDays(toDate, fromDate) + 1;
+  return { from: toYmd(fromDate), to: toYmd(toDate), dayCount };
 }
 
 /**
- * Build an inclusive Gantt window: `visibleDays` columns starting on `start` (day 1 = start).
- * Returns `to` as the last visible calendar day.
+ * Pixels per day column from zoom (0 = fit entire plan in viewport, 100 = one day ≈ full width).
  */
-export function ganttRangeFromStart(
-  start: Date,
-  visibleDays: number
-): { from: string; to: string; visibleDays: number } {
-  const clamped = clampGanttVisibleDays(visibleDays);
-  const fromDate = startOfDay(start);
-  const toDate = addDays(fromDate, clamped - 1);
-  return { from: toYmd(fromDate), to: toYmd(toDate), visibleDays: clamped };
+export function pixelsPerDayForZoom(
+  zoom: number,
+  dayCount: number,
+  timelineViewportPx: number
+): number {
+  const days = Math.max(1, dayCount);
+  const viewport = Math.max(200, timelineViewportPx);
+  const fitAllPx = Math.max(MIN_PX_PER_DAY, viewport / days);
+  const oneDayPx = Math.max(fitAllPx, viewport, MIN_ONE_DAY_PX);
+  const t = clampGanttZoom(zoom) / MAX_GANTT_ZOOM;
+  return Math.round(fitAllPx + t * (oneDayPx - fitAllPx));
 }
 
-/** Page the timeline forward/back by one full visible window. */
-export function shiftGanttRangeStart(
-  start: Date,
-  visibleDays: number,
-  direction: -1 | 1
-): Date {
-  return addDays(startOfDay(start), direction * clampGanttVisibleDays(visibleDays));
+export function zoomLabel(zoom: number): string {
+  const z = clampGanttZoom(zoom);
+  if (z <= 0) return "Fit plan";
+  if (z >= 100) return "1 day / screen";
+  if (z < 35) return "Wide";
+  if (z < 70) return "Medium";
+  return "Detailed";
 }
 
-export function readPersistedGanttRangeStart(fallback: Date): Date {
-  if (typeof window === "undefined") return startOfDay(fallback);
-  try {
-    const raw = window.localStorage.getItem(STORAGE_START);
-    if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-      const d = parseISO(`${raw}T00:00:00`);
-      if (!Number.isNaN(d.getTime())) return startOfDay(d);
-    }
-  } catch {
-    /* ignore */
+/** Wide query window for API fetch (single production returns all phases regardless). */
+export function apiRangeForPlanner(
+  lines: Array<{ task: { start: string; end: string } }> | undefined
+): { from: string; to: string } {
+  const span = lines?.length ? ganttTaskSpanFromLines(lines) : null;
+  if (span) {
+    const from = subDays(parseISO(`${span.from}T00:00:00`), API_PADDING_DAYS);
+    const to = addDays(parseISO(`${span.to}T00:00:00`), API_PADDING_DAYS);
+    return { from: toYmd(from), to: toYmd(to) };
   }
-  return startOfDay(fallback);
-}
-
-export function writePersistedGanttRangeStart(start: Date): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_START, toYmd(startOfDay(start)));
-  } catch {
-    /* ignore */
-  }
-}
-
-export function readPersistedGanttVisibleDays(fallback = 90): number {
-  if (typeof window === "undefined") return clampGanttVisibleDays(fallback);
-  try {
-    const raw = window.localStorage.getItem(STORAGE_DAYS);
-    if (raw !== null) {
-      const n = Number(raw);
-      if (Number.isFinite(n)) return clampGanttVisibleDays(n);
-    }
-    // Migrate legacy month / quarter / season presets
-    const legacy = window.localStorage.getItem("ordo.viewMode.productionPlanner");
-    if (legacy === "month") return 30;
-    if (legacy === "quarter") return 90;
-    if (legacy === "season") return 180;
-  } catch {
-    /* ignore */
-  }
-  return clampGanttVisibleDays(fallback);
-}
-
-export function writePersistedGanttVisibleDays(days: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_DAYS, String(clampGanttVisibleDays(days)));
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Pick start + day count that covers production start/end (inclusive). */
-export function ganttRangeForProductionSpan(
-  productionStartYmd: string,
-  productionEndYmd: string
-): { start: Date; visibleDays: number } {
-  const start = startOfDay(parseISO(`${productionStartYmd}T00:00:00`));
-  const end = startOfDay(parseISO(`${productionEndYmd}T00:00:00`));
-  const visibleDays = clampGanttVisibleDays(differenceInCalendarDays(end, start) + 1);
-  return { start, visibleDays };
+  const today = startOfDay(new Date());
+  return { from: toYmd(subDays(today, 365)), to: toYmd(addDays(today, 730)) };
 }
