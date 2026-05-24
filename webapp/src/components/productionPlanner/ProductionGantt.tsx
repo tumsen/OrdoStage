@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState, useLayoutEffect } from "react";
-import { format, parseISO, differenceInCalendarDays, isToday, isWeekend } from "date-fns";
+import { format, parseISO, isToday, isWeekend } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { ProductionPlannerGanttLine, ProductionPlannerRow } from "@/lib/types";
 import {
@@ -32,12 +32,21 @@ import {
 import {
   pixelsPerDayForZoom,
 } from "@/lib/productionGanttRange";
+import {
+  buildDayColumns,
+  buildWeekColumns,
+  columnWidthForScale,
+  formatWeekHeader,
+  headerHeightForScale,
+  HOUR_TICKS,
+  resolveTimelineScale,
+  type GanttTimelineScale,
+} from "@/lib/productionGanttTimeline";
 import { toast } from "@/hooks/use-toast";
 
 const ROW_HEIGHT = 40;
 const BAR_HEIGHT = 24;
 const LABEL_WIDTH = 300;
-const TIMELINE_HEADER_H = 52;
 const MIN_DRAG_PX = 4;
 
 type DependencyArrow = {
@@ -163,6 +172,168 @@ function effectiveTaskDates(
   };
 }
 
+function HourGridLines() {
+  return (
+    <div className="absolute inset-0 flex pointer-events-none">
+      {Array.from({ length: 24 }, (_, h) => (
+        <div
+          key={h}
+          className={cn(
+            "flex-1 h-full border-r",
+            h % 6 === 5 ? "border-white/[0.07]" : "border-white/[0.025]"
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TimelineHeader({
+  scale,
+  days,
+  weekColumns,
+  colWidth,
+  headerHeight,
+}: {
+  scale: GanttTimelineScale;
+  days: Date[];
+  weekColumns: ReturnType<typeof buildWeekColumns>;
+  colWidth: number;
+  headerHeight: number;
+}) {
+  if (scale === "weeks") {
+    return (
+      <>
+        {weekColumns.map((week) => {
+          const { primary, secondary } = formatWeekHeader(week.start);
+          return (
+            <div
+              key={week.key}
+              className="shrink-0 border-r border-white/5 px-1 py-2 text-center bg-white/[0.01]"
+              style={{ width: colWidth, height: headerHeight }}
+            >
+              <p className="text-[9px] text-white/35 uppercase tabular-nums">{primary}</p>
+              <p className="text-[10px] tabular-nums font-medium text-white/65 truncate">
+                {secondary}
+              </p>
+            </div>
+          );
+        })}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {days.map((day) => (
+        <div
+          key={day.toISOString()}
+          className={cn(
+            "shrink-0 border-r border-white/5 text-center relative overflow-hidden",
+            isWeekend(day) && "bg-white/[0.02]",
+            isToday(day) && "bg-red-950/30"
+          )}
+          style={{ width: colWidth, height: headerHeight }}
+        >
+          {scale === "hours" ? (
+            <>
+              <div className="px-1 pt-1.5 pb-0.5 border-b border-white/[0.06]">
+                <p className="text-[9px] text-white/35 uppercase">{format(day, "EEE")}</p>
+                <p
+                  className={cn(
+                    "text-[11px] tabular-nums font-medium",
+                    isToday(day) ? "text-red-300" : "text-white/70"
+                  )}
+                >
+                  {format(day, "d MMM")}
+                </p>
+              </div>
+              <div className="relative h-[22px] mx-1">
+                {HOUR_TICKS.map((h) => (
+                  <span
+                    key={h}
+                    className="absolute bottom-0 text-[8px] tabular-nums text-white/30 -translate-x-1/2"
+                    style={{ left: `${(h / 24) * 100}%` }}
+                  >
+                    {String(h).padStart(2, "0")}
+                  </span>
+                ))}
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 flex h-full pointer-events-none pt-7">
+                {Array.from({ length: 24 }, (_, h) => (
+                  <div
+                    key={h}
+                    className={cn(
+                      "flex-1 border-r",
+                      h % 6 === 5 ? "border-white/[0.06]" : "border-transparent"
+                    )}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="px-1 py-2">
+              <p className="text-[9px] text-white/35 uppercase">{format(day, "EEE")}</p>
+              <p
+                className={cn(
+                  "text-[11px] tabular-nums font-medium",
+                  isToday(day) ? "text-red-300" : "text-white/70"
+                )}
+              >
+                {format(day, "d")}
+              </p>
+            </div>
+          )}
+        </div>
+      ))}
+    </>
+  );
+}
+
+function TimelineGridBackground({
+  scale,
+  days,
+  weekColumns,
+  colWidth,
+}: {
+  scale: GanttTimelineScale;
+  days: Date[];
+  weekColumns: ReturnType<typeof buildWeekColumns>;
+  colWidth: number;
+}) {
+  if (scale === "weeks") {
+    return (
+      <>
+        {weekColumns.map((week) => (
+          <div
+            key={week.key}
+            className="shrink-0 h-full border-r border-white/[0.06] bg-white/[0.008]"
+            style={{ width: colWidth }}
+          />
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {days.map((day) => (
+        <div
+          key={day.toISOString()}
+          className={cn(
+            "shrink-0 h-full border-r border-white/[0.04] relative",
+            isWeekend(day) && "bg-white/[0.015]",
+            isToday(day) && "bg-red-950/15"
+          )}
+          style={{ width: colWidth }}
+        >
+          {scale === "hours" ? <HourGridLines /> : null}
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function ProductionGantt({
   row,
   from,
@@ -202,21 +373,22 @@ export function ProductionGantt({
 
   const lines = useMemo(() => row?.ganttLines ?? [], [row?.ganttLines]);
 
-  const days = useMemo(() => {
-    const count = differenceInCalendarDays(rangeEnd, rangeStart);
-    return Array.from({ length: Math.max(1, count) }, (_, i) => {
-      const d = new Date(rangeStart);
-      d.setDate(d.getDate() + i);
-      return d;
-    });
-  }, [rangeStart, rangeEnd]);
+  const days = useMemo(() => buildDayColumns(rangeStart, rangeEnd), [rangeStart, rangeEnd]);
+  const weekColumns = useMemo(() => buildWeekColumns(rangeStart, rangeEnd), [rangeStart, rangeEnd]);
 
   const dayCount = days.length;
-  const colMinWidth = useMemo(
+  const pixelsPerDay = useMemo(
     () => pixelsPerDayForZoom(zoom, dayCount, viewportWidth),
     [zoom, dayCount, viewportWidth]
   );
-  const timelineMinWidth = dayCount * colMinWidth;
+  const scale = useMemo(
+    () => resolveTimelineScale(zoom, pixelsPerDay),
+    [zoom, pixelsPerDay]
+  );
+  const colWidth = columnWidthForScale(scale, pixelsPerDay);
+  const headerHeight = headerHeightForScale(scale);
+  const columnCount = scale === "weeks" ? weekColumns.length : days.length;
+  const timelineMinWidth = columnCount * colWidth;
 
   const todayLeft =
     ((Date.now() - rangeStart.getTime()) / (rangeEnd.getTime() - rangeStart.getTime())) * 100;
@@ -360,33 +532,19 @@ export function ProductionGantt({
         <div className="flex border-b border-white/10 shrink-0 bg-white/[0.02]">
           <div
             className="shrink-0 border-r border-white/10 px-3 flex items-end pb-2 text-[10px] font-semibold uppercase tracking-wider text-white/40"
-            style={{ width: LABEL_WIDTH, height: TIMELINE_HEADER_H }}
+            style={{ width: LABEL_WIDTH, height: headerHeight }}
           >
             Task
           </div>
           <div className="flex-1 overflow-x-auto">
             <div className="flex min-w-max" style={{ minWidth: timelineMinWidth }}>
-              {days.map((day) => (
-                <div
-                  key={day.toISOString()}
-                  className={cn(
-                    "shrink-0 border-r border-white/5 px-1 py-2 text-center",
-                    isWeekend(day) && "bg-white/[0.02]",
-                    isToday(day) && "bg-red-950/30"
-                  )}
-                  style={{ width: colMinWidth, height: TIMELINE_HEADER_H }}
-                >
-                  <p className="text-[9px] text-white/35 uppercase">{format(day, "EEE")}</p>
-                  <p
-                    className={cn(
-                      "text-[11px] tabular-nums font-medium",
-                      isToday(day) ? "text-red-300" : "text-white/70"
-                    )}
-                  >
-                    {format(day, "d")}
-                  </p>
-                </div>
-              ))}
+              <TimelineHeader
+                scale={scale}
+                days={days}
+                weekColumns={weekColumns}
+                colWidth={colWidth}
+                headerHeight={headerHeight}
+              />
             </div>
           </div>
         </div>
@@ -477,17 +635,12 @@ export function ProductionGantt({
                       style={{ minWidth: timelineMinWidth }}
                     >
                       <div className="absolute inset-0 flex pointer-events-none">
-                        {days.map((day) => (
-                          <div
-                            key={day.toISOString()}
-                            className={cn(
-                              "shrink-0 h-full border-r border-white/[0.04]",
-                              isWeekend(day) && "bg-white/[0.015]",
-                              isToday(day) && "bg-red-950/15"
-                            )}
-                            style={{ width: colMinWidth }}
-                          />
-                        ))}
+                        <TimelineGridBackground
+                          scale={scale}
+                          days={days}
+                          weekColumns={weekColumns}
+                          colWidth={colWidth}
+                        />
                       </div>
 
                       {todayLeft >= 0 && todayLeft <= 100 ? (

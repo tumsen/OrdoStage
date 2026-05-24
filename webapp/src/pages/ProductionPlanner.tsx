@@ -32,6 +32,7 @@ import {
   writePersistedGanttZoom,
   zoomLabel,
 } from "@/lib/productionGanttRange";
+import { resolveTimelineScaleFromZoom } from "@/lib/productionGanttTimeline";
 
 const LEGEND_CATEGORIES = [
   "planning_window",
@@ -249,7 +250,9 @@ export default function ProductionPlanner() {
             <Label htmlFor="gantt-zoom" className="text-[10px] uppercase text-white/40">
               Day resolution
             </Label>
-            <span className="text-[10px] text-white/45">{zoomLabel(zoom)}</span>
+            <span className="text-[10px] text-white/45">
+              {zoomLabel(zoom, resolveTimelineScaleFromZoom(zoom))}
+            </span>
           </div>
           <input
             id="gantt-zoom"
