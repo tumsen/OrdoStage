@@ -84,6 +84,15 @@ export function headerHeightForScale(scale: GanttTimelineScale): number {
   return scale === "hours" ? 64 : 52;
 }
 
+/** Show all 24 hour labels when zoomed in enough; otherwise every 3 hours in hourly mode. */
+const ALL_HOUR_LABELS_ZOOM = 90;
+const ALL_HOUR_LABELS_PX_PER_DAY = 150;
+
+export function hourLabelStep(zoom: number, pixelsPerDay: number): 1 | 3 {
+  if (zoom >= ALL_HOUR_LABELS_ZOOM || pixelsPerDay >= ALL_HOUR_LABELS_PX_PER_DAY) return 1;
+  return 3;
+}
+
 export function formatWeekHeader(weekStart: Date): { primary: string; secondary: string } {
   const weekEnd = addDays(endOfWeek(weekStart, { weekStartsOn: 1 }), 0);
   return {

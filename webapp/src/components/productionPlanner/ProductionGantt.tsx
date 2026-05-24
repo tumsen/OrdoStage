@@ -38,6 +38,7 @@ import {
   columnWidthForScale,
   formatWeekHeader,
   headerHeightForScale,
+  hourLabelStep as resolveHourLabelStep,
   resolveTimelineScale,
   type GanttTimelineScale,
 } from "@/lib/productionGanttTimeline";
@@ -171,7 +172,7 @@ function effectiveTaskDates(
   };
 }
 
-function HourGridLines() {
+function HourGridLines({ labelStep }: { labelStep: 1 | 3 }) {
   return (
     <div className="absolute inset-0 flex pointer-events-none">
       {Array.from({ length: 24 }, (_, h) => (
@@ -179,7 +180,13 @@ function HourGridLines() {
           key={h}
           className={cn(
             "flex-1 h-full border-r",
-            h % 6 === 5 ? "border-white/[0.07]" : "border-white/[0.025]"
+            labelStep === 3
+              ? h % 3 === 2
+                ? "border-white/[0.07]"
+                : "border-transparent"
+              : h % 6 === 5
+                ? "border-white/[0.07]"
+                : "border-white/[0.025]"
           )}
         />
       ))}
@@ -193,12 +200,14 @@ function TimelineHeader({
   weekColumns,
   colWidth,
   headerHeight,
+  hourLabelStep,
 }: {
   scale: GanttTimelineScale;
   days: Date[];
   weekColumns: ReturnType<typeof buildWeekColumns>;
   colWidth: number;
   headerHeight: number;
+  hourLabelStep: 1 | 3;
 }) {
   if (scale === "weeks") {
     return (
@@ -253,7 +262,7 @@ function TimelineHeader({
                     key={h}
                     className="flex-1 min-w-0 text-center text-[7px] leading-[22px] tabular-nums text-white/30"
                   >
-                    {String(h).padStart(2, "0")}
+                    {hourLabelStep === 1 || h % 3 === 0 ? String(h).padStart(2, "0") : ""}
                   </span>
                 ))}
               </div>
@@ -263,7 +272,13 @@ function TimelineHeader({
                     key={h}
                     className={cn(
                       "flex-1 border-r",
-                      h % 6 === 5 ? "border-white/[0.06]" : "border-transparent"
+                      hourLabelStep === 3
+                        ? h % 3 === 2
+                          ? "border-white/[0.06]"
+                          : "border-transparent"
+                        : h % 6 === 5
+                          ? "border-white/[0.06]"
+                          : "border-transparent"
                     )}
                   />
                 ))}
@@ -293,11 +308,13 @@ function TimelineGridBackground({
   days,
   weekColumns,
   colWidth,
+  hourLabelStep,
 }: {
   scale: GanttTimelineScale;
   days: Date[];
   weekColumns: ReturnType<typeof buildWeekColumns>;
   colWidth: number;
+  hourLabelStep: 1 | 3;
 }) {
   if (scale === "weeks") {
     return (
@@ -325,7 +342,7 @@ function TimelineGridBackground({
           )}
           style={{ width: colWidth }}
         >
-          {scale === "hours" ? <HourGridLines /> : null}
+          {scale === "hours" ? <HourGridLines labelStep={hourLabelStep} /> : null}
         </div>
       ))}
     </>
@@ -382,6 +399,10 @@ export function ProductionGantt({
   const scale = useMemo(
     () => resolveTimelineScale(zoom, pixelsPerDay),
     [zoom, pixelsPerDay]
+  );
+  const hourStep = useMemo(
+    () => (scale === "hours" ? resolveHourLabelStep(zoom, pixelsPerDay) : 1),
+    [scale, zoom, pixelsPerDay]
   );
   const colWidth = columnWidthForScale(scale, pixelsPerDay);
   const headerHeight = headerHeightForScale(scale);
@@ -542,6 +563,7 @@ export function ProductionGantt({
                 weekColumns={weekColumns}
                 colWidth={colWidth}
                 headerHeight={headerHeight}
+                hourLabelStep={hourStep}
               />
             </div>
           </div>
@@ -638,6 +660,7 @@ export function ProductionGantt({
                           days={days}
                           weekColumns={weekColumns}
                           colWidth={colWidth}
+                          hourLabelStep={hourStep}
                         />
                       </div>
 
