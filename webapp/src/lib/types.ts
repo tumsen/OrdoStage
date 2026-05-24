@@ -15,4 +15,11 @@ export type {
   EventPerson,
   Document,
   Calendar,
+  ProductionCostCategory,
+  ProductionCostLine,
+  CreateProductionCostLine,
+  UpdateProductionCostLine,
+  ProductionPlannerTask,
+  ProductionPlannerRow,
+  ProductionPlannerResponse,
 } from "../../../backend/src/types";

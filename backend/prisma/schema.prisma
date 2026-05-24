@@ -134,6 +134,7 @@ model Organization {
   timeTags         TimeTag[]
   timeProjects     TimeProject[]
   timeEntries      TimeEntry[]
+  productionCostLines ProductionCostLine[]
   timeTravelClaims TimeTravelClaim[]
   timesheetApprovals TimesheetApproval[]
 }
@@ -464,6 +465,7 @@ model Event {
   teamDocuments  EventTeamDocument[]
   timeProjects   TimeProject[]
   timeEntries    TimeEntry[]
+  productionCostLines ProductionCostLine[]
   bookings       InternalBooking[]
 
   @@index([ownerTeamId])
@@ -770,6 +772,7 @@ model Tour {
   people           TourPerson[]
   teams            TourTeam[]
   personNotes      TourPersonNote[]
+  productionCostLines ProductionCostLine[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 }
@@ -1075,4 +1078,32 @@ model TimesheetApproval {
 
   @@unique([organizationId, personId, periodStart, periodEnd])
   @@index([organizationId, personId, status])
+}
+
+/** Budget / actual cost line for an event or tour production (shown on production planner). */
+model ProductionCostLine {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  eventId        String?
+  event          Event?       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tourId         String?
+  tour           Tour?        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  /** labor | venue | equipment | travel | marketing | rights | contingency | revenue | other */
+  category       String       @default("other")
+  label          String
+  plannedCents   Int          @default(0)
+  actualCents    Int?
+  currencyCode   String       @default("EUR")
+  /** Optional calendar span for Gantt placement */
+  startDate      DateTime?
+  endDate        DateTime?
+  notes          String?
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, eventId])
+  @@index([organizationId, tourId])
+  @@index([organizationId, startDate])
 }

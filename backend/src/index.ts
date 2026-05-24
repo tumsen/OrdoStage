@@ -22,6 +22,7 @@ import timeRouter from "./routes/time";
 import staffingRouter from "./routes/staffing";
 import accountRouter from "./routes/account";
 import roleDefinitionsRouter from "./routes/roleDefinitions";
+import productionPlannerRouter from "./routes/productionPlanner";
 import type { EffectiveRole } from "./effectiveRole";
 import { resolveEffectiveRole } from "./effectiveRole";
 import { prisma } from "./prisma";
@@ -281,6 +282,7 @@ app.route("/api", toursRouter);
 app.route("/api", siteContentRouter);
 app.route("/api", timeRouter);
 app.route("/api", staffingRouter);
+app.route("/api", productionPlannerRouter);
 
 const port = Number(process.env.PORT) || 3000;
 

@@ -1532,3 +1532,141 @@ export const OrgBillingPlanSummarySchema = z.object({
   fixedOverageEstimateCents: z.number().int(),
   fixedAnnualRoundToTen: z.boolean(),
 });
+
+// —— Production planner (Gantt + cost management) ——
+
+export const ProductionCostCategorySchema = z.enum([
+  "labor",
+  "venue",
+  "equipment",
+  "travel",
+  "marketing",
+  "rights",
+  "contingency",
+  "revenue",
+  "other",
+]);
+
+export const ProductionCostLineSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  eventId: z.string().nullable(),
+  tourId: z.string().nullable(),
+  category: ProductionCostCategorySchema,
+  label: z.string(),
+  plannedCents: z.number().int(),
+  actualCents: z.number().int().nullable(),
+  currencyCode: z.string(),
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  notes: z.string().nullable(),
+  sortOrder: z.number().int(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const CreateProductionCostLineSchema = z
+  .object({
+    eventId: z.string().min(1).optional(),
+    tourId: z.string().min(1).optional(),
+    category: ProductionCostCategorySchema.default("other"),
+    label: z.string().min(1),
+    plannedCents: z.number().int().min(0).default(0),
+    actualCents: z.number().int().min(0).nullable().optional(),
+    currencyCode: z.string().min(3).max(3).optional(),
+    startDate: z.string().nullable().optional(),
+    endDate: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .refine((b) => Boolean(b.eventId) !== Boolean(b.tourId), {
+    message: "Link cost to either an event or a tour, not both.",
+  });
+
+export const UpdateProductionCostLineSchema = z
+  .object({
+    category: ProductionCostCategorySchema.optional(),
+    label: z.string().min(1).optional(),
+    plannedCents: z.number().int().min(0).optional(),
+    actualCents: z.number().int().min(0).nullable().optional(),
+    currencyCode: z.string().min(3).max(3).optional(),
+    startDate: z.string().nullable().optional(),
+    endDate: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: "No changes" });
+
+export const ProductionPlannerTaskCategorySchema = z.enum([
+  "production_window",
+  "get_in",
+  "get_out",
+  "rehearsal",
+  "soundcheck",
+  "performance",
+  "travel",
+  "day_off",
+  "job",
+  "custom",
+  "cost",
+]);
+
+export const ProductionPlannerTaskSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  category: ProductionPlannerTaskCategorySchema,
+  start: z.string(),
+  end: z.string(),
+  status: z.string().nullable().optional(),
+  dayLabel: z.string().nullable().optional(),
+  venueLabel: z.string().nullable().optional(),
+  departmentName: z.string().nullable().optional(),
+  assigneeName: z.string().nullable().optional(),
+  costPlannedCents: z.number().int().nullable().optional(),
+  costActualCents: z.number().int().nullable().optional(),
+});
+
+export const ProductionPlannerCostSummarySchema = z.object({
+  currencyCode: z.string(),
+  plannedCents: z.number().int(),
+  actualCents: z.number().int(),
+  varianceCents: z.number().int(),
+  loggedLaborMinutes: z.number().int(),
+  byCategory: z.array(
+    z.object({
+      category: ProductionCostCategorySchema,
+      plannedCents: z.number().int(),
+      actualCents: z.number().int(),
+    })
+  ),
+});
+
+export const ProductionPlannerRowSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["event", "tour"]),
+  title: z.string(),
+  status: z.string(),
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  venueLabel: z.string().nullable().optional(),
+  href: z.string(),
+  tasks: z.array(ProductionPlannerTaskSchema),
+  costs: z.array(ProductionCostLineSchema),
+  costSummary: ProductionPlannerCostSummarySchema,
+});
+
+export const ProductionPlannerResponseSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  currencyCode: z.string(),
+  rows: z.array(ProductionPlannerRowSchema),
+  totals: ProductionPlannerCostSummarySchema,
+});
+
+export type ProductionCostCategory = z.infer<typeof ProductionCostCategorySchema>;
+export type ProductionCostLine = z.infer<typeof ProductionCostLineSchema>;
+export type CreateProductionCostLine = z.infer<typeof CreateProductionCostLineSchema>;
+export type UpdateProductionCostLine = z.infer<typeof UpdateProductionCostLineSchema>;
+export type ProductionPlannerTask = z.infer<typeof ProductionPlannerTaskSchema>;
+export type ProductionPlannerRow = z.infer<typeof ProductionPlannerRowSchema>;
+export type ProductionPlannerResponse = z.infer<typeof ProductionPlannerResponseSchema>;
