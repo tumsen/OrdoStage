@@ -1216,7 +1216,7 @@ timeRouter.patch(
         ...(body.vacationDaysPerYear !== undefined ? { vacationDaysPerYear: body.vacationDaysPerYear } : {}),
       },
     });
-    return c.json({ ok: true });
+    return c.json({ data: { ok: true } });
   }
 );
 

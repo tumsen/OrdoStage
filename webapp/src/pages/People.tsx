@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { z } from "zod";
@@ -11,7 +11,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
-import { useAutoSave, type AutoSaveStatus } from "@/hooks/useAutoSave";
+import { useAutoSave, type AutoSaveStatus, autoSaveBlurCapture } from "@/hooks/useAutoSave";
 import { AutoSaveStatus as AutoSaveIndicator } from "@/components/AutoSaveStatus";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
@@ -507,13 +507,14 @@ function PersonFormDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- draft aligns when permission payload / doc identity changes
   }, [permissionState, permissionsDoc?.id, permissionOptions?.teams]);
 
-  // Sync contract fields when editing a person
-  useEffect(() => {
-    if (asPage || open) return;
-    setContractWeeklyHours(person?.weeklyContractHours != null ? String(person.weeklyContractHours) : "");
-    setContractVacationDays(person?.vacationDaysPerYear != null ? String(person.vacationDaysPerYear) : "");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [person?.id, open]);
+  // Sync contract fields from loaded person (after contractAutoSave is defined below)
+  const syncContractFromPerson = useCallback((p: Person | undefined) => {
+    const weekly = p?.weeklyContractHours != null ? String(p.weeklyContractHours) : "";
+    const vacation = p?.vacationDaysPerYear != null ? String(p.vacationDaysPerYear) : "";
+    setContractWeeklyHours(weekly);
+    setContractVacationDays(vacation);
+    return { contractWeeklyHours: weekly, contractVacationDays: vacation };
+  }, []);
 
   const watchedAssignments = form.watch("teamAssignments");
   const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
@@ -812,15 +813,28 @@ function PersonFormDialog({
     resetKey: person?.id ? `${person.id}-contract` : null,
     getSnapshot: () => ({ contractWeeklyHours, contractVacationDays }),
     save: async () => {
-      if (!person?.id) return;
+      const personId = person?.id;
+      if (!personId) return;
       const wh = contractWeeklyHours.trim() === "" ? null : parseFloat(contractWeeklyHours);
       const vd = contractVacationDays.trim() === "" ? null : parseFloat(contractVacationDays);
-      await api.patch(`/api/time/person-contract/${person.id}`, {
+      if (wh !== null && Number.isNaN(wh)) throw new Error("Weekly hours must be a number");
+      if (vd !== null && Number.isNaN(vd)) throw new Error("Vacation days must be a number");
+      await api.patch(`/api/time/person-contract/${personId}`, {
         weeklyContractHours: wh,
         vacationDaysPerYear: vd,
       });
+      const updated = await api.get<Person>(`/api/people/${personId}`);
+      queryClient.setQueryData(["people", personId], updated);
+      onPersonUpdated?.(updated);
+      await queryClient.invalidateQueries({ queryKey: ["time-people"] });
     },
   });
+
+  useEffect(() => {
+    const snapshot = syncContractFromPerson(person);
+    contractAutoSave.markSaved(snapshot);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load contract when switching person only
+  }, [person?.id, syncContractFromPerson, contractAutoSave.markSaved]);
 
   useEffect(() => {
     if (!asPage || !onAutoSaveState) return;
@@ -1270,7 +1284,10 @@ function PersonFormDialog({
             </div>
 
             {asPage && person && canManageContracts ? (
-              <div className={`${cardClass} space-y-4 min-w-0`}>
+              <div
+                className={`${cardClass} space-y-4 min-w-0`}
+                onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
+              >
                 <p className={sectionTitle}>Work contract</p>
                 <p className="text-[11px] text-white/30">
                   Used for overtime and vacation tracking in time reports.
@@ -1555,7 +1572,10 @@ function PersonFormDialog({
 
         {/* Work contract — dialog layout only (page layout uses column in teams row) */}
         {!asPage && person && canManageContracts ? (
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4">
+          <div
+            className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4"
+            onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
+          >
             <div>
               <p className={sectionTitle}>Work contract</p>
               <p className="text-[11px] text-white/30 mt-0.5">
