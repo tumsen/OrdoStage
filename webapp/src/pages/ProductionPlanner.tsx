@@ -74,7 +74,7 @@ export default function ProductionPlanner() {
   }, []);
 
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
-  const [sideTab, setSideTab] = useState<"phase" | "budget" | "crew">("phase");
+  const [detailTab, setDetailTab] = useState<"phase" | "budget" | "crew">("phase");
   const [createOpen, setCreateOpen] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -128,8 +128,8 @@ export default function ProductionPlanner() {
 
   useEffect(() => {
     if (!selectedLine) return;
-    if (selectedLine.kind === "cost") setSideTab("budget");
-    else if (selectedLine.kind === "phase") setSideTab("phase");
+    if (selectedLine.kind === "cost") setDetailTab("budget");
+    else if (selectedLine.kind === "phase") setDetailTab("phase");
   }, [selectedLine]);
 
   const invalidatePlanner = useCallback(() => {
@@ -290,7 +290,7 @@ export default function ProductionPlanner() {
             aria-label="Timeline day resolution"
           />
           <div className="flex justify-between text-[9px] text-white/30">
-            <span>Fit plan</span>
+            <span>12 months</span>
             <span>1 day / screen</span>
           </div>
         </div>
@@ -329,8 +329,8 @@ export default function ProductionPlanner() {
       ) : error ? (
         <p className="text-red-400 text-sm">Could not load production planner.</p>
       ) : (
-        <div className="flex flex-col xl:flex-row gap-4 flex-1 min-h-0">
-          <div className="flex-1 min-h-[280px] xl:min-h-0 flex flex-col min-w-0">
+        <div className="flex flex-col flex-1 min-h-0 gap-3 w-full">
+          <div className="w-full flex-1 min-h-[320px] flex flex-col">
             <ProductionGantt
               row={selectedRow}
               from={from}
@@ -343,53 +343,61 @@ export default function ProductionPlanner() {
               onPhaseReschedule={handlePhaseReschedule}
             />
           </div>
-          <div className="xl:w-[340px] shrink-0 xl:max-h-full flex flex-col min-h-[240px]">
-            <Tabs
-              value={sideTab}
-              onValueChange={(v) => setSideTab(v as "phase" | "budget" | "crew")}
-              className="flex flex-col min-h-0 flex-1"
+
+          <Tabs
+            value={detailTab}
+            onValueChange={(v) => setDetailTab(v as "phase" | "budget" | "crew")}
+            className="w-full shrink-0"
+          >
+            <TabsList className="w-full max-w-md bg-white/5 border border-white/10">
+              <TabsTrigger value="phase" className="flex-1 text-xs data-[state=active]:bg-white/10">
+                Phase
+              </TabsTrigger>
+              <TabsTrigger value="crew" className="flex-1 text-xs data-[state=active]:bg-white/10">
+                Crew
+              </TabsTrigger>
+              <TabsTrigger value="budget" className="flex-1 text-xs data-[state=active]:bg-white/10">
+                Budget
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent
+              value="phase"
+              className="mt-2 data-[state=inactive]:hidden max-h-[min(38vh,400px)] overflow-y-auto"
             >
-              <TabsList className="w-full bg-white/5 border border-white/10 shrink-0">
-                <TabsTrigger value="phase" className="flex-1 text-xs data-[state=active]:bg-white/10">
-                  Phase
-                </TabsTrigger>
-                <TabsTrigger value="crew" className="flex-1 text-xs data-[state=active]:bg-white/10">
-                  Crew
-                </TabsTrigger>
-                <TabsTrigger value="budget" className="flex-1 text-xs data-[state=active]:bg-white/10">
-                  Budget
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="phase" className="flex-1 min-h-0 mt-2 flex flex-col data-[state=inactive]:hidden">
-                <ProductionPhasePanel
-                  row={selectedRow}
-                  selectedLine={selectedLine}
-                  plannerQueryKey={["production-planner", productionId]}
-                  canEdit={canEdit}
-                  onDeleted={() => {
-                    const next = selectedRow?.ganttLines.find((l) => l.kind === "phase");
-                    setSelectedLineId(next?.lineId ?? null);
-                  }}
-                />
-              </TabsContent>
-              <TabsContent value="crew" className="flex-1 min-h-0 mt-2 flex flex-col data-[state=inactive]:hidden">
-                <ProductionCrewPanel
-                  row={selectedRow}
-                  productionId={productionId}
-                  plannerQueryKey={["production-planner", productionId]}
-                  canEdit={canEdit}
-                />
-              </TabsContent>
-              <TabsContent value="budget" className="flex-1 min-h-0 mt-2 flex flex-col data-[state=inactive]:hidden">
-                <ProductionCostPanel
-                  row={selectedRow}
-                  currencyCode={data?.currencyCode ?? "EUR"}
-                  canEdit={canEdit}
-                  plannerQueryKey={["production-planner", productionId]}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
+              <ProductionPhasePanel
+                row={selectedRow}
+                selectedLine={selectedLine}
+                plannerQueryKey={["production-planner", productionId]}
+                canEdit={canEdit}
+                onDeleted={() => {
+                  const next = selectedRow?.ganttLines.find((l) => l.kind === "phase");
+                  setSelectedLineId(next?.lineId ?? null);
+                }}
+              />
+            </TabsContent>
+            <TabsContent
+              value="crew"
+              className="mt-2 data-[state=inactive]:hidden max-h-[min(38vh,400px)] overflow-y-auto"
+            >
+              <ProductionCrewPanel
+                row={selectedRow}
+                productionId={productionId}
+                plannerQueryKey={["production-planner", productionId]}
+                canEdit={canEdit}
+              />
+            </TabsContent>
+            <TabsContent
+              value="budget"
+              className="mt-2 data-[state=inactive]:hidden max-h-[min(38vh,400px)] overflow-y-auto"
+            >
+              <ProductionCostPanel
+                row={selectedRow}
+                currencyCode={data?.currencyCode ?? "EUR"}
+                canEdit={canEdit}
+                plannerQueryKey={["production-planner", productionId]}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       )}
 

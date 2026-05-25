@@ -34,11 +34,13 @@ import {
 } from "@/lib/productionGanttRange";
 import {
   buildDayColumns,
+  buildMonthColumns,
   buildWeekColumns,
   columnWidthForScale,
   formatWeekHeader,
   headerHeightForScale,
   hourLabelStep as resolveHourLabelStep,
+  MONTH_COLUMN_COUNT,
   resolveTimelineScale,
   type GanttTimelineScale,
 } from "@/lib/productionGanttTimeline";
@@ -198,6 +200,7 @@ function TimelineHeader({
   scale,
   days,
   weekColumns,
+  monthColumns,
   colWidth,
   headerHeight,
   hourLabelStep,
@@ -205,10 +208,27 @@ function TimelineHeader({
   scale: GanttTimelineScale;
   days: Date[];
   weekColumns: ReturnType<typeof buildWeekColumns>;
+  monthColumns: ReturnType<typeof buildMonthColumns>;
   colWidth: number;
   headerHeight: number;
   hourLabelStep: 1 | 3;
 }) {
+  if (scale === "months") {
+    return (
+      <>
+        {monthColumns.map((month) => (
+          <div
+            key={month.key}
+            className="shrink-0 border-r border-white/5 px-1 py-2 text-center bg-white/[0.01]"
+            style={{ width: colWidth, height: headerHeight }}
+          >
+            <p className="text-[10px] tabular-nums font-medium text-white/70">{month.label}</p>
+          </div>
+        ))}
+      </>
+    );
+  }
+
   if (scale === "weeks") {
     return (
       <>
@@ -307,15 +327,31 @@ function TimelineGridBackground({
   scale,
   days,
   weekColumns,
+  monthColumns,
   colWidth,
   hourLabelStep,
 }: {
   scale: GanttTimelineScale;
   days: Date[];
   weekColumns: ReturnType<typeof buildWeekColumns>;
+  monthColumns: ReturnType<typeof buildMonthColumns>;
   colWidth: number;
   hourLabelStep: 1 | 3;
 }) {
+  if (scale === "months") {
+    return (
+      <>
+        {monthColumns.map((month) => (
+          <div
+            key={month.key}
+            className="shrink-0 h-full border-r border-white/[0.06] bg-white/[0.008]"
+            style={{ width: colWidth }}
+          />
+        ))}
+      </>
+    );
+  }
+
   if (scale === "weeks") {
     return (
       <>
@@ -390,6 +426,7 @@ export function ProductionGantt({
 
   const days = useMemo(() => buildDayColumns(rangeStart, rangeEnd), [rangeStart, rangeEnd]);
   const weekColumns = useMemo(() => buildWeekColumns(rangeStart, rangeEnd), [rangeStart, rangeEnd]);
+  const monthColumns = useMemo(() => buildMonthColumns(rangeStart, MONTH_COLUMN_COUNT), [rangeStart]);
 
   const dayCount = days.length;
   const pixelsPerDay = useMemo(
@@ -404,17 +441,36 @@ export function ProductionGantt({
     () => (scale === "hours" ? resolveHourLabelStep(zoom, pixelsPerDay) : 1),
     [scale, zoom, pixelsPerDay]
   );
-  const colWidth = columnWidthForScale(scale, pixelsPerDay);
+  const colWidth = columnWidthForScale(scale, pixelsPerDay, viewportWidth);
   const headerHeight = headerHeightForScale(scale);
-  const columnCount = scale === "weeks" ? weekColumns.length : days.length;
+  const columnCount =
+    scale === "months"
+      ? MONTH_COLUMN_COUNT
+      : scale === "weeks"
+        ? weekColumns.length
+        : days.length;
   const timelineMinWidth = columnCount * colWidth;
 
+  const chartRangeStart =
+    scale === "months" && monthColumns[0] ? monthColumns[0].start : rangeStart;
+  const chartRangeEnd =
+    scale === "months" && monthColumns.length > 0
+      ? monthColumns[monthColumns.length - 1]!.end
+      : rangeEnd;
+
+  const chartDayCount = Math.max(
+    1,
+    Math.round((chartRangeEnd.getTime() - chartRangeStart.getTime()) / 86_400_000)
+  );
+
   const todayLeft =
-    ((Date.now() - rangeStart.getTime()) / (rangeEnd.getTime() - rangeStart.getTime())) * 100;
+    ((Date.now() - chartRangeStart.getTime()) /
+      (chartRangeEnd.getTime() - chartRangeStart.getTime())) *
+    100;
 
   const dependencyArrows = useMemo(
-    () => buildDependencyArrows(lines, rangeStart, rangeEnd),
-    [lines, rangeStart, rangeEnd]
+    () => buildDependencyArrows(lines, chartRangeStart, chartRangeEnd),
+    [lines, chartRangeStart, chartRangeEnd]
   );
 
   useLayoutEffect(() => {
@@ -517,7 +573,7 @@ export function ProductionGantt({
       const dx = ev.clientX - dragRef.current.startX;
       const passed =
         dragRef.current.passed || Math.abs(dx) >= MIN_DRAG_PX;
-      const deltaDays = deltaDaysFromPointerDelta(dx, width, rangeStart, rangeEnd);
+      const deltaDays = deltaDaysFromPointerDelta(dx, width, chartRangeStart, chartRangeEnd);
       dragRef.current = { ...dragRef.current, deltaDays, passed };
       setDrag({ ...dragRef.current });
     };
@@ -561,6 +617,7 @@ export function ProductionGantt({
                 scale={scale}
                 days={days}
                 weekColumns={weekColumns}
+                monthColumns={monthColumns}
                 colWidth={colWidth}
                 headerHeight={headerHeight}
                 hourLabelStep={hourStep}
@@ -597,9 +654,9 @@ export function ProductionGantt({
                 const pos = taskBarStyle(
                   dates.start,
                   dates.end,
-                  rangeStart,
-                  rangeEnd,
-                  dayCount
+                  chartRangeStart,
+                  chartRangeEnd,
+                  chartDayCount
                 );
                 const isMilestone =
                   line.task.phaseKind === "milestone" || line.task.phaseKind === "deadline";
@@ -659,6 +716,7 @@ export function ProductionGantt({
                           scale={scale}
                           days={days}
                           weekColumns={weekColumns}
+                          monthColumns={monthColumns}
                           colWidth={colWidth}
                           hourLabelStep={hourStep}
                         />

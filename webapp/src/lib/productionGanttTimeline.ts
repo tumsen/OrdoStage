@@ -1,13 +1,24 @@
 import {
   addDays,
+  addMonths,
   addWeeks,
   differenceInCalendarDays,
   endOfWeek,
   format,
+  startOfMonth,
   startOfWeek,
 } from "date-fns";
 
-export type GanttTimelineScale = "weeks" | "days" | "hours";
+export const MONTH_COLUMN_COUNT = 12;
+
+export type GanttTimelineScale = "months" | "weeks" | "days" | "hours";
+
+export type GanttMonthColumn = {
+  key: string;
+  start: Date;
+  end: Date;
+  label: string;
+};
 
 export type GanttWeekColumn = {
   key: string;
@@ -20,13 +31,20 @@ export type GanttWeekColumn = {
 const HOURS_ZOOM_THRESHOLD = 72;
 const HOURS_PX_PER_DAY_THRESHOLD = 88;
 
-/** Week columns when zoomed out (fit-all / compressed). */
+/** 12 month columns when fully zoomed out. */
+const MONTHS_ZOOM_THRESHOLD = 12;
+const MONTHS_PX_PER_DAY_THRESHOLD = 6;
+
+/** Week columns when moderately zoomed out. */
 const WEEKS_ZOOM_THRESHOLD = 28;
 const WEEKS_PX_PER_DAY_THRESHOLD = 14;
 
 export function resolveTimelineScale(zoom: number, pixelsPerDay: number): GanttTimelineScale {
   if (zoom >= HOURS_ZOOM_THRESHOLD || pixelsPerDay >= HOURS_PX_PER_DAY_THRESHOLD) {
     return "hours";
+  }
+  if (zoom <= MONTHS_ZOOM_THRESHOLD || pixelsPerDay <= MONTHS_PX_PER_DAY_THRESHOLD) {
+    return "months";
   }
   if (zoom <= WEEKS_ZOOM_THRESHOLD || pixelsPerDay <= WEEKS_PX_PER_DAY_THRESHOLD) {
     return "weeks";
@@ -37,14 +55,30 @@ export function resolveTimelineScale(zoom: number, pixelsPerDay: number): GanttT
 /** Approximate scale from zoom alone (for labels before layout measure). */
 export function resolveTimelineScaleFromZoom(zoom: number): GanttTimelineScale {
   if (zoom >= HOURS_ZOOM_THRESHOLD) return "hours";
+  if (zoom <= MONTHS_ZOOM_THRESHOLD) return "months";
   if (zoom <= WEEKS_ZOOM_THRESHOLD) return "weeks";
   return "days";
 }
 
 export function scaleLabel(scale: GanttTimelineScale): string {
   if (scale === "hours") return "Hourly";
+  if (scale === "months") return "12 months";
   if (scale === "weeks") return "Weekly";
   return "Daily";
+}
+
+export function buildMonthColumns(anchor: Date, count = MONTH_COLUMN_COUNT): GanttMonthColumn[] {
+  const start = startOfMonth(anchor);
+  return Array.from({ length: count }, (_, i) => {
+    const monthStart = addMonths(start, i);
+    const monthEnd = addMonths(monthStart, 1);
+    return {
+      key: format(monthStart, "yyyy-MM"),
+      start: monthStart,
+      end: monthEnd,
+      label: format(monthStart, "MMM yyyy"),
+    };
+  });
 }
 
 export function buildDayColumns(rangeStart: Date, rangeEnd: Date): Date[] {
@@ -75,7 +109,15 @@ export function buildWeekColumns(rangeStart: Date, rangeEnd: Date): GanttWeekCol
   return weeks.length > 0 ? weeks : [{ key: "w0", start: rangeStart, end: addDays(rangeStart, 7), dayCount: 7 }];
 }
 
-export function columnWidthForScale(scale: GanttTimelineScale, pixelsPerDay: number): number {
+export function columnWidthForScale(
+  scale: GanttTimelineScale,
+  pixelsPerDay: number,
+  timelineViewportPx?: number
+): number {
+  if (scale === "months") {
+    const vw = Math.max(200, timelineViewportPx ?? 800);
+    return Math.max(48, Math.floor(vw / MONTH_COLUMN_COUNT));
+  }
   if (scale === "weeks") return Math.max(56, pixelsPerDay * 7);
   return pixelsPerDay;
 }

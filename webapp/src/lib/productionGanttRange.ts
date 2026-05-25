@@ -84,6 +84,7 @@ export function pixelsPerDayForZoom(
 
 export function zoomLabel(zoom: number, scale?: import("./productionGanttTimeline").GanttTimelineScale): string {
   if (scale === "hours") return "Hourly view";
+  if (scale === "months") return "12-month view";
   if (scale === "weeks") return "Weekly view";
   const z = clampGanttZoom(zoom);
   if (z <= 0) return "Fit plan";
