@@ -9,8 +9,8 @@ import {
   usePersistedProductionId,
   useSyncProductionSelection,
 } from "@/hooks/usePersistedProductionId";
+import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductionGantt } from "@/components/productionPlanner/ProductionGantt";
@@ -321,45 +321,28 @@ export default function ProductionPlanner() {
       </div>
 
       <div className="flex flex-col gap-3 shrink-0">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="gantt-from" className="text-[10px] uppercase text-white/40">
-              From
-            </Label>
-            <Input
-              id="gantt-from"
-              type="date"
-              value={visibleFrom}
-              disabled={!productionId}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!v) return;
-                setRangeManual(true);
-                setVisibleFrom(v);
-                if (v > visibleTo) setVisibleTo(v);
-              }}
-              className="w-[148px] h-9 bg-white/5 border-white/10 tabular-nums"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="gantt-to" className="text-[10px] uppercase text-white/40">
-              To
-            </Label>
-            <Input
-              id="gantt-to"
-              type="date"
-              value={visibleTo}
-              disabled={!productionId}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!v) return;
-                setRangeManual(true);
-                setVisibleTo(v);
-                if (v < visibleFrom) setVisibleFrom(v);
-              }}
-              className="w-[148px] h-9 bg-white/5 border-white/10 tabular-nums"
-            />
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <DateInputWithWeekday
+            value={visibleFrom}
+            disabled={!productionId}
+            onChange={(v) => {
+              if (!v) return;
+              setRangeManual(true);
+              setVisibleFrom(v);
+              if (v > visibleTo) setVisibleTo(v);
+            }}
+          />
+          <span className="text-white/30 text-xs">to</span>
+          <DateInputWithWeekday
+            value={visibleTo}
+            disabled={!productionId}
+            onChange={(v) => {
+              if (!v) return;
+              setRangeManual(true);
+              setVisibleTo(v);
+              if (v < visibleFrom) setVisibleFrom(v);
+            }}
+          />
           <Button
             type="button"
             size="sm"
