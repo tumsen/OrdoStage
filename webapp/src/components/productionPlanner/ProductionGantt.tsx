@@ -604,28 +604,6 @@ export function ProductionGantt({
           </div>
         ) : null}
 
-        <div className="flex border-b border-white/10 shrink-0 bg-white/[0.02]">
-          <div
-            className="shrink-0 border-r border-white/10 px-3 flex items-end pb-2 text-[10px] font-semibold uppercase tracking-wider text-white/40"
-            style={{ width: LABEL_WIDTH, height: headerHeight }}
-          >
-            Task
-          </div>
-          <div className="flex-1 overflow-x-auto">
-            <div className="flex min-w-max" style={{ minWidth: timelineMinWidth }}>
-              <TimelineHeader
-                scale={scale}
-                days={days}
-                weekColumns={weekColumns}
-                monthColumns={monthColumns}
-                colWidth={colWidth}
-                headerHeight={headerHeight}
-                hourLabelStep={hourStep}
-              />
-            </div>
-          </div>
-        </div>
-
         <div ref={viewportRef} className="flex-1 overflow-auto relative min-h-0">
           {!row || lines.length === 0 ? (
             <p className="p-8 text-center text-sm text-white/40">
@@ -634,20 +612,50 @@ export function ProductionGantt({
                 : "No phases yet. Add phases to build your Gantt plan."}
             </p>
           ) : (
-            <div className="relative" style={{ minWidth: LABEL_WIDTH + timelineMinWidth }}>
-              <div
-                ref={timelineRef}
-                className="absolute top-0 h-0 overflow-hidden pointer-events-none"
-                style={{ left: LABEL_WIDTH, width: timelineMinWidth }}
-                aria-hidden
-              />
-              <DependencyLayer
-                arrows={dependencyArrows}
-                rowCount={lines.length}
-                timelineWidth={timelineWidth || timelineMinWidth}
-              />
+            <div
+              className="relative"
+              style={{ minWidth: LABEL_WIDTH + timelineMinWidth }}
+            >
+              <div className="flex border-b border-white/10 sticky top-0 z-30 bg-[#12121a]">
+                <div
+                  className="shrink-0 border-r border-white/10 px-3 flex items-end pb-2 text-[10px] font-semibold uppercase tracking-wider text-white/40 sticky left-0 z-40 bg-[#12121a]"
+                  style={{ width: LABEL_WIDTH, height: headerHeight }}
+                >
+                  Task
+                </div>
+                <div
+                  className="flex min-w-max bg-white/[0.02]"
+                  style={{ minWidth: timelineMinWidth }}
+                >
+                  <TimelineHeader
+                    scale={scale}
+                    days={days}
+                    weekColumns={weekColumns}
+                    monthColumns={monthColumns}
+                    colWidth={colWidth}
+                    headerHeight={headerHeight}
+                    hourLabelStep={hourStep}
+                  />
+                </div>
+              </div>
 
-              {lines.map((line) => {
+              <div
+                className="relative"
+                style={{ minHeight: lines.length * ROW_HEIGHT }}
+              >
+                <div
+                  ref={timelineRef}
+                  className="absolute top-0 h-0 overflow-hidden pointer-events-none"
+                  style={{ left: LABEL_WIDTH, width: timelineMinWidth }}
+                  aria-hidden
+                />
+                <DependencyLayer
+                  arrows={dependencyArrows}
+                  rowCount={lines.length}
+                  timelineWidth={timelineWidth || timelineMinWidth}
+                />
+
+                {lines.map((line) => {
                 const selected = line.lineId === selectedLineId;
                 const colors = taskCategoryColors(line.category);
                 const dates = effectiveTaskDates(line, drag);
@@ -678,7 +686,12 @@ export function ProductionGantt({
                     onClick={() => onSelectLine(line.lineId)}
                   >
                     <div
-                      className="shrink-0 border-r border-white/10 px-3 flex flex-col justify-center min-w-0 cursor-pointer"
+                      className={cn(
+                        "shrink-0 border-r border-white/10 px-3 flex flex-col justify-center min-w-0 cursor-pointer sticky left-0 z-20",
+                        selected ? "bg-[#1c1c26]" : "bg-[#12121a]",
+                        line.kind === "summary" && !selected && "bg-[#14101f]",
+                        isCritical && !selected && "bg-[#1a1218]"
+                      )}
                       style={{ width: LABEL_WIDTH }}
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
@@ -708,8 +721,8 @@ export function ProductionGantt({
                     </div>
 
                     <div
-                      className="flex-1 relative overflow-hidden"
-                      style={{ minWidth: timelineMinWidth }}
+                      className="shrink-0 relative overflow-hidden"
+                      style={{ width: timelineMinWidth, minWidth: timelineMinWidth }}
                     >
                       <div className="absolute inset-0 flex pointer-events-none">
                         <TimelineGridBackground
@@ -808,6 +821,7 @@ export function ProductionGantt({
                   </div>
                 );
               })}
+              </div>
             </div>
           )}
         </div>
