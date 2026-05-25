@@ -1777,12 +1777,23 @@ export const ProductionPlannerGanttLineKindSchema = z.enum([
   "cost",
 ]);
 
+export const ProductionPhaseDocumentSchema = z.object({
+  id: z.string(),
+  phaseId: z.string(),
+  name: z.string(),
+  type: z.string(),
+  filename: z.string(),
+  mimeType: z.string(),
+  createdAt: z.string(),
+});
+
 export const ProductionPlannerGanttLineSchema = z.object({
   lineId: z.string(),
   kind: ProductionPlannerGanttLineKindSchema,
   label: z.string(),
   category: z.string(),
   status: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
   assigneePersonId: z.string().nullable().optional(),
   assigneeName: z.string().nullable().optional(),
   departmentId: z.string().nullable().optional(),
@@ -1858,6 +1869,7 @@ export type ProductionCostLine = z.infer<typeof ProductionCostLineSchema>;
 export type CreateProductionCostLine = z.infer<typeof CreateProductionCostLineSchema>;
 export type UpdateProductionCostLine = z.infer<typeof UpdateProductionCostLineSchema>;
 export type ProductionPlannerTask = z.infer<typeof ProductionPlannerTaskSchema>;
+export type ProductionPhaseDocument = z.infer<typeof ProductionPhaseDocumentSchema>;
 export type ProductionPlannerGanttLine = z.infer<typeof ProductionPlannerGanttLineSchema>;
 export type ProductionPlannerRow = z.infer<typeof ProductionPlannerRowSchema>;
 export type ProductionPlannerResponse = z.infer<typeof ProductionPlannerResponseSchema>;

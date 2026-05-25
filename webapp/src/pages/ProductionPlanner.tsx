@@ -15,8 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductionGantt } from "@/components/productionPlanner/ProductionGantt";
 import { ProductionCostPanel } from "@/components/productionPlanner/ProductionCostPanel";
-import { ProductionPhasePanel } from "@/components/productionPlanner/ProductionPhasePanel";
 import { ProductionCrewPanel } from "@/components/productionPlanner/ProductionCrewPanel";
+import { ProductionTaskEditor } from "@/components/productionPlanner/ProductionTaskEditor";
 import { downloadProductionPlanPDF } from "@/components/productionPlanner/ProductionPlanPDF";
 import { ProductionSelector } from "@/components/productionPlanner/ProductionSelector";
 import { CreateProductionDialog } from "@/components/productionPlanner/CreateProductionDialog";
@@ -77,7 +77,8 @@ export default function ProductionPlanner() {
   const [zoom, setZoomState] = useState(() => readPersistedGanttZoom(0));
 
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
-  const [detailTab, setDetailTab] = useState<"phase" | "budget" | "crew">("phase");
+  const [detailTab, setDetailTab] = useState<"budget" | "crew">("crew");
+  const [taskEditorOpen, setTaskEditorOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -211,11 +212,10 @@ export default function ProductionPlanner() {
     }
   }, [selectedRow, selectedLineId]);
 
-  useEffect(() => {
-    if (!selectedLine) return;
-    if (selectedLine.kind === "cost") setDetailTab("budget");
-    else if (selectedLine.kind === "phase") setDetailTab("phase");
-  }, [selectedLine]);
+  const openTaskEditor = useCallback((lineId: string) => {
+    setSelectedLineId(lineId);
+    setTaskEditorOpen(true);
+  }, []);
 
   const invalidatePlanner = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["production-planner"] });
@@ -486,6 +486,7 @@ export default function ProductionPlanner() {
               currencyCode={data?.currencyCode ?? "EUR"}
               selectedLineId={selectedLineId}
               onSelectLine={setSelectedLineId}
+              onOpenTaskEditor={openTaskEditor}
               canEdit={canEdit}
               onPhaseReschedule={handlePhaseReschedule}
             />
@@ -493,35 +494,17 @@ export default function ProductionPlanner() {
 
           <Tabs
             value={detailTab}
-            onValueChange={(v) => setDetailTab(v as "phase" | "budget" | "crew")}
+            onValueChange={(v) => setDetailTab(v as "budget" | "crew")}
             className="w-full shrink-0"
           >
-            <TabsList className="w-full max-w-md bg-white/5 border border-white/10">
-              <TabsTrigger value="phase" className="flex-1 text-xs data-[state=active]:bg-white/10">
-                Phase
-              </TabsTrigger>
+            <TabsList className="w-full max-w-sm bg-white/5 border border-white/10">
               <TabsTrigger value="crew" className="flex-1 text-xs data-[state=active]:bg-white/10">
-                Crew
+                Production crew
               </TabsTrigger>
               <TabsTrigger value="budget" className="flex-1 text-xs data-[state=active]:bg-white/10">
-                Budget
+                Budget overview
               </TabsTrigger>
             </TabsList>
-            <TabsContent
-              value="phase"
-              className="mt-2 data-[state=inactive]:hidden max-h-[min(38vh,400px)] overflow-y-auto"
-            >
-              <ProductionPhasePanel
-                row={selectedRow}
-                selectedLine={selectedLine}
-                plannerQueryKey={["production-planner", productionId]}
-                canEdit={canEdit}
-                onDeleted={() => {
-                  const next = selectedRow?.ganttLines.find((l) => l.kind === "phase");
-                  setSelectedLineId(next?.lineId ?? null);
-                }}
-              />
-            </TabsContent>
             <TabsContent
               value="crew"
               className="mt-2 data-[state=inactive]:hidden max-h-[min(38vh,400px)] overflow-y-auto"
@@ -560,6 +543,20 @@ export default function ProductionPlanner() {
         open={phaseOpen}
         onOpenChange={setPhaseOpen}
         onCreated={invalidatePlanner}
+      />
+
+      <ProductionTaskEditor
+        open={taskEditorOpen}
+        onOpenChange={setTaskEditorOpen}
+        row={selectedRow}
+        selectedLine={selectedLine}
+        currencyCode={data?.currencyCode ?? "EUR"}
+        plannerQueryKey={["production-planner", productionId]}
+        canEdit={canEdit}
+        onDeleted={() => {
+          const next = selectedRow?.ganttLines.find((l) => l.kind === "phase" && l.task.phaseId);
+          setSelectedLineId(next?.lineId ?? null);
+        }}
       />
     </div>
   );

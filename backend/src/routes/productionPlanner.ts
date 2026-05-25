@@ -1220,4 +1220,146 @@ productionPlannerRouter.delete("/productions/:id/people/:personId", async (c) =>
   return c.body(null, 204);
 });
 
+async function assertPhaseInOrg(phaseId: string, organizationId: string) {
+  return prisma.productionPhase.findFirst({
+    where: { id: phaseId, production: { organizationId } },
+    select: { id: true, productionId: true },
+  });
+}
+
+// GET /api/productions/phases/:phaseId/documents
+productionPlannerRouter.get("/productions/phases/:phaseId/documents", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "schedule") && !canView(c, "events")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+
+  const phaseId = c.req.param("phaseId");
+  const phase = await assertPhaseInOrg(phaseId, user.organizationId);
+  if (!phase) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  const documents = await prisma.productionPhaseDocument.findMany({
+    where: { phaseId },
+    select: {
+      id: true,
+      phaseId: true,
+      name: true,
+      type: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return c.json({
+    data: documents.map((doc) => ({ ...doc, createdAt: doc.createdAt.toISOString() })),
+  });
+});
+
+// POST /api/productions/phases/:phaseId/documents
+productionPlannerRouter.post("/productions/phases/:phaseId/documents", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canWrite(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+
+  const phaseId = c.req.param("phaseId");
+  const phase = await assertPhaseInOrg(phaseId, user.organizationId);
+  if (!phase) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  const formData = await c.req.parseBody();
+  const file = formData["file"];
+  const name = formData["name"];
+  const type = formData["type"];
+
+  if (!file || typeof file === "string") {
+    return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
+  }
+  if (typeof name !== "string" || !name.trim()) {
+    return c.json({ error: { message: "Name is required", code: "BAD_REQUEST" } }, 400);
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  const document = await prisma.productionPhaseDocument.create({
+    data: {
+      organizationId: user.organizationId,
+      phaseId,
+      name: name.trim(),
+      type: typeof type === "string" && type.trim() ? type.trim() : "other",
+      filename: file.name,
+      data: buffer,
+      mimeType: file.type || "application/octet-stream",
+    },
+    select: {
+      id: true,
+      phaseId: true,
+      name: true,
+      type: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+  });
+
+  return c.json(
+    { data: { ...document, createdAt: document.createdAt.toISOString() } },
+    201
+  );
+});
+
+// GET /api/productions/phase-documents/:docId/download
+productionPlannerRouter.get("/productions/phase-documents/:docId/download", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+
+  const docId = c.req.param("docId");
+  const document = await prisma.productionPhaseDocument.findFirst({
+    where: { id: docId, organizationId: user.organizationId },
+  });
+  if (!document) {
+    return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  return new Response(document.data, {
+    headers: {
+      "Content-Type": document.mimeType,
+      "Content-Disposition": `attachment; filename="${document.filename}"`,
+      "Content-Length": String(document.data.length),
+    },
+  });
+});
+
+// DELETE /api/productions/phase-documents/:docId
+productionPlannerRouter.delete("/productions/phase-documents/:docId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canWrite(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+
+  const docId = c.req.param("docId");
+  const document = await prisma.productionPhaseDocument.findFirst({
+    where: { id: docId, organizationId: user.organizationId },
+  });
+  if (!document) {
+    return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  await prisma.productionPhaseDocument.delete({ where: { id: docId } });
+  return c.body(null, 204);
+});
+
 export default productionPlannerRouter;

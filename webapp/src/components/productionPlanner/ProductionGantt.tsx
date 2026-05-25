@@ -393,6 +393,7 @@ export function ProductionGantt({
   currencyCode,
   selectedLineId,
   onSelectLine,
+  onOpenTaskEditor,
   canEdit,
   onPhaseReschedule,
 }: {
@@ -403,6 +404,7 @@ export function ProductionGantt({
   currencyCode: string;
   selectedLineId: string | null;
   onSelectLine: (lineId: string) => void;
+  onOpenTaskEditor: (lineId: string) => void;
   canEdit: boolean;
   onPhaseReschedule: (
     phaseId: string,
@@ -686,6 +688,8 @@ export function ProductionGantt({
                     onClick={() => onSelectLine(line.lineId)}
                   >
                     <div
+                      role="button"
+                      tabIndex={0}
                       className={cn(
                         "shrink-0 border-r border-white/10 px-3 flex flex-col justify-center min-w-0 cursor-pointer sticky left-0 z-20",
                         selected ? "bg-[#1c1c26]" : "bg-[#12121a]",
@@ -693,6 +697,19 @@ export function ProductionGantt({
                         isCritical && !selected && "bg-[#1a1218]"
                       )}
                       style={{ width: LABEL_WIDTH }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectLine(line.lineId);
+                        onOpenTaskEditor(line.lineId);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onSelectLine(line.lineId);
+                          onOpenTaskEditor(line.lineId);
+                        }
+                      }}
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span

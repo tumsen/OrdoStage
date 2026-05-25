@@ -130,6 +130,7 @@ export type ProductionWithRelations = {
     departmentId: string | null;
     dependsOnPhaseId: string | null;
     dependsOnPhase: { id: string; title: string } | null;
+    notes: string | null;
     assigneePerson: { name: string } | null;
     department: { name: string } | null;
   }>;
@@ -195,6 +196,7 @@ export function buildGanttLines(
       label: phase.title,
       category: phase.category,
       status: phase.status,
+      notes: phase.notes,
       assigneePersonId: phase.assigneePersonId,
       assigneeName: phase.assigneePerson?.name ?? null,
       departmentId: phase.departmentId,

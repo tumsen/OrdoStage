@@ -136,6 +136,7 @@ model Organization {
   timeEntries      TimeEntry[]
   productions      Production[]
   productionCostLines ProductionCostLine[]
+  productionPhaseDocuments ProductionPhaseDocument[]
   timeTravelClaims TimeTravelClaim[]
   timesheetApprovals TimesheetApproval[]
 }
@@ -1172,12 +1173,30 @@ model ProductionPhase {
   dependentPhases  ProductionPhase[] @relation("ProductionPhaseDependency")
   notes            String?
   sortOrder        Int          @default(0)
+  documents        ProductionPhaseDocument[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
   @@index([productionId, startDate])
   @@index([productionId, sortOrder])
   @@index([dependsOnPhaseId])
+}
+
+model ProductionPhaseDocument {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  phaseId        String
+  phase          ProductionPhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  name           String
+  type           String          @default("other")
+  filename       String
+  data           Bytes
+  mimeType       String          @default("application/octet-stream")
+  createdAt      DateTime        @default(now())
+
+  @@index([phaseId, createdAt])
+  @@index([organizationId])
 }
 
 model ProductionPerson {
