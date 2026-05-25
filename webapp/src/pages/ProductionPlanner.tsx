@@ -340,78 +340,73 @@ export default function ProductionPlanner() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-end gap-3 shrink-0">
-        <div className="space-y-1">
-          <p className="text-[10px] uppercase tracking-wide text-white/40">Production</p>
-          <ProductionSelector value={productionId} onChange={setProductionId} />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 shrink-0">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            size="sm"
-            variant={rangePreset === "today" ? "default" : "outline"}
-            className={cn(
-              "h-9",
-              rangePreset === "today"
-                ? "bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-                : "border-white/10 text-white/80"
-            )}
-            disabled={!productionId}
-            onClick={showToday}
-          >
-            Today
-          </Button>
-          <DateInputWithWeekday
-            value={visibleFrom}
-            disabled={!productionId}
-            onChange={(v) => {
-              if (!v) return;
-              setRangePreset(null);
-              setRangeManual(true);
-              setVisibleFrom(v);
-              if (v > visibleTo) setVisibleTo(v);
-            }}
-          />
-          <span className="text-white/30 text-xs">to</span>
-          <DateInputWithWeekday
-            value={visibleTo}
-            disabled={!productionId}
-            onChange={(v) => {
-              if (!v) return;
-              setRangePreset(null);
-              setRangeManual(true);
-              setVisibleTo(v);
-              if (v < visibleFrom) setVisibleFrom(v);
-            }}
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-9 border-white/10 text-white/80"
-            disabled={!productionBounds}
-            onClick={showFullProduction}
-          >
-            Full production
-          </Button>
+      <div className="flex flex-col gap-2 shrink-0">
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-wide text-white/40">Production</p>
+            <ProductionSelector value={productionId} onChange={setProductionId} />
+          </div>
           {productionId ? (
-            <p className="text-sm text-white/50 tabular-nums self-center">
-              {visibleFrom} — {visibleTo}
-              <span className="text-[10px] text-white/35 ml-2">({visibleDayCount} days)</span>
-              {productionBounds ? (
-                <span className="text-[10px] text-white/25 ml-1">
-                  · plan {productionBounds.dayCount}d
-                </span>
-              ) : null}
-            </p>
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant={rangePreset === "today" ? "default" : "outline"}
+                className={cn(
+                  "h-9",
+                  rangePreset === "today"
+                    ? "bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+                    : "border-white/10 text-white/80"
+                )}
+                onClick={showToday}
+              >
+                Today
+              </Button>
+              <DateInputWithWeekday
+                value={visibleFrom}
+                onChange={(v) => {
+                  if (!v) return;
+                  setRangePreset(null);
+                  setRangeManual(true);
+                  setVisibleFrom(v);
+                  if (v > visibleTo) setVisibleTo(v);
+                }}
+              />
+              <span className="text-white/30 text-xs pb-2">to</span>
+              <DateInputWithWeekday
+                value={visibleTo}
+                onChange={(v) => {
+                  if (!v) return;
+                  setRangePreset(null);
+                  setRangeManual(true);
+                  setVisibleTo(v);
+                  if (v < visibleFrom) setVisibleFrom(v);
+                }}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 border-white/10 text-white/80"
+                disabled={!productionBounds}
+                onClick={showFullProduction}
+              >
+                Full production
+              </Button>
+              <p className="text-sm text-white/50 tabular-nums pb-2">
+                {visibleFrom} — {visibleTo}
+                <span className="text-[10px] text-white/35 ml-2">({visibleDayCount} days)</span>
+                {productionBounds ? (
+                  <span className="text-[10px] text-white/25 ml-1">
+                    · plan {productionBounds.dayCount}d
+                  </span>
+                ) : null}
+              </p>
+            </>
           ) : null}
         </div>
-
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex-1 min-w-[200px] max-w-md space-y-1.5">
+        <div className="flex flex-wrap items-end gap-4 max-w-lg">
+          <div className="flex-1 min-w-[200px] space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="gantt-zoom" className="text-[10px] uppercase text-white/40">
                 Day resolution
@@ -432,7 +427,8 @@ export default function ProductionPlanner() {
               max={MAX_GANTT_ZOOM}
               value={zoom}
               onChange={(e) => handleZoomChange(Number(e.target.value))}
-              className="w-full h-1.5 accent-red-500 cursor-pointer"
+              disabled={!productionId}
+              className="w-full h-1.5 accent-red-500 cursor-pointer disabled:opacity-40"
               aria-label="Timeline day resolution"
             />
             <div className="flex justify-between text-[9px] text-white/30">
@@ -472,12 +468,12 @@ export default function ProductionPlanner() {
       {!productionId ? (
         <p className="text-sm text-white/40 py-8 text-center">Select or create a production.</p>
       ) : isLoading ? (
-        <Skeleton className="flex-1 min-h-[320px] rounded-xl bg-white/5" />
+        <Skeleton className="h-48 w-full rounded-xl bg-white/5" />
       ) : error ? (
         <p className="text-red-400 text-sm">Could not load production planner.</p>
       ) : (
-        <div className="flex flex-col flex-1 min-h-0 gap-3 w-full">
-          <div className="w-full flex-1 min-h-[320px] flex flex-col">
+        <div className="flex flex-col gap-3 w-full shrink-0">
+          <div className="w-full">
             <ProductionGantt
               row={selectedRow}
               from={visibleFrom}

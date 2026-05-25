@@ -590,7 +590,7 @@ export function ProductionGantt({
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="rounded-xl border border-white/10 bg-[#12121a]/80 overflow-hidden flex flex-col min-h-0 flex-1">
+      <div className="rounded-xl border border-white/10 bg-[#12121a]/80 overflow-hidden flex flex-col w-full shrink-0">
         {row ? (
           <div className="px-3 py-2 border-b border-white/10 bg-white/[0.02] shrink-0 flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-white/90">{row.title}</span>
@@ -606,7 +606,7 @@ export function ProductionGantt({
           </div>
         ) : null}
 
-        <div ref={viewportRef} className="flex-1 overflow-auto relative min-h-0">
+        <div ref={viewportRef} className="overflow-x-auto overflow-y-visible relative w-full">
           {!row || lines.length === 0 ? (
             <p className="p-8 text-center text-sm text-white/40">
               {!row
@@ -643,7 +643,7 @@ export function ProductionGantt({
 
               <div
                 className="relative"
-                style={{ minHeight: lines.length * ROW_HEIGHT }}
+                style={{ height: lines.length * ROW_HEIGHT }}
               >
                 <div
                   ref={timelineRef}
