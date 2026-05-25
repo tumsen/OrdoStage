@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Clapperboard, Download, Plus, ListPlus } from "lucide-react";
+import { Download, Plus, ListPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatMoneyFromCents } from "@/lib/formatMoney";
 import type { Production, ProductionPlannerResponse } from "@/lib/types";
@@ -264,25 +264,10 @@ export default function ProductionPlanner() {
 
   return (
     <div className="app-page-fill flex flex-col gap-4 p-4 md:p-6 max-md:app-page-fill-mobile min-h-0">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 shrink-0">
-        <div>
-          <div className="flex items-center gap-2 text-red-400/90 mb-1">
-            <Clapperboard className="h-5 w-5" />
-            <span className="text-xs font-semibold uppercase tracking-widest">Production</span>
-          </div>
-          <h1 className="text-xl md:text-2xl font-semibold text-white tracking-tight">
-            Production planner
-          </h1>
-          <p className="text-sm text-white/45 mt-1 max-w-xl">
-            Gantt plan per show: each phase on its own row, with finish-to-start dependencies between
-            deadlines.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-end gap-2">
-          {canEdit ? (
-            <>
-              <Button
+      <div className="flex flex-wrap items-end justify-end gap-2 shrink-0">
+        {canEdit ? (
+          <>
+            <Button
                 type="button"
                 size="sm"
                 className="h-9 bg-red-900/80 hover:bg-red-800 text-white"
@@ -301,43 +286,42 @@ export default function ProductionPlanner() {
               >
                 <ListPlus className="h-4 w-4 mr-1.5" />
                 Add plan line
-              </Button>
-            </>
-          ) : null}
-          {selectedRow ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-9 border-white/10 text-white/80"
-              disabled={pdfLoading}
-              onClick={async () => {
-                setPdfLoading(true);
-                try {
-                  await downloadProductionPlanPDF(selectedRow);
-                } catch {
-                  toast({ title: "Could not generate PDF", variant: "destructive" });
-                } finally {
-                  setPdfLoading(false);
-                }
-              }}
-            >
-              <Download className="h-4 w-4 mr-1.5" />
-              {pdfLoading ? "Generating…" : "Download PDF"}
             </Button>
-          ) : null}
-          {selectedRow ? (
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
-              <p className="text-[10px] uppercase text-white/40">Production budget</p>
-              <p className="text-sm font-semibold text-yellow-300/90 tabular-nums">
-                {formatMoneyFromCents(
-                  selectedRow.costSummary.plannedCents,
-                  data?.currencyCode ?? "EUR"
-                )}
-              </p>
-            </div>
-          ) : null}
-        </div>
+          </>
+        ) : null}
+        {selectedRow ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 border-white/10 text-white/80"
+            disabled={pdfLoading}
+            onClick={async () => {
+              setPdfLoading(true);
+              try {
+                await downloadProductionPlanPDF(selectedRow);
+              } catch {
+                toast({ title: "Could not generate PDF", variant: "destructive" });
+              } finally {
+                setPdfLoading(false);
+              }
+            }}
+          >
+            <Download className="h-4 w-4 mr-1.5" />
+            {pdfLoading ? "Generating…" : "Download PDF"}
+          </Button>
+        ) : null}
+        {selectedRow ? (
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
+            <p className="text-[10px] uppercase text-white/40">Production budget</p>
+            <p className="text-sm font-semibold text-yellow-300/90 tabular-nums">
+              {formatMoneyFromCents(
+                selectedRow.costSummary.plannedCents,
+                data?.currencyCode ?? "EUR"
+              )}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2 shrink-0">
