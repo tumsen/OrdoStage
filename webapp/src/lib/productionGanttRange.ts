@@ -1,4 +1,14 @@
-import { addDays, differenceInCalendarDays, format, parseISO, startOfDay, subDays } from "date-fns";
+import {
+  addDays,
+  addMonths,
+  differenceInCalendarDays,
+  format,
+  parseISO,
+  startOfDay,
+  startOfMonth,
+  subDays,
+  subMonths,
+} from "date-fns";
 
 const STORAGE_ZOOM = "ordo.productionPlanner.zoom";
 const SPAN_PADDING_DAYS = 2;
@@ -44,6 +54,19 @@ export function writePersistedGanttZoom(zoom: number): void {
   }
 }
 
+export type GanttVisibleRange = {
+  from: string;
+  to: string;
+  dayCount: number;
+};
+
+function rangeFromDates(fromDate: Date, toDate: Date): GanttVisibleRange {
+  const from = startOfDay(fromDate);
+  const to = startOfDay(toDate);
+  const dayCount = Math.max(1, differenceInCalendarDays(to, from) + 1);
+  return { from: toYmd(from), to: toYmd(to), dayCount };
+}
+
 /** Inclusive span from earliest task start to latest task end on the chart. */
 export function ganttTaskSpanFromLines(
   lines: Array<{ task: { start: string; end: string } }>
@@ -80,6 +103,91 @@ export function pixelsPerDayForZoom(
   const oneDayPx = Math.max(fitAllPx, viewport, MIN_ONE_DAY_PX);
   const t = clampGanttZoom(zoom) / MAX_GANTT_ZOOM;
   return Math.round(fitAllPx + t * (oneDayPx - fitAllPx));
+}
+
+/** Visible window length (days) for a zoom step; low zoom ≈ 12 months. */
+export function visibleDayCountForZoom(zoom: number): number {
+  const z = clampGanttZoom(zoom);
+  if (z <= 12) return 365;
+  if (z <= 28) return 84;
+  if (z < 50) return 42;
+  if (z < 70) return 21;
+  if (z < 90) return 10;
+  return 3;
+}
+
+/** Center a day window on anchor, optionally clipped to production bounds. */
+export function visibleRangeCenteredOn(
+  anchor: Date,
+  dayCount: number,
+  bounds: { from: string; to: string } | null
+): GanttVisibleRange {
+  const count = Math.max(1, dayCount);
+  const half = Math.floor(count / 2);
+  let from = subDays(startOfDay(anchor), half);
+  let to = addDays(from, count - 1);
+
+  if (bounds) {
+    const bFrom = startOfDay(parseISO(`${bounds.from}T00:00:00`));
+    const bTo = startOfDay(parseISO(`${bounds.to}T00:00:00`));
+    if (from.getTime() < bFrom.getTime()) {
+      from = bFrom;
+      to = addDays(from, count - 1);
+    }
+    if (to.getTime() > bTo.getTime()) {
+      to = bTo;
+      from = subDays(to, count - 1);
+    }
+    if (from.getTime() < bFrom.getTime()) from = bFrom;
+  }
+
+  return rangeFromDates(from, to);
+}
+
+/** Compute visible from/to from zoom; aligns with timeline scale (12 months at low zoom). */
+export function visibleRangeForZoom(
+  zoom: number,
+  anchor: Date,
+  productionSpan: { from: string; to: string } | null
+): GanttVisibleRange {
+  const z = clampGanttZoom(zoom);
+
+  if (z <= 12) {
+    const anchorMonth = startOfMonth(anchor);
+    if (productionSpan) {
+      const prodFrom = startOfMonth(parseISO(`${productionSpan.from}T00:00:00`));
+      const prodTo = startOfDay(parseISO(`${productionSpan.to}T00:00:00`));
+      const twelveEnd = subDays(addMonths(prodFrom, 12), 1);
+      if (prodTo.getTime() <= twelveEnd.getTime()) {
+        return rangeFromDates(prodFrom, prodTo);
+      }
+      let start = startOfMonth(subMonths(anchorMonth, 5));
+      if (start.getTime() < prodFrom.getTime()) start = prodFrom;
+      let end = subDays(addMonths(start, 12), 1);
+      if (end.getTime() > prodTo.getTime()) end = prodTo;
+      return rangeFromDates(start, end);
+    }
+    const start = startOfMonth(subMonths(anchorMonth, 5));
+    const end = subDays(addMonths(start, 12), 1);
+    return rangeFromDates(start, end);
+  }
+
+  let dayCount = visibleDayCountForZoom(zoom);
+  if (productionSpan) {
+    const prodDays =
+      differenceInCalendarDays(
+        parseISO(`${productionSpan.to}T00:00:00`),
+        parseISO(`${productionSpan.from}T00:00:00`)
+      ) + 1;
+    dayCount = Math.min(dayCount, prodDays);
+  }
+  return visibleRangeCenteredOn(anchor, dayCount, productionSpan);
+}
+
+export function midpointOfRange(from: string, to: string): Date {
+  const a = parseISO(`${from}T00:00:00`).getTime();
+  const b = parseISO(`${to}T00:00:00`).getTime();
+  return startOfDay(new Date((a + b) / 2));
 }
 
 export function zoomLabel(zoom: number, scale?: import("./productionGanttTimeline").GanttTimelineScale): string {

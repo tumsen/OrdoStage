@@ -1065,6 +1065,26 @@ export const AssignTourTeamSchema = z.object({
   teamId: z.string(),
 });
 
+// ProductionPerson / ProductionTeam
+export const ProductionPersonSchema = z.object({
+  id: z.string(),
+  productionId: z.string(),
+  personId: z.string(),
+  role: z.string().nullable(),
+  person: PersonSchema,
+});
+
+export const ProductionTeamSchema = z.object({
+  id: z.string(),
+  productionId: z.string(),
+  teamId: z.string(),
+  team: DepartmentSchema,
+});
+
+export const AssignProductionTeamSchema = z.object({
+  teamId: z.string(),
+});
+
 export const CreateTourSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
@@ -1763,7 +1783,9 @@ export const ProductionPlannerGanttLineSchema = z.object({
   label: z.string(),
   category: z.string(),
   status: z.string().nullable().optional(),
+  assigneePersonId: z.string().nullable().optional(),
   assigneeName: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
   departmentName: z.string().nullable().optional(),
   dependsOnPhaseId: z.string().nullable(),
   dependsOnLabel: z.string().nullable().optional(),
@@ -1796,7 +1818,10 @@ export const ProductionPlannerRowSchema = z.object({
   endDate: z.string().nullable(),
   premiereDate: z.string().nullable(),
   venueLabel: z.string().nullable().optional(),
+  leadPersonId: z.string().nullable().optional(),
   leadPersonName: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
   linkedTourId: z.string().nullable().optional(),
   linkedTourName: z.string().nullable().optional(),
   linkedEventId: z.string().nullable().optional(),
@@ -1807,6 +1832,8 @@ export const ProductionPlannerRowSchema = z.object({
   tasks: z.array(ProductionPlannerTaskSchema),
   costs: z.array(ProductionCostLineSchema),
   costSummary: ProductionPlannerCostSummarySchema,
+  people: z.array(ProductionPersonSchema),
+  teams: z.array(ProductionTeamSchema),
 });
 
 export const ProductionPlannerResponseSchema = z.object({
@@ -1834,3 +1861,6 @@ export type ProductionPlannerTask = z.infer<typeof ProductionPlannerTaskSchema>;
 export type ProductionPlannerGanttLine = z.infer<typeof ProductionPlannerGanttLineSchema>;
 export type ProductionPlannerRow = z.infer<typeof ProductionPlannerRowSchema>;
 export type ProductionPlannerResponse = z.infer<typeof ProductionPlannerResponseSchema>;
+export type ProductionPerson = z.infer<typeof ProductionPersonSchema>;
+export type ProductionTeam = z.infer<typeof ProductionTeamSchema>;
+export type AssignProductionTeam = z.infer<typeof AssignProductionTeamSchema>;

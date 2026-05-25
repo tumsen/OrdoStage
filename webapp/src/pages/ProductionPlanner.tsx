@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Clapperboard, Download, Plus, ListPlus } from "lucide-react";
 import { api } from "@/lib/api";
@@ -10,6 +10,7 @@ import {
   useSyncProductionSelection,
 } from "@/hooks/usePersistedProductionId";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductionGantt } from "@/components/productionPlanner/ProductionGantt";
@@ -29,11 +30,14 @@ import {
   clampGanttZoom,
   ganttTaskSpanFromLines,
   MAX_GANTT_ZOOM,
+  midpointOfRange,
   MIN_GANTT_ZOOM,
   readPersistedGanttZoom,
+  visibleRangeForZoom,
   writePersistedGanttZoom,
   zoomLabel,
 } from "@/lib/productionGanttRange";
+import { startOfDay } from "date-fns";
 import { resolveTimelineScaleFromZoom } from "@/lib/productionGanttTimeline";
 
 const LEGEND_CATEGORIES = [
@@ -67,17 +71,15 @@ export default function ProductionPlanner() {
   useSyncProductionSelection(productionId, setProductionId, productionIds);
 
   const [zoom, setZoomState] = useState(() => readPersistedGanttZoom(0));
-  const setZoom = useCallback((value: number) => {
-    const next = clampGanttZoom(value);
-    setZoomState(next);
-    writePersistedGanttZoom(next);
-  }, []);
 
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"phase" | "budget" | "crew">("phase");
   const [createOpen, setCreateOpen] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [visibleFrom, setVisibleFrom] = useState(INITIAL_API_RANGE.from);
+  const [visibleTo, setVisibleTo] = useState(INITIAL_API_RANGE.to);
+  const [rangeManual, setRangeManual] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["production-planner", productionId],
@@ -94,13 +96,69 @@ export default function ProductionPlanner() {
 
   const selectedRow = data?.rows[0] ?? null;
 
-  const chartSpan = useMemo(
+  const productionSpan = useMemo(
     () => (selectedRow?.ganttLines.length ? ganttTaskSpanFromLines(selectedRow.ganttLines) : null),
     [selectedRow?.ganttLines]
   );
 
-  const from = chartSpan?.from ?? INITIAL_API_RANGE.from;
-  const to = chartSpan?.to ?? INITIAL_API_RANGE.to;
+  const rangeInitFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (rangeInitFor.current !== productionId) {
+      rangeInitFor.current = null;
+    }
+  }, [productionId]);
+
+  useEffect(() => {
+    if (!productionId || !productionSpan) return;
+    if (rangeInitFor.current === productionId) return;
+    rangeInitFor.current = productionId;
+    setRangeManual(false);
+    const center = midpointOfRange(productionSpan.from, productionSpan.to);
+    const next = visibleRangeForZoom(zoom, center, productionSpan);
+    setVisibleFrom(next.from);
+    setVisibleTo(next.to);
+  }, [productionId, productionSpan, zoom]);
+
+  const applyZoomRange = useCallback(
+    (nextZoom: number, anchor?: Date) => {
+      const center = anchor ?? midpointOfRange(visibleFrom, visibleTo);
+      const next = visibleRangeForZoom(nextZoom, center, productionSpan);
+      setVisibleFrom(next.from);
+      setVisibleTo(next.to);
+    },
+    [productionSpan, visibleFrom, visibleTo]
+  );
+
+  const handleZoomChange = useCallback(
+    (value: number) => {
+      const next = clampGanttZoom(value);
+      setZoomState(next);
+      writePersistedGanttZoom(next);
+      if (!rangeManual) {
+        applyZoomRange(next);
+      }
+    },
+    [applyZoomRange, rangeManual]
+  );
+
+  const showToday = useCallback(() => {
+    setRangeManual(false);
+    applyZoomRange(zoom, startOfDay(new Date()));
+  }, [applyZoomRange, zoom]);
+
+  const showFullProduction = useCallback(() => {
+    if (!productionSpan) return;
+    setRangeManual(true);
+    setVisibleFrom(productionSpan.from);
+    setVisibleTo(productionSpan.to);
+  }, [productionSpan]);
+
+  const visibleDayCount = useMemo(() => {
+    const a = startOfDay(new Date(`${visibleFrom}T12:00:00`));
+    const b = startOfDay(new Date(`${visibleTo}T12:00:00`));
+    return Math.max(1, Math.round((b.getTime() - a.getTime()) / 86_400_000) + 1);
+  }, [visibleFrom, visibleTo]);
 
   const selectedLine = useMemo(
     () => selectedRow?.ganttLines.find((l) => l.lineId === selectedLineId) ?? null,
@@ -262,36 +320,104 @@ export default function ProductionPlanner() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-4 shrink-0">
-        {chartSpan ? (
-          <div className="text-sm text-white/70 tabular-nums">
-            {from} — {to}
-            <span className="text-[10px] text-white/35 ml-2">({chartSpan.dayCount} days)</span>
-          </div>
-        ) : null}
-
-        <div className="flex-1 min-w-[200px] max-w-md space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="gantt-zoom" className="text-[10px] uppercase text-white/40">
-              Day resolution
+      <div className="flex flex-col gap-3 shrink-0">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <Label htmlFor="gantt-from" className="text-[10px] uppercase text-white/40">
+              From
             </Label>
-            <span className="text-[10px] text-white/45">
-              {zoomLabel(zoom, resolveTimelineScaleFromZoom(zoom))}
-            </span>
+            <Input
+              id="gantt-from"
+              type="date"
+              value={visibleFrom}
+              disabled={!productionId}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                setRangeManual(true);
+                setVisibleFrom(v);
+                if (v > visibleTo) setVisibleTo(v);
+              }}
+              className="w-[148px] h-9 bg-white/5 border-white/10 tabular-nums"
+            />
           </div>
-          <input
-            id="gantt-zoom"
-            type="range"
-            min={MIN_GANTT_ZOOM}
-            max={MAX_GANTT_ZOOM}
-            value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
-            className="w-full h-1.5 accent-red-500 cursor-pointer"
-            aria-label="Timeline day resolution"
-          />
-          <div className="flex justify-between text-[9px] text-white/30">
-            <span>12 months</span>
-            <span>1 day / screen</span>
+          <div className="space-y-1">
+            <Label htmlFor="gantt-to" className="text-[10px] uppercase text-white/40">
+              To
+            </Label>
+            <Input
+              id="gantt-to"
+              type="date"
+              value={visibleTo}
+              disabled={!productionId}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                setRangeManual(true);
+                setVisibleTo(v);
+                if (v < visibleFrom) setVisibleFrom(v);
+              }}
+              className="w-[148px] h-9 bg-white/5 border-white/10 tabular-nums"
+            />
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 border-white/10 text-white/80"
+            disabled={!productionId}
+            onClick={showToday}
+          >
+            Today
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 border-white/10 text-white/80"
+            disabled={!productionSpan}
+            onClick={showFullProduction}
+          >
+            Full production
+          </Button>
+          {productionId ? (
+            <p className="text-sm text-white/50 tabular-nums self-center pb-1">
+              {visibleFrom} — {visibleTo}
+              <span className="text-[10px] text-white/35 ml-2">({visibleDayCount} days)</span>
+              {productionSpan ? (
+                <span className="text-[10px] text-white/25 ml-1">
+                  · plan {productionSpan.dayCount}d
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[200px] max-w-md space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="gantt-zoom" className="text-[10px] uppercase text-white/40">
+                Day resolution
+              </Label>
+              <span className="text-[10px] text-white/45">
+                {zoomLabel(zoom, resolveTimelineScaleFromZoom(zoom))}
+                {!rangeManual ? " · range follows zoom" : ""}
+              </span>
+            </div>
+            <input
+              id="gantt-zoom"
+              type="range"
+              min={MIN_GANTT_ZOOM}
+              max={MAX_GANTT_ZOOM}
+              value={zoom}
+              onChange={(e) => handleZoomChange(Number(e.target.value))}
+              className="w-full h-1.5 accent-red-500 cursor-pointer"
+              aria-label="Timeline day resolution"
+            />
+            <div className="flex justify-between text-[9px] text-white/30">
+              <span>12 months</span>
+              <span>1 day / screen</span>
+            </div>
           </div>
         </div>
       </div>
@@ -333,8 +459,8 @@ export default function ProductionPlanner() {
           <div className="w-full flex-1 min-h-[320px] flex flex-col">
             <ProductionGantt
               row={selectedRow}
-              from={from}
-              to={to}
+              from={visibleFrom}
+              to={visibleTo}
               zoom={zoom}
               currencyCode={data?.currencyCode ?? "EUR"}
               selectedLineId={selectedLineId}
