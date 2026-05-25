@@ -54,7 +54,7 @@ const LEGEND_CATEGORIES = [
 
 const INITIAL_API_RANGE = apiRangeForPlanner(undefined);
 
-type RangePreset = "today" | "full" | null;
+type RangePreset = "today" | null;
 
 export default function ProductionPlanner() {
   const queryClient = useQueryClient();
@@ -173,10 +173,12 @@ export default function ProductionPlanner() {
 
   const showFullProduction = useCallback(() => {
     if (!productionBounds) return;
-    setRangePreset("full");
+    setRangePreset(null);
     setRangeManual(true);
     setVisibleFrom(productionBounds.from);
     setVisibleTo(productionBounds.to);
+    setZoomState(MIN_GANTT_ZOOM);
+    writePersistedGanttZoom(MIN_GANTT_ZOOM);
   }, [productionBounds]);
 
   const visibleDayCount = useMemo(() => {
@@ -388,13 +390,8 @@ export default function ProductionPlanner() {
           <Button
             type="button"
             size="sm"
-            variant={rangePreset === "full" ? "default" : "outline"}
-            className={cn(
-              "h-9",
-              rangePreset === "full"
-                ? "bg-red-900 hover:bg-red-800 text-white border-red-700/50"
-                : "border-white/10 text-white/80"
-            )}
+            variant="outline"
+            className="h-9 border-white/10 text-white/80"
             disabled={!productionBounds}
             onClick={showFullProduction}
           >
