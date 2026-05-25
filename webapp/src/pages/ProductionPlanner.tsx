@@ -28,12 +28,14 @@ import { toast } from "@/hooks/use-toast";
 import {
   apiRangeForPlanner,
   clampGanttZoom,
+  ganttTaskBoundsFromLines,
   ganttTaskSpanFromLines,
   MAX_GANTT_ZOOM,
   midpointOfRange,
   MIN_GANTT_ZOOM,
   readPersistedGanttZoom,
   visibleRangeForZoom,
+  visibleRangeWithFixedStart,
   writePersistedGanttZoom,
   zoomLabel,
 } from "@/lib/productionGanttRange";
@@ -51,6 +53,8 @@ const LEGEND_CATEGORIES = [
 ] as const;
 
 const INITIAL_API_RANGE = apiRangeForPlanner(undefined);
+
+type RangePreset = "today" | "full" | null;
 
 export default function ProductionPlanner() {
   const queryClient = useQueryClient();
@@ -80,6 +84,7 @@ export default function ProductionPlanner() {
   const [visibleFrom, setVisibleFrom] = useState(INITIAL_API_RANGE.from);
   const [visibleTo, setVisibleTo] = useState(INITIAL_API_RANGE.to);
   const [rangeManual, setRangeManual] = useState(false);
+  const [rangePreset, setRangePreset] = useState<RangePreset>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["production-planner", productionId],
@@ -101,6 +106,11 @@ export default function ProductionPlanner() {
     [selectedRow?.ganttLines]
   );
 
+  const productionBounds = useMemo(
+    () => (selectedRow?.ganttLines.length ? ganttTaskBoundsFromLines(selectedRow.ganttLines) : null),
+    [selectedRow?.ganttLines]
+  );
+
   const rangeInitFor = useRef<string | null>(null);
 
   useEffect(() => {
@@ -114,6 +124,7 @@ export default function ProductionPlanner() {
     if (rangeInitFor.current === productionId) return;
     rangeInitFor.current = productionId;
     setRangeManual(false);
+    setRangePreset(null);
     const center = midpointOfRange(productionSpan.from, productionSpan.to);
     const next = visibleRangeForZoom(zoom, center, productionSpan);
     setVisibleFrom(next.from);
@@ -130,29 +141,43 @@ export default function ProductionPlanner() {
     [productionSpan, visibleFrom, visibleTo]
   );
 
+  const applyTodayRange = useCallback(
+    (nextZoom: number, fromYmd: string) => {
+      const next = visibleRangeWithFixedStart(fromYmd, nextZoom, startOfDay(new Date()));
+      setVisibleTo(next.to);
+    },
+    []
+  );
+
   const handleZoomChange = useCallback(
     (value: number) => {
       const next = clampGanttZoom(value);
       setZoomState(next);
       writePersistedGanttZoom(next);
+      if (rangePreset === "today") {
+        applyTodayRange(next, visibleFrom);
+        return;
+      }
       if (!rangeManual) {
         applyZoomRange(next);
       }
     },
-    [applyZoomRange, rangeManual]
+    [applyTodayRange, applyZoomRange, rangeManual, rangePreset, visibleFrom]
   );
 
   const showToday = useCallback(() => {
+    setRangePreset("today");
     setRangeManual(false);
-    applyZoomRange(zoom, startOfDay(new Date()));
-  }, [applyZoomRange, zoom]);
+    applyTodayRange(zoom, visibleFrom);
+  }, [applyTodayRange, visibleFrom, zoom]);
 
   const showFullProduction = useCallback(() => {
-    if (!productionSpan) return;
+    if (!productionBounds) return;
+    setRangePreset("full");
     setRangeManual(true);
-    setVisibleFrom(productionSpan.from);
-    setVisibleTo(productionSpan.to);
-  }, [productionSpan]);
+    setVisibleFrom(productionBounds.from);
+    setVisibleTo(productionBounds.to);
+  }, [productionBounds]);
 
   const visibleDayCount = useMemo(() => {
     const a = startOfDay(new Date(`${visibleFrom}T12:00:00`));
@@ -322,11 +347,27 @@ export default function ProductionPlanner() {
 
       <div className="flex flex-col gap-3 shrink-0">
         <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            size="sm"
+            variant={rangePreset === "today" ? "default" : "outline"}
+            className={cn(
+              "h-9",
+              rangePreset === "today"
+                ? "bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+                : "border-white/10 text-white/80"
+            )}
+            disabled={!productionId}
+            onClick={showToday}
+          >
+            Today
+          </Button>
           <DateInputWithWeekday
             value={visibleFrom}
             disabled={!productionId}
             onChange={(v) => {
               if (!v) return;
+              setRangePreset(null);
               setRangeManual(true);
               setVisibleFrom(v);
               if (v > visibleTo) setVisibleTo(v);
@@ -338,6 +379,7 @@ export default function ProductionPlanner() {
             disabled={!productionId}
             onChange={(v) => {
               if (!v) return;
+              setRangePreset(null);
               setRangeManual(true);
               setVisibleTo(v);
               if (v < visibleFrom) setVisibleFrom(v);
@@ -346,30 +388,25 @@ export default function ProductionPlanner() {
           <Button
             type="button"
             size="sm"
-            variant="outline"
-            className="h-9 border-white/10 text-white/80"
-            disabled={!productionId}
-            onClick={showToday}
-          >
-            Today
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-9 border-white/10 text-white/80"
-            disabled={!productionSpan}
+            variant={rangePreset === "full" ? "default" : "outline"}
+            className={cn(
+              "h-9",
+              rangePreset === "full"
+                ? "bg-red-900 hover:bg-red-800 text-white border-red-700/50"
+                : "border-white/10 text-white/80"
+            )}
+            disabled={!productionBounds}
             onClick={showFullProduction}
           >
             Full production
           </Button>
           {productionId ? (
-            <p className="text-sm text-white/50 tabular-nums self-center pb-1">
+            <p className="text-sm text-white/50 tabular-nums self-center">
               {visibleFrom} — {visibleTo}
               <span className="text-[10px] text-white/35 ml-2">({visibleDayCount} days)</span>
-              {productionSpan ? (
+              {productionBounds ? (
                 <span className="text-[10px] text-white/25 ml-1">
-                  · plan {productionSpan.dayCount}d
+                  · plan {productionBounds.dayCount}d
                 </span>
               ) : null}
             </p>
@@ -384,7 +421,11 @@ export default function ProductionPlanner() {
               </Label>
               <span className="text-[10px] text-white/45">
                 {zoomLabel(zoom, resolveTimelineScaleFromZoom(zoom))}
-                {!rangeManual ? " · range follows zoom" : ""}
+                {rangePreset === "today"
+                  ? " · end follows zoom"
+                  : !rangeManual
+                    ? " · range follows zoom"
+                    : ""}
               </span>
             </div>
             <input

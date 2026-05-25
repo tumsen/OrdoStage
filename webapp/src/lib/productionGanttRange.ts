@@ -67,10 +67,9 @@ function rangeFromDates(fromDate: Date, toDate: Date): GanttVisibleRange {
   return { from: toYmd(from), to: toYmd(to), dayCount };
 }
 
-/** Inclusive span from earliest task start to latest task end on the chart. */
-export function ganttTaskSpanFromLines(
+function taskExtentFromLines(
   lines: Array<{ task: { start: string; end: string } }>
-): { from: string; to: string; dayCount: number } | null {
+): { minMs: number; maxMs: number } | null {
   if (lines.length === 0) return null;
 
   let minMs = Infinity;
@@ -82,11 +81,45 @@ export function ganttTaskSpanFromLines(
     if (!Number.isNaN(endMs)) maxMs = Math.max(maxMs, endMs);
   }
   if (!Number.isFinite(minMs) || !Number.isFinite(maxMs)) return null;
+  return { minMs, maxMs };
+}
 
-  const fromDate = subDays(startOfDay(new Date(minMs)), SPAN_PADDING_DAYS);
-  const toDate = addDays(startOfDay(new Date(maxMs)), SPAN_PADDING_DAYS);
-  const dayCount = differenceInCalendarDays(toDate, fromDate) + 1;
-  return { from: toYmd(fromDate), to: toYmd(toDate), dayCount };
+/** First task start through last task end (no chart padding). */
+export function ganttTaskBoundsFromLines(
+  lines: Array<{ task: { start: string; end: string } }>
+): GanttVisibleRange | null {
+  const extent = taskExtentFromLines(lines);
+  if (!extent) return null;
+  return rangeFromDates(
+    startOfDay(new Date(extent.minMs)),
+    startOfDay(new Date(extent.maxMs))
+  );
+}
+
+/** Inclusive span from earliest task start to latest task end on the chart. */
+export function ganttTaskSpanFromLines(
+  lines: Array<{ task: { start: string; end: string } }>
+): GanttVisibleRange | null {
+  const extent = taskExtentFromLines(lines);
+  if (!extent) return null;
+
+  const fromDate = subDays(startOfDay(new Date(extent.minMs)), SPAN_PADDING_DAYS);
+  const toDate = addDays(startOfDay(new Date(extent.maxMs)), SPAN_PADDING_DAYS);
+  return rangeFromDates(fromDate, toDate);
+}
+
+/** Visible window with a fixed start date; end follows zoom and includes anchor (e.g. today). */
+export function visibleRangeWithFixedStart(
+  from: string,
+  zoom: number,
+  anchor: Date
+): GanttVisibleRange {
+  const fromDate = startOfDay(parseISO(`${from}T00:00:00`));
+  const dayCount = visibleDayCountForZoom(zoom);
+  let to = addDays(fromDate, dayCount - 1);
+  const anchorDay = startOfDay(anchor);
+  if (anchorDay.getTime() > to.getTime()) to = anchorDay;
+  return rangeFromDates(fromDate, to);
 }
 
 /**
