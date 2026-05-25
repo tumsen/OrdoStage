@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
-import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { formatMoneyFromCents, parseMoneyToCents } from "@/lib/formatMoney";
 import type {
   Department,
@@ -30,12 +28,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -81,24 +73,18 @@ function costIdFromLine(line: ProductionPlannerGanttLine): string | null {
   return null;
 }
 
-export function ProductionTaskEditor({
-  open,
-  onOpenChange,
+export function ProductionTaskEditorPanel({
   row,
   selectedLine,
   currencyCode,
   plannerQueryKey,
   canEdit,
-  onDeleted,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   row: ProductionPlannerRow | null;
   selectedLine: ProductionPlannerGanttLine | null;
   currencyCode: string;
   plannerQueryKey: unknown[];
   canEdit: boolean;
-  onDeleted: () => void;
 }) {
   const queryClient = useQueryClient();
   const isPhase = selectedLine?.kind === "phase" && !!selectedLine.task.phaseId;
@@ -147,7 +133,7 @@ export function ProductionTaskEditor({
   const invalidate = () => queryClient.invalidateQueries({ queryKey: plannerQueryKey });
 
   useEffect(() => {
-    if (!selectedLine || !open) return;
+    if (!selectedLine) return;
     if (isPhase && phaseId) {
       setTitle(selectedLine.label);
       setCategory(selectedLine.category as ProductionPhaseCategory);
@@ -174,7 +160,7 @@ export function ProductionTaskEditor({
       setCostEnd(costLine.endDate?.slice(0, 10) ?? "");
       setCostNotes(costLine.notes ?? "");
     }
-  }, [selectedLine, open, isPhase, isCost, phaseId, costLine]);
+  }, [selectedLine, isPhase, isCost, phaseId, costLine]);
 
   const siblingPhases =
     row?.ganttLines.filter(
@@ -227,21 +213,6 @@ export function ProductionTaskEditor({
       }),
   });
 
-  const deletePhaseMutation = useMutation({
-    mutationFn: () => api.delete(`/api/productions/phases/${phaseId}`),
-    onSuccess: () => {
-      invalidate();
-      onOpenChange(false);
-      onDeleted();
-      toast({ title: "Task removed" });
-    },
-    onError: (e) =>
-      toast({
-        title: e instanceof Error ? e.message : "Could not delete",
-        variant: "destructive",
-      }),
-  });
-
   const saveCostMutation = useMutation({
     mutationFn: async () => {
       if (!costId || !row) throw new Error("No cost line");
@@ -272,73 +243,10 @@ export function ProductionTaskEditor({
       }),
   });
 
-  const deleteCostMutation = useMutation({
-    mutationFn: () => api.delete(`/api/production-planner/costs/${costId}`),
-    onSuccess: () => {
-      invalidate();
-      onOpenChange(false);
-      onDeleted();
-      toast({ title: "Cost line removed" });
-    },
-    onError: () => toast({ title: "Could not delete", variant: "destructive" }),
-  });
-
-  const sheetTitle = selectedLine?.label ?? "Task";
   const editorKind = isCost ? "cost" : isPhase ? "phase" : isReadOnly ? "readonly" : null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-full sm:max-w-lg border-white/10 bg-[#12121a] text-white flex flex-col p-0 gap-0"
-      >
-        <SheetHeader className="px-5 py-4 border-b border-white/10 shrink-0 text-left space-y-1">
-          <div className="flex items-start justify-between gap-2 pr-8">
-            <div className="min-w-0">
-              <SheetTitle className="text-white truncate">{sheetTitle}</SheetTitle>
-              {selectedLine ? (
-                <p className="text-xs text-white/45 mt-1">
-                  {TASK_CATEGORY_LABELS[selectedLine.category] ?? selectedLine.category}
-                  {selectedLine.isCritical ? (
-                    <span className="text-red-300/80 ml-2">· Critical path</span>
-                  ) : null}
-                  {selectedLine.floatDays != null && selectedLine.floatDays > 0 ? (
-                    <span className="ml-2">· {selectedLine.floatDays}d float</span>
-                  ) : null}
-                </p>
-              ) : null}
-            </div>
-            {canEdit && editorKind === "phase" ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-red-400/70 shrink-0"
-                onClick={() => {
-                  if (!confirmDeleteAction(`task "${selectedLine?.label}"`)) return;
-                  deletePhaseMutation.mutate();
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            ) : null}
-            {canEdit && editorKind === "cost" ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-red-400/70 shrink-0"
-                onClick={() => {
-                  if (!confirmDeleteAction(`cost line "${selectedLine?.label}"`)) return;
-                  deleteCostMutation.mutate();
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            ) : null}
-          </div>
-        </SheetHeader>
-
+    <div className="flex flex-col min-h-0 flex-1">
         <div className="flex-1 min-h-0 overflow-y-auto">
           {!selectedLine || !row ? (
             <p className="p-5 text-sm text-white/40">Select a task on the timeline.</p>
@@ -660,7 +568,6 @@ export function ProductionTaskEditor({
             </Button>
           </div>
         ) : null}
-      </SheetContent>
-    </Sheet>
+    </div>
   );
 }

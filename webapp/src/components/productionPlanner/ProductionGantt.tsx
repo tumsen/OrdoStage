@@ -11,7 +11,6 @@ import {
 import { formatMoneyFromCents } from "@/lib/formatMoney";
 import {
   barDatesFromDrag,
-  dateToPct,
   deltaDaysFromPointerDelta,
   isoFromYmd,
   taskBarStyle,
@@ -22,6 +21,7 @@ import {
   phaseInputFromGanttLine,
   validatePhaseDates,
 } from "@/lib/productionScheduleClient";
+import { buildGanttDependencyArrows } from "@/lib/productionGanttDependencies";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -51,14 +51,6 @@ const BAR_HEIGHT = 24;
 const LABEL_WIDTH = 300;
 const MIN_DRAG_PX = 4;
 
-type DependencyArrow = {
-  key: string;
-  fromRow: number;
-  toRow: number;
-  fromPct: number;
-  toPct: number;
-};
-
 type DragPayload = {
   lineId: string;
   phaseId: string;
@@ -75,39 +67,12 @@ function isEditablePhase(line: ProductionPlannerGanttLine): boolean {
   return line.kind === "phase" && !!line.task.phaseId;
 }
 
-function buildDependencyArrows(
-  lines: ProductionPlannerGanttLine[],
-  rangeStart: Date,
-  rangeEnd: Date
-): DependencyArrow[] {
-  const rowByPhaseId = new Map<string, number>();
-  lines.forEach((line, idx) => {
-    if (line.kind === "phase" && line.task.phaseId) {
-      rowByPhaseId.set(line.task.phaseId, idx);
-    }
-  });
-
-  const arrows: DependencyArrow[] = [];
-  lines.forEach((line, toRow) => {
-    const depId = line.dependsOnPhaseId;
-    if (!depId) return;
-    const fromRow = rowByPhaseId.get(depId);
-    if (fromRow == null) return;
-    const pred = lines[fromRow];
-    if (!pred) return;
-    const fromPct = dateToPct(parseISO(pred.task.end), rangeStart, rangeEnd);
-    const toPct = dateToPct(parseISO(line.task.start), rangeStart, rangeEnd);
-    arrows.push({ key: `${depId}->${line.lineId}`, fromRow, toRow, fromPct, toPct });
-  });
-  return arrows;
-}
-
 function DependencyLayer({
   arrows,
   rowCount,
   timelineWidth,
 }: {
-  arrows: DependencyArrow[];
+  arrows: ReturnType<typeof buildGanttDependencyArrows>;
   rowCount: number;
   timelineWidth: number;
 }) {
@@ -115,7 +80,7 @@ function DependencyLayer({
   const height = rowCount * ROW_HEIGHT;
   return (
     <svg
-      className="absolute top-0 pointer-events-none z-20"
+      className="absolute top-0 left-0 pointer-events-none z-[25]"
       style={{ left: LABEL_WIDTH, width: timelineWidth, height }}
       aria-hidden
     >
@@ -128,7 +93,7 @@ function DependencyLayer({
           refY="4"
           orient="auto"
         >
-          <path d="M0,0 L8,4 L0,8 Z" fill="rgba(255,255,255,0.45)" />
+          <path d="M0,0 L8,4 L0,8 Z" fill="#94a3b8" />
         </marker>
       </defs>
       {arrows.map((a) => {
@@ -143,8 +108,8 @@ function DependencyLayer({
             key={a.key}
             d={d}
             fill="none"
-            stroke="rgba(255,255,255,0.35)"
-            strokeWidth="1.5"
+            stroke="#94a3b8"
+            strokeWidth={2}
             markerEnd="url(#gantt-arrowhead)"
           />
         );
@@ -471,7 +436,7 @@ export function ProductionGantt({
     100;
 
   const dependencyArrows = useMemo(
-    () => buildDependencyArrows(lines, chartRangeStart, chartRangeEnd),
+    () => buildGanttDependencyArrows(lines, chartRangeStart, chartRangeEnd),
     [lines, chartRangeStart, chartRangeEnd]
   );
 
@@ -651,12 +616,6 @@ export function ProductionGantt({
                   style={{ left: LABEL_WIDTH, width: timelineMinWidth }}
                   aria-hidden
                 />
-                <DependencyLayer
-                  arrows={dependencyArrows}
-                  rowCount={lines.length}
-                  timelineWidth={timelineWidth || timelineMinWidth}
-                />
-
                 {lines.map((line) => {
                 const selected = line.lineId === selectedLineId;
                 const colors = taskCategoryColors(line.category);
@@ -838,6 +797,11 @@ export function ProductionGantt({
                   </div>
                 );
               })}
+                <DependencyLayer
+                  arrows={dependencyArrows}
+                  rowCount={lines.length}
+                  timelineWidth={timelineWidth || timelineMinWidth}
+                />
               </div>
             </div>
           )}

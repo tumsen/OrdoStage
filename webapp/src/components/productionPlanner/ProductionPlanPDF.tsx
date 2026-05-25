@@ -12,6 +12,7 @@ import {
   PRODUCTION_STATUS_LABELS,
   TASK_CATEGORY_LABELS,
 } from "@/lib/productionPlannerTheme";
+import { ProductionGanttPdfChart } from "@/components/productionPlanner/ProductionGanttPdfChart";
 
 const styles = StyleSheet.create({
   page: {
@@ -140,6 +141,11 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 7.5,
     color: "#888",
+  },
+  ganttPage: {
+    paddingTop: 40,
+    paddingBottom: 48,
+    paddingHorizontal: 36,
   },
 });
 
@@ -315,6 +321,20 @@ export function ProductionPlanPDF({ row }: { row: ProductionPlannerRow }) {
           <View style={styles.footer} fixed>
             <Text style={styles.footerText}>Generated {generatedDate}</Text>
             <Text style={styles.footerText}>{row.title} — Production Plan</Text>
+          </View>
+        </Page>
+      ) : null}
+
+      {row.ganttLines.length > 0 ? (
+        <Page size="A4" orientation="landscape" style={styles.ganttPage}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>{row.title}</Text>
+            <Text style={styles.headerSubtitle}>Planner calendar · dependency arrows</Text>
+          </View>
+          <ProductionGanttPdfChart row={row} />
+          <View style={styles.footer} fixed>
+            <Text style={styles.footerText}>Generated {generatedDate}</Text>
+            <Text style={styles.footerText}>{row.title} — Gantt</Text>
           </View>
         </Page>
       ) : null}

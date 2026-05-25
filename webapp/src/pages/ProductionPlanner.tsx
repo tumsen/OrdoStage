@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Download, Plus, ListPlus } from "lucide-react";
 import { api } from "@/lib/api";
@@ -16,7 +17,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProductionGantt } from "@/components/productionPlanner/ProductionGantt";
 import { ProductionCostPanel } from "@/components/productionPlanner/ProductionCostPanel";
 import { ProductionCrewPanel } from "@/components/productionPlanner/ProductionCrewPanel";
-import { ProductionTaskEditor } from "@/components/productionPlanner/ProductionTaskEditor";
 import { downloadProductionPlanPDF } from "@/components/productionPlanner/ProductionPlanPDF";
 import { ProductionSelector } from "@/components/productionPlanner/ProductionSelector";
 import { CreateProductionDialog } from "@/components/productionPlanner/CreateProductionDialog";
@@ -57,6 +57,7 @@ const INITIAL_API_RANGE = apiRangeForPlanner(undefined);
 type RangePreset = "today" | null;
 
 export default function ProductionPlanner() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canView, canAction } = usePermissions();
   const canAccess = canView("schedule") || canView("events");
@@ -78,7 +79,6 @@ export default function ProductionPlanner() {
 
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"budget" | "crew">("crew");
-  const [taskEditorOpen, setTaskEditorOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -188,11 +188,6 @@ export default function ProductionPlanner() {
     return Math.max(1, Math.round((b.getTime() - a.getTime()) / 86_400_000) + 1);
   }, [visibleFrom, visibleTo]);
 
-  const selectedLine = useMemo(
-    () => selectedRow?.ganttLines.find((l) => l.lineId === selectedLineId) ?? null,
-    [selectedRow, selectedLineId]
-  );
-
   const existingPhases = useMemo(
     () =>
       (selectedRow?.ganttLines ?? [])
@@ -212,10 +207,14 @@ export default function ProductionPlanner() {
     }
   }, [selectedRow, selectedLineId]);
 
-  const openTaskEditor = useCallback((lineId: string) => {
-    setSelectedLineId(lineId);
-    setTaskEditorOpen(true);
-  }, []);
+  const openTaskEditor = useCallback(
+    (lineId: string) => {
+      if (!productionId) return;
+      setSelectedLineId(lineId);
+      navigate(`/production/${productionId}/task/${encodeURIComponent(lineId)}`);
+    },
+    [navigate, productionId]
+  );
 
   const invalidatePlanner = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["production-planner"] });
@@ -525,19 +524,6 @@ export default function ProductionPlanner() {
         onCreated={invalidatePlanner}
       />
 
-      <ProductionTaskEditor
-        open={taskEditorOpen}
-        onOpenChange={setTaskEditorOpen}
-        row={selectedRow}
-        selectedLine={selectedLine}
-        currencyCode={data?.currencyCode ?? "EUR"}
-        plannerQueryKey={["production-planner", productionId]}
-        canEdit={canEdit}
-        onDeleted={() => {
-          const next = selectedRow?.ganttLines.find((l) => l.kind === "phase" && l.task.phaseId);
-          setSelectedLineId(next?.lineId ?? null);
-        }}
-      />
     </div>
   );
 }
