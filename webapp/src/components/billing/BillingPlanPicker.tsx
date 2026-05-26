@@ -21,7 +21,7 @@ import {
   temporarySeatPassTotalMajor,
 } from "@/lib/flexFixedPricing";
 import { FlexFixedPlanComparison } from "@/components/pricing/FlexFixedPlanComparison";
-import { openPaddleCheckout } from "@/lib/paddleCheckout";
+import { openPaddleCheckout, isPaddleJsConfigured } from "@/lib/paddleCheckout";
 import { pricingSeatRangeClass } from "@/components/pricing/pricingSeatRangeClass";
 import { z } from "zod";
 import type {
@@ -33,14 +33,14 @@ import type {
   FixedTemporaryPassQuoteSchema,
 } from "@/contracts/backendTypes";
 
-type PlanChoice = "flex" | "yearly";
-
 type Props = {
   billingPlan: "flex" | "fixed";
   committedSeats: number | null;
   annualRenewalDate: string | null;
   billableCountThisMonth: number;
   isOwner: boolean;
+  orgRole?: string;
+  paddleBackendConfigured?: boolean;
   fixedAnnualRoundToTen?: boolean;
   temporarySeatsBoost?: number | null;
   temporarySeatsBoostExpiresAt?: string | null;
@@ -54,44 +54,14 @@ function clampSeats(n: number): number {
   return Math.min(200, Math.max(FLEX_FIXED_MIN_SEATS, Math.round(n)));
 }
 
-function PlanChoiceCard({
-  plan,
-  selected,
-  title,
-  subtitle,
-  onSelect,
-}: {
-  plan: PlanChoice;
-  selected: boolean;
-  title: string;
-  subtitle: string;
-  onSelect: () => void;
-}) {
-  const accent = plan === "flex" ? planAccentStyles.flex : planAccentStyles.yearly;
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "rounded-xl border p-4 text-left transition-colors w-full",
-        selected ? accent.cardBorder : "border-white/10 bg-white/[0.02] hover:border-white/20",
-      )}
-    >
-      <p className={cn("text-sm font-semibold", selected ? "text-white" : "text-white/85")}>{title}</p>
-      <p className="mt-1 text-xs text-white/55 leading-relaxed">{subtitle}</p>
-      {selected ? (
-        <p className={cn("mt-2 text-[11px] font-medium uppercase tracking-wide", accent.label)}>Selected</p>
-      ) : null}
-    </button>
-  );
-}
-
 export function BillingPlanPicker({
   billingPlan,
   committedSeats,
   annualRenewalDate,
   billableCountThisMonth,
   isOwner,
+  orgRole = "member",
+  paddleBackendConfigured = false,
   fixedAnnualRoundToTen = true,
   temporarySeatsBoost = null,
   temporarySeatsBoostExpiresAt = null,
@@ -102,7 +72,6 @@ export function BillingPlanPicker({
 }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedPlan, setSelectedPlan] = useState<PlanChoice>("flex");
   const [checkoutSeats, setCheckoutSeats] = useState(10);
   const [increaseSeats, setIncreaseSeats] = useState(() => (committedSeats ?? 10) + 5);
   const [passExtraSeats, setPassExtraSeats] = useState(() => {
@@ -399,55 +368,49 @@ export function BillingPlanPicker({
       <div>
         <p className="text-sm font-medium text-white">Choose your billing plan</p>
         <p className="text-xs text-white/50 mt-1">
-          Flex bills monthly for seats used. Yearly pays upfront for committed seats with a volume discount.
+          Flex bills monthly for seats used. Yearly pays upfront with Paddle for committed seats (volume discount).
         </p>
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <PlanChoiceCard
-            plan="flex"
-            selected={selectedPlan === "flex"}
-            title="Flex — monthly postpaid"
-            subtitle="Pay each month for billable seats. No upfront annual payment. Trial applies to new workspaces."
-            onSelect={() => setSelectedPlan("flex")}
-          />
-          <PlanChoiceCard
-            plan="yearly"
-            selected={selectedPlan === "yearly"}
-            title="Yearly — annual commitment"
-            subtitle="One annual Paddle payment for committed seats. Overage above commitment billed monthly at Flex rates."
-            onSelect={() => setSelectedPlan("yearly")}
-          />
+          <div className={cn("rounded-xl border p-4", planAccentStyles.flex.cardBorder)}>
+            <p className="text-sm font-semibold text-white">Flex — monthly postpaid</p>
+            <p className="mt-1 text-xs text-white/55 leading-relaxed">
+              Default for new workspaces. Pay open invoices with Paddle when they are issued.
+            </p>
+          </div>
+          <div className={cn("rounded-xl border p-4", planAccentStyles.yearly.cardBorder)}>
+            <p className="text-sm font-semibold text-white">Yearly — annual commitment</p>
+            <p className="mt-1 text-xs text-white/55 leading-relaxed">
+              Pay upfront for committed seats — use <strong className="text-white/70">Pay with Paddle</strong> below.
+            </p>
+          </div>
         </div>
       </div>
 
       <FlexFixedPlanComparison />
 
+      {!paddleBackendConfigured || !isPaddleJsConfigured() ? (
+        <div className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-xs text-amber-100/85 leading-relaxed">
+          Paddle checkout is not fully configured yet
+          {!paddleBackendConfigured ? " (server API key missing)" : ""}
+          {!isPaddleJsConfigured() ? " (client token missing from webapp build)" : ""}. Checkout may fall back to a
+          hosted payment page when available.
+        </div>
+      ) : null}
+
       {isOwner ? (
-        selectedPlan === "flex" ? (
-          <div className={cn("rounded-xl border p-4 space-y-3", planAccentStyles.flex.sectionBorder, planAccentStyles.flex.sectionBg)}>
-            <p className="text-sm font-medium text-white">Flex billing</p>
-            <p className="text-xs text-white/55 leading-relaxed">
-              You are billed monthly for billable seats in the previous calendar month. When an invoice is issued, pay
-              it from this page with Paddle. No checkout is required to start on Flex.
-            </p>
-            <p className="text-sm text-white/70">
-              Billable this month: <span className="text-white font-medium tabular-nums">{billableCountThisMonth}</span>{" "}
-              seat{billableCountThisMonth === 1 ? "" : "s"}
-            </p>
-            <Button
-              type="button"
-              className="bg-rose-700 hover:bg-rose-600"
-              disabled={chooseFlex.isPending}
-              onClick={() => chooseFlex.mutate()}
-            >
-              {chooseFlex.isPending ? "Saving…" : "Continue with Flex"}
-            </Button>
-          </div>
-        ) : (
-          <div className={cn("rounded-xl border p-4 space-y-4", planAccentStyles.yearly.sectionBorder, planAccentStyles.yearly.sectionBg)}>
+        <>
+          <div
+            id="yearly-paddle-checkout"
+            className={cn(
+              "rounded-xl border p-4 space-y-4",
+              planAccentStyles.yearly.sectionBorder,
+              planAccentStyles.yearly.sectionBg,
+            )}
+          >
             <div>
-              <p className="text-sm font-medium text-white">Yearly checkout</p>
+              <p className="text-sm font-medium text-white">Pay with Paddle — Yearly plan</p>
               <p className="text-xs text-white/50 mt-1">
-                Pay annually upfront via Paddle for your committed seats. Yearly does not include a free trial.
+                Choose committed seats and pay the annual invoice in Paddle checkout. No free trial on Yearly.
               </p>
             </div>
 
@@ -489,13 +452,36 @@ export function BillingPlanPicker({
                 disabled={fixedCheckout.isPending}
                 onClick={() => fixedCheckout.mutate()}
               >
-                {fixedCheckout.isPending ? "Opening checkout…" : "Continue to Paddle checkout (Yearly)"}
+                {fixedCheckout.isPending ? "Opening checkout…" : "Pay with Paddle (Yearly)"}
               </Button>
             )}
           </div>
-        )
+
+          <div className={cn("rounded-xl border p-4 space-y-3", planAccentStyles.flex.sectionBorder, planAccentStyles.flex.sectionBg)}>
+            <p className="text-sm font-medium text-white">Stay on Flex</p>
+            <p className="text-xs text-white/55 leading-relaxed">
+              Monthly postpaid billing — no upfront payment. Confirm Flex if you do not want Yearly checkout now.
+            </p>
+            <p className="text-sm text-white/70">
+              Billable this month: <span className="text-white font-medium tabular-nums">{billableCountThisMonth}</span>{" "}
+              seat{billableCountThisMonth === 1 ? "" : "s"}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-white/15"
+              disabled={chooseFlex.isPending}
+              onClick={() => chooseFlex.mutate()}
+            >
+              {chooseFlex.isPending ? "Saving…" : "Continue with Flex (no checkout)"}
+            </Button>
+          </div>
+        </>
       ) : (
-        <p className="text-xs text-white/45">Only organisation owners can choose a plan or start checkout.</p>
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/55">
+          Only the organisation <strong className="text-white/75">owner</strong> can start Paddle checkout or change
+          billing plan. Your role: <span className="text-white/70 capitalize">{orgRole}</span>.
+        </div>
       )}
     </div>
   );

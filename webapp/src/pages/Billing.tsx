@@ -33,6 +33,7 @@ interface OrgBillingData {
   temporarySeatPassDays?: number;
   temporarySeatPassPricePerSeatMajor?: number;
   effectiveCommittedSeats?: number | null;
+  paddleBilling?: { configured: boolean; environment: "sandbox" | "live" };
   billingTrialDays?: number;
   billingGraceDaysAfterDue?: number;
   billingOnTrial?: boolean;
@@ -66,7 +67,7 @@ function formatShortDate(iso: string | null | undefined): string {
 }
 
 export default function Billing({ embedded = false }: { embedded?: boolean } = {}) {
-  const { canAction, isOwner } = usePermissions();
+  const { canAction, isOwner, orgRole } = usePermissions();
   const canManageBilling = canAction("billing.manage");
   const { data: org, isLoading } = useQuery<OrgBillingData>({
     queryKey: ["org"],
@@ -164,6 +165,8 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
         annualRenewalDate={org?.annualRenewalDate ?? null}
         billableCountThisMonth={billable.length}
         isOwner={isOwner}
+        orgRole={orgRole}
+        paddleBackendConfigured={org?.paddleBilling?.configured === true}
         fixedAnnualRoundToTen={org?.fixedAnnualRoundToTen !== false}
         temporarySeatsBoost={org?.temporarySeatsBoost ?? null}
         temporarySeatsBoostExpiresAt={org?.temporarySeatsBoostExpiresAt ?? null}
