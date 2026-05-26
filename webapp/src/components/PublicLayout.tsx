@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { CreditCard, FileText, LogIn, Menu, Shield, Sparkles } from "lucide-react";
+import { CreditCard, FileText, LogIn, Menu, Shield, Sparkles, UserPlus } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,8 @@ const pageTitles: Record<string, string> = {
   "/terms-of-service": "Terms of Service",
   "/privacy-policy": "Privacy Policy",
   "/accept-invite": "Invitation",
+  "/signup": "Sign up",
+  "/login": "Log in",
 };
 
 function getPublicPageTitle(pathname: string): string {
@@ -81,7 +83,15 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
         })}
       </nav>
 
-      <div className="shrink-0 px-3 py-4 border-t border-white/10">
+      <div className="shrink-0 px-3 py-4 border-t border-white/10 space-y-1">
+        <Link
+          to="/signup"
+          onClick={onNav}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-gradient-to-r from-ordo-magenta/25 via-ordo-orange/15 to-ordo-violet/25 text-white border border-ordo-yellow/35 hover:border-ordo-yellow/55 transition-all duration-150"
+        >
+          <UserPlus size={16} className="text-ordo-yellow" />
+          <span className="font-medium">Sign up free</span>
+        </Link>
         <Link
           to="/login"
           onClick={onNav}
@@ -102,6 +112,7 @@ interface PublicLayoutProps {
 }
 
 export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps) {
+  const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const pageTitle = pageTitleOverride ?? getPublicPageTitle(location.pathname);

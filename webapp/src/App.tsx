@@ -30,6 +30,7 @@ const Staffing = lazy(() => import("./pages/Staffing"));
 const TimeTracking = lazy(() => import("./pages/TimeTracking"));
 const TimeReport = lazy(() => import("./pages/TimeReport"));
 const Login = lazy(() => import("./pages/Login"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const SetupOrg = lazy(() => import("./pages/SetupOrg"));
@@ -72,6 +73,22 @@ const App = () => (
               <GuestRoute>
                 <Login />
               </GuestRoute>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <GuestRoute>
+                <Login />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/accept-invite"
+            element={
+              <PublicLayout pageTitleOverride="Invitation">
+                <AcceptInvite />
+              </PublicLayout>
             }
           />
           <Route
@@ -444,23 +461,9 @@ const App = () => (
             }
           />
 
-          {/* Protected share routes during private rollout */}
-          <Route
-            path="/t/:token"
-            element={
-              <ProtectedRoute>
-                <PublicTourSchedule />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/p/:personalToken"
-            element={
-              <ProtectedRoute>
-                <PersonalTourView />
-              </ProtectedRoute>
-            }
-          />
+          {/* Public tour share links (no login required) */}
+          <Route path="/t/:token" element={<PublicTourSchedule />} />
+          <Route path="/p/:personalToken" element={<PersonalTourView />} />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -202,7 +202,7 @@ export default function PublicPricing() {
               asChild
               className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
             >
-              <Link to="/login">Get started free</Link>
+              <Link to="/signup">Get started free</Link>
             </Button>
             <Button asChild variant="outline" className="border-white/20 text-white bg-transparent hover:bg-white/5">
               <Link to="/">Learn more</Link>

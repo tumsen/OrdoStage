@@ -253,8 +253,8 @@ function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefi
 
 function MarketingHome({ siteContent }: { siteContent: SiteContent | undefined }) {
   const welcome = useWelcomeCopy(siteContent);
-  const ctaText = siteContent?.landing_cta_text?.trim() || "View pricing & sign up";
-  const ctaPath = siteContent?.landing_cta_url?.trim() || "/pricing";
+  const ctaText = siteContent?.landing_cta_text?.trim() || "Get started free";
+  const ctaPath = siteContent?.landing_cta_url?.trim() || "/signup";
   const ctaExternal = /^https?:\/\//i.test(ctaPath);
   return (
     <FrontShell>
@@ -271,7 +271,7 @@ function MarketingHome({ siteContent }: { siteContent: SiteContent | undefined }
           sectionBody={welcome.sectionBody}
           closing={welcome.closing}
         />
-        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
           {ctaExternal ? (
             <Button
               asChild
@@ -286,9 +286,12 @@ function MarketingHome({ siteContent }: { siteContent: SiteContent | undefined }
               asChild
               className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
             >
-              <Link to={ctaPath || "/pricing"}>{ctaText}</Link>
+              <Link to={ctaPath || "/signup"}>{ctaText}</Link>
             </Button>
           )}
+          <Button asChild variant="outline" className="border-white/25 text-white/90 bg-white/5 hover:bg-white/10">
+            <Link to="/pricing">View pricing</Link>
+          </Button>
           <Button asChild variant="outline" className="border-white/25 text-white/90 bg-white/5 hover:bg-white/10">
             <Link to="/login">Log in</Link>
           </Button>

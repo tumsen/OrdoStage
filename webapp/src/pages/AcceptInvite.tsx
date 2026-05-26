@@ -96,9 +96,14 @@ export default function AcceptInvite() {
     return (
       <div className="flex min-h-[min(70vh,520px)] flex-col items-center justify-center gap-4 px-6 py-12">
         <p className="text-white/60 text-sm text-center max-w-md">{msg}</p>
-        <Button variant="outline" className="border-white/20 text-white" asChild>
-          <Link to="/login">Sign in</Link>
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 justify-center">
+          <Button variant="outline" className="border-white/20 text-white" asChild>
+            <Link to="/signup">Sign up</Link>
+          </Button>
+          <Button variant="outline" className="border-white/20 text-white" asChild>
+            <Link to="/login">Sign in</Link>
+          </Button>
+        </div>
       </div>
     );
   }

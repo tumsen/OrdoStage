@@ -34,7 +34,7 @@ export default function SetupOrg() {
           </div>
           <h1 className="text-3xl font-bold text-white">Welcome!</h1>
           <p className="text-gray-400 mt-2">
-            Create an additional workspace, or finish setup if you signed in with GitHub before naming your organization.
+            Name your theatre or venue workspace. You can create additional organisations later from your account.
           </p>
         </div>
         <div className="bg-gray-900 border border-white/10 rounded-xl p-6">

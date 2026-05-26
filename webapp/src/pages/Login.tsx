@@ -1,22 +1,33 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import { GuestAuthLayout } from "@/components/GuestAuthLayout";
 import { completePostAuthenticationNavigation } from "@/lib/postAuthRouting";
 
+function initialAuthMode(pathname: string, modeParam: string | null): "signin" | "signup" {
+  if (pathname === "/signup" || modeParam === "signup") return "signup";
+  return "signin";
+}
+
 export default function Login() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get("returnTo")?.trim() ?? "";
   const emailFromQuery = searchParams.get("email")?.trim() ?? "";
+  const modeParam = searchParams.get("mode");
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">(() => initialAuthMode(pathname, modeParam));
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setMode(initialAuthMode(pathname, modeParam));
+  }, [pathname, modeParam]);
 
   useEffect(() => {
     if (emailFromQuery) setEmail(emailFromQuery);
@@ -174,6 +185,23 @@ export default function Login() {
             {loading ? "Please wait..." : mode === "signin" ? "Sign in" : "Create account"}
           </button>
         </form>
+        <p className="text-center text-sm text-white/45 mt-4">
+          {mode === "signin" ? (
+            <>
+              New to OrdoStage?{" "}
+              <Link to="/signup" className="text-violet-400 hover:text-violet-300">
+                Create a free account
+              </Link>
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <Link to="/login" className="text-violet-400 hover:text-violet-300">
+                Sign in
+              </Link>
+            </>
+          )}
+        </p>
       </div>
     </GuestAuthLayout>
   );
