@@ -31,12 +31,8 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
     value:
       "Built for resident companies and presenting houses. For music venues and festivals. For tour managers and road crews. For anyone who cannot afford a wrong answer on opening night.",
   },
-  {
-    key: "landing_postscript",
-    value:
-      "We are in private rollout now. Early access theaters will be onboarded first. Early-bird tester offer: theaters that join testing get unlimited use for 6 months. Contact: mail@ordostage.com",
-  },
-  { key: "landing_cta_text", value: "View pricing" },
+  { key: "landing_postscript", value: "" },
+  { key: "landing_cta_text", value: "View pricing & sign up" },
   { key: "landing_cta_url", value: "/pricing" },
   { key: "terms_content", value: DEFAULT_TERMS_CONTENT },
   { key: "privacy_content", value: DEFAULT_PRIVACY_CONTENT },
@@ -52,7 +48,6 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   },
   /** Global (English row is source of truth; merged for all languages). 1 = on, 0 = off. */
   { key: "public_maintenance_mode", value: "0" },
-  { key: "public_early_bird_landing", value: "1" },
   {
     key: "public_maintenance_title",
     value: "We will be back soon",

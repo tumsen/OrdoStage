@@ -234,11 +234,9 @@ const en = {
       saveError: "Failed to save website content.",
       publicHomeMode: "Public home (global)",
       publicHomeModeHint:
-        "Applies in every language. The public shell always has a left menu (Features, Pricing, Terms, Privacy). Turn off both modes for the shorter “live” home; turn on maintenance for a minimal notice, or early-bird for the long welcome page.",
+        "Applies in every language. The public shell always has a left menu (Features, Pricing, Terms, Privacy). Maintenance mode replaces the home page with a short notice; otherwise visitors see the full marketing home with pricing calculator and sign-up.",
       maintenanceMode: "Maintenance welcome screen",
-      maintenanceModeHint: "Replaces the home page with a short “back soon” message. No marketing sidebar.",
-      earlyBirdMode: "Early-bird / private rollout home",
-      earlyBirdModeHint: "Long single-page welcome (current rollout design). Off: compact live home with nav to Pricing and Log in.",
+      maintenanceModeHint: "Replaces the home page with a short “back soon” message. The Features section stays available in the main area.",
       flagSaveError: "Could not update that setting.",
     },
   },

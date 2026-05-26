@@ -20,17 +20,10 @@ const W = {
     "Plan shows and venue holds on a real calendar. Route tours with day-by-day detail. Keep venue specs, files, and tech riders next to the booking they belong to. Staff jobs from the same roster your people and departments already use. Track time when you need it, share calendars when partners ask, and lock access down with roles that match how theatres and venues actually work.",
   landing_closing:
     "Built for resident companies and presenting houses. For music venues and festivals. For tour managers and road crews. For anyone who cannot afford a wrong answer on opening night.",
-  landing_postscript:
-    "We are in private rollout now. Early access theaters will be onboarded first. Early-bird tester offer: theaters that join testing get unlimited use for 6 months. Contact: mail@ordostage.com",
 } as const;
 
 function useWelcomeCopy(site: SiteContent | undefined) {
   return useMemo(() => {
-    const ps = site?.landing_postscript;
-    const postscript =
-      ps !== undefined && String(ps).trim() === ""
-        ? ""
-        : String(ps?.trim() || W.landing_postscript);
     return {
       title: site?.landing_title?.trim() || W.landing_title,
       subtitle: site?.landing_subtitle?.trim() || W.landing_subtitle,
@@ -38,7 +31,6 @@ function useWelcomeCopy(site: SiteContent | undefined) {
       sectionHeading: site?.landing_section_heading?.trim() || W.landing_section_heading,
       sectionBody: site?.landing_section_body?.trim() || W.landing_section_body,
       closing: site?.landing_closing?.trim() || W.landing_closing,
-      postscript,
     };
   }, [site]);
 }
@@ -259,35 +251,7 @@ function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefi
   );
 }
 
-function EarlyBirdFrontpage({ siteContent }: { siteContent: SiteContent | undefined }) {
-  const welcome = useWelcomeCopy(siteContent);
-  return (
-    <FrontShell>
-      <HashScroll />
-      <main className="relative flex min-h-full w-full flex-col items-center justify-start gap-8 px-6 pb-12 pt-6 md:pt-8">
-        <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} />
-        <FeatureBlock
-          sectionHeading={welcome.sectionHeading}
-          sectionBody={welcome.sectionBody}
-          closing={welcome.closing}
-        />
-        {welcome.postscript ? (
-          <p className="w-full text-center text-sm leading-relaxed text-white/80">{welcome.postscript}</p>
-        ) : null}
-        <div className="pb-2">
-          <Button
-            asChild
-            className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
-          >
-            <Link to="/login">Early-Bird Login</Link>
-          </Button>
-        </div>
-      </main>
-    </FrontShell>
-  );
-}
-
-function LiveFrontpage({ siteContent }: { siteContent: SiteContent | undefined }) {
+function MarketingHome({ siteContent }: { siteContent: SiteContent | undefined }) {
   const welcome = useWelcomeCopy(siteContent);
   const ctaText = siteContent?.landing_cta_text?.trim() || "View pricing & sign up";
   const ctaPath = siteContent?.landing_cta_url?.trim() || "/pricing";
@@ -342,13 +306,9 @@ export default function Frontpage() {
   });
 
   const maintenance = isPublicFlagOn(siteContent?.public_maintenance_mode, false);
-  const earlyBird = isPublicFlagOn(siteContent?.public_early_bird_landing, true);
 
   if (maintenance) {
     return <MaintenanceWelcome siteContent={siteContent} />;
   }
-  if (earlyBird) {
-    return <EarlyBirdFrontpage siteContent={siteContent} />;
-  }
-  return <LiveFrontpage siteContent={siteContent} />;
+  return <MarketingHome siteContent={siteContent} />;
 }

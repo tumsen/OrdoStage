@@ -191,23 +191,8 @@ export default function SiteContentAdmin() {
             aria-label={t("admin.siteContent.maintenanceMode")}
           />
         </div>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <Label className="text-white/90">{t("admin.siteContent.earlyBirdMode")}</Label>
-            <p className="text-xs text-white/45 mt-0.5">{t("admin.siteContent.earlyBirdModeHint")}</p>
-          </div>
-          <Switch
-            checked={isPublicFlagOn(enSnapshot?.public_early_bird_landing, true)}
-            disabled={flagMutation.isPending || enSnapshot === undefined}
-            onCheckedChange={(on) => {
-              flagMutation.mutate({ key: "public_early_bird_landing", value: on ? "1" : "0" });
-            }}
-            aria-label={t("admin.siteContent.earlyBirdMode")}
-          />
-        </div>
         <p className="text-[11px] text-ordo-yellow/80">
-          Paddle: use the live home (both off) for the shortest path to Pricing and sign-up. Maintenance mode keeps the
-          same sidebar; the main area is a short notice plus a Features section.
+          With maintenance off, the home page shows the pricing calculator, feature grid, and CTAs to Pricing and Log in.
         </p>
       </div>
 
@@ -280,7 +265,7 @@ export default function SiteContentAdmin() {
 
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-4 max-w-4xl">
         <h3 className="text-sm font-semibold text-white">Home page — main story</h3>
-        <p className="text-xs text-white/45">Shown on the public home: hero, then the #features block (headline, body, closing). Postscript is mainly for early-bird / rollout (optional).</p>
+        <p className="text-xs text-white/45">Shown on the public home: hero, then the #features block (headline, body, closing).</p>
         <div className="space-y-2">
           <Label>Lead paragraph</Label>
           <Textarea
@@ -314,7 +299,7 @@ export default function SiteContentAdmin() {
           />
         </div>
         <div className="space-y-2">
-          <Label>Postscript (early-bird; leave empty to hide on translated locales if you clear it)</Label>
+          <Label>Postscript (optional; not shown on the public home — reserved for future use)</Label>
           <Textarea
             className="min-h-[72px] bg-gray-900/80 border-white/10"
             value={merged.landing_postscript ?? ""}
