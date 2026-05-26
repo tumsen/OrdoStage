@@ -1499,8 +1499,12 @@ export type PublicPlanQuote = z.infer<typeof PublicPlanQuoteSchema>;
 export const FixedCheckoutRequestSchema = z.object({
   seats: z.number().int().min(1).max(200),
 });
-export const FixedCheckoutResponseSchema = z.object({
+export const PaddleCheckoutFieldsSchema = z.object({
   checkoutUrl: z.string().url().nullable(),
+  paddleTransactionId: z.string().nullable().optional(),
+});
+
+export const FixedCheckoutResponseSchema = PaddleCheckoutFieldsSchema.extend({
   annualInvoiceCents: z.number().int(),
   seats: z.number().int(),
   requiresEnterpriseContact: z.boolean().optional(),
@@ -1536,16 +1540,17 @@ export const FixedTemporaryPassCheckoutRequestSchema = z.object({
   extraSeats: z.number().int().min(1).max(200),
 });
 
-export const FixedTemporaryPassCheckoutResponseSchema = z.object({
-  checkoutUrl: z.string().url().nullable(),
+export const FixedTemporaryPassCheckoutResponseSchema = PaddleCheckoutFieldsSchema.extend({
   totalCents: z.number().int(),
   extraSeats: z.number().int(),
   passDays: z.number().int(),
 });
 
-export const OpenInvoicePaddleCheckoutResponseSchema = z.object({
-  checkoutUrl: z.string().url().nullable(),
-  paddleTransactionId: z.string().nullable().optional(),
+export const FixedSeatIncreaseCheckoutResponseSchema = PaddleCheckoutFieldsSchema.extend({
+  topUpCents: z.number().int(),
+});
+
+export const OpenInvoicePaddleCheckoutResponseSchema = PaddleCheckoutFieldsSchema.extend({
   paddleInvoiceId: z.string().nullable().optional(),
 });
 

@@ -19,11 +19,14 @@ import {
   temporarySeatPassTotalMajor,
 } from "@/lib/flexFixedPricing";
 import { FlexFixedPlanComparison } from "@/components/pricing/FlexFixedPlanComparison";
+import { openPaddleCheckout } from "@/lib/paddleCheckout";
 import { pricingSeatRangeClass } from "@/components/pricing/pricingSeatRangeClass";
 import { z } from "zod";
 import type {
   FixedCheckoutResponseSchema,
+  FixedSeatIncreaseCheckoutResponseSchema,
   FixedSeatIncreaseQuoteSchema,
+  FixedTemporaryPassCheckoutResponseSchema,
   FixedTemporaryPassQuoteSchema,
 } from "@/contracts/backendTypes";
 
@@ -87,7 +90,7 @@ export function BillingPlanPicker({
       api.post<z.infer<typeof FixedCheckoutResponseSchema>>("/api/billing/fixed/checkout", {
         seats: quote.n,
       }),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data.requiresEnterpriseContact) {
         toast({
           title: "Contact us for 150+ seats",
@@ -95,11 +98,18 @@ export function BillingPlanPicker({
         });
         return;
       }
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-        return;
+      const mode = await openPaddleCheckout({
+        paddleTransactionId: data.paddleTransactionId,
+        checkoutUrl: data.checkoutUrl,
+      });
+      if (mode === "unavailable") {
+        toast({
+          title: "Checkout unavailable",
+          description:
+            "Paddle did not return a checkout link. Enable Checkout in Paddle and set your default payment link.",
+          variant: "destructive",
+        });
       }
-      toast({ title: "Checkout unavailable", description: "Paddle did not return a checkout URL.", variant: "destructive" });
     },
     onError: (err) => {
       toast({
@@ -119,15 +129,17 @@ export function BillingPlanPicker({
 
   const increaseCheckout = useMutation({
     mutationFn: (newSeats: number) =>
-      api.post<{ checkoutUrl: string | null; topUpCents: number }>("/api/billing/fixed/seat-increase", {
+      api.post<z.infer<typeof FixedSeatIncreaseCheckoutResponseSchema>>("/api/billing/fixed/seat-increase", {
         newCommittedSeats: newSeats,
       }),
-    onSuccess: (data) => {
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-        return;
+    onSuccess: async (data) => {
+      const mode = await openPaddleCheckout({
+        paddleTransactionId: data.paddleTransactionId,
+        checkoutUrl: data.checkoutUrl,
+      });
+      if (mode === "unavailable") {
+        toast({ title: "Checkout unavailable", variant: "destructive" });
       }
-      toast({ title: "Checkout unavailable", variant: "destructive" });
     },
     onError: (err) => {
       toast({
@@ -147,16 +159,18 @@ export function BillingPlanPicker({
 
   const passCheckout = useMutation({
     mutationFn: (extraSeats: number) =>
-      api.post<{ checkoutUrl: string | null; totalCents: number; passDays: number }>(
+      api.post<z.infer<typeof FixedTemporaryPassCheckoutResponseSchema>>(
         "/api/billing/fixed/temporary-pass-checkout",
         { extraSeats },
       ),
-    onSuccess: (data) => {
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-        return;
+    onSuccess: async (data) => {
+      const mode = await openPaddleCheckout({
+        paddleTransactionId: data.paddleTransactionId,
+        checkoutUrl: data.checkoutUrl,
+      });
+      if (mode === "unavailable") {
+        toast({ title: "Checkout unavailable", variant: "destructive" });
       }
-      toast({ title: "Checkout unavailable", variant: "destructive" });
     },
     onError: (err) => {
       toast({

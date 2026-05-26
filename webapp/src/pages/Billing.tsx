@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, isApiError } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { openPaddleCheckout } from "@/lib/paddleCheckout";
 import { BillingPlanPicker } from "@/components/billing/BillingPlanPicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Receipt, Users } from "lucide-react";
@@ -79,18 +80,23 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
 
   const payInvoiceMutation = useMutation({
     mutationFn: () =>
-      api.post<{ checkoutUrl: string | null }>("/api/billing/open-invoice/checkout", {}),
-    onSuccess: (data) => {
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-        return;
-      }
-      toast({
-        title: "Checkout unavailable",
-        description:
-          "Paddle did not return a payment link. Confirm checkout is enabled in your Paddle account (default payment link).",
-        variant: "destructive",
+      api.post<{ checkoutUrl: string | null; paddleTransactionId?: string | null }>(
+        "/api/billing/open-invoice/checkout",
+        {},
+      ),
+    onSuccess: async (data) => {
+      const mode = await openPaddleCheckout({
+        paddleTransactionId: data.paddleTransactionId,
+        checkoutUrl: data.checkoutUrl,
       });
+      if (mode === "unavailable") {
+        toast({
+          title: "Checkout unavailable",
+          description:
+            "Paddle did not return a payment link. Enable Checkout and set your default payment link in Paddle.",
+          variant: "destructive",
+        });
+      }
     },
     onError: (err) => {
       toast({

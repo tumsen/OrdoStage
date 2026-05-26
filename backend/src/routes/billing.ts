@@ -267,6 +267,7 @@ app.post("/billing/fixed/checkout", async (c) => {
     return c.json({
       data: {
         checkoutUrl: tx.checkout?.url ?? null,
+        paddleTransactionId: tx.id,
         annualInvoiceCents: annualCents,
         seats,
         requiresEnterpriseContact: false,
@@ -393,7 +394,9 @@ app.post("/billing/fixed/seat-increase", async (c) => {
       newSeats: newCommittedSeats,
       amountCents: topUpCents,
     });
-    return c.json({ data: { checkoutUrl: tx.checkout?.url ?? null, topUpCents } });
+    return c.json({
+      data: { checkoutUrl: tx.checkout?.url ?? null, paddleTransactionId: tx.id, topUpCents },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Paddle checkout failed";
     return c.json({ error: { message, code: "PADDLE_CHECKOUT_FAILED" } }, 502);
@@ -504,6 +507,7 @@ app.post("/billing/fixed/temporary-pass-checkout", async (c) => {
     return c.json({
       data: {
         checkoutUrl: tx.checkout?.url ?? null,
+        paddleTransactionId: tx.id,
         totalCents,
         extraSeats: body.extraSeats,
         passDays: fp.temporarySeatPassDays,
