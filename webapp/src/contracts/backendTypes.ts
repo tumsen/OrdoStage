@@ -1499,8 +1499,12 @@ export type PublicPlanQuote = z.infer<typeof PublicPlanQuoteSchema>;
 export const FixedCheckoutRequestSchema = z.object({
   seats: z.number().int().min(1).max(200),
 });
-export const FixedCheckoutResponseSchema = z.object({
+export const PaddleCheckoutFieldsSchema = z.object({
   checkoutUrl: z.string().url().nullable(),
+  paddleTransactionId: z.string().nullable().optional(),
+});
+
+export const FixedCheckoutResponseSchema = PaddleCheckoutFieldsSchema.extend({
   annualInvoiceCents: z.number().int(),
   seats: z.number().int(),
   requiresEnterpriseContact: z.boolean().optional(),
@@ -1536,11 +1540,18 @@ export const FixedTemporaryPassCheckoutRequestSchema = z.object({
   extraSeats: z.number().int().min(1).max(200),
 });
 
-export const FixedTemporaryPassCheckoutResponseSchema = z.object({
-  checkoutUrl: z.string().url().nullable(),
+export const FixedTemporaryPassCheckoutResponseSchema = PaddleCheckoutFieldsSchema.extend({
   totalCents: z.number().int(),
   extraSeats: z.number().int(),
   passDays: z.number().int(),
+});
+
+export const FixedSeatIncreaseCheckoutResponseSchema = PaddleCheckoutFieldsSchema.extend({
+  topUpCents: z.number().int(),
+});
+
+export const OpenInvoicePaddleCheckoutResponseSchema = PaddleCheckoutFieldsSchema.extend({
+  paddleInvoiceId: z.string().nullable().optional(),
 });
 
 export const OrgBillingPlanSummarySchema = z.object({
@@ -1777,12 +1788,23 @@ export const ProductionPlannerGanttLineKindSchema = z.enum([
   "cost",
 ]);
 
+export const ProductionPhaseDocumentSchema = z.object({
+  id: z.string(),
+  phaseId: z.string(),
+  name: z.string(),
+  type: z.string(),
+  filename: z.string(),
+  mimeType: z.string(),
+  createdAt: z.string(),
+});
+
 export const ProductionPlannerGanttLineSchema = z.object({
   lineId: z.string(),
   kind: ProductionPlannerGanttLineKindSchema,
   label: z.string(),
   category: z.string(),
   status: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
   assigneePersonId: z.string().nullable().optional(),
   assigneeName: z.string().nullable().optional(),
   departmentId: z.string().nullable().optional(),
@@ -1858,6 +1880,7 @@ export type ProductionCostLine = z.infer<typeof ProductionCostLineSchema>;
 export type CreateProductionCostLine = z.infer<typeof CreateProductionCostLineSchema>;
 export type UpdateProductionCostLine = z.infer<typeof UpdateProductionCostLineSchema>;
 export type ProductionPlannerTask = z.infer<typeof ProductionPlannerTaskSchema>;
+export type ProductionPhaseDocument = z.infer<typeof ProductionPhaseDocumentSchema>;
 export type ProductionPlannerGanttLine = z.infer<typeof ProductionPlannerGanttLineSchema>;
 export type ProductionPlannerRow = z.infer<typeof ProductionPlannerRowSchema>;
 export type ProductionPlannerResponse = z.infer<typeof ProductionPlannerResponseSchema>;

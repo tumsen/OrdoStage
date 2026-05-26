@@ -3,13 +3,16 @@
 FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
-COPY package.json ./
-RUN bun install
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
 COPY . .
 
 ARG VITE_BACKEND_URL
 ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
+
+# Contracts must be vendored in git (sync-contracts needs monorepo backend/).
+RUN test -s src/contracts/backendTypes.ts
 
 RUN bun run build
 

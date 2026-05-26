@@ -28,7 +28,7 @@ import {
   serializeFixedPlanPricingJson,
 } from "../fixedPlanPricingConfig";
 import { DEFAULT_TIERED_SEAT_MODEL, tieredMonthlyTotalCents, type TieredSeatModel } from "../tieredSeatPricing";
-import { createPaddleCustomer, createPaddleTransactionForInvoice } from "../paddleClient";
+import { syncBillingInvoiceWithPaddle } from "../billingPaddle";
 import { AdminOrgEmailMembersBodySchema } from "../types";
 import { sendHtmlEmail } from "../resendMail";
 import { parseSeatCalculatorJson, SEAT_CALCULATOR_JSON_MAX_CHARS } from "../seatCalculatorJson";
@@ -350,62 +350,22 @@ app.post("/admin/billing/invoices/:id/paddle-sync", async (c) => {
   const invoiceId = c.req.param("id");
   const invoice = await prisma.billingInvoice.findUnique({
     where: { id: invoiceId },
-    include: {
-      organization: {
-        select: {
-          id: true,
-          name: true,
-          paddleCustomerId: true,
-          invoiceEmail: true,
-        },
-      },
-    },
+    select: { id: true },
   });
   if (!invoice) {
     return c.json({ error: { message: "Invoice not found", code: "NOT_FOUND" } }, 404);
   }
 
   try {
-    let paddleCustomerId = invoice.organization.paddleCustomerId;
-    if (!paddleCustomerId) {
-      const customer = await createPaddleCustomer({
-        organizationId: invoice.organization.id,
-        name: invoice.organization.name,
-        email: invoice.organization.invoiceEmail,
-      });
-      paddleCustomerId = customer.id;
-      await prisma.organization.update({
-        where: { id: invoice.organization.id },
-        data: { paddleCustomerId },
-      });
-    }
-
-    const periodLabel = `${invoice.periodStart.toISOString().slice(0, 10)} to ${invoice.periodEnd.toISOString().slice(0, 10)}`;
-    const transaction = await createPaddleTransactionForInvoice({
-      customerId: paddleCustomerId,
-      invoiceId: invoice.id,
-      organizationName: invoice.organization.name,
-      periodLabel,
-      amountCents: invoice.totalCents,
-      currencyCode: invoice.currency,
-    });
-
-    const updated = await prisma.billingInvoice.update({
-      where: { id: invoice.id },
+    const result = await syncBillingInvoiceWithPaddle(prisma, invoiceId);
+    return c.json({
       data: {
-        paddleTransactionId: transaction.id,
-        paddleInvoiceId: transaction.invoice?.id ?? invoice.paddleInvoiceId,
-        paddleInvoiceUrl: transaction.checkout?.url ?? invoice.paddleInvoiceUrl,
-      },
-      select: {
-        id: true,
-        paddleTransactionId: true,
-        paddleInvoiceId: true,
-        paddleInvoiceUrl: true,
+        id: invoiceId,
+        paddleTransactionId: result.paddleTransactionId,
+        paddleInvoiceId: result.paddleInvoiceId,
+        paddleInvoiceUrl: result.checkoutUrl,
       },
     });
-
-    return c.json({ data: updated });
   } catch (error) {
     return c.json(
       {
