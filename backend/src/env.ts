@@ -15,6 +15,8 @@ const envSchema = z.object({
   PADDLE_API_KEY: z.string().optional(),
   PADDLE_WEBHOOK_SECRET: z.string().optional(),
   PADDLE_ENV: z.enum(["sandbox", "live"]).default("live"),
+  /** Catalog product for inline checkout line items (pro_…). Set via `bun run paddle:setup-catalog`. */
+  PADDLE_PRODUCT_ID: z.string().optional(),
   // Email (production)
   RESEND_API_KEY: z.string().optional(),
   FROM_EMAIL: z.string().optional(),

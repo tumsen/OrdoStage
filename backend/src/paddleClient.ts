@@ -20,7 +20,7 @@ type PaddleErrorBody = {
   };
 };
 
-function paddleBaseUrl(): string {
+export function paddleBaseUrl(): string {
   return env.PADDLE_ENV === "live" ? "https://api.paddle.com" : "https://sandbox-api.paddle.com";
 }
 
@@ -35,7 +35,7 @@ export function getPaddlePublicInfo(): { configured: boolean; environment: "sand
   };
 }
 
-function normalizePaddleApiKey(raw: string | undefined): string {
+export function normalizePaddleApiKey(raw: string | undefined): string {
   const trimmed = raw?.trim() ?? "";
   if (!trimmed) return "";
   return trimmed.replace(/^Bearer\s+/i, "");
@@ -86,7 +86,7 @@ async function paddleRequest<T>(
   return json.data;
 }
 
-/** Inline (non-catalog) prices require a nested product on Paddle Billing v2. */
+/** Inline (non-catalog) prices; uses catalog product_id when PADDLE_PRODUCT_ID is set. */
 function inlinePriceItem(input: {
   name: string;
   description: string;
@@ -96,6 +96,7 @@ function inlinePriceItem(input: {
 }) {
   const amount = Math.max(0, Math.round(input.amountCents)).toString();
   const currencyCode = input.currencyCode.toUpperCase();
+  const catalogProductId = env.PADDLE_PRODUCT_ID?.trim();
   const price: Record<string, unknown> = {
     name: input.name,
     description: input.description,
@@ -103,11 +104,15 @@ function inlinePriceItem(input: {
       amount,
       currency_code: currencyCode,
     },
-    product: {
-      name: "OrdoStage",
-      description: "Theater and venue production management",
-      tax_category: "saas",
-    },
+    ...(catalogProductId
+      ? { product_id: catalogProductId }
+      : {
+          product: {
+            name: "OrdoStage",
+            description: "Theater and venue production management",
+            tax_category: "saas",
+          },
+        }),
   };
   if (input.billingCycle) {
     price.billing_cycle = input.billingCycle;
