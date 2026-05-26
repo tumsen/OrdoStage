@@ -15,7 +15,9 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:prepare": "docker compose up -d && sleep 3 && prisma migrate deploy",
     "db:migrate:railway": "bunx @railway/cli ssh -s Backend -- sh -c 'cd /app && bunx prisma migrate deploy'",
-    "paddle:setup-catalog": "bun run scripts/setup-paddle-catalog.ts"
+    "paddle:setup-catalog": "bun run scripts/setup-paddle-catalog.ts",
+    "paddle:setup-production": "bun run scripts/setup-paddle-production.ts",
+    "paddle:sync-railway": "bun run scripts/sync-paddle-railway.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

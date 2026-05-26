@@ -11,6 +11,12 @@ COPY . .
 ARG VITE_BACKEND_URL
 ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
 
+ARG VITE_PADDLE_CLIENT_TOKEN
+ENV VITE_PADDLE_CLIENT_TOKEN=${VITE_PADDLE_CLIENT_TOKEN}
+
+ARG VITE_PADDLE_ENV=production
+ENV VITE_PADDLE_ENV=${VITE_PADDLE_ENV}
+
 # Contracts must be vendored in git (sync-contracts needs monorepo backend/).
 RUN test -s src/contracts/backendTypes.ts
 

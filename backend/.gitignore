@@ -19,6 +19,7 @@ studio.log
 
 # dotenv environment variable files
 .env
+.paddle-railway-sync.json
 .env.development.local
 .env.test.local
 .env.production.local
