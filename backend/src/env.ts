@@ -14,7 +14,7 @@ const envSchema = z.object({
   // Paddle
   PADDLE_API_KEY: z.string().optional(),
   PADDLE_WEBHOOK_SECRET: z.string().optional(),
-  PADDLE_ENV: z.enum(["sandbox", "live"]).default("sandbox"),
+  PADDLE_ENV: z.enum(["sandbox", "live"]).default("live"),
   // Email (production)
   RESEND_API_KEY: z.string().optional(),
   FROM_EMAIL: z.string().optional(),

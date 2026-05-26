@@ -12,13 +12,10 @@ function clientToken(): string | undefined {
   return raw || undefined;
 }
 
-/** Matches VITE_PADDLE_ENV and Paddle client token prefixes (live_ / test_). */
+/** Paddle.js environment; defaults to production (live). Set VITE_PADDLE_ENV=sandbox only for Paddle sandbox accounts. */
 export function paddleJsEnvironment(): "sandbox" | "production" {
   const raw = import.meta.env.VITE_PADDLE_ENV?.trim().toLowerCase();
-  if (raw === "live" || raw === "production") return "production";
   if (raw === "sandbox") return "sandbox";
-  const token = clientToken() ?? "";
-  if (token.startsWith("test_")) return "sandbox";
   return "production";
 }
 

@@ -31,14 +31,12 @@ import type {
   FixedSeatIncreaseQuoteSchema,
   FixedTemporaryPassCheckoutResponseSchema,
   FixedTemporaryPassQuoteSchema,
-  PaddleCheckoutFieldsSchema,
 } from "@/contracts/backendTypes";
 
 type PlanChoice = "flex" | "yearly";
 
 type Props = {
   billingPlan: "flex" | "fixed";
-  paddleBilling?: { configured: boolean; environment: "sandbox" | "live" };
   committedSeats: number | null;
   annualRenewalDate: string | null;
   billableCountThisMonth: number;
@@ -90,7 +88,6 @@ function PlanChoiceCard({
 
 export function BillingPlanPicker({
   billingPlan,
-  paddleBilling,
   committedSeats,
   annualRenewalDate,
   billableCountThisMonth,
@@ -141,31 +138,6 @@ export function BillingPlanPicker({
       toast({
         title: "Could not confirm plan",
         description: isApiError(err) ? err.message : "Try again later.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const sandboxTestCheckout = useMutation({
-    mutationFn: () =>
-      api.post<z.infer<typeof PaddleCheckoutFieldsSchema>>("/api/billing/sandbox/checkout-test", {}),
-    onSuccess: async (data) => {
-      const mode = await openPaddleCheckout({
-        paddleTransactionId: data.paddleTransactionId,
-        checkoutUrl: data.checkoutUrl,
-      });
-      if (mode === "unavailable") {
-        toast({
-          title: "Checkout unavailable",
-          description: "Enable Checkout in Paddle sandbox and set your default payment link.",
-          variant: "destructive",
-        });
-      }
-    },
-    onError: (err) => {
-      toast({
-        title: "Sandbox test failed",
-        description: isApiError(err) ? err.message : "Could not start test checkout.",
         variant: "destructive",
       });
     },
@@ -422,9 +394,6 @@ export function BillingPlanPicker({
     );
   }
 
-  const showSandboxTools =
-    paddleBilling?.environment === "sandbox" && paddleBilling.configured && isOwner;
-
   return (
     <div className="space-y-6">
       <div>
@@ -451,26 +420,6 @@ export function BillingPlanPicker({
       </div>
 
       <FlexFixedPlanComparison />
-
-      {showSandboxTools ? (
-        <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 space-y-3">
-          <p className="text-sm font-medium text-amber-50">Paddle sandbox</p>
-          <p className="text-xs text-amber-100/75 leading-relaxed">
-            API and checkout run in sandbox mode. Use card{" "}
-            <span className="font-mono text-amber-50">4242 4242 4242 4242</span>, any future expiry, any CVC. The €1
-            test charge does not change your plan or subscription.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            className="border-amber-500/40 text-amber-50 hover:bg-amber-500/15"
-            disabled={sandboxTestCheckout.isPending}
-            onClick={() => sandboxTestCheckout.mutate()}
-          >
-            {sandboxTestCheckout.isPending ? "Starting test…" : "Run €1 sandbox payment test"}
-          </Button>
-        </div>
-      ) : null}
 
       {isOwner ? (
         selectedPlan === "flex" ? (

@@ -246,32 +246,6 @@ export async function createPaddleCheckoutForTemporarySeatPass(input: {
   });
 }
 
-/** One-off €1 checkout to verify Paddle sandbox (does not change billing plan). */
-export async function createPaddleSandboxTestCheckout(input: {
-  customerId: string;
-  organizationId: string;
-  currencyCode?: string;
-}): Promise<PaddleTransaction> {
-  const currencyCode = (input.currencyCode ?? "EUR").toUpperCase();
-  return createTransaction({
-    customer_id: input.customerId,
-    collection_mode: "automatic",
-    currency_code: currencyCode,
-    items: [
-      inlinePriceItem({
-        name: "OrdoStage sandbox payment test",
-        description: "Test charge only — does not activate a subscription or change your plan.",
-        amountCents: 100,
-        currencyCode,
-      }),
-    ],
-    custom_data: {
-      organizationId: input.organizationId,
-      checkoutKind: "sandbox_test",
-    },
-  });
-}
-
 export async function createPaddleTransactionForInvoice(input: {
   customerId: string;
   invoiceId: string;
