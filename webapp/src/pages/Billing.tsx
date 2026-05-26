@@ -33,6 +33,7 @@ interface OrgBillingData {
   temporarySeatPassDays?: number;
   temporarySeatPassPricePerSeatMajor?: number;
   effectiveCommittedSeats?: number | null;
+  paddleBilling?: { configured: boolean; environment: "sandbox" | "live" };
   billingTrialDays?: number;
   billingGraceDaysAfterDue?: number;
   billingOnTrial?: boolean;
@@ -160,6 +161,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
 
       <BillingPlanPicker
         billingPlan={billingPlan}
+        paddleBilling={org?.paddleBilling}
         committedSeats={org?.committedSeats ?? null}
         annualRenewalDate={org?.annualRenewalDate ?? null}
         billableCountThisMonth={billable.length}

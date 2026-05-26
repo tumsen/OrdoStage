@@ -13,6 +13,7 @@ import {
   fixedOverageMonthlyTotalCents,
   organizationUsesFlexPostpaid,
 } from "../flexFixedPricing";
+import { getPaddlePublicInfo } from "../paddleClient";
 import {
   BILLING_CURRENCY_CODE,
   currentUtcMonthRange,
@@ -449,6 +450,7 @@ app.get("/org", async (c) => {
       openInvoice,
       fixedOverageEstimateCents,
       fixedAnnualRoundToTen: billingConfig.fixedAnnualRoundToTen,
+      paddleBilling: getPaddlePublicInfo(),
     },
   });
 });

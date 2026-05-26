@@ -28,6 +28,13 @@ export function isPaddleConfigured(): boolean {
   return Boolean(normalizePaddleApiKey(env.PADDLE_API_KEY));
 }
 
+export function getPaddlePublicInfo(): { configured: boolean; environment: "sandbox" | "live" } {
+  return {
+    configured: isPaddleConfigured(),
+    environment: env.PADDLE_ENV,
+  };
+}
+
 function normalizePaddleApiKey(raw: string | undefined): string {
   const trimmed = raw?.trim() ?? "";
   if (!trimmed) return "";
@@ -235,6 +242,32 @@ export async function createPaddleCheckoutForTemporarySeatPass(input: {
       extraSeats: String(extra),
       passDays: String(days),
       passCents: String(Math.max(0, Math.round(input.amountCents))),
+    },
+  });
+}
+
+/** One-off €1 checkout to verify Paddle sandbox (does not change billing plan). */
+export async function createPaddleSandboxTestCheckout(input: {
+  customerId: string;
+  organizationId: string;
+  currencyCode?: string;
+}): Promise<PaddleTransaction> {
+  const currencyCode = (input.currencyCode ?? "EUR").toUpperCase();
+  return createTransaction({
+    customer_id: input.customerId,
+    collection_mode: "automatic",
+    currency_code: currencyCode,
+    items: [
+      inlinePriceItem({
+        name: "OrdoStage sandbox payment test",
+        description: "Test charge only — does not activate a subscription or change your plan.",
+        amountCents: 100,
+        currencyCode,
+      }),
+    ],
+    custom_data: {
+      organizationId: input.organizationId,
+      checkoutKind: "sandbox_test",
     },
   });
 }

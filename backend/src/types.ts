@@ -1496,6 +1496,19 @@ export const PublicPlanQuoteSchema = z.object({
 });
 export type PublicPlanQuote = z.infer<typeof PublicPlanQuoteSchema>;
 
+export const PaddleBillingInfoSchema = z.object({
+  configured: z.boolean(),
+  environment: z.enum(["sandbox", "live"]),
+});
+
+export const ChooseBillingPlanRequestSchema = z.object({
+  plan: z.literal("flex"),
+});
+
+export const ChooseBillingPlanResponseSchema = z.object({
+  billingPlan: BillingPlanSchema,
+});
+
 export const FixedCheckoutRequestSchema = z.object({
   seats: z.number().int().min(1).max(200),
 });

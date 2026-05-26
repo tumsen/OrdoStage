@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { planAccentStyles } from "@/lib/ordoBrandColors";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -23,15 +25,20 @@ import { openPaddleCheckout } from "@/lib/paddleCheckout";
 import { pricingSeatRangeClass } from "@/components/pricing/pricingSeatRangeClass";
 import { z } from "zod";
 import type {
+  ChooseBillingPlanResponseSchema,
   FixedCheckoutResponseSchema,
   FixedSeatIncreaseCheckoutResponseSchema,
   FixedSeatIncreaseQuoteSchema,
   FixedTemporaryPassCheckoutResponseSchema,
   FixedTemporaryPassQuoteSchema,
+  PaddleCheckoutFieldsSchema,
 } from "@/contracts/backendTypes";
+
+type PlanChoice = "flex" | "yearly";
 
 type Props = {
   billingPlan: "flex" | "fixed";
+  paddleBilling?: { configured: boolean; environment: "sandbox" | "live" };
   committedSeats: number | null;
   annualRenewalDate: string | null;
   billableCountThisMonth: number;
@@ -49,8 +56,41 @@ function clampSeats(n: number): number {
   return Math.min(200, Math.max(FLEX_FIXED_MIN_SEATS, Math.round(n)));
 }
 
+function PlanChoiceCard({
+  plan,
+  selected,
+  title,
+  subtitle,
+  onSelect,
+}: {
+  plan: PlanChoice;
+  selected: boolean;
+  title: string;
+  subtitle: string;
+  onSelect: () => void;
+}) {
+  const accent = plan === "flex" ? planAccentStyles.flex : planAccentStyles.yearly;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "rounded-xl border p-4 text-left transition-colors w-full",
+        selected ? accent.cardBorder : "border-white/10 bg-white/[0.02] hover:border-white/20",
+      )}
+    >
+      <p className={cn("text-sm font-semibold", selected ? "text-white" : "text-white/85")}>{title}</p>
+      <p className="mt-1 text-xs text-white/55 leading-relaxed">{subtitle}</p>
+      {selected ? (
+        <p className={cn("mt-2 text-[11px] font-medium uppercase tracking-wide", accent.label)}>Selected</p>
+      ) : null}
+    </button>
+  );
+}
+
 export function BillingPlanPicker({
   billingPlan,
+  paddleBilling,
   committedSeats,
   annualRenewalDate,
   billableCountThisMonth,
@@ -64,6 +104,8 @@ export function BillingPlanPicker({
   effectiveCommittedSeats: effectiveCommittedProp = null,
 }: Props) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedPlan, setSelectedPlan] = useState<PlanChoice>("flex");
   const [checkoutSeats, setCheckoutSeats] = useState(10);
   const [increaseSeats, setIncreaseSeats] = useState(() => (committedSeats ?? 10) + 5);
   const [passExtraSeats, setPassExtraSeats] = useState(() => {
@@ -84,6 +126,50 @@ export function BillingPlanPicker({
       enterprise: requiresEnterpriseContact(n),
     };
   }, [checkoutSeats, roundTen]);
+
+  const chooseFlex = useMutation({
+    mutationFn: () =>
+      api.post<z.infer<typeof ChooseBillingPlanResponseSchema>>("/api/billing/choose-plan", { plan: "flex" }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["org"] });
+      toast({
+        title: "Flex plan selected",
+        description: "You are on monthly postpaid billing. Pay open invoices via Paddle when they are issued.",
+      });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not confirm plan",
+        description: isApiError(err) ? err.message : "Try again later.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sandboxTestCheckout = useMutation({
+    mutationFn: () =>
+      api.post<z.infer<typeof PaddleCheckoutFieldsSchema>>("/api/billing/sandbox/checkout-test", {}),
+    onSuccess: async (data) => {
+      const mode = await openPaddleCheckout({
+        paddleTransactionId: data.paddleTransactionId,
+        checkoutUrl: data.checkoutUrl,
+      });
+      if (mode === "unavailable") {
+        toast({
+          title: "Checkout unavailable",
+          description: "Enable Checkout in Paddle sandbox and set your default payment link.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (err) => {
+      toast({
+        title: "Sandbox test failed",
+        description: isApiError(err) ? err.message : "Could not start test checkout.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const fixedCheckout = useMutation({
     mutationFn: () =>
@@ -336,64 +422,131 @@ export function BillingPlanPicker({
     );
   }
 
+  const showSandboxTools =
+    paddleBilling?.environment === "sandbox" && paddleBilling.configured && isOwner;
+
   return (
     <div className="space-y-6">
+      <div>
+        <p className="text-sm font-medium text-white">Choose your billing plan</p>
+        <p className="text-xs text-white/50 mt-1">
+          Flex bills monthly for seats used. Yearly pays upfront for committed seats with a volume discount.
+        </p>
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <PlanChoiceCard
+            plan="flex"
+            selected={selectedPlan === "flex"}
+            title="Flex — monthly postpaid"
+            subtitle="Pay each month for billable seats. No upfront annual payment. Trial applies to new workspaces."
+            onSelect={() => setSelectedPlan("flex")}
+          />
+          <PlanChoiceCard
+            plan="yearly"
+            selected={selectedPlan === "yearly"}
+            title="Yearly — annual commitment"
+            subtitle="One annual Paddle payment for committed seats. Overage above commitment billed monthly at Flex rates."
+            onSelect={() => setSelectedPlan("yearly")}
+          />
+        </div>
+      </div>
+
       <FlexFixedPlanComparison />
 
+      {showSandboxTools ? (
+        <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 space-y-3">
+          <p className="text-sm font-medium text-amber-50">Paddle sandbox</p>
+          <p className="text-xs text-amber-100/75 leading-relaxed">
+            API and checkout run in sandbox mode. Use card{" "}
+            <span className="font-mono text-amber-50">4242 4242 4242 4242</span>, any future expiry, any CVC. The €1
+            test charge does not change your plan or subscription.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-amber-500/40 text-amber-50 hover:bg-amber-500/15"
+            disabled={sandboxTestCheckout.isPending}
+            onClick={() => sandboxTestCheckout.mutate()}
+          >
+            {sandboxTestCheckout.isPending ? "Starting test…" : "Run €1 sandbox payment test"}
+          </Button>
+        </div>
+      ) : null}
+
       {isOwner ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
-          <div>
-            <p className="text-sm font-medium text-white">Switch to Yearly</p>
-            <p className="text-xs text-white/50 mt-1">
-              Pay annually upfront via Paddle for your committed seats. Overage above commitment is billed monthly at
-              Flex marginal rates unless you buy a short-term seat pass. Yearly does not include a free trial.
+        selectedPlan === "flex" ? (
+          <div className={cn("rounded-xl border p-4 space-y-3", planAccentStyles.flex.sectionBorder, planAccentStyles.flex.sectionBg)}>
+            <p className="text-sm font-medium text-white">Flex billing</p>
+            <p className="text-xs text-white/55 leading-relaxed">
+              You are billed monthly for billable seats in the previous calendar month. When an invoice is issued, pay
+              it from this page with Paddle. No checkout is required to start on Flex.
             </p>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1 min-w-[12rem] flex-1 max-w-md">
-              <Label htmlFor="fixed-checkout-seats" className="text-xs text-white/50">
-                Committed seats
-              </Label>
-              <input
-                id="fixed-checkout-seats"
-                type="range"
-                min={FLEX_FIXED_MIN_SEATS}
-                max={FLEX_FIXED_MAX_SEATS}
-                value={Math.min(quote.n, FLEX_FIXED_MAX_SEATS)}
-                onChange={(e) => setCheckoutSeats(Number(e.target.value))}
-                className={pricingSeatRangeClass}
-              />
-              <p className="text-sm text-white tabular-nums">{quote.n} seats</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            <p className="text-white/70">
-              Annual invoice: <span className="text-white font-medium">{formatEuroMajor(quote.annual)}</span>
-              {roundTen ? <span className="text-white/45 text-xs"> (rounded to €10)</span> : null}
+            <p className="text-sm text-white/70">
+              Billable this month: <span className="text-white font-medium tabular-nums">{billableCountThisMonth}</span>{" "}
+              seat{billableCountThisMonth === 1 ? "" : "s"}
             </p>
-            <p className="text-white/70">
-              Discount: <span className="text-white font-medium">{quote.discount.toFixed(1)}%</span>
-            </p>
-            <p className="text-ordo-yellow/90">Save {formatEuroMajor(quote.saving)}/yr vs Flex</p>
-          </div>
-
-          {quote.enterprise ? (
-            <p className="text-sm text-amber-200/90">More than 150 seats requires an enterprise conversation.</p>
-          ) : (
             <Button
               type="button"
               className="bg-rose-700 hover:bg-rose-600"
-              disabled={fixedCheckout.isPending}
-              onClick={() => fixedCheckout.mutate()}
+              disabled={chooseFlex.isPending}
+              onClick={() => chooseFlex.mutate()}
             >
-              {fixedCheckout.isPending ? "Opening checkout…" : "Continue to Paddle checkout (Yearly)"}
+              {chooseFlex.isPending ? "Saving…" : "Continue with Flex"}
             </Button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className={cn("rounded-xl border p-4 space-y-4", planAccentStyles.yearly.sectionBorder, planAccentStyles.yearly.sectionBg)}>
+            <div>
+              <p className="text-sm font-medium text-white">Yearly checkout</p>
+              <p className="text-xs text-white/50 mt-1">
+                Pay annually upfront via Paddle for your committed seats. Yearly does not include a free trial.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="space-y-1 min-w-[12rem] flex-1 max-w-md">
+                <Label htmlFor="fixed-checkout-seats" className="text-xs text-white/50">
+                  Committed seats
+                </Label>
+                <input
+                  id="fixed-checkout-seats"
+                  type="range"
+                  min={FLEX_FIXED_MIN_SEATS}
+                  max={FLEX_FIXED_MAX_SEATS}
+                  value={Math.min(quote.n, FLEX_FIXED_MAX_SEATS)}
+                  onChange={(e) => setCheckoutSeats(Number(e.target.value))}
+                  className={pricingSeatRangeClass}
+                />
+                <p className="text-sm text-white tabular-nums">{quote.n} seats</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+              <p className="text-white/70">
+                Annual invoice: <span className="text-white font-medium">{formatEuroMajor(quote.annual)}</span>
+                {roundTen ? <span className="text-white/45 text-xs"> (rounded to €10)</span> : null}
+              </p>
+              <p className="text-white/70">
+                Discount: <span className="text-white font-medium">{quote.discount.toFixed(1)}%</span>
+              </p>
+              <p className="text-ordo-yellow/90">Save {formatEuroMajor(quote.saving)}/yr vs Flex</p>
+            </div>
+
+            {quote.enterprise ? (
+              <p className="text-sm text-amber-200/90">More than 150 seats requires an enterprise conversation.</p>
+            ) : (
+              <Button
+                type="button"
+                className="bg-rose-700 hover:bg-rose-600"
+                disabled={fixedCheckout.isPending}
+                onClick={() => fixedCheckout.mutate()}
+              >
+                {fixedCheckout.isPending ? "Opening checkout…" : "Continue to Paddle checkout (Yearly)"}
+              </Button>
+            )}
+          </div>
+        )
       ) : (
-        <p className="text-xs text-white/45">Only organisation owners can start Yearly checkout.</p>
+        <p className="text-xs text-white/45">Only organisation owners can choose a plan or start checkout.</p>
       )}
     </div>
   );

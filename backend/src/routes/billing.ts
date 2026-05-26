@@ -21,10 +21,13 @@ import {
   createPaddleCheckoutForFixedTopUp,
   createPaddleCheckoutForTemporarySeatPass,
   createPaddleCustomer,
+  createPaddleSandboxTestCheckout,
+  isPaddleConfigured,
 } from "../paddleClient";
 import { getBillingConfig, markInvoiceOverdue, markInvoicePaid } from "../postpaidBilling";
 import { prisma } from "../prisma";
 import {
+  ChooseBillingPlanRequestSchema,
   FixedCheckoutRequestSchema,
   FixedSeatIncreaseRequestSchema,
   FixedTemporaryPassCheckoutRequestSchema,
@@ -216,6 +219,93 @@ app.post("/billing/checkout", async (c) => {
     },
     410,
   );
+});
+
+// POST /api/billing/choose-plan — confirm Flex (monthly postpaid); Yearly uses fixed checkout
+app.post("/billing/choose-plan", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (user.orgRole !== "owner") {
+    return c.json(
+      { error: { message: "Only organisation owners can choose a billing plan", code: "FORBIDDEN" } },
+      403,
+    );
+  }
+
+  const body = ChooseBillingPlanRequestSchema.parse(await c.req.json());
+  if (body.plan !== "flex") {
+    return c.json(
+      { error: { message: "Use Yearly checkout to switch to the annual plan", code: "USE_YEARLY_CHECKOUT" } },
+      400,
+    );
+  }
+
+  await prisma.organization.update({
+    where: { id: user.organizationId },
+    data: {
+      billingPlan: "flex",
+      committedSeats: null,
+      temporarySeatsBoost: null,
+      temporarySeatsBoostExpiresAt: null,
+      annualRenewalDate: null,
+      annualTermStartDate: null,
+      annualInvoiceAmountCents: null,
+      paddleSubscriptionId: null,
+    },
+  });
+
+  return c.json({ data: { billingPlan: "flex" as const } });
+});
+
+// POST /api/billing/sandbox/checkout-test — €1 Paddle test (sandbox API only)
+app.post("/billing/sandbox/checkout-test", async (c) => {
+  if (env.PADDLE_ENV !== "sandbox") {
+    return c.json(
+      { error: { message: "Sandbox checkout test is only available when PADDLE_ENV=sandbox", code: "NOT_SANDBOX" } },
+      403,
+    );
+  }
+  if (!isPaddleConfigured()) {
+    return c.json({ error: { message: "Paddle is not configured", code: "PADDLE_NOT_CONFIGURED" } }, 503);
+  }
+
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (user.orgRole !== "owner") {
+    return c.json(
+      { error: { message: "Only organisation owners can run sandbox checkout tests", code: "FORBIDDEN" } },
+      403,
+    );
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { id: true, name: true, paddleCustomerId: true, invoiceEmail: true },
+  });
+  if (!org) {
+    return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  try {
+    const customerId = await ensurePaddleCustomer(org, user.email);
+    const tx = await createPaddleSandboxTestCheckout({
+      customerId,
+      organizationId: org.id,
+    });
+    return c.json({
+      data: {
+        checkoutUrl: tx.checkout?.url ?? null,
+        paddleTransactionId: tx.id,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Paddle checkout failed";
+    return c.json({ error: { message, code: "PADDLE_CHECKOUT_FAILED" } }, 502);
+  }
 });
 
 // POST /api/billing/fixed/checkout — annual Fixed plan (org owner)
