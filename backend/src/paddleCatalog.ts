@@ -6,24 +6,41 @@ const PRODUCT_NAME = "OrdoStage";
 type PaddleProduct = { id: string; name: string; status?: string };
 type PaddlePrice = { id: string; name?: string; description?: string; product_id: string };
 
-type PaddleListResponse<T> = { data: T[]; meta?: { pagination?: { has_more?: boolean; next?: string } } };
-
+type PaddleListResponse<T> = { data: T[] };
 type PaddleErrorBody = {
   error?: { detail?: string; code?: string; errors?: Array<{ field?: string; message?: string }> };
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function paddleFetch(path: string, init: RequestInit, attempt = 0): Promise<Response> {
+  const key = normalizePaddleApiKey(env.PADDLE_API_KEY);
+  if (!key) throw new Error("PADDLE_API_KEY is not configured.");
+  const response = await fetch(`${paddleBaseUrl()}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json",
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...init.headers,
+    },
+  });
+  if (response.status === 429 && attempt < 5) {
+    const retrySec = parseInt(response.headers.get("Retry-After") || "30", 10);
+    await sleep(Math.min(Math.max(retrySec, 5), 120) * 1000);
+    return paddleFetch(path, init, attempt + 1);
+  }
+  return response;
+}
 
 async function paddleApi<T>(
   path: string,
   init: { method: "GET" | "POST" | "PATCH"; body?: Record<string, unknown> },
 ): Promise<T> {
-  const key = normalizePaddleApiKey(env.PADDLE_API_KEY);
-  if (!key) throw new Error("PADDLE_API_KEY is not configured.");
-  const response = await fetch(`${paddleBaseUrl()}${path}`, {
+  const response = await paddleFetch(path, {
     method: init.method,
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
     body: init.body ? JSON.stringify(init.body) : undefined,
   });
   const json = (await response.json().catch(() => ({}))) as PaddleErrorBody & { data?: T };
@@ -35,33 +52,42 @@ async function paddleApi<T>(
   return json.data;
 }
 
-async function listProducts(): Promise<PaddleProduct[]> {
-  const out: PaddleProduct[] = [];
-  let path: string | null = "/products?status=active&per_page=200";
-  while (path) {
-    const key = normalizePaddleApiKey(env.PADDLE_API_KEY);
-    const response = await fetch(`${paddleBaseUrl()}${path}`, {
-      headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
-    });
-    const json = (await response.json()) as PaddleListResponse<PaddleProduct> & PaddleErrorBody;
-    if (!response.ok) {
-      throw new Error(json.error?.detail || `List products failed: HTTP ${response.status}`);
-    }
-    out.push(...(json.data ?? []));
-    const next = json.meta?.pagination?.next;
-    path = next ? next.replace(paddleBaseUrl(), "") : null;
+async function getProductById(productId: string): Promise<PaddleProduct | null> {
+  const response = await paddleFetch(`/products/${encodeURIComponent(productId)}`, { method: "GET" });
+  if (response.status === 404) return null;
+  const json = (await response.json()) as PaddleErrorBody & { data?: PaddleProduct };
+  if (!response.ok || !json.data) return null;
+  return json.data;
+}
+
+/** One page only — avoids hammering the API when paginating large catalogs. */
+async function findProductByName(name: string): Promise<PaddleProduct | undefined> {
+  const response = await paddleFetch("/products?status=active&per_page=200", { method: "GET" });
+  const json = (await response.json()) as PaddleListResponse<PaddleProduct> & PaddleErrorBody;
+  if (!response.ok) {
+    throw new Error(json.error?.detail || `List products failed: HTTP ${response.status}`);
   }
-  return out;
+  const needle = name.trim().toLowerCase();
+  return (json.data ?? []).find((p) => p.name.trim().toLowerCase() === needle);
+}
+
+async function createOrdoStageProduct(): Promise<PaddleProduct> {
+  return paddleApi<PaddleProduct>("/products", {
+    method: "POST",
+    body: {
+      name: PRODUCT_NAME,
+      tax_category: "saas",
+      description:
+        "Theater and venue production management — Flex (monthly usage) and Yearly (annual seat commitment).",
+      type: "standard",
+    },
+  });
 }
 
 async function listPricesForProduct(productId: string): Promise<PaddlePrice[]> {
   return paddleApi<PaddlePrice[]>(`/prices?product_id=${encodeURIComponent(productId)}&status=active&per_page=200`, {
     method: "GET",
   });
-}
-
-function findProductByName(products: PaddleProduct[], name: string): PaddleProduct | undefined {
-  return products.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
 }
 
 export type PaddleCatalogSetupResult = {
@@ -80,21 +106,16 @@ export async function ensureOrdoStagePaddleCatalog(): Promise<PaddleCatalogSetup
     throw new Error("PADDLE_API_KEY is not configured.");
   }
 
-  const existing = await listProducts();
-  let product = findProductByName(existing, PRODUCT_NAME);
+  const configuredId = env.PADDLE_PRODUCT_ID?.trim();
+  let product: PaddleProduct | null | undefined = configuredId ? await getProductById(configuredId) : null;
   let productCreated = false;
 
   if (!product) {
-    product = await paddleApi<PaddleProduct>("/products", {
-      method: "POST",
-      body: {
-        name: PRODUCT_NAME,
-        tax_category: "saas",
-        description:
-          "Theater and venue production management — Flex (monthly usage) and Yearly (annual seat commitment).",
-        type: "standard",
-      },
-    });
+    product = await findProductByName(PRODUCT_NAME);
+  }
+
+  if (!product) {
+    product = await createOrdoStageProduct();
     productCreated = true;
   }
 
