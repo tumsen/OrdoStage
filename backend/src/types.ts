@@ -1543,6 +1543,12 @@ export const FixedTemporaryPassCheckoutResponseSchema = z.object({
   passDays: z.number().int(),
 });
 
+export const OpenInvoicePaddleCheckoutResponseSchema = z.object({
+  checkoutUrl: z.string().url().nullable(),
+  paddleTransactionId: z.string().nullable().optional(),
+  paddleInvoiceId: z.string().nullable().optional(),
+});
+
 export const OrgBillingPlanSummarySchema = z.object({
   billingPlan: BillingPlanSchema,
   committedSeats: z.number().int().nullable(),

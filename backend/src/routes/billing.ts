@@ -15,6 +15,7 @@ import {
   increaseFixedCommittedSeats,
   provisionFixedPlanSubscription,
 } from "../fixedPlanProvisioning";
+import { syncBillingInvoiceWithPaddle } from "../billingPaddle";
 import {
   createPaddleCheckoutForFixedPlan,
   createPaddleCheckoutForFixedTopUp,
@@ -508,6 +509,37 @@ app.post("/billing/fixed/temporary-pass-checkout", async (c) => {
         passDays: fp.temporarySeatPassDays,
       },
     });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Paddle checkout failed";
+    return c.json({ error: { message, code: "PADDLE_CHECKOUT_FAILED" } }, 502);
+  }
+});
+
+// POST /api/billing/open-invoice/checkout — Flex/monthly open invoice (owner or billing.manage)
+app.post("/billing/open-invoice/checkout", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (user.orgRole !== "owner") {
+    return c.json(
+      { error: { message: "Only organisation owners can open invoice checkout", code: "FORBIDDEN" } },
+      403,
+    );
+  }
+
+  const openInvoice = await prisma.billingInvoice.findFirst({
+    where: { organizationId: user.organizationId, status: { in: ["issued", "overdue"] } },
+    orderBy: { dueAt: "asc" },
+    select: { id: true },
+  });
+  if (!openInvoice) {
+    return c.json({ error: { message: "No open invoice", code: "NOT_FOUND" } }, 404);
+  }
+
+  try {
+    const result = await syncBillingInvoiceWithPaddle(prisma, openInvoice.id, user.email);
+    return c.json({ data: result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Paddle checkout failed";
     return c.json({ error: { message, code: "PADDLE_CHECKOUT_FAILED" } }, 502);

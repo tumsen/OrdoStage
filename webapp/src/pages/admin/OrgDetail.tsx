@@ -54,6 +54,7 @@ interface Invoice {
   discountPercent: number;
   discountCents: number;
   totalCents: number;
+  paddleInvoiceUrl?: string | null;
   lines: InvoiceLine[];
 }
 
@@ -143,6 +144,30 @@ function BillingTab({ org }: { org: OrgDetail }) {
     },
   });
 
+  const paddleSyncMutation = useMutation({
+    mutationFn: (invoiceId: string) =>
+      api.post<{ paddleInvoiceUrl: string | null }>(`/api/admin/billing/invoices/${invoiceId}/paddle-sync`, {}),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
+      if (data.paddleInvoiceUrl) {
+        toast({ title: "Paddle checkout link ready" });
+      } else {
+        toast({
+          title: "Synced, but no checkout URL",
+          description: "Enable Paddle Checkout and set a default payment link in the Paddle dashboard.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (err) => {
+      toast({
+        title: "Paddle sync failed",
+        description: isApiError(err) ? err.message : "Could not create Paddle transaction.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4 p-5 rounded-lg bg-gray-900/60 border border-white/10">
@@ -184,14 +209,32 @@ function BillingTab({ org }: { org: OrgDetail }) {
                   <p className="text-sm text-white">Total €{(inv.totalCents / 100).toFixed(2)}</p>
                   <p className="text-xs text-white/50">Lines: {inv.lines.length}</p>
                   {inv.status !== "paid" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => markPaidMutation.mutate(inv.id)}
-                      disabled={markPaidMutation.isPending}
-                    >
-                      Mark as paid
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      {inv.paddleInvoiceUrl ? (
+                        <Button size="sm" variant="outline" asChild>
+                          <a href={inv.paddleInvoiceUrl} target="_blank" rel="noreferrer">
+                            Open Paddle checkout
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => paddleSyncMutation.mutate(inv.id)}
+                          disabled={paddleSyncMutation.isPending}
+                        >
+                          {paddleSyncMutation.isPending ? "Syncing…" : "Create Paddle checkout"}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => markPaidMutation.mutate(inv.id)}
+                        disabled={markPaidMutation.isPending}
+                      >
+                        Mark as paid
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
               ))

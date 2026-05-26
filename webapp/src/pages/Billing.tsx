@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import { BillingPlanPicker } from "@/components/billing/BillingPlanPicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Receipt, Users } from "lucide-react";
@@ -45,6 +47,7 @@ interface OrgBillingData {
     dueAt: string;
     status: string;
     totalCents: number;
+    paddleInvoiceUrl?: string | null;
     lines: Array<{
       id: string;
       userName: string | null;
@@ -73,6 +76,32 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
   const trialDays = org?.billingTrialDays ?? 0;
   const graceDays = org?.billingGraceDaysAfterDue ?? 0;
   const billingPlan = org?.billingPlan === "fixed" ? "fixed" : "flex";
+
+  const payInvoiceMutation = useMutation({
+    mutationFn: () =>
+      api.post<{ checkoutUrl: string | null }>("/api/billing/open-invoice/checkout", {}),
+    onSuccess: (data) => {
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      toast({
+        title: "Checkout unavailable",
+        description:
+          "Paddle did not return a payment link. Confirm checkout is enabled in your Paddle account (default payment link).",
+        variant: "destructive",
+      });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not open payment",
+        description: isApiError(err) ? err.message : "Paddle checkout failed.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openInvoicePayUrl = org?.openInvoice?.paddleInvoiceUrl?.trim() || null;
 
   return (
     <div className={embedded ? "space-y-8" : "p-6 md:p-8 space-y-8"}>
@@ -213,6 +242,28 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
                 If overdue past any configured grace period, the organization becomes view-only until payment is
                 registered.
               </p>
+              {isOwner && org.openInvoice.status !== "paid" ? (
+                <div className="pt-3">
+                  {openInvoicePayUrl ? (
+                    <Button
+                      asChild
+                      className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white border-0"
+                    >
+                      <a href={openInvoicePayUrl} target="_blank" rel="noreferrer">
+                        Pay invoice with Paddle
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button
+                      className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white border-0"
+                      disabled={payInvoiceMutation.isPending}
+                      onClick={() => payInvoiceMutation.mutate()}
+                    >
+                      {payInvoiceMutation.isPending ? "Opening checkout…" : "Pay invoice with Paddle"}
+                    </Button>
+                  )}
+                </div>
+              ) : null}
             </div>
           )}
         </CardContent>
