@@ -1,5 +1,4 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import type { PublicRoleFeature } from "@/lib/publicRoleFeatures";
 import { PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
@@ -35,7 +34,7 @@ export function RoleFeatureBinder({
     const panelRect = panel.getBoundingClientRect();
     setConnector({
       left: tabRect.left - panelRect.left + tabRect.width / 2,
-      width: Math.min(tabRect.width - 8, 120),
+      width: Math.min(tabRect.width - 12, 160),
     });
   }, [activeRole]);
 
@@ -50,7 +49,7 @@ export function RoleFeatureBinder({
   return (
     <div className={cn("w-full", className)}>
       <div
-        className="grid w-full gap-2 sm:gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7"
+        className="grid w-full gap-3 grid-cols-1 min-[480px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7"
         role="tablist"
         aria-label="Roles in your organisation"
       >
@@ -71,7 +70,7 @@ export function RoleFeatureBinder({
               onClick={() => setActiveSlug(role.slug)}
               className={cn(
                 "relative flex flex-col rounded-t-xl border text-left transition-all duration-200",
-                "p-3 gap-1.5 min-h-[7rem] sm:min-h-[7.5rem]",
+                "p-4 sm:p-5 gap-2 min-h-[9.5rem] sm:min-h-[10.5rem]",
                 isActive
                   ? cn(
                       "z-20 border-ordo-yellow/45 border-b-transparent",
@@ -83,18 +82,13 @@ export function RoleFeatureBinder({
             >
               <span
                 className={cn(
-                  "text-sm font-semibold leading-snug",
+                  "text-base font-semibold leading-snug",
                   isActive ? "text-white" : "text-white/90"
                 )}
               >
                 {role.title}
               </span>
-              <span className="flex-1 text-xs leading-relaxed text-white/65 line-clamp-2">{role.intro}</span>
-              {isActive ? (
-                <span className="text-xs font-medium text-ordo-yellow">Selected</span>
-              ) : (
-                <span className="text-xs font-medium text-white/45">View details</span>
-              )}
+              <span className="flex-1 text-sm leading-relaxed text-white/70">{role.intro}</span>
             </button>
           );
         })}
@@ -122,22 +116,14 @@ export function RoleFeatureBinder({
           />
         ) : null}
 
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-ordo-yellow/90">
-              For {activeRole.title}s
-            </p>
-            <h3 className="mt-1 text-xl font-semibold text-white md:text-2xl">{activeRole.title}</h3>
-          </div>
-          <Link
-            to={`/features/${activeRole.slug}`}
-            className="shrink-0 text-sm font-medium text-ordo-yellow hover:underline"
-          >
-            Full page →
-          </Link>
-        </div>
+        <header className="mb-6 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-ordo-yellow/90">
+            For {activeRole.title}s
+          </p>
+          <h3 className="text-xl font-semibold text-white md:text-2xl">{activeRole.title}</h3>
+        </header>
 
-        <RoleFeatureDetailContent role={activeRole} compact />
+        <RoleFeatureDetailContent role={activeRole} />
       </div>
     </div>
   );
