@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { PublicRoleFeature } from "@/lib/publicRoleFeatures";
 import { PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
+import { getTimeTrackingSection } from "@/lib/roleTimeTrackingSections";
 import { getRoleAccent, ORDO_ACCENT_STYLES } from "@/lib/roleAccentStyles";
 import { RoleFeatureDetailContent } from "@/components/marketing/RoleFeatureDetailContent";
 
@@ -34,8 +35,8 @@ export function RoleFeatureBinder({
     const tabRect = tab.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
     setConnector({
-      left: tabRect.left - panelRect.left + tabRect.width / 2,
-      width: Math.min(tabRect.width - 16, 180),
+      left: tabRect.left - panelRect.left,
+      width: tabRect.width,
     });
   }, [activeRole]);
 
@@ -50,14 +51,15 @@ export function RoleFeatureBinder({
   return (
     <div className={cn("w-full", className)}>
       <div
-        className="grid w-full gap-3 sm:gap-4 grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7"
+        className="flex w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]"
         role="tablist"
         aria-label="Roles in your organisation"
       >
-        {roles.map((role) => {
+        {roles.map((role, index) => {
           const isActive = role.slug === activeRole.slug;
           const accent = getRoleAccent(role.slug);
           const styles = ORDO_ACCENT_STYLES[accent];
+          const timeTracking = getTimeTrackingSection(role.slug);
 
           return (
             <button
@@ -73,24 +75,43 @@ export function RoleFeatureBinder({
               }}
               onClick={() => setActiveSlug(role.slug)}
               className={cn(
-                "relative flex flex-col overflow-hidden rounded-t-2xl border text-left transition-all duration-200",
-                "p-5 sm:p-6 gap-2.5 min-h-[11rem] sm:min-h-[12rem]",
-                isActive ? cn("z-20 rounded-b-none", styles.tabActive) : cn("z-10 rounded-2xl", styles.tabInactive)
+                "relative flex min-w-[10.5rem] sm:min-w-[12rem] flex-1 flex-col text-left transition-all duration-200",
+                "border-y border-l px-4 py-4 sm:px-5 sm:py-5 gap-2 last:border-r",
+                index === 0 && "rounded-tl-2xl",
+                index === roles.length - 1 && !isActive && "rounded-tr-2xl",
+                "shrink-0 sm:shrink",
+                isActive
+                  ? cn("z-20 -mb-px rounded-t-2xl rounded-b-none border-b-transparent border-r", styles.tabActive)
+                  : cn("z-10 rounded-t-xl rounded-b-lg mb-1", styles.tabInactive, "opacity-90 hover:opacity-100")
               )}
             >
               <span
                 aria-hidden
-                className={cn("absolute inset-x-0 top-0 h-1", styles.tabBar, isActive ? "opacity-100" : "opacity-70")}
+                className={cn(
+                  "absolute inset-x-0 top-0 h-1",
+                  styles.tabBar,
+                  isActive ? "opacity-100" : "opacity-55",
+                  index === 0 && "rounded-tl-2xl",
+                  index === roles.length - 1 && "rounded-tr-2xl"
+                )}
               />
               <span
                 className={cn(
-                  "pt-1 text-lg sm:text-xl font-bold leading-snug tracking-tight",
+                  "pt-1 text-base sm:text-lg font-bold leading-snug tracking-tight",
                   isActive ? styles.tabTitle : styles.tabTitleInactive
                 )}
               >
                 {role.title}
               </span>
-              <span className="flex-1 text-sm sm:text-base leading-relaxed text-white/75">{role.intro}</span>
+              <span className="text-sm leading-relaxed text-white/75">{role.intro}</span>
+              <span
+                className={cn(
+                  "mt-1 pt-2 text-xs leading-snug border-t border-white/10",
+                  isActive ? styles.tabTitle : "text-white/55"
+                )}
+              >
+                <span className="font-semibold">{timeTracking.heading}:</span> {timeTracking.bullets[0]}
+              </span>
             </button>
           );
         })}
@@ -102,7 +123,7 @@ export function RoleFeatureBinder({
         role="tabpanel"
         aria-labelledby={`role-tab-${activeRole.slug}`}
         className={cn(
-          "relative -mt-px rounded-b-2xl rounded-tr-2xl border p-6 sm:p-8 md:p-9",
+          "relative w-full rounded-b-2xl border border-t-0 p-6 sm:p-8 md:p-9",
           activeStyles.panelBorder,
           activeStyles.panelBg,
           activeStyles.panelInset
@@ -112,11 +133,11 @@ export function RoleFeatureBinder({
           <div
             aria-hidden
             className={cn(
-              "pointer-events-none absolute top-0 h-1 rounded-full transition-all duration-200 ease-out",
+              "pointer-events-none absolute top-0 h-[3px] transition-all duration-200 ease-out",
               activeStyles.connector
             )}
             style={{
-              left: connector.left - connector.width / 2,
+              left: connector.left,
               width: connector.width,
             }}
           />

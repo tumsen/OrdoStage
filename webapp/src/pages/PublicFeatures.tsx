@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { PlatformFeaturesGrid } from "@/components/marketing/PlatformFeaturesGrid";
 import { RoleFeatureBinder } from "@/components/marketing/RoleFeatureBinder";
-import { PLATFORM_FEATURE_HIGHLIGHTS } from "@/lib/publicPlatformFeatures";
-import { ORDO_ACCENT_STYLES } from "@/lib/roleAccentStyles";
 
 export default function PublicFeatures() {
   return (
@@ -19,30 +18,6 @@ export default function PublicFeatures() {
           </p>
         </header>
 
-        <section aria-labelledby="platform-features-heading" className="space-y-5">
-          <h2 id="platform-features-heading" className="text-xl md:text-2xl font-semibold text-white">
-            Everything in one platform
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {PLATFORM_FEATURE_HIGHLIGHTS.map((feature) => {
-              const styles = ORDO_ACCENT_STYLES[feature.accent];
-              return (
-                <div
-                  key={feature.title}
-                  className={`rounded-xl border p-4 space-y-2 ${styles.section}`}
-                >
-                  <h3 className={`text-sm font-bold ${styles.sectionHeading}`}>{feature.title}</h3>
-                  <p className="text-sm leading-relaxed text-white/75">{feature.description}</p>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-sm text-white/60">
-            <strong className="text-ordo-yellow/90">Time tracking</strong> is available across the organisation — every
-            role below includes how hours and reports fit that job.
-          </p>
-        </section>
-
         <section
           aria-labelledby="roles-features-heading"
           className="space-y-6 rounded-2xl border border-ordo-magenta/25 bg-gradient-to-br from-ordo-magenta/[0.08] via-black/30 to-ordo-violet/[0.10] p-5 sm:p-7 shadow-[0_0_40px_rgba(131,56,236,0.08)]"
@@ -52,12 +27,14 @@ export default function PublicFeatures() {
               By role
             </h2>
             <p className="text-sm md:text-base text-white/80 leading-relaxed max-w-3xl">
-              Pick your job to see how OrdoStage supports your day-to-day — including time tracking, scheduling, and
-              the tools your department shares with the rest of the company.
+              Select a tab to open that role&apos;s feature page — each includes scheduling, staffing, and time tracking
+              for that job.
             </p>
           </div>
           <RoleFeatureBinder />
         </section>
+
+        <PlatformFeaturesGrid className="space-y-0" />
 
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap">
           <Button
