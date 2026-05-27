@@ -63,7 +63,7 @@ export function RoleFeatureBinder({
         role="tabpanel"
         aria-labelledby={`role-tab-${activeRole.slug}`}
         className={cn(
-          "relative z-[1] overflow-hidden rounded-2xl border-2 border-t-0 p-6 sm:p-8 md:p-9",
+          "relative z-[1] overflow-hidden rounded-2xl border-2 p-6 sm:p-8 md:p-9",
           rolePanelFill(activeStyles)
         )}
       >
