@@ -33,11 +33,11 @@ export function RoleFeatureBinder({
       )}
     >
       <div
-        className="relative flex shrink-0 items-end overflow-x-auto overscroll-x-contain px-2 pt-2 sm:px-3 [scrollbar-width:thin]"
+        className="relative flex shrink-0 items-end gap-2 overflow-x-auto overscroll-x-contain px-2 pt-2 sm:px-3 [scrollbar-width:thin]"
         role="tablist"
         aria-label="Roles in your organisation"
       >
-        {roles.map((role, index) => {
+        {roles.map((role) => {
           const isActive = role.slug === activeRole.slug;
           const styles = ORDO_ACCENT_STYLES[getRoleAccent(role.slug)];
 
@@ -50,14 +50,12 @@ export function RoleFeatureBinder({
               aria-selected={isActive}
               aria-controls="role-feature-panel"
               onClick={() => setActiveSlug(role.slug)}
-              style={{ zIndex: isActive ? roles.length + 10 : index + 1 }}
               className={cn(
                 "relative shrink-0 whitespace-nowrap rounded-t-xl rounded-bl-none rounded-br-none border-2 border-b-0 px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-semibold transition-shadow duration-200",
                 roleTabCard(styles),
-                index > 0 ? "-ml-2 sm:-ml-3" : null,
                 isActive
-                  ? "-mb-0.5 text-white shadow-[0_4px_16px_rgba(0,0,0,0.45)]"
-                  : "text-white/90 hover:text-white"
+                  ? "z-20 -mb-0.5 text-white shadow-[0_4px_16px_rgba(0,0,0,0.45)]"
+                  : "z-10 text-white/90 hover:text-white"
               )}
             >
               {role.title}
