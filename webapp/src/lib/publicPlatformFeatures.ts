@@ -167,7 +167,7 @@ export const PLATFORM_FEATURE_AREAS: readonly PlatformFeatureArea[] = [
     summary: "Publish read-only views, manage billing, and keep company details where owners expect them.",
     accent: "blue",
     body:
-      "Not everyone needs a login. Shared calendars and public tour links let partners see current dates safely. Organisation owners manage plans, seats, company details, and legal context in the account area — alongside the work the whole company runs in OrdoStage.",
+      "Not everyone needs a login. Shared calendars and public tour links let partners see current dates safely. Organisation owners manage plans, seats, and company billing details in the account area — alongside the work the whole company runs in OrdoStage.",
     bullets: [
       "Publish shared calendars when external partners need a read-only view",
       "Export or coordinate outward while OrdoStage remains the source of truth",
@@ -175,10 +175,10 @@ export const PLATFORM_FEATURE_AREAS: readonly PlatformFeatureArea[] = [
       "Store company, invoice, and billing contact details in the organisation account",
       "Choose Flex or Yearly billing with seat tiers suited to your team size",
       "Manage organisation settings, members, and owners in one account area",
-      "Support multi-language site content for public marketing pages",
-      "Keep terms, privacy, and refund policies available from the public shell",
+      "Send email invitations and onboard new members into the right organisation",
       "Use the dashboard to see upcoming events and activity at a glance",
       "Switch between organisations when your company runs multiple entities",
+      "Control who can manage billing and membership as organisation owners",
     ],
   },
 ] as const;
