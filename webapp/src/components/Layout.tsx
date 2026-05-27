@@ -65,7 +65,7 @@ const navItems: { to: string; labelKey: string; icon: LucideIcon; view: string }
 ];
 
 const publicNavItems: Array<{ to: string; label: string; icon: LucideIcon }> = [
-  { to: "/", label: "Features", icon: LayoutDashboard },
+  { to: "/features", label: "Features", icon: LayoutDashboard },
   { to: "/pricing", label: "Pricing", icon: CalendarDays },
   { to: "/terms-of-service", label: "Terms", icon: ShieldCheck },
   { to: "/privacy-policy", label: "Privacy", icon: UserCircle },

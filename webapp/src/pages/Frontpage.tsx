@@ -97,6 +97,11 @@ function FeatureBlock({
         <p className="text-center text-sm font-medium leading-relaxed text-ordo-yellow/90 sm:text-left md:text-base">
           {closing}
         </p>
+        <p className="text-center sm:text-left">
+          <Link to="/features" className="text-sm font-medium text-ordo-yellow hover:underline">
+            Open full features page →
+          </Link>
+        </p>
       </div>
 
       <RoleFeatureBinder />
@@ -177,8 +182,9 @@ function MarketingHome({ siteContent }: { siteContent: SiteContent | undefined }
       <main className="relative flex min-h-full w-full flex-col items-stretch gap-8 px-6 pb-12 pt-6 md:pt-8">
         <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} titleClass="md:text-4xl" />
         <p className="w-full text-center text-sm leading-relaxed text-white/70">
-          Use the sidebar for <strong>Features</strong> and <strong>Pricing</strong>, plus{" "}
-          <strong>Terms</strong> and <strong>Privacy</strong>.
+          Use the sidebar for <Link to="/features" className="text-ordo-yellow hover:underline"><strong>Features</strong></Link> and{" "}
+          <Link to="/pricing" className="text-ordo-yellow hover:underline"><strong>Pricing</strong></Link>, plus{" "}
+          <strong>Terms</strong> and <strong>Privacy</strong> in the menu.
         </p>
         <FeatureBlock
           sectionHeading={welcome.sectionHeading}

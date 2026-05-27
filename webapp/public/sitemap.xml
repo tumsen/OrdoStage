@@ -11,6 +11,11 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://www.ordostage.com/features</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
     <loc>https://www.ordostage.com/features/hr-manager</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>

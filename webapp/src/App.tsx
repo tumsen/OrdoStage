@@ -49,6 +49,7 @@ const AdminUsers = lazy(() => import("./pages/admin/Users"));
 const SiteContentAdmin = lazy(() => import("./pages/admin/SiteContent"));
 const Frontpage = lazy(() => import("./pages/Frontpage"));
 const PublicPricing = lazy(() => import("./pages/PublicPricing"));
+const PublicFeatures = lazy(() => import("./pages/PublicFeatures"));
 const PublicRoleFeatures = lazy(() => import("./pages/PublicRoleFeatures"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
 
@@ -141,6 +142,14 @@ const App = () => (
             element={
               <PublicLayout>
                 <PublicPricing />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/features"
+            element={
+              <PublicLayout>
+                <PublicFeatures />
               </PublicLayout>
             }
           />

@@ -1,3 +1,5 @@
+import { getTimeTrackingSection, isTimeTrackingSection } from "@/lib/roleTimeTrackingSections";
+
 export type PublicRoleFeatureSection = {
   heading: string;
   body?: string;
@@ -13,7 +15,20 @@ export type PublicRoleFeature = {
   relatedSlugs: readonly string[];
 };
 
-export const PUBLIC_ROLE_FEATURES: readonly PublicRoleFeature[] = [
+function withTimeTrackingSection(role: PublicRoleFeature): PublicRoleFeature {
+  const withoutTime = role.sections.filter((s) => !isTimeTrackingSection(s.heading));
+  const billingIdx = withoutTime.findIndex((s) => s.heading === "Plans & billing");
+  const timeSection = getTimeTrackingSection(role.slug);
+  if (billingIdx >= 0) {
+    return {
+      ...role,
+      sections: [...withoutTime.slice(0, billingIdx), timeSection, ...withoutTime.slice(billingIdx)],
+    };
+  }
+  return { ...role, sections: [...withoutTime, timeSection] };
+}
+
+const RAW_PUBLIC_ROLE_FEATURES: PublicRoleFeature[] = [
   {
     slug: "hr-manager",
     title: "HR Manager",
@@ -173,15 +188,6 @@ export const PUBLIC_ROLE_FEATURES: readonly PublicRoleFeature[] = [
           "Support smooth handovers between rehearsal, tech, and performance phases",
         ],
       },
-      {
-        heading: "Time logging",
-        body: "When your organisation tracks hours, crew can log time against the right work.",
-        bullets: [
-          "Let crew and staff log time where it belongs on busy show days",
-          "Connect hours to events and roles finance can reconcile later",
-          "Reduce memory-based timesheets after a long run",
-        ],
-      },
     ],
     relatedSlugs: ["production-manager", "producer", "head-of-stage"],
   },
@@ -277,14 +283,6 @@ export const PUBLIC_ROLE_FEATURES: readonly PublicRoleFeature[] = [
       "Finance needs hours, exports, and company details in one place — not a folder of timesheets after closing night. OrdoStage connects time tracking to the work crew actually did and keeps billing context in the organisation account.",
     sections: [
       {
-        heading: "Time tracking",
-        bullets: [
-          "Collect time entries from staff and crew linked to the work they did",
-          "Support organisations that log hours against events, roles, and categories",
-          "Reduce reliance on memory and ad-hoc spreadsheets after long runs",
-        ],
-      },
-      {
         heading: "Reports & exports",
         bullets: [
           "Run time reports for payroll prep and retrospective costing",
@@ -312,7 +310,10 @@ export const PUBLIC_ROLE_FEATURES: readonly PublicRoleFeature[] = [
     ],
     relatedSlugs: ["hr-manager", "stage-manager", "production-manager"],
   },
-] as const;
+];
+
+export const PUBLIC_ROLE_FEATURES: readonly PublicRoleFeature[] =
+  RAW_PUBLIC_ROLE_FEATURES.map(withTimeTrackingSection);
 
 const SLUG_SET = new Set(PUBLIC_ROLE_FEATURES.map((r) => r.slug));
 

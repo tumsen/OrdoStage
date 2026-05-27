@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 import { getRoleBySlug, isPublicRoleSlug } from "@/lib/publicRoleFeatures";
 
-const navItems: { label: string; icon: LucideIcon; to: string; homeHash?: string; exact?: boolean }[] = [
-  { to: "/", label: "Features", icon: Sparkles, homeHash: "features" },
+const navItems: { label: string; icon: LucideIcon; to: string; exact?: boolean }[] = [
+  { to: "/features", label: "Features", icon: Sparkles },
   { to: "/pricing", label: "Pricing", icon: CreditCard, exact: true },
   { to: "/terms-of-service", label: "Terms", icon: FileText, exact: true },
   { to: "/privacy-policy", label: "Privacy", icon: Shield, exact: true },
@@ -18,6 +18,7 @@ const navItems: { label: string; icon: LucideIcon; to: string; homeHash?: string
 
 const pageTitles: Record<string, string> = {
   "/": "Home",
+  "/features": "Features",
   "/pricing": "Pricing",
   "/terms-of-service": "Terms of Service",
   "/privacy-policy": "Privacy Policy",
@@ -42,14 +43,7 @@ function getPublicPageTitle(pathname: string): string {
 function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
   const location = useLocation();
 
-  function isNavActive(
-    to: string,
-    exact: boolean | undefined,
-    homeHash: string | undefined
-  ): boolean {
-    if (homeHash) {
-      return location.pathname === "/" && location.hash === `#${homeHash}`;
-    }
+  function isNavActive(to: string, exact: boolean | undefined): boolean {
     if (exact) {
       return location.pathname === to;
     }
@@ -69,13 +63,12 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 space-y-1" aria-label="Homepage sections and legal">
-        {navItems.map(({ to, label, icon: Icon, exact, homeHash }) => {
-          const isActive = isNavActive(to, exact, homeHash);
-          const linkTo = homeHash ? { pathname: "/" as const, hash: homeHash } : to;
+        {navItems.map(({ to, label, icon: Icon, exact }) => {
+          const isActive = isNavActive(to, exact);
           return (
             <Link
-              key={label + (homeHash ?? to)}
-              to={linkTo}
+              key={label + to}
+              to={to}
               onClick={onNav}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150",
