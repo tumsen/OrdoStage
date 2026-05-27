@@ -2,7 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { PublicRoleFeature } from "@/lib/publicRoleFeatures";
 import { PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
-import { getRoleAccent, ORDO_ACCENT_STYLES, rolePanelFill } from "@/lib/roleAccentStyles";
+import { getRoleAccent, ORDO_ACCENT_STYLES, roleActiveTabFill, rolePanelFill } from "@/lib/roleAccentStyles";
 import { RoleFeatureDetailContent } from "@/components/marketing/RoleFeatureDetailContent";
 
 type RoleFeatureBinderProps = {
@@ -49,7 +49,7 @@ export function RoleFeatureBinder({
                 "shrink-0 whitespace-nowrap px-4 py-3 sm:px-5 sm:py-3.5 text-sm sm:text-base font-semibold transition-colors duration-200",
                 "border-2 border-b-0",
                 isActive
-                  ? cn("z-20 -mb-0.5 rounded-t-xl text-white", rolePanelFill(styles))
+                  ? cn("z-20 -mb-px rounded-t-xl text-white", roleActiveTabFill(styles))
                   : cn(
                       "z-10 rounded-t-xl border-white/20 bg-[#0d0d14] text-white/70",
                       "hover:border-white/30 hover:bg-[#12121c]/80 hover:text-white/90"
