@@ -7,6 +7,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
+import { getRoleBySlug, isPublicRoleSlug } from "@/lib/publicRoleFeatures";
 
 const navItems: { label: string; icon: LucideIcon; to: string; homeHash?: string; exact?: boolean }[] = [
   { to: "/", label: "Features", icon: Sparkles, homeHash: "features" },
@@ -27,6 +28,14 @@ const pageTitles: Record<string, string> = {
 
 function getPublicPageTitle(pathname: string): string {
   if (pathname in pageTitles) return pageTitles[pathname]!;
+  const featuresMatch = /^\/features\/([^/]+)$/.exec(pathname);
+  if (featuresMatch) {
+    const slug = featuresMatch[1];
+    if (isPublicRoleSlug(slug)) {
+      const role = getRoleBySlug(slug);
+      if (role) return `${role.title} · Features`;
+    }
+  }
   return "OrdoStage";
 }
 

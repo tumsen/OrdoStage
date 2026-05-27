@@ -49,6 +49,7 @@ const AdminUsers = lazy(() => import("./pages/admin/Users"));
 const SiteContentAdmin = lazy(() => import("./pages/admin/SiteContent"));
 const Frontpage = lazy(() => import("./pages/Frontpage"));
 const PublicPricing = lazy(() => import("./pages/PublicPricing"));
+const PublicRoleFeatures = lazy(() => import("./pages/PublicRoleFeatures"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
 
 /** Opt into React Router v7 behaviors early — removes dev-only future-flag console warnings. */
@@ -140,6 +141,14 @@ const App = () => (
             element={
               <PublicLayout>
                 <PublicPricing />
+              </PublicLayout>
+            }
+          />
+          <Route
+            path="/features/:roleSlug"
+            element={
+              <PublicLayout>
+                <PublicRoleFeatures />
               </PublicLayout>
             }
           />
