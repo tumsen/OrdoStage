@@ -1,12 +1,12 @@
 import type { OrdoAccent } from "@/lib/roleAccentStyles";
 
-/** SVG stroke matching panel border colour at 50% opacity. */
+/** SVG stroke — solid ordo accent, aligned with tab panel borders. */
 export const PANEL_STROKE: Record<OrdoAccent, string> = {
-  magenta: "rgba(255, 0, 110, 0.5)",
-  orange: "rgba(251, 86, 7, 0.5)",
-  yellow: "rgba(255, 190, 11, 0.5)",
-  blue: "rgba(58, 134, 255, 0.5)",
-  violet: "rgba(131, 56, 236, 0.5)",
+  magenta: "#ff006e",
+  orange: "#fb5607",
+  yellow: "#ffbe0b",
+  blue: "#3a86ff",
+  violet: "#8338ec",
 };
 
 const CARD_RADIUS = 16;
