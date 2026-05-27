@@ -22,8 +22,10 @@ type AccentStyleSet = {
   tabTitle: string;
   tabTitleInactive: string;
   panelBorder: string;
-  /** Top tint — same class on the active tab and the panel gradient start. */
+  /** Top tint — active tab fill; matches panel gradient start. */
   panelTop: string;
+  /** Bottom edge on active tab — covers panel top border for a seamless join. */
+  tabJoinBorder: string;
   panelBg: string;
   panelInset: string;
   connector: string;
@@ -38,14 +40,19 @@ export function roleTabCard(styles: AccentStyleSet): string {
   return `${styles.panelBorder} ${styles.panelTop}`;
 }
 
-/** Active tab — same fill as other tabs; panel uses matching colours below. */
-export function roleActiveTabFill(styles: AccentStyleSet): string {
-  return roleTabCard(styles);
+/** Active tab — border on three sides + tinted bottom edge that hides the card’s top border. */
+export function roleActiveTabJoin(styles: AccentStyleSet): string {
+  return `${styles.panelBorder} ${styles.panelTop} ${styles.tabJoinBorder}`;
 }
 
 /** Panel — same role tint at the top, deepening below. */
 export function rolePanelFill(styles: AccentStyleSet): string {
   return `${styles.panelBorder} ${styles.panelBg}`;
+}
+
+/** Panel background only (border applied on outer shell). */
+export function rolePanelBackground(styles: AccentStyleSet): string {
+  return styles.panelBg;
 }
 
 export const ORDO_ACCENT_STYLES: Record<OrdoAccent, AccentStyleSet> = {
@@ -59,6 +66,7 @@ export const ORDO_ACCENT_STYLES: Record<OrdoAccent, AccentStyleSet> = {
     tabTitleInactive: "text-white/95",
     panelBorder: "border-ordo-magenta/50",
     panelTop: "bg-ordo-magenta/[0.25]",
+    tabJoinBorder: "border-b-ordo-magenta/[0.25]",
     panelBg: "bg-gradient-to-b from-ordo-magenta/[0.25] via-ordo-magenta/10 to-[#12121c]",
     panelInset: "shadow-[inset_0_2px_0_rgba(255,0,110,0.35)]",
     connector: "bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-yellow",
@@ -77,6 +85,7 @@ export const ORDO_ACCENT_STYLES: Record<OrdoAccent, AccentStyleSet> = {
     tabTitleInactive: "text-white/95",
     panelBorder: "border-ordo-orange/50",
     panelTop: "bg-ordo-orange/[0.25]",
+    tabJoinBorder: "border-b-ordo-orange/[0.25]",
     panelBg: "bg-gradient-to-b from-ordo-orange/[0.25] via-ordo-orange/10 to-[#12121c]",
     panelInset: "shadow-[inset_0_2px_0_rgba(251,86,7,0.35)]",
     connector: "bg-gradient-to-r from-ordo-orange via-ordo-yellow to-ordo-magenta",
@@ -95,6 +104,7 @@ export const ORDO_ACCENT_STYLES: Record<OrdoAccent, AccentStyleSet> = {
     tabTitleInactive: "text-white/95",
     panelBorder: "border-ordo-yellow/50",
     panelTop: "bg-ordo-yellow/[0.22]",
+    tabJoinBorder: "border-b-ordo-yellow/[0.22]",
     panelBg: "bg-gradient-to-b from-ordo-yellow/[0.22] via-ordo-yellow/10 to-[#12121c]",
     panelInset: "shadow-[inset_0_2px_0_rgba(255,190,11,0.35)]",
     connector: "bg-gradient-to-r from-ordo-yellow via-ordo-orange to-ordo-magenta",
@@ -113,6 +123,7 @@ export const ORDO_ACCENT_STYLES: Record<OrdoAccent, AccentStyleSet> = {
     tabTitleInactive: "text-white/95",
     panelBorder: "border-ordo-blue/50",
     panelTop: "bg-ordo-blue/[0.25]",
+    tabJoinBorder: "border-b-ordo-blue/[0.25]",
     panelBg: "bg-gradient-to-b from-ordo-blue/[0.25] via-ordo-blue/10 to-[#12121c]",
     panelInset: "shadow-[inset_0_2px_0_rgba(58,134,255,0.35)]",
     connector: "bg-gradient-to-r from-ordo-blue via-ordo-violet to-ordo-magenta",
@@ -131,6 +142,7 @@ export const ORDO_ACCENT_STYLES: Record<OrdoAccent, AccentStyleSet> = {
     tabTitleInactive: "text-white/95",
     panelBorder: "border-ordo-violet/50",
     panelTop: "bg-ordo-violet/[0.28]",
+    tabJoinBorder: "border-b-ordo-violet/[0.28]",
     panelBg: "bg-gradient-to-b from-ordo-violet/[0.28] via-ordo-violet/[0.12] to-[#12121c]",
     panelInset: "shadow-[inset_0_2px_0_rgba(131,56,236,0.35)]",
     connector: "bg-gradient-to-r from-ordo-violet via-ordo-magenta to-ordo-orange",
