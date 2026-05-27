@@ -1,6 +1,7 @@
 import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { RoleFeatureCardGrid } from "@/components/marketing/RoleFeatureCard";
+import { RoleFeatureDetailContent } from "@/components/marketing/RoleFeatureDetailContent";
 import { getRoleBySlug, isPublicRoleSlug, PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
 
 function SectionDivider() {
@@ -61,31 +62,7 @@ export default function PublicRoleFeatures() {
         </header>
 
         <div className="space-y-6">
-          {role.sections.map((section) => (
-            <section
-              key={section.heading}
-              className="rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6 space-y-3"
-            >
-              <h2 className="text-lg md:text-xl font-semibold text-white">{section.heading}</h2>
-              {section.body ? (
-                <p className="text-sm md:text-base leading-relaxed text-white/75">{section.body}</p>
-              ) : null}
-              <ul className="list-disc space-y-1.5 pl-5 text-sm md:text-base leading-relaxed text-white/85 marker:text-ordo-yellow">
-                {section.bullets.map((bullet) => (
-                  <li key={bullet}>{bullet}</li>
-                ))}
-              </ul>
-              {role.slug === "accountant" && section.heading === "Plans & billing" ? (
-                <p className="text-sm text-white/70 pt-1">
-                  Compare Flex and Yearly on the{" "}
-                  <Link to="/pricing" className="text-ordo-yellow hover:underline">
-                    pricing page
-                  </Link>
-                  .
-                </p>
-              ) : null}
-            </section>
-          ))}
+          <RoleFeatureDetailContent role={role} showHeroLead={false} />
         </div>
 
         {relatedRoles.length > 0 ? (

@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { RoleFeatureCardGrid } from "@/components/marketing/RoleFeatureCard";
+import { RoleFeatureBinder } from "@/components/marketing/RoleFeatureBinder";
 import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 import { isPublicFlagOn } from "@/lib/publicSiteFlags";
 
@@ -99,7 +99,7 @@ function FeatureBlock({
         </p>
       </div>
 
-      <RoleFeatureCardGrid />
+      <RoleFeatureBinder />
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-ordo-yellow/35 bg-gradient-to-br from-ordo-magenta/[0.12] to-ordo-violet/[0.10] p-5">
