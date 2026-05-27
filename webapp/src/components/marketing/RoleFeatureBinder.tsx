@@ -27,7 +27,7 @@ export function RoleFeatureBinder({
   return (
     <div className={cn("w-full", className)}>
       <div
-        className="flex w-full flex-wrap sm:flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]"
+        className="flex w-full flex-wrap sm:flex-nowrap items-end gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:thin]"
         role="tablist"
         aria-label="Roles in your organisation"
       >
@@ -46,11 +46,11 @@ export function RoleFeatureBinder({
               aria-controls="role-feature-panel"
               onClick={() => setActiveSlug(role.slug)}
               className={cn(
-                "shrink-0 whitespace-nowrap rounded-xl border-2 px-4 py-3 sm:px-5 sm:py-3.5 text-sm sm:text-base font-semibold transition-[opacity,box-shadow] duration-200",
+                "shrink-0 whitespace-nowrap border-2 px-4 py-3 sm:px-5 sm:py-3.5 text-sm sm:text-base font-semibold transition-[opacity,box-shadow] duration-200",
                 roleTabCard(styles),
                 isActive
-                  ? "z-20 text-white shadow-[0_0_20px_rgba(0,0,0,0.35)] ring-1 ring-white/15"
-                  : "z-10 text-white/90 opacity-95 hover:opacity-100 hover:ring-1 hover:ring-white/10"
+                  ? "z-20 -mb-px rounded-t-xl rounded-b-none border-b-0 text-white shadow-[0_0_20px_rgba(0,0,0,0.35)]"
+                  : "z-10 rounded-xl text-white/90 opacity-95 hover:opacity-100"
               )}
             >
               {role.title}
@@ -64,7 +64,7 @@ export function RoleFeatureBinder({
         role="tabpanel"
         aria-labelledby={`role-tab-${activeRole.slug}`}
         className={cn(
-          "relative w-full rounded-2xl border-2 p-6 sm:p-8 md:p-9",
+          "relative w-full rounded-b-2xl border-2 border-t-0 p-6 sm:p-8 md:p-9",
           rolePanelFill(activeStyles)
         )}
       >
