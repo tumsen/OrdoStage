@@ -15,9 +15,6 @@ export function getRoleAccent(slug: string): OrdoAccent {
   return ROLE_ACCENT_BY_SLUG[slug] ?? "magenta";
 }
 
-/** Solid fill shared by active tab and panel (gradients sit on top of this in the panel). */
-export const ROLE_TAB_PANEL_SOLID = "bg-[#12121c]";
-
 type AccentStyleSet = {
   tabBar: string;
   tabInactive: string;
@@ -34,12 +31,7 @@ type AccentStyleSet = {
   marker: string;
 };
 
-/** Active tab — solid fill matching the panel base colour. */
-export function roleActiveTabFill(styles: AccentStyleSet): string {
-  return `${styles.panelBorder} ${ROLE_TAB_PANEL_SOLID}`;
-}
-
-/** Panel — same border + accent gradient (via colour matches tab solid). */
+/** Active tab and panel — same role accent border and background fill. */
 export function rolePanelFill(styles: AccentStyleSet): string {
   return `${styles.panelBorder} ${styles.panelBg}`;
 }
