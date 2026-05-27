@@ -5,7 +5,7 @@ import { PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
 import {
   getRoleAccent,
   ORDO_ACCENT_STYLES,
-  roleActiveTabJoin,
+  roleActiveTabSurface,
   rolePanelFill,
   roleTabCard,
 } from "@/lib/roleAccentStyles";
@@ -51,13 +51,10 @@ export function RoleFeatureBinder({
               aria-controls="role-feature-panel"
               onClick={() => setActiveSlug(role.slug)}
               className={cn(
-                "relative shrink-0 whitespace-nowrap rounded-t-xl rounded-bl-none rounded-br-none border-2 px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-semibold transition-shadow duration-200",
+                "relative shrink-0 whitespace-nowrap rounded-t-xl rounded-bl-none rounded-br-none border-2 border-b-0 px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-semibold",
                 isActive
-                  ? cn(
-                      "z-20 -mb-0.5 border-b-0 pb-[calc(0.625rem+2px)] sm:pb-[calc(0.75rem+2px)] text-white",
-                      roleActiveTabJoin(activeStyles)
-                    )
-                  : cn("z-10 border-b-0 text-white/90 hover:text-white", roleTabCard(tabStyles))
+                  ? cn("z-30 -mb-0.5 text-white", roleActiveTabSurface(activeStyles))
+                  : cn("z-10 text-white/90 hover:text-white", roleTabCard(tabStyles))
               )}
             >
               {role.title}

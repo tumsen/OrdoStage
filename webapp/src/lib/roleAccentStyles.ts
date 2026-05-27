@@ -38,9 +38,14 @@ export function roleTabCard(styles: AccentStyleSet): string {
   return `${styles.panelBorder} ${styles.panelTop}`;
 }
 
-/** Active tab — border on top and sides only; bottom is open into the card. */
+/** Active tab — same surface as the card top so the join has no seam. */
+export function roleActiveTabSurface(styles: AccentStyleSet): string {
+  return `${styles.panelBorder} ${styles.panelBg} bg-[length:100%_800px] bg-top`;
+}
+
+/** @deprecated Use roleActiveTabSurface */
 export function roleActiveTabJoin(styles: AccentStyleSet): string {
-  return roleTabCard(styles);
+  return roleActiveTabSurface(styles);
 }
 
 /** Panel — same role tint at the top, deepening below. */
