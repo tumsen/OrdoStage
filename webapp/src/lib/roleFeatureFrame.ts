@@ -59,3 +59,18 @@ export function buildCardFramePath(
 
   return d;
 }
+
+/** Horizontal segments beside the active tab — drawn above inactive tabs. */
+export function buildCardTopJoinPaths(
+  containerWidth: number,
+  joinY: number,
+  tabLeft: number,
+  tabRight: number,
+  cardRadius = CARD_RADIUS
+): { left: string; right: string } {
+  const w = containerWidth;
+  const cr = cardRadius;
+  const left = tabLeft > cr ? `M ${cr} ${joinY} H ${tabLeft}` : "";
+  const right = tabRight < w - cr ? `M ${tabRight} ${joinY} H ${w - cr}` : "";
+  return { left, right };
+}

@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { PublicRoleFeature } from "@/lib/publicRoleFeatures";
 import { PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
-import { buildCardFramePath, PANEL_STROKE } from "@/lib/roleFeatureFrame";
+import { buildCardFramePath, buildCardTopJoinPaths, PANEL_STROKE } from "@/lib/roleFeatureFrame";
 import {
   getRoleAccent,
   ORDO_ACCENT_STYLES,
@@ -16,6 +16,9 @@ type FrameLayout = {
   width: number;
   height: number;
   path: string;
+  topJoinLeft: string;
+  topJoinRight: string;
+  inactiveClipBottom: Record<string, number>;
 };
 
 type RoleFeatureBinderProps = {
@@ -52,18 +55,36 @@ export function RoleFeatureBinder({
       const containerRect = container.getBoundingClientRect();
       const activeRect = activeTab.getBoundingClientRect();
       const panelRect = panel.getBoundingClientRect();
+      const tabs = container.querySelectorAll<HTMLElement>('[role="tab"]');
 
       const width = containerRect.width;
-      const joinY = activeRect.bottom - containerRect.top;
+      let joinY = 0;
+      const inactiveClipBottom: Record<string, number> = {};
+      tabs.forEach((tab) => {
+        const bottom = tab.getBoundingClientRect().bottom - containerRect.top;
+        joinY = Math.max(joinY, bottom);
+        const slug = tab.id.replace("role-tab-", "");
+        inactiveClipBottom[slug] = 0;
+      });
+      tabs.forEach((tab) => {
+        const bottom = tab.getBoundingClientRect().bottom - containerRect.top;
+        const slug = tab.id.replace("role-tab-", "");
+        inactiveClipBottom[slug] = Math.max(0, Math.round(bottom - joinY));
+      });
+
       const panelBottom = panelRect.bottom - containerRect.top;
       const tabLeft = activeRect.left - containerRect.left;
       const tabRight = activeRect.right - containerRect.left;
       const tabTop = activeRect.top - containerRect.top;
+      const topJoin = buildCardTopJoinPaths(width, joinY, tabLeft, tabRight);
 
       setFrame({
         width,
         height: containerRect.height,
         path: buildCardFramePath(width, joinY, panelBottom, tabLeft, tabRight, tabTop),
+        topJoinLeft: topJoin.left,
+        topJoinRight: topJoin.right,
+        inactiveClipBottom,
       });
     };
 
@@ -77,22 +98,49 @@ export function RoleFeatureBinder({
   return (
     <div ref={containerRef} className={cn("relative w-full", className)}>
       {frame != null ? (
-        <svg
-          aria-hidden
-          className="pointer-events-none absolute left-0 top-0 overflow-visible"
-          width={frame.width}
-          height={frame.height}
-        >
-          <path
-            d={frame.path}
-            fill="none"
-            stroke={PANEL_STROKE[activeAccent]}
-            strokeWidth={2}
-            strokeLinejoin="miter"
-            strokeMiterlimit={10}
-            strokeLinecap="butt"
-          />
-        </svg>
+        <>
+          <svg
+            aria-hidden
+            className="pointer-events-none absolute left-0 top-0 z-[8] overflow-visible"
+            width={frame.width}
+            height={frame.height}
+          >
+            <path
+              d={frame.path}
+              fill="none"
+              stroke={PANEL_STROKE[activeAccent]}
+              strokeWidth={2}
+              strokeLinejoin="miter"
+              strokeMiterlimit={10}
+              strokeLinecap="butt"
+            />
+          </svg>
+          <svg
+            aria-hidden
+            className="pointer-events-none absolute left-0 top-0 z-[15] overflow-visible"
+            width={frame.width}
+            height={frame.height}
+          >
+            {frame.topJoinLeft ? (
+              <path
+                d={frame.topJoinLeft}
+                fill="none"
+                stroke={PANEL_STROKE[activeAccent]}
+                strokeWidth={2}
+                strokeLinecap="butt"
+              />
+            ) : null}
+            {frame.topJoinRight ? (
+              <path
+                d={frame.topJoinRight}
+                fill="none"
+                stroke={PANEL_STROKE[activeAccent]}
+                strokeWidth={2}
+                strokeLinecap="butt"
+              />
+            ) : null}
+          </svg>
+        </>
       ) : null}
 
       <div
@@ -114,6 +162,11 @@ export function RoleFeatureBinder({
               aria-selected={isActive}
               aria-controls="role-feature-panel"
               onClick={() => setActiveSlug(role.slug)}
+              style={
+                !isActive && frame?.inactiveClipBottom[role.slug]
+                  ? { clipPath: `inset(0 0 ${frame.inactiveClipBottom[role.slug]}px 0)` }
+                  : undefined
+              }
               className={cn(
                 TAB_BASE,
                 isActive
