@@ -1,31 +1,55 @@
 import { cn } from "@/lib/utils";
-import { PLATFORM_FEATURE_HIGHLIGHTS } from "@/lib/publicPlatformFeatures";
+import { PLATFORM_FEATURE_AREAS } from "@/lib/publicPlatformFeatures";
 import { ORDO_ACCENT_STYLES } from "@/lib/roleAccentStyles";
 
 type PlatformFeaturesGridProps = {
   id?: string;
   heading?: string;
+  intro?: string;
   className?: string;
 };
 
 export function PlatformFeaturesGrid({
   id = "platform-features-heading",
-  heading = "Everything in one platform",
+  heading = "All platform functions",
+  intro = "Every module in OrdoStage — what it does and how your organisation uses it day to day.",
   className,
 }: PlatformFeaturesGridProps) {
   return (
-    <section aria-labelledby={id} className={className}>
-      <h2 id={id} className="text-xl md:text-2xl font-semibold text-white mb-5">
-        {heading}
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {PLATFORM_FEATURE_HIGHLIGHTS.map((feature) => {
+    <section aria-labelledby={id} className={cn("space-y-6", className)}>
+      <div className="space-y-2 max-w-3xl">
+        <h2 id={id} className="text-xl font-semibold text-white md:text-2xl">
+          {heading}
+        </h2>
+        {intro ? <p className="text-sm leading-relaxed text-white/75 md:text-base">{intro}</p> : null}
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2">
+        {PLATFORM_FEATURE_AREAS.map((feature) => {
           const styles = ORDO_ACCENT_STYLES[feature.accent];
           return (
-            <div key={feature.title} className={cn("rounded-xl border p-4 space-y-2", styles.section)}>
-              <h3 className={cn("text-sm font-bold", styles.sectionHeading)}>{feature.title}</h3>
-              <p className="text-sm leading-relaxed text-white/75">{feature.description}</p>
-            </div>
+            <article
+              key={feature.title}
+              className={cn("rounded-xl border p-5 md:p-6 space-y-3", styles.section)}
+            >
+              <div className="space-y-1">
+                <h3 className={cn("text-base font-bold tracking-tight md:text-lg", styles.sectionHeading)}>
+                  {feature.title}
+                </h3>
+                <p className="text-sm font-medium leading-snug text-white/90">{feature.summary}</p>
+              </div>
+              <p className="text-sm leading-relaxed text-white/75">{feature.body}</p>
+              <ul
+                className={cn(
+                  "list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-white/88",
+                  styles.marker
+                )}
+              >
+                {feature.bullets.map((bullet) => (
+                  <li key={bullet}>{bullet}</li>
+                ))}
+              </ul>
+            </article>
           );
         })}
       </div>

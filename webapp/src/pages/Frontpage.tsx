@@ -107,7 +107,7 @@ function FeatureBlock({
 
       <RoleFeatureBinder />
 
-      <PlatformFeaturesGrid className="space-y-0" />
+      <PlatformFeaturesGrid id="platform-functions" className="scroll-mt-6" />
 
       <div className="grid gap-4 md:grid-cols-1">
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
