@@ -89,7 +89,7 @@ function FeatureBlock({
   return (
     <section
       id="features"
-      className="w-full scroll-mt-6 space-y-6 rounded-2xl bg-gradient-to-br from-ordo-magenta/[0.08] via-black/30 to-ordo-violet/[0.10] p-5 text-left backdrop-blur-sm sm:p-7 shadow-[0_0_40px_rgba(131,56,236,0.08)]"
+      className="w-full scroll-mt-6 space-y-6"
     >
       <div className="space-y-4">
         <h2 className="text-center text-lg font-semibold text-white sm:text-left md:text-2xl">{sectionHeading}</h2>

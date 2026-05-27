@@ -18,9 +18,7 @@ export default function PublicFeatures() {
           </p>
         </header>
 
-        <section className="rounded-2xl bg-gradient-to-br from-ordo-magenta/[0.08] via-black/30 to-ordo-violet/[0.10] p-5 sm:p-7 shadow-[0_0_40px_rgba(131,56,236,0.08)]">
-          <RoleFeatureBinder />
-        </section>
+        <RoleFeatureBinder />
 
         <PlatformFeaturesGrid className="space-y-0" />
 
