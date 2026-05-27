@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { CreditCard, FileText, LogIn, Menu, Shield, Sparkles, UserPlus } from "lucide-react";
+import { CreditCard, FileText, LogIn, Mail, Menu, Shield, Sparkles, UserPlus } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 import { getRoleBySlug, isPublicRoleSlug } from "@/lib/publicRoleFeatures";
+import { ORDOSTAGE_MAILTO_HREF } from "@/lib/ordostageContact";
 
 const navItems: { label: string; icon: LucideIcon; to: string; exact?: boolean }[] = [
   { to: "/#features", label: "Features", icon: Sparkles },
@@ -86,6 +87,14 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
             </Link>
           );
         })}
+        <a
+          href={ORDOSTAGE_MAILTO_HREF}
+          onClick={onNav}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/50 hover:text-white/80 hover:bg-white/5 transition-all duration-150"
+        >
+          <Mail size={16} className="text-white/40" />
+          <span className="font-medium">Mail us</span>
+        </a>
       </nav>
 
       <div className="shrink-0 px-3 py-4 border-t border-white/10 space-y-1">

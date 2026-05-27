@@ -17,6 +17,7 @@ import {
   Timer,
   ClipboardList,
   Clapperboard,
+  Mail,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -34,6 +35,7 @@ import { WorkAnnouncementBar } from "@/components/WorkAnnouncementBar";
 import { useI18n } from "@/lib/i18n";
 import type { Person } from "../../../backend/src/types";
 import { RemoteImageHoverPreview } from "@/components/DocumentListThumbnail";
+import { ORDOSTAGE_MAILTO_HREF } from "@/lib/ordostageContact";
 
 interface OrgData {
   id: string;
@@ -154,6 +156,18 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
                 </Link>
               );
             })}
+            <a
+              href={ORDOSTAGE_MAILTO_HREF}
+              onClick={onNav}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm border border-transparent",
+                "transition-[color,background-color,border-color] duration-200 ease-out",
+                "text-white/55 hover:text-white hover:bg-white/[0.06] hover:border-white/5"
+              )}
+            >
+              <Mail size={16} className="text-white/45" />
+              <span className="font-medium">Mail us</span>
+            </a>
             <Link
               to="/login"
               onClick={onNav}
