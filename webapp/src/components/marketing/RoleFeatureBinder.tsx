@@ -53,7 +53,7 @@ export function RoleFeatureBinder({
               className={cn(
                 "relative shrink-0 whitespace-nowrap rounded-t-xl rounded-bl-none rounded-br-none border-2 px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-semibold transition-shadow duration-200",
                 isActive
-                  ? cn("z-20 -mb-0.5 border-b-2 text-white", roleActiveTabJoin(activeStyles))
+                  ? cn("z-20 -mb-0.5 border-b-0 text-white", roleActiveTabJoin(activeStyles))
                   : cn("z-10 border-b-0 text-white/90 hover:text-white", roleTabCard(tabStyles))
               )}
             >
@@ -68,7 +68,7 @@ export function RoleFeatureBinder({
         role="tabpanel"
         aria-labelledby={`role-tab-${activeRole.slug}`}
         className={cn(
-          "relative z-[1] overflow-hidden rounded-2xl border-2 p-6 sm:p-8 md:p-9",
+          "relative z-[1] overflow-hidden rounded-2xl border-2 border-t-0 p-6 sm:p-8 md:p-9",
           rolePanelFill(activeStyles)
         )}
       >
