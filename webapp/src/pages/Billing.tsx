@@ -67,18 +67,13 @@ function formatShortDate(iso: string | null | undefined): string {
 }
 
 export default function Billing({ embedded = false }: { embedded?: boolean } = {}) {
-  const { canAction, isOwner, orgRole } = usePermissions();
+  const { canAction, isOwner, isPending: permsPending } = usePermissions();
   const canManageBilling = canAction("billing.manage");
   const { data: org, isLoading } = useQuery<OrgBillingData>({
     queryKey: ["org"],
     queryFn: () => api.get<OrgBillingData>("/api/org"),
+    enabled: isOwner,
   });
-
-  const billable = org?.billableMembersThisMonth ?? [];
-  const trialDays = org?.billingTrialDays ?? 0;
-  const graceDays = org?.billingGraceDaysAfterDue ?? 0;
-  const billingPlan = org?.billingPlan === "fixed" ? "fixed" : "flex";
-
   const payInvoiceMutation = useMutation({
     mutationFn: () =>
       api.post<{ checkoutUrl: string | null; paddleTransactionId?: string | null }>(
@@ -108,6 +103,17 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
     },
   });
 
+  if (permsPending) {
+    return embedded ? null : <div className="p-6 md:p-8 text-sm text-white/50">Loading…</div>;
+  }
+  if (!isOwner) {
+    return null;
+  }
+
+  const billable = org?.billableMembersThisMonth ?? [];
+  const trialDays = org?.billingTrialDays ?? 0;
+  const graceDays = org?.billingGraceDaysAfterDue ?? 0;
+  const billingPlan = org?.billingPlan === "fixed" ? "fixed" : "flex";
   const openInvoicePayUrl = org?.openInvoice?.paddleInvoiceUrl?.trim() || null;
 
   return (
@@ -165,7 +171,6 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
         annualRenewalDate={org?.annualRenewalDate ?? null}
         billableCountThisMonth={billable.length}
         isOwner={isOwner}
-        orgRole={orgRole}
         paddleBackendConfigured={org?.paddleBilling?.configured === true}
         fixedAnnualRoundToTen={org?.fixedAnnualRoundToTen !== false}
         temporarySeatsBoost={org?.temporarySeatsBoost ?? null}

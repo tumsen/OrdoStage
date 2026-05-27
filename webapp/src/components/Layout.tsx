@@ -269,6 +269,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
 }
 
 function BillingBanner() {
+  const { isOwner } = usePermissions();
   const { data: org } = useQuery<OrgData>({
     queryKey: ["org"],
     queryFn: () => api.get<OrgData>("/api/org"),
@@ -281,10 +282,13 @@ function BillingBanner() {
         <AlertTriangle size={14} className="text-red-400 flex-shrink-0 hidden sm:block" />
         <span className="billing-banner-message text-red-300">
           Billing overdue. Organization is view-only until invoice is paid.
+          {!isOwner ? " Contact your organisation owner to pay." : null}
         </span>
-        <Link to="/account#billing" className="billing-banner-action text-red-200">
-          Open billing
-        </Link>
+        {isOwner ? (
+          <Link to="/account#billing" className="billing-banner-action text-red-200">
+            Open billing
+          </Link>
+        ) : null}
       </div>
     );
   }
@@ -301,10 +305,13 @@ function BillingBanner() {
         <span className="billing-banner-message text-amber-100/95">
           Invoice is past due. Read-only starts after <span className="font-medium text-amber-50">{until}</span> unless
           paid.
+          {!isOwner ? " Contact your organisation owner to pay." : null}
         </span>
-        <Link to="/account#billing" className="billing-banner-action text-amber-100">
-          Open billing
-        </Link>
+        {isOwner ? (
+          <Link to="/account#billing" className="billing-banner-action text-amber-100">
+            Open billing
+          </Link>
+        ) : null}
       </div>
     );
   }
@@ -316,9 +323,11 @@ function BillingBanner() {
         <span className="billing-banner-message text-emerald-100/90">
           Trial active until {end}. Unpaid invoices do not lock the workspace during the trial.
         </span>
-        <Link to="/account#billing" className="billing-banner-action text-emerald-100">
-          Billing
-        </Link>
+        {isOwner ? (
+          <Link to="/account#billing" className="billing-banner-action text-emerald-100">
+            Billing
+          </Link>
+        ) : null}
       </div>
     );
   }
@@ -330,9 +339,11 @@ function BillingBanner() {
         <div className="billing-banner bg-ordo-orange/15 border-b border-ordo-yellow/35">
           <AlertTriangle size={14} className="text-ordo-yellow flex-shrink-0 hidden sm:block" />
           <span className="billing-banner-message text-ordo-yellow/95">Open invoice due on {dueStr}.</span>
-          <Link to="/account#billing" className="billing-banner-action text-ordo-yellow">
-            Open billing
-          </Link>
+          {isOwner ? (
+            <Link to="/account#billing" className="billing-banner-action text-ordo-yellow">
+              Open billing
+            </Link>
+          ) : null}
         </div>
       );
     }

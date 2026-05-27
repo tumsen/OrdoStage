@@ -39,7 +39,6 @@ type Props = {
   annualRenewalDate: string | null;
   billableCountThisMonth: number;
   isOwner: boolean;
-  orgRole?: string;
   paddleBackendConfigured?: boolean;
   fixedAnnualRoundToTen?: boolean;
   temporarySeatsBoost?: number | null;
@@ -60,7 +59,6 @@ export function BillingPlanPicker({
   annualRenewalDate,
   billableCountThisMonth,
   isOwner,
-  orgRole = "member",
   paddleBackendConfigured = false,
   fixedAnnualRoundToTen = true,
   temporarySeatsBoost = null,
@@ -477,12 +475,7 @@ export function BillingPlanPicker({
             </Button>
           </div>
         </>
-      ) : (
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/55">
-          Only the organisation <strong className="text-white/75">owner</strong> can start Paddle checkout or change
-          billing plan. Your role: <span className="text-white/70 capitalize">{orgRole}</span>.
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }

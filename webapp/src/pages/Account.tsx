@@ -88,7 +88,7 @@ export default function Account() {
   const queryClient = useQueryClient();
   const { effective, isLoading } = usePreferences();
   const { t } = useI18n();
-  const { canAction } = usePermissions();
+  const { canAction, isOwner } = usePermissions();
   const canManageBranding = canAction("billing.manage");
   const canDeleteOrganization = canAction("org.delete");
   type DeletionRequirements = {
@@ -120,14 +120,14 @@ export default function Account() {
   const documentRowHandleMap = useRef(new Map<string, PersonDocumentListRowHandle>());
 
   useEffect(() => {
-    if (window.location.hash !== "#billing") return;
+    if (!isOwner || window.location.hash !== "#billing") return;
     const el = document.getElementById("billing");
     if (!el) return;
     const t = window.setTimeout(() => {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [isOwner]);
 
   const { data: mePerson } = useQuery<Person | null>({
     queryKey: ["people", "me"],
@@ -545,12 +545,14 @@ export default function Account() {
       <div>
         <h2 className="text-xl font-semibold text-white">{t("account.title")}</h2>
         <p className="text-sm text-white/45 mt-1">{t("account.subtitle")}</p>
-        <a
-          href="#billing"
-          className="inline-block mt-3 text-sm text-ordo-yellow/90 hover:text-ordo-yellow underline-offset-2 hover:underline"
-        >
-          Jump to billing &amp; Paddle checkout →
-        </a>
+        {isOwner ? (
+          <a
+            href="#billing"
+            className="inline-block mt-3 text-sm text-ordo-yellow/90 hover:text-ordo-yellow underline-offset-2 hover:underline"
+          >
+            Jump to billing &amp; Paddle checkout →
+          </a>
+        ) : null}
       </div>
 
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
@@ -731,15 +733,17 @@ export default function Account() {
         </div>
       ) : null}
 
-      <div id="billing" className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
-        <div>
-          <p className="text-sm font-medium text-white">Billing</p>
-          <p className="text-xs text-white/50 mt-1">
-            Manage monthly invoicing, organization billing options, and payment status.
-          </p>
+      {isOwner ? (
+        <div id="billing" className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-white">Billing</p>
+            <p className="text-xs text-white/50 mt-1">
+              Manage monthly invoicing, organization billing options, and payment status.
+            </p>
+          </div>
+          <Billing embedded />
         </div>
-        <Billing embedded />
-      </div>
+      ) : null}
 
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
         <div>

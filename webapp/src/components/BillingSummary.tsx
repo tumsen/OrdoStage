@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Receipt, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export interface OrgBillingPayload {
   userCount?: number;
@@ -19,6 +20,9 @@ interface BillingSummaryProps {
 }
 
 export function BillingSummary({ org, isLoading, className, variant = "card" }: BillingSummaryProps) {
+  const { isOwner } = usePermissions();
+  if (!isOwner) return null;
+
   if (isLoading || !org) {
     return (
       <div

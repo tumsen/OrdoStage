@@ -192,7 +192,7 @@ function MonthCalendar({ events, tourDetails }: { events: EventDetail[]; tourDet
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { canAction } = usePermissions();
+  const { canAction, isOwner } = usePermissions();
   const canManageBilling = canAction("billing.manage");
 
   const { data: events, isLoading: eventsLoading } = useQuery({
@@ -307,9 +307,11 @@ export default function Dashboard() {
         <div className="bg-white/[0.03] border border-white/10 rounded-xl p-5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-white">Usage this month</h3>
-            <Link to="/account#billing" className="text-xs text-white/40 hover:text-white/70">
-              Billing details →
-            </Link>
+            {isOwner ? (
+              <Link to="/account#billing" className="text-xs text-white/40 hover:text-white/70">
+                Billing details →
+              </Link>
+            ) : null}
           </div>
           <p className="text-xs text-white/45 leading-relaxed">
             Billable members (UTC month to date) had jobs, staffing, event edits, or work time. You only pay for seats
@@ -324,7 +326,10 @@ export default function Dashboard() {
             ))}
           </ul>
           {orgUsage.billableMembersThisMonth.length > 8 ? (
-            <p className="text-[11px] text-white/35">+{orgUsage.billableMembersThisMonth.length - 8} more on the billing page.</p>
+            <p className="text-[11px] text-white/35">
+              +{orgUsage.billableMembersThisMonth.length - 8} more
+              {isOwner ? " on the billing page" : ""}.
+            </p>
           ) : null}
           {canManageBilling && orgUsage.estimatedMonthlyCents != null ? (
             <p className="text-xs text-white/55 pt-1">
