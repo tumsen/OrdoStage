@@ -27,7 +27,7 @@ export function RoleFeatureBinder({
   return (
     <div className={cn("w-full", className)}>
       <div
-        className="flex w-full flex-wrap sm:flex-nowrap gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:thin]"
+        className="flex w-full flex-wrap sm:flex-nowrap gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:thin]"
         role="tablist"
         aria-label="Roles in your organisation"
       >
