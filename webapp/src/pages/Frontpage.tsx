@@ -7,21 +7,36 @@ import { PlatformFeaturesGrid } from "@/components/marketing/PlatformFeaturesGri
 import { RoleFeatureBinder } from "@/components/marketing/RoleFeatureBinder";
 import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 import { isPublicFlagOn } from "@/lib/publicSiteFlags";
+import { cn } from "@/lib/utils";
 
 type SiteContent = Record<string, string>;
 
+const W_HERO_HIGHLIGHTS = [
+  "Workflow-first planning — not a generic project tool.",
+  "One schedule across venues, tours, and departments.",
+  "Riders, specs, and staffing — linked to the show they belong to.",
+] as const;
+
 const W = {
-  landing_title: "OrdoStage",
+  landing_title: "OrdoStage — Planning for theaters, venues & touring productions",
   landing_subtitle:
-    "Production operations for theatres, concert halls, clubs, and touring shows — one workspace your whole company can trust on show day.",
+    "Plan productions, coordinate teams, and run tours in one platform built for live performance.",
   landing_lead:
-    "Whether you run a repertory season, book a busy music room, or move a tour through cities every week, the same problems show up: dates slip, specs drift apart, and crews work from outdated notes. OrdoStage ties events, venues, tours, staffing, and documents together so technical, production, and front-of-house teams share one live picture — from first hold on the calendar to load-out.",
-  landing_section_heading: "Built for the people who run the show",
+    "Stop juggling spreadsheets, email threads, and shared drives. OrdoStage connects scheduling, venue specs, tech riders, and crew coordination in one live workspace — from first rehearsal to closing night.",
+  landing_postscript: W_HERO_HIGHLIGHTS.join("\n"),
+  landing_closing: "For theaters · venues · touring companies · everyone running the show.",
+  landing_section_heading: "See it by role",
   landing_section_body:
-    "Every role in your organisation sees the same live data — filtered to what they need. Pick your job below to see how OrdoStage supports you.",
-  landing_closing:
-    "Built for resident companies and presenting houses. For music venues and festivals. For tour managers and road crews. For anyone who cannot afford a wrong answer on opening night.",
+    "Same live data for your whole organisation — pick a role to explore what matters for that job.",
 } as const;
+
+function parseHighlightLines(raw: string | undefined, fallback: string): string[] {
+  const source = raw?.trim() ? raw : fallback;
+  return source
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
 
 function useWelcomeCopy(site: SiteContent | undefined) {
   return useMemo(() => {
@@ -29,9 +44,10 @@ function useWelcomeCopy(site: SiteContent | undefined) {
       title: site?.landing_title?.trim() || W.landing_title,
       subtitle: site?.landing_subtitle?.trim() || W.landing_subtitle,
       lead: site?.landing_lead?.trim() || W.landing_lead,
+      highlights: parseHighlightLines(site?.landing_postscript, W.landing_postscript),
+      closing: site?.landing_closing?.trim() || W.landing_closing,
       sectionHeading: site?.landing_section_heading?.trim() || W.landing_section_heading,
       sectionBody: site?.landing_section_body?.trim() || W.landing_section_body,
-      closing: site?.landing_closing?.trim() || W.landing_closing,
     };
   }, [site]);
 }
@@ -67,11 +83,15 @@ function WelcomeHero({
   title,
   subtitle,
   lead,
+  highlights,
+  closing,
   titleClass = "md:text-4xl",
 }: {
   title: string;
   subtitle: string;
   lead: string;
+  highlights: string[];
+  closing: string;
   titleClass?: string;
 }) {
   return (
@@ -79,30 +99,33 @@ function WelcomeHero({
       <h1 className={`text-2xl font-bold leading-tight tracking-tight ${titleClass}`}>{title}</h1>
       <p className="text-base font-medium leading-relaxed text-white/90 md:text-xl">{subtitle}</p>
       <p className="text-sm leading-relaxed text-white/85 md:text-base text-left sm:text-center">{lead}</p>
+      {highlights.length > 0 ? (
+        <ul
+          className={cn(
+            "mx-auto max-w-2xl space-y-2 text-left text-sm leading-relaxed text-white/85 sm:text-center",
+            "list-disc pl-5 sm:list-none sm:pl-0 marker:text-ordo-yellow"
+          )}
+        >
+          {highlights.map((line) => (
+            <li key={line} className="sm:px-1">
+              {line}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {closing ? (
+        <p className="text-sm font-medium leading-relaxed text-ordo-yellow/90 md:text-base">{closing}</p>
+      ) : null}
     </section>
   );
 }
 
-function FeatureBlock({
-  sectionHeading,
-  sectionBody,
-  closing,
-}: {
-  sectionHeading: string;
-  sectionBody: string;
-  closing: string;
-}) {
+function FeatureBlock({ sectionHeading, sectionBody }: { sectionHeading: string; sectionBody: string }) {
   return (
-    <section
-      id="features"
-      className="w-full scroll-mt-6 space-y-6"
-    >
-      <div className="space-y-4">
+    <section id="features" className="w-full scroll-mt-6 space-y-6">
+      <div className="space-y-3">
         <h2 className="text-center text-lg font-semibold text-white sm:text-left md:text-2xl">{sectionHeading}</h2>
         <p className="text-sm leading-relaxed text-white/88 md:text-base">{sectionBody}</p>
-        <p className="text-center text-sm font-medium leading-relaxed text-ordo-yellow/90 sm:text-left md:text-base">
-          {closing}
-        </p>
       </div>
 
       <RoleFeatureBinder />
@@ -113,12 +136,20 @@ function FeatureBlock({
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
           <h3 className="text-base font-semibold text-white">Why organisations switch</h3>
           <p className="mt-2 text-sm leading-relaxed text-white/80">
-            Less re-keying between tools. Fewer “did you see the update?” moments before load-in. Technical, production, and operations leadership see the same live picture — so decisions on show day rest on current data, not memory.
+            Less re-keying between tools. Fewer “did you see the update?” moments before load-in. Technical, production,
+            and operations leadership see the same live picture — so decisions on show day rest on current data, not
+            memory.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">Fewer planning mistakes</span>
-            <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">Faster handovers</span>
-            <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">Better team alignment</span>
+            <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">
+              Fewer planning mistakes
+            </span>
+            <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">
+              Faster handovers
+            </span>
+            <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">
+              Better team alignment
+            </span>
           </div>
         </div>
       </div>
@@ -127,8 +158,7 @@ function FeatureBlock({
 }
 
 function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefined }) {
-  const title =
-    siteContent?.public_maintenance_title?.trim() || "We will be back soon";
+  const title = siteContent?.public_maintenance_title?.trim() || "We will be back soon";
   const subtitle =
     siteContent?.public_maintenance_subtitle?.trim() ||
     "OrdoStage is being updated. Please try again in a little while.";
@@ -174,12 +204,15 @@ function MarketingHome({ siteContent }: { siteContent: SiteContent | undefined }
     <FrontShell>
       <HashScroll />
       <main className="relative flex min-h-full w-full flex-col items-stretch gap-8 px-6 pb-12 pt-6 md:pt-8">
-        <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} titleClass="md:text-4xl" />
-        <FeatureBlock
-          sectionHeading={welcome.sectionHeading}
-          sectionBody={welcome.sectionBody}
+        <WelcomeHero
+          title={welcome.title}
+          subtitle={welcome.subtitle}
+          lead={welcome.lead}
+          highlights={welcome.highlights}
           closing={welcome.closing}
+          titleClass="md:text-4xl"
         />
+        <FeatureBlock sectionHeading={welcome.sectionHeading} sectionBody={welcome.sectionBody} />
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
           {ctaExternal ? (
             <Button

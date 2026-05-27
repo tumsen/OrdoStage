@@ -238,8 +238,8 @@ export default function SiteContentAdmin() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Landing title (brand)</Label>
-          <p className="text-xs text-white/40">Usually OrdoStage — leave empty to use the default.</p>
+          <Label>Landing title (hero H1)</Label>
+          <p className="text-xs text-white/40">Main headline on ordostage.com — leave empty to use the default.</p>
           <Input value={merged.landing_title ?? ""} onChange={(e) => setField("landing_title", e.target.value)} />
         </div>
         <div className="space-y-2">
@@ -265,9 +265,12 @@ export default function SiteContentAdmin() {
 
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-4 max-w-4xl">
         <h3 className="text-sm font-semibold text-white">Home page — main story</h3>
-        <p className="text-xs text-white/45">Shown on the public home: hero, then the #features block (headline, body, closing).</p>
+        <p className="text-xs text-white/45">
+          Hero: lead paragraph, highlight bullets, and audience line. Below that: role tabs (#features) with a short
+          intro only.
+        </p>
         <div className="space-y-2">
-          <Label>Lead paragraph</Label>
+          <Label>Lead paragraph (hero)</Label>
           <Textarea
             className="min-h-[80px] bg-gray-900/80 border-white/10"
             value={merged.landing_lead ?? ""}
@@ -275,23 +278,16 @@ export default function SiteContentAdmin() {
           />
         </div>
         <div className="space-y-2">
-          <Label>Section headline (#features)</Label>
-          <Input
-            className="bg-gray-900/80 border-white/10"
-            value={merged.landing_section_heading ?? ""}
-            onChange={(e) => setField("landing_section_heading", e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Section body</Label>
+          <Label>Hero highlights (one bullet per line)</Label>
           <Textarea
-            className="min-h-[100px] bg-gray-900/80 border-white/10"
-            value={merged.landing_section_body ?? ""}
-            onChange={(e) => setField("landing_section_body", e.target.value)}
+            className="min-h-[72px] bg-gray-900/80 border-white/10"
+            value={merged.landing_postscript ?? ""}
+            onChange={(e) => setField("landing_postscript", e.target.value)}
+            placeholder="Workflow-first planning — not a generic project tool."
           />
         </div>
         <div className="space-y-2">
-          <Label>Closing line</Label>
+          <Label>Hero audience line (yellow text under bullets)</Label>
           <Textarea
             className="min-h-[64px] bg-gray-900/80 border-white/10"
             value={merged.landing_closing ?? ""}
@@ -299,12 +295,19 @@ export default function SiteContentAdmin() {
           />
         </div>
         <div className="space-y-2">
-          <Label>Postscript (optional; not shown on the public home — reserved for future use)</Label>
+          <Label>Section headline (above role tabs)</Label>
+          <Input
+            className="bg-gray-900/80 border-white/10"
+            value={merged.landing_section_heading ?? ""}
+            onChange={(e) => setField("landing_section_heading", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Section body (above role tabs)</Label>
           <Textarea
-            className="min-h-[72px] bg-gray-900/80 border-white/10"
-            value={merged.landing_postscript ?? ""}
-            onChange={(e) => setField("landing_postscript", e.target.value)}
-            placeholder="Rollout and contact lines…"
+            className="min-h-[80px] bg-gray-900/80 border-white/10"
+            value={merged.landing_section_body ?? ""}
+            onChange={(e) => setField("landing_section_body", e.target.value)}
           />
         </div>
       </div>

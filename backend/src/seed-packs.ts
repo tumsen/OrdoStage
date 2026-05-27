@@ -6,32 +6,41 @@ import {
 } from "./legal-defaults";
 
 const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
-  { key: "landing_title", value: "OrdoStage" },
+  {
+    key: "landing_title",
+    value: "OrdoStage — Planning for theaters, venues & touring productions",
+  },
   {
     key: "landing_subtitle",
     value:
-      "Production operations for theatres, concert halls, clubs, and touring shows — one workspace your whole company can trust on show day.",
+      "Plan productions, coordinate teams, and run tours in one platform built for live performance.",
   },
   {
     key: "landing_lead",
     value:
-      "Whether you run a repertory season, book a busy music room, or move a tour through cities every week, the same problems show up: dates slip, specs drift apart, and crews work from outdated notes. OrdoStage ties events, venues, tours, staffing, and documents together so technical, production, and front-of-house teams share one live picture — from first hold on the calendar to load-out.",
+      "Stop juggling spreadsheets, email threads, and shared drives. OrdoStage connects scheduling, venue specs, tech riders, and crew coordination in one live workspace — from first rehearsal to closing night.",
+  },
+  {
+    key: "landing_postscript",
+    value: [
+      "Workflow-first planning — not a generic project tool.",
+      "One schedule across venues, tours, and departments.",
+      "Riders, specs, and staffing — linked to the show they belong to.",
+    ].join("\n"),
+  },
+  {
+    key: "landing_closing",
+    value: "For theaters · venues · touring companies · everyone running the show.",
   },
   {
     key: "landing_section_heading",
-    value: "Everything your live organisation already juggles — in one place",
+    value: "See it by role",
   },
   {
     key: "landing_section_body",
     value:
-      "Plan shows and venue holds on a real calendar. Route tours with day-by-day detail. Keep venue specs, files, and tech riders next to the booking they belong to. Staff jobs from the same roster your people and departments already use. Track time when you need it, share calendars when partners ask, and lock access down with roles that match how theatres and venues actually work.",
+      "Same live data for your whole organisation — pick a role to explore what matters for that job.",
   },
-  {
-    key: "landing_closing",
-    value:
-      "Built for resident companies and presenting houses. For music venues and festivals. For tour managers and road crews. For anyone who cannot afford a wrong answer on opening night.",
-  },
-  { key: "landing_postscript", value: "" },
   { key: "landing_cta_text", value: "Get started free" },
   { key: "landing_cta_url", value: "/signup" },
   { key: "terms_content", value: DEFAULT_TERMS_CONTENT },
