@@ -27,7 +27,7 @@ export function RoleFeatureBinder({
   return (
     <div className={cn("w-full", className)}>
       <div
-        className="flex w-full flex-wrap sm:flex-nowrap overflow-x-auto overscroll-x-contain border-b border-white/10 [scrollbar-width:thin]"
+        className="flex w-full flex-wrap sm:flex-nowrap gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:thin]"
         role="tablist"
         aria-label="Roles in your organisation"
       >
@@ -47,11 +47,11 @@ export function RoleFeatureBinder({
               onClick={() => setActiveSlug(role.slug)}
               className={cn(
                 "shrink-0 whitespace-nowrap px-4 py-3 sm:px-5 sm:py-3.5 text-sm sm:text-base font-semibold transition-colors duration-200",
-                "border border-b-0 -mb-px",
+                "border-2 border-b-0",
                 isActive
-                  ? cn("z-20 rounded-t-xl text-white", styles.panelBorder, styles.panelBg)
+                  ? cn("z-20 -mb-0.5 rounded-t-xl text-white", styles.panelBorder, styles.panelBg)
                   : cn(
-                      "z-10 rounded-t-lg text-white/70 opacity-80 hover:text-white/90 hover:opacity-100",
+                      "z-10 rounded-t-xl text-white/70 opacity-80 hover:text-white/90 hover:opacity-100",
                       styles.tabInactive
                     )
               )}
@@ -67,7 +67,7 @@ export function RoleFeatureBinder({
         role="tabpanel"
         aria-labelledby={`role-tab-${activeRole.slug}`}
         className={cn(
-          "relative w-full rounded-b-2xl border border-t-0 p-6 sm:p-8 md:p-9",
+          "relative w-full rounded-b-2xl border-2 border-t-0 p-6 sm:p-8 md:p-9",
           activeStyles.panelBorder,
           activeStyles.panelBg
         )}
