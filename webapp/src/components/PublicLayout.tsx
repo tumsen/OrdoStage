@@ -10,7 +10,7 @@ import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 import { getRoleBySlug, isPublicRoleSlug } from "@/lib/publicRoleFeatures";
 
 const navItems: { label: string; icon: LucideIcon; to: string; exact?: boolean }[] = [
-  { to: "/features", label: "Features", icon: Sparkles },
+  { to: "/#features", label: "Features", icon: Sparkles },
   { to: "/pricing", label: "Pricing", icon: CreditCard, exact: true },
   { to: "/terms-of-service", label: "Terms", icon: FileText, exact: true },
   { to: "/privacy-policy", label: "Privacy", icon: Shield, exact: true },
@@ -44,6 +44,9 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
   const location = useLocation();
 
   function isNavActive(to: string, exact: boolean | undefined): boolean {
+    if (to === "/#features") {
+      return location.pathname === "/" || location.pathname.startsWith("/features");
+    }
     if (exact) {
       return location.pathname === to;
     }

@@ -45,7 +45,7 @@ export default function PublicRoleFeatures() {
               /
             </li>
             <li>
-              <Link to="/features" className="hover:text-white/80 transition-colors">
+              <Link to="/#features" className="hover:text-white/80 transition-colors">
                 Features
               </Link>
             </li>

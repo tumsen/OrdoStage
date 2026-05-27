@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { PlatformFeaturesGrid } from "@/components/marketing/PlatformFeaturesGrid";
 import { RoleFeatureBinder } from "@/components/marketing/RoleFeatureBinder";
 import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
 import { isPublicFlagOn } from "@/lib/publicSiteFlags";
@@ -41,10 +42,15 @@ function HashScroll() {
     if (pathname !== "/") return;
     if (!hash) return;
     const id = hash.startsWith("#") ? hash.slice(1) : hash;
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    const scrollToTarget = () => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+    scrollToTarget();
+    const t = window.setTimeout(scrollToTarget, 100);
+    return () => window.clearTimeout(t);
   }, [pathname, hash]);
   return null;
 }
@@ -97,25 +103,13 @@ function FeatureBlock({
         <p className="text-center text-sm font-medium leading-relaxed text-ordo-yellow/90 sm:text-left md:text-base">
           {closing}
         </p>
-        <p className="text-center sm:text-left">
-          <Link to="/features" className="text-sm font-medium text-ordo-yellow hover:underline">
-            Open full features page →
-          </Link>
-        </p>
       </div>
 
       <RoleFeatureBinder />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-ordo-yellow/35 bg-gradient-to-br from-ordo-magenta/[0.12] to-ordo-violet/[0.10] p-5">
-          <h3 className="text-base font-semibold text-white">Everything in one platform</h3>
-          <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-white/85 marker:text-ordo-yellow">
-            <li>One calendar for events, venue holds, tours, and rehearsals</li>
-            <li>Venue specs, files, and tech riders tied to the right booking</li>
-            <li>Staffing and roster data that stays in sync with permissions</li>
-            <li>Time and exports when finance and partners need them</li>
-          </ul>
-        </div>
+      <PlatformFeaturesGrid className="space-y-0" />
+
+      <div className="grid gap-4 md:grid-cols-1">
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
           <h3 className="text-base font-semibold text-white">Why organisations switch</h3>
           <p className="mt-2 text-sm leading-relaxed text-white/80">
@@ -181,11 +175,6 @@ function MarketingHome({ siteContent }: { siteContent: SiteContent | undefined }
       <HashScroll />
       <main className="relative flex min-h-full w-full flex-col items-stretch gap-8 px-6 pb-12 pt-6 md:pt-8">
         <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} titleClass="md:text-4xl" />
-        <p className="w-full text-center text-sm leading-relaxed text-white/70">
-          Use the sidebar for <Link to="/features" className="text-ordo-yellow hover:underline"><strong>Features</strong></Link> and{" "}
-          <Link to="/pricing" className="text-ordo-yellow hover:underline"><strong>Pricing</strong></Link>, plus{" "}
-          <strong>Terms</strong> and <strong>Privacy</strong> in the menu.
-        </p>
         <FeatureBlock
           sectionHeading={welcome.sectionHeading}
           sectionBody={welcome.sectionBody}
