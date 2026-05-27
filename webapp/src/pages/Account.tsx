@@ -119,6 +119,16 @@ export default function Account() {
 
   const documentRowHandleMap = useRef(new Map<string, PersonDocumentListRowHandle>());
 
+  useEffect(() => {
+    if (window.location.hash !== "#billing") return;
+    const el = document.getElementById("billing");
+    if (!el) return;
+    const t = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const { data: mePerson } = useQuery<Person | null>({
     queryKey: ["people", "me"],
     queryFn: () => api.get<Person | null>("/api/people/me"),
@@ -535,6 +545,12 @@ export default function Account() {
       <div>
         <h2 className="text-xl font-semibold text-white">{t("account.title")}</h2>
         <p className="text-sm text-white/45 mt-1">{t("account.subtitle")}</p>
+        <a
+          href="#billing"
+          className="inline-block mt-3 text-sm text-ordo-yellow/90 hover:text-ordo-yellow underline-offset-2 hover:underline"
+        >
+          Jump to billing &amp; Paddle checkout →
+        </a>
       </div>
 
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
