@@ -25,7 +25,7 @@ type RoleFeatureBinderProps = {
 };
 
 const TAB_BASE =
-  "relative shrink-0 whitespace-nowrap rounded-t-xl rounded-bl-none rounded-br-none border-2 border-b-0 px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-semibold";
+  "relative shrink-0 whitespace-nowrap rounded-t-xl rounded-bl-none rounded-br-none border-2 border-b-0 px-3 py-2.5 shadow-none sm:px-4 sm:py-3 text-sm sm:text-base font-semibold";
 
 export function RoleFeatureBinder({
   roles = PUBLIC_ROLE_FEATURES,
@@ -58,11 +58,12 @@ export function RoleFeatureBinder({
       const panelBottom = panelRect.bottom - containerRect.top;
       const tabLeft = activeRect.left - containerRect.left;
       const tabRight = activeRect.right - containerRect.left;
+      const tabTop = activeRect.top - containerRect.top;
 
       setFrame({
         width,
         height: containerRect.height,
-        path: buildCardFramePath(width, panelTop, panelBottom, tabLeft, tabRight),
+        path: buildCardFramePath(width, panelTop, panelBottom, tabLeft, tabRight, tabTop),
       });
     };
 
@@ -87,7 +88,8 @@ export function RoleFeatureBinder({
             fill="none"
             stroke={PANEL_STROKE[activeAccent]}
             strokeWidth={2}
-            vectorEffect="non-scaling-stroke"
+            strokeLinejoin="round"
+            strokeLinecap="butt"
           />
         </svg>
       ) : null}
@@ -114,8 +116,8 @@ export function RoleFeatureBinder({
               className={cn(
                 TAB_BASE,
                 isActive
-                  ? cn("z-20 text-white", roleActiveTabSurface(activeStyles))
-                  : cn("z-10 text-white/90 hover:text-white", roleTabCard(tabStyles))
+                  ? cn("z-20 border-transparent text-white shadow-none", roleActiveTabSurface(activeStyles))
+                  : cn("z-10 text-white/90 shadow-none hover:text-white", roleTabCard(tabStyles))
               )}
             >
               {role.title}

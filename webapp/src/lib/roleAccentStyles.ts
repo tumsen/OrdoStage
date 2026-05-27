@@ -38,9 +38,9 @@ export function roleTabCard(styles: AccentStyleSet): string {
   return `${styles.panelBorder} ${styles.panelTop}`;
 }
 
-/** Active tab — same surface as the card top so the join has no seam. */
+/** Active tab fill — flat top tint; border from the shared SVG frame. */
 export function roleActiveTabSurface(styles: AccentStyleSet): string {
-  return `${styles.panelBorder} ${styles.panelBg} bg-[length:100%_800px] bg-top`;
+  return styles.panelTop;
 }
 
 /** @deprecated Use roleActiveTabSurface */

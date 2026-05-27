@@ -9,11 +9,12 @@ export const PANEL_STROKE: Record<OrdoAccent, string> = {
   violet: "rgba(131, 56, 236, 0.5)",
 };
 
-const CORNER_RADIUS = 16;
+const CARD_RADIUS = 16;
+const TAB_RADIUS = 12;
 
 /**
- * Card outline: left, bottom, right, and top segments beside the active tab (not under it).
- * Coordinates are relative to the binder container (0,0 = top-left).
+ * One continuous outline: card (no top under tab) + active tab (top and sides).
+ * Coordinates are relative to the binder container.
  */
 export function buildCardFramePath(
   containerWidth: number,
@@ -21,34 +22,41 @@ export function buildCardFramePath(
   panelBottom: number,
   tabLeft: number,
   tabRight: number,
-  radius = CORNER_RADIUS
+  tabTop: number,
+  cardRadius = CARD_RADIUS,
+  tabRadius = TAB_RADIUS
 ): string {
   const w = containerWidth;
   const bottom = panelBottom;
-  const top = panelTop;
-  const r = radius;
+  const joinY = panelTop;
+  const cr = cardRadius;
+  const tr = tabRadius;
 
-  let d = `M ${r} ${bottom}`;
-  d += ` L ${w - r} ${bottom}`;
-  d += ` Q ${w} ${bottom} ${w} ${bottom - r}`;
-  d += ` L ${w} ${top + r}`;
-  d += ` Q ${w} ${top} ${w - r} ${top}`;
+  let d = `M ${cr} ${bottom}`;
+  d += ` L ${w - cr} ${bottom}`;
+  d += ` Q ${w} ${bottom} ${w} ${bottom - cr}`;
+  d += ` L ${w} ${joinY + cr}`;
+  d += ` Q ${w} ${joinY} ${w - cr} ${joinY}`;
 
-  const rightEnd = Math.max(tabRight, r);
-  if (rightEnd < w - r) {
-    d += ` L ${rightEnd} ${top}`;
+  if (tabRight < w - cr) {
+    d += ` L ${tabRight} ${joinY}`;
   }
 
-  const leftStart = Math.min(tabLeft, w - r);
-  d += ` M ${leftStart} ${top}`;
+  // Active tab: up the right side, across the top, down the left side to the card top line
+  d += ` L ${tabRight} ${tabTop + tr}`;
+  d += ` Q ${tabRight} ${tabTop} ${tabRight - tr} ${tabTop}`;
+  d += ` L ${tabLeft + tr} ${tabTop}`;
+  d += ` Q ${tabLeft} ${tabTop} ${tabLeft} ${tabTop + tr}`;
+  d += ` L ${tabLeft} ${joinY}`;
 
-  if (leftStart > r) {
-    d += ` L ${r} ${top}`;
+  if (tabLeft > cr) {
+    d += ` L ${cr} ${joinY}`;
   }
 
-  d += ` Q 0 ${top} 0 ${top + r}`;
-  d += ` L 0 ${bottom - r}`;
-  d += ` Q 0 ${bottom} ${r} ${bottom}`;
+  d += ` Q 0 ${joinY} 0 ${joinY + cr}`;
+  d += ` L 0 ${bottom - cr}`;
+  d += ` Q 0 ${bottom} ${cr} ${bottom}`;
+  d += " Z";
 
   return d;
 }
