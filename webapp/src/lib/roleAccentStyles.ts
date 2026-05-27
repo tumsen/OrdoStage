@@ -33,9 +33,14 @@ type AccentStyleSet = {
   marker: string;
 };
 
-/** Active tab — same top tint as the connected info panel. */
-export function roleActiveTabFill(styles: AccentStyleSet): string {
+/** Role tab card — accent border and tint (selected or not). */
+export function roleTabCard(styles: AccentStyleSet): string {
   return `${styles.panelBorder} ${styles.panelTop}`;
+}
+
+/** Active tab — same fill as other tabs; panel uses matching colours below. */
+export function roleActiveTabFill(styles: AccentStyleSet): string {
+  return roleTabCard(styles);
 }
 
 /** Panel — same role tint at the top, deepening below. */
