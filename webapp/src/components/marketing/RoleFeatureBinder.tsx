@@ -54,7 +54,7 @@ export function RoleFeatureBinder({
       const panelRect = panel.getBoundingClientRect();
 
       const width = containerRect.width;
-      const panelTop = panelRect.top - containerRect.top;
+      const joinY = activeRect.bottom - containerRect.top;
       const panelBottom = panelRect.bottom - containerRect.top;
       const tabLeft = activeRect.left - containerRect.left;
       const tabRight = activeRect.right - containerRect.left;
@@ -63,7 +63,7 @@ export function RoleFeatureBinder({
       setFrame({
         width,
         height: containerRect.height,
-        path: buildCardFramePath(width, panelTop, panelBottom, tabLeft, tabRight, tabTop),
+        path: buildCardFramePath(width, joinY, panelBottom, tabLeft, tabRight, tabTop),
       });
     };
 
@@ -88,7 +88,8 @@ export function RoleFeatureBinder({
             fill="none"
             stroke={PANEL_STROKE[activeAccent]}
             strokeWidth={2}
-            strokeLinejoin="round"
+            strokeLinejoin="miter"
+            strokeMiterlimit={10}
             strokeLinecap="butt"
           />
         </svg>

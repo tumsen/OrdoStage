@@ -18,19 +18,7 @@ export default function PublicFeatures() {
           </p>
         </header>
 
-        <section
-          aria-labelledby="roles-features-heading"
-          className="space-y-6 rounded-2xl bg-gradient-to-br from-ordo-magenta/[0.08] via-black/30 to-ordo-violet/[0.10] p-5 sm:p-7 shadow-[0_0_40px_rgba(131,56,236,0.08)]"
-        >
-          <div className="space-y-2">
-            <h2 id="roles-features-heading" className="text-xl md:text-2xl font-semibold text-white">
-              By role
-            </h2>
-            <p className="text-sm md:text-base text-white/80 leading-relaxed max-w-3xl">
-              Select a tab to open that role&apos;s feature page — each includes scheduling, staffing, and time tracking
-              for that job.
-            </p>
-          </div>
+        <section className="rounded-2xl bg-gradient-to-br from-ordo-magenta/[0.08] via-black/30 to-ordo-violet/[0.10] p-5 sm:p-7 shadow-[0_0_40px_rgba(131,56,236,0.08)]">
           <RoleFeatureBinder />
         </section>
 

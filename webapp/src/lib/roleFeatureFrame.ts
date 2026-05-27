@@ -18,7 +18,7 @@ const TAB_RADIUS = 12;
  */
 export function buildCardFramePath(
   containerWidth: number,
-  panelTop: number,
+  joinY: number,
   panelBottom: number,
   tabLeft: number,
   tabRight: number,
@@ -28,7 +28,6 @@ export function buildCardFramePath(
 ): string {
   const w = containerWidth;
   const bottom = panelBottom;
-  const joinY = panelTop;
   const cr = cardRadius;
   const tr = tabRadius;
 
