@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { RoleFeatureCardGrid } from "@/components/marketing/RoleFeatureCard";
 import { RoleFeatureDetailContent } from "@/components/marketing/RoleFeatureDetailContent";
 import { getRoleBySlug, isPublicRoleSlug, PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
+import { getRoleAccent } from "@/lib/roleAccentStyles";
 
 function SectionDivider() {
   return (
@@ -62,7 +63,7 @@ export default function PublicRoleFeatures() {
         </header>
 
         <div className="space-y-6">
-          <RoleFeatureDetailContent role={role} showHeroLead={false} />
+          <RoleFeatureDetailContent role={role} showHeroLead={false} accent={getRoleAccent(role.slug)} />
         </div>
 
         {relatedRoles.length > 0 ? (
