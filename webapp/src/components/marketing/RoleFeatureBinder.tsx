@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { PublicRoleFeature } from "@/lib/publicRoleFeatures";
 import { PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
@@ -10,6 +10,12 @@ import {
   roleTabCard,
 } from "@/lib/roleAccentStyles";
 import { RoleFeatureDetailContent } from "@/components/marketing/RoleFeatureDetailContent";
+
+type TopBorderSegments = {
+  panelTop: number;
+  leftWidth: number;
+  rightWidth: number;
+};
 
 type RoleFeatureBinderProps = {
   roles?: readonly PublicRoleFeature[];
@@ -23,15 +29,42 @@ export function RoleFeatureBinder({
   className,
 }: RoleFeatureBinderProps) {
   const [activeSlug, setActiveSlug] = useState(defaultSlug ?? roles[0]?.slug ?? "");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [topBorder, setTopBorder] = useState<TopBorderSegments | null>(null);
 
   const activeRole = roles.find((r) => r.slug === activeSlug) ?? roles[0];
   const activeAccent = activeRole ? getRoleAccent(activeRole.slug) : "magenta";
   const activeStyles = ORDO_ACCENT_STYLES[activeAccent];
 
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const activeTab = activeTabRef.current;
+    const panel = panelRef.current;
+    if (!container || !activeTab || !panel) return;
+
+    const measure = () => {
+      const containerRect = container.getBoundingClientRect();
+      const activeRect = activeTab.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+
+      setTopBorder({
+        panelTop: panelRect.top - containerRect.top,
+        leftWidth: Math.max(0, activeRect.left - containerRect.left),
+        rightWidth: Math.max(0, containerRect.right - activeRect.right),
+      });
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [activeSlug, roles]);
+
   if (!activeRole) return null;
 
   return (
-    <div className={cn("w-full", className)}>
+    <div ref={containerRef} className={cn("relative w-full", className)}>
       <div
         className="relative flex shrink-0 items-end gap-2 overflow-x-auto overscroll-x-contain bg-transparent pl-4 sm:pl-5 [scrollbar-width:thin]"
         role="tablist"
@@ -44,6 +77,7 @@ export function RoleFeatureBinder({
           return (
             <button
               key={role.slug}
+              ref={isActive ? activeTabRef : undefined}
               type="button"
               role="tab"
               id={`role-tab-${role.slug}`}
@@ -63,12 +97,28 @@ export function RoleFeatureBinder({
         })}
       </div>
 
+      {topBorder != null && topBorder.leftWidth > 0 ? (
+        <div
+          aria-hidden
+          className={cn("pointer-events-none absolute left-0 border-t-2", activeStyles.panelBorder)}
+          style={{ top: topBorder.panelTop, width: topBorder.leftWidth }}
+        />
+      ) : null}
+      {topBorder != null && topBorder.rightWidth > 0 ? (
+        <div
+          aria-hidden
+          className={cn("pointer-events-none absolute right-0 border-t-2", activeStyles.panelBorder)}
+          style={{ top: topBorder.panelTop, width: topBorder.rightWidth }}
+        />
+      ) : null}
+
       <div
+        ref={panelRef}
         id="role-feature-panel"
         role="tabpanel"
         aria-labelledby={`role-tab-${activeRole.slug}`}
         className={cn(
-          "relative z-[1] overflow-hidden rounded-2xl border-2 p-6 sm:p-8 md:p-9",
+          "relative z-[1] rounded-2xl border-2 border-t-0 p-6 sm:p-8 md:p-9",
           rolePanelFill(activeStyles)
         )}
       >
