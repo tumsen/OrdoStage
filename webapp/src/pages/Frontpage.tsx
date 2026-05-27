@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
-import { HomePricingCalculator } from "@/components/pricing/HomePricingCalculator";
 import { isPublicFlagOn } from "@/lib/publicSiteFlags";
 
 type SiteContent = Record<string, string>;
@@ -15,9 +14,9 @@ const W = {
     "Production operations for theatres, concert halls, clubs, and touring shows — one workspace your whole company can trust on show day.",
   landing_lead:
     "Whether you run a repertory season, book a busy music room, or move a tour through cities every week, the same problems show up: dates slip, specs drift apart, and crews work from outdated notes. OrdoStage ties events, venues, tours, staffing, and documents together so technical, production, and front-of-house teams share one live picture — from first hold on the calendar to load-out.",
-  landing_section_heading: "Everything your live organisation already juggles — in one place",
+  landing_section_heading: "Built for the people who run the show",
   landing_section_body:
-    "Plan shows and venue holds on a real calendar. Route tours with day-by-day detail. Keep venue specs, files, and tech riders next to the booking they belong to. Staff jobs from the same roster your people and departments already use. Track time when you need it, share calendars when partners ask, and lock access down with roles that match how theatres and venues actually work.",
+    "Every role in your organisation sees the same live data — filtered to what they need. Jump to your job below, or scroll through how OrdoStage supports the whole company from programming to payroll.",
   landing_closing:
     "Built for resident companies and presenting houses. For music venues and festivals. For tour managers and road crews. For anyone who cannot afford a wrong answer on opening night.",
 } as const;
@@ -35,59 +34,88 @@ function useWelcomeCopy(site: SiteContent | undefined) {
   }, [site]);
 }
 
-const AUDIENCE_CHIPS = [
-  "Repertory theatre",
-  "Presenting venue",
-  "Concert hall & orchestra",
-  "Club & live room",
-  "Touring company",
-  "Festival production office",
-] as const;
-
-const FEATURE_LIST: readonly { title: string; body: string }[] = [
+const ROLE_SECTIONS: readonly {
+  id: string;
+  title: string;
+  intro: string;
+  bullets: readonly string[];
+}[] = [
   {
-    title: "Events & productions",
-    body: "Run your season or one-off specials with events that carry shows, rehearsals, notes, and venue links in one record. Everyone sees the same status from programming through tech week — not a scattered thread of PDFs and DMs.",
+    id: "role-hr-manager",
+    title: "HR Manager",
+    intro: "Keep your roster accurate and your people onboarded without chasing spreadsheets.",
+    bullets: [
+      "Maintain people profiles, photos, and contact details in one roster",
+      "Organise departments and teams that match how your house or tour is structured",
+      "Invite new members and reuse the same people across events and staffing",
+      "Align access with permission groups so each department sees what they need",
+    ],
   },
   {
-    title: "Schedule & venue bookings",
-    body: "Week and month views combine events, internal venue bookings, rehearsals, tours, and maintenance in one filterable calendar. See holds and get-ins next to the show they support, across one building or many.",
+    id: "role-producer",
+    title: "Producer",
+    intro: "Program the season and keep artistic planning tied to real dates and venues.",
+    bullets: [
+      "Run events and productions with shows, rehearsals, and notes in one record",
+      "See holds, get-ins, and venue availability on a shared schedule",
+      "Track status from first programming conversation through tech week",
+      "Publish calendars when partners need a read-only view without full access",
+    ],
   },
   {
-    title: "Venues & room inventory",
-    body: "Keep every stage, hall, and studio in a single inventory with documents and thumbnails attached to the venue. Venue pages include their own booking calendar so operations and artistic can agree on what is possible when.",
+    id: "role-production-manager",
+    title: "Production Manager",
+    intro: "Coordinate deadlines, documents, and crew requirements across the whole production.",
+    bullets: [
+      "Plan phases and tasks in the production planner with costs and notes",
+      "Keep production documents and details next to the event they belong to",
+      "Line up staffing requirements and assignments for each show",
+      "Filter the schedule across events, tours, rehearsals, and venue bookings",
+    ],
   },
   {
-    title: "Tours & road dates",
-    body: "Structure tours with days, cities, and shows so routing and production deadlines stay legible. Share public or personal tour schedules when artists, crew, or partners need a read-only link without logging into your whole org.",
+    id: "role-stage-manager",
+    title: "Stage Manager",
+    intro: "Trust the schedule and staffing picture on show day — not a thread of outdated messages.",
+    bullets: [
+      "See get-ins, rehearsals, and performances in one filterable calendar",
+      "Review show staffing and assignments from the same data the office uses",
+      "Open event records with notes and links your crew can rely on at call time",
+      "Let crew log time against the right work when your organisation tracks hours",
+    ],
   },
   {
-    title: "Tech riders & production PDFs",
-    body: "Generate and share venue tech riders from tour data so front-of-house and local production get the same pack. Fewer last-minute email chains and fewer “which version is this?” moments when the truck rolls in.",
+    id: "role-tour-manager",
+    title: "Tour Manager",
+    intro: "Route the tour and keep every city, day, and local pack aligned.",
+    bullets: [
+      "Structure tours with days, cities, and shows so routing stays legible",
+      "Generate and share tech riders from tour data for local production teams",
+      "Share public or personal tour schedules when artists and partners need a link",
+      "Coordinate tour dates alongside venue bookings and production deadlines",
+    ],
   },
   {
-    title: "Staffing & show jobs",
-    body: "Line up requirements and assignments for shows and staffing views built around how performance organisations actually staff — not a generic task list bolted onto a spreadsheet.",
+    id: "role-head-of-stage",
+    title: "Head of Stage",
+    intro: "Own venue specs, room inventory, and technical information where bookings live.",
+    bullets: [
+      "Maintain every stage, hall, and studio with documents attached to the venue",
+      "Use venue booking calendars so artistic and operations agree on what is possible",
+      "Keep specs and files next to the room — not lost in email attachments",
+      "Support touring shows with consistent tech information at each stop",
+    ],
   },
   {
-    title: "People & team structure",
-    body: "Maintain your roster, photos, and org chart with departments and teams that match your house or tour. Onboard people once and reuse them across events, staffing, and permissions.",
-  },
-  {
-    title: "Time tracking & reports",
-    body: "Let crew and staff log time where it belongs so payroll prep and retrospective costing do not depend on memory after a long run. Reporting keeps managers and finance aligned.",
-  },
-  {
-    title: "Shared calendars",
-    body: "Publish calendars and exports when you need to coordinate with partners who live in Outlook or Google — without giving up your source of truth inside OrdoStage.",
-  },
-  {
-    title: "Roles & access control",
-    body: "Grant view or write access by area so volunteers, contractors, and departments see what they need — and nothing sensitive they do not. Match the way your venue already thinks about trust.",
-  },
-  {
-    title: "Account, company profile & billing",
-    body: "Store invoice and company details where finance expects them. Choose Flex (monthly, pay for activity) or Yearly (committed seats, best rate) — see pricing for how seat billing scales.",
+    id: "role-accountant",
+    title: "Accountant",
+    intro: "Turn crew hours and company details into numbers finance can work with.",
+    bullets: [
+      "Collect time entries from staff and crew linked to the work they did",
+      "Run time reports for payroll prep and retrospective costing",
+      "Export data when finance needs to reconcile outside OrdoStage",
+      "Store company and invoice details in the organisation account",
+    ],
   },
 ];
 
@@ -95,11 +123,11 @@ function HashScroll() {
   const { pathname, hash } = useLocation();
   useLayoutEffect(() => {
     if (pathname !== "/") return;
-    if (hash === "#features") {
-      const el = document.getElementById("features");
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+    if (!hash) return;
+    const id = hash.startsWith("#") ? hash.slice(1) : hash;
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [pathname, hash]);
   return null;
@@ -155,40 +183,50 @@ function FeatureBlock({
         </p>
       </div>
 
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-white/50">Who it is for</p>
+      <nav aria-label="Jump to role">
+        <p className="text-xs font-medium uppercase tracking-wide text-white/50">By role</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {AUDIENCE_CHIPS.map((label) => (
-            <span
-              key={label}
-              className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-xs text-white/80"
+          {ROLE_SECTIONS.map((role) => (
+            <a
+              key={role.id}
+              href={`#${role.id}`}
+              className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-xs text-white/80 transition-colors hover:border-ordo-yellow/40 hover:text-white"
             >
-              {label}
-            </span>
+              {role.title}
+            </a>
           ))}
         </div>
-      </div>
+      </nav>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {FEATURE_LIST.map((f) => (
-          <article key={f.title} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <h3 className="text-sm font-semibold text-white">{f.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-white/75">{f.body}</p>
+      <div className="space-y-5">
+        {ROLE_SECTIONS.map((role) => (
+          <article
+            key={role.id}
+            id={role.id}
+            className="scroll-mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:p-5"
+          >
+            <h3 className="text-base font-semibold text-white">{role.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-white/75">{role.intro}</p>
+            <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-white/85 marker:text-ordo-yellow">
+              {role.bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+              {role.id === "role-accountant" ? (
+                <li>
+                  Flex and Yearly billing for your organisation —{" "}
+                  <Link to="/pricing" className="text-ordo-yellow hover:underline">
+                    see pricing
+                  </Link>
+                </li>
+              ) : null}
+            </ul>
           </article>
         ))}
       </div>
 
-      <p className="text-center text-sm text-white/70">
-        Flex and Yearly pricing scale with your team —{" "}
-        <Link to="/pricing" className="text-ordo-yellow hover:underline">
-          read pricing
-        </Link>
-        .
-      </p>
-
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-ordo-yellow/35 bg-gradient-to-br from-ordo-magenta/[0.12] to-ordo-violet/[0.10] p-5">
-          <h3 className="text-base font-semibold text-white">What teams get with OrdoStage</h3>
+          <h3 className="text-base font-semibold text-white">Everything in one platform</h3>
           <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-white/85 marker:text-ordo-yellow">
             <li>One calendar for events, venue holds, tours, and rehearsals</li>
             <li>Venue specs, files, and tech riders tied to the right booking</li>
@@ -238,12 +276,12 @@ function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefi
             <Link to="/pricing" className="text-ordo-yellow hover:underline">
               Pricing
             </Link>{" "}
-            (Flex and Yearly plans) and{" "}
+            and{" "}
             <Link to="/login" className="text-ordo-yellow hover:underline">
               Log in
             </Link>
-            . The full platform covers events, schedules, venues, tours, staffing, people, time, calendars, roles, and
-            documents — all described on the live homepage when maintenance is off.
+            . The live homepage describes OrdoStage by role — HR, production, stage management, touring, technical, and
+            finance — when maintenance is off.
           </p>
         </section>
       </main>
@@ -261,10 +299,9 @@ function MarketingHome({ siteContent }: { siteContent: SiteContent | undefined }
       <HashScroll />
       <main className="relative flex min-h-full w-full flex-col items-center justify-start gap-8 px-6 pb-12 pt-6 text-center md:pt-8">
         <WelcomeHero title={welcome.title} subtitle={welcome.subtitle} lead={welcome.lead} titleClass="md:text-4xl" />
-        <HomePricingCalculator />
         <p className="w-full text-sm leading-relaxed text-white/70">
-          Use the sidebar to jump to <strong>Features</strong>, or open <strong>Pricing</strong> for billing details.{" "}
-          <strong>Terms</strong> and <strong>Privacy</strong> are there too.
+          Use the sidebar for <strong>Features</strong> and <strong>Pricing</strong>, plus{" "}
+          <strong>Terms</strong> and <strong>Privacy</strong>.
         </p>
         <FeatureBlock
           sectionHeading={welcome.sectionHeading}

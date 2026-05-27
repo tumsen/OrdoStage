@@ -234,7 +234,7 @@ const en = {
       saveError: "Failed to save website content.",
       publicHomeMode: "Public home (global)",
       publicHomeModeHint:
-        "Applies in every language. The public shell always has a left menu (Features, Pricing, Terms, Privacy). Maintenance mode replaces the home page with a short notice; otherwise visitors see the full marketing home with pricing calculator and sign-up.",
+        "Applies in every language. The public shell always has a left menu (Features, Pricing, Terms, Privacy). Maintenance mode replaces the home page with a short notice; otherwise visitors see the marketing home with role-based features and sign-up.",
       maintenanceMode: "Maintenance welcome screen",
       maintenanceModeHint: "Replaces the home page with a short “back soon” message. The Features section stays available in the main area.",
       flagSaveError: "Could not update that setting.",
