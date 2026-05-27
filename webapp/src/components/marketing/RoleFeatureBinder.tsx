@@ -25,15 +25,9 @@ export function RoleFeatureBinder({
   if (!activeRole) return null;
 
   return (
-    <div
-      className={cn(
-        "flex w-full flex-col overflow-hidden rounded-2xl border-2",
-        rolePanelFill(activeStyles),
-        className
-      )}
-    >
+    <div className={cn("w-full", className)}>
       <div
-        className="relative flex shrink-0 items-end gap-2 overflow-x-auto overscroll-x-contain px-2 pt-2 sm:px-3 [scrollbar-width:thin]"
+        className="relative flex shrink-0 items-end gap-2 overflow-x-auto overscroll-x-contain bg-transparent pl-4 sm:pl-5 [scrollbar-width:thin]"
         role="tablist"
         aria-label="Roles in your organisation"
       >
@@ -54,7 +48,7 @@ export function RoleFeatureBinder({
                 "relative shrink-0 whitespace-nowrap rounded-t-xl rounded-bl-none rounded-br-none border-2 border-b-0 px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-semibold transition-shadow duration-200",
                 roleTabCard(styles),
                 isActive
-                  ? "z-20 -mb-0.5 text-white shadow-[0_4px_16px_rgba(0,0,0,0.45)]"
+                  ? "z-20 -mb-0.5 text-white shadow-[0_-4px_14px_rgba(0,0,0,0.35)]"
                   : "z-10 text-white/90 hover:text-white"
               )}
             >
@@ -68,7 +62,10 @@ export function RoleFeatureBinder({
         id="role-feature-panel"
         role="tabpanel"
         aria-labelledby={`role-tab-${activeRole.slug}`}
-        className={cn("relative z-[1] border-t-2 p-6 sm:p-8 md:p-9", activeStyles.panelBorder)}
+        className={cn(
+          "relative z-[1] overflow-hidden rounded-2xl border-2 border-t-0 p-6 sm:p-8 md:p-9",
+          rolePanelFill(activeStyles)
+        )}
       >
         <header className="mb-8 space-y-3 border-b border-white/10 pb-6">
           <p className={cn("text-xs font-bold uppercase tracking-widest", activeStyles.headerEyebrow)}>
