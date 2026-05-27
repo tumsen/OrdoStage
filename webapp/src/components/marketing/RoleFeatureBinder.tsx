@@ -25,16 +25,21 @@ export function RoleFeatureBinder({
   if (!activeRole) return null;
 
   return (
-    <div className={cn("w-full", className)}>
+    <div
+      className={cn(
+        "flex w-full flex-col overflow-hidden rounded-2xl border-2",
+        rolePanelFill(activeStyles),
+        className
+      )}
+    >
       <div
-        className="flex w-full flex-wrap sm:flex-nowrap items-end gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:thin]"
+        className="relative flex shrink-0 items-end overflow-x-auto overscroll-x-contain px-2 pt-2 sm:px-3 [scrollbar-width:thin]"
         role="tablist"
         aria-label="Roles in your organisation"
       >
-        {roles.map((role) => {
+        {roles.map((role, index) => {
           const isActive = role.slug === activeRole.slug;
-          const accent = getRoleAccent(role.slug);
-          const styles = ORDO_ACCENT_STYLES[accent];
+          const styles = ORDO_ACCENT_STYLES[getRoleAccent(role.slug)];
 
           return (
             <button
@@ -45,12 +50,14 @@ export function RoleFeatureBinder({
               aria-selected={isActive}
               aria-controls="role-feature-panel"
               onClick={() => setActiveSlug(role.slug)}
+              style={{ zIndex: isActive ? roles.length + 10 : index + 1 }}
               className={cn(
-                "shrink-0 whitespace-nowrap border-2 px-4 py-3 sm:px-5 sm:py-3.5 text-sm sm:text-base font-semibold transition-[opacity,box-shadow] duration-200",
+                "relative shrink-0 whitespace-nowrap rounded-t-xl rounded-bl-none rounded-br-none border-2 border-b-0 px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-semibold transition-shadow duration-200",
                 roleTabCard(styles),
+                index > 0 ? "-ml-2 sm:-ml-3" : null,
                 isActive
-                  ? "z-20 -mb-0.5 rounded-t-xl rounded-bl-none rounded-br-none border-b-0 text-white shadow-[0_0_20px_rgba(0,0,0,0.35)]"
-                  : "z-10 rounded-xl text-white/90 opacity-95 hover:opacity-100"
+                  ? "-mb-0.5 text-white shadow-[0_4px_16px_rgba(0,0,0,0.45)]"
+                  : "text-white/90 hover:text-white"
               )}
             >
               {role.title}
@@ -63,10 +70,7 @@ export function RoleFeatureBinder({
         id="role-feature-panel"
         role="tabpanel"
         aria-labelledby={`role-tab-${activeRole.slug}`}
-        className={cn(
-          "relative w-full rounded-2xl border-2 p-6 sm:p-8 md:p-9",
-          rolePanelFill(activeStyles)
-        )}
+        className={cn("relative z-[1] border-t-2 p-6 sm:p-8 md:p-9", activeStyles.panelBorder)}
       >
         <header className="mb-8 space-y-3 border-b border-white/10 pb-6">
           <p className={cn("text-xs font-bold uppercase tracking-widest", activeStyles.headerEyebrow)}>
