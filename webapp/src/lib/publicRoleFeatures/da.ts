@@ -3,7 +3,7 @@ import type { PublicRoleFeature } from "./types";
 export const rawPublicRoleFeaturesDa: PublicRoleFeature[] = [
   {
     slug: "hr-manager",
-    title: "HR-chef",
+    title: "Personaleansvarlig",
     intro: "Hold styr på medarbejderlisten og onboarding uden at jage regneark.",
     heroLead:
       "OrdoStage giver HR og people operations én fælles medarbejderliste, som produktion, bemanding og rettigheder trækker på — så I onboarder én gang, og alle afdelinger arbejder ud fra samme registrering.",

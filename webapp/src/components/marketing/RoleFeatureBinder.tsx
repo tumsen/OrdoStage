@@ -68,8 +68,9 @@ export function RoleFeatureBinder({
     update();
     const observer = new ResizeObserver(update);
     observer.observe(container);
+    observer.observe(measureRow);
     return () => observer.disconnect();
-  }, [roles]);
+  }, [roles, language]);
 
   useLayoutEffect(() => {
     if (stacked) {
@@ -120,9 +121,13 @@ export function RoleFeatureBinder({
     };
 
     measure();
+    const raf = requestAnimationFrame(() => measure());
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [activeSlug, stacked]);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", measure);
+    };
+  }, [activeSlug, stacked, roles, language]);
 
   if (!activeRole) return null;
 
