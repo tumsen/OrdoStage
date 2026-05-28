@@ -131,10 +131,10 @@ export const rawPublicRoleFeaturesDa: PublicRoleFeature[] = [
   },
   {
     slug: "stage-manager",
-    title: "Stagemanager",
+    title: "Scenemester",
     intro: "Stol på plan og bemanding på showday — ikke en tråd med forældede beskeder.",
     heroLead:
-      "På showday har stagemanagere brug for den aktuelle plan, bemanding og noter — ikke et screenshot fra i går. OrdoStage giver jer de samme live data, som kontoret bruger, filtreret til det, der betyder noget ved call time.",
+      "På showday har scenemestre brug for den aktuelle plan, bemanding og noter — ikke et screenshot fra i går. OrdoStage giver jer de samme live data, som kontoret bruger, filtreret til det, der betyder noget ved call time.",
     sections: [
       {
         heading: "Showday-plan",
