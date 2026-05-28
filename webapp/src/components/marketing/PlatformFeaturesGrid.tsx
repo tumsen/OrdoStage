@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
-import { PLATFORM_FEATURE_AREAS } from "@/lib/publicPlatformFeatures";
+import { getPlatformFeatureAreas } from "@/lib/publicPlatformFeatures";
+import { usePublicSiteLanguage } from "@/contexts/PublicSiteLanguageContext";
+import { useMarketingCopy } from "@/lib/marketing/i18n";
 import { ORDO_ACCENT_STYLES } from "@/lib/roleAccentStyles";
 
 type PlatformFeaturesGridProps = {
@@ -11,10 +13,15 @@ type PlatformFeaturesGridProps = {
 
 export function PlatformFeaturesGrid({
   id = "platform-features-heading",
-  heading = "All platform functions",
-  intro = "Every module in OrdoStage — what it does and how your organisation uses it day to day.",
+  heading: headingProp,
+  intro: introProp,
   className,
 }: PlatformFeaturesGridProps) {
+  const { language } = usePublicSiteLanguage();
+  const { t } = useMarketingCopy();
+  const areas = getPlatformFeatureAreas(language);
+  const heading = headingProp ?? t.platformGridHeading;
+  const intro = introProp ?? t.platformGridIntro;
   return (
     <section aria-labelledby={id} className={cn("space-y-6", className)}>
       <div className="space-y-2 max-w-3xl">
@@ -25,7 +32,7 @@ export function PlatformFeaturesGrid({
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
-        {PLATFORM_FEATURE_AREAS.map((feature) => {
+        {areas.map((feature) => {
           const styles = ORDO_ACCENT_STYLES[feature.accent];
           return (
             <article

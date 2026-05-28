@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { PublicRoleFeature } from "@/lib/publicRoleFeatures";
-import { PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
+import { getPublicRoleFeatures, type PublicRoleFeature } from "@/lib/publicRoleFeatures";
+import { usePublicSiteLanguage } from "@/contexts/PublicSiteLanguageContext";
+import { useMarketingCopy } from "@/lib/marketing/i18n";
 import { buildCardFramePath, buildCardTopJoinPaths, PANEL_STROKE } from "@/lib/roleFeatureFrame";
 import {
   getRoleAccent,
@@ -35,10 +36,14 @@ const STACKED_CARD_BASE =
   "w-full rounded-xl border-2 px-4 py-3 text-left text-sm font-semibold shadow-none sm:text-base";
 
 export function RoleFeatureBinder({
-  roles = PUBLIC_ROLE_FEATURES,
-  defaultSlug = roles[0]?.slug,
+  roles: rolesProp,
+  defaultSlug: defaultSlugProp,
   className,
 }: RoleFeatureBinderProps) {
+  const { language } = usePublicSiteLanguage();
+  const { t } = useMarketingCopy();
+  const roles = rolesProp ?? getPublicRoleFeatures(language);
+  const defaultSlug = defaultSlugProp ?? roles[0]?.slug;
   const [activeSlug, setActiveSlug] = useState(defaultSlug ?? roles[0]?.slug ?? "");
   const [stacked, setStacked] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -150,7 +155,7 @@ export function RoleFeatureBinder({
 
       {stacked ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="tablist" aria-label="Roles in your organisation">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="tablist" aria-label={t.roleBinderAriaLabel}>
             {roles.map((role) => {
               const isActive = role.slug === activeRole.slug;
               const tabStyles = ORDO_ACCENT_STYLES[getRoleAccent(role.slug)];
@@ -237,7 +242,7 @@ export function RoleFeatureBinder({
           <div
             className="relative z-10 flex shrink-0 items-end gap-2 overflow-x-auto overscroll-x-contain bg-transparent pl-4 pb-0.5 sm:pl-5 [scrollbar-width:thin]"
             role="tablist"
-            aria-label="Roles in your organisation"
+            aria-label={t.roleBinderAriaLabel}
           >
             {roles.map((role) => {
               const isActive = role.slug === activeRole.slug;

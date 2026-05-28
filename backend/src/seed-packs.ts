@@ -4,45 +4,11 @@ import {
   DEFAULT_REFUND_CONTENT,
   DEFAULT_TERMS_CONTENT,
 } from "./legal-defaults";
+import { getLandingSeedRows, mergeLandingDefaults, type Language as SiteLanguage } from "./site-content-defaults";
+import type { z } from "zod";
+import type { LanguageSchema } from "./types";
 
 const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
-  {
-    key: "landing_title",
-    value: "OrdoStage — Planning for theaters, venues & touring productions",
-  },
-  {
-    key: "landing_subtitle",
-    value:
-      "Plan productions, coordinate teams, and run tours in one platform built for live performance.",
-  },
-  {
-    key: "landing_lead",
-    value:
-      "Stop juggling spreadsheets, email threads, and shared drives. OrdoStage connects scheduling, venue specs, tech riders, and crew coordination in one live workspace — from first rehearsal to closing night.",
-  },
-  {
-    key: "landing_postscript",
-    value: [
-      "Workflow-first planning — not a generic project tool.",
-      "One schedule across venues, tours, and departments.",
-      "Riders, specs, and staffing — linked to the show they belong to.",
-    ].join("\n"),
-  },
-  {
-    key: "landing_closing",
-    value: "For theaters · venues · touring companies · everyone running the show.",
-  },
-  {
-    key: "landing_section_heading",
-    value: "See it by role",
-  },
-  {
-    key: "landing_section_body",
-    value:
-      "Same live data for your whole organisation — pick a role to explore what matters for that job.",
-  },
-  { key: "landing_cta_text", value: "Get started free" },
-  { key: "landing_cta_url", value: "/signup" },
   { key: "terms_content", value: DEFAULT_TERMS_CONTENT },
   { key: "privacy_content", value: DEFAULT_PRIVACY_CONTENT },
   { key: "refund_content", value: DEFAULT_REFUND_CONTENT },
@@ -83,9 +49,13 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   },
 ];
 
-/** Merged into GET /api/site-content and GET /api/admin/site-content so UIs always see full defaults when keys are missing in DB. */
-export function getDefaultSiteContentMap(): Record<string, string> {
+function getBaseSiteContentMap(): Record<string, string> {
   return Object.fromEntries(DEFAULT_SITE_CONTENT.map((item) => [item.key, item.value]));
+}
+
+/** Merged into GET /api/site-content and GET /api/admin/site-content so UIs always see full defaults when keys are missing in DB. */
+export function getDefaultSiteContentMap(language: z.infer<typeof LanguageSchema> = "en"): Record<string, string> {
+  return mergeLandingDefaults(getBaseSiteContentMap(), language as SiteLanguage);
 }
 
 export async function seedPacks() {
@@ -94,6 +64,13 @@ export async function seedPacks() {
       where: { key_locale: { key: item.key, locale: "en" } },
       update: {},
       create: { key: item.key, locale: "en", value: item.value },
+    });
+  }
+  for (const row of getLandingSeedRows()) {
+    await prisma.siteContent.upsert({
+      where: { key_locale: { key: row.key, locale: row.locale } },
+      update: {},
+      create: { key: row.key, locale: row.locale, value: row.value },
     });
   }
 }

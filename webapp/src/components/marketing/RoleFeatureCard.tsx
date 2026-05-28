@@ -1,7 +1,15 @@
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import type { PublicRoleFeature } from "@/lib/publicRoleFeatures";
-import { PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
+import { getPublicRoleFeatures, type PublicRoleFeature } from "@/lib/publicRoleFeatures";
+import { usePublicSiteLanguage } from "@/contexts/PublicSiteLanguageContext";
+import { useMarketingCopy } from "@/lib/marketing/i18n";
+
+function LearnMoreLabel() {
+  const { t } = useMarketingCopy();
+  return (
+    <span className="text-xs font-medium text-ordo-yellow/90 group-hover:text-ordo-yellow">{t.learnMore}</span>
+  );
+}
 
 type RoleFeatureCardProps = {
   role: PublicRoleFeature;
@@ -30,9 +38,7 @@ export function RoleFeatureCard({ role, compact = false, className }: RoleFeatur
       >
         {role.intro}
       </p>
-      <span className="text-xs font-medium text-ordo-yellow/90 group-hover:text-ordo-yellow">
-        Learn more →
-      </span>
+      <LearnMoreLabel />
     </Link>
   );
 }
@@ -44,10 +50,12 @@ type RoleFeatureCardGridProps = {
 };
 
 export function RoleFeatureCardGrid({
-  roles = PUBLIC_ROLE_FEATURES,
+  roles: rolesProp,
   compact = true,
   className,
 }: RoleFeatureCardGridProps) {
+  const { language } = usePublicSiteLanguage();
+  const roles = rolesProp ?? getPublicRoleFeatures(language);
   return (
     <div
       className={cn(

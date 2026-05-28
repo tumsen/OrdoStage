@@ -46,7 +46,7 @@ type SiteContentRow = { key: string; locale: string; value: string };
 
 /** Defaults first; `en` rows fill in; non-`en` locales override by key. */
 function mergeSiteContentForLanguage(rows: SiteContentRow[], language: z.infer<typeof LanguageSchema>): Record<string, string> {
-  const defaults = getDefaultSiteContentMap();
+  const defaults = getDefaultSiteContentMap(language);
   const enRows = rows.filter((r) => r.locale === "en");
   const langRows = language === "en" ? [] : rows.filter((r) => r.locale === language);
 

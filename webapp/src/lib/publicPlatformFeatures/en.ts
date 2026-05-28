@@ -1,15 +1,6 @@
-import type { OrdoAccent } from "@/lib/roleAccentStyles";
+import type { PlatformFeatureArea } from "./types";
 
-export type PlatformFeatureArea = {
-  title: string;
-  summary: string;
-  body: string;
-  bullets: readonly string[];
-  accent: OrdoAccent;
-};
-
-/** Detailed capability list for the homepage “all functions” section below role tabs. */
-export const PLATFORM_FEATURE_AREAS: readonly PlatformFeatureArea[] = [
+export const rawPlatformFeatureAreasEn: PlatformFeatureArea[] = [
   {
     title: "Events & productions",
     summary: "Programme the season and keep every show, rehearsal, and note in one live record.",
@@ -181,7 +172,4 @@ export const PLATFORM_FEATURE_AREAS: readonly PlatformFeatureArea[] = [
       "Control who can manage billing and membership as organisation owners",
     ],
   },
-] as const;
-
-/** @deprecated Use PLATFORM_FEATURE_AREAS */
-export const PLATFORM_FEATURE_HIGHLIGHTS = PLATFORM_FEATURE_AREAS;
+];

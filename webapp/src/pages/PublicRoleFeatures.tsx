@@ -2,7 +2,9 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { RoleFeatureCardGrid } from "@/components/marketing/RoleFeatureCard";
 import { RoleFeatureDetailContent } from "@/components/marketing/RoleFeatureDetailContent";
-import { getRoleBySlug, isPublicRoleSlug, PUBLIC_ROLE_FEATURES } from "@/lib/publicRoleFeatures";
+import { getPublicRoleFeatures, getRoleBySlug, isPublicRoleSlug } from "@/lib/publicRoleFeatures";
+import { usePublicSiteLanguage } from "@/contexts/PublicSiteLanguageContext";
+import { useMarketingCopy } from "@/lib/marketing/i18n";
 import { getRoleAccent } from "@/lib/roleAccentStyles";
 
 function SectionDivider() {
@@ -17,18 +19,21 @@ function SectionDivider() {
 
 export default function PublicRoleFeatures() {
   const { roleSlug } = useParams<{ roleSlug: string }>();
+  const { language } = usePublicSiteLanguage();
+  const { t } = useMarketingCopy();
 
   if (!isPublicRoleSlug(roleSlug)) {
     return <Navigate to="/" replace />;
   }
 
-  const role = getRoleBySlug(roleSlug);
+  const role = getRoleBySlug(roleSlug, language);
   if (!role) {
     return <Navigate to="/" replace />;
   }
 
+  const allRoles = getPublicRoleFeatures(language);
   const relatedRoles = role.relatedSlugs
-    .map((slug) => PUBLIC_ROLE_FEATURES.find((r) => r.slug === slug))
+    .map((slug) => allRoles.find((r) => r.slug === slug))
     .filter((r): r is NonNullable<typeof r> => r != null);
 
   return (
@@ -38,7 +43,7 @@ export default function PublicRoleFeatures() {
           <ol className="flex flex-wrap items-center gap-1.5">
             <li>
               <Link to="/" className="hover:text-white/80 transition-colors">
-                Home
+                {t.breadcrumbHome}
               </Link>
             </li>
             <li aria-hidden className="text-white/35">
@@ -46,7 +51,7 @@ export default function PublicRoleFeatures() {
             </li>
             <li>
               <Link to="/#features" className="hover:text-white/80 transition-colors">
-                Features
+                {t.breadcrumbFeatures}
               </Link>
             </li>
             <li aria-hidden className="text-white/35">
@@ -57,7 +62,9 @@ export default function PublicRoleFeatures() {
         </nav>
 
         <header className="space-y-4 max-w-4xl">
-          <p className="text-xs font-semibold uppercase tracking-wider text-ordo-yellow/90">For {role.title}s</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-ordo-yellow/90">
+            {t.forRolePrefix} {role.title}
+          </p>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">{role.title}</h1>
           <p className="text-lg text-white/75 leading-relaxed">{role.heroLead}</p>
         </header>
@@ -70,8 +77,8 @@ export default function PublicRoleFeatures() {
           <>
             <SectionDivider />
             <section className="space-y-4">
-              <h2 className="text-xl font-semibold text-white">See also</h2>
-              <p className="text-sm text-white/65">Other roles that often work closely with {role.title}s.</p>
+              <h2 className="text-xl font-semibold text-white">{t.seeAlso}</h2>
+              <p className="text-sm text-white/65">{t.seeAlsoBody}</p>
               <RoleFeatureCardGrid roles={relatedRoles} compact={false} className="xl:grid-cols-3" />
             </section>
           </>
@@ -84,13 +91,13 @@ export default function PublicRoleFeatures() {
             asChild
             className="bg-gradient-to-r from-ordo-magenta via-ordo-orange to-ordo-violet text-white shadow-sm hover:opacity-95 border-0"
           >
-            <Link to="/signup">Get started free</Link>
+            <Link to="/signup">{t.getStartedFree}</Link>
           </Button>
           <Button asChild variant="outline" className="border-white/25 text-white/90 bg-white/5 hover:bg-white/10">
-            <Link to="/pricing">View pricing</Link>
+            <Link to="/pricing">{t.viewPricing}</Link>
           </Button>
           <Button asChild variant="outline" className="border-white/25 text-white/90 bg-white/5 hover:bg-white/10">
-            <Link to="/#features">All roles</Link>
+            <Link to="/#features">{t.allRoles}</Link>
           </Button>
         </div>
       </article>

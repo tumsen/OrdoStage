@@ -2,47 +2,31 @@ import { Link, useLocation } from "react-router-dom";
 import { CreditCard, FileText, LogIn, Mail, Menu, Shield, Sparkles, UserPlus } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 import { getRoleBySlug, isPublicRoleSlug } from "@/lib/publicRoleFeatures";
 import { ORDOSTAGE_MAILTO_HREF } from "@/lib/ordostageContact";
-
-const navItems: { label: string; icon: LucideIcon; to: string; exact?: boolean }[] = [
-  { to: "/#features", label: "Features", icon: Sparkles },
-  { to: "/pricing", label: "Pricing", icon: CreditCard, exact: true },
-  { to: "/terms-of-service", label: "Terms", icon: FileText, exact: true },
-  { to: "/privacy-policy", label: "Privacy", icon: Shield, exact: true },
-];
-
-const pageTitles: Record<string, string> = {
-  "/": "Home",
-  "/features": "Features",
-  "/pricing": "Pricing",
-  "/terms-of-service": "Terms of Service",
-  "/privacy-policy": "Privacy Policy",
-  "/accept-invite": "Invitation",
-  "/signup": "Sign up",
-  "/login": "Log in",
-};
-
-function getPublicPageTitle(pathname: string): string {
-  if (pathname in pageTitles) return pageTitles[pathname]!;
-  const featuresMatch = /^\/features\/([^/]+)$/.exec(pathname);
-  if (featuresMatch) {
-    const slug = featuresMatch[1];
-    if (isPublicRoleSlug(slug)) {
-      const role = getRoleBySlug(slug);
-      if (role) return `${role.title} · Features`;
-    }
-  }
-  return "OrdoStage";
-}
+import { PublicSiteLanguageProvider, usePublicSiteLanguage } from "@/contexts/PublicSiteLanguageContext";
+import { useMarketingCopy } from "@/lib/marketing/i18n";
+import { languageNativeLabel, SUPPORTED_LANGUAGES, type Language } from "@/lib/preferences";
 
 function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const { language, setLanguage } = usePublicSiteLanguage();
+  const { t } = useMarketingCopy();
+
+  const navItems: { label: string; icon: LucideIcon; to: string; exact?: boolean }[] = [
+    { to: "/#features", label: t.navFeatures, icon: Sparkles },
+    { to: "/pricing", label: t.navPricing, icon: CreditCard, exact: true },
+    { to: "/terms-of-service", label: t.navTerms, icon: FileText, exact: true },
+    { to: "/privacy-policy", label: t.navPrivacy, icon: Shield, exact: true },
+  ];
 
   function isNavActive(to: string, exact: boolean | undefined): boolean {
     if (to === "/#features") {
@@ -52,6 +36,12 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
       return location.pathname === to;
     }
     return location.pathname === to || location.pathname.startsWith(`${to}/`);
+  }
+
+  function onLanguageChange(value: string) {
+    const lang = value as Language;
+    setLanguage(lang);
+    void queryClient.invalidateQueries({ queryKey: ["site-content"] });
   }
 
   return (
@@ -93,18 +83,36 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/50 hover:text-white/80 hover:bg-white/5 transition-all duration-150"
         >
           <Mail size={16} className="text-white/40" />
-          <span className="font-medium">Mail us</span>
+          <span className="font-medium">{t.navMailUs}</span>
         </a>
       </nav>
 
-      <div className="shrink-0 px-3 py-4 border-t border-white/10 space-y-1">
+      <div className="shrink-0 px-3 py-4 border-t border-white/10 space-y-2">
+        <label className="sr-only" htmlFor="public-site-language">
+          Language
+        </label>
+        <Select value={language} onValueChange={onLanguageChange}>
+          <SelectTrigger
+            id="public-site-language"
+            className="w-full border-white/15 bg-white/5 text-white text-sm h-9"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <SelectItem key={lang} value={lang}>
+                {languageNativeLabel(lang)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Link
           to="/signup"
           onClick={onNav}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-gradient-to-r from-ordo-magenta/25 via-ordo-orange/15 to-ordo-violet/25 text-white border border-ordo-yellow/35 hover:border-ordo-yellow/55 transition-all duration-150"
         >
           <UserPlus size={16} className="text-ordo-yellow" />
-          <span className="font-medium">Sign up free</span>
+          <span className="font-medium">{t.signUpFree}</span>
         </Link>
         <Link
           to="/login"
@@ -112,7 +120,7 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-ordo-magenta/90 hover:text-white hover:bg-ordo-violet/20 border border-transparent hover:border-ordo-magenta/35 transition-all duration-150"
         >
           <LogIn size={16} className="text-ordo-magenta" />
-          <span className="font-medium">Log in</span>
+          <span className="font-medium">{t.logIn}</span>
         </Link>
       </div>
     </div>
@@ -121,14 +129,40 @@ function PublicSidebarContent({ onNav }: { onNav?: () => void }) {
 
 interface PublicLayoutProps {
   children: React.ReactNode;
-  /** Use for catch-all routes (e.g. 404) where the pathname is not a known marketing page. */
   pageTitleOverride?: string;
 }
 
-export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps) {
+function PublicLayoutInner({ children, pageTitleOverride }: PublicLayoutProps) {
   const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { language } = usePublicSiteLanguage();
+  const { t } = useMarketingCopy();
+
+  const pageTitles: Record<string, string> = {
+    "/": t.pageHome,
+    "/features": t.pageFeatures,
+    "/pricing": t.pagePricing,
+    "/terms-of-service": t.pageTerms,
+    "/privacy-policy": t.pagePrivacy,
+    "/accept-invite": t.pageInvite,
+    "/signup": t.pageSignUp,
+    "/login": t.pageLogIn,
+  };
+
+  function getPublicPageTitle(pathname: string): string {
+    if (pathname in pageTitles) return pageTitles[pathname]!;
+    const featuresMatch = /^\/features\/([^/]+)$/.exec(pathname);
+    if (featuresMatch) {
+      const slug = featuresMatch[1];
+      if (isPublicRoleSlug(slug)) {
+        const role = getRoleBySlug(slug, language);
+        if (role) return `${role.title} · ${t.roleFeaturesTitleSuffix}`;
+      }
+    }
+    return "OrdoStage";
+  }
+
   const pageTitle = pageTitleOverride ?? getPublicPageTitle(location.pathname);
 
   useEffect(() => {
@@ -141,7 +175,7 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
         href="#main-content"
         className="absolute left-4 top-0 z-[260] -translate-y-full bg-ordo-violet/95 px-4 py-2 text-sm text-white shadow-lg transition-transform focus:translate-y-4 focus:outline-none focus:ring-2 focus:ring-ordo-yellow/50"
       >
-        Skip to main content
+        {t.skipToMain}
       </a>
 
       {!isMobile ? (
@@ -175,5 +209,13 @@ export function PublicLayout({ children, pageTitleOverride }: PublicLayoutProps)
         </main>
       </div>
     </div>
+  );
+}
+
+export function PublicLayout(props: PublicLayoutProps) {
+  return (
+    <PublicSiteLanguageProvider>
+      <PublicLayoutInner {...props} />
+    </PublicSiteLanguageProvider>
   );
 }

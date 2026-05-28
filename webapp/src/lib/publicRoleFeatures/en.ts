@@ -1,34 +1,6 @@
-import { getTimeTrackingSection, isTimeTrackingSection } from "@/lib/roleTimeTrackingSections";
+import type { PublicRoleFeature } from "./types";
 
-export type PublicRoleFeatureSection = {
-  heading: string;
-  body?: string;
-  bullets: readonly string[];
-};
-
-export type PublicRoleFeature = {
-  slug: string;
-  title: string;
-  intro: string;
-  heroLead: string;
-  sections: readonly PublicRoleFeatureSection[];
-  relatedSlugs: readonly string[];
-};
-
-function withTimeTrackingSection(role: PublicRoleFeature): PublicRoleFeature {
-  const withoutTime = role.sections.filter((s) => !isTimeTrackingSection(s.heading));
-  const billingIdx = withoutTime.findIndex((s) => s.heading === "Plans & billing");
-  const timeSection = getTimeTrackingSection(role.slug);
-  if (billingIdx >= 0) {
-    return {
-      ...role,
-      sections: [...withoutTime.slice(0, billingIdx), timeSection, ...withoutTime.slice(billingIdx)],
-    };
-  }
-  return { ...role, sections: [...withoutTime, timeSection] };
-}
-
-const RAW_PUBLIC_ROLE_FEATURES: PublicRoleFeature[] = [
+export const rawPublicRoleFeaturesEn: PublicRoleFeature[] = [
   {
     slug: "hr-manager",
     title: "HR Manager",
@@ -311,16 +283,3 @@ const RAW_PUBLIC_ROLE_FEATURES: PublicRoleFeature[] = [
     relatedSlugs: ["hr-manager", "stage-manager", "production-manager"],
   },
 ];
-
-export const PUBLIC_ROLE_FEATURES: readonly PublicRoleFeature[] =
-  RAW_PUBLIC_ROLE_FEATURES.map(withTimeTrackingSection);
-
-const SLUG_SET = new Set(PUBLIC_ROLE_FEATURES.map((r) => r.slug));
-
-export function isPublicRoleSlug(slug: string | undefined): slug is string {
-  return slug != null && SLUG_SET.has(slug);
-}
-
-export function getRoleBySlug(slug: string): PublicRoleFeature | undefined {
-  return PUBLIC_ROLE_FEATURES.find((r) => r.slug === slug);
-}

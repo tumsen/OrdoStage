@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import type { PublicRoleFeature } from "@/lib/publicRoleFeatures";
+import { isPlansBillingSection } from "@/lib/roleTimeTrackingSections";
+import { useMarketingCopy } from "@/lib/marketing/i18n";
 import { type OrdoAccent, ORDO_ACCENT_STYLES } from "@/lib/roleAccentStyles";
 
 type RoleFeatureDetailContentProps = {
@@ -16,6 +18,7 @@ export function RoleFeatureDetailContent({
   showHeroLead = true,
   accent,
 }: RoleFeatureDetailContentProps) {
+  const { t } = useMarketingCopy();
   const vibrant = accent != null;
   const styles = accent ? ORDO_ACCENT_STYLES[accent] : null;
 
@@ -68,11 +71,11 @@ export function RoleFeatureDetailContent({
                 <li key={bullet}>{bullet}</li>
               ))}
             </ul>
-            {role.slug === "accountant" && section.heading === "Plans & billing" ? (
+            {role.slug === "accountant" && isPlansBillingSection(section.heading) ? (
               <p className="text-sm text-white/75 pt-1">
-                Compare Flex and Yearly on the{" "}
+                {t.accountantPricingNote}{" "}
                 <Link to="/pricing" className="text-ordo-yellow hover:underline font-medium">
-                  pricing page
+                  {t.pricingLinkText}
                 </Link>
                 .
               </p>

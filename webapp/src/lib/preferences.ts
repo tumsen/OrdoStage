@@ -29,16 +29,36 @@ export function languageLabel(language: Language): string {
   return "German";
 }
 
+/** Native name for public language selector. */
+export function languageNativeLabel(language: Language): string {
+  if (language === "en") return "English";
+  if (language === "da") return "Dansk";
+  return "Deutsch";
+}
+
+function languageFromTag(tag: string): Language | null {
+  const lower = tag.toLowerCase();
+  if (lower.startsWith("da")) return "da";
+  if (lower.startsWith("de")) return "de";
+  if (lower.startsWith("en")) return "en";
+  return null;
+}
+
 export function localeForLanguage(language: Language): string {
   return LOCALE_MAP[language];
 }
 
-/** Browsers report BCP-47; map to site language codes. */
+/** Browsers report BCP-47; map to site language codes (first supported match). */
 export function getBrowserLanguage(): Language {
   if (typeof navigator === "undefined") return "en";
-  const nav = (navigator.language || "en").toLowerCase();
-  if (nav.startsWith("da")) return "da";
-  if (nav.startsWith("de")) return "de";
+  const tags =
+    typeof navigator.languages !== "undefined" && navigator.languages.length > 0
+      ? [...navigator.languages]
+      : [navigator.language || "en"];
+  for (const tag of tags) {
+    const lang = languageFromTag(tag);
+    if (lang) return lang;
+  }
   return "en";
 }
 

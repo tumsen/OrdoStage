@@ -6,29 +6,12 @@ import { Button } from "@/components/ui/button";
 import { PlatformFeaturesGrid } from "@/components/marketing/PlatformFeaturesGrid";
 import { RoleFeatureBinder } from "@/components/marketing/RoleFeatureBinder";
 import { useSiteContentLanguage } from "@/hooks/useSiteContentLanguage";
+import { useMarketingCopy } from "@/lib/marketing/i18n";
+import { getLandingContentDefaults } from "@/lib/siteContentDefaults";
 import { isPublicFlagOn } from "@/lib/publicSiteFlags";
 import { cn } from "@/lib/utils";
 
 type SiteContent = Record<string, string>;
-
-const W_HERO_HIGHLIGHTS = [
-  "Workflow-first planning — not a generic project tool.",
-  "One schedule across venues, tours, and departments.",
-  "Riders, specs, and staffing — linked to the show they belong to.",
-] as const;
-
-const W = {
-  landing_title: "OrdoStage — Planning for theaters, venues & touring productions",
-  landing_subtitle:
-    "Plan productions, coordinate teams, and run tours in one platform built for live performance.",
-  landing_lead:
-    "Stop juggling spreadsheets, email threads, and shared drives. OrdoStage connects scheduling, venue specs, tech riders, and crew coordination in one live workspace — from first rehearsal to closing night.",
-  landing_postscript: W_HERO_HIGHLIGHTS.join("\n"),
-  landing_closing: "For theaters · venues · touring companies · everyone running the show.",
-  landing_section_heading: "See it by role",
-  landing_section_body:
-    "Same live data for your whole organisation — pick a role to explore what matters for that job.",
-} as const;
 
 function parseHighlightLines(raw: string | undefined, fallback: string): string[] {
   const source = raw?.trim() ? raw : fallback;
@@ -38,18 +21,19 @@ function parseHighlightLines(raw: string | undefined, fallback: string): string[
     .filter(Boolean);
 }
 
-function useWelcomeCopy(site: SiteContent | undefined) {
+function useWelcomeCopy(site: SiteContent | undefined, language: ReturnType<typeof useSiteContentLanguage>) {
+  const defaults = getLandingContentDefaults(language);
   return useMemo(() => {
     return {
-      title: site?.landing_title?.trim() || W.landing_title,
-      subtitle: site?.landing_subtitle?.trim() || W.landing_subtitle,
-      lead: site?.landing_lead?.trim() || W.landing_lead,
-      highlights: parseHighlightLines(site?.landing_postscript, W.landing_postscript),
-      closing: site?.landing_closing?.trim() || W.landing_closing,
-      sectionHeading: site?.landing_section_heading?.trim() || W.landing_section_heading,
-      sectionBody: site?.landing_section_body?.trim() || W.landing_section_body,
+      title: site?.landing_title?.trim() || defaults.landing_title,
+      subtitle: site?.landing_subtitle?.trim() || defaults.landing_subtitle,
+      lead: site?.landing_lead?.trim() || defaults.landing_lead,
+      highlights: parseHighlightLines(site?.landing_postscript, defaults.landing_postscript),
+      closing: site?.landing_closing?.trim() || defaults.landing_closing,
+      sectionHeading: site?.landing_section_heading?.trim() || defaults.landing_section_heading,
+      sectionBody: site?.landing_section_body?.trim() || defaults.landing_section_body,
     };
-  }, [site]);
+  }, [site, defaults]);
 }
 
 function HashScroll() {
@@ -121,6 +105,7 @@ function WelcomeHero({
 }
 
 function FeatureBlock({ sectionHeading, sectionBody }: { sectionHeading: string; sectionBody: string }) {
+  const { t } = useMarketingCopy();
   return (
     <section id="features" className="w-full scroll-mt-6 space-y-6">
       <div className="space-y-3">
@@ -134,21 +119,17 @@ function FeatureBlock({ sectionHeading, sectionBody }: { sectionHeading: string;
 
       <div className="grid gap-4 md:grid-cols-1">
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <h3 className="text-base font-semibold text-white">Why organisations switch</h3>
-          <p className="mt-2 text-sm leading-relaxed text-white/80">
-            Less re-keying between tools. Fewer “did you see the update?” moments before load-in. Technical, production,
-            and operations leadership see the same live picture — so decisions on show day rest on current data, not
-            memory.
-          </p>
+          <h3 className="text-base font-semibold text-white">{t.whySwitchHeading}</h3>
+          <p className="mt-2 text-sm leading-relaxed text-white/80">{t.whySwitchBody}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">
-              Fewer planning mistakes
+              {t.chipFewerMistakes}
             </span>
             <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">
-              Faster handovers
+              {t.chipFasterHandovers}
             </span>
             <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75">
-              Better team alignment
+              {t.chipBetterAlignment}
             </span>
           </div>
         </div>
@@ -158,11 +139,13 @@ function FeatureBlock({ sectionHeading, sectionBody }: { sectionHeading: string;
 }
 
 function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefined }) {
+  const siteLang = useSiteContentLanguage();
+  const { t } = useMarketingCopy();
   const title = siteContent?.public_maintenance_title?.trim() || "We will be back soon";
   const subtitle =
     siteContent?.public_maintenance_subtitle?.trim() ||
     "OrdoStage is being updated. Please try again in a little while.";
-  const welcome = useWelcomeCopy(siteContent);
+  const welcome = useWelcomeCopy(siteContent, siteLang);
   return (
     <FrontShell>
       <HashScroll />
@@ -176,18 +159,17 @@ function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefi
           className="w-full scroll-mt-6 rounded-2xl border border-white/15 bg-black/25 p-5 text-left backdrop-blur-sm md:p-6"
           id="features"
         >
-          <h2 className="text-lg font-semibold text-white">Features</h2>
+          <h2 className="text-lg font-semibold text-white">{t.pageFeatures}</h2>
           <p className="mt-3 text-sm leading-relaxed text-white/80">
-            {welcome.lead} When we are back online, use the menu for{" "}
+            {welcome.lead} {t.maintenanceFeaturesLead}{" "}
             <Link to="/pricing" className="text-ordo-yellow hover:underline">
-              Pricing
+              {t.maintenancePricingLink}
             </Link>{" "}
             and{" "}
             <Link to="/login" className="text-ordo-yellow hover:underline">
-              Log in
+              {t.maintenanceLoginLink}
             </Link>
-            . The live homepage lists OrdoStage by role — HR, production, stage management, touring, technical, and
-            finance — when maintenance is off.
+            .
           </p>
         </section>
       </main>
@@ -196,8 +178,11 @@ function MaintenanceWelcome({ siteContent }: { siteContent: SiteContent | undefi
 }
 
 function MarketingHome({ siteContent }: { siteContent: SiteContent | undefined }) {
-  const welcome = useWelcomeCopy(siteContent);
-  const ctaText = siteContent?.landing_cta_text?.trim() || "Get started free";
+  const siteLang = useSiteContentLanguage();
+  const { t } = useMarketingCopy();
+  const welcome = useWelcomeCopy(siteContent, siteLang);
+  const landingDefaults = getLandingContentDefaults(siteLang);
+  const ctaText = siteContent?.landing_cta_text?.trim() || landingDefaults.landing_cta_text;
   const ctaPath = siteContent?.landing_cta_url?.trim() || "/signup";
   const ctaExternal = /^https?:\/\//i.test(ctaPath);
   return (
@@ -232,10 +217,10 @@ function MarketingHome({ siteContent }: { siteContent: SiteContent | undefined }
             </Button>
           )}
           <Button asChild variant="outline" className="border-white/25 text-white/90 bg-white/5 hover:bg-white/10">
-            <Link to="/pricing">View pricing</Link>
+            <Link to="/pricing">{t.viewPricing}</Link>
           </Button>
           <Button asChild variant="outline" className="border-white/25 text-white/90 bg-white/5 hover:bg-white/10">
-            <Link to="/login">Log in</Link>
+            <Link to="/login">{t.logIn}</Link>
           </Button>
         </div>
       </main>
