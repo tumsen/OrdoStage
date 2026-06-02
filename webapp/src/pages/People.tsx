@@ -324,8 +324,17 @@ async function uploadPersonPhoto(personId: string, file: File): Promise<void> {
   }
 }
 
-async function updatePersonPhotoFocus(personId: string, x: number, y: number): Promise<void> {
-  await api.patch(`/api/people/${personId}/photo-focus`, { x, y });
+type PhotoCrop = { x: number; y: number; zoom: number };
+
+async function updatePersonPhotoFocus(
+  personId: string,
+  crop: PhotoCrop
+): Promise<void> {
+  await api.patch(`/api/people/${personId}/photo-focus`, {
+    x: crop.x,
+    y: crop.y,
+    zoom: crop.zoom,
+  });
 }
 
 function clampFocus(v: number): number {
@@ -333,12 +342,48 @@ function clampFocus(v: number): number {
   return Math.max(0, Math.min(100, Math.round(v)));
 }
 
+function clampZoom(v: number): number {
+  if (!Number.isFinite(v)) return 100;
+  return Math.max(100, Math.min(400, Math.round(v)));
+}
+
+function normalizePhotoCrop(crop: Partial<PhotoCrop>): PhotoCrop {
+  return {
+    x: clampFocus(crop.x ?? 50),
+    y: clampFocus(crop.y ?? 50),
+    zoom: clampZoom(crop.zoom ?? 100),
+  };
+}
+
+function photoCropLayout(
+  containerW: number,
+  containerH: number,
+  naturalW: number,
+  naturalH: number,
+  crop: PhotoCrop
+) {
+  const cw = Math.max(1, containerW);
+  const ch = Math.max(1, containerH);
+  const nw = Math.max(1, naturalW);
+  const nh = Math.max(1, naturalH);
+  const coverScale = Math.max(cw / nw, ch / nh);
+  const zoomFactor = crop.zoom / 100;
+  const displayW = nw * coverScale * zoomFactor;
+  const displayH = nh * coverScale * zoomFactor;
+  const maxPanX = Math.max(0, (displayW - cw) / 2);
+  const maxPanY = Math.max(0, (displayH - ch) / 2);
+  const panX = ((crop.x - 50) / 50) * maxPanX;
+  const panY = ((crop.y - 50) / 50) * maxPanY;
+  return { displayW, displayH, panX, panY, maxPanX, maxPanY };
+}
+
 function CircularPhotoEditor({
   src,
   alt,
   focusX,
   focusY,
-  onFocusChange,
+  zoom,
+  onCropChange,
   editable = true,
   sizeClassName = "h-32 w-32",
 }: {
@@ -346,73 +391,114 @@ function CircularPhotoEditor({
   alt: string;
   focusX: number;
   focusY: number;
-  onFocusChange?: (x: number, y: number) => void;
+  zoom: number;
+  onCropChange?: (crop: PhotoCrop) => void;
   editable?: boolean;
   sizeClassName?: string;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
-  const [localFocus, setLocalFocus] = useState({ x: clampFocus(focusX), y: clampFocus(focusY) });
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  const [containerSize, setContainerSize] = useState({ w: 128, h: 128 });
+  const [localCrop, setLocalCrop] = useState<PhotoCrop>(() =>
+    normalizePhotoCrop({ x: focusX, y: focusY, zoom })
+  );
   const dragRef = useRef<{
     startX: number;
     startY: number;
-    startFocusX: number;
-    startFocusY: number;
-    width: number;
-    height: number;
+    startCrop: PhotoCrop;
+    maxPanX: number;
+    maxPanY: number;
   } | null>(null);
 
   useEffect(() => {
-    setLocalFocus({ x: clampFocus(focusX), y: clampFocus(focusY) });
-  }, [focusX, focusY]);
+    setLocalCrop(normalizePhotoCrop({ x: focusX, y: focusY, zoom }));
+  }, [focusX, focusY, zoom]);
 
-  const finishDrag = (event: React.PointerEvent<HTMLDivElement>, commit: boolean) => {
-    const s = dragRef.current;
-    if (!s) return;
-    const deltaXPercent = ((event.clientX - s.startX) / Math.max(1, s.width)) * 100;
-    const deltaYPercent = ((event.clientY - s.startY) / Math.max(1, s.height)) * 100;
-    // Move image with pointer (grab feel): drag right → image shifts right in the circle.
-    const x = clampFocus(s.startFocusX - deltaXPercent);
-    const y = clampFocus(s.startFocusY - deltaYPercent);
-    setLocalFocus({ x, y });
-    if (commit && onFocusChange) onFocusChange(x, y);
-    dragRef.current = null;
-    setDragging(false);
+  useEffect(() => {
+    setNaturalSize(null);
+  }, [src]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      setContainerSize({ w: rect.width, h: rect.height });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const layout =
+    naturalSize != null
+      ? photoCropLayout(
+          containerSize.w,
+          containerSize.h,
+          naturalSize.w,
+          naturalSize.h,
+          localCrop
+        )
+      : null;
+
+  const cropFromDrag = (
+    clientX: number,
+    clientY: number,
+    start: NonNullable<typeof dragRef.current>
+  ): PhotoCrop => {
+    const deltaX = clientX - start.startX;
+    const deltaY = clientY - start.startY;
+    let x = start.startCrop.x;
+    let y = start.startCrop.y;
+    if (start.maxPanX > 0) {
+      x = clampFocus(start.startCrop.x - (deltaX / start.maxPanX) * 50);
+    }
+    if (start.maxPanY > 0) {
+      y = clampFocus(start.startCrop.y - (deltaY / start.maxPanY) * 50);
+    }
+    return { ...start.startCrop, x, y };
   };
 
-  return (
+  const commitCrop = (crop: PhotoCrop) => {
+    const normalized = normalizePhotoCrop(crop);
+    setLocalCrop(normalized);
+    onCropChange?.(normalized);
+  };
+
+  const viewport = (
     <div
+      ref={containerRef}
       className={`${sizeClassName} relative overflow-hidden rounded-full border border-white/15 bg-black/20 ${
         editable ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""
       }`}
       style={{ touchAction: editable ? "none" : undefined }}
       onPointerDown={(e) => {
-        if (!editable) return;
+        if (!editable || !layout) return;
         e.preventDefault();
-        const rect = e.currentTarget.getBoundingClientRect();
         dragRef.current = {
           startX: e.clientX,
           startY: e.clientY,
-          startFocusX: localFocus.x,
-          startFocusY: localFocus.y,
-          width: rect.width,
-          height: rect.height,
+          startCrop: localCrop,
+          maxPanX: layout.maxPanX,
+          maxPanY: layout.maxPanY,
         };
         setDragging(true);
         e.currentTarget.setPointerCapture(e.pointerId);
       }}
       onPointerMove={(e) => {
-        if (!dragging) return;
-        const s = dragRef.current;
-        if (!s) return;
-        const deltaXPercent = ((e.clientX - s.startX) / Math.max(1, s.width)) * 100;
-        const deltaYPercent = ((e.clientY - s.startY) / Math.max(1, s.height)) * 100;
-        const x = clampFocus(s.startFocusX - deltaXPercent);
-        const y = clampFocus(s.startFocusY - deltaYPercent);
-        setLocalFocus({ x, y });
+        if (!dragging || !dragRef.current) return;
+        setLocalCrop(cropFromDrag(e.clientX, e.clientY, dragRef.current));
       }}
       onPointerUp={(e) => {
         if (!dragging) return;
-        finishDrag(e, true);
+        const final = dragRef.current
+          ? cropFromDrag(e.clientX, e.clientY, dragRef.current)
+          : localCrop;
+        dragRef.current = null;
+        setDragging(false);
+        commitCrop(final);
         try {
           e.currentTarget.releasePointerCapture(e.pointerId);
         } catch {
@@ -421,17 +507,74 @@ function CircularPhotoEditor({
       }}
       onPointerCancel={(e) => {
         if (!dragging) return;
-        finishDrag(e, true);
+        const final = dragRef.current
+          ? cropFromDrag(e.clientX, e.clientY, dragRef.current)
+          : localCrop;
+        dragRef.current = null;
+        setDragging(false);
+        commitCrop(final);
       }}
-      title={editable ? "Click and hold, then drag to position the photo in the circle" : undefined}
+      onWheel={(e) => {
+        if (!editable) return;
+        e.preventDefault();
+        const nextZoom = clampZoom(localCrop.zoom + (e.deltaY < 0 ? 8 : -8));
+        const next = normalizePhotoCrop({ ...localCrop, zoom: nextZoom });
+        setLocalCrop(next);
+        commitCrop(next);
+      }}
+      title={
+        editable
+          ? "Drag to pan; scroll or use slider to zoom"
+          : undefined
+      }
     >
       <img
         src={src}
         alt={alt}
         draggable={false}
-        className="pointer-events-none h-full w-full select-none object-cover"
-        style={{ objectPosition: `${localFocus.x}% ${localFocus.y}%` }}
+        onLoad={(e) => {
+          const img = e.currentTarget;
+          if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+            setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+          }
+        }}
+        className={`pointer-events-none max-w-none select-none ${
+          layout ? "absolute left-1/2 top-1/2" : "h-full w-full object-cover"
+        }`}
+        style={
+          layout
+            ? {
+                width: layout.displayW,
+                height: layout.displayH,
+                transform: `translate(calc(-50% + ${layout.panX}px), calc(-50% + ${layout.panY}px))`,
+              }
+            : undefined
+        }
       />
+    </div>
+  );
+
+  if (!editable) return viewport;
+
+  return (
+    <div className="space-y-2">
+      {viewport}
+      <label className="flex items-center gap-2 text-[10px] text-white/45">
+        <span className="shrink-0 w-8">Zoom</span>
+        <input
+          type="range"
+          min={100}
+          max={400}
+          step={1}
+          value={localCrop.zoom}
+          onChange={(e) => {
+            const next = normalizePhotoCrop({ ...localCrop, zoom: Number(e.target.value) });
+            setLocalCrop(next);
+            commitCrop(next);
+          }}
+          className="h-1 flex-1 accent-white/70"
+        />
+      </label>
     </div>
   );
 }
@@ -568,10 +711,13 @@ function PersonFormDialog({
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [photoFocus, setPhotoFocus] = useState<{ x: number; y: number }>({
-    x: person?.photoFocusX ?? 50,
-    y: person?.photoFocusY ?? 50,
-  });
+  const [photoFocus, setPhotoFocus] = useState<PhotoCrop>(() =>
+    normalizePhotoCrop({
+      x: person?.photoFocusX ?? 50,
+      y: person?.photoFocusY ?? 50,
+      zoom: person?.photoZoom ?? 100,
+    })
+  );
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
   const [docExpires, setDocExpires] = useState("");
@@ -753,8 +899,8 @@ function PersonFormDialog({
         URL.revokeObjectURL(photoPreviewUrl);
         setPhotoPreviewUrl(null);
       }
+      setPhotoFocus(normalizePhotoCrop({ x: 50, y: 50, zoom: 100 }));
       const id = person!.id;
-      await updatePersonPhotoFocus(id, photoFocus.x, photoFocus.y);
       await queryClient.invalidateQueries({ queryKey: ["people", id] });
       await queryClient.invalidateQueries({ queryKey: ["people"] });
       await queryClient.invalidateQueries({ queryKey: ["people", "me"] });
@@ -772,9 +918,9 @@ function PersonFormDialog({
   });
 
   const photoFocusMutation = useMutation({
-    mutationFn: async (focus: { x: number; y: number }) => {
+    mutationFn: async (crop: PhotoCrop) => {
       if (!person?.id) return;
-      await updatePersonPhotoFocus(person.id, focus.x, focus.y);
+      await updatePersonPhotoFocus(person.id, crop);
     },
     onSuccess: async () => {
       if (!person?.id) return;
@@ -826,8 +972,14 @@ function PersonFormDialog({
       return null;
     });
     setPhotoFile(null);
-    setPhotoFocus({ x: person?.photoFocusX ?? 50, y: person?.photoFocusY ?? 50 });
-  }, [person?.id, person?.photoFocusX, person?.photoFocusY]);
+    setPhotoFocus(
+      normalizePhotoCrop({
+        x: person?.photoFocusX ?? 50,
+        y: person?.photoFocusY ?? 50,
+        zoom: person?.photoZoom ?? 100,
+      })
+    );
+  }, [person?.id, person?.photoFocusX, person?.photoFocusY, person?.photoZoom]);
 
   const uploadDocMutation = useMutation({
     mutationFn: async () => {
@@ -1019,15 +1171,18 @@ function PersonFormDialog({
             alt={person ? `${person.name} profile` : "Profile preview"}
             focusX={photoFocus.x}
             focusY={photoFocus.y}
-            onFocusChange={(x, y) => {
-              setPhotoFocus({ x, y });
+            zoom={photoFocus.zoom}
+            onCropChange={(crop) => {
+              setPhotoFocus(crop);
               if (person?.id) {
-                photoFocusMutation.mutate({ x, y });
+                photoFocusMutation.mutate(crop);
               }
             }}
             editable
           />
-          <p className="text-[10px] text-white/40">Click and hold the photo, then drag to fit the face inside the circle.</p>
+          <p className="text-[10px] text-white/40">
+            Drag in any direction to pan. Scroll on the photo or use the zoom slider to scale, then drag to fit inside the circle.
+          </p>
         </div>
       ) : null}
       <Input
@@ -1861,6 +2016,7 @@ function PersonCard({
             alt={person.name}
             focusX={person.photoFocusX ?? 50}
             focusY={person.photoFocusY ?? 50}
+            zoom={person.photoZoom ?? 100}
             editable={false}
             sizeClassName="h-14 w-14"
           />

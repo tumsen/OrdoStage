@@ -192,6 +192,7 @@ export const PersonSchema = z.object({
   photoUpdatedAt: z.string().nullable().optional(),
   photoFocusX: z.number().int().min(0).max(100).optional(),
   photoFocusY: z.number().int().min(0).max(100).optional(),
+  photoZoom: z.number().int().min(100).max(400).optional(),
   departmentId: z.string().nullable(),
   teamIds: z.array(z.string()),
   teams: z.array(DepartmentSchema),
@@ -375,6 +376,7 @@ export const UpdatePersonSchema = z
 export const UpdatePersonPhotoFocusSchema = z.object({
   x: z.number().int().min(0).max(100),
   y: z.number().int().min(0).max(100),
+  zoom: z.number().int().min(100).max(400),
 });
 
 // Event

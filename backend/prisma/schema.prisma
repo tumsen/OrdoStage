@@ -360,6 +360,8 @@ model Person {
   photoUpdatedAt    DateTime?
   photoFocusX       Int        @default(50)
   photoFocusY       Int        @default(50)
+  /** Crop scale as percent of cover-fit (100–400). */
+  photoZoom         Int        @default(100)
   organizationId   String
   organization     Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   departmentId     String?

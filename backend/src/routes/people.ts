@@ -180,6 +180,7 @@ function serializePerson(person: {
   photoUpdatedAt?: Date | null;
   photoFocusX?: number | null;
   photoFocusY?: number | null;
+  photoZoom?: number | null;
   departmentId: string | null;
   isActive?: boolean;
   weeklyContractHours?: number | null;
@@ -231,6 +232,7 @@ function serializePerson(person: {
     photoUpdatedAt: person.photoUpdatedAt ? person.photoUpdatedAt.toISOString() : null,
     photoFocusX: person.photoFocusX ?? 50,
     photoFocusY: person.photoFocusY ?? 50,
+    photoZoom: person.photoZoom ?? 100,
     departmentId: person.departmentId,
     isActive: person.isActive ?? true,
     weeklyContractHours: person.weeklyContractHours ?? null,
@@ -953,6 +955,7 @@ peopleRouter.post("/people/:id/photo", async (c) => {
       photoUpdatedAt: new Date(),
       photoFocusX: 50,
       photoFocusY: 50,
+      photoZoom: 100,
     },
   });
   return c.json({ data: { ok: true } }, 201);
@@ -981,7 +984,7 @@ peopleRouter.patch("/people/:id/photo-focus", zValidator("json", UpdatePersonPho
   const body = c.req.valid("json");
   await prisma.person.update({
     where: { id: person.id },
-    data: { photoFocusX: body.x, photoFocusY: body.y },
+    data: { photoFocusX: body.x, photoFocusY: body.y, photoZoom: body.zoom },
   });
   return c.json({ data: { ok: true } });
 });
