@@ -15,9 +15,11 @@ import { useAutoSave, type AutoSaveStatus, autoSaveBlurCapture } from "@/hooks/u
 import { AutoSaveStatus as AutoSaveIndicator } from "@/components/AutoSaveStatus";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { BillingSummary, type OrgBillingPayload } from "@/components/BillingSummary";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
+import { RemoteImageHoverPreview } from "@/components/DocumentListThumbnail";
 import {
   PERSON_DOCUMENT_TYPE_OPTIONS,
   personDocumentTypeLabel,
@@ -420,6 +422,7 @@ function CircularPhotoEditor({
   cropSeedKey,
   onCropChange,
   editable = true,
+  hoverPreview = !editable,
   sizeClassName = "h-40 w-40",
 }: {
   src: string;
@@ -431,6 +434,8 @@ function CircularPhotoEditor({
   cropSeedKey?: string;
   onCropChange?: (crop: PhotoCrop) => void;
   editable?: boolean;
+  /** Show full image on hover (default on for read-only avatars). */
+  hoverPreview?: boolean;
   sizeClassName?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -660,11 +665,27 @@ function CircularPhotoEditor({
     </div>
   );
 
-  if (!editable) return viewport;
+  const framedViewport =
+    hoverPreview && src ? (
+      <RemoteImageHoverPreview
+        src={src}
+        alt={alt}
+        openDelay={editable ? 400 : 100}
+        triggerClassName={cn(
+          sizeClassName,
+          "rounded-full border-0 bg-transparent p-0 shadow-none overflow-hidden"
+        )}
+        trigger={viewport}
+      />
+    ) : (
+      viewport
+    );
+
+  if (!editable) return framedViewport;
 
   return (
     <div className="space-y-2">
-      {viewport}
+      {framedViewport}
       <label className="flex items-center gap-2 text-[10px] text-white/45">
         <span className="shrink-0 w-8">Zoom</span>
         <input
@@ -1320,6 +1341,7 @@ function PersonFormDialog({
             zoom={photoFocus.zoom}
             onCropChange={person?.id ? applyPhotoCrop : undefined}
             editable
+            hoverPreview
           />
           <p className="text-[10px] text-white/40">
             Drag to pan and scroll or use the zoom slider to scale. Crop saves automatically when you leave the page.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Download, File, FileText, Film } from "lucide-react";
 import { toast } from "sonner";
 
@@ -361,10 +361,13 @@ type RemoteImageHoverPreviewProps = {
   src: string;
   alt: string;
   /** Classes on the outer trigger (shape, size, border). */
-  triggerClassName: string;
-  /** Classes on the `<img>` inside the trigger. */
-  triggerImgClassName: string;
+  triggerClassName?: string;
+  /** Classes on the `<img>` inside the trigger (default img trigger only). */
+  triggerImgClassName?: string;
   title?: string;
+  /** Custom trigger; hover card still shows full `src` (e.g. cropped avatar). */
+  trigger?: ReactNode;
+  openDelay?: number;
 };
 
 function RemoteImagePreviewTrigger({
@@ -392,42 +395,20 @@ function RemoteImagePreviewTrigger({
 }
 
 /** Larger image on hover (profile photos, logos) — disabled on mobile to avoid a full-screen preview on tap. */
-export function RemoteImageHoverPreview({
+function RemoteImageHoverCard({
   src,
   alt,
-  triggerClassName,
-  triggerImgClassName,
-  title,
-}: RemoteImageHoverPreviewProps) {
-  const isMobile = useIsMobile();
-
-  if (isMobile) {
-    return (
-      <RemoteImagePreviewTrigger
-        src={src}
-        alt={alt}
-        triggerClassName={triggerClassName}
-        triggerImgClassName={triggerImgClassName}
-        title={title}
-      />
-    );
-  }
-
+  openDelay,
+  children,
+}: {
+  src: string;
+  alt: string;
+  openDelay?: number;
+  children: ReactNode;
+}) {
   return (
-    <HoverCard openDelay={100} closeDelay={280}>
-      <HoverCardTrigger asChild>
-        <button
-          type="button"
-          title={title ?? `${alt} — hover to enlarge`}
-          aria-label={title ?? `Enlarge ${alt}`}
-          className={cn(
-            "group relative block shrink-0 overflow-hidden border border-white/10 bg-white/[0.04] p-0 text-left hover:border-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45",
-            triggerClassName,
-          )}
-        >
-          <img src={src} alt={alt} className={triggerImgClassName} />
-        </button>
-      </HoverCardTrigger>
+    <HoverCard openDelay={openDelay ?? 100} closeDelay={280}>
+      <HoverCardTrigger asChild>{children}</HoverCardTrigger>
       <HoverCardContent side="top" align="center" sideOffset={8} className={hoverCardContentClass}>
         <div className="overflow-hidden rounded-md border border-white/10 bg-black/50">
           <img
@@ -442,5 +423,69 @@ export function RemoteImageHoverPreview({
         ) : null}
       </HoverCardContent>
     </HoverCard>
+  );
+}
+
+export function RemoteImageHoverPreview({
+  src,
+  alt,
+  triggerClassName = "",
+  triggerImgClassName,
+  title,
+  trigger,
+  openDelay,
+}: RemoteImageHoverPreviewProps) {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    if (trigger) {
+      return (
+        <span title={title ?? alt} className={cn("inline-block shrink-0", triggerClassName)}>
+          {trigger}
+        </span>
+      );
+    }
+    return (
+      <RemoteImagePreviewTrigger
+        src={src}
+        alt={alt}
+        triggerClassName={triggerClassName}
+        triggerImgClassName={triggerImgClassName ?? "h-full w-full object-cover"}
+        title={title}
+      />
+    );
+  }
+
+  if (trigger) {
+    return (
+      <RemoteImageHoverCard src={src} alt={alt} openDelay={openDelay}>
+        <div
+          title={title ?? `${alt} — hover to enlarge`}
+          className={cn("inline-block shrink-0 cursor-default", triggerClassName)}
+        >
+          {trigger}
+        </div>
+      </RemoteImageHoverCard>
+    );
+  }
+
+  return (
+    <RemoteImageHoverCard src={src} alt={alt} openDelay={openDelay}>
+      <button
+        type="button"
+        title={title ?? `${alt} — hover to enlarge`}
+        aria-label={title ?? `Enlarge ${alt}`}
+        className={cn(
+          "group relative block shrink-0 overflow-hidden border border-white/10 bg-white/[0.04] p-0 text-left hover:border-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/45",
+          triggerClassName
+        )}
+      >
+        <img
+          src={src}
+          alt={alt}
+          className={triggerImgClassName ?? "block h-full w-full max-h-full max-w-full object-cover"}
+        />
+      </button>
+    </RemoteImageHoverCard>
   );
 }
