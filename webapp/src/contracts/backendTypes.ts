@@ -390,6 +390,7 @@ export const EventSchema = z.object({
   customFields: z.string().nullable(),
   ownerTeamId: z.string().nullable().optional(),
   leadPersonId: z.string().nullable().optional(),
+  productionId: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -591,6 +592,7 @@ export const CreateEventSchema = z.object({
   ownerTeamId: z.string().optional(),
   leadPersonId: z.string().nullable().optional(),
   teamIds: z.array(z.string()).optional(),
+  productionId: z.string().nullable().optional(),
 });
 
 export const UpdateEventSchema = CreateEventSchema.partial();
@@ -1021,6 +1023,7 @@ export const TourSchema = z.object({
   customFields: z.array(CustomFieldSchema),
   riderVisibility: RiderVisibilitySchema,
   techRiderPdfName: z.string().nullable(),
+  productionId: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -1101,6 +1104,7 @@ export const CreateTourSchema = z.object({
   riderNotes: z.string().optional(),
   customFields: z.array(CustomFieldSchema).optional(),
   riderVisibility: RiderVisibilitySchema.partial().optional(),
+  productionId: z.string().nullable().optional(),
 });
 
 export const UpdateTourSchema = CreateTourSchema.partial();
@@ -1664,6 +1668,10 @@ export const ProductionSchema = z.object({
   eventId: z.string().nullable(),
   eventTitle: z.string().nullable().optional(),
   notes: z.string().nullable(),
+  linkedTourIds: z.array(z.string()).optional(),
+  linkedTourNames: z.array(z.string()).optional(),
+  linkedEventIds: z.array(z.string()).optional(),
+  linkedEventTitles: z.array(z.string()).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -1693,6 +1701,8 @@ export const UpdateProductionSchema = z
     leadPersonId: z.string().nullable().optional(),
     tourId: z.string().nullable().optional(),
     eventId: z.string().nullable().optional(),
+    linkedTourIds: z.array(z.string()).optional(),
+    linkedEventIds: z.array(z.string()).optional(),
     notes: z.string().nullable().optional(),
   })
   .refine((b) => Object.keys(b).length > 0, { message: "No changes" });

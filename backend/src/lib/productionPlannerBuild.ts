@@ -117,6 +117,8 @@ export type ProductionWithRelations = {
   leadPerson: { name: string } | null;
   tour: { id: string; name: string } | null;
   event: { id: string; title: string } | null;
+  tours?: Array<{ id: string; name: string }>;
+  events?: Array<{ id: string; title: string }>;
   phases: Array<{
     id: string;
     title: string;

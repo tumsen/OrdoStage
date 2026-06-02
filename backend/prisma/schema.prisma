@@ -474,10 +474,15 @@ model Event {
   timeProjects   TimeProject[]
   timeEntries    TimeEntry[]
   bookings       InternalBooking[]
-  production     Production?
+  /** Legacy single linked production record (kept for backward compatibility). */
+  production     Production?   @relation("PrimaryProductionEvent")
+  /** Optional parent show/production; enables one production to own many in-house runs. */
+  productionId   String?
+  productionRef  Production?   @relation("ProductionEvents", fields: [productionId], references: [id], onDelete: SetNull)
 
   @@index([ownerTeamId])
   @@index([organizationId, startDate])
+  @@index([productionId])
 }
 
 model EventTeam {
@@ -782,9 +787,15 @@ model Tour {
   people           TourPerson[]
   teams            TourTeam[]
   personNotes      TourPersonNote[]
-  production       Production?
+  /** Legacy single linked production record (kept for backward compatibility). */
+  production       Production? @relation("PrimaryProductionTour")
+  /** Optional parent show/production; enables one production to own many tours/legs. */
+  productionId     String?
+  productionRef    Production? @relation("ProductionTours", fields: [productionId], references: [id], onDelete: SetNull)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
+
+  @@index([productionId])
 }
 
 model TourTeam {
@@ -1133,10 +1144,14 @@ model Production {
   leadPerson        Person?      @relation("ProductionLeadPerson", fields: [leadPersonId], references: [id], onDelete: SetNull)
   /** Set when this production goes on tour with the show. */
   tourId            String?      @unique
-  tour              Tour?        @relation(fields: [tourId], references: [id], onDelete: SetNull)
+  tour              Tour?        @relation("PrimaryProductionTour", fields: [tourId], references: [id], onDelete: SetNull)
   /** Optional link to a resident run at the home venue. */
   eventId           String?      @unique
-  event             Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  event             Event?       @relation("PrimaryProductionEvent", fields: [eventId], references: [id], onDelete: SetNull)
+  /** One production can have many in-house runs/events. */
+  events            Event[]      @relation("ProductionEvents")
+  /** One production can have many tours/legs over time. */
+  tours             Tour[]       @relation("ProductionTours")
   notes             String?
   phases            ProductionPhase[]
   costLines         ProductionCostLine[]

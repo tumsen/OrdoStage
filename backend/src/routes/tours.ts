@@ -243,6 +243,7 @@ function serializeTour(tour: any) {
     customFields: parseCustomFields(tour.customFields),
     riderVisibility: parseRiderVisibility(tour.riderVisibility),
     techRiderPdfName: tour.techRiderPdfName ?? null,
+    productionId: tour.productionId ?? null,
     createdAt: tour.createdAt instanceof Date ? tour.createdAt.toISOString() : tour.createdAt,
     updatedAt: tour.updatedAt instanceof Date ? tour.updatedAt.toISOString() : tour.updatedAt,
   };
@@ -292,6 +293,15 @@ toursRouter.post("/tours", zValidator("json", CreateTourSchema), async (c) => {
   }
 
   const body = c.req.valid("json");
+  if (body.productionId) {
+    const production = await prisma.production.findFirst({
+      where: { id: body.productionId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!production) {
+      return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
+    }
+  }
   const tour = await prisma.tour.create({
     data: {
       name: body.name,
@@ -311,6 +321,7 @@ toursRouter.post("/tours", zValidator("json", CreateTourSchema), async (c) => {
       riderVisibility: body.riderVisibility
         ? JSON.stringify({ ...DEFAULT_RIDER_VISIBILITY, ...body.riderVisibility })
         : JSON.stringify(DEFAULT_RIDER_VISIBILITY),
+      productionId: body.productionId ?? null,
       organizationId: user.organizationId,
     },
   });
@@ -417,6 +428,15 @@ toursRouter.put("/tours/:id", zValidator("json", UpdateTourSchema), async (c) =>
 
   const { id } = c.req.param();
   const body = c.req.valid("json");
+  if (body.productionId !== undefined && body.productionId !== null && body.productionId !== "") {
+    const production = await prisma.production.findFirst({
+      where: { id: body.productionId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!production) {
+      return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
+    }
+  }
 
   const existing = await prisma.tour.findUnique({
     where: { id, organizationId: user.organizationId },
@@ -449,6 +469,9 @@ toursRouter.put("/tours/:id", zValidator("json", UpdateTourSchema), async (c) =>
           ...parseRiderVisibility(existing.riderVisibility),
           ...body.riderVisibility,
         }),
+      }),
+      ...(body.productionId !== undefined && {
+        productionId: body.productionId === "" ? null : body.productionId,
       }),
     },
   });

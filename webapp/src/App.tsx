@@ -26,6 +26,7 @@ const PersonEdit = lazy(() => import("./pages/PersonEdit"));
 const Team = lazy(() => import("./pages/Team"));
 const Calendars = lazy(() => import("./pages/Calendars"));
 const ProductionPlanner = lazy(() => import("./pages/ProductionPlanner"));
+const Shows = lazy(() => import("./pages/Shows"));
 const ProductionPlanTaskPage = lazy(() => import("./pages/ProductionPlanTaskPage"));
 const Schedule = lazy(() => import("./pages/Schedule"));
 const Staffing = lazy(() => import("./pages/Staffing"));
@@ -318,6 +319,18 @@ const App = () => (
                 <Layout>
                   <Calendars />
                 </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/shows"
+            element={
+              <ProtectedRoute>
+                <ProductionPlannerFeatureRoute>
+                  <Layout>
+                    <Shows />
+                  </Layout>
+                </ProductionPlannerFeatureRoute>
               </ProtectedRoute>
             }
           />

@@ -56,6 +56,8 @@ const productionInclude = {
   leadPerson: { select: { name: true } },
   tour: { select: { id: true, name: true } },
   event: { select: { id: true, title: true } },
+  tours: { select: { id: true, name: true }, orderBy: { createdAt: "asc" as const } },
+  events: { select: { id: true, title: true }, orderBy: { createdAt: "asc" as const } },
   people: {
     orderBy: { createdAt: "asc" as const },
     include: {
@@ -260,7 +262,11 @@ function serializeProduction(row: {
   leadPerson?: { name: string } | null;
   tour?: { id: string; name: string } | null;
   event?: { id: string; title: string } | null;
+  tours?: Array<{ id: string; name: string }>;
+  events?: Array<{ id: string; title: string }>;
 }): Production {
+  const linkedTours = row.tours ?? (row.tour ? [row.tour] : []);
+  const linkedEvents = row.events ?? (row.event ? [row.event] : []);
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -278,6 +284,10 @@ function serializeProduction(row: {
     tourName: row.tour?.name ?? null,
     eventId: row.eventId,
     eventTitle: row.event?.title ?? null,
+    linkedTourIds: linkedTours.map((tour) => tour.id),
+    linkedTourNames: linkedTours.map((tour) => tour.name),
+    linkedEventIds: linkedEvents.map((event) => event.id),
+    linkedEventTitles: linkedEvents.map((event) => event.title),
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -529,6 +539,8 @@ productionPlannerRouter.get("/productions", async (c) => {
       leadPerson: { select: { name: true } },
       tour: { select: { id: true, name: true } },
       event: { select: { id: true, title: true } },
+      tours: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
+      events: { select: { id: true, title: true }, orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -544,6 +556,7 @@ productionPlannerRouter.post(
     if (!user?.organizationId) {
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
     }
+    const organizationId = user.organizationId;
     if (!canWrite(c)) {
       return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
     }
@@ -554,13 +567,13 @@ productionPlannerRouter.post(
 
     if (body.homeVenueId) {
       const venue = await prisma.venue.findFirst({
-        where: { id: body.homeVenueId, organizationId: user.organizationId },
+        where: { id: body.homeVenueId, organizationId },
       });
       if (!venue) return c.json({ error: { message: "Venue not found", code: "NOT_FOUND" } }, 404);
     }
     if (body.leadPersonId) {
       const person = await prisma.person.findFirst({
-        where: { id: body.leadPersonId, organizationId: user.organizationId },
+        where: { id: body.leadPersonId, organizationId },
       });
       if (!person) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
     }
@@ -585,6 +598,8 @@ productionPlannerRouter.post(
         leadPerson: { select: { name: true } },
         tour: { select: { id: true, name: true } },
         event: { select: { id: true, title: true } },
+        tours: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
+        events: { select: { id: true, title: true }, orderBy: { createdAt: "asc" } },
       },
     });
 
@@ -623,6 +638,7 @@ productionPlannerRouter.patch(
     if (!user?.organizationId) {
       return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
     }
+    const organizationId = user.organizationId;
     if (!canWrite(c)) {
       return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
     }
@@ -630,13 +646,13 @@ productionPlannerRouter.patch(
     const id = c.req.param("id");
     const body = c.req.valid("json");
     const existing = await prisma.production.findFirst({
-      where: { id, organizationId: user.organizationId },
+      where: { id, organizationId },
     });
     if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
 
     if (body.homeVenueId) {
       const venue = await prisma.venue.findFirst({
-        where: { id: body.homeVenueId, organizationId: user.organizationId },
+        where: { id: body.homeVenueId, organizationId },
       });
       if (!venue) return c.json({ error: { message: "Venue not found", code: "NOT_FOUND" } }, 404);
     }
@@ -648,45 +664,91 @@ productionPlannerRouter.patch(
     }
     if (body.tourId) {
       const tour = await prisma.tour.findFirst({
-        where: { id: body.tourId, organizationId: user.organizationId },
+        where: { id: body.tourId, organizationId },
       });
       if (!tour) return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
     }
     if (body.eventId) {
       const event = await prisma.event.findFirst({
-        where: { id: body.eventId, organizationId: user.organizationId },
+        where: { id: body.eventId, organizationId },
       });
       if (!event) return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
     }
+    if (body.linkedTourIds) {
+      const count = await prisma.tour.count({
+        where: { organizationId, id: { in: body.linkedTourIds } },
+      });
+      if (count !== body.linkedTourIds.length) {
+        return c.json({ error: { message: "One or more tours not found", code: "NOT_FOUND" } }, 404);
+      }
+    }
+    if (body.linkedEventIds) {
+      const count = await prisma.event.count({
+        where: { organizationId, id: { in: body.linkedEventIds } },
+      });
+      if (count !== body.linkedEventIds.length) {
+        return c.json({ error: { message: "One or more events not found", code: "NOT_FOUND" } }, 404);
+      }
+    }
 
-    const updated = await prisma.production.update({
-      where: { id },
-      data: {
-        name: body.name,
-        description: body.description,
-        status: body.status,
-        planningStartDate:
-          body.planningStartDate === undefined
-            ? undefined
-            : parseIncomingDateTimeOrNull(body.planningStartDate),
-        premiereDate:
-          body.premiereDate === undefined
-            ? undefined
-            : parseIncomingDateTimeOrNull(body.premiereDate),
-        closedAt:
-          body.closedAt === undefined ? undefined : parseIncomingDateTimeOrNull(body.closedAt),
-        homeVenueId: body.homeVenueId,
-        leadPersonId: body.leadPersonId,
-        tourId: body.tourId,
-        eventId: body.eventId,
-        notes: body.notes,
-      },
-      include: {
-        homeVenue: { select: { name: true } },
-        leadPerson: { select: { name: true } },
-        tour: { select: { id: true, name: true } },
-        event: { select: { id: true, title: true } },
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.production.update({
+        where: { id },
+        data: {
+          name: body.name,
+          description: body.description,
+          status: body.status,
+          planningStartDate:
+            body.planningStartDate === undefined
+              ? undefined
+              : parseIncomingDateTimeOrNull(body.planningStartDate),
+          premiereDate:
+            body.premiereDate === undefined
+              ? undefined
+              : parseIncomingDateTimeOrNull(body.premiereDate),
+          closedAt:
+            body.closedAt === undefined ? undefined : parseIncomingDateTimeOrNull(body.closedAt),
+          homeVenueId: body.homeVenueId,
+          leadPersonId: body.leadPersonId,
+          tourId: body.tourId,
+          eventId: body.eventId,
+          notes: body.notes,
+        },
+      });
+
+      if (body.linkedTourIds) {
+        await tx.tour.updateMany({
+          where: { organizationId, productionId: id, id: { notIn: body.linkedTourIds } },
+          data: { productionId: null },
+        });
+        await tx.tour.updateMany({
+          where: { organizationId, id: { in: body.linkedTourIds } },
+          data: { productionId: id },
+        });
+      }
+
+      if (body.linkedEventIds) {
+        await tx.event.updateMany({
+          where: { organizationId, productionId: id, id: { notIn: body.linkedEventIds } },
+          data: { productionId: null },
+        });
+        await tx.event.updateMany({
+          where: { organizationId, id: { in: body.linkedEventIds } },
+          data: { productionId: id },
+        });
+      }
+
+      return tx.production.findUniqueOrThrow({
+        where: { id: row.id },
+        include: {
+          homeVenue: { select: { name: true } },
+          leadPerson: { select: { name: true } },
+          tour: { select: { id: true, name: true } },
+          event: { select: { id: true, title: true } },
+          tours: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
+          events: { select: { id: true, title: true }, orderBy: { createdAt: "asc" } },
+        },
+      });
     });
 
     return c.json({ data: serializeProduction(updated) });

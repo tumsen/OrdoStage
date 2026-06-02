@@ -266,6 +266,7 @@ function serializeEvent(event: {
   customFields: string | null;
   ownerTeamId?: string | null;
   leadPersonId?: string | null;
+  productionId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -287,6 +288,7 @@ function serializeEvent(event: {
     customFields: event.customFields,
     ownerTeamId: event.ownerTeamId ?? null,
     leadPersonId: event.leadPersonId ?? null,
+    productionId: event.productionId ?? null,
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
   };
@@ -682,6 +684,15 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
       return c.json({ error: { message: "Event lead person not found", code: "NOT_FOUND" } }, 404);
     }
   }
+  if (body.productionId) {
+    const production = await prisma.production.findFirst({
+      where: { id: body.productionId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!production) {
+      return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
+    }
+  }
   const event = await prismaAny.event.create({
     data: {
       title: body.title,
@@ -701,6 +712,8 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
       ownerTeamId: null,
       leadPersonId:
         body.leadPersonId && body.leadPersonId !== "" ? body.leadPersonId : null,
+      productionId:
+        body.productionId && body.productionId !== "" ? body.productionId : null,
       organizationId: user.organizationId,
     },
     include: eventInclude,
@@ -797,6 +810,15 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
       return c.json({ error: { message: "Event lead person not found", code: "NOT_FOUND" } }, 404);
     }
   }
+  if (body.productionId !== undefined && body.productionId !== null && body.productionId !== "") {
+    const production = await prisma.production.findFirst({
+      where: { id: body.productionId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!production) {
+      return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
+    }
+  }
 
   const event = await prisma.event.update({
     where: { id },
@@ -821,6 +843,9 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
       ...(body.customFields !== undefined && { customFields: body.customFields }),
       ...(body.leadPersonId !== undefined && {
         leadPersonId: body.leadPersonId === null || body.leadPersonId === "" ? null : body.leadPersonId,
+      }),
+      ...(body.productionId !== undefined && {
+        productionId: body.productionId === null || body.productionId === "" ? null : body.productionId,
       }),
     },
     include: eventInclude,

@@ -54,6 +54,7 @@ interface OrgData {
 const navItems: { to: string; labelKey: string; icon: LucideIcon; view: string }[] = [
   { to: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard, view: "dashboard" },
   { to: "/schedule", labelKey: "nav.schedule", icon: CalendarRange, view: "schedule" },
+  { to: "/shows", labelKey: "nav.shows", icon: Clapperboard, view: "schedule" },
   { to: "/production", labelKey: "nav.production", icon: Clapperboard, view: "schedule" },
   { to: "/events", labelKey: "nav.events", icon: CalendarDays, view: "events" },
   { to: "/tours", labelKey: "nav.tours", icon: Route, view: "tours" },
@@ -199,7 +200,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
           </div>
         ) : (
           navItems
-          .filter((item) => (item.to === "/production" ? productionPlannerEnabled : true))
+          .filter((item) => (item.to === "/production" || item.to === "/shows" ? productionPlannerEnabled : true))
           .filter((item) => navBypass || canView(item.view))
           .map(({ to, labelKey, icon: Icon }) => {
           const isActive =
