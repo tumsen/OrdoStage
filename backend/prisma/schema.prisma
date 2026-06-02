@@ -109,6 +109,8 @@ model Organization {
   /** Optional JSON for owner-admin seat calculator: tier {base,start,floor,floorAt}, yearlyDiscountPercent, yearlyDiscountApply. */
   customSeatCalculatorJson String?
   billingCurrencyCode     String             @default("USD")
+  /** Feature flag: enables production planner routes/UI for this org. */
+  productionPlannerEnabled Boolean           @default(false)
   paddleCustomerId        String?
   /** Company / invoice information (optional — used on generated PDF invoices). */
   invoiceName      String?

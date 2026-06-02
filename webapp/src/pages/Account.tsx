@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { signOut } from "@/lib/auth-client";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -91,6 +92,7 @@ export default function Account() {
   const { canAction, isOwner } = usePermissions();
   const canManageBranding = canAction("billing.manage");
   const canDeleteOrganization = canAction("org.delete");
+  const canManageOrgFeatures = canAction("org.update");
   type DeletionRequirements = {
     organizationName: string;
     owners: { id: string; email: string; name: string | null }[];
@@ -101,6 +103,12 @@ export default function Account() {
     queryFn: () => api.get<DeletionRequirements>("/api/org/deletion-requirements"),
     enabled: canDeleteOrganization,
   });
+  const { data: orgFeatureData } = useQuery<{ productionPlannerEnabled?: boolean }>({
+    queryKey: ["org", "features"],
+    queryFn: () => api.get<{ productionPlannerEnabled?: boolean }>("/api/org"),
+    enabled: canManageOrgFeatures,
+  });
+  const [productionPlannerEnabled, setProductionPlannerEnabled] = useState(false);
 
   const [confirmPhrase, setConfirmPhrase] = useState("");
   const [loading, setLoading] = useState(false);
@@ -177,6 +185,10 @@ export default function Account() {
   const [companyLogoPreviewUrl, setCompanyLogoPreviewUrl] = useState<string | null>(null);
   const [companyLogoStatus, setCompanyLogoStatus] = useState<string>("");
 
+  useEffect(() => {
+    setProductionPlannerEnabled(Boolean(orgFeatureData?.productionPlannerEnabled));
+  }, [orgFeatureData?.productionPlannerEnabled]);
+
   const { data: companyInfo } = useQuery<{
     name: string;
     invoiceName: string | null;
@@ -251,6 +263,24 @@ export default function Account() {
       setCompanyLogoStatus(msg);
       setProfileMessage(msg);
       toast({ title: "Could not save company information", description: msg, variant: "destructive" });
+    },
+  });
+
+  const updateOrgFeaturesMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      api.patch<{ ok: boolean; productionPlannerEnabled: boolean }>("/api/org/features", {
+        productionPlannerEnabled: enabled,
+      }),
+    onSuccess: (data) => {
+      setProductionPlannerEnabled(Boolean(data.productionPlannerEnabled));
+      queryClient.invalidateQueries({ queryKey: ["org"] });
+      queryClient.invalidateQueries({ queryKey: ["org", "features"] });
+      toast({ title: "Organization feature updated" });
+    },
+    onError: (e: unknown) => {
+      setProductionPlannerEnabled(Boolean(orgFeatureData?.productionPlannerEnabled));
+      const msg = isApiError(e) ? e.message : "Could not update organization feature.";
+      toast({ title: "Feature update failed", description: msg, variant: "destructive" });
     },
   });
 
@@ -742,6 +772,31 @@ export default function Account() {
             </p>
           </div>
           <Billing embedded />
+        </div>
+      ) : null}
+
+      {canManageOrgFeatures ? (
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-white">Organization features</p>
+            <p className="text-xs text-white/50 mt-1">
+              Enable Production Planner only for organizations you want to pilot.
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
+            <div>
+              <p className="text-sm text-white">Production planner</p>
+              <p className="text-xs text-white/45">Disabled by default while Events and Tours continue.</p>
+            </div>
+            <Switch
+              checked={productionPlannerEnabled}
+              disabled={updateOrgFeaturesMutation.isPending}
+              onCheckedChange={(checked) => {
+                setProductionPlannerEnabled(checked);
+                updateOrgFeaturesMutation.mutate(checked);
+              }}
+            />
+          </div>
         </div>
       ) : null}
 

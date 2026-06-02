@@ -28,6 +28,29 @@ import { parseIncomingDateTime, parseIncomingDateTimeOrNull } from "../parseInco
 
 const productionPlannerRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
+productionPlannerRouter.use("*", async (c, next) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const org = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { productionPlannerEnabled: true },
+  });
+  if (!org?.productionPlannerEnabled) {
+    return c.json(
+      {
+        error: {
+          message: "Production planner is disabled for this organization.",
+          code: "FEATURE_DISABLED",
+        },
+      },
+      403
+    );
+  }
+  await next();
+});
+
 const productionInclude = {
   homeVenue: { select: { name: true } },
   leadPerson: { select: { name: true } },

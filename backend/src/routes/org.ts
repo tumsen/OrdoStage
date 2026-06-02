@@ -39,6 +39,10 @@ const OrgPreferencesSchema = z.object({
   distanceUnit: DistanceUnitSchema,
 });
 
+const OrgFeaturesPatchSchema = z.object({
+  productionPlannerEnabled: z.boolean(),
+});
+
 const UserPreferencesPatchSchema = z.object({
   language: LanguageSchema.optional(),
   timeFormat: TimeFormatSchema.optional(),
@@ -451,6 +455,7 @@ app.get("/org", async (c) => {
       fixedOverageEstimateCents,
       fixedAnnualRoundToTen: billingConfig.fixedAnnualRoundToTen,
       paddleBilling: getPaddlePublicInfo(),
+      productionPlannerEnabled: org.productionPlannerEnabled,
     },
   });
 });
@@ -523,6 +528,26 @@ app.patch("/org/preferences", async (c) => {
   });
 
   return c.json({ data: { ok: true } });
+});
+
+// PATCH /api/org/features
+app.patch("/org/features", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "org.update")) {
+    return c.json(
+      { error: { message: "You do not have permission to change organization features", code: "FORBIDDEN" } },
+      403
+    );
+  }
+  const body = OrgFeaturesPatchSchema.parse(await c.req.json().catch(() => ({})));
+  await prisma.organization.update({
+    where: { id: user.organizationId },
+    data: { productionPlannerEnabled: body.productionPlannerEnabled },
+  });
+  return c.json({ data: { ok: true, productionPlannerEnabled: body.productionPlannerEnabled } });
 });
 
 // GET /api/org/invoice-info — fetch current org's invoice/company info (owner/manager)

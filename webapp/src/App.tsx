@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,12 +6,14 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { PublicLayout } from "@/components/PublicLayout";
 import { AdminLayout, AdminRoute } from "@/components/AdminLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { GuestRoute } from "@/components/GuestRoute";
 import { RouteFallback } from "@/components/RouteFallback";
+import { api } from "@/lib/api";
 
 const Index = lazy(() => import("./pages/Index"));
 const Events = lazy(() => import("./pages/Events"));
@@ -58,6 +60,19 @@ const ROUTER_FUTURE = {
   v7_startTransition: true,
   v7_relativeSplatPath: true,
 } as const;
+
+function ProductionPlannerFeatureRoute({ children }: { children: ReactNode }) {
+  const { data: org, isPending } = useQuery<{ productionPlannerEnabled?: boolean }>({
+    queryKey: ["org", "features"],
+    queryFn: () => api.get<{ productionPlannerEnabled?: boolean }>("/api/org"),
+    staleTime: 60_000,
+  });
+  if (isPending) return <RouteFallback />;
+  if (!org?.productionPlannerEnabled) {
+    return <Navigate to="/events" replace />;
+  }
+  return <>{children}</>;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -310,9 +325,11 @@ const App = () => (
             path="/production"
             element={
               <ProtectedRoute>
-                <Layout>
-                  <ProductionPlanner />
-                </Layout>
+                <ProductionPlannerFeatureRoute>
+                  <Layout>
+                    <ProductionPlanner />
+                  </Layout>
+                </ProductionPlannerFeatureRoute>
               </ProtectedRoute>
             }
           />
@@ -320,9 +337,11 @@ const App = () => (
             path="/production/:productionId/task/:lineId"
             element={
               <ProtectedRoute>
-                <Layout>
-                  <ProductionPlanTaskPage />
-                </Layout>
+                <ProductionPlannerFeatureRoute>
+                  <Layout>
+                    <ProductionPlanTaskPage />
+                  </Layout>
+                </ProductionPlannerFeatureRoute>
               </ProtectedRoute>
             }
           />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError } from "@/lib/api";
@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import {
   AdminOrgEmailMembersResultSchema,
   type AdminOrgEmailMembersResult,
@@ -61,6 +62,7 @@ interface Invoice {
 interface OrgDetail {
   id: string;
   name: string;
+  productionPlannerEnabled?: boolean;
   billingStatus: string;
   billingDueAt: string | null;
   customDiscountPercent: number | null;
@@ -134,6 +136,29 @@ function StatItem({ icon: Icon, label, value }: { icon: React.ElementType; label
 function BillingTab({ org }: { org: OrgDetail }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [plannerEnabled, setPlannerEnabled] = useState(Boolean(org.productionPlannerEnabled));
+  useEffect(() => {
+    setPlannerEnabled(Boolean(org.productionPlannerEnabled));
+  }, [org.productionPlannerEnabled]);
+
+  const updateFeaturesMutation = useMutation({
+    mutationFn: (productionPlannerEnabled: boolean) =>
+      api.patch<{ id: string; productionPlannerEnabled: boolean }>(`/api/admin/orgs/${org.id}/features`, {
+        productionPlannerEnabled,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
+      toast({ title: "Organization features updated" });
+    },
+    onError: (err) => {
+      setPlannerEnabled(Boolean(org.productionPlannerEnabled));
+      toast({
+        title: "Could not update organization features",
+        description: isApiError(err) ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const markPaidMutation = useMutation({
     mutationFn: (invoiceId: string) =>
@@ -170,6 +195,27 @@ function BillingTab({ org }: { org: OrgDetail }) {
 
   return (
     <div className="space-y-6">
+      <Card className="bg-gray-900 border border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white text-base">Feature flags</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <div>
+              <p className="text-sm font-medium text-white">Production planner</p>
+              <p className="text-xs text-white/50">Keep disabled until this organisation should access it.</p>
+            </div>
+            <Switch
+              checked={plannerEnabled}
+              disabled={updateFeaturesMutation.isPending}
+              onCheckedChange={(checked) => {
+                setPlannerEnabled(checked);
+                updateFeaturesMutation.mutate(checked);
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
       <div className="flex items-center gap-4 p-5 rounded-lg bg-gray-900/60 border border-white/10">
         <div className="w-12 h-12 rounded-xl bg-blue-950/60 border border-blue-800/30 flex items-center justify-center flex-shrink-0">
           <Receipt size={20} className="text-blue-300" />

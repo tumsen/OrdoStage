@@ -597,6 +597,27 @@ app.get("/admin/orgs/:id", async (c) => {
   });
 });
 
+app.patch("/admin/orgs/:id/features", async (c) => {
+  const orgId = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const { productionPlannerEnabled } = z
+    .object({ productionPlannerEnabled: z.boolean() })
+    .parse(body);
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { id: true },
+  });
+  if (!org) {
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  }
+  const updated = await prisma.organization.update({
+    where: { id: orgId },
+    data: { productionPlannerEnabled },
+    select: { id: true, productionPlannerEnabled: true },
+  });
+  return c.json({ data: updated });
+});
+
 app.post("/admin/orgs/:id/grant-org-admin", async (c) => {
   const orgId = c.req.param("id");
   const body = await c.req.json();

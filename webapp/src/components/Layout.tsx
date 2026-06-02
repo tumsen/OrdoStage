@@ -40,6 +40,7 @@ import { ORDOSTAGE_MAILTO_HREF } from "@/lib/ordostageContact";
 interface OrgData {
   id: string;
   name: string;
+  productionPlannerEnabled?: boolean;
   userCount: number;
   billingStatus?: string;
   isViewOnlyDueToBilling?: boolean;
@@ -105,6 +106,13 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
   const isSupportUser = userEmail.toLowerCase() === "tumsen@gmail.com";
   const canAccessOwnerAdmin = isAdmin || isSupportUser;
   const navBypass = canAccessOwnerAdmin;
+  const { data: orgFeatures } = useQuery<Pick<OrgData, "productionPlannerEnabled">>({
+    queryKey: ["org", "features"],
+    queryFn: () => api.get<Pick<OrgData, "productionPlannerEnabled">>("/api/org"),
+    enabled: Boolean(session?.user),
+    staleTime: 60_000,
+  });
+  const productionPlannerEnabled = Boolean(orgFeatures?.productionPlannerEnabled);
   const initials = displayName
     .split(" ")
     .map((part: string) => part[0])
@@ -191,6 +199,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
           </div>
         ) : (
           navItems
+          .filter((item) => (item.to === "/production" ? productionPlannerEnabled : true))
           .filter((item) => navBypass || canView(item.view))
           .map(({ to, labelKey, icon: Icon }) => {
           const isActive =
