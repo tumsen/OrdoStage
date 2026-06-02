@@ -2,13 +2,13 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/lib/auth-client";
-import { Loader2, User } from "lucide-react";
+import { Loader2, User, UserMinus } from "lucide-react";
 import { PersonCard } from "@/components/person/PersonCard";
 import { TeamAddPersonFooter } from "./TeamAddPersonFooter";
 import { TeamMemberRolesEditor } from "./TeamMemberRolesEditor";
 import { api, isApiError } from "@/lib/api";
-import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Person } from "../../../../backend/src/types";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -184,24 +184,37 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
                 hideTeamsLine
                 showActiveToggle={false}
                 canEditPerson={canEditPerson}
-                canDeletePerson={canWrite}
+                canDeletePerson={false}
                 canSeeDocumentSummaries={canWrite}
-                deleteAction="remove-from-team"
                 onEdit={() => navigate(`/people/${person.id}/edit`)}
-                onDelete={() => setRemoveTarget(m)}
+                onDelete={() => {}}
                 footer={
-                  <TeamMemberRolesEditor
-                    departmentId={departmentId}
-                    member={m}
-                    canWrite={canWrite}
-                    onSaveTeamRoles={(role) =>
-                      patchRoleMutation.mutate({ personId: m.personId, role })
-                    }
-                    isSaving={
-                      patchRoleMutation.isPending &&
-                      patchRoleMutation.variables?.personId === m.personId
-                    }
-                  />
+                  <div className="space-y-2">
+                    <TeamMemberRolesEditor
+                      departmentId={departmentId}
+                      member={m}
+                      canWrite={canWrite}
+                      onSaveTeamRoles={(role) =>
+                        patchRoleMutation.mutate({ personId: m.personId, role })
+                      }
+                      isSaving={
+                        patchRoleMutation.isPending &&
+                        patchRoleMutation.variables?.personId === m.personId
+                      }
+                    />
+                    {canWrite ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs border-white/15 text-white/55 hover:text-red-300 hover:border-red-500/40 hover:bg-red-950/30 gap-1.5"
+                        onClick={() => setRemoveTarget(m)}
+                      >
+                        <UserMinus size={13} />
+                        Remove from team
+                      </Button>
+                    ) : null}
+                  </div>
                 }
               />
             );
@@ -249,10 +262,10 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
       <AlertDialog open={removeTarget !== null} onOpenChange={(o) => { if (!o) setRemoveTarget(null); }}>
         <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete team member?</AlertDialogTitle>
+            <AlertDialogTitle>Remove from team?</AlertDialogTitle>
             <AlertDialogDescription className="text-white/50">
               {removeTarget
-                ? `${removeTarget.name} will be removed from this team only. They must stay on at least one other team.`
+                ? `${removeTarget.name} will be removed from this team only. They stay in People and on any other teams.`
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -262,12 +275,11 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
               onClick={() => {
                 if (!removeTarget) return;
-                if (!confirmDeleteAction(`team member "${removeTarget.name}"`)) return;
                 removeMutation.mutate(removeTarget.personId);
               }}
               disabled={removeMutation.isPending}
             >
-              {removeMutation.isPending ? "Deleting…" : "Delete"}
+              {removeMutation.isPending ? "Removing…" : "Remove from team"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
