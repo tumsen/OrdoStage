@@ -27,14 +27,23 @@ export function PeopleCountGraphic({ count, label }: PeopleCountGraphicProps) {
 type PersonChipProps = {
   name: string;
   roleLabel: string;
+  photoUrl?: string;
 };
 
-export function PersonChip({ name, roleLabel }: PersonChipProps) {
+export function PersonChip({ name, roleLabel, photoUrl }: PersonChipProps) {
   return (
     <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/60">
-        <UserRound className="h-4 w-4" />
-      </div>
+      {photoUrl ? (
+        <img
+          src={photoUrl}
+          alt={name || roleLabel}
+          className="h-8 w-8 rounded-full border border-white/15 object-cover"
+        />
+      ) : (
+        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/60">
+          <UserRound className="h-4 w-4" />
+        </div>
+      )}
       <div className="min-w-0">
         <p className="truncate text-sm text-white/90">{name || "Unnamed"}</p>
         <p className="text-[10px] uppercase tracking-wide text-white/45">{roleLabel}</p>

@@ -224,12 +224,6 @@ export default function Shows() {
                         </p>
                       </div>
                     </div>
-                    {show.actorNames?.length || show.techNames?.length ? (
-                      <p className="mt-2 text-[11px] text-white/45 truncate">
-                        Cast: {(show.actorNames ?? []).slice(0, 3).join(", ") || "—"} | Tech:{" "}
-                        {(show.techNames ?? []).slice(0, 3).join(", ") || "—"}
-                      </p>
-                    ) : null}
                   </div>
                 </button>
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5 pt-0.5">

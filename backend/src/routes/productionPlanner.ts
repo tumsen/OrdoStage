@@ -103,6 +103,8 @@ function serializeAssignmentPerson(person: {
   addressCountry: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
+  photoData?: Uint8Array | null;
+  photoUpdatedAt?: Date | null;
   departmentId: string | null;
   isActive: boolean;
   createdAt: Date;
@@ -129,6 +131,8 @@ function serializeAssignmentPerson(person: {
     addressCountry: person.addressCountry,
     emergencyContactName: person.emergencyContactName,
     emergencyContactPhone: person.emergencyContactPhone,
+    hasPhoto: Boolean(person.photoData),
+    photoUpdatedAt: person.photoUpdatedAt ? person.photoUpdatedAt.toISOString() : null,
     departmentId: person.departmentId,
     teamIds: memberships.map((m) => m.departmentId),
     teams: memberships.map((m) => ({
@@ -580,6 +584,39 @@ productionPlannerRouter.get("/production-planner", async (c) => {
       totals: mergePlannerTotals(rows, currencyCode),
     },
   });
+});
+
+// GET /api/productions/:id/people
+productionPlannerRouter.get("/productions/:id/people", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canRead(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+
+  const { id } = c.req.param();
+  const production = await prisma.production.findFirst({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true },
+  });
+  if (!production) {
+    return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const rows = await prisma.productionPerson.findMany({
+    where: { productionId: id },
+    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+    include: {
+      person: {
+        include: {
+          teamMemberships: { include: { department: true } },
+        },
+      },
+    },
+  });
+  return c.json({ data: rows.map(serializeProductionPerson) });
 });
 
 // GET /api/productions

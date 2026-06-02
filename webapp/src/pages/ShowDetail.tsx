@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Upload, Download, Trash2, FileText, Plus } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Production, ProductionDocument, UpdateProduction } from "@/lib/types";
+import type { Person, Production, ProductionDocument, ProductionPerson, UpdateProduction } from "@/lib/types";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,8 +23,6 @@ type FormState = {
   stageWidth: string;
   stageDepth: string;
   stageHeight: string;
-  actorNames: string[];
-  techNames: string[];
   technicalSpecs: string;
 };
 
@@ -39,8 +37,6 @@ function toForm(show: Production | null): FormState {
     stageWidth: show?.stageWidth ?? "",
     stageDepth: show?.stageDepth ?? "",
     stageHeight: show?.stageHeight ?? "",
-    actorNames: show?.actorNames ?? [],
-    techNames: show?.techNames ?? [],
     technicalSpecs: show?.technicalSpecs ?? "",
   };
 }
@@ -63,11 +59,23 @@ export default function ShowDetail() {
     queryFn: () => api.get<ProductionDocument[]>(`/api/productions/${id}/documents`),
     enabled: Boolean(id) && canAccess,
   });
+  const { data: people } = useQuery({
+    queryKey: ["people"],
+    queryFn: () => api.get<Person[]>("/api/people"),
+    enabled: canAccess,
+  });
+  const { data: assignedPeople } = useQuery({
+    queryKey: ["shows", "detail", id, "people"],
+    queryFn: () => api.get<ProductionPerson[]>(`/api/productions/${id}/people`),
+    enabled: Boolean(id) && canAccess,
+  });
 
   const [form, setForm] = useState<FormState>(() => toForm(null));
   const [docType, setDocType] = useState<ProductionDocument["type"]>("other");
   const [docFolder, setDocFolder] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedActorId, setSelectedActorId] = useState("");
+  const [selectedTechId, setSelectedTechId] = useState("");
 
   useEffect(() => {
     if (show) setForm(toForm(show));
@@ -86,8 +94,6 @@ export default function ShowDetail() {
         stageWidth: form.stageWidth.trim() || null,
         stageDepth: form.stageDepth.trim() || null,
         stageHeight: form.stageHeight.trim() || null,
-        actorNames: form.actorNames.map((name) => name.trim()).filter(Boolean),
-        techNames: form.techNames.map((name) => name.trim()).filter(Boolean),
         technicalSpecs: form.technicalSpecs.trim() || null,
       };
       return api.patch<Production>(`/api/productions/${id}`, payload);
@@ -164,6 +170,32 @@ export default function ShowDetail() {
       toast({ title: e instanceof Error ? e.message : "Could not delete document", variant: "destructive" }),
   });
 
+  const assignProductionPersonMutation = useMutation({
+    mutationFn: async (input: { personId: string; role: string }) => {
+      if (!id) throw new Error("Missing show id");
+      return api.post<ProductionPerson>(`/api/productions/${id}/people`, input);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shows", "detail", id, "people"] });
+      toast({ title: "Person assigned to show" });
+    },
+    onError: (e) =>
+      toast({ title: e instanceof Error ? e.message : "Could not assign person", variant: "destructive" }),
+  });
+
+  const removeProductionPersonMutation = useMutation({
+    mutationFn: async (personId: string) => {
+      if (!id) throw new Error("Missing show id");
+      await api.delete<void>(`/api/productions/${id}/people/${personId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shows", "detail", id, "people"] });
+      toast({ title: "Person removed from show" });
+    },
+    onError: (e) =>
+      toast({ title: e instanceof Error ? e.message : "Could not remove person", variant: "destructive" }),
+  });
+
   const updateDocumentMutation = useMutation({
     mutationFn: async (input: {
       docId: string;
@@ -212,18 +244,15 @@ export default function ShowDetail() {
     });
   };
 
-  const setActorName = (index: number, value: string) =>
-    setForm((prev) => {
-      const next = [...prev.actorNames];
-      next[index] = value;
-      return { ...prev, actorNames: next };
-    });
-  const setTechName = (index: number, value: string) =>
-    setForm((prev) => {
-      const next = [...prev.techNames];
-      next[index] = value;
-      return { ...prev, techNames: next };
-    });
+  const actorPeople = (assignedPeople ?? []).filter((p) => (p.role ?? "").toLowerCase() === "actor");
+  const techPeople = (assignedPeople ?? []).filter((p) => (p.role ?? "").toLowerCase() === "tech");
+
+  const availableActorOptions = (people ?? []).filter(
+    (person) => !actorPeople.some((assigned) => assigned.personId === person.id)
+  );
+  const availableTechOptions = (people ?? []).filter(
+    (person) => !techPeople.some((assigned) => assigned.personId === person.id)
+  );
 
   if (!canAccess) {
     return <div className="p-6 text-sm text-muted-foreground">No access to shows.</div>;
@@ -344,43 +373,56 @@ export default function ShowDetail() {
 
             <div className="space-y-3 md:col-span-2">
               <div className="flex items-center justify-between">
-                <Label>Actor names</Label>
+                <Label>Actors (from People)</Label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  className="rounded-md border bg-background px-3 py-2 text-sm"
+                  value={selectedActorId}
+                  onChange={(e) => setSelectedActorId(e.target.value)}
+                >
+                  <option value="">Select person as actor...</option>
+                  {availableActorOptions.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name}
+                    </option>
+                  ))}
+                </select>
                 <Button
                   type="button"
                   variant="secondary"
-                  size="sm"
-                  onClick={() => setForm((prev) => ({ ...prev, actorNames: [...prev.actorNames, ""] }))}
+                  disabled={!canEdit || !selectedActorId || assignProductionPersonMutation.isPending}
+                  onClick={() => {
+                    if (!selectedActorId) return;
+                    assignProductionPersonMutation.mutate({ personId: selectedActorId, role: "actor" });
+                    setSelectedActorId("");
+                  }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add actor
                 </Button>
               </div>
-              {form.actorNames.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No actor names added yet.</p>
-              ) : null}
+              {actorPeople.length === 0 ? <p className="text-xs text-muted-foreground">No actors assigned yet.</p> : null}
               <div className="grid gap-2">
-                {form.actorNames.map((actorName, idx) => (
-                  <div key={`actor-${idx}`} className="grid gap-2 md:grid-cols-[1fr_auto]">
-                    <Input
-                      value={actorName}
-                      placeholder={`Actor ${idx + 1}`}
-                      onChange={(e) => setActorName(idx, e.target.value)}
+                {actorPeople.map((assignment) => (
+                  <div key={`actor-${assignment.personId}`} className="grid gap-2 md:grid-cols-[1fr_auto]">
+                    <PersonChip
+                      name={assignment.person.name}
+                      roleLabel="Actor"
+                      photoUrl={
+                        assignment.person.hasPhoto
+                          ? `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${assignment.person.id}/photo`
+                          : undefined
+                      }
                     />
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() =>
-                        setForm((prev) => ({
-                          ...prev,
-                          actorNames: prev.actorNames.filter((_, i) => i !== idx),
-                        }))
-                      }
+                      disabled={!canEdit || removeProductionPersonMutation.isPending}
+                      onClick={() => removeProductionPersonMutation.mutate(assignment.personId)}
                     >
                       Remove
                     </Button>
-                    <div className="md:col-span-2">
-                      <PersonChip name={actorName} roleLabel="Actor" />
-                    </div>
                   </div>
                 ))}
               </div>
@@ -388,43 +430,58 @@ export default function ShowDetail() {
 
             <div className="space-y-3 md:col-span-2">
               <div className="flex items-center justify-between">
-                <Label>Technical crew names</Label>
+                <Label>Technical crew (from People)</Label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  className="rounded-md border bg-background px-3 py-2 text-sm"
+                  value={selectedTechId}
+                  onChange={(e) => setSelectedTechId(e.target.value)}
+                >
+                  <option value="">Select person as tech...</option>
+                  {availableTechOptions.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name}
+                    </option>
+                  ))}
+                </select>
                 <Button
                   type="button"
                   variant="secondary"
-                  size="sm"
-                  onClick={() => setForm((prev) => ({ ...prev, techNames: [...prev.techNames, ""] }))}
+                  disabled={!canEdit || !selectedTechId || assignProductionPersonMutation.isPending}
+                  onClick={() => {
+                    if (!selectedTechId) return;
+                    assignProductionPersonMutation.mutate({ personId: selectedTechId, role: "tech" });
+                    setSelectedTechId("");
+                  }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add tech
                 </Button>
               </div>
-              {form.techNames.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No technical crew names added yet.</p>
+              {techPeople.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No technical crew assigned yet.</p>
               ) : null}
               <div className="grid gap-2">
-                {form.techNames.map((techName, idx) => (
-                  <div key={`tech-${idx}`} className="grid gap-2 md:grid-cols-[1fr_auto]">
-                    <Input
-                      value={techName}
-                      placeholder={`Tech ${idx + 1}`}
-                      onChange={(e) => setTechName(idx, e.target.value)}
+                {techPeople.map((assignment) => (
+                  <div key={`tech-${assignment.personId}`} className="grid gap-2 md:grid-cols-[1fr_auto]">
+                    <PersonChip
+                      name={assignment.person.name}
+                      roleLabel="Tech"
+                      photoUrl={
+                        assignment.person.hasPhoto
+                          ? `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${assignment.person.id}/photo`
+                          : undefined
+                      }
                     />
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() =>
-                        setForm((prev) => ({
-                          ...prev,
-                          techNames: prev.techNames.filter((_, i) => i !== idx),
-                        }))
-                      }
+                      disabled={!canEdit || removeProductionPersonMutation.isPending}
+                      onClick={() => removeProductionPersonMutation.mutate(assignment.personId)}
                     >
                       Remove
                     </Button>
-                    <div className="md:col-span-2">
-                      <PersonChip name={techName} roleLabel="Tech" />
-                    </div>
                   </div>
                 ))}
               </div>
