@@ -417,6 +417,7 @@ function CircularPhotoEditor({
   focusX,
   focusY,
   zoom,
+  cropSeedKey,
   onCropChange,
   editable = true,
   sizeClassName = "h-40 w-40",
@@ -426,12 +427,15 @@ function CircularPhotoEditor({
   focusX: number;
   focusY: number;
   zoom: number;
+  /** When this changes (e.g. person id), local crop resets from props. */
+  cropSeedKey?: string;
   onCropChange?: (crop: PhotoCrop) => void;
   editable?: boolean;
   sizeClassName?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
+  const notifyParentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragging, setDragging] = useState(false);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [containerSize, setContainerSize] = useState({ w: 160, h: 160 });
@@ -448,11 +452,53 @@ function CircularPhotoEditor({
     maxPanY: number;
     zoom: number;
   } | null>(null);
+  const localCropRef = useRef(localCrop);
+  localCropRef.current = localCrop;
+  const cropSeedRef = useRef(cropSeedKey);
+
+  const flushNotifyParent = useCallback(
+    (crop: PhotoCrop) => {
+      if (notifyParentTimerRef.current) {
+        clearTimeout(notifyParentTimerRef.current);
+        notifyParentTimerRef.current = null;
+      }
+      onCropChange?.(normalizePhotoCrop(crop));
+    },
+    [onCropChange]
+  );
+
+  const scheduleNotifyParent = useCallback(
+    (crop: PhotoCrop) => {
+      if (!onCropChange) return;
+      if (notifyParentTimerRef.current) clearTimeout(notifyParentTimerRef.current);
+      notifyParentTimerRef.current = setTimeout(() => {
+        notifyParentTimerRef.current = null;
+        onCropChange(normalizePhotoCrop(crop));
+      }, 400);
+    },
+    [onCropChange]
+  );
 
   useEffect(() => {
-    if (dragging) return;
+    return () => {
+      if (notifyParentTimerRef.current) {
+        clearTimeout(notifyParentTimerRef.current);
+        notifyParentTimerRef.current = null;
+        onCropChange?.(normalizePhotoCrop(localCropRef.current));
+      }
+    };
+  }, [onCropChange]);
+
+  useEffect(() => {
+    if (editable) {
+      if (cropSeedKey === undefined) return;
+      if (cropSeedRef.current === cropSeedKey) return;
+      cropSeedRef.current = cropSeedKey;
+      setLocalCrop(normalizePhotoCrop({ x: focusX, y: focusY, zoom }));
+      return;
+    }
     setLocalCrop(normalizePhotoCrop({ x: focusX, y: focusY, zoom }));
-  }, [focusX, focusY, zoom, dragging]);
+  }, [editable, cropSeedKey, focusX, focusY, zoom]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -517,10 +563,8 @@ function CircularPhotoEditor({
     };
   };
 
-  const commitCrop = (crop: PhotoCrop) => {
-    const normalized = normalizePhotoCrop(crop);
-    setLocalCrop(normalized);
-    onCropChange?.(normalized);
+  const applyLocalCrop = (crop: PhotoCrop) => {
+    setLocalCrop(normalizePhotoCrop(crop));
   };
 
   const viewport = (
@@ -547,7 +591,7 @@ function CircularPhotoEditor({
       }}
       onPointerMove={(e) => {
         if (!dragging || !dragRef.current) return;
-        setLocalCrop(cropFromDrag(e.clientX, e.clientY, dragRef.current));
+        applyLocalCrop(cropFromDrag(e.clientX, e.clientY, dragRef.current));
       }}
       onPointerUp={(e) => {
         if (!dragging) return;
@@ -556,7 +600,8 @@ function CircularPhotoEditor({
           : localCrop;
         dragRef.current = null;
         setDragging(false);
-        commitCrop(final);
+        applyLocalCrop(final);
+        flushNotifyParent(final);
         try {
           e.currentTarget.releasePointerCapture(e.pointerId);
         } catch {
@@ -570,15 +615,16 @@ function CircularPhotoEditor({
           : localCrop;
         dragRef.current = null;
         setDragging(false);
-        commitCrop(final);
+        applyLocalCrop(final);
+        flushNotifyParent(final);
       }}
       onWheel={(e) => {
         if (!editable) return;
         e.preventDefault();
         const nextZoom = clampZoom(localCrop.zoom + (e.deltaY < 0 ? 8 : -8));
         const next = normalizePhotoCrop({ ...localCrop, zoom: nextZoom });
-        setLocalCrop(next);
-        commitCrop(next);
+        applyLocalCrop(next);
+        scheduleNotifyParent(next);
       }}
       title={
         editable
@@ -598,15 +644,15 @@ function CircularPhotoEditor({
           }
         }}
         className={`pointer-events-none max-w-none select-none ${
-          layout ? "absolute left-1/2 top-1/2 will-change-transform" : "h-full w-full object-cover"
+          layout ? "absolute" : "h-full w-full object-cover"
         }`}
         style={
           layout
             ? {
                 width: layout.displayW,
                 height: layout.displayH,
-                transform: `translate3d(calc(-50% + ${layout.panX}px), calc(-50% + ${layout.panY}px), 0)`,
-                backfaceVisibility: "hidden",
+                left: `calc(50% - ${layout.displayW / 2}px + ${layout.panX}px)`,
+                top: `calc(50% - ${layout.displayH / 2}px + ${layout.panY}px)`,
               }
             : undefined
         }
@@ -628,10 +674,10 @@ function CircularPhotoEditor({
           step={1}
           value={localCrop.zoom}
           onChange={(e) => {
-            const next = normalizePhotoCrop({ ...localCrop, zoom: Number(e.target.value) });
-            setLocalCrop(next);
-            commitCrop(next);
+            applyLocalCrop({ ...localCrop, zoom: Number(e.target.value) });
           }}
+          onPointerUp={() => flushNotifyParent(localCropRef.current)}
+          onBlur={() => flushNotifyParent(localCropRef.current)}
           className="h-1 flex-1 accent-white/70"
         />
       </label>
@@ -1268,6 +1314,7 @@ function PersonFormDialog({
           <CircularPhotoEditor
             src={profileImageSrc}
             alt={person ? `${person.name} profile` : "Profile preview"}
+            cropSeedKey={`${person?.id ?? "new"}-${person?.photoUpdatedAt ?? ""}`}
             focusX={photoFocus.x}
             focusY={photoFocus.y}
             zoom={photoFocus.zoom}
