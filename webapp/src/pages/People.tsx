@@ -377,6 +377,11 @@ function photoCropLayout(
   return { displayW, displayH, panX, panY, maxPanX, maxPanY };
 }
 
+function focusFromPan(pan: number, maxPan: number): number {
+  if (maxPan <= 0) return 50;
+  return clampFocus(50 + (pan / maxPan) * 50);
+}
+
 function CircularPhotoEditor({
   src,
   alt,
@@ -406,9 +411,11 @@ function CircularPhotoEditor({
   const dragRef = useRef<{
     startX: number;
     startY: number;
-    startCrop: PhotoCrop;
+    startPanX: number;
+    startPanY: number;
     maxPanX: number;
     maxPanY: number;
+    zoom: number;
   } | null>(null);
 
   useEffect(() => {
@@ -450,15 +457,13 @@ function CircularPhotoEditor({
   ): PhotoCrop => {
     const deltaX = clientX - start.startX;
     const deltaY = clientY - start.startY;
-    let x = start.startCrop.x;
-    let y = start.startCrop.y;
-    if (start.maxPanX > 0) {
-      x = clampFocus(start.startCrop.x - (deltaX / start.maxPanX) * 50);
-    }
-    if (start.maxPanY > 0) {
-      y = clampFocus(start.startCrop.y - (deltaY / start.maxPanY) * 50);
-    }
-    return { ...start.startCrop, x, y };
+    const panX = Math.max(-start.maxPanX, Math.min(start.maxPanX, start.startPanX + deltaX));
+    const panY = Math.max(-start.maxPanY, Math.min(start.maxPanY, start.startPanY + deltaY));
+    return {
+      x: focusFromPan(panX, start.maxPanX),
+      y: focusFromPan(panY, start.maxPanY),
+      zoom: start.zoom,
+    };
   };
 
   const commitCrop = (crop: PhotoCrop) => {
@@ -480,9 +485,11 @@ function CircularPhotoEditor({
         dragRef.current = {
           startX: e.clientX,
           startY: e.clientY,
-          startCrop: localCrop,
+          startPanX: layout.panX,
+          startPanY: layout.panY,
           maxPanX: layout.maxPanX,
           maxPanY: layout.maxPanY,
+          zoom: localCrop.zoom,
         };
         setDragging(true);
         e.currentTarget.setPointerCapture(e.pointerId);
