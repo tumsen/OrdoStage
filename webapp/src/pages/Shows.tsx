@@ -224,6 +224,12 @@ export default function Shows() {
                         </p>
                       </div>
                     </div>
+                    <p className="mt-2 text-[11px] text-white/45">
+                      {show.linkedEventDates?.length ? `Events: ${show.linkedEventDates.slice(0, 2).map((d) => new Date(d).toLocaleDateString()).join(", ")}` : "Events: -"}
+                    </p>
+                    <p className="text-[11px] text-white/45">
+                      {show.linkedTourDates?.length ? `Tours: ${show.linkedTourDates.slice(0, 2).map((d) => new Date(d).toLocaleDateString()).join(", ")}` : "Tours: -"}
+                    </p>
                   </div>
                 </button>
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5 pt-0.5">

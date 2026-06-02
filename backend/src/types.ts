@@ -1691,8 +1691,10 @@ export const ProductionSchema = z.object({
   hasTechRiderPdf: z.boolean().optional(),
   linkedTourIds: z.array(z.string()).optional(),
   linkedTourNames: z.array(z.string()).optional(),
+  linkedTourDates: z.array(z.string()).optional(),
   linkedEventIds: z.array(z.string()).optional(),
   linkedEventTitles: z.array(z.string()).optional(),
+  linkedEventDates: z.array(z.string()).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

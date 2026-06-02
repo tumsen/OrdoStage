@@ -62,8 +62,11 @@ const productionInclude = {
   leadPerson: { select: { name: true } },
   tour: { select: { id: true, name: true } },
   event: { select: { id: true, title: true } },
-  tours: { select: { id: true, name: true }, orderBy: { createdAt: "asc" as const } },
-  events: { select: { id: true, title: true }, orderBy: { createdAt: "asc" as const } },
+  tours: {
+    select: { id: true, name: true, shows: { select: { date: true }, orderBy: { date: "asc" as const } } },
+    orderBy: { createdAt: "asc" as const },
+  },
+  events: { select: { id: true, title: true, startDate: true }, orderBy: { createdAt: "asc" as const } },
   people: {
     orderBy: { createdAt: "asc" as const },
     include: {
@@ -282,12 +285,16 @@ function serializeProduction(row: {
   homeVenue?: { name: string } | null;
   leadPerson?: { name: string } | null;
   tour?: { id: string; name: string } | null;
-  event?: { id: string; title: string } | null;
-  tours?: Array<{ id: string; name: string }>;
-  events?: Array<{ id: string; title: string }>;
+  event?: { id: string; title: string; startDate?: Date | null } | null;
+  tours?: Array<{ id: string; name: string; shows?: Array<{ date: Date }> }>;
+  events?: Array<{ id: string; title: string; startDate: Date | null }>;
 }): Production {
-  const linkedTours = row.tours ?? (row.tour ? [row.tour] : []);
-  const linkedEvents = row.events ?? (row.event ? [row.event] : []);
+  const linkedTours = row.tours ?? (row.tour ? [{ ...row.tour, shows: [] }] : []);
+  const linkedEvents = row.events ?? (row.event ? [{ ...row.event, startDate: row.event.startDate ?? null }] : []);
+  const linkedTourDates = linkedTours.flatMap((tour) => (tour.shows ?? []).map((show) => show.date.toISOString()));
+  const linkedEventDates = linkedEvents
+    .map((event) => event.startDate?.toISOString() ?? null)
+    .filter((value): value is string => Boolean(value));
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -307,8 +314,10 @@ function serializeProduction(row: {
     eventTitle: row.event?.title ?? null,
     linkedTourIds: linkedTours.map((tour) => tour.id),
     linkedTourNames: linkedTours.map((tour) => tour.name),
+    linkedTourDates,
     linkedEventIds: linkedEvents.map((event) => event.id),
     linkedEventTitles: linkedEvents.map((event) => event.title),
+    linkedEventDates,
     notes: row.notes,
     actorCount: row.actorCount,
     techCount: row.techCount,
@@ -637,8 +646,11 @@ productionPlannerRouter.get("/productions", async (c) => {
       leadPerson: { select: { name: true } },
       tour: { select: { id: true, name: true } },
       event: { select: { id: true, title: true } },
-      tours: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
-      events: { select: { id: true, title: true }, orderBy: { createdAt: "asc" } },
+      tours: {
+        select: { id: true, name: true, shows: { select: { date: true }, orderBy: { date: "asc" } } },
+        orderBy: { createdAt: "asc" },
+      },
+      events: { select: { id: true, title: true, startDate: true }, orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -662,8 +674,11 @@ productionPlannerRouter.get("/productions/:id", async (c) => {
       leadPerson: { select: { name: true } },
       tour: { select: { id: true, name: true } },
       event: { select: { id: true, title: true } },
-      tours: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
-      events: { select: { id: true, title: true }, orderBy: { createdAt: "asc" } },
+      tours: {
+        select: { id: true, name: true, shows: { select: { date: true }, orderBy: { date: "asc" } } },
+        orderBy: { createdAt: "asc" },
+      },
+      events: { select: { id: true, title: true, startDate: true }, orderBy: { createdAt: "asc" } },
     },
   });
   if (!production) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
@@ -732,7 +747,7 @@ productionPlannerRouter.post(
         tour: { select: { id: true, name: true } },
         event: { select: { id: true, title: true } },
         tours: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
-        events: { select: { id: true, title: true }, orderBy: { createdAt: "asc" } },
+        events: { select: { id: true, title: true, startDate: true }, orderBy: { createdAt: "asc" } },
       },
     });
 
@@ -903,8 +918,11 @@ productionPlannerRouter.patch(
           leadPerson: { select: { name: true } },
           tour: { select: { id: true, name: true } },
           event: { select: { id: true, title: true } },
-          tours: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
-          events: { select: { id: true, title: true }, orderBy: { createdAt: "asc" } },
+          tours: {
+            select: { id: true, name: true, shows: { select: { date: true }, orderBy: { date: "asc" } } },
+            orderBy: { createdAt: "asc" },
+          },
+          events: { select: { id: true, title: true, startDate: true }, orderBy: { createdAt: "asc" } },
         },
       });
     });

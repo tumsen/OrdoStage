@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Upload, Download, Trash2, FileText, Plus } from "lucide-react";
+import { format } from "date-fns";
 import { api } from "@/lib/api";
 import type { Person, Production, ProductionDocument, ProductionPerson, UpdateProduction } from "@/lib/types";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -48,6 +49,17 @@ function toForm(show: Production | null): FormState {
     stageHeight: stageFieldToInput(show?.stageHeight) || fromStageSize?.stageHeight || "",
     technicalSpecs: show?.technicalSpecs ?? "",
   };
+}
+
+function parseShowRole(role: string | null | undefined): { type: "actor" | "tech" | "other"; label: string } {
+  const raw = (role ?? "").trim();
+  if (!raw) return { type: "other", label: "" };
+  const [maybeType, ...rest] = raw.split(":");
+  if (maybeType === "actor") return { type: "actor", label: rest.join(":").trim() };
+  if (maybeType === "tech") return { type: "tech", label: rest.join(":").trim() };
+  if (raw.toLowerCase() === "actor") return { type: "actor", label: "" };
+  if (raw.toLowerCase() === "tech") return { type: "tech", label: "" };
+  return { type: "other", label: raw };
 }
 
 export default function ShowDetail() {
@@ -253,8 +265,8 @@ export default function ShowDetail() {
     });
   };
 
-  const actorPeople = (assignedPeople ?? []).filter((p) => (p.role ?? "").toLowerCase() === "actor");
-  const techPeople = (assignedPeople ?? []).filter((p) => (p.role ?? "").toLowerCase() === "tech");
+  const actorPeople = (assignedPeople ?? []).filter((p) => parseShowRole(p.role).type === "actor");
+  const techPeople = (assignedPeople ?? []).filter((p) => parseShowRole(p.role).type === "tech");
 
   const availableActorOptions = (people ?? []).filter(
     (person) => !actorPeople.some((assigned) => assigned.personId === person.id)
@@ -262,6 +274,19 @@ export default function ShowDetail() {
   const availableTechOptions = (people ?? []).filter(
     (person) => !techPeople.some((assigned) => assigned.personId === person.id)
   );
+  const showCalendarRows = useMemo(() => {
+    const eventRows = (show?.linkedEventDates ?? []).map((iso) => ({
+      type: "Event",
+      iso,
+    }));
+    const tourRows = (show?.linkedTourDates ?? []).map((iso) => ({
+      type: "Tour",
+      iso,
+    }));
+    return [...eventRows, ...tourRows]
+      .sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime())
+      .slice(0, 12);
+  }, [show?.linkedEventDates, show?.linkedTourDates]);
 
   if (!canAccess) {
     return <div className="p-6 text-sm text-muted-foreground">No access to shows.</div>;
@@ -281,6 +306,7 @@ export default function ShowDetail() {
         </Button>
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>Show details</CardTitle>
@@ -364,121 +390,6 @@ export default function ShowDetail() {
               <PeopleCountGraphic count={Number(form.techCount) || 0} label="Technical Crew" />
             </div>
 
-            <div className="space-y-3 md:col-span-2">
-              <div className="flex items-center justify-between">
-                <Label>Actors (from People)</Label>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <select
-                  className="rounded-md border bg-background px-3 py-2 text-sm"
-                  value={selectedActorId}
-                  onChange={(e) => setSelectedActorId(e.target.value)}
-                >
-                  <option value="">Select person as actor...</option>
-                  {availableActorOptions.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {person.name}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!canEdit || !selectedActorId || assignProductionPersonMutation.isPending}
-                  onClick={() => {
-                    if (!selectedActorId) return;
-                    assignProductionPersonMutation.mutate({ personId: selectedActorId, role: "actor" });
-                    setSelectedActorId("");
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add actor
-                </Button>
-              </div>
-              {actorPeople.length === 0 ? <p className="text-xs text-muted-foreground">No actors assigned yet.</p> : null}
-              <div className="grid gap-2">
-                {actorPeople.map((assignment) => (
-                  <div key={`actor-${assignment.personId}`} className="grid gap-2 md:grid-cols-[1fr_auto]">
-                    <PersonChip
-                      name={assignment.person.name}
-                      roleLabel="Actor"
-                      photoUrl={
-                        assignment.person.hasPhoto
-                          ? `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${assignment.person.id}/photo`
-                          : undefined
-                      }
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!canEdit || removeProductionPersonMutation.isPending}
-                      onClick={() => removeProductionPersonMutation.mutate(assignment.personId)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3 md:col-span-2">
-              <div className="flex items-center justify-between">
-                <Label>Technical crew (from People)</Label>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <select
-                  className="rounded-md border bg-background px-3 py-2 text-sm"
-                  value={selectedTechId}
-                  onChange={(e) => setSelectedTechId(e.target.value)}
-                >
-                  <option value="">Select person as tech...</option>
-                  {availableTechOptions.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {person.name}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!canEdit || !selectedTechId || assignProductionPersonMutation.isPending}
-                  onClick={() => {
-                    if (!selectedTechId) return;
-                    assignProductionPersonMutation.mutate({ personId: selectedTechId, role: "tech" });
-                    setSelectedTechId("");
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add tech
-                </Button>
-              </div>
-              {techPeople.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No technical crew assigned yet.</p>
-              ) : null}
-              <div className="grid gap-2">
-                {techPeople.map((assignment) => (
-                  <div key={`tech-${assignment.personId}`} className="grid gap-2 md:grid-cols-[1fr_auto]">
-                    <PersonChip
-                      name={assignment.person.name}
-                      roleLabel="Tech"
-                      photoUrl={
-                        assignment.person.hasPhoto
-                          ? `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${assignment.person.id}/photo`
-                          : undefined
-                      }
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!canEdit || removeProductionPersonMutation.isPending}
-                      onClick={() => removeProductionPersonMutation.mutate(assignment.personId)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -489,6 +400,166 @@ export default function ShowDetail() {
           </div>
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Show team and calendar</CardTitle>
+          <CardDescription>Assign people with roles and track planned play dates.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Actors (from People)</Label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <select className="rounded-md border bg-background px-3 py-2 text-sm" value={selectedActorId} onChange={(e) => setSelectedActorId(e.target.value)}>
+                <option value="">Select person as actor...</option>
+                {availableActorOptions.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!canEdit || !selectedActorId || assignProductionPersonMutation.isPending}
+                onClick={() => {
+                  if (!selectedActorId) return;
+                  assignProductionPersonMutation.mutate({ personId: selectedActorId, role: "actor:" });
+                  setSelectedActorId("");
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add actor
+              </Button>
+            </div>
+            {actorPeople.length === 0 ? <p className="text-xs text-muted-foreground">No actors assigned yet.</p> : null}
+            <div className="grid gap-2">
+              {actorPeople.map((assignment) => {
+                const parsedRole = parseShowRole(assignment.role);
+                return (
+                  <div key={`actor-${assignment.personId}`} className="grid gap-2 md:grid-cols-[1fr_auto]">
+                    <div className="space-y-2">
+                      <PersonChip
+                        name={assignment.person.name}
+                        roleLabel={parsedRole.label || "Actor"}
+                        photoUrl={
+                          assignment.person.hasPhoto
+                            ? `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${assignment.person.id}/photo`
+                            : undefined
+                        }
+                      />
+                      <Input
+                        defaultValue={parsedRole.label}
+                        placeholder="Role (e.g. Lead, Understudy)"
+                        onBlur={(e) =>
+                          assignProductionPersonMutation.mutate({
+                            personId: assignment.personId,
+                            role: `actor:${e.target.value.trim()}`,
+                          })
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canEdit || removeProductionPersonMutation.isPending}
+                      onClick={() => removeProductionPersonMutation.mutate(assignment.personId)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Technical crew (from People)</Label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <select className="rounded-md border bg-background px-3 py-2 text-sm" value={selectedTechId} onChange={(e) => setSelectedTechId(e.target.value)}>
+                <option value="">Select person as tech...</option>
+                {availableTechOptions.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!canEdit || !selectedTechId || assignProductionPersonMutation.isPending}
+                onClick={() => {
+                  if (!selectedTechId) return;
+                  assignProductionPersonMutation.mutate({ personId: selectedTechId, role: "tech:" });
+                  setSelectedTechId("");
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add tech
+              </Button>
+            </div>
+            {techPeople.length === 0 ? <p className="text-xs text-muted-foreground">No technical crew assigned yet.</p> : null}
+            <div className="grid gap-2">
+              {techPeople.map((assignment) => {
+                const parsedRole = parseShowRole(assignment.role);
+                return (
+                  <div key={`tech-${assignment.personId}`} className="grid gap-2 md:grid-cols-[1fr_auto]">
+                    <div className="space-y-2">
+                      <PersonChip
+                        name={assignment.person.name}
+                        roleLabel={parsedRole.label || "Tech"}
+                        photoUrl={
+                          assignment.person.hasPhoto
+                            ? `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${assignment.person.id}/photo`
+                            : undefined
+                        }
+                      />
+                      <Input
+                        defaultValue={parsedRole.label}
+                        placeholder="Role (e.g. Sound, Lights, Stage manager)"
+                        onBlur={(e) =>
+                          assignProductionPersonMutation.mutate({
+                            personId: assignment.personId,
+                            role: `tech:${e.target.value.trim()}`,
+                          })
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canEdit || removeProductionPersonMutation.isPending}
+                      onClick={() => removeProductionPersonMutation.mutate(assignment.personId)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t border-border pt-4">
+            <Label>Show calendar</Label>
+            {showCalendarRows.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No event or tour dates linked yet.</p>
+            ) : (
+              <div className="space-y-1 rounded-md border p-2">
+                {showCalendarRows.map((row, index) => (
+                  <div key={`${row.type}-${row.iso}-${index}`} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{row.type}</span>
+                    <span>{format(new Date(row.iso), "EEE, dd MMM yyyy")}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      </div>
 
       <Card>
         <CardHeader>
