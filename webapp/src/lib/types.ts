@@ -32,6 +32,7 @@ export type {
   ProductionPhaseDocument,
   ProductionPhaseCategory,
   CreateProduction,
+  UpdateProduction,
   CreateProductionPhase,
   UpdateProductionPhase,
 } from "../../../backend/src/types";

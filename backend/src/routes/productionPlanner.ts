@@ -261,6 +261,11 @@ function serializeProduction(row: {
   tourId: string | null;
   eventId: string | null;
   notes: string | null;
+  actorCount: number | null;
+  durationMinutes: number | null;
+  stageSize: string | null;
+  technicalSpecs: string | null;
+  techRiderPdfName: string | null;
   createdAt: Date;
   updatedAt: Date;
   homeVenue?: { name: string } | null;
@@ -294,6 +299,12 @@ function serializeProduction(row: {
     linkedEventIds: linkedEvents.map((event) => event.id),
     linkedEventTitles: linkedEvents.map((event) => event.title),
     notes: row.notes,
+    actorCount: row.actorCount,
+    durationMinutes: row.durationMinutes,
+    stageSize: row.stageSize,
+    technicalSpecs: row.technicalSpecs,
+    techRiderPdfName: row.techRiderPdfName ?? null,
+    hasTechRiderPdf: Boolean(row.techRiderPdfName),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -552,6 +563,31 @@ productionPlannerRouter.get("/productions", async (c) => {
   return c.json({ data: productions.map(serializeProduction) });
 });
 
+// GET /api/productions/:id
+productionPlannerRouter.get("/productions/:id", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canRead(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const production = await prisma.production.findFirst({
+    where: { id, organizationId: user.organizationId },
+    include: {
+      homeVenue: { select: { name: true } },
+      leadPerson: { select: { name: true } },
+      tour: { select: { id: true, name: true } },
+      event: { select: { id: true, title: true } },
+      tours: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
+      events: { select: { id: true, title: true }, orderBy: { createdAt: "asc" } },
+    },
+  });
+  if (!production) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  return c.json({ data: serializeProduction(production) });
+});
+
 // POST /api/productions
 productionPlannerRouter.post(
   "/productions",
@@ -597,6 +633,10 @@ productionPlannerRouter.post(
         homeVenueId: body.homeVenueId ?? null,
         leadPersonId: body.leadPersonId ?? null,
         notes: body.notes ?? null,
+        actorCount: body.actorCount ?? null,
+        durationMinutes: body.durationMinutes ?? null,
+        stageSize: body.stageSize ?? null,
+        technicalSpecs: body.technicalSpecs ?? null,
       },
       include: {
         homeVenue: { select: { name: true } },
@@ -718,6 +758,10 @@ productionPlannerRouter.patch(
           tourId: body.tourId,
           eventId: body.eventId,
           notes: body.notes,
+          actorCount: body.actorCount,
+          durationMinutes: body.durationMinutes,
+          stageSize: body.stageSize,
+          technicalSpecs: body.technicalSpecs,
         },
       });
 
@@ -775,6 +819,87 @@ productionPlannerRouter.delete("/productions/:id", async (c) => {
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
 
   await prisma.production.delete({ where: { id } });
+  return c.body(null, 204);
+});
+
+const MAX_SHOW_TECH_RIDER_BYTES = 25 * 1024 * 1024;
+
+// POST /api/productions/:id/tech-rider
+productionPlannerRouter.post("/productions/:id/tech-rider", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canWrite(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const production = await assertProductionInOrg(id, user.organizationId);
+  if (!production) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  const formData = await c.req.parseBody();
+  const file = formData["file"];
+  if (!file || typeof file === "string") {
+    return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
+  }
+  const pdfFile = file as File;
+  const bytes = Buffer.from(await pdfFile.arrayBuffer());
+  if (bytes.length > MAX_SHOW_TECH_RIDER_BYTES) {
+    return c.json({ error: { message: "PDF must be at most 25 MB", code: "BAD_REQUEST" } }, 400);
+  }
+
+  await prisma.production.update({
+    where: { id },
+    data: {
+      techRiderPdfData: bytes,
+      techRiderPdfName: pdfFile.name || "tech-rider.pdf",
+    },
+  });
+  return c.json({ data: { ok: true } }, 201);
+});
+
+// GET /api/productions/:id/tech-rider/download
+productionPlannerRouter.get("/productions/:id/tech-rider/download", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canRead(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const production = await prisma.production.findFirst({
+    where: { id, organizationId: user.organizationId },
+    select: { techRiderPdfData: true, techRiderPdfName: true },
+  });
+  if (!production?.techRiderPdfData) {
+    return c.json({ error: { message: "No tech rider uploaded", code: "NOT_FOUND" } }, 404);
+  }
+  return new Response(production.techRiderPdfData, {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${production.techRiderPdfName || "tech-rider.pdf"}"`,
+      "Content-Length": String(production.techRiderPdfData.length),
+    },
+  });
+});
+
+// DELETE /api/productions/:id/tech-rider
+productionPlannerRouter.delete("/productions/:id/tech-rider", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canWrite(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const production = await assertProductionInOrg(id, user.organizationId);
+  if (!production) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  await prisma.production.update({
+    where: { id },
+    data: { techRiderPdfData: null, techRiderPdfName: null },
+  });
   return c.body(null, 204);
 });
 

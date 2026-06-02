@@ -1668,6 +1668,12 @@ export const ProductionSchema = z.object({
   eventId: z.string().nullable(),
   eventTitle: z.string().nullable().optional(),
   notes: z.string().nullable(),
+  actorCount: z.number().int().nullable().optional(),
+  durationMinutes: z.number().int().nullable().optional(),
+  stageSize: z.string().nullable().optional(),
+  technicalSpecs: z.string().nullable().optional(),
+  techRiderPdfName: z.string().nullable().optional(),
+  hasTechRiderPdf: z.boolean().optional(),
   linkedTourIds: z.array(z.string()).optional(),
   linkedTourNames: z.array(z.string()).optional(),
   linkedEventIds: z.array(z.string()).optional(),
@@ -1685,6 +1691,10 @@ export const CreateProductionSchema = z.object({
   homeVenueId: z.string().nullable().optional(),
   leadPersonId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  actorCount: z.number().int().min(0).nullable().optional(),
+  durationMinutes: z.number().int().min(0).nullable().optional(),
+  stageSize: z.string().nullable().optional(),
+  technicalSpecs: z.string().nullable().optional(),
   /** Seed default phases (set build, rehearsals, tech, premiere) when premiere date is set. */
   useDefaultPhases: z.boolean().optional(),
 });
@@ -1704,6 +1714,10 @@ export const UpdateProductionSchema = z
     linkedTourIds: z.array(z.string()).optional(),
     linkedEventIds: z.array(z.string()).optional(),
     notes: z.string().nullable().optional(),
+    actorCount: z.number().int().min(0).nullable().optional(),
+    durationMinutes: z.number().int().min(0).nullable().optional(),
+    stageSize: z.string().nullable().optional(),
+    technicalSpecs: z.string().nullable().optional(),
   })
   .refine((b) => Object.keys(b).length > 0, { message: "No changes" });
 

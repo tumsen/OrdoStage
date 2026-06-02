@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Ticket, Route } from "lucide-react";
+import { Plus, Ticket, Route, Trash2, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import type { CreateProduction, Production } from "@/lib/types";
@@ -75,6 +75,20 @@ export default function Shows() {
     onError: (e) =>
       toast({
         title: e instanceof Error ? e.message : "Could not create show",
+        variant: "destructive",
+      }),
+  });
+
+  const deleteShowMutation = useMutation({
+    mutationFn: (productionId: string) => api.delete<void>(`/api/productions/${productionId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shows", "productions"] });
+      queryClient.invalidateQueries({ queryKey: ["productions"] });
+      toast({ title: "Show deleted" });
+    },
+    onError: (e) =>
+      toast({
+        title: e instanceof Error ? e.message : "Could not delete show",
         variant: "destructive",
       }),
   });
@@ -223,6 +237,19 @@ export default function Shows() {
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => navigate(`/production?productionId=${show.id}`)}>
                   Open in planner
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => navigate(`/shows/${show.id}`)}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Details
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={!canEdit || deleteShowMutation.isPending}
+                  onClick={() => deleteShowMutation.mutate(show.id)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
                 </Button>
               </div>
             </CardContent>

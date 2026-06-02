@@ -1153,6 +1153,12 @@ model Production {
   /** One production can have many tours/legs over time. */
   tours             Tour[]       @relation("ProductionTours")
   notes             String?
+  actorCount        Int?
+  durationMinutes   Int?
+  stageSize         String?
+  technicalSpecs    String?
+  techRiderPdfData  Bytes?
+  techRiderPdfName  String?
   phases            ProductionPhase[]
   costLines         ProductionCostLine[]
   people            ProductionPerson[]
