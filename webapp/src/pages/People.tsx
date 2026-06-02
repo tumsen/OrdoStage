@@ -418,10 +418,6 @@ function CircularPhotoEditor({
         className="h-full w-full object-cover"
         style={{ objectPosition: `${localFocus.x}% ${localFocus.y}%` }}
       />
-      <div
-        className="pointer-events-none absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-white/15"
-        style={{ left: "50%", top: "50%" }}
-      />
     </div>
   );
 }
@@ -1018,7 +1014,7 @@ function PersonFormDialog({
             editable
             sizeClassName="h-24 w-24"
           />
-          <p className="text-[10px] text-white/40">Drag image so face sits in center circle.</p>
+          <p className="text-[10px] text-white/40">Drag image to position face in frame.</p>
         </div>
       ) : null}
       <Input
