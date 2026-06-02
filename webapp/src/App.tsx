@@ -326,11 +326,9 @@ const App = () => (
             path="/shows"
             element={
               <ProtectedRoute>
-                <ProductionPlannerFeatureRoute>
-                  <Layout>
-                    <Shows />
-                  </Layout>
-                </ProductionPlannerFeatureRoute>
+                <Layout>
+                  <Shows />
+                </Layout>
               </ProtectedRoute>
             }
           />

@@ -200,7 +200,7 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
           </div>
         ) : (
           navItems
-          .filter((item) => (item.to === "/production" || item.to === "/shows" ? productionPlannerEnabled : true))
+          .filter((item) => (item.to === "/production" ? productionPlannerEnabled : true))
           .filter((item) => navBypass || canView(item.view))
           .map(({ to, labelKey, icon: Icon }) => {
           const isActive =

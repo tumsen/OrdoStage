@@ -33,6 +33,11 @@ productionPlannerRouter.use("*", async (c, next) => {
   if (!user?.organizationId) {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
   }
+  // Core show management must stay available even when planner visuals are paused.
+  if (c.req.path.startsWith("/api/productions")) {
+    await next();
+    return;
+  }
   const org = await prisma.organization.findUnique({
     where: { id: user.organizationId },
     select: { productionPlannerEnabled: true },
