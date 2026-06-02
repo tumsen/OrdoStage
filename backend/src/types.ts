@@ -1628,6 +1628,15 @@ export const ProductionCostCategorySchema = z.enum([
   "other",
 ]);
 
+export const PRODUCTION_DOCUMENT_TYPES = [
+  "manuscript",
+  "tech_notes",
+  "image",
+  "graphic",
+  "other",
+] as const;
+export const ProductionDocumentTypeSchema = z.enum(PRODUCTION_DOCUMENT_TYPES);
+
 export const ProductionPhaseSchema = z.object({
   id: z.string(),
   productionId: z.string(),
@@ -1680,6 +1689,16 @@ export const ProductionSchema = z.object({
   linkedEventTitles: z.array(z.string()).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+export const ProductionDocumentSchema = z.object({
+  id: z.string(),
+  productionId: z.string(),
+  name: z.string(),
+  type: ProductionDocumentTypeSchema,
+  filename: z.string(),
+  mimeType: z.string(),
+  createdAt: z.string(),
 });
 
 export const CreateProductionSchema = z.object({
@@ -1908,6 +1927,7 @@ export type ProductionPhaseCategory = z.infer<typeof ProductionPhaseCategorySche
 export type ProductionPhaseKind = z.infer<typeof ProductionPhaseKindSchema>;
 export type ProductionPhase = z.infer<typeof ProductionPhaseSchema>;
 export type Production = z.infer<typeof ProductionSchema>;
+export type ProductionDocument = z.infer<typeof ProductionDocumentSchema>;
 export type CreateProduction = z.infer<typeof CreateProductionSchema>;
 export type UpdateProduction = z.infer<typeof UpdateProductionSchema>;
 export type CreateProductionPhase = z.infer<typeof CreateProductionPhaseSchema>;

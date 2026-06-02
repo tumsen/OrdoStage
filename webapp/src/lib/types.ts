@@ -29,6 +29,7 @@ export type {
   ProductionPerson,
   ProductionTeam,
   ProductionPhase,
+  ProductionDocument,
   ProductionPhaseDocument,
   ProductionPhaseCategory,
   CreateProduction,

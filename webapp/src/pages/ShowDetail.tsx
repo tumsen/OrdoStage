@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Upload, Download, Trash2 } from "lucide-react";
+import { ArrowLeft, Upload, Download, Trash2, FileText } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Production, UpdateProduction } from "@/lib/types";
+import type { Production, ProductionDocument, UpdateProduction } from "@/lib/types";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,11 @@ export default function ShowDetail() {
   const { data: show, isLoading } = useQuery({
     queryKey: ["shows", "detail", id],
     queryFn: () => api.get<Production>(`/api/productions/${id}`),
+    enabled: Boolean(id) && canAccess,
+  });
+  const { data: documents } = useQuery({
+    queryKey: ["shows", "detail", id, "documents"],
+    queryFn: () => api.get<ProductionDocument[]>(`/api/productions/${id}/documents`),
     enabled: Boolean(id) && canAccess,
   });
 
@@ -105,6 +110,37 @@ export default function ShowDetail() {
     },
     onError: (e) =>
       toast({ title: e instanceof Error ? e.message : "Could not remove tech rider", variant: "destructive" }),
+  });
+
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async (input: { file: File; type: string; name: string }) => {
+      if (!id) throw new Error("Missing show id");
+      const data = new FormData();
+      data.set("file", input.file);
+      data.set("type", input.type);
+      data.set("name", input.name || input.file.name);
+      const res = await api.raw(`/api/productions/${id}/documents`, { method: "POST", body: data });
+      if (!res.ok) throw new Error("Could not upload document");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shows", "detail", id, "documents"] });
+      toast({ title: "Document uploaded" });
+    },
+    onError: (e) =>
+      toast({ title: e instanceof Error ? e.message : "Could not upload document", variant: "destructive" }),
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (docId: string) => {
+      if (!id) throw new Error("Missing show id");
+      await api.delete<void>(`/api/productions/${id}/documents/${docId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shows", "detail", id, "documents"] });
+      toast({ title: "Document deleted" });
+    },
+    onError: (e) =>
+      toast({ title: e instanceof Error ? e.message : "Could not delete document", variant: "destructive" }),
   });
 
   if (!canAccess) {
@@ -197,6 +233,87 @@ export default function ShowDetail() {
               {saveMutation.isPending ? "Saving..." : "Save show details"}
             </Button>
             <Button variant="outline" onClick={() => navigate(`/shows`)}>Done</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Show documents</CardTitle>
+          <CardDescription>
+            Upload all core show files: manuscript, tech notes, images, graphics, and other standard documentation.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { type: "manuscript", label: "Upload manuscript" },
+              { type: "tech_notes", label: "Upload tech notes" },
+              { type: "image", label: "Upload image" },
+              { type: "graphic", label: "Upload graphic" },
+              { type: "other", label: "Upload other doc" },
+            ].map((entry) => (
+              <label key={entry.type} className="inline-flex cursor-pointer items-center">
+                <input
+                  type="file"
+                  className="hidden"
+                  disabled={!canEdit || uploadDocumentMutation.isPending}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      uploadDocumentMutation.mutate({
+                        file,
+                        type: entry.type,
+                        name: file.name,
+                      });
+                    }
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <Button type="button" variant="secondary" disabled={!canEdit || uploadDocumentMutation.isPending} asChild>
+                  <span>
+                    <Upload className="mr-2 h-4 w-4" />
+                    {entry.label}
+                  </span>
+                </Button>
+              </label>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            {(documents ?? []).map((doc) => (
+              <div key={doc.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{doc.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {doc.type} • {doc.filename}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={`${import.meta.env.VITE_BACKEND_URL || ""}/api/productions/${id}/documents/${doc.id}/download`}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </a>
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={!canEdit || deleteDocumentMutation.isPending}
+                    onClick={() => deleteDocumentMutation.mutate(doc.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {documents?.length === 0 ? (
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                <FileText className="mb-2 h-4 w-4" />
+                No documents yet.
+              </div>
+            ) : null}
           </div>
         </CardContent>
       </Card>

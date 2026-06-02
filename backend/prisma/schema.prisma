@@ -139,6 +139,7 @@ model Organization {
   productions      Production[]
   productionCostLines ProductionCostLine[]
   productionPhaseDocuments ProductionPhaseDocument[]
+  productionDocuments ProductionDocument[]
   timeTravelClaims TimeTravelClaim[]
   timesheetApprovals TimesheetApproval[]
 }
@@ -1159,6 +1160,7 @@ model Production {
   technicalSpecs    String?
   techRiderPdfData  Bytes?
   techRiderPdfName  String?
+  documents         ProductionDocument[]
   phases            ProductionPhase[]
   costLines         ProductionCostLine[]
   people            ProductionPerson[]
@@ -1168,6 +1170,24 @@ model Production {
 
   @@index([organizationId, status])
   @@index([organizationId, premiereDate])
+}
+
+model ProductionDocument {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  productionId   String
+  production     Production   @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  name           String
+  /** manuscript | tech_notes | image | graphic | other */
+  type           String       @default("other")
+  filename       String
+  data           Bytes
+  mimeType       String       @default("application/octet-stream")
+  createdAt      DateTime     @default(now())
+
+  @@index([productionId, createdAt])
+  @@index([organizationId])
 }
 
 /** Gantt bar, milestone, or deadline on a production timeline. */

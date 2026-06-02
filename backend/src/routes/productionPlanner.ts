@@ -14,6 +14,7 @@ import {
   UpdateProductionSchema,
   type Production,
   type ProductionCostLine,
+  type ProductionDocument,
   type ProductionPerson,
   type ProductionPhase,
   type ProductionTeam,
@@ -341,6 +342,26 @@ function serializeCostLine(row: {
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function serializeProductionDocument(row: {
+  id: string;
+  productionId: string;
+  name: string;
+  type: string;
+  filename: string;
+  mimeType: string;
+  createdAt: Date;
+}): ProductionDocument {
+  return {
+    id: row.id,
+    productionId: row.productionId,
+    name: row.name,
+    type: row.type as ProductionDocument["type"],
+    filename: row.filename,
+    mimeType: row.mimeType,
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -900,6 +921,122 @@ productionPlannerRouter.delete("/productions/:id/tech-rider", async (c) => {
     where: { id },
     data: { techRiderPdfData: null, techRiderPdfName: null },
   });
+  return c.body(null, 204);
+});
+
+// GET /api/productions/:id/documents
+productionPlannerRouter.get("/productions/:id/documents", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canRead(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const production = await assertProductionInOrg(id, user.organizationId);
+  if (!production) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  const docs = await prisma.productionDocument.findMany({
+    where: { productionId: id },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      productionId: true,
+      name: true,
+      type: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+  });
+  return c.json({ data: docs.map(serializeProductionDocument) });
+});
+
+// POST /api/productions/:id/documents
+productionPlannerRouter.post("/productions/:id/documents", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canWrite(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const production = await assertProductionInOrg(id, user.organizationId);
+  if (!production) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  const formData = await c.req.parseBody();
+  const file = formData["file"];
+  const name = typeof formData["name"] === "string" ? formData["name"].trim() : "";
+  const type = typeof formData["type"] === "string" ? formData["type"].trim() : "other";
+  if (!file || typeof file === "string") {
+    return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
+  }
+
+  const doc = await prisma.productionDocument.create({
+    data: {
+      organizationId: user.organizationId,
+      productionId: id,
+      name: name || file.name,
+      type: type || "other",
+      filename: file.name,
+      data: Buffer.from(await file.arrayBuffer()),
+      mimeType: file.type || "application/octet-stream",
+    },
+    select: {
+      id: true,
+      productionId: true,
+      name: true,
+      type: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+  });
+  return c.json({ data: serializeProductionDocument(doc) }, 201);
+});
+
+// GET /api/productions/:id/documents/:docId/download
+productionPlannerRouter.get("/productions/:id/documents/:docId/download", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canRead(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const docId = c.req.param("docId");
+  const doc = await prisma.productionDocument.findFirst({
+    where: { id: docId, productionId: id, organizationId: user.organizationId },
+  });
+  if (!doc) return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  return new Response(doc.data, {
+    headers: {
+      "Content-Type": doc.mimeType,
+      "Content-Disposition": `attachment; filename="${doc.filename}"`,
+      "Content-Length": String(doc.data.length),
+    },
+  });
+});
+
+// DELETE /api/productions/:id/documents/:docId
+productionPlannerRouter.delete("/productions/:id/documents/:docId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canWrite(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const docId = c.req.param("docId");
+  const doc = await prisma.productionDocument.findFirst({
+    where: { id: docId, productionId: id, organizationId: user.organizationId },
+    select: { id: true },
+  });
+  if (!doc) return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+  await prisma.productionDocument.delete({ where: { id: doc.id } });
   return c.body(null, 204);
 });
 
