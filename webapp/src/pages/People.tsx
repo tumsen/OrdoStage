@@ -339,6 +339,7 @@ function CircularPhotoEditor({
   focusX,
   focusY,
   onFocusChange,
+  editable = true,
   sizeClassName = "h-24 w-24",
 }: {
   src: string;
@@ -346,19 +347,31 @@ function CircularPhotoEditor({
   focusX: number;
   focusY: number;
   onFocusChange?: (x: number, y: number) => void;
+  editable?: boolean;
   sizeClassName?: string;
 }) {
   const [dragging, setDragging] = useState(false);
   const [localFocus, setLocalFocus] = useState({ x: clampFocus(focusX), y: clampFocus(focusY) });
+  const dragRef = useRef<{
+    startX: number;
+    startY: number;
+    startFocusX: number;
+    startFocusY: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   useEffect(() => {
     setLocalFocus({ x: clampFocus(focusX), y: clampFocus(focusY) });
   }, [focusX, focusY]);
 
-  const updateFromPointer = (event: React.PointerEvent<HTMLDivElement>, commit: boolean) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = clampFocus(((event.clientX - rect.left) / rect.width) * 100);
-    const y = clampFocus(((event.clientY - rect.top) / rect.height) * 100);
+  const updateFromDrag = (event: React.PointerEvent<HTMLDivElement>, commit: boolean) => {
+    const s = dragRef.current;
+    if (!s) return;
+    const deltaXPercent = ((event.clientX - s.startX) / Math.max(1, s.width)) * 100;
+    const deltaYPercent = ((event.clientY - s.startY) / Math.max(1, s.height)) * 100;
+    const x = clampFocus(s.startFocusX + deltaXPercent);
+    const y = clampFocus(s.startFocusY + deltaYPercent);
     setLocalFocus({ x, y });
     if (commit && onFocusChange) onFocusChange(x, y);
   };
@@ -367,26 +380,37 @@ function CircularPhotoEditor({
     <div
       className={`${sizeClassName} relative overflow-hidden rounded-full border border-white/15 bg-black/20`}
       onPointerDown={(e) => {
+        if (!editable) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        dragRef.current = {
+          startX: e.clientX,
+          startY: e.clientY,
+          startFocusX: localFocus.x,
+          startFocusY: localFocus.y,
+          width: rect.width,
+          height: rect.height,
+        };
         setDragging(true);
-        updateFromPointer(e, false);
       }}
       onPointerMove={(e) => {
         if (!dragging) return;
-        updateFromPointer(e, false);
+        updateFromDrag(e, false);
       }}
       onPointerUp={(e) => {
         if (!dragging) return;
         setDragging(false);
-        updateFromPointer(e, true);
+        updateFromDrag(e, true);
+        dragRef.current = null;
       }}
       onPointerLeave={(e) => {
         if (!dragging) return;
         setDragging(false);
-        updateFromPointer(e, true);
+        updateFromDrag(e, true);
+        dragRef.current = null;
       }}
-      role="button"
-      tabIndex={0}
-      title="Drag to position visible area"
+      role={editable ? "button" : undefined}
+      tabIndex={editable ? 0 : -1}
+      title={editable ? "Drag image to center face" : undefined}
     >
       <img
         src={src}
@@ -396,7 +420,7 @@ function CircularPhotoEditor({
       />
       <div
         className="pointer-events-none absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-white/15"
-        style={{ left: `${localFocus.x}%`, top: `${localFocus.y}%` }}
+        style={{ left: "50%", top: "50%" }}
       />
     </div>
   );
@@ -991,9 +1015,10 @@ function PersonFormDialog({
                 photoFocusMutation.mutate({ x, y });
               }
             }}
+            editable
             sizeClassName="h-24 w-24"
           />
-          <p className="text-[10px] text-white/40">Drag the circle to choose visible area.</p>
+          <p className="text-[10px] text-white/40">Drag image so face sits in center circle.</p>
         </div>
       ) : null}
       <Input
@@ -1781,14 +1806,6 @@ function PersonCard({
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
   const [deactivateOpen, setDeactivateOpen] = useState(false);
-  const [cardFocus, setCardFocus] = useState<{ x: number; y: number }>({
-    x: person.photoFocusX ?? 50,
-    y: person.photoFocusY ?? 50,
-  });
-
-  useEffect(() => {
-    setCardFocus({ x: person.photoFocusX ?? 50, y: person.photoFocusY ?? 50 });
-  }, [person.id, person.photoFocusX, person.photoFocusY]);
 
   const activeMutation = useMutation({
     mutationFn: (nextActive: boolean) =>
@@ -1809,12 +1826,6 @@ function PersonCard({
     },
   });
 
-  const focusMutation = useMutation({
-    mutationFn: async (focus: { x: number; y: number }) => updatePersonPhotoFocus(person.id, focus.x, focus.y),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["people"] });
-    },
-  });
 
   const isActive = person.isActive !== false;
 
@@ -1839,12 +1850,9 @@ function PersonCard({
           <CircularPhotoEditor
             src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
             alt={person.name}
-            focusX={cardFocus.x}
-            focusY={cardFocus.y}
-            onFocusChange={(x, y) => {
-              setCardFocus({ x, y });
-              focusMutation.mutate({ x, y });
-            }}
+            focusX={person.photoFocusX ?? 50}
+            focusY={person.photoFocusY ?? 50}
+            editable={false}
             sizeClassName="h-14 w-14"
           />
         ) : (
