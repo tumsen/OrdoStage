@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Upload, Download, Trash2, FileText, Plus } from "lucide-react";
@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { PeopleCountGraphic, PersonChip } from "@/components/show/PeopleVisuals";
 import { StageDimensionFields } from "@/components/StageDimensionFields";
 import { decodeToFormFields, formatMetresForInput } from "@/lib/stageSize";
@@ -48,6 +50,21 @@ function toForm(show: Production | null): FormState {
     stageDepth: stageFieldToInput(show?.stageDepth) || fromStageSize?.stageDepth || "",
     stageHeight: stageFieldToInput(show?.stageHeight) || fromStageSize?.stageHeight || "",
     technicalSpecs: show?.technicalSpecs ?? "",
+  };
+}
+
+function formToPayload(form: FormState): UpdateProduction {
+  return {
+    name: form.name.trim(),
+    description: form.description.trim() || null,
+    notes: form.notes.trim() || null,
+    actorCount: form.actorCount.trim() ? Number(form.actorCount) : null,
+    techCount: form.techCount.trim() ? Number(form.techCount) : null,
+    durationMinutes: form.durationMinutes.trim() ? Number(form.durationMinutes) : null,
+    stageWidth: form.stageWidth.trim() || null,
+    stageDepth: form.stageDepth.trim() || null,
+    stageHeight: form.stageHeight.trim() || null,
+    technicalSpecs: form.technicalSpecs.trim() || null,
   };
 }
 
@@ -92,42 +109,40 @@ export default function ShowDetail() {
   });
 
   const [form, setForm] = useState<FormState>(() => toForm(null));
+  const formRef = useRef(form);
+  formRef.current = form;
   const [docType, setDocType] = useState<ProductionDocument["type"]>("other");
   const [docFolder, setDocFolder] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedActorId, setSelectedActorId] = useState("");
   const [selectedTechId, setSelectedTechId] = useState("");
 
-  useEffect(() => {
-    if (show) setForm(toForm(show));
-  }, [show]);
+  const persistShowDetails = useCallback(async () => {
+    if (!id) throw new Error("Missing show id");
+    const draft = formRef.current;
+    if (!draft.name.trim()) throw new Error("Show name is required");
+    const updated = await api.patch<Production>(`/api/productions/${id}`, formToPayload(draft));
+    queryClient.setQueryData(["shows", "detail", id], updated);
+    queryClient.setQueryData<Production[]>(["shows", "productions"], (old) =>
+      old ? old.map((p) => (p.id === id ? { ...p, ...updated } : p)) : old
+    );
+    queryClient.invalidateQueries({ queryKey: ["productions"] });
+  }, [id, queryClient]);
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (!id) throw new Error("Missing show id");
-      const payload: UpdateProduction = {
-        name: form.name.trim(),
-        description: form.description.trim() || null,
-        notes: form.notes.trim() || null,
-        actorCount: form.actorCount.trim() ? Number(form.actorCount) : null,
-        techCount: form.techCount.trim() ? Number(form.techCount) : null,
-        durationMinutes: form.durationMinutes.trim() ? Number(form.durationMinutes) : null,
-        stageWidth: form.stageWidth.trim() || null,
-        stageDepth: form.stageDepth.trim() || null,
-        stageHeight: form.stageHeight.trim() || null,
-        technicalSpecs: form.technicalSpecs.trim() || null,
-      };
-      return api.patch<Production>(`/api/productions/${id}`, payload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["shows", "detail", id] });
-      queryClient.invalidateQueries({ queryKey: ["shows", "productions"] });
-      queryClient.invalidateQueries({ queryKey: ["productions"] });
-      toast({ title: "Show updated" });
-    },
-    onError: (e) =>
-      toast({ title: e instanceof Error ? e.message : "Could not update show", variant: "destructive" }),
+  const showDetailsAutoSave = useAutoSaveDraft({
+    enabled: canEdit && Boolean(id) && Boolean(show?.id),
+    resetKey: show?.id,
+    getSnapshot: () => formRef.current,
+    save: persistShowDetails,
   });
+
+  useEffect(() => {
+    if (!show?.id) return;
+    const next = toForm(show);
+    setForm(next);
+    showDetailsAutoSave.markSaved(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load form when switching show only
+  }, [show?.id]);
 
   const uploadTechRiderMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -297,13 +312,25 @@ export default function ShowDetail() {
 
   return (
     <div className="w-full space-y-4 p-4 md:p-6">
-      <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/shows">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to shows
-          </Link>
-        </Button>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/shows">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to shows
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">{show?.name ?? "Show"}</h1>
+            {canEdit ? (
+              <AutoSaveStatus
+                status={showDetailsAutoSave.status}
+                error={showDetailsAutoSave.error}
+                className="mt-0.5"
+              />
+            ) : null}
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -314,7 +341,7 @@ export default function ShowDetail() {
             Master data for this show: cast, technical crew, stage dimensions, duration, specs, and all show docs.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4" onBlurCapture={showDetailsAutoSave.onBlurCapture}>
           {isLoading ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -393,10 +420,15 @@ export default function ShowDetail() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => saveMutation.mutate()} disabled={!canEdit || saveMutation.isPending || !form.name.trim()}>
-              {saveMutation.isPending ? "Saving..." : "Save show details"}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void showDetailsAutoSave.flush().then(() => navigate("/shows"));
+              }}
+            >
+              Back to shows
             </Button>
-            <Button variant="outline" onClick={() => navigate(`/shows`)}>Done</Button>
           </div>
         </CardContent>
       </Card>
