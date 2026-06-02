@@ -194,7 +194,10 @@ export default function Shows() {
       <div className="grid gap-4">
         {(shows ?? []).map((show) => (
           <Card key={show.id}>
-            <CardHeader className="space-y-1">
+            <CardHeader
+              className="space-y-1 cursor-pointer"
+              onClick={() => navigate(`/shows/${show.id}`)}
+            >
               <CardTitle className="text-lg">{show.name}</CardTitle>
               <CardDescription>
                 {(show.linkedEventTitles?.length ?? 0)} in-house/local events • {(show.linkedTourNames?.length ?? 0)} tours

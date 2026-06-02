@@ -115,7 +115,7 @@ export default function ShowDetail() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4 p-4 md:p-6">
+    <div className="w-full space-y-4 p-4 md:p-6">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm" asChild>
           <Link to="/shows">
