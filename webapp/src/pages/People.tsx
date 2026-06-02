@@ -60,7 +60,6 @@ import {
   type PersonDocumentListRowHandle,
   type PersonDocumentSavePatch,
 } from "@/components/PersonDocumentListRow";
-import { RemoteImageHoverPreview } from "@/components/DocumentListThumbnail";
 import {
   DocumentPermissionsForm,
   normalizeDocumentPermissions,
@@ -325,6 +324,84 @@ async function uploadPersonPhoto(personId: string, file: File): Promise<void> {
   }
 }
 
+async function updatePersonPhotoFocus(personId: string, x: number, y: number): Promise<void> {
+  await api.patch(`/api/people/${personId}/photo-focus`, { x, y });
+}
+
+function clampFocus(v: number): number {
+  if (!Number.isFinite(v)) return 50;
+  return Math.max(0, Math.min(100, Math.round(v)));
+}
+
+function CircularPhotoEditor({
+  src,
+  alt,
+  focusX,
+  focusY,
+  onFocusChange,
+  sizeClassName = "h-24 w-24",
+}: {
+  src: string;
+  alt: string;
+  focusX: number;
+  focusY: number;
+  onFocusChange?: (x: number, y: number) => void;
+  sizeClassName?: string;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [localFocus, setLocalFocus] = useState({ x: clampFocus(focusX), y: clampFocus(focusY) });
+
+  useEffect(() => {
+    setLocalFocus({ x: clampFocus(focusX), y: clampFocus(focusY) });
+  }, [focusX, focusY]);
+
+  const updateFromPointer = (event: React.PointerEvent<HTMLDivElement>, commit: boolean) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = clampFocus(((event.clientX - rect.left) / rect.width) * 100);
+    const y = clampFocus(((event.clientY - rect.top) / rect.height) * 100);
+    setLocalFocus({ x, y });
+    if (commit && onFocusChange) onFocusChange(x, y);
+  };
+
+  return (
+    <div
+      className={`${sizeClassName} relative overflow-hidden rounded-full border border-white/15 bg-black/20`}
+      onPointerDown={(e) => {
+        setDragging(true);
+        updateFromPointer(e, false);
+      }}
+      onPointerMove={(e) => {
+        if (!dragging) return;
+        updateFromPointer(e, false);
+      }}
+      onPointerUp={(e) => {
+        if (!dragging) return;
+        setDragging(false);
+        updateFromPointer(e, true);
+      }}
+      onPointerLeave={(e) => {
+        if (!dragging) return;
+        setDragging(false);
+        updateFromPointer(e, true);
+      }}
+      role="button"
+      tabIndex={0}
+      title="Drag to position visible area"
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="h-full w-full object-cover"
+        style={{ objectPosition: `${localFocus.x}% ${localFocus.y}%` }}
+      />
+      <div
+        className="pointer-events-none absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-white/15"
+        style={{ left: `${localFocus.x}%`, top: `${localFocus.y}%` }}
+      />
+    </div>
+  );
+}
+
 async function uploadPersonDocument(
   personId: string,
   file: File,
@@ -457,6 +534,10 @@ function PersonFormDialog({
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoFocus, setPhotoFocus] = useState<{ x: number; y: number }>({
+    x: person?.photoFocusX ?? 50,
+    y: person?.photoFocusY ?? 50,
+  });
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
   const [docExpires, setDocExpires] = useState("");
@@ -639,6 +720,7 @@ function PersonFormDialog({
         setPhotoPreviewUrl(null);
       }
       const id = person!.id;
+      await updatePersonPhotoFocus(id, photoFocus.x, photoFocus.y);
       await queryClient.invalidateQueries({ queryKey: ["people", id] });
       await queryClient.invalidateQueries({ queryKey: ["people"] });
       await queryClient.invalidateQueries({ queryKey: ["people", "me"] });
@@ -652,6 +734,18 @@ function PersonFormDialog({
         description: e.message,
         variant: "destructive",
       });
+    },
+  });
+
+  const photoFocusMutation = useMutation({
+    mutationFn: async (focus: { x: number; y: number }) => {
+      if (!person?.id) return;
+      await updatePersonPhotoFocus(person.id, focus.x, focus.y);
+    },
+    onSuccess: async () => {
+      if (!person?.id) return;
+      await queryClient.invalidateQueries({ queryKey: ["people", person.id] });
+      await queryClient.invalidateQueries({ queryKey: ["people"] });
     },
   });
 
@@ -698,7 +792,8 @@ function PersonFormDialog({
       return null;
     });
     setPhotoFile(null);
-  }, [person?.id]);
+    setPhotoFocus({ x: person?.photoFocusX ?? 50, y: person?.photoFocusY ?? 50 });
+  }, [person?.id, person?.photoFocusX, person?.photoFocusY]);
 
   const uploadDocMutation = useMutation({
     mutationFn: async () => {
@@ -884,12 +979,22 @@ function PersonFormDialog({
           : "You can pick an image now; it uploads right after you click Add Person."}
       </p>
       {profileImageSrc ? (
-        <RemoteImageHoverPreview
-          src={profileImageSrc}
-          alt={person ? `${person.name} profile` : "Profile preview"}
-          triggerClassName="h-24 w-24 rounded-md border border-white/10 bg-black/20 p-0 shadow-none"
-          triggerImgClassName="h-full w-full object-cover"
-        />
+        <div className="space-y-2">
+          <CircularPhotoEditor
+            src={profileImageSrc}
+            alt={person ? `${person.name} profile` : "Profile preview"}
+            focusX={photoFocus.x}
+            focusY={photoFocus.y}
+            onFocusChange={(x, y) => {
+              setPhotoFocus({ x, y });
+              if (person?.id) {
+                photoFocusMutation.mutate({ x, y });
+              }
+            }}
+            sizeClassName="h-24 w-24"
+          />
+          <p className="text-[10px] text-white/40">Drag the circle to choose visible area.</p>
+        </div>
       ) : null}
       <Input
         type="file"
@@ -1676,6 +1781,14 @@ function PersonCard({
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
   const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [cardFocus, setCardFocus] = useState<{ x: number; y: number }>({
+    x: person.photoFocusX ?? 50,
+    y: person.photoFocusY ?? 50,
+  });
+
+  useEffect(() => {
+    setCardFocus({ x: person.photoFocusX ?? 50, y: person.photoFocusY ?? 50 });
+  }, [person.id, person.photoFocusX, person.photoFocusY]);
 
   const activeMutation = useMutation({
     mutationFn: (nextActive: boolean) =>
@@ -1693,6 +1806,13 @@ function PersonCard({
         title: e.message || "Could not update status",
         variant: "destructive",
       });
+    },
+  });
+
+  const focusMutation = useMutation({
+    mutationFn: async (focus: { x: number; y: number }) => updatePersonPhotoFocus(person.id, focus.x, focus.y),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["people"] });
     },
   });
 
@@ -1716,12 +1836,16 @@ function PersonCard({
       {/* Avatar */}
       <div className="w-14 h-14 rounded-full overflow-hidden bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
         {person.hasPhoto ? (
-          <RemoteImageHoverPreview
+          <CircularPhotoEditor
             src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`}
             alt={person.name}
-            triggerClassName="h-14 w-14 max-h-14 max-w-14 rounded-full border-0 bg-transparent p-0 ring-0 shadow-none"
-            triggerImgClassName="h-full w-full object-cover"
-            title={person.name}
+            focusX={cardFocus.x}
+            focusY={cardFocus.y}
+            onFocusChange={(x, y) => {
+              setCardFocus({ x, y });
+              focusMutation.mutate({ x, y });
+            }}
+            sizeClassName="h-14 w-14"
           />
         ) : (
           <User size={21} className="text-white/30" />

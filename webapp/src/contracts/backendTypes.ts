@@ -190,6 +190,8 @@ export const PersonSchema = z.object({
   notes: z.string().nullable().optional(),
   hasPhoto: z.boolean().optional(),
   photoUpdatedAt: z.string().nullable().optional(),
+  photoFocusX: z.number().int().min(0).max(100).optional(),
+  photoFocusY: z.number().int().min(0).max(100).optional(),
   departmentId: z.string().nullable(),
   teamIds: z.array(z.string()),
   teams: z.array(DepartmentSchema),
@@ -369,6 +371,11 @@ export const UpdatePersonSchema = z
         }
       }),
   });
+
+export const UpdatePersonPhotoFocusSchema = z.object({
+  x: z.number().int().min(0).max(100),
+  y: z.number().int().min(0).max(100),
+});
 
 // Event
 export const EventSchema = z.object({

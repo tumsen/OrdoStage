@@ -6,6 +6,7 @@ import { filenameFromDisplayRename } from "../lib/documentFilenameRename";
 import { auth } from "../auth";
 import {
   CreatePersonSchema,
+  UpdatePersonPhotoFocusSchema,
   UpdatePersonSchema,
   PersonActiveSchema,
   UpdatePersonDocumentSchema,
@@ -177,6 +178,8 @@ function serializePerson(person: {
   notes?: string | null;
   photoData?: Uint8Array | null;
   photoUpdatedAt?: Date | null;
+  photoFocusX?: number | null;
+  photoFocusY?: number | null;
   departmentId: string | null;
   isActive?: boolean;
   weeklyContractHours?: number | null;
@@ -226,6 +229,8 @@ function serializePerson(person: {
     notes: person.notes ?? null,
     hasPhoto: Boolean(person.photoData),
     photoUpdatedAt: person.photoUpdatedAt ? person.photoUpdatedAt.toISOString() : null,
+    photoFocusX: person.photoFocusX ?? 50,
+    photoFocusY: person.photoFocusY ?? 50,
     departmentId: person.departmentId,
     isActive: person.isActive ?? true,
     weeklyContractHours: person.weeklyContractHours ?? null,
@@ -946,9 +951,39 @@ peopleRouter.post("/people/:id/photo", async (c) => {
       photoFilename: file.name,
       photoMimeType: file.type || "application/octet-stream",
       photoUpdatedAt: new Date(),
+      photoFocusX: 50,
+      photoFocusY: 50,
     },
   });
   return c.json({ data: { ok: true } }, 201);
+});
+
+// PATCH /api/people/:id/photo-focus
+peopleRouter.patch("/people/:id/photo-focus", zValidator("json", UpdatePersonPhotoFocusSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  const { id } = c.req.param();
+  const person = await prisma.person.findUnique({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true, email: true },
+  });
+  if (!person) {
+    return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+  }
+  const canWritePeople = canAction(c, "write.people");
+  const canEditSelf = canEditOwnProfile(user, person.email);
+  if (!canWritePeople && !canEditSelf) {
+    return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+  }
+
+  const body = c.req.valid("json");
+  await prisma.person.update({
+    where: { id: person.id },
+    data: { photoFocusX: body.x, photoFocusY: body.y },
+  });
+  return c.json({ data: { ok: true } });
 });
 
 // GET /api/people/:id/photo
