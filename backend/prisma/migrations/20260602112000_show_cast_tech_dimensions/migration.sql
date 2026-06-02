@@ -1,0 +1,7 @@
+ALTER TABLE "Production"
+ADD COLUMN "techCount" INTEGER,
+ADD COLUMN "stageWidth" TEXT,
+ADD COLUMN "stageDepth" TEXT,
+ADD COLUMN "stageHeight" TEXT,
+ADD COLUMN "actorNames" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN "techNames" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

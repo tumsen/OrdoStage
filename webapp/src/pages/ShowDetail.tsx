@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Upload, Download, Trash2, FileText } from "lucide-react";
+import { ArrowLeft, Upload, Download, Trash2, FileText, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Production, ProductionDocument, UpdateProduction } from "@/lib/types";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -11,14 +11,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { PeopleCountGraphic, PersonChip } from "@/components/show/PeopleVisuals";
 
 type FormState = {
   name: string;
   description: string;
   notes: string;
   actorCount: string;
+  techCount: string;
   durationMinutes: string;
-  stageSize: string;
+  stageWidth: string;
+  stageDepth: string;
+  stageHeight: string;
+  actorNames: string[];
+  techNames: string[];
   technicalSpecs: string;
 };
 
@@ -28,8 +34,13 @@ function toForm(show: Production | null): FormState {
     description: show?.description ?? "",
     notes: show?.notes ?? "",
     actorCount: show?.actorCount == null ? "" : String(show.actorCount),
+    techCount: show?.techCount == null ? "" : String(show.techCount),
     durationMinutes: show?.durationMinutes == null ? "" : String(show.durationMinutes),
-    stageSize: show?.stageSize ?? "",
+    stageWidth: show?.stageWidth ?? "",
+    stageDepth: show?.stageDepth ?? "",
+    stageHeight: show?.stageHeight ?? "",
+    actorNames: show?.actorNames ?? [],
+    techNames: show?.techNames ?? [],
     technicalSpecs: show?.technicalSpecs ?? "",
   };
 }
@@ -70,8 +81,13 @@ export default function ShowDetail() {
         description: form.description.trim() || null,
         notes: form.notes.trim() || null,
         actorCount: form.actorCount.trim() ? Number(form.actorCount) : null,
+        techCount: form.techCount.trim() ? Number(form.techCount) : null,
         durationMinutes: form.durationMinutes.trim() ? Number(form.durationMinutes) : null,
-        stageSize: form.stageSize.trim() || null,
+        stageWidth: form.stageWidth.trim() || null,
+        stageDepth: form.stageDepth.trim() || null,
+        stageHeight: form.stageHeight.trim() || null,
+        actorNames: form.actorNames.map((name) => name.trim()).filter(Boolean),
+        techNames: form.techNames.map((name) => name.trim()).filter(Boolean),
         technicalSpecs: form.technicalSpecs.trim() || null,
       };
       return api.patch<Production>(`/api/productions/${id}`, payload);
@@ -196,6 +212,19 @@ export default function ShowDetail() {
     });
   };
 
+  const setActorName = (index: number, value: string) =>
+    setForm((prev) => {
+      const next = [...prev.actorNames];
+      next[index] = value;
+      return { ...prev, actorNames: next };
+    });
+  const setTechName = (index: number, value: string) =>
+    setForm((prev) => {
+      const next = [...prev.techNames];
+      next[index] = value;
+      return { ...prev, techNames: next };
+    });
+
   if (!canAccess) {
     return <div className="p-6 text-sm text-muted-foreground">No access to shows.</div>;
   }
@@ -218,7 +247,7 @@ export default function ShowDetail() {
         <CardHeader>
           <CardTitle>Show details</CardTitle>
           <CardDescription>
-            Master data for this show: cast size, duration, stage/tech requirements and rider documents.
+            Master data for this show: cast, technical crew, stage dimensions, duration, specs, and all show docs.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -240,6 +269,16 @@ export default function ShowDetail() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="tech-count">Number of technical crew</Label>
+              <Input
+                id="tech-count"
+                type="number"
+                min={0}
+                value={form.techCount}
+                onChange={(e) => setForm((p) => ({ ...p, techCount: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="duration">Duration (minutes)</Label>
               <Input
                 id="duration"
@@ -249,13 +288,31 @@ export default function ShowDetail() {
                 onChange={(e) => setForm((p) => ({ ...p, durationMinutes: e.target.value }))}
               />
             </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="stage-size">Stage size</Label>
+            <div className="space-y-2">
+              <Label htmlFor="stage-width">Stage width</Label>
               <Input
-                id="stage-size"
-                value={form.stageSize}
-                onChange={(e) => setForm((p) => ({ ...p, stageSize: e.target.value }))}
-                placeholder="e.g. 10m x 8m x 5m"
+                id="stage-width"
+                value={form.stageWidth}
+                onChange={(e) => setForm((p) => ({ ...p, stageWidth: e.target.value }))}
+                placeholder="e.g. 10m"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="stage-depth">Stage depth</Label>
+              <Input
+                id="stage-depth"
+                value={form.stageDepth}
+                onChange={(e) => setForm((p) => ({ ...p, stageDepth: e.target.value }))}
+                placeholder="e.g. 8m"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="stage-height">Stage height</Label>
+              <Input
+                id="stage-height"
+                value={form.stageHeight}
+                onChange={(e) => setForm((p) => ({ ...p, stageHeight: e.target.value }))}
+                placeholder="e.g. 5m"
               />
             </div>
             <div className="space-y-2 md:col-span-2">
@@ -278,6 +335,99 @@ export default function ShowDetail() {
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="notes">Internal notes</Label>
               <Textarea id="notes" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
+            </div>
+
+            <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
+              <PeopleCountGraphic count={Number(form.actorCount) || 0} label="Actors" />
+              <PeopleCountGraphic count={Number(form.techCount) || 0} label="Technical Crew" />
+            </div>
+
+            <div className="space-y-3 md:col-span-2">
+              <div className="flex items-center justify-between">
+                <Label>Actor names</Label>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setForm((prev) => ({ ...prev, actorNames: [...prev.actorNames, ""] }))}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add actor
+                </Button>
+              </div>
+              {form.actorNames.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No actor names added yet.</p>
+              ) : null}
+              <div className="grid gap-2">
+                {form.actorNames.map((actorName, idx) => (
+                  <div key={`actor-${idx}`} className="grid gap-2 md:grid-cols-[1fr_auto]">
+                    <Input
+                      value={actorName}
+                      placeholder={`Actor ${idx + 1}`}
+                      onChange={(e) => setActorName(idx, e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          actorNames: prev.actorNames.filter((_, i) => i !== idx),
+                        }))
+                      }
+                    >
+                      Remove
+                    </Button>
+                    <div className="md:col-span-2">
+                      <PersonChip name={actorName} roleLabel="Actor" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3 md:col-span-2">
+              <div className="flex items-center justify-between">
+                <Label>Technical crew names</Label>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setForm((prev) => ({ ...prev, techNames: [...prev.techNames, ""] }))}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add tech
+                </Button>
+              </div>
+              {form.techNames.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No technical crew names added yet.</p>
+              ) : null}
+              <div className="grid gap-2">
+                {form.techNames.map((techName, idx) => (
+                  <div key={`tech-${idx}`} className="grid gap-2 md:grid-cols-[1fr_auto]">
+                    <Input
+                      value={techName}
+                      placeholder={`Tech ${idx + 1}`}
+                      onChange={(e) => setTechName(idx, e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          techNames: prev.techNames.filter((_, i) => i !== idx),
+                        }))
+                      }
+                    >
+                      Remove
+                    </Button>
+                    <div className="md:col-span-2">
+                      <PersonChip name={techName} roleLabel="Tech" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 

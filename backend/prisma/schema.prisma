@@ -1155,7 +1155,13 @@ model Production {
   tours             Tour[]       @relation("ProductionTours")
   notes             String?
   actorCount        Int?
+  techCount         Int?
   durationMinutes   Int?
+  stageWidth        String?
+  stageDepth        String?
+  stageHeight       String?
+  actorNames        String[]     @default([])
+  techNames         String[]     @default([])
   stageSize         String?
   technicalSpecs    String?
   techRiderPdfData  Bytes?

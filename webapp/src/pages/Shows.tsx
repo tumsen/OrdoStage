@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
+import { PeopleCountGraphic } from "@/components/show/PeopleVisuals";
 
 type CreateRunForm = {
   title: string;
@@ -213,6 +214,22 @@ export default function Shows() {
                       </span>
                     </div>
                     {show.notes ? <p className="text-[11px] text-white/35 mt-0.5 truncate">{show.notes}</p> : null}
+                    <div className="mt-2 grid gap-2 md:grid-cols-3">
+                      <PeopleCountGraphic count={show.actorCount ?? show.actorNames?.length ?? 0} label="Actors" />
+                      <PeopleCountGraphic count={show.techCount ?? show.techNames?.length ?? 0} label="Tech" />
+                      <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                        <p className="text-xs uppercase tracking-wide text-white/40">Stage</p>
+                        <p className="mt-2 text-sm text-white/85">
+                          {show.stageWidth || "-"} W • {show.stageDepth || "-"} D • {show.stageHeight || "-"} H
+                        </p>
+                      </div>
+                    </div>
+                    {show.actorNames?.length || show.techNames?.length ? (
+                      <p className="mt-2 text-[11px] text-white/45 truncate">
+                        Cast: {(show.actorNames ?? []).slice(0, 3).join(", ") || "—"} | Tech:{" "}
+                        {(show.techNames ?? []).slice(0, 3).join(", ") || "—"}
+                      </p>
+                    ) : null}
                   </div>
                 </button>
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5 pt-0.5">

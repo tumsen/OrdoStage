@@ -263,7 +263,13 @@ function serializeProduction(row: {
   eventId: string | null;
   notes: string | null;
   actorCount: number | null;
+  techCount: number | null;
   durationMinutes: number | null;
+  stageWidth: string | null;
+  stageDepth: string | null;
+  stageHeight: string | null;
+  actorNames: string[];
+  techNames: string[];
   stageSize: string | null;
   technicalSpecs: string | null;
   techRiderPdfName: string | null;
@@ -301,7 +307,13 @@ function serializeProduction(row: {
     linkedEventTitles: linkedEvents.map((event) => event.title),
     notes: row.notes,
     actorCount: row.actorCount,
+    techCount: row.techCount,
     durationMinutes: row.durationMinutes,
+    stageWidth: row.stageWidth,
+    stageDepth: row.stageDepth,
+    stageHeight: row.stageHeight,
+    actorNames: row.actorNames ?? [],
+    techNames: row.techNames ?? [],
     stageSize: row.stageSize,
     technicalSpecs: row.technicalSpecs,
     techRiderPdfName: row.techRiderPdfName ?? null,
@@ -309,6 +321,14 @@ function serializeProduction(row: {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function sanitizeNameList(names: string[] | undefined) {
+  if (!names) return undefined;
+  return names
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0)
+    .slice(0, 100);
 }
 
 function serializeCostLine(row: {
@@ -659,7 +679,13 @@ productionPlannerRouter.post(
         leadPersonId: body.leadPersonId ?? null,
         notes: body.notes ?? null,
         actorCount: body.actorCount ?? null,
+        techCount: body.techCount ?? null,
         durationMinutes: body.durationMinutes ?? null,
+        stageWidth: body.stageWidth?.trim() || null,
+        stageDepth: body.stageDepth?.trim() || null,
+        stageHeight: body.stageHeight?.trim() || null,
+        actorNames: sanitizeNameList(body.actorNames) ?? [],
+        techNames: sanitizeNameList(body.techNames) ?? [],
         stageSize: body.stageSize ?? null,
         technicalSpecs: body.technicalSpecs ?? null,
       },
@@ -784,7 +810,28 @@ productionPlannerRouter.patch(
           eventId: body.eventId,
           notes: body.notes,
           actorCount: body.actorCount,
+          techCount: body.techCount,
           durationMinutes: body.durationMinutes,
+          stageWidth:
+            body.stageWidth === undefined
+              ? undefined
+              : body.stageWidth === null
+                ? null
+                : body.stageWidth.trim() || null,
+          stageDepth:
+            body.stageDepth === undefined
+              ? undefined
+              : body.stageDepth === null
+                ? null
+                : body.stageDepth.trim() || null,
+          stageHeight:
+            body.stageHeight === undefined
+              ? undefined
+              : body.stageHeight === null
+                ? null
+                : body.stageHeight.trim() || null,
+          actorNames: sanitizeNameList(body.actorNames),
+          techNames: sanitizeNameList(body.techNames),
           stageSize: body.stageSize,
           technicalSpecs: body.technicalSpecs,
         },
