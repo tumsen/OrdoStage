@@ -340,7 +340,7 @@ function CircularPhotoEditor({
   focusY,
   onFocusChange,
   editable = true,
-  sizeClassName = "h-24 w-24",
+  sizeClassName = "h-32 w-32",
 }: {
   src: string;
   alt: string;
@@ -365,22 +365,29 @@ function CircularPhotoEditor({
     setLocalFocus({ x: clampFocus(focusX), y: clampFocus(focusY) });
   }, [focusX, focusY]);
 
-  const updateFromDrag = (event: React.PointerEvent<HTMLDivElement>, commit: boolean) => {
+  const finishDrag = (event: React.PointerEvent<HTMLDivElement>, commit: boolean) => {
     const s = dragRef.current;
     if (!s) return;
     const deltaXPercent = ((event.clientX - s.startX) / Math.max(1, s.width)) * 100;
     const deltaYPercent = ((event.clientY - s.startY) / Math.max(1, s.height)) * 100;
-    const x = clampFocus(s.startFocusX + deltaXPercent);
-    const y = clampFocus(s.startFocusY + deltaYPercent);
+    // Move image with pointer (grab feel): drag right → image shifts right in the circle.
+    const x = clampFocus(s.startFocusX - deltaXPercent);
+    const y = clampFocus(s.startFocusY - deltaYPercent);
     setLocalFocus({ x, y });
     if (commit && onFocusChange) onFocusChange(x, y);
+    dragRef.current = null;
+    setDragging(false);
   };
 
   return (
     <div
-      className={`${sizeClassName} relative overflow-hidden rounded-full border border-white/15 bg-black/20`}
+      className={`${sizeClassName} relative overflow-hidden rounded-full border border-white/15 bg-black/20 ${
+        editable ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""
+      }`}
+      style={{ touchAction: editable ? "none" : undefined }}
       onPointerDown={(e) => {
         if (!editable) return;
+        e.preventDefault();
         const rect = e.currentTarget.getBoundingClientRect();
         dragRef.current = {
           startX: e.clientX,
@@ -391,31 +398,38 @@ function CircularPhotoEditor({
           height: rect.height,
         };
         setDragging(true);
+        e.currentTarget.setPointerCapture(e.pointerId);
       }}
       onPointerMove={(e) => {
         if (!dragging) return;
-        updateFromDrag(e, false);
+        const s = dragRef.current;
+        if (!s) return;
+        const deltaXPercent = ((e.clientX - s.startX) / Math.max(1, s.width)) * 100;
+        const deltaYPercent = ((e.clientY - s.startY) / Math.max(1, s.height)) * 100;
+        const x = clampFocus(s.startFocusX - deltaXPercent);
+        const y = clampFocus(s.startFocusY - deltaYPercent);
+        setLocalFocus({ x, y });
       }}
       onPointerUp={(e) => {
         if (!dragging) return;
-        setDragging(false);
-        updateFromDrag(e, true);
-        dragRef.current = null;
+        finishDrag(e, true);
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          /* already released */
+        }
       }}
-      onPointerLeave={(e) => {
+      onPointerCancel={(e) => {
         if (!dragging) return;
-        setDragging(false);
-        updateFromDrag(e, true);
-        dragRef.current = null;
+        finishDrag(e, true);
       }}
-      role={editable ? "button" : undefined}
-      tabIndex={editable ? 0 : -1}
-      title={editable ? "Drag image to center face" : undefined}
+      title={editable ? "Click and hold, then drag to position the photo in the circle" : undefined}
     >
       <img
         src={src}
         alt={alt}
-        className="h-full w-full object-cover"
+        draggable={false}
+        className="pointer-events-none h-full w-full select-none object-cover"
         style={{ objectPosition: `${localFocus.x}% ${localFocus.y}%` }}
       />
     </div>
@@ -1012,9 +1026,8 @@ function PersonFormDialog({
               }
             }}
             editable
-            sizeClassName="h-24 w-24"
           />
-          <p className="text-[10px] text-white/40">Drag image to position face in frame.</p>
+          <p className="text-[10px] text-white/40">Click and hold the photo, then drag to fit the face inside the circle.</p>
         </div>
       ) : null}
       <Input
