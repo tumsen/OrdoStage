@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Upload, Download, Trash2, FileText } from "lucide-react";
@@ -54,6 +54,9 @@ export default function ShowDetail() {
   });
 
   const [form, setForm] = useState<FormState>(() => toForm(null));
+  const [docType, setDocType] = useState<ProductionDocument["type"]>("other");
+  const [docFolder, setDocFolder] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
 
   useEffect(() => {
     if (show) setForm(toForm(show));
@@ -113,12 +116,14 @@ export default function ShowDetail() {
   });
 
   const uploadDocumentMutation = useMutation({
-    mutationFn: async (input: { file: File; type: string; name: string }) => {
+    mutationFn: async (input: { file: File; type: string; name: string; folder: string; sortOrder: number }) => {
       if (!id) throw new Error("Missing show id");
       const data = new FormData();
       data.set("file", input.file);
       data.set("type", input.type);
       data.set("name", input.name || input.file.name);
+      data.set("folder", input.folder);
+      data.set("sortOrder", String(input.sortOrder));
       const res = await api.raw(`/api/productions/${id}/documents`, { method: "POST", body: data });
       if (!res.ok) throw new Error("Could not upload document");
     },
@@ -142,6 +147,54 @@ export default function ShowDetail() {
     onError: (e) =>
       toast({ title: e instanceof Error ? e.message : "Could not delete document", variant: "destructive" }),
   });
+
+  const updateDocumentMutation = useMutation({
+    mutationFn: async (input: {
+      docId: string;
+      patch: Partial<Pick<ProductionDocument, "name" | "type" | "folder" | "sortOrder">>;
+    }) => {
+      if (!id) throw new Error("Missing show id");
+      return api.patch<ProductionDocument>(`/api/productions/${id}/documents/${input.docId}`, input.patch);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shows", "detail", id, "documents"] });
+    },
+    onError: (e) =>
+      toast({ title: e instanceof Error ? e.message : "Could not update document", variant: "destructive" }),
+  });
+
+  const groupedDocs = useMemo(() => {
+    const map = new Map<string, ProductionDocument[]>();
+    for (const doc of documents ?? []) {
+      const key = doc.folder?.trim() || "General";
+      const list = map.get(key) ?? [];
+      list.push(doc);
+      map.set(key, list);
+    }
+    return Array.from(map.entries());
+  }, [documents]);
+
+  const nextSortOrder = (folder: string) =>
+    Math.max(
+      0,
+      ...((documents ?? [])
+        .filter((d) => (d.folder?.trim() || "") === folder.trim())
+        .map((d) => d.sortOrder ?? 0))
+    ) + 1;
+
+  const uploadFiles = (files: FileList | File[] | null) => {
+    if (!files || files.length === 0) return;
+    const folder = docFolder.trim();
+    Array.from(files).forEach((file, idx) => {
+      uploadDocumentMutation.mutate({
+        file,
+        type: docType,
+        name: file.name,
+        folder,
+        sortOrder: nextSortOrder(folder) + idx,
+      });
+    });
+  };
 
   if (!canAccess) {
     return <div className="p-6 text-sm text-muted-foreground">No access to shows.</div>;
@@ -245,74 +298,178 @@ export default function ShowDetail() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {[
-              { type: "manuscript", label: "Upload manuscript" },
-              { type: "tech_notes", label: "Upload tech notes" },
-              { type: "image", label: "Upload image" },
-              { type: "graphic", label: "Upload graphic" },
-              { type: "other", label: "Upload other doc" },
-            ].map((entry) => (
-              <label key={entry.type} className="inline-flex cursor-pointer items-center">
+          <div className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Document type</Label>
+              <select
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={docType}
+                onChange={(e) => setDocType(e.target.value as ProductionDocument["type"])}
+              >
+                <option value="manuscript">Manuscript</option>
+                <option value="tech_notes">Tech notes</option>
+                <option value="image">Image</option>
+                <option value="graphic">Graphic</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Folder</Label>
+              <Input
+                placeholder="e.g. Script v2, Promo, Tech pack"
+                value={docFolder}
+                onChange={(e) => setDocFolder(e.target.value)}
+              />
+            </div>
+            <div className="flex items-end">
+              <label className="inline-flex w-full cursor-pointer items-center">
                 <input
                   type="file"
+                  multiple
                   className="hidden"
                   disabled={!canEdit || uploadDocumentMutation.isPending}
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      uploadDocumentMutation.mutate({
-                        file,
-                        type: entry.type,
-                        name: file.name,
-                      });
-                    }
+                    uploadFiles(e.target.files);
                     e.currentTarget.value = "";
                   }}
                 />
-                <Button type="button" variant="secondary" disabled={!canEdit || uploadDocumentMutation.isPending} asChild>
+                <Button type="button" variant="secondary" className="w-full" disabled={!canEdit || uploadDocumentMutation.isPending} asChild>
                   <span>
                     <Upload className="mr-2 h-4 w-4" />
-                    {entry.label}
+                    Upload files
                   </span>
                 </Button>
               </label>
-            ))}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            {(documents ?? []).map((doc) => (
-              <div key={doc.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{doc.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {doc.type} • {doc.filename}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={`${import.meta.env.VITE_BACKEND_URL || ""}/api/productions/${id}/documents/${doc.id}/download`}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </a>
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={!canEdit || deleteDocumentMutation.isPending}
-                    onClick={() => deleteDocumentMutation.mutate(doc.id)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
-                </div>
+          <div
+            className={`rounded-md border border-dashed p-4 text-center text-sm ${
+              isDragOver ? "border-primary bg-primary/5" : "text-muted-foreground"
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragOver(false);
+              uploadFiles(e.dataTransfer.files);
+            }}
+          >
+            Drag and drop one or multiple files here
+          </div>
+
+          <div className="space-y-4">
+            {groupedDocs.map(([folder, docs]) => (
+              <div key={folder} className="space-y-2">
+                <h4 className="text-sm font-semibold">{folder}</h4>
+                {docs.map((doc) => (
+                  <div key={doc.id} className="space-y-2 rounded-md border p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{doc.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {doc.type} • {doc.filename}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={`${import.meta.env.VITE_BACKEND_URL || ""}/api/productions/${id}/documents/${doc.id}/download`}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Download
+                          </a>
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={!canEdit || deleteDocumentMutation.isPending}
+                          onClick={() => deleteDocumentMutation.mutate(doc.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+
+                    {doc.mimeType.startsWith("image/") ? (
+                      <img
+                        src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/productions/${id}/documents/${doc.id}/download`}
+                        alt={doc.name}
+                        className="max-h-48 rounded-md border object-contain"
+                      />
+                    ) : null}
+                    {doc.mimeType === "application/pdf" ? (
+                      <iframe
+                        title={`preview-${doc.id}`}
+                        src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/productions/${id}/documents/${doc.id}/download`}
+                        className="h-64 w-full rounded-md border"
+                      />
+                    ) : null}
+
+                    <div className="grid gap-2 md:grid-cols-4">
+                      <Input
+                        defaultValue={doc.name}
+                        onBlur={(e) =>
+                          updateDocumentMutation.mutate({
+                            docId: doc.id,
+                            patch: { name: e.target.value },
+                          })
+                        }
+                        disabled={!canEdit}
+                      />
+                      <select
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                        value={doc.type}
+                        disabled={!canEdit}
+                        onBlur={(e) =>
+                          updateDocumentMutation.mutate({
+                            docId: doc.id,
+                            patch: { type: e.target.value as ProductionDocument["type"] },
+                          })
+                        }
+                      >
+                        <option value="manuscript">Manuscript</option>
+                        <option value="tech_notes">Tech notes</option>
+                        <option value="image">Image</option>
+                        <option value="graphic">Graphic</option>
+                        <option value="other">Other</option>
+                      </select>
+                      <Input
+                        defaultValue={doc.folder ?? ""}
+                        placeholder="Folder"
+                        disabled={!canEdit}
+                        onBlur={(e) =>
+                          updateDocumentMutation.mutate({
+                            docId: doc.id,
+                            patch: { folder: e.target.value || null },
+                          })
+                        }
+                      />
+                      <Input
+                        type="number"
+                        min={0}
+                        defaultValue={doc.sortOrder ?? 0}
+                        disabled={!canEdit}
+                        onBlur={(e) =>
+                          updateDocumentMutation.mutate({
+                            docId: doc.id,
+                            patch: { sortOrder: Number(e.target.value) || 0 },
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
+
             {documents?.length === 0 ? (
               <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
                 <FileText className="mb-2 h-4 w-4" />
                 No documents yet.
-              </div>
+                </div>
             ) : null}
           </div>
         </CardContent>

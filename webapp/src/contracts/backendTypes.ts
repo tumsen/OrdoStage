@@ -1696,6 +1696,8 @@ export const ProductionDocumentSchema = z.object({
   productionId: z.string(),
   name: z.string(),
   type: ProductionDocumentTypeSchema,
+  folder: z.string().nullable().optional(),
+  sortOrder: z.number().int().optional(),
   filename: z.string(),
   mimeType: z.string(),
   createdAt: z.string(),

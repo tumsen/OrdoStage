@@ -350,6 +350,8 @@ function serializeProductionDocument(row: {
   productionId: string;
   name: string;
   type: string;
+  folder: string | null;
+  sortOrder: number;
   filename: string;
   mimeType: string;
   createdAt: Date;
@@ -359,6 +361,8 @@ function serializeProductionDocument(row: {
     productionId: row.productionId,
     name: row.name,
     type: row.type as ProductionDocument["type"],
+    folder: row.folder ?? null,
+    sortOrder: row.sortOrder,
     filename: row.filename,
     mimeType: row.mimeType,
     createdAt: row.createdAt.toISOString(),
@@ -938,12 +942,14 @@ productionPlannerRouter.get("/productions/:id/documents", async (c) => {
   if (!production) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
   const docs = await prisma.productionDocument.findMany({
     where: { productionId: id },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ folder: "asc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
     select: {
       id: true,
       productionId: true,
       name: true,
       type: true,
+      folder: true,
+      sortOrder: true,
       filename: true,
       mimeType: true,
       createdAt: true,
@@ -969,6 +975,9 @@ productionPlannerRouter.post("/productions/:id/documents", async (c) => {
   const file = formData["file"];
   const name = typeof formData["name"] === "string" ? formData["name"].trim() : "";
   const type = typeof formData["type"] === "string" ? formData["type"].trim() : "other";
+  const folder = typeof formData["folder"] === "string" ? formData["folder"].trim() : "";
+  const sortOrderRaw = typeof formData["sortOrder"] === "string" ? Number(formData["sortOrder"]) : NaN;
+  const sortOrder = Number.isFinite(sortOrderRaw) ? Math.max(0, Math.trunc(sortOrderRaw)) : 0;
   if (!file || typeof file === "string") {
     return c.json({ error: { message: "File is required", code: "BAD_REQUEST" } }, 400);
   }
@@ -979,6 +988,8 @@ productionPlannerRouter.post("/productions/:id/documents", async (c) => {
       productionId: id,
       name: name || file.name,
       type: type || "other",
+      folder: folder || null,
+      sortOrder,
       filename: file.name,
       data: Buffer.from(await file.arrayBuffer()),
       mimeType: file.type || "application/octet-stream",
@@ -988,12 +999,63 @@ productionPlannerRouter.post("/productions/:id/documents", async (c) => {
       productionId: true,
       name: true,
       type: true,
+      folder: true,
+      sortOrder: true,
       filename: true,
       mimeType: true,
       createdAt: true,
     },
   });
   return c.json({ data: serializeProductionDocument(doc) }, 201);
+});
+
+// PATCH /api/productions/:id/documents/:docId
+productionPlannerRouter.patch("/productions/:id/documents/:docId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canWrite(c)) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const docId = c.req.param("docId");
+  const body = await c.req.json().catch(() => ({}));
+  const name = typeof body.name === "string" ? body.name.trim() : undefined;
+  const type = typeof body.type === "string" ? body.type.trim() : undefined;
+  const folder = typeof body.folder === "string" ? body.folder.trim() : undefined;
+  const sortOrder =
+    typeof body.sortOrder === "number" && Number.isFinite(body.sortOrder)
+      ? Math.max(0, Math.trunc(body.sortOrder))
+      : undefined;
+
+  const existing = await prisma.productionDocument.findFirst({
+    where: { id: docId, productionId: id, organizationId: user.organizationId },
+    select: { id: true },
+  });
+  if (!existing) return c.json({ error: { message: "Document not found", code: "NOT_FOUND" } }, 404);
+
+  const updated = await prisma.productionDocument.update({
+    where: { id: existing.id },
+    data: {
+      ...(name !== undefined ? { name: name || "Untitled document" } : {}),
+      ...(type !== undefined ? { type: type || "other" } : {}),
+      ...(folder !== undefined ? { folder: folder || null } : {}),
+      ...(sortOrder !== undefined ? { sortOrder } : {}),
+    },
+    select: {
+      id: true,
+      productionId: true,
+      name: true,
+      type: true,
+      folder: true,
+      sortOrder: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true,
+    },
+  });
+  return c.json({ data: serializeProductionDocument(updated) });
 });
 
 // GET /api/productions/:id/documents/:docId/download

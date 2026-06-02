@@ -1,0 +1,3 @@
+ALTER TABLE "ProductionDocument"
+ADD COLUMN "folder" TEXT,
+ADD COLUMN "sortOrder" INTEGER NOT NULL DEFAULT 0;

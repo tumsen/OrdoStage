@@ -1181,6 +1181,8 @@ model ProductionDocument {
   name           String
   /** manuscript | tech_notes | image | graphic | other */
   type           String       @default("other")
+  folder         String?
+  sortOrder      Int          @default(0)
   filename       String
   data           Bytes
   mimeType       String       @default("application/octet-stream")
