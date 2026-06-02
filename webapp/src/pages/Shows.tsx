@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Ticket, Route, Trash2, FileText } from "lucide-react";
+import { ChevronRight, ExternalLink, Plus, Ticket, Route, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import type { CreateProduction, Production } from "@/lib/types";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 
 type CreateRunForm = {
@@ -162,105 +162,126 @@ export default function Shows() {
   });
 
   if (!canAccess) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>No access</CardTitle>
-            <CardDescription>You do not have access to shows in this organization.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
+    return <div className="p-6 text-sm text-muted-foreground">You do not have access to shows in this organization.</div>;
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 p-4 md:p-6">
-      <Card>
-        <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <CardTitle>Shows</CardTitle>
-            <CardDescription>
-              Create your in-house produced shows and from each show create local/in-house events or tours.
-            </CardDescription>
-          </div>
-          <Button onClick={() => setCreateOpen(true)} disabled={!canEdit}>
-            <Plus className="mr-2 h-4 w-4" />
-            New show
-          </Button>
-        </CardHeader>
-      </Card>
-
-      <div className="grid gap-4">
-        {(shows ?? []).map((show) => (
-          <Card key={show.id}>
-            <CardHeader
-              className="space-y-1 cursor-pointer"
-              onClick={() => navigate(`/shows/${show.id}`)}
-            >
-              <CardTitle className="text-lg">{show.name}</CardTitle>
-              <CardDescription>
-                {(show.linkedEventTitles?.length ?? 0)} in-house/local events • {(show.linkedTourNames?.length ?? 0)} tours
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {show.notes ? <p className="text-sm text-muted-foreground">{show.notes}</p> : null}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={!canEdit}
-                  onClick={() => {
-                    setLinkDialog({ productionId: show.id, kind: "event" });
-                    setLinkDialogCurrentLinks({
-                      eventIds: show.linkedEventIds ?? [],
-                      tourIds: show.linkedTourIds ?? [],
-                    });
-                    setRunForm({ ...emptyRunForm, title: `${show.name} - Local run` });
-                  }}
-                >
-                  <Ticket className="mr-2 h-4 w-4" />
-                  Create in-house event
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={!canEdit}
-                  onClick={() => {
-                    setLinkDialog({ productionId: show.id, kind: "tour" });
-                    setLinkDialogCurrentLinks({
-                      eventIds: show.linkedEventIds ?? [],
-                      tourIds: show.linkedTourIds ?? [],
-                    });
-                    setRunForm({ ...emptyRunForm, title: `${show.name} - Tour` });
-                  }}
-                >
-                  <Route className="mr-2 h-4 w-4" />
-                  Create tour
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => navigate(`/production?productionId=${show.id}`)}>
-                  Open in planner
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => navigate(`/shows/${show.id}`)}>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Details
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={!canEdit || deleteShowMutation.isPending}
-                  onClick={() => deleteShowMutation.mutate(show.id)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="page-shell">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-white/50">
+          Create your in-house produced shows and from each show create local/in-house events or tours.
+        </p>
+        <Button
+          onClick={() => setCreateOpen(true)}
+          disabled={!canEdit}
+          className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 flex-shrink-0"
+        >
+          <Plus size={14} /> New Show
+        </Button>
       </div>
 
-      {isLoading ? <p className="text-sm text-muted-foreground">Loading shows...</p> : null}
+      <div className="bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 text-xs font-medium text-white/40 uppercase tracking-wide border-b border-white/10">
+          Shows
+        </div>
+        {isLoading ? (
+          <div className="p-5 space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full rounded bg-white/5" />
+            ))}
+          </div>
+        ) : (shows ?? []).length === 0 ? (
+          <div className="py-12 text-center text-white/30 text-sm">No shows yet. Create your first one.</div>
+        ) : (
+          (shows ?? []).map((show) => (
+            <div key={show.id} className="border-b last:border-b-0 border-white/5 px-4 sm:px-5 py-3.5">
+              <div className="flex items-start gap-2">
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-start gap-2 text-left rounded-md py-0.5 -my-0.5 px-1 -mx-1 hover:bg-white/[0.04]"
+                  onClick={() => navigate(`/shows/${show.id}`)}
+                >
+                  <ChevronRight size={16} className="text-white/45 shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-x-2 flex-wrap min-w-0">
+                      <span className="text-sm font-medium text-white/90 truncate">{show.name}</span>
+                      <span className="text-[10px] tabular-nums text-white/40 shrink-0">
+                        {(show.linkedEventTitles?.length ?? 0)} events
+                      </span>
+                      <span className="text-[10px] tabular-nums text-white/40 shrink-0">
+                        {(show.linkedTourNames?.length ?? 0)} tours
+                      </span>
+                    </div>
+                    {show.notes ? <p className="text-[11px] text-white/35 mt-0.5 truncate">{show.notes}</p> : null}
+                  </div>
+                </button>
+                <div className="flex shrink-0 flex-wrap items-center gap-1.5 pt-0.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 border-white/15 text-white hover:bg-white/10"
+                    onClick={() => navigate(`/shows/${show.id}`)}
+                  >
+                    Details
+                    <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 border-white/15 text-white hover:bg-white/10"
+                    onClick={() => navigate(`/production?productionId=${show.id}`)}
+                  >
+                    Open planner
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 border-white/15 text-white hover:bg-white/10"
+                    disabled={!canEdit}
+                    onClick={() => {
+                      setLinkDialog({ productionId: show.id, kind: "event" });
+                      setLinkDialogCurrentLinks({
+                        eventIds: show.linkedEventIds ?? [],
+                        tourIds: show.linkedTourIds ?? [],
+                      });
+                      setRunForm({ ...emptyRunForm, title: `${show.name} - Local run` });
+                    }}
+                  >
+                    <Ticket className="mr-1.5 h-3.5 w-3.5" />
+                    Event
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 border-white/15 text-white hover:bg-white/10"
+                    disabled={!canEdit}
+                    onClick={() => {
+                      setLinkDialog({ productionId: show.id, kind: "tour" });
+                      setLinkDialogCurrentLinks({
+                        eventIds: show.linkedEventIds ?? [],
+                        tourIds: show.linkedTourIds ?? [],
+                      });
+                      setRunForm({ ...emptyRunForm, title: `${show.name} - Tour` });
+                    }}
+                  >
+                    <Route className="mr-1.5 h-3.5 w-3.5" />
+                    Tour
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-white/30 hover:text-red-400"
+                    disabled={!canEdit || deleteShowMutation.isPending}
+                    onClick={() => deleteShowMutation.mutate(show.id)}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
