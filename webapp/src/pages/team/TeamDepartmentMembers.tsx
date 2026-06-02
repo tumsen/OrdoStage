@@ -2,13 +2,20 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/lib/auth-client";
-import { Loader2 } from "lucide-react";
+import { Loader2, User } from "lucide-react";
 import { PersonCard } from "@/components/person/PersonCard";
 import { TeamAddPersonFooter } from "./TeamAddPersonFooter";
 import { TeamMemberRolesEditor } from "./TeamMemberRolesEditor";
 import { api, isApiError } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Person } from "../../../../backend/src/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +39,27 @@ export interface DepartmentMember {
 import { parseTeamRoles, serializeTeamRoles } from "./teamRoles";
 export { parseTeamRoles, serializeTeamRoles } from "./teamRoles";
 
+function personPhotoUrl(person: Person): string | null {
+  if (!person.hasPhoto) return null;
+  return `${import.meta.env.VITE_BACKEND_URL || ""}/api/people/${person.id}/photo?ts=${person.photoUpdatedAt ?? ""}`;
+}
+
+function PersonPickerLabel({ person }: { person: Person }) {
+  const photoUrl = personPhotoUrl(person);
+  return (
+    <span className="flex items-center gap-2 min-w-0">
+      <span className="h-6 w-6 rounded-full overflow-hidden bg-white/10 border border-white/10 shrink-0 flex items-center justify-center">
+        {photoUrl ? (
+          <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <User size={12} className="text-white/30" />
+        )}
+      </span>
+      <span className="truncate text-sm">{person.name}</span>
+    </span>
+  );
+}
+
 interface TeamDepartmentMembersProps {
   departmentId: string;
   expanded: boolean;
@@ -43,6 +71,7 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const [removeTarget, setRemoveTarget] = useState<DepartmentMember | null>(null);
+  const [addPersonId, setAddPersonId] = useState("");
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["department-members", departmentId],
@@ -61,6 +90,7 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
 
   const memberIds = new Set(members.map((m) => m.personId));
   const candidates = allPeople.filter((p) => !memberIds.has(p.id));
+  const addPerson = addPersonId ? peopleById.get(addPersonId) : undefined;
 
   const addMutation = useMutation({
     mutationFn: ({ personId, roles }: { personId: string; roles: string }) =>
@@ -72,6 +102,7 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
       queryClient.invalidateQueries({ queryKey: ["department-members", departmentId] });
       queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["people"] });
+      setAddPersonId("");
       toast({ title: "Added to team" });
     },
     onError: (e: unknown) => {
@@ -184,33 +215,33 @@ export function TeamDepartmentMembers({ departmentId, expanded, canWrite }: Team
           {candidates.length === 0 ? (
             <p className="text-xs text-white/30 py-1">Everyone is already on this team.</p>
           ) : (
-            <div className="rounded-lg border border-white/5 overflow-hidden bg-white/[0.02]">
-              {candidates.map((person) => {
-                const personEmail = person.email?.toLowerCase() ?? null;
-                const canEditPerson =
-                  canWrite || Boolean(sessionEmail && personEmail && sessionEmail === personEmail);
-                return (
-                  <PersonCard
-                    key={person.id}
-                    person={person}
-                    showActiveToggle={false}
-                    canEditPerson={canEditPerson}
-                    canDeletePerson={false}
-                    canSeeDocumentSummaries={canWrite}
-                    onEdit={() => navigate(`/people/${person.id}/edit`)}
-                    onDelete={() => {}}
-                    footer={
-                      <TeamAddPersonFooter
-                        isAdding={
-                          addMutation.isPending && addMutation.variables?.personId === person.id
-                        }
-                        onAdd={(roles) => addMutation.mutate({ personId: person.id, roles })}
-                      />
-                    }
-                  />
-                );
-              })}
-            </div>
+            <>
+              <Select value={addPersonId || undefined} onValueChange={setAddPersonId}>
+                <SelectTrigger className="w-full bg-white/5 border-white/10 text-white h-10">
+                  {addPerson ? (
+                    <PersonPickerLabel person={addPerson} />
+                  ) : (
+                    <SelectValue placeholder="Choose someone…" />
+                  )}
+                </SelectTrigger>
+                <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-60">
+                  {candidates.map((person) => (
+                    <SelectItem key={person.id} value={person.id} className="py-2">
+                      <PersonPickerLabel person={person} />
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {addPerson ? (
+                <TeamAddPersonFooter
+                  key={addPerson.id}
+                  isAdding={
+                    addMutation.isPending && addMutation.variables?.personId === addPerson.id
+                  }
+                  onAdd={(roles) => addMutation.mutate({ personId: addPerson.id, roles })}
+                />
+              ) : null}
+            </>
           )}
         </div>
       ) : null}
