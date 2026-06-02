@@ -355,18 +355,26 @@ function normalizePhotoCrop(crop: Partial<PhotoCrop>): PhotoCrop {
   };
 }
 
+function getDevicePixelRatio(): number {
+  if (typeof window === "undefined") return 1;
+  return Math.min(window.devicePixelRatio || 1, 3);
+}
+
+/** Layout image in CSS px; uses DPR so downscale to the circle stays sharp on retina. */
 function photoCropLayout(
   containerW: number,
   containerH: number,
   naturalW: number,
   naturalH: number,
-  crop: PhotoCrop
+  crop: PhotoCrop,
+  devicePixelRatio: number
 ) {
   const cw = Math.max(1, containerW);
   const ch = Math.max(1, containerH);
   const nw = Math.max(1, naturalW);
   const nh = Math.max(1, naturalH);
-  const coverScale = Math.max(cw / nw, ch / nh);
+  const dpr = Math.max(1, devicePixelRatio);
+  const coverScale = Math.max((cw * dpr) / nw, (ch * dpr) / nh);
   const zoomFactor = crop.zoom / 100;
   const displayW = nw * coverScale * zoomFactor;
   const displayH = nh * coverScale * zoomFactor;
@@ -374,7 +382,14 @@ function photoCropLayout(
   const maxPanY = Math.max(0, (displayH - ch) / 2);
   const panX = ((crop.x - 50) / 50) * maxPanX;
   const panY = ((crop.y - 50) / 50) * maxPanY;
-  return { displayW, displayH, panX, panY, maxPanX, maxPanY };
+  return {
+    displayW: Math.round(displayW),
+    displayH: Math.round(displayH),
+    panX: Math.round(panX),
+    panY: Math.round(panY),
+    maxPanX,
+    maxPanY,
+  };
 }
 
 function focusFromPan(pan: number, maxPan: number): number {
@@ -404,7 +419,7 @@ function CircularPhotoEditor({
   zoom,
   onCropChange,
   editable = true,
-  sizeClassName = "h-32 w-32",
+  sizeClassName = "h-40 w-40",
 }: {
   src: string;
   alt: string;
@@ -419,7 +434,8 @@ function CircularPhotoEditor({
   const mountedRef = useRef(true);
   const [dragging, setDragging] = useState(false);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
-  const [containerSize, setContainerSize] = useState({ w: 128, h: 128 });
+  const [containerSize, setContainerSize] = useState({ w: 160, h: 160 });
+  const [devicePixelRatio, setDevicePixelRatio] = useState(getDevicePixelRatio);
   const [localCrop, setLocalCrop] = useState<PhotoCrop>(() =>
     normalizePhotoCrop({ x: focusX, y: focusY, zoom })
   );
@@ -450,12 +466,22 @@ function CircularPhotoEditor({
   }, [src]);
 
   useEffect(() => {
+    const syncDpr = () => {
+      if (mountedRef.current) setDevicePixelRatio(getDevicePixelRatio());
+    };
+    syncDpr();
+    window.addEventListener("resize", syncDpr);
+    return () => window.removeEventListener("resize", syncDpr);
+  }, []);
+
+  useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const measure = () => {
       if (!mountedRef.current) return;
       const rect = el.getBoundingClientRect();
       setContainerSize({ w: rect.width, h: rect.height });
+      setDevicePixelRatio(getDevicePixelRatio());
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -470,7 +496,8 @@ function CircularPhotoEditor({
           containerSize.h,
           naturalSize.w,
           naturalSize.h,
-          localCrop
+          localCrop,
+          devicePixelRatio
         )
       : null;
 
@@ -571,14 +598,15 @@ function CircularPhotoEditor({
           }
         }}
         className={`pointer-events-none max-w-none select-none ${
-          layout ? "absolute left-1/2 top-1/2" : "h-full w-full object-cover"
+          layout ? "absolute left-1/2 top-1/2 will-change-transform" : "h-full w-full object-cover"
         }`}
         style={
           layout
             ? {
                 width: layout.displayW,
                 height: layout.displayH,
-                transform: `translate(calc(-50% + ${layout.panX}px), calc(-50% + ${layout.panY}px))`,
+                transform: `translate3d(calc(-50% + ${layout.panX}px), calc(-50% + ${layout.panY}px), 0)`,
+                backfaceVisibility: "hidden",
               }
             : undefined
         }
