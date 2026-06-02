@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
+import { contentDispositionHeader } from "../lib/contentDisposition";
 import { filenameFromDisplayRename } from "../lib/documentFilenameRename";
 import { auth } from "../auth";
 import {
@@ -1003,11 +1004,18 @@ peopleRouter.get("/people/:id/photo", async (c) => {
   if (!person || !person.photoData) {
     return c.json({ error: { message: "Photo not found", code: "NOT_FOUND" } }, 404);
   }
-  return new Response(person.photoData, {
+  const body =
+    person.photoData instanceof Uint8Array
+      ? person.photoData
+      : new Uint8Array(person.photoData);
+  return new Response(body, {
     headers: {
       "Content-Type": person.photoMimeType || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${person.photoFilename || "photo"}"`,
-      "Content-Length": String(person.photoData.length),
+      "Content-Disposition": contentDispositionHeader(
+        "inline",
+        person.photoFilename || "photo"
+      ),
+      "Content-Length": String(body.byteLength),
       "Cache-Control": "private, max-age=60",
     },
   });
