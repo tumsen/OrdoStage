@@ -219,8 +219,8 @@ export default function Shows() {
                       <PeopleCountGraphic count={show.techCount ?? show.techNames?.length ?? 0} label="Tech" />
                       <div className="rounded-md border border-white/10 bg-white/5 p-3">
                         <p className="text-xs uppercase tracking-wide text-white/40">Stage</p>
-                        <p className="mt-2 text-sm text-white/85">
-                          {show.stageWidth || "-"} W • {show.stageDepth || "-"} D • {show.stageHeight || "-"} H
+                        <p className="mt-2 text-sm text-white/85 tabular-nums">
+                          {show.stageWidth || "0"} × {show.stageDepth || "0"} × {show.stageHeight || "0"} m
                         </p>
                       </div>
                     </div>

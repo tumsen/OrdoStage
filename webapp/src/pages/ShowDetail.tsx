@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { PeopleCountGraphic, PersonChip } from "@/components/show/PeopleVisuals";
+import { StageDimensionFields } from "@/components/StageDimensionFields";
+import { decodeToFormFields, formatMetresForInput } from "@/lib/stageSize";
 
 type FormState = {
   name: string;
@@ -26,7 +28,14 @@ type FormState = {
   technicalSpecs: string;
 };
 
+function stageFieldToInput(value: string | null | undefined): string {
+  if (!value?.trim()) return "";
+  const n = parseFloat(value.trim().replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? formatMetresForInput(n) : value.trim();
+}
+
 function toForm(show: Production | null): FormState {
+  const fromStageSize = show?.stageSize ? decodeToFormFields(show.stageSize) : null;
   return {
     name: show?.name ?? "",
     description: show?.description ?? "",
@@ -34,9 +43,9 @@ function toForm(show: Production | null): FormState {
     actorCount: show?.actorCount == null ? "" : String(show.actorCount),
     techCount: show?.techCount == null ? "" : String(show.techCount),
     durationMinutes: show?.durationMinutes == null ? "" : String(show.durationMinutes),
-    stageWidth: show?.stageWidth ?? "",
-    stageDepth: show?.stageDepth ?? "",
-    stageHeight: show?.stageHeight ?? "",
+    stageWidth: stageFieldToInput(show?.stageWidth) || fromStageSize?.stageWidth || "",
+    stageDepth: stageFieldToInput(show?.stageDepth) || fromStageSize?.stageDepth || "",
+    stageHeight: stageFieldToInput(show?.stageHeight) || fromStageSize?.stageHeight || "",
     technicalSpecs: show?.technicalSpecs ?? "",
   };
 }
@@ -317,31 +326,15 @@ export default function ShowDetail() {
                 onChange={(e) => setForm((p) => ({ ...p, durationMinutes: e.target.value }))}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="stage-width">Stage width</Label>
-              <Input
-                id="stage-width"
-                value={form.stageWidth}
-                onChange={(e) => setForm((p) => ({ ...p, stageWidth: e.target.value }))}
-                placeholder="e.g. 10m"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stage-depth">Stage depth</Label>
-              <Input
-                id="stage-depth"
-                value={form.stageDepth}
-                onChange={(e) => setForm((p) => ({ ...p, stageDepth: e.target.value }))}
-                placeholder="e.g. 8m"
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="stage-height">Stage height</Label>
-              <Input
-                id="stage-height"
-                value={form.stageHeight}
-                onChange={(e) => setForm((p) => ({ ...p, stageHeight: e.target.value }))}
-                placeholder="e.g. 5m"
+            <div className="md:col-span-2">
+              <StageDimensionFields
+                values={{
+                  stageWidth: form.stageWidth,
+                  stageDepth: form.stageDepth,
+                  stageHeight: form.stageHeight,
+                }}
+                onChange={(key, value) => setForm((p) => ({ ...p, [key]: value }))}
+                disabled={!canEdit}
               />
             </div>
             <div className="space-y-2 md:col-span-2">
