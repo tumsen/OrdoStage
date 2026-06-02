@@ -2,6 +2,10 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
+import {
+  contentDispositionHeader,
+  sanitizeStoredFilename,
+} from "../lib/contentDisposition";
 import { filenameFromDisplayRename } from "../lib/documentFilenameRename";
 import { CreateVenueSchema, UpdateVenueSchema, UpdateVenueDocumentSchema, type VenueDocumentKind } from "../types";
 import { canAction } from "../requestRole";
@@ -285,7 +289,7 @@ venuesRouter.get("/venues/documents/:docId/download", async (c) => {
   return new Response(doc.data, {
     headers: {
       "Content-Type": doc.mimeType,
-      "Content-Disposition": `attachment; filename="${doc.filename}"`,
+      "Content-Disposition": contentDispositionHeader("attachment", doc.filename),
       "Content-Length": String(doc.data.length),
     },
   });
@@ -413,7 +417,7 @@ venuesRouter.post("/venues/:id/documents", async (c) => {
       venueId: venue.id,
       name: rawName,
       kind,
-      filename: file.name,
+      filename: sanitizeStoredFilename(file.name),
       data: bytes,
       mimeType: file.type || "application/octet-stream",
     },

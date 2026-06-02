@@ -1,7 +1,6 @@
-const MAX_FILENAME_LEN = 200;
+import { sanitizeStoredFilename } from "./contentDisposition";
 
-/** Strip characters unsafe in paths / downloads (aligned with client ZIP naming). */
-const BAD_FILENAME_CHARS = /[/\\?%*:|"<>]/g;
+const MAX_FILENAME_LEN = 200;
 
 /**
  * When the user edits the display name of a stored file, derive the stored `filename`
@@ -12,7 +11,7 @@ export function filenameFromDisplayRename(displayName: string, previousFilename:
   const trimmed = displayName.trim();
   if (!trimmed) return previousFilename;
 
-  let cleaned = trimmed.replace(BAD_FILENAME_CHARS, "_").trim();
+  let cleaned = sanitizeStoredFilename(trimmed);
   if (!cleaned) return previousFilename;
 
   const lastDot = cleaned.lastIndexOf(".");

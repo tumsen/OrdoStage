@@ -4,6 +4,7 @@ import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { CreateCalendarSchema, PatchCalendarSchema } from "../types";
 import { canAction } from "../requestRole";
+import { contentDispositionHeader } from "../lib/contentDisposition";
 import { env } from "../env";
 import { normalizeClientIanaZone, wallClockInstantFromStoredDayAndHHMM } from "../clientWallClock";
 
@@ -692,7 +693,10 @@ calendarsRouter.get("/calendars/:tokenIcs", async (c) => {
   return new Response(icsContent, {
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${calendar.name}.ics"`,
+      "Content-Disposition": contentDispositionHeader(
+        "attachment",
+        `${calendar.name}.ics`
+      ),
     },
   });
 });

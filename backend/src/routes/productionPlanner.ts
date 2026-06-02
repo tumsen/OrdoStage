@@ -3,6 +3,10 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { auth } from "../auth";
 import { prisma } from "../prisma";
+import {
+  contentDispositionHeader,
+  sanitizeStoredFilename,
+} from "../lib/contentDisposition";
 import { canAction, canView } from "../requestRole";
 import {
   AssignProductionTeamSchema,
@@ -979,7 +983,7 @@ productionPlannerRouter.post("/productions/:id/tech-rider", async (c) => {
     where: { id },
     data: {
       techRiderPdfData: bytes,
-      techRiderPdfName: pdfFile.name || "tech-rider.pdf",
+      techRiderPdfName: sanitizeStoredFilename(pdfFile.name || "tech-rider.pdf"),
     },
   });
   return c.json({ data: { ok: true } }, 201);
@@ -1005,7 +1009,10 @@ productionPlannerRouter.get("/productions/:id/tech-rider/download", async (c) =>
   return new Response(production.techRiderPdfData, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${production.techRiderPdfName || "tech-rider.pdf"}"`,
+      "Content-Disposition": contentDispositionHeader(
+        "attachment",
+        production.techRiderPdfName || "tech-rider.pdf"
+      ),
       "Content-Length": String(production.techRiderPdfData.length),
     },
   });
@@ -1092,7 +1099,7 @@ productionPlannerRouter.post("/productions/:id/documents", async (c) => {
       type: type || "other",
       folder: folder || null,
       sortOrder,
-      filename: file.name,
+      filename: sanitizeStoredFilename(file.name),
       data: Buffer.from(await file.arrayBuffer()),
       mimeType: file.type || "application/octet-stream",
     },
@@ -1178,7 +1185,7 @@ productionPlannerRouter.get("/productions/:id/documents/:docId/download", async 
   return new Response(doc.data, {
     headers: {
       "Content-Type": doc.mimeType,
-      "Content-Disposition": `attachment; filename="${doc.filename}"`,
+      "Content-Disposition": contentDispositionHeader("attachment", doc.filename),
       "Content-Length": String(doc.data.length),
     },
   });
@@ -1811,7 +1818,7 @@ productionPlannerRouter.post("/productions/phases/:phaseId/documents", async (c)
       phaseId,
       name: name.trim(),
       type: typeof type === "string" && type.trim() ? type.trim() : "other",
-      filename: file.name,
+      filename: sanitizeStoredFilename(file.name),
       data: buffer,
       mimeType: file.type || "application/octet-stream",
     },
@@ -1850,7 +1857,7 @@ productionPlannerRouter.get("/productions/phase-documents/:docId/download", asyn
   return new Response(document.data, {
     headers: {
       "Content-Type": document.mimeType,
-      "Content-Disposition": `attachment; filename="${document.filename}"`,
+      "Content-Disposition": contentDispositionHeader("attachment", document.filename),
       "Content-Length": String(document.data.length),
     },
   });

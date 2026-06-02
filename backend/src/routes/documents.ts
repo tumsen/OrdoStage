@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
+import {
+  contentDispositionHeader,
+  sanitizeStoredFilename,
+} from "../lib/contentDisposition";
 
 const documentsRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -77,7 +81,7 @@ documentsRouter.post("/events/:eventId/documents", async (c) => {
       eventId,
       name: name.trim(),
       type: typeof type === "string" && type.trim() ? type.trim() : "other",
-      filename: file.name,
+      filename: sanitizeStoredFilename(file.name),
       data: buffer,
       mimeType: file.type || "application/octet-stream",
     },
@@ -125,7 +129,7 @@ documentsRouter.get("/documents/:id/download", async (c) => {
   return new Response(document.data, {
     headers: {
       "Content-Type": document.mimeType,
-      "Content-Disposition": `attachment; filename="${document.filename}"`,
+      "Content-Disposition": contentDispositionHeader("attachment", document.filename),
       "Content-Length": String(document.data.length),
     },
   });

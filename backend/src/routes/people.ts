@@ -2,7 +2,10 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
-import { contentDispositionHeader } from "../lib/contentDisposition";
+import {
+  contentDispositionHeader,
+  sanitizeStoredFilename,
+} from "../lib/contentDisposition";
 import { filenameFromDisplayRename } from "../lib/documentFilenameRename";
 import { auth } from "../auth";
 import {
@@ -951,7 +954,7 @@ peopleRouter.post("/people/:id/photo", async (c) => {
     where: { id: person.id },
     data: {
       photoData: bytes,
-      photoFilename: file.name,
+      photoFilename: sanitizeStoredFilename(file.name),
       photoMimeType: file.type || "application/octet-stream",
       photoUpdatedAt: new Date(),
       photoFocusX: 50,
@@ -1097,7 +1100,7 @@ peopleRouter.post("/people/:id/documents", async (c) => {
       personId: person.id,
       name: rawName,
       type: rawType,
-      filename: file.name,
+      filename: sanitizeStoredFilename(file.name),
       data: bytes,
       mimeType: file.type || "application/octet-stream",
       doesNotExpire,
@@ -1386,7 +1389,7 @@ peopleRouter.get("/people/documents/:docId/download", async (c) => {
   return new Response(doc.data, {
     headers: {
       "Content-Type": doc.mimeType,
-      "Content-Disposition": `attachment; filename="${doc.filename}"`,
+      "Content-Disposition": contentDispositionHeader("attachment", doc.filename),
       "Content-Length": String(doc.data.length),
     },
   });

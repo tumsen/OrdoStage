@@ -3,6 +3,10 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import {
+  contentDispositionHeader,
+  sanitizeStoredFilename,
+} from "../lib/contentDisposition";
+import {
   CreateEventSchema,
   CreateEventShowSchema,
   CreateEventShowJobSchema,
@@ -1232,7 +1236,7 @@ eventsRouter.post("/events/:id/teams/:eventTeamId/documents", async (c) => {
       teamId: eventTeamId,
       name: name || file.name,
       type: type || "other",
-      filename: file.name,
+      filename: sanitizeStoredFilename(file.name),
       data: bytes,
       mimeType: file.type || "application/octet-stream",
       createdByUserId: user.id,
@@ -1284,7 +1288,7 @@ eventsRouter.get("/events/:id/team-documents/:docId/download", async (c) => {
   return new Response(doc.data, {
     headers: {
       "Content-Type": doc.mimeType,
-      "Content-Disposition": `attachment; filename="${doc.filename}"`,
+      "Content-Disposition": contentDispositionHeader("attachment", doc.filename),
       "Content-Length": String(doc.data.length),
     },
   });

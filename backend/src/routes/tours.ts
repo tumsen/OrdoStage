@@ -12,6 +12,10 @@ import {
   ReplaceTourScheduleEventsSchema,
 } from "../types";
 import { canAction } from "../requestRole";
+import {
+  contentDispositionHeader,
+  sanitizeStoredFilename,
+} from "../lib/contentDisposition";
 import { dayKeyFromDateInput, normalizeTimeHHMM } from "../lib/timeHHMM";
 import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
 import { parseIncomingDateTime } from "../parseIncomingDateTime";
@@ -57,10 +61,10 @@ function hasVenueTechRiderPdfStored(show: {
   );
 }
 
-function venueTechRiderContentDispositionFilename(name: string | null | undefined): string {
-  const raw = name?.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120);
-  if (raw && raw.toLowerCase().endsWith(".pdf")) return raw;
-  return `${raw || "tech-rider"}.pdf`;
+function venueTechRiderDisplayFilename(name: string | null | undefined): string {
+  const raw = sanitizeStoredFilename(name?.trim() || "tech-rider");
+  if (raw.toLowerCase().endsWith(".pdf")) return raw;
+  return `${raw}.pdf`;
 }
 
 const DEFAULT_RIDER_VISIBILITY = {
@@ -1191,7 +1195,7 @@ toursRouter.post("/tours/:id/tech-rider", async (c) => {
     where: { id },
     data: {
       techRiderPdfData: buffer,
-      techRiderPdfName: (file as File).name,
+      techRiderPdfName: sanitizeStoredFilename((file as File).name),
     },
   });
 
@@ -1216,7 +1220,10 @@ toursRouter.get("/tours/:id/tech-rider/download", async (c) => {
   return new Response(tour.techRiderPdfData, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${tour.techRiderPdfName || "tech-rider.pdf"}"`,
+      "Content-Disposition": contentDispositionHeader(
+        "attachment",
+        tour.techRiderPdfName || "tech-rider.pdf"
+      ),
       "Content-Length": String(tour.techRiderPdfData.length),
     },
   });
@@ -1283,7 +1290,7 @@ toursRouter.post("/tours/:id/shows/:showId/venue-rider", async (c) => {
     where: { id: showId },
     data: {
       venueTechRiderPdfData: Buffer.from(ab),
-      venueTechRiderPdfName: pdfFile.name || "tech-rider.pdf",
+      venueTechRiderPdfName: sanitizeStoredFilename(pdfFile.name || "tech-rider.pdf"),
       techRiderPdfUrl: null,
     },
   });
@@ -1331,12 +1338,12 @@ toursRouter.get("/tours/:id/shows/:showId/venue-rider/track", async (c) => {
 
   if (storedBytes) {
     const body = new Uint8Array(storedBytes);
-    const filename = venueTechRiderContentDispositionFilename(show.venueTechRiderPdfName);
+    const filename = venueTechRiderDisplayFilename(show.venueTechRiderPdfName);
     return new Response(body, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${filename}"`,
+        "Content-Disposition": contentDispositionHeader("inline", filename),
         "Cache-Control": "private, no-store",
       },
     });
