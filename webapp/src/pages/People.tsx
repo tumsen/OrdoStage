@@ -382,6 +382,20 @@ function focusFromPan(pan: number, maxPan: number): number {
   return clampFocus(50 + (pan / maxPan) * 50);
 }
 
+function photoCropEqual(a: unknown, b: unknown): boolean {
+  const left = a as PhotoCrop;
+  const right = b as PhotoCrop;
+  return left.x === right.x && left.y === right.y && left.zoom === right.zoom;
+}
+
+function mergeAutoSaveStatuses(...statuses: AutoSaveStatus[]): AutoSaveStatus {
+  if (statuses.includes("error")) return "error";
+  if (statuses.includes("saving")) return "saving";
+  if (statuses.includes("pending")) return "pending";
+  if (statuses.includes("saved")) return "saved";
+  return "idle";
+}
+
 function CircularPhotoEditor({
   src,
   alt,
@@ -402,6 +416,7 @@ function CircularPhotoEditor({
   sizeClassName?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
   const [dragging, setDragging] = useState(false);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [containerSize, setContainerSize] = useState({ w: 128, h: 128 });
@@ -419,8 +434,16 @@ function CircularPhotoEditor({
   } | null>(null);
 
   useEffect(() => {
+    if (dragging) return;
     setLocalCrop(normalizePhotoCrop({ x: focusX, y: focusY, zoom }));
-  }, [focusX, focusY, zoom]);
+  }, [focusX, focusY, zoom, dragging]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     setNaturalSize(null);
@@ -430,6 +453,7 @@ function CircularPhotoEditor({
     const el = containerRef.current;
     if (!el) return;
     const measure = () => {
+      if (!mountedRef.current) return;
       const rect = el.getBoundingClientRect();
       setContainerSize({ w: rect.width, h: rect.height });
     };
@@ -540,6 +564,7 @@ function CircularPhotoEditor({
         alt={alt}
         draggable={false}
         onLoad={(e) => {
+          if (!mountedRef.current) return;
           const img = e.currentTarget;
           if (img.naturalWidth > 0 && img.naturalHeight > 0) {
             setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
@@ -725,6 +750,51 @@ function PersonFormDialog({
       zoom: person?.photoZoom ?? 100,
     })
   );
+  const photoCropRef = useRef(photoFocus);
+  photoCropRef.current = photoFocus;
+  const personIdRef = useRef(person?.id);
+  personIdRef.current = person?.id;
+
+  const photoCropAutoSave = useAutoSave({
+    enabled: Boolean(person?.id),
+    resetKey: person?.id,
+    debounceMs: 500,
+    getSnapshot: () => photoCropRef.current,
+    isEqual: photoCropEqual,
+    save: async () => {
+      const id = personIdRef.current;
+      if (!id) return;
+      const crop = normalizePhotoCrop(photoCropRef.current);
+      await updatePersonPhotoFocus(id, crop);
+      queryClient.setQueryData<Person>(["people", id], (old) =>
+        old
+          ? { ...old, photoFocusX: crop.x, photoFocusY: crop.y, photoZoom: crop.zoom }
+          : old
+      );
+      queryClient.setQueryData<Person[]>(["people"], (old) =>
+        old
+          ? old.map((p) =>
+              p.id === id
+                ? { ...p, photoFocusX: crop.x, photoFocusY: crop.y, photoZoom: crop.zoom }
+                : p
+            )
+          : old
+      );
+      const updated = queryClient.getQueryData<Person>(["people", id]);
+      if (updated) onPersonUpdated?.(updated);
+    },
+  });
+
+  const applyPhotoCrop = useCallback(
+    (crop: PhotoCrop) => {
+      const normalized = normalizePhotoCrop(crop);
+      setPhotoFocus(normalized);
+      photoCropRef.current = normalized;
+      photoCropAutoSave.schedule();
+    },
+    [photoCropAutoSave]
+  );
+
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
   const [docExpires, setDocExpires] = useState("");
@@ -906,7 +976,10 @@ function PersonFormDialog({
         URL.revokeObjectURL(photoPreviewUrl);
         setPhotoPreviewUrl(null);
       }
-      setPhotoFocus(normalizePhotoCrop({ x: 50, y: 50, zoom: 100 }));
+      const resetCrop = normalizePhotoCrop({ x: 50, y: 50, zoom: 100 });
+      setPhotoFocus(resetCrop);
+      photoCropRef.current = resetCrop;
+      photoCropAutoSave.markSaved(resetCrop);
       const id = person!.id;
       await queryClient.invalidateQueries({ queryKey: ["people", id] });
       await queryClient.invalidateQueries({ queryKey: ["people"] });
@@ -921,18 +994,6 @@ function PersonFormDialog({
         description: e.message,
         variant: "destructive",
       });
-    },
-  });
-
-  const photoFocusMutation = useMutation({
-    mutationFn: async (crop: PhotoCrop) => {
-      if (!person?.id) return;
-      await updatePersonPhotoFocus(person.id, crop);
-    },
-    onSuccess: async () => {
-      if (!person?.id) return;
-      await queryClient.invalidateQueries({ queryKey: ["people", person.id] });
-      await queryClient.invalidateQueries({ queryKey: ["people"] });
     },
   });
 
@@ -979,14 +1040,20 @@ function PersonFormDialog({
       return null;
     });
     setPhotoFile(null);
-    setPhotoFocus(
-      normalizePhotoCrop({
-        x: person?.photoFocusX ?? 50,
-        y: person?.photoFocusY ?? 50,
-        zoom: person?.photoZoom ?? 100,
-      })
-    );
-  }, [person?.id, person?.photoFocusX, person?.photoFocusY, person?.photoZoom]);
+  }, [person?.id]);
+
+  useEffect(() => {
+    if (!person?.id) return;
+    const crop = normalizePhotoCrop({
+      x: person.photoFocusX ?? 50,
+      y: person.photoFocusY ?? 50,
+      zoom: person.photoZoom ?? 100,
+    });
+    setPhotoFocus(crop);
+    photoCropRef.current = crop;
+    photoCropAutoSave.markSaved(crop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- baseline crop when switching person only
+  }, [person?.id]);
 
   const uploadDocMutation = useMutation({
     mutationFn: async () => {
@@ -1126,17 +1193,12 @@ function PersonFormDialog({
 
   useEffect(() => {
     if (!asPage || !onAutoSaveState) return;
-    const status =
-      autoSave.status === "error" || contractAutoSave.status === "error"
-        ? "error"
-        : autoSave.status === "saving" || contractAutoSave.status === "saving"
-          ? "saving"
-          : autoSave.status === "pending" || contractAutoSave.status === "pending"
-            ? "pending"
-            : autoSave.status === "saved" || contractAutoSave.status === "saved"
-              ? "saved"
-              : "idle";
-    const error = autoSave.error ?? contractAutoSave.error;
+    const status = mergeAutoSaveStatuses(
+      autoSave.status,
+      contractAutoSave.status,
+      photoCropAutoSave.status
+    );
+    const error = autoSave.error ?? contractAutoSave.error ?? photoCropAutoSave.error;
     onAutoSaveState({ status, error });
   }, [
     asPage,
@@ -1145,6 +1207,8 @@ function PersonFormDialog({
     autoSave.error,
     contractAutoSave.status,
     contractAutoSave.error,
+    photoCropAutoSave.status,
+    photoCropAutoSave.error,
   ]);
 
   const cardClass = "rounded-xl border border-white/10 bg-white/[0.03] p-5 md:p-6";
@@ -1179,16 +1243,11 @@ function PersonFormDialog({
             focusX={photoFocus.x}
             focusY={photoFocus.y}
             zoom={photoFocus.zoom}
-            onCropChange={(crop) => {
-              setPhotoFocus(crop);
-              if (person?.id) {
-                photoFocusMutation.mutate(crop);
-              }
-            }}
+            onCropChange={person?.id ? applyPhotoCrop : undefined}
             editable
           />
           <p className="text-[10px] text-white/40">
-            Drag in any direction to pan. Scroll on the photo or use the zoom slider to scale, then drag to fit inside the circle.
+            Drag to pan and scroll or use the zoom slider to scale. Crop saves automatically when you leave the page.
           </p>
         </div>
       ) : null}
