@@ -34,19 +34,23 @@ type TravelDraft = {
   lodgingAllowance: boolean;
   lodgingCovered: boolean;
   foodCoveredByReceipts: boolean;
-  isTemporaryWorkplace: boolean;
-  hasUsualResidence: boolean;
-  overnightAwayFromHome: boolean;
-  cannotReturnHome: boolean;
-  twelveMonthRuleOk: boolean;
-  salaryReductionAgreement: boolean;
-  receivesBIncome: boolean;
-  excludedWorkerType: boolean;
   transportsPeopleOrGoods: boolean;
   lodgingByReceipt: boolean;
   dayLines: TravelDayLine[];
   notes: string;
 };
+
+/** Employer handles SKAT eligibility; we always calculate as a standard eligible trip. */
+const TRAVEL_ELIGIBILITY_DEFAULTS = {
+  isTemporaryWorkplace: true,
+  hasUsualResidence: true,
+  overnightAwayFromHome: true,
+  cannotReturnHome: true,
+  twelveMonthRuleOk: true,
+  salaryReductionAgreement: false,
+  receivesBIncome: false,
+  excludedWorkerType: false,
+} as const;
 
 function travelAllowanceDays(startsAt: string, endsAt: string): number {
   const start = new Date(startsAt).getTime();
@@ -95,24 +99,6 @@ function makeDayLine(date: string, existing?: TravelDayLine): TravelDayLine {
   };
 }
 
-function skatEligibility(draft: TravelDraft): { ok: boolean; reasons: string[] } {
-  const reasons: string[] = [];
-  const start = new Date(draft.startsAt).getTime();
-  const end = new Date(draft.endsAt).getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end - start < 24 * 60 * 60_000) {
-    reasons.push("Travel must last at least 24 hours.");
-  }
-  if (!draft.isTemporaryWorkplace) reasons.push("Workplace must be temporary.");
-  if (!draft.hasUsualResidence) reasons.push("Employee must have a usual residence.");
-  if (!draft.overnightAwayFromHome) reasons.push("Employee must sleep away from home.");
-  if (!draft.cannotReturnHome) reasons.push("Distance/work must make overnighting at home impossible.");
-  if (!draft.twelveMonthRuleOk) reasons.push("12-month rule must still allow standard rates.");
-  if (draft.salaryReductionAgreement) reasons.push("Allowance cannot replace reduced salary.");
-  if (draft.receivesBIncome) reasons.push("B-income cannot receive tax-free allowance.");
-  if (draft.excludedWorkerType) reasons.push("Worker type is excluded by SKAT rules.");
-  return { ok: reasons.length === 0, reasons };
-}
-
 export function TravelClaimsPanel({
   rangeFrom,
   rangeTo,
@@ -146,14 +132,6 @@ export function TravelClaimsPanel({
       lodgingAllowance: false,
       lodgingCovered: false,
       foodCoveredByReceipts: false,
-      isTemporaryWorkplace: true,
-      hasUsualResidence: true,
-      overnightAwayFromHome: true,
-      cannotReturnHome: true,
-      twelveMonthRuleOk: true,
-      salaryReductionAgreement: false,
-      receivesBIncome: false,
-      excludedWorkerType: false,
       transportsPeopleOrGoods: false,
       lodgingByReceipt: false,
       dayLines: travelDates(startsAt, endsAt).map((date) => makeDayLine(date)),
@@ -216,14 +194,7 @@ export function TravelClaimsPanel({
       lodgingAllowance: draft.lodgingAllowance,
       lodgingCovered: draft.lodgingCovered,
       foodCoveredByReceipts: draft.foodCoveredByReceipts,
-      isTemporaryWorkplace: draft.isTemporaryWorkplace,
-      hasUsualResidence: draft.hasUsualResidence,
-      overnightAwayFromHome: draft.overnightAwayFromHome,
-      cannotReturnHome: draft.cannotReturnHome,
-      twelveMonthRuleOk: draft.twelveMonthRuleOk,
-      salaryReductionAgreement: draft.salaryReductionAgreement,
-      receivesBIncome: draft.receivesBIncome,
-      excludedWorkerType: draft.excludedWorkerType,
+      ...TRAVEL_ELIGIBILITY_DEFAULTS,
       transportsPeopleOrGoods: draft.transportsPeopleOrGoods,
       lodgingByReceipt: draft.lodgingByReceipt,
       dayLines: draft.dayLines,
@@ -232,7 +203,6 @@ export function TravelClaimsPanel({
   }
 
   const total = (claims ?? []).reduce((sum, claim) => sum + claim.totalAmountCents, 0);
-  const eligibility = skatEligibility(draft);
   const timeframeSet = hasValidTravelTimeframe(draft.startsAt, draft.endsAt);
   const allowanceDays = travelAllowanceDays(draft.startsAt, draft.endsAt);
   const canClaimLodging =
@@ -250,7 +220,7 @@ export function TravelClaimsPanel({
           <div>
             <h3 className="text-sm font-semibold text-white">Travel allowance</h3>
             <p className="mt-1 text-xs text-white/45">
-              Danish tax-free travel allowance using SKAT's 2025/2026 rates, 24-hour rule, meal reductions, 25% receipt rule, and lodging exclusions.
+              Register travel and employer-covered meals. Amounts use current Danish rates and your day-by-day input.
             </p>
           </div>
           <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
@@ -286,7 +256,7 @@ export function TravelClaimsPanel({
               <p className="text-[11px] text-white/35">Set start and end to list travel days and employer-covered meals.</p>
             ) : allowanceDays < 1 ? (
               <p className="rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
-                SKAT requires at least 24 hours of travel before tax-free diæter (food allowance) applies.
+                Trips under 24 hours do not receive a daily food allowance in the calculation.
               </p>
             ) : (
               <TravelDayMealsTable
@@ -370,50 +340,9 @@ export function TravelClaimsPanel({
                 <Textarea
                   value={draft.purpose}
                   onChange={(e) => setDraft((d) => ({ ...d, purpose: e.target.value }))}
-                  placeholder="Work purpose and temporary workplace"
+                  placeholder="What was this trip for?"
                   className="mt-1 min-h-20 border-white/10 bg-white/5 text-white"
                 />
-              </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
-                <p className="text-xs font-semibold text-white">SKAT eligibility</p>
-                <p className="mt-0.5 text-[10px] text-white/45 leading-snug">
-                  All positive conditions must be true. If one fails, the tax-free amount calculates to 0.
-                </p>
-                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
-                  {[
-                    ["isTemporaryWorkplace", "Temporary workplace"],
-                    ["hasUsualResidence", "Usual residence"],
-                    ["overnightAwayFromHome", "Overnight away from home"],
-                    ["cannotReturnHome", "Cannot reasonably sleep at home"],
-                    ["twelveMonthRuleOk", "Within 12-month rule"],
-                  ].map(([key, label]) => (
-                    <label key={key} className="flex items-center gap-2 text-xs text-white/65">
-                      <Checkbox
-                        checked={Boolean(draft[key as keyof TravelDraft])}
-                        onCheckedChange={(checked) => setDraft((d) => ({ ...d, [key]: checked === true }))}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                  {[
-                    ["salaryReductionAgreement", "Salary reduced for allowance"],
-                    ["receivesBIncome", "B-income / honorar"],
-                    ["excludedWorkerType", "Excluded worker type"],
-                  ].map(([key, label]) => (
-                    <label key={key} className="flex items-center gap-2 text-xs text-white/65">
-                      <Checkbox
-                        checked={Boolean(draft[key as keyof TravelDraft])}
-                        onCheckedChange={(checked) => setDraft((d) => ({ ...d, [key]: checked === true }))}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-                {!eligibility.ok ? (
-                  <p className="mt-3 rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
-                    Not tax-free under SKAT rules: {eligibility.reasons[0]}
-                  </p>
-                ) : null}
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2">
@@ -436,7 +365,7 @@ export function TravelClaimsPanel({
               </div>
               {!canClaimLodging && draft.lodgingAllowance ? (
                 <p className="rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
-                  SKAT does not allow tax-free lodging allowance for tourist drivers/transport of people or goods, or when lodging is covered by receipts.
+                  Lodging allowance is not combined with tour-driver rates, transport of people/goods, or receipt-based lodging.
                 </p>
               ) : null}
               <Textarea
@@ -483,8 +412,7 @@ export function TravelClaimsPanel({
                   </p>
                   {claim.totalAmountCents === 0 ? (
                     <p className="mt-1 text-[10px] text-amber-200/80 leading-snug">
-                      Calculated as 0 — trip may not meet all tax-free SKAT conditions or selected allowances are
-                      excluded.
+                      Calculated as 0 — check trip length, meals covered, and allowance options.
                     </p>
                   ) : null}
                   {claim.dayLines.length > 0 ? (
