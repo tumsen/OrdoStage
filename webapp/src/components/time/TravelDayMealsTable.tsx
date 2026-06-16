@@ -5,9 +5,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   foodRateCentsForYear,
+  formatAllowanceDayUnits,
   mealReductionCentsForDay,
   mealReductionLabel,
   SKAT_TRAVEL_ALLOWANCE_URL,
+  travelAllowanceDayUnits,
 } from "@/lib/danishTravelAllowance";
 
 export type TravelDayLine = {
@@ -28,24 +30,23 @@ function money(cents: number): string {
 export function TravelDayMealsTable({
   dayLines,
   allowanceType,
-  allowanceDays,
+  allowanceHours,
   foodCoveredByReceipts,
   onUpdateLine,
 }: {
   dayLines: TravelDayLine[];
   allowanceType: "standard" | "tour_driver_denmark" | "tour_driver_abroad";
-  /** Days that count toward SKAT meal allowance (from trip duration). */
-  allowanceDays: number;
+  /** Commenced travel hours (diæt uses hours ÷ 24, not calendar days). */
+  allowanceHours: number;
   foodCoveredByReceipts: boolean;
   onUpdateLine: (date: string, patch: Partial<TravelDayLine>) => void;
 }) {
   const foodRateCents = foodRateCentsForYear(2026, allowanceType);
   const showMealReductions = allowanceType === "standard" && !foodCoveredByReceipts;
+  const allowanceDayUnits = travelAllowanceDayUnits(allowanceHours);
 
   const totalReduction = showMealReductions
-    ? dayLines
-        .slice(0, allowanceDays)
-        .reduce((sum, line) => sum + mealReductionCentsForDay(foodRateCents, line), 0)
+    ? dayLines.reduce((sum, line) => sum + mealReductionCentsForDay(foodRateCents, line), 0)
     : 0;
 
   return (
@@ -54,9 +55,8 @@ export function TravelDayMealsTable({
         <div>
           <p className="text-xs font-semibold text-white">Travel days — meals covered by employer</p>
           <p className="mt-0.5 text-[10px] text-white/45 leading-snug max-w-2xl">
-            For each calendar day, mark meals that were{" "}
-            <strong className="font-medium text-white/55">included or paid by the employer</strong>. SKAT
-            reduces the tax-free food allowance: breakfast 15%, lunch 30%, dinner 30% (max 75% per day).
+            Calendar rows are for meals per date. Diæt is calculated from travel hours (÷ 24), not the number of
+            calendar dates.
           </p>
           <a
             href={SKAT_TRAVEL_ALLOWANCE_URL}
@@ -68,9 +68,15 @@ export function TravelDayMealsTable({
             <ExternalLink size={10} />
           </a>
         </div>
-        <p className="shrink-0 text-[10px] text-white/35">
-          {dayLines.length} day{dayLines.length === 1 ? "" : "s"}
-          {allowanceDays > 0 ? ` · ${allowanceDays} allowance day${allowanceDays === 1 ? "" : "s"}` : ""}
+        <p className="shrink-0 text-[10px] text-white/35 text-right leading-snug">
+          {dayLines.length} kalenderdag{dayLines.length === 1 ? "" : "e"}
+          {allowanceHours > 0 ? (
+            <>
+              <br />
+              {allowanceHours} t · {formatAllowanceDayUnits(allowanceDayUnits)} diætdag
+              {allowanceDayUnits === 1 ? "" : "e"}
+            </>
+          ) : null}
         </p>
       </div>
 
@@ -105,23 +111,14 @@ export function TravelDayMealsTable({
             </tr>
           </thead>
           <tbody>
-            {dayLines.map((line, index) => {
-              const countsForAllowance = index < allowanceDays;
-              const reduction = showMealReductions && countsForAllowance
-                ? mealReductionCentsForDay(foodRateCents, line)
-                : 0;
+            {dayLines.map((line) => {
+              const reduction = showMealReductions ? mealReductionCentsForDay(foodRateCents, line) : 0;
               const reductionNote = mealReductionLabel(line);
 
               return (
-                <tr
-                  key={line.date}
-                  className={`border-t border-white/10 ${countsForAllowance ? "hover:bg-white/[0.02]" : "opacity-50"}`}
-                >
+                <tr key={line.date} className="border-t border-white/10 hover:bg-white/[0.02]">
                   <td className="whitespace-nowrap px-2 py-1.5 text-white/70 tabular-nums">
                     <div>{format(parseISO(line.date), "EEE d MMM")}</div>
-                    {!countsForAllowance ? (
-                      <div className="text-[9px] text-white/30">Outside allowance</div>
-                    ) : null}
                   </td>
                   <td className="p-1">
                     <Input
@@ -150,7 +147,7 @@ export function TravelDayMealsTable({
                       <label className="flex items-center gap-1.5 text-[10px] text-white/55 cursor-pointer">
                         <Checkbox
                           checked={Boolean(line[key])}
-                          disabled={!showMealReductions || !countsForAllowance}
+                          disabled={!showMealReductions}
                           onCheckedChange={(checked) =>
                             onUpdateLine(line.date, { [key]: checked === true } as Partial<TravelDayLine>)
                           }

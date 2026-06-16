@@ -43,3 +43,29 @@ export function mealReductionLabel(meals: MealFlags): string | null {
   if (meals.dinnerProvided) parts.push("dinner −30%");
   return parts.length > 0 ? parts.join(", ") : null;
 }
+
+/** Whole commenced hours of travel (matches backend calculation). */
+export function travelDurationHours(startMs: number, endMs: number): number {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
+  return Math.ceil((endMs - startMs) / 3_600_000);
+}
+
+/** Diæt is prorated per 24 h; 26 h → 26/24 day units, not 2 full days. */
+export function travelAllowanceDayUnits(hours: number): number {
+  if (hours < 24) return 0;
+  return hours / 24;
+}
+
+export function formatAllowanceDayUnits(units: number): string {
+  return units.toLocaleString("da-DK", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+export function estimatedFoodAllowanceCents(
+  hours: number,
+  foodRateCents: number,
+  foodCoveredByReceipts: boolean
+): number {
+  if (hours < 24) return 0;
+  const gross = Math.round((foodRateCents * hours) / 24);
+  return foodCoveredByReceipts ? Math.round(gross * 0.25) : gross;
+}

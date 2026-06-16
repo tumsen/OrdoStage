@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { TravelDayMealsTable, type TravelDayLine } from "@/components/time/TravelDayMealsTable";
+import { travelDurationHours } from "@/lib/danishTravelAllowance";
 import type { TimeProject, TimeTravelClaim } from "@/contracts/backendTypes";
 
 function toDatetimeLocalValue(date: Date): string {
@@ -51,13 +52,6 @@ const TRAVEL_ELIGIBILITY_DEFAULTS = {
   receivesBIncome: false,
   excludedWorkerType: false,
 } as const;
-
-function travelAllowanceDays(startsAt: string, endsAt: string): number {
-  const start = new Date(startsAt).getTime();
-  const end = new Date(endsAt).getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
-  return Math.ceil((end - start) / 86_400_000);
-}
 
 function hasValidTravelTimeframe(startsAt: string, endsAt: string): boolean {
   const start = new Date(startsAt).getTime();
@@ -204,7 +198,10 @@ export function TravelClaimsPanel({
 
   const total = (claims ?? []).reduce((sum, claim) => sum + claim.totalAmountCents, 0);
   const timeframeSet = hasValidTravelTimeframe(draft.startsAt, draft.endsAt);
-  const allowanceDays = travelAllowanceDays(draft.startsAt, draft.endsAt);
+  const allowanceHours = travelDurationHours(
+    new Date(draft.startsAt).getTime(),
+    new Date(draft.endsAt).getTime()
+  );
   const canClaimLodging =
     draft.allowanceType === "standard" && !draft.transportsPeopleOrGoods && !draft.lodgingByReceipt;
   const updateDayLine = (date: string, patch: Partial<TravelDayLine>) =>
@@ -254,15 +251,15 @@ export function TravelClaimsPanel({
 
             {!timeframeSet ? (
               <p className="text-[11px] text-white/35">Set start and end to list travel days and employer-covered meals.</p>
-            ) : allowanceDays < 1 ? (
+            ) : allowanceHours < 24 ? (
               <p className="rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
-                Trips under 24 hours do not receive a daily food allowance in the calculation.
+                Rejsen skal vare mindst 24 timer for at udløse diæt.
               </p>
             ) : (
               <TravelDayMealsTable
                 dayLines={draft.dayLines}
                 allowanceType={draft.allowanceType}
-                allowanceDays={allowanceDays}
+                allowanceHours={allowanceHours}
                 foodCoveredByReceipts={draft.foodCoveredByReceipts}
                 onUpdateLine={updateDayLine}
               />
