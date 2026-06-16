@@ -4,8 +4,10 @@ import { ExternalLink } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
+  computeTravelLinePayouts,
   foodRateCentsForYear,
   formatAllowanceDayUnits,
+  formatMoneyDkk,
   mealReductionCentsForDay,
   mealReductionLabel,
   SKAT_TRAVEL_ALLOWANCE_URL,
@@ -23,27 +25,45 @@ export type TravelDayLine = {
   lodgingByReceipt: boolean;
 };
 
-function money(cents: number): string {
-  return `${(cents / 100).toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr.`;
-}
-
 export function TravelDayMealsTable({
   dayLines,
+  startsAt,
+  endsAt,
   allowanceType,
   allowanceHours,
   foodCoveredByReceipts,
+  lodgingAllowance,
+  lodgingByReceipt,
+  transportsPeopleOrGoods,
   onUpdateLine,
 }: {
   dayLines: TravelDayLine[];
+  startsAt: Date;
+  endsAt: Date;
   allowanceType: "standard" | "tour_driver_denmark" | "tour_driver_abroad";
   /** Commenced travel hours (diæt uses hours ÷ 24, not calendar days). */
   allowanceHours: number;
   foodCoveredByReceipts: boolean;
+  lodgingAllowance: boolean;
+  lodgingByReceipt: boolean;
+  transportsPeopleOrGoods: boolean;
   onUpdateLine: (date: string, patch: Partial<TravelDayLine>) => void;
 }) {
   const foodRateCents = foodRateCentsForYear(2026, allowanceType);
   const showMealReductions = allowanceType === "standard" && !foodCoveredByReceipts;
   const allowanceDayUnits = travelAllowanceDayUnits(allowanceHours);
+  const linePayouts = computeTravelLinePayouts({
+    startsAt,
+    endsAt,
+    dayLines,
+    allowanceType,
+    foodCoveredByReceipts,
+    lodgingAllowance,
+    lodgingByReceipt,
+    transportsPeopleOrGoods,
+  });
+  const payoutByDate = new Map(linePayouts.map((row) => [row.date, row]));
+  const totalPayoutCents = linePayouts.reduce((sum, row) => sum + row.payoutCents, 0);
 
   const totalReduction = showMealReductions
     ? dayLines.reduce((sum, line) => sum + mealReductionCentsForDay(foodRateCents, line), 0)
@@ -82,7 +102,7 @@ export function TravelDayMealsTable({
 
       {showMealReductions && totalReduction > 0 ? (
         <p className="mt-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-white/55">
-          Total meal reduction: <span className="font-medium text-white/80">−{money(totalReduction)}</span>
+          Total meal reduction: <span className="font-medium text-white/80">−{formatMoneyDkk(totalReduction)}</span>
         </p>
       ) : null}
 
@@ -108,12 +128,14 @@ export function TravelDayMealsTable({
               <th className="min-w-[7rem] px-1 py-1.5">Dinner</th>
               {showMealReductions ? <th className="min-w-[6rem] px-2 py-1.5">Reduction</th> : null}
               <th className="min-w-[5rem] px-1 py-1.5">Lodging</th>
+              <th className="min-w-[5.5rem] px-2 py-1.5 text-right">Udbetaling</th>
             </tr>
           </thead>
           <tbody>
             {dayLines.map((line) => {
               const reduction = showMealReductions ? mealReductionCentsForDay(foodRateCents, line) : 0;
               const reductionNote = mealReductionLabel(line);
+              const payout = payoutByDate.get(line.date);
 
               return (
                 <tr key={line.date} className="border-t border-white/10 hover:bg-white/[0.02]">
@@ -160,7 +182,7 @@ export function TravelDayMealsTable({
                   {showMealReductions ? (
                     <td className="px-2 py-1.5 text-white/50">
                       {reduction > 0 ? (
-                        <span title={reductionNote ?? undefined}>−{money(reduction)}</span>
+                        <span title={reductionNote ?? undefined}>−{formatMoneyDkk(reduction)}</span>
                       ) : (
                         <span className="text-white/25">—</span>
                       )}
@@ -190,10 +212,43 @@ export function TravelDayMealsTable({
                       </label>
                     </div>
                   </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">
+                    {payout && payout.payoutCents > 0 ? (
+                      <span
+                        className="font-medium text-white/85"
+                        title={
+                          payout.lodgingCents > 0
+                            ? `Diæt ${formatMoneyDkk(payout.foodNetCents)} + logi ${formatMoneyDkk(payout.lodgingCents)}`
+                            : payout.mealReductionCents > 0
+                              ? `Brutto ${formatMoneyDkk(payout.foodGrossCents)} − måltider ${formatMoneyDkk(payout.mealReductionCents)}`
+                              : undefined
+                        }
+                      >
+                        {formatMoneyDkk(payout.payoutCents)}
+                      </span>
+                    ) : (
+                      <span className="text-white/25">—</span>
+                    )}
+                  </td>
                 </tr>
               );
             })}
           </tbody>
+          {allowanceHours >= 24 ? (
+            <tfoot>
+              <tr className="border-t border-white/15 bg-black/20 text-white/70">
+                <td
+                  colSpan={showMealReductions ? 8 : 7}
+                  className="px-2 py-1.5 text-right text-[10px] font-medium uppercase tracking-wide text-white/40"
+                >
+                  Total udbetaling
+                </td>
+                <td className="px-2 py-1.5 text-right font-semibold text-white tabular-nums">
+                  {formatMoneyDkk(totalPayoutCents)}
+                </td>
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       </div>
     </div>

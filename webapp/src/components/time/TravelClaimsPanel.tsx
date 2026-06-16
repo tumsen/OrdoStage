@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { TravelDayMealsTable, type TravelDayLine } from "@/components/time/TravelDayMealsTable";
-import { travelDurationHours } from "@/lib/danishTravelAllowance";
+import { travelDurationHours, computeTravelLinePayouts, formatMoneyDkk } from "@/lib/danishTravelAllowance";
 import type { TimeProject, TimeTravelClaim } from "@/contracts/backendTypes";
 
 function toDatetimeLocalValue(date: Date): string {
@@ -258,9 +258,14 @@ export function TravelClaimsPanel({
             ) : (
               <TravelDayMealsTable
                 dayLines={draft.dayLines}
+                startsAt={new Date(draft.startsAt)}
+                endsAt={new Date(draft.endsAt)}
                 allowanceType={draft.allowanceType}
                 allowanceHours={allowanceHours}
                 foodCoveredByReceipts={draft.foodCoveredByReceipts}
+                lodgingAllowance={draft.lodgingAllowance}
+                lodgingByReceipt={draft.lodgingByReceipt}
+                transportsPeopleOrGoods={draft.transportsPeopleOrGoods}
                 onUpdateLine={updateDayLine}
               />
             )}
@@ -390,7 +395,24 @@ export function TravelClaimsPanel({
             No travel claims in this range.
           </div>
         ) : (
-          (claims ?? []).map((claim) => (
+          (claims ?? []).map((claim) => {
+            const claimPayouts =
+              claim.dayLines.length > 0
+                ? computeTravelLinePayouts({
+                    startsAt: new Date(claim.startsAt),
+                    endsAt: new Date(claim.endsAt),
+                    dayLines: claim.dayLines,
+                    allowanceType: claim.allowanceType,
+                    rateYear: claim.rateYear,
+                    foodCoveredByReceipts: claim.foodCoveredByReceipts,
+                    lodgingAllowance: claim.lodgingAllowance,
+                    lodgingByReceipt: claim.lodgingByReceipt,
+                    transportsPeopleOrGoods: claim.transportsPeopleOrGoods,
+                  })
+                : [];
+            const payoutByDate = new Map(claimPayouts.map((row) => [row.date, row]));
+
+            return (
             <div key={claim.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -421,6 +443,7 @@ export function TravelClaimsPanel({
                             <th className="min-w-[5rem] px-1 py-1">City</th>
                             <th className="min-w-[5rem] px-1 py-1">Hotel</th>
                             <th className="px-2 py-1">Covered</th>
+                            <th className="px-2 py-1 text-right">Udbetaling</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -432,6 +455,7 @@ export function TravelClaimsPanel({
                               line.lodgingCovered ? "H" : null,
                               line.lodgingByReceipt ? "R" : null,
                             ].filter(Boolean);
+                            const payout = payoutByDate.get(line.date);
                             return (
                               <tr key={line.date} className="border-t border-white/10 text-white/65">
                                 <td className="whitespace-nowrap px-2 py-0.5 tabular-nums">
@@ -441,6 +465,9 @@ export function TravelClaimsPanel({
                                 <td className="max-w-[10rem] truncate px-1 py-0.5">{line.hotel || "—"}</td>
                                 <td className="px-2 py-0.5 text-white/50">
                                   {covered.length > 0 ? covered.join(" ") : "—"}
+                                </td>
+                                <td className="px-2 py-0.5 text-right tabular-nums text-white/80">
+                                  {payout && payout.payoutCents > 0 ? formatMoneyDkk(payout.payoutCents) : "—"}
                                 </td>
                               </tr>
                             );
@@ -473,7 +500,8 @@ export function TravelClaimsPanel({
                 </div>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

@@ -60,12 +60,119 @@ export function formatAllowanceDayUnits(units: number): string {
   return units.toLocaleString("da-DK", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
-export function estimatedFoodAllowanceCents(
-  hours: number,
-  foodRateCents: number,
-  foodCoveredByReceipts: boolean
-): number {
-  if (hours < 24) return 0;
-  const gross = Math.round((foodRateCents * hours) / 24);
-  return foodCoveredByReceipts ? Math.round(gross * 0.25) : gross;
+export function lodgingRateCentsForYear(rateYear: number): number {
+  return rateYear === 2025 ? 25_600 : 26_800;
+}
+
+export function travelFullOvernightDays(startMs: number, endMs: number): number {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
+  return Math.floor((endMs - startMs) / 86_400_000);
+}
+
+function msOnCalendarDay(dayYmd: string, startsAt: Date, endsAt: Date): number {
+  const [y, m, d] = dayYmd.split("-").map(Number);
+  const dayStart = new Date(y, m - 1, d, 0, 0, 0, 0);
+  const dayEnd = new Date(y, m - 1, d + 1, 0, 0, 0, 0);
+  const start = Math.max(startsAt.getTime(), dayStart.getTime());
+  const end = Math.min(endsAt.getTime(), dayEnd.getTime());
+  return Math.max(0, end - start);
+}
+
+export type TravelDayLineInput = {
+  date: string;
+  breakfastProvided: boolean;
+  lunchProvided: boolean;
+  dinnerProvided: boolean;
+  lodgingCovered: boolean;
+  lodgingByReceipt: boolean;
+};
+
+export type TravelLinePayout = {
+  date: string;
+  hoursOnDay: number;
+  foodGrossCents: number;
+  mealReductionCents: number;
+  foodNetCents: number;
+  lodgingCents: number;
+  payoutCents: number;
+};
+
+export function computeTravelLinePayouts(params: {
+  startsAt: Date;
+  endsAt: Date;
+  dayLines: TravelDayLineInput[];
+  allowanceType: "standard" | "tour_driver_denmark" | "tour_driver_abroad";
+  rateYear?: number;
+  foodCoveredByReceipts: boolean;
+  lodgingAllowance: boolean;
+  lodgingByReceipt: boolean;
+  transportsPeopleOrGoods: boolean;
+}): TravelLinePayout[] {
+  const year = params.rateYear ?? 2026;
+  const foodRate = foodRateCentsForYear(year, params.allowanceType);
+  const lodgingRate = lodgingRateCentsForYear(year);
+  const startMs = params.startsAt.getTime();
+  const endMs = params.endsAt.getTime();
+  const totalMs = endMs - startMs;
+  const totalHours = travelDurationHours(startMs, endMs);
+
+  if (totalHours < 24 || totalMs <= 0) {
+    return params.dayLines.map((line) => ({
+      date: line.date,
+      hoursOnDay: 0,
+      foodGrossCents: 0,
+      mealReductionCents: 0,
+      foodNetCents: 0,
+      lodgingCents: 0,
+      payoutCents: 0,
+    }));
+  }
+
+  const totalFoodGross = params.foodCoveredByReceipts
+    ? Math.round(((foodRate * totalHours) / 24) * 0.25)
+    : Math.round((foodRate * totalHours) / 24);
+
+  const segments = params.dayLines.map((line) => ({
+    line,
+    ms: msOnCalendarDay(line.date, params.startsAt, params.endsAt),
+  }));
+
+  const fullDays = travelFullOvernightDays(startMs, endMs);
+  const lodgingEligible =
+    params.allowanceType === "standard" &&
+    !params.transportsPeopleOrGoods &&
+    !params.lodgingByReceipt &&
+    params.lodgingAllowance;
+  const showMealReductions = params.allowanceType === "standard" && !params.foodCoveredByReceipts;
+
+  let allocatedFood = 0;
+  return segments.map(({ line, ms }, index) => {
+    const hoursOnDay = ms > 0 ? Math.ceil(ms / 3_600_000) : 0;
+    const foodGrossCents =
+      index === segments.length - 1
+        ? totalFoodGross - allocatedFood
+        : Math.round((ms / totalMs) * totalFoodGross);
+    allocatedFood += foodGrossCents;
+
+    const mealReductionCents = showMealReductions ? mealReductionCentsForDay(foodRate, line) : 0;
+    const foodNetCents = Math.max(0, foodGrossCents - mealReductionCents);
+    const lodgingCents =
+      lodgingEligible && index < fullDays && !line.lodgingCovered && !line.lodgingByReceipt
+        ? lodgingRate
+        : 0;
+
+    return {
+      date: line.date,
+      hoursOnDay,
+      foodGrossCents,
+      mealReductionCents,
+      foodNetCents,
+      lodgingCents,
+      payoutCents: foodNetCents + lodgingCents,
+    };
+  });
+}
+
+export function formatMoneyDkk(cents: number): string {
+  return `${(cents / 100).toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr.`;
 }
