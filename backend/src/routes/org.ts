@@ -7,7 +7,8 @@ import { canAction } from "../requestRole";
 import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
 import { wipeOrganizationCompletely } from "../deleteOrganizationWipe";
 import { verifyUserCredentialPassword } from "../verifyCredentialPassword";
-import { DistanceUnitSchema, LanguageSchema, TimeFormatSchema } from "../types";
+import { DistanceUnitSchema, LanguageSchema, PatchOrgCountryFeaturesSchema, TimeFormatSchema } from "../types";
+import { patchCountryFeatures, normalizeCountryFeatures } from "../countryFeatures";
 import {
   effectiveYearlyCommittedSeats,
   fixedOverageMonthlyTotalCents,
@@ -456,6 +457,7 @@ app.get("/org", async (c) => {
       fixedAnnualRoundToTen: billingConfig.fixedAnnualRoundToTen,
       paddleBilling: getPaddlePublicInfo(),
       productionPlannerEnabled: org.productionPlannerEnabled,
+      countryFeatures: normalizeCountryFeatures(org.countryFeatures),
     },
   });
 });
@@ -548,6 +550,36 @@ app.patch("/org/features", async (c) => {
     data: { productionPlannerEnabled: body.productionPlannerEnabled },
   });
   return c.json({ data: { ok: true, productionPlannerEnabled: body.productionPlannerEnabled } });
+});
+
+// PATCH /api/org/country-features — enable/disable country-specific modules
+app.patch("/org/country-features", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "org.update")) {
+    return c.json(
+      { error: { message: "You do not have permission to change organization features", code: "FORBIDDEN" } },
+      403
+    );
+  }
+  const body = PatchOrgCountryFeaturesSchema.parse(await c.req.json().catch(() => ({})));
+  const existing = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { countryFeatures: true },
+  });
+  if (!existing) {
+    return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
+  }
+  const countryFeatures = patchCountryFeatures(existing.countryFeatures, body.country, {
+    travelAllowance: body.travelAllowance,
+  });
+  await prisma.organization.update({
+    where: { id: user.organizationId },
+    data: { countryFeatures },
+  });
+  return c.json({ data: { ok: true, countryFeatures } });
 });
 
 // GET /api/org/invoice-info — fetch current org's invoice/company info (owner/manager)

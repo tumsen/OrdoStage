@@ -4,6 +4,18 @@ export const LanguageSchema = z.enum(["en", "da", "de"]);
 export const TimeFormatSchema = z.enum(["12h", "24h"]);
 export const DistanceUnitSchema = z.enum(["km", "mi"]);
 
+/** Per-country optional modules, e.g. { DK: { travelAllowance: true } }. */
+export const CountryFeatureFlagsSchema = z.object({
+  travelAllowance: z.boolean().optional(),
+});
+
+export const OrganizationCountryFeaturesSchema = z.record(z.string(), CountryFeatureFlagsSchema);
+
+export const PatchOrgCountryFeaturesSchema = z.object({
+  country: z.string().length(2),
+  travelAllowance: z.boolean(),
+});
+
 export const UserPreferencesSchema = z.object({
   language: LanguageSchema,
   timeFormat: TimeFormatSchema,

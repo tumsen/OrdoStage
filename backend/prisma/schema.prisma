@@ -111,6 +111,8 @@ model Organization {
   billingCurrencyCode     String             @default("USD")
   /** Feature flag: enables production planner routes/UI for this org. */
   productionPlannerEnabled Boolean           @default(false)
+  /** Per-country feature modules, e.g. { "DK": { "travelAllowance": true } }. */
+  countryFeatures          Json              @default("{}")
   paddleCustomerId        String?
   /** Company / invoice information (optional — used on generated PDF invoices). */
   invoiceName      String?

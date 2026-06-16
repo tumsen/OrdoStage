@@ -16,6 +16,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
+import { COUNTRY_FEATURE_CATALOG, isCountryFeatureEnabled } from "@/lib/countryFeatures";
+import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 import {
   AdminOrgEmailMembersResultSchema,
   type AdminOrgEmailMembersResult,
@@ -63,6 +65,7 @@ interface OrgDetail {
   id: string;
   name: string;
   productionPlannerEnabled?: boolean;
+  countryFeatures?: OrganizationCountryFeatures;
   billingStatus: string;
   billingDueAt: string | null;
   customDiscountPercent: number | null;
@@ -137,9 +140,13 @@ function BillingTab({ org }: { org: OrgDetail }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [plannerEnabled, setPlannerEnabled] = useState(Boolean(org.productionPlannerEnabled));
+  const [dkTravelEnabled, setDkTravelEnabled] = useState(
+    isCountryFeatureEnabled(org.countryFeatures, "DK", "travelAllowance")
+  );
   useEffect(() => {
     setPlannerEnabled(Boolean(org.productionPlannerEnabled));
-  }, [org.productionPlannerEnabled]);
+    setDkTravelEnabled(isCountryFeatureEnabled(org.countryFeatures, "DK", "travelAllowance"));
+  }, [org.productionPlannerEnabled, org.countryFeatures]);
 
   const updateFeaturesMutation = useMutation({
     mutationFn: (productionPlannerEnabled: boolean) =>
@@ -154,6 +161,26 @@ function BillingTab({ org }: { org: OrgDetail }) {
       setPlannerEnabled(Boolean(org.productionPlannerEnabled));
       toast({
         title: "Could not update organization features",
+        description: isApiError(err) ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateCountryFeaturesMutation = useMutation({
+    mutationFn: (travelAllowance: boolean) =>
+      api.patch<{ id: string; countryFeatures: OrganizationCountryFeatures }>(
+        `/api/admin/orgs/${org.id}/country-features`,
+        { country: "DK", travelAllowance }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
+      toast({ title: "Country features updated" });
+    },
+    onError: (err) => {
+      setDkTravelEnabled(isCountryFeatureEnabled(org.countryFeatures, "DK", "travelAllowance"));
+      toast({
+        title: "Could not update country features",
         description: isApiError(err) ? err.message : "Try again.",
         variant: "destructive",
       });
@@ -211,6 +238,24 @@ function BillingTab({ org }: { org: OrgDetail }) {
               onCheckedChange={(checked) => {
                 setPlannerEnabled(checked);
                 updateFeaturesMutation.mutate(checked);
+              }}
+            />
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <div>
+              <p className="text-sm font-medium text-white">
+                {COUNTRY_FEATURE_CATALOG.DK.label}: {COUNTRY_FEATURE_CATALOG.DK.features.travelAllowance.label}
+              </p>
+              <p className="text-xs text-white/50">
+                {COUNTRY_FEATURE_CATALOG.DK.features.travelAllowance.description}
+              </p>
+            </div>
+            <Switch
+              checked={dkTravelEnabled}
+              disabled={updateCountryFeaturesMutation.isPending}
+              onCheckedChange={(checked) => {
+                setDkTravelEnabled(checked);
+                updateCountryFeaturesMutation.mutate(checked);
               }}
             />
           </div>

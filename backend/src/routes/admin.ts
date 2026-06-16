@@ -4,6 +4,8 @@ import { auth } from "../auth";
 import { adminMiddleware } from "../admin-middleware";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { z } from "zod";
+import { PatchOrgCountryFeaturesSchema } from "../types";
+import { patchCountryFeatures, normalizeCountryFeatures } from "../countryFeatures";
 import { reassignUsersBeforeOrgDelete } from "../orgMembership";
 import { ensureSystemRoles } from "../effectiveRole";
 import { env, isDeployedRuntime } from "../env";
@@ -616,6 +618,29 @@ app.patch("/admin/orgs/:id/features", async (c) => {
     select: { id: true, productionPlannerEnabled: true },
   });
   return c.json({ data: updated });
+});
+
+app.patch("/admin/orgs/:id/country-features", async (c) => {
+  const orgId = c.req.param("id");
+  const body = PatchOrgCountryFeaturesSchema.parse(await c.req.json().catch(() => ({})));
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { id: true, countryFeatures: true },
+  });
+  if (!org) {
+    return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  }
+  const countryFeatures = patchCountryFeatures(org.countryFeatures, body.country, {
+    travelAllowance: body.travelAllowance,
+  });
+  const updated = await prisma.organization.update({
+    where: { id: orgId },
+    data: { countryFeatures },
+    select: { id: true, countryFeatures: true },
+  });
+  return c.json({
+    data: { ...updated, countryFeatures: normalizeCountryFeatures(updated.countryFeatures) },
+  });
 });
 
 app.post("/admin/orgs/:id/grant-org-admin", async (c) => {

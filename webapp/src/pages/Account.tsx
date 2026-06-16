@@ -25,6 +25,8 @@ import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/AddressFields";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { usePermissions } from "@/hooks/usePermissions";
+import { COUNTRY_FEATURE_CATALOG, isCountryFeatureEnabled } from "@/lib/countryFeatures";
+import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 import { autoSaveBlurCapture, useAutoSave } from "@/hooks/useAutoSave";
 import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
@@ -103,12 +105,17 @@ export default function Account() {
     queryFn: () => api.get<DeletionRequirements>("/api/org/deletion-requirements"),
     enabled: canDeleteOrganization,
   });
-  const { data: orgFeatureData } = useQuery<{ productionPlannerEnabled?: boolean }>({
+  const { data: orgFeatureData } = useQuery<{
+    productionPlannerEnabled?: boolean;
+    countryFeatures?: OrganizationCountryFeatures;
+  }>({
     queryKey: ["org", "features"],
-    queryFn: () => api.get<{ productionPlannerEnabled?: boolean }>("/api/org"),
+    queryFn: () =>
+      api.get<{ productionPlannerEnabled?: boolean; countryFeatures?: OrganizationCountryFeatures }>("/api/org"),
     enabled: canManageOrgFeatures,
   });
   const [productionPlannerEnabled, setProductionPlannerEnabled] = useState(false);
+  const [dkTravelAllowanceEnabled, setDkTravelAllowanceEnabled] = useState(false);
 
   const [confirmPhrase, setConfirmPhrase] = useState("");
   const [loading, setLoading] = useState(false);
@@ -187,7 +194,10 @@ export default function Account() {
 
   useEffect(() => {
     setProductionPlannerEnabled(Boolean(orgFeatureData?.productionPlannerEnabled));
-  }, [orgFeatureData?.productionPlannerEnabled]);
+    setDkTravelAllowanceEnabled(
+      isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "travelAllowance")
+    );
+  }, [orgFeatureData?.productionPlannerEnabled, orgFeatureData?.countryFeatures]);
 
   const { data: companyInfo } = useQuery<{
     name: string;
@@ -280,6 +290,29 @@ export default function Account() {
     onError: (e: unknown) => {
       setProductionPlannerEnabled(Boolean(orgFeatureData?.productionPlannerEnabled));
       const msg = isApiError(e) ? e.message : "Could not update organization feature.";
+      toast({ title: "Feature update failed", description: msg, variant: "destructive" });
+    },
+  });
+
+  const updateCountryFeaturesMutation = useMutation({
+    mutationFn: (travelAllowance: boolean) =>
+      api.patch<{ ok: boolean; countryFeatures: OrganizationCountryFeatures }>("/api/org/country-features", {
+        country: "DK",
+        travelAllowance,
+      }),
+    onSuccess: (data) => {
+      setDkTravelAllowanceEnabled(
+        isCountryFeatureEnabled(data.countryFeatures, "DK", "travelAllowance")
+      );
+      queryClient.invalidateQueries({ queryKey: ["org"] });
+      queryClient.invalidateQueries({ queryKey: ["org", "features"] });
+      toast({ title: "Country feature updated" });
+    },
+    onError: (e: unknown) => {
+      setDkTravelAllowanceEnabled(
+        isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "travelAllowance")
+      );
+      const msg = isApiError(e) ? e.message : "Could not update country feature.";
       toast({ title: "Feature update failed", description: msg, variant: "destructive" });
     },
   });
@@ -780,7 +813,7 @@ export default function Account() {
           <div>
             <p className="text-sm font-medium text-white">Organization features</p>
             <p className="text-xs text-white/50 mt-1">
-              Enable Production Planner only for organizations you want to pilot.
+              Enable optional modules per organization. Country-specific rules can be toggled separately.
             </p>
           </div>
           <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
@@ -796,6 +829,27 @@ export default function Account() {
                 updateOrgFeaturesMutation.mutate(checked);
               }}
             />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-white/35">Country modules</p>
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
+              <div>
+                <p className="text-sm text-white">
+                  {COUNTRY_FEATURE_CATALOG.DK.label}: {COUNTRY_FEATURE_CATALOG.DK.features.travelAllowance.label}
+                </p>
+                <p className="text-xs text-white/45">
+                  {COUNTRY_FEATURE_CATALOG.DK.features.travelAllowance.description}
+                </p>
+              </div>
+              <Switch
+                checked={dkTravelAllowanceEnabled}
+                disabled={updateCountryFeaturesMutation.isPending}
+                onCheckedChange={(checked) => {
+                  setDkTravelAllowanceEnabled(checked);
+                  updateCountryFeaturesMutation.mutate(checked);
+                }}
+              />
+            </div>
           </div>
         </div>
       ) : null}

@@ -92,6 +92,7 @@ function calculateDanishTravelAllowance(input: TravelAllowanceInput): TravelAllo
     input.receivesBIncome !== true &&
     input.excludedWorkerType !== true;
   const eligibleFoodHours = baseEligible ? startedHours : 0;
+  const allowanceDays = eligibleFoodHours > 0 ? Math.ceil(eligibleFoodHours / 24) : 0;
 
   const dayLines = input.dayLines?.length
     ? input.dayLines
@@ -109,7 +110,8 @@ function calculateDanishTravelAllowance(input: TravelAllowanceInput): TravelAllo
   if (input.foodCoveredByReceipts) {
     foodAmountCents = Math.round(foodAmountCents * 0.25);
   } else if (input.allowanceType === "standard") {
-    const mealReductionCents = dayLines.reduce((sum, line) => {
+    const billableDayLines = dayLines.slice(0, allowanceDays);
+    const mealReductionCents = billableDayLines.reduce((sum, line) => {
       const reductionPct =
         (line.breakfastProvided ? 0.15 : 0) +
         (line.lunchProvided ? 0.30 : 0) +

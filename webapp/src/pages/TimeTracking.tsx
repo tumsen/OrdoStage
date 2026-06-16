@@ -60,6 +60,8 @@ import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
 import { TravelClaimsPanel } from "@/components/time/TravelClaimsPanel";
+import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
+import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { CalendarGrid } from "@/components/schedule/CalendarGrid";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
@@ -306,6 +308,18 @@ export default function TimeTracking() {
   const readAll = canAction("time.read_all");
   const canManageTimeCatalog = canAction("time.manage_catalog");
 
+  const { data: orgFeatures } = useQuery<{ countryFeatures?: OrganizationCountryFeatures }>({
+    queryKey: ["org", "features"],
+    queryFn: () => api.get<{ countryFeatures?: OrganizationCountryFeatures }>("/api/org"),
+    enabled: canUsePage,
+    staleTime: 60_000,
+  });
+  const travelAllowanceEnabled = isCountryFeatureEnabled(
+    orgFeatures?.countryFeatures,
+    "DK",
+    "travelAllowance"
+  );
+
   const [mode, setMode] = usePersistedViewMode(
     "ordo.viewMode.timeTracking",
     TIME_TRACKING_VIEW_MODES,
@@ -313,6 +327,13 @@ export default function TimeTracking() {
   );
   const [section, setSection] = useState<"time" | "travel">("time");
   const [anchor, setAnchor] = useState(() => new Date());
+
+  useEffect(() => {
+    if (!travelAllowanceEnabled && section === "travel") {
+      setSection("time");
+    }
+  }, [travelAllowanceEnabled, section]);
+
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [upcomingCollapsed, setUpcomingCollapsed] = useState(true);
   /** Collapsed by default so the week grid matches Schedule height (upcoming + catalog live here). */
@@ -1342,19 +1363,21 @@ export default function TimeTracking() {
             >
               Time
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSection("travel");
-                setMode("week");
-              }}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-sm",
-                section === "travel" ? "bg-white/10 text-white" : "text-white/55"
-              )}
-            >
-              Travel
-            </button>
+            {travelAllowanceEnabled ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSection("travel");
+                  setMode("week");
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm",
+                  section === "travel" ? "bg-white/10 text-white" : "text-white/55"
+                )}
+              >
+                Travel
+              </button>
+            ) : null}
           </div>
           <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
             <button
@@ -1676,7 +1699,7 @@ export default function TimeTracking() {
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col">
-      {section === "travel" ? (
+      {section === "travel" && travelAllowanceEnabled ? (
         <div className="min-h-0 flex-1 overflow-auto pr-1">
           <TravelClaimsPanel
             rangeFrom={rangeFrom}

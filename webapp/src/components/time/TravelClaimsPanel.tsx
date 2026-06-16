@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { TravelDayMealsTable, type TravelDayLine } from "@/components/time/TravelDayMealsTable";
 import type { TimeProject, TimeTravelClaim } from "@/contracts/backendTypes";
 
 function toDatetimeLocalValue(date: Date): string {
@@ -30,9 +31,6 @@ type TravelDraft = {
   country: "DK";
   allowanceType: "standard" | "tour_driver_denmark" | "tour_driver_abroad";
   timeProjectId: string;
-  breakfastProvided: boolean;
-  lunchProvided: boolean;
-  dinnerProvided: boolean;
   lodgingAllowance: boolean;
   lodgingCovered: boolean;
   foodCoveredByReceipts: boolean;
@@ -50,16 +48,18 @@ type TravelDraft = {
   notes: string;
 };
 
-type TravelDayLine = {
-  date: string;
-  city: string;
-  hotel: string;
-  breakfastProvided: boolean;
-  lunchProvided: boolean;
-  dinnerProvided: boolean;
-  lodgingCovered: boolean;
-  lodgingByReceipt: boolean;
-};
+function travelAllowanceDays(startsAt: string, endsAt: string): number {
+  const start = new Date(startsAt).getTime();
+  const end = new Date(endsAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  return Math.ceil((end - start) / 86_400_000);
+}
+
+function hasValidTravelTimeframe(startsAt: string, endsAt: string): boolean {
+  const start = new Date(startsAt).getTime();
+  const end = new Date(endsAt).getTime();
+  return Number.isFinite(start) && Number.isFinite(end) && end > start;
+}
 
 function isoDateLocal(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -143,9 +143,6 @@ export function TravelClaimsPanel({
       country: "DK",
       allowanceType: "standard",
       timeProjectId: "__none__",
-      breakfastProvided: false,
-      lunchProvided: false,
-      dinnerProvided: false,
       lodgingAllowance: false,
       lodgingCovered: false,
       foodCoveredByReceipts: false,
@@ -213,9 +210,9 @@ export function TravelClaimsPanel({
       country: draft.country,
       allowanceType: draft.allowanceType,
       timeProjectId: draft.timeProjectId === "__none__" ? null : draft.timeProjectId,
-      breakfastProvided: draft.breakfastProvided,
-      lunchProvided: draft.lunchProvided,
-      dinnerProvided: draft.dinnerProvided,
+      breakfastProvided: draft.dayLines.some((line) => line.breakfastProvided),
+      lunchProvided: draft.dayLines.some((line) => line.lunchProvided),
+      dinnerProvided: draft.dayLines.some((line) => line.dinnerProvided),
       lodgingAllowance: draft.lodgingAllowance,
       lodgingCovered: draft.lodgingCovered,
       foodCoveredByReceipts: draft.foodCoveredByReceipts,
@@ -236,6 +233,8 @@ export function TravelClaimsPanel({
 
   const total = (claims ?? []).reduce((sum, claim) => sum + claim.totalAmountCents, 0);
   const eligibility = skatEligibility(draft);
+  const timeframeSet = hasValidTravelTimeframe(draft.startsAt, draft.endsAt);
+  const allowanceDays = travelAllowanceDays(draft.startsAt, draft.endsAt);
   const canClaimLodging =
     draft.allowanceType === "standard" && !draft.transportsPeopleOrGoods && !draft.lodgingByReceipt;
   const updateDayLine = (date: string, patch: Partial<TravelDayLine>) =>
@@ -261,8 +260,8 @@ export function TravelClaimsPanel({
         </div>
 
         {canEdit ? (
-          <div className="mt-4 grid gap-3 lg:grid-cols-2">
-            <div className="grid gap-2 sm:grid-cols-2">
+          <div className="mt-4 space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:max-w-xl">
               <div>
                 <Label className="text-xs text-white/50">Start</Label>
                 <Input
@@ -281,6 +280,26 @@ export function TravelClaimsPanel({
                   className="mt-1 border-white/10 bg-white/5 text-white"
                 />
               </div>
+            </div>
+
+            {!timeframeSet ? (
+              <p className="text-[11px] text-white/35">Set start and end to list travel days and employer-covered meals.</p>
+            ) : allowanceDays < 1 ? (
+              <p className="rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
+                SKAT requires at least 24 hours of travel before tax-free diæter (food allowance) applies.
+              </p>
+            ) : (
+              <TravelDayMealsTable
+                dayLines={draft.dayLines}
+                allowanceType={draft.allowanceType}
+                allowanceDays={allowanceDays}
+                foodCoveredByReceipts={draft.foodCoveredByReceipts}
+                onUpdateLine={updateDayLine}
+              />
+            )}
+
+            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <div>
                 <Label className="text-xs text-white/50">Destination</Label>
                 <Input
@@ -397,89 +416,6 @@ export function TravelClaimsPanel({
                 ) : null}
               </div>
 
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2 sm:p-3">
-                <div className="flex flex-wrap items-baseline justify-between gap-2 px-0.5">
-                  <div>
-                    <p className="text-xs font-semibold text-white">Day by day tour details</p>
-                    <p className="mt-0.5 text-[10px] text-white/45 leading-snug">
-                      One row per travel day — city, hotel, and covered meals drive SKAT meal/lodging reductions.
-                    </p>
-                  </div>
-                  <p className="shrink-0 text-[10px] text-white/35">{draft.dayLines.length} days</p>
-                </div>
-                <div className="mt-2 overflow-x-auto rounded-md border border-white/10">
-                  <table className="w-full min-w-[36rem] border-collapse text-left text-[11px]">
-                    <thead>
-                      <tr className="border-b border-white/10 bg-black/25 text-[10px] font-medium uppercase tracking-wide text-white/40">
-                        <th className="whitespace-nowrap px-2 py-1.5">Date</th>
-                        <th className="min-w-[6rem] px-1 py-1.5">City</th>
-                        <th className="min-w-[6rem] px-1 py-1.5">Hotel</th>
-                        <th className="w-8 px-0.5 py-1.5 text-center" title="Breakfast covered">
-                          B
-                        </th>
-                        <th className="w-8 px-0.5 py-1.5 text-center" title="Lunch covered">
-                          L
-                        </th>
-                        <th className="w-8 px-0.5 py-1.5 text-center" title="Dinner covered">
-                          D
-                        </th>
-                        <th className="w-8 px-0.5 py-1.5 text-center" title="Free lodging">
-                          H
-                        </th>
-                        <th className="w-8 px-0.5 py-1.5 text-center" title="Lodging by receipt">
-                          R
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {draft.dayLines.map((line) => (
-                        <tr key={line.date} className="border-t border-white/10 hover:bg-white/[0.02]">
-                          <td className="whitespace-nowrap px-2 py-1 text-white/70 tabular-nums">
-                            {format(parseISO(line.date), "EEE d MMM")}
-                          </td>
-                          <td className="p-1">
-                            <Input
-                              value={line.city}
-                              onChange={(e) => updateDayLine(line.date, { city: e.target.value })}
-                              placeholder="City"
-                              className="h-7 border-white/10 bg-white/5 px-2 py-0 text-[11px] text-white"
-                            />
-                          </td>
-                          <td className="p-1">
-                            <Input
-                              value={line.hotel}
-                              onChange={(e) => updateDayLine(line.date, { hotel: e.target.value })}
-                              placeholder="Hotel"
-                              className="h-7 border-white/10 bg-white/5 px-2 py-0 text-[11px] text-white"
-                            />
-                          </td>
-                          {(
-                            [
-                              "breakfastProvided",
-                              "lunchProvided",
-                              "dinnerProvided",
-                              "lodgingCovered",
-                              "lodgingByReceipt",
-                            ] as const
-                          ).map((key) => (
-                            <td key={key} className="p-0.5 text-center align-middle">
-                              <div className="flex justify-center">
-                                <Checkbox
-                                  checked={Boolean(line[key])}
-                                  onCheckedChange={(checked) =>
-                                    updateDayLine(line.date, { [key]: checked === true } as Partial<TravelDayLine>)
-                                  }
-                                />
-                              </div>
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
               <div className="grid gap-2 sm:grid-cols-2">
                 {[
                   ["foodCoveredByReceipts", "Meals by receipts"],
@@ -513,6 +449,7 @@ export function TravelClaimsPanel({
                 Add travel claim
               </Button>
             </div>
+          </div>
           </div>
         ) : (
           <p className="mt-4 rounded-lg border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">

@@ -9,6 +9,7 @@ import { canAction, canView } from "../requestRole";
 import type { EffectiveRole } from "../effectiveRole";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { getCountryRuleSet, type TravelAllowanceType, type TravelClaimDayLine } from "../rules/countryRuleSets";
+import { isCountryFeatureEnabled } from "../countryFeatures";
 import {
   CreateTimeTagSchema,
   PatchTimeTagSchema,
@@ -1037,6 +1038,14 @@ function normalizeTravelDayLines(value: unknown): TravelClaimDayLine[] {
       lodgingByReceipt: line.lodgingByReceipt === true,
     }))
     .filter((line) => line.date.length > 0);
+}
+
+async function travelAllowanceFeatureEnabled(organizationId: string, country: string): Promise<boolean> {
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { countryFeatures: true },
+  });
+  return isCountryFeatureEnabled(org?.countryFeatures, country, "travelAllowance");
 }
 
 function serializeTravelClaim(row: {
@@ -3430,6 +3439,9 @@ timeRouter.get("/time/travel-claims", async (c) => {
   if (!canView(c, "time")) {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
+  if (!(await travelAllowanceFeatureEnabled(user.organizationId, "DK"))) {
+    return c.json({ data: [] });
+  }
   const r = parseRange(c);
   if ("error" in r) return c.json({ error: { message: r.error, code: "BAD_REQUEST" } }, 400);
   const qPerson = c.req.query("personId");
@@ -3457,11 +3469,23 @@ timeRouter.post("/time/travel-claims", zValidator("json", CreateTimeTravelClaimS
   if (!canView(c, "time") || !canAction(c, "time.write")) {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
+  const body = c.req.valid("json");
+  const country = body.country.trim().toUpperCase();
+  if (!(await travelAllowanceFeatureEnabled(user.organizationId, country))) {
+    return c.json(
+      {
+        error: {
+          message: "Travel allowance is not enabled for this organization.",
+          code: "FEATURE_DISABLED",
+        },
+      },
+      403
+    );
+  }
   const personId = await resolvePersonIdForUser(user.organizationId, user.email);
   if (!personId) {
     return c.json({ error: { message: "No linked person profile.", code: "BAD_REQUEST" } }, 400);
   }
-  const body = c.req.valid("json");
   const startsAt = new Date(body.startsAt);
   const endsAt = new Date(body.endsAt);
   if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt) {
@@ -3473,7 +3497,6 @@ timeRouter.post("/time/travel-claims", zValidator("json", CreateTimeTravelClaimS
       423
     );
   }
-  const country = body.country.trim().toUpperCase();
   const ruleSet = getCountryRuleSet(country);
   if (!ruleSet) {
     return c.json({ error: { message: "Country rule set is not supported yet.", code: "UNSUPPORTED_RULE_SET" } }, 400);
@@ -3552,6 +3575,17 @@ timeRouter.patch("/time/travel-claims/:id", zValidator("json", PatchTimeTravelCl
     where: { id, organizationId: user.organizationId },
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  if (!(await travelAllowanceFeatureEnabled(user.organizationId, existing.country))) {
+    return c.json(
+      {
+        error: {
+          message: "Travel allowance is not enabled for this organization.",
+          code: "FEATURE_DISABLED",
+        },
+      },
+      403
+    );
+  }
   const myPersonId = await resolvePersonIdForUser(user.organizationId, user.email);
   const canEditOwn = Boolean(myPersonId && existing.personId === myPersonId && canAction(c, "time.write"));
   const canEditAny = canAction(c, "time.read_all");
@@ -3577,6 +3611,17 @@ timeRouter.patch("/time/travel-claims/:id", zValidator("json", PatchTimeTravelCl
   }
   const allowanceType = body.allowanceType ?? (existing.allowanceType as TravelAllowanceType);
   const country = body.country !== undefined ? body.country.trim().toUpperCase() : existing.country;
+  if (!(await travelAllowanceFeatureEnabled(user.organizationId, country))) {
+    return c.json(
+      {
+        error: {
+          message: "Travel allowance is not enabled for this organization.",
+          code: "FEATURE_DISABLED",
+        },
+      },
+      403
+    );
+  }
   const ruleSet = getCountryRuleSet(country);
   if (!ruleSet) {
     return c.json({ error: { message: "Country rule set is not supported yet.", code: "UNSUPPORTED_RULE_SET" } }, 400);
@@ -3653,6 +3698,17 @@ timeRouter.delete("/time/travel-claims/:id", async (c) => {
     where: { id, organizationId: user.organizationId },
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  if (!(await travelAllowanceFeatureEnabled(user.organizationId, existing.country))) {
+    return c.json(
+      {
+        error: {
+          message: "Travel allowance is not enabled for this organization.",
+          code: "FEATURE_DISABLED",
+        },
+      },
+      403
+    );
+  }
   const myPersonId = await resolvePersonIdForUser(user.organizationId, user.email);
   const canDelOwn = Boolean(myPersonId && existing.personId === myPersonId && canAction(c, "time.write"));
   const canDelAny = canAction(c, "time.read_all");
