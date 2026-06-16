@@ -5,11 +5,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   computeTravelLinePayouts,
+  describeSkatKostgodtgorelse,
   foodRateCentsForYear,
   formatAllowanceDayUnits,
   formatMoneyDkk,
   mealReductionCentsForDay,
   mealReductionLabel,
+  SKAT_KOSTGODTGORELSE_SUMMARY,
   SKAT_TRAVEL_ALLOWANCE_URL,
   travelAllowanceDayUnits,
 } from "@/lib/danishTravelAllowance";
@@ -68,15 +70,21 @@ export function TravelDayMealsTable({
   const totalReduction = showMealReductions
     ? dayLines.reduce((sum, line) => sum + mealReductionCentsForDay(foodRateCents, line), 0)
     : 0;
+  const kostgodtgorelseNote = describeSkatKostgodtgorelse({
+    hours: allowanceHours,
+    foodRateCents,
+    foodCoveredByReceipts,
+  });
+  const foodOnlyTotalCents = linePayouts.reduce((sum, row) => sum + row.foodNetCents, 0);
 
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2 sm:p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold text-white">Travel days — meals covered by employer</p>
+          <p className="text-xs font-semibold text-white">Rejsedage — måltider dækket af arbejdsgiver</p>
           <p className="mt-0.5 text-[10px] text-white/45 leading-snug max-w-2xl">
-            Calendar rows are for meals per date. Diæt is calculated from travel hours (÷ 24), not the number of
-            calendar dates.
+            Kalenderlinjer bruges til måltidsfradrag pr. dato. Kostgodtgørelse beregnes af påbegyndte rejsetimer
+            (÷ 24), ikke antal kalenderdage.
           </p>
           <a
             href={SKAT_TRAVEL_ALLOWANCE_URL}
@@ -93,22 +101,39 @@ export function TravelDayMealsTable({
           {allowanceHours > 0 ? (
             <>
               <br />
-              {allowanceHours} t · {formatAllowanceDayUnits(allowanceDayUnits)} diætdag
-              {allowanceDayUnits === 1 ? "" : "e"}
+              {allowanceHours} t · {formatAllowanceDayUnits(allowanceDayUnits)} døgnenhed
+              {allowanceDayUnits === 1 ? "" : "er"}
             </>
           ) : null}
         </p>
       </div>
 
-      {showMealReductions && totalReduction > 0 ? (
-        <p className="mt-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-white/55">
-          Total meal reduction: <span className="font-medium text-white/80">−{formatMoneyDkk(totalReduction)}</span>
+      <details className="mt-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-white/55">
+        <summary className="cursor-pointer font-medium text-white/70">Udbetaling af kostgodtgørelse (SKAT)</summary>
+        <ul className="mt-1.5 list-disc space-y-1 pl-4 leading-snug">
+          {SKAT_KOSTGODTGORELSE_SUMMARY.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </details>
+
+      {allowanceHours >= 24 ? (
+        <p className="mt-2 rounded-md border border-blue-400/15 bg-blue-500/10 px-2 py-1.5 text-[11px] text-blue-100/90 leading-snug">
+          <span className="font-medium text-blue-50">Kostgodtgørelse (brutto): </span>
+          {kostgodtgorelseNote}
+          {showMealReductions && totalReduction > 0 ? (
+            <>
+              {" "}
+              − måltidsfradrag {formatMoneyDkk(totalReduction)} ={" "}
+              <span className="font-medium text-blue-50">{formatMoneyDkk(foodOnlyTotalCents)}</span>
+            </>
+          ) : null}
         </p>
       ) : null}
 
       {foodCoveredByReceipts ? (
         <p className="mt-2 rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
-          Meals are claimed by receipt — SKAT pays 25% of the food allowance; per-meal reductions do not apply.
+          Kost dækkes efter regning — SKAT giver op til 25% af kostsatsen; måltidsfradrag gælder ikke.
         </p>
       ) : allowanceType !== "standard" ? (
         <p className="mt-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-white/45">

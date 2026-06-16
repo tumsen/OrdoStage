@@ -128,9 +128,7 @@ export function computeTravelLinePayouts(params: {
     }));
   }
 
-  const totalFoodGross = params.foodCoveredByReceipts
-    ? Math.round(((foodRate * totalHours) / 24) * 0.25)
-    : Math.round((foodRate * totalHours) / 24);
+  const totalFoodGross = foodAllowanceGrossCents(totalHours, foodRate, params.foodCoveredByReceipts);
 
   const segments = params.dayLines.map((line) => ({
     line,
@@ -176,3 +174,68 @@ export function computeTravelLinePayouts(params: {
 export function formatMoneyDkk(cents: number): string {
   return `${(cents / 100).toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr.`;
 }
+
+/** Gross kostgodtgørelse before meal reductions (SKAT: commenced hours ÷ 24 × døgnsats). */
+export function foodAllowanceGrossCents(
+  hours: number,
+  foodRateCents: number,
+  foodCoveredByReceipts: boolean
+): number {
+  if (hours < 24) return 0;
+  const gross = Math.round((foodRateCents * hours) / 24);
+  return foodCoveredByReceipts ? Math.round(gross * 0.25) : gross;
+}
+
+/** SKAT-style breakdown: 40 t → 1 døgnsats + 16/24 døgnsats. */
+export function skatFoodAllowanceFormula(hours: number): {
+  fullDayUnits: number;
+  extraHours: number;
+  label: string;
+} {
+  if (hours < 24) {
+    return { fullDayUnits: 0, extraHours: hours, label: "ingen kostgodtgørelse" };
+  }
+  const fullDayUnits = Math.floor(hours / 24);
+  const extraHours = hours % 24;
+  if (fullDayUnits === 0) {
+    return { fullDayUnits: 0, extraHours: hours, label: `${hours}/24 døgnsats` };
+  }
+  const dayWord = fullDayUnits === 1 ? "døgnsats" : "døgnsatser";
+  if (extraHours === 0) {
+    return {
+      fullDayUnits,
+      extraHours: 0,
+      label: fullDayUnits === 1 ? "1 døgnsats" : `${fullDayUnits} ${dayWord}`,
+    };
+  }
+  return {
+    fullDayUnits,
+    extraHours,
+    label: `${fullDayUnits} ${dayWord} + ${extraHours}/24 døgnsats`,
+  };
+}
+
+export function describeSkatKostgodtgorelse(params: {
+  hours: number;
+  foodRateCents: number;
+  foodCoveredByReceipts: boolean;
+}): string {
+  const { hours, foodRateCents, foodCoveredByReceipts } = params;
+  if (hours < 24) {
+    return "Rejsen skal vare mindst 24 timer, før skattefri kostgodtgørelse kan udbetales.";
+  }
+  const formula = skatFoodAllowanceFormula(hours);
+  const gross = foodAllowanceGrossCents(hours, foodRateCents, foodCoveredByReceipts);
+  const rateLabel = formatMoneyDkk(foodRateCents);
+  if (foodCoveredByReceipts) {
+    return `${hours} påbegyndte timer → ${formula.label} × 25% (kost efter regning) = ${formatMoneyDkk(gross)}`;
+  }
+  return `${hours} påbegyndte timer → ${formula.label} × ${rateLabel} = ${formatMoneyDkk(gross)}`;
+}
+
+export const SKAT_KOSTGODTGORELSE_SUMMARY = [
+  "Kostgodtgørelsen dækker udokumenterede udgifter til måltider og småfornødenheder på rejsen.",
+  "Udbetaling sker pr. døgn: efter 24 timer udbetales døgnsatsen, derefter pr. påbegyndt rejsetime (fx 40 t = 1 døgnsats + 16/24).",
+  "Kost dækket som udlæg efter regning giver op til 25% af kostsatsen for hele rejsen.",
+  "B-indkomst giver ikke ret til skattefri kostgodtgørelse.",
+] as const;
