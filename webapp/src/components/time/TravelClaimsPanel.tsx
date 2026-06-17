@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, format, parseISO } from "date-fns";
 import { ChevronDown, ChevronRight, Lock, Trash2 } from "lucide-react";
@@ -24,8 +24,6 @@ import type { TimeProject, TimeTravelClaim } from "@/contracts/backendTypes";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import {
-  computeTravelLinePayouts,
-  formatMoneyDkk,
   travelDurationHours,
 } from "@/lib/danishTravelAllowance";
 
@@ -212,9 +210,11 @@ function TravelClaimCollapsedMeta({
 
 function useSyncedDayLines(
   draft: TravelDraft,
-  setDraft: React.Dispatch<React.SetStateAction<TravelDraft>>
+  setDraft: React.Dispatch<React.SetStateAction<TravelDraft>>,
+  enabled = true
 ) {
   useEffect(() => {
+    if (!enabled) return;
     setDraft((current) => {
       const dates = travelDates(current.startsAt, current.endsAt);
       const byDate = new Map(current.dayLines.map((line) => [line.date, line]));
@@ -225,77 +225,7 @@ function useSyncedDayLines(
         nextLines.every((line, idx) => line.date === current.dayLines[idx]?.date);
       return unchanged ? current : { ...current, dayLines: nextLines };
     });
-  }, [draft.startsAt, draft.endsAt, setDraft]);
-}
-
-function TravelClaimDayTable({
-  claim,
-  projectById,
-}: {
-  claim: TimeTravelClaim;
-  projectById: Map<string, TimeProject>;
-}) {
-  const claimPayouts =
-    claim.dayLines.length > 0
-      ? computeTravelLinePayouts({
-          startsAt: new Date(claim.startsAt),
-          endsAt: new Date(claim.endsAt),
-          dayLines: claim.dayLines,
-          allowanceType: claim.allowanceType,
-          rateYear: claim.rateYear,
-          foodCoveredByReceipts: claim.foodCoveredByReceipts,
-          lodgingAllowance: claim.lodgingAllowance,
-          lodgingByReceipt: claim.lodgingByReceipt,
-          transportsPeopleOrGoods: claim.transportsPeopleOrGoods,
-        })
-      : [];
-  const payoutByDate = new Map(claimPayouts.map((row) => [row.date, row]));
-
-  if (claim.dayLines.length === 0) return null;
-
-  return (
-    <div className="overflow-x-auto rounded-md border border-white/10">
-      <table className="w-full min-w-[28rem] border-collapse text-left text-[11px]">
-        <thead>
-          <tr className="border-b border-white/10 bg-black/25 text-[10px] font-medium uppercase tracking-wide text-white/40">
-            <th className="whitespace-nowrap px-2 py-1">Date</th>
-            <th className="min-w-[5rem] px-1 py-1">City</th>
-            <th className="min-w-[6rem] px-1 py-1">Project</th>
-            <th className="min-w-[5rem] px-1 py-1">Hotel</th>
-            <th className="px-2 py-1">Covered</th>
-            <th className="px-2 py-1 text-right">Udbetaling</th>
-          </tr>
-        </thead>
-        <tbody>
-          {claim.dayLines.map((line) => {
-            const covered = [
-              line.breakfastProvided ? "B" : null,
-              line.lunchProvided ? "L" : null,
-              line.dinnerProvided ? "D" : null,
-              line.lodgingCovered ? "H" : null,
-              line.lodgingByReceipt ? "R" : null,
-            ].filter(Boolean);
-            const payout = payoutByDate.get(line.date);
-            const projectName = line.timeProjectId && projectById.get(line.timeProjectId)?.name;
-            return (
-              <tr key={line.date} className="border-t border-white/10 text-white/65">
-                <td className="whitespace-nowrap px-2 py-0.5 tabular-nums">
-                  {format(parseISO(line.date), "EEE d MMM")}
-                </td>
-                <td className="max-w-[10rem] truncate px-1 py-0.5">{line.city || "—"}</td>
-                <td className="max-w-[8rem] truncate px-1 py-0.5 text-white/50">{projectName || "—"}</td>
-                <td className="max-w-[10rem] truncate px-1 py-0.5">{line.hotel || "—"}</td>
-                <td className="px-2 py-0.5 text-white/50">{covered.length > 0 ? covered.join(" ") : "—"}</td>
-                <td className="px-2 py-0.5 text-right tabular-nums text-white/80">
-                  {payout && payout.payoutCents > 0 ? formatMoneyDkk(payout.payoutCents) : "—"}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
+  }, [draft.startsAt, draft.endsAt, setDraft, enabled]);
 }
 
 function TravelClaimForm({
@@ -305,15 +235,17 @@ function TravelClaimForm({
   submitLabel,
   onSubmit,
   isPending,
+  readOnly = false,
 }: {
   draft: TravelDraft;
   setDraft: React.Dispatch<React.SetStateAction<TravelDraft>>;
   projects: TimeProject[];
-  submitLabel: string;
-  onSubmit: () => void;
-  isPending: boolean;
+  submitLabel?: string;
+  onSubmit?: () => void;
+  isPending?: boolean;
+  readOnly?: boolean;
 }) {
-  useSyncedDayLines(draft, setDraft);
+  useSyncedDayLines(draft, setDraft, !readOnly);
 
   const timeframeSet = hasValidTravelTimeframe(draft.startsAt, draft.endsAt);
   const allowanceHours = travelDurationHours(
@@ -344,7 +276,8 @@ function TravelClaimForm({
             type="datetime-local"
             value={draft.startsAt}
             onChange={(e) => setDraft((d) => ({ ...d, startsAt: e.target.value }))}
-            className="mt-1 border-white/10 bg-white/5 text-white"
+            readOnly={readOnly}
+            className="mt-1 border-white/10 bg-white/5 text-white read-only:cursor-default read-only:opacity-100"
           />
         </div>
         <div>
@@ -353,7 +286,8 @@ function TravelClaimForm({
             type="datetime-local"
             value={draft.endsAt}
             onChange={(e) => setDraft((d) => ({ ...d, endsAt: e.target.value }))}
-            className="mt-1 border-white/10 bg-white/5 text-white"
+            readOnly={readOnly}
+            className="mt-1 border-white/10 bg-white/5 text-white read-only:cursor-default read-only:opacity-100"
           />
         </div>
       </div>
@@ -378,6 +312,7 @@ function TravelClaimForm({
           transportsPeopleOrGoods={draft.transportsPeopleOrGoods}
           projects={projects}
           onUpdateLine={updateDayLine}
+          readOnly={readOnly}
         />
       )}
 
@@ -389,21 +324,25 @@ function TravelClaimForm({
             ["lodgingByReceipt", "Alt logi som udlæg efter regning"],
             ["transportsPeopleOrGoods", "Transporterer varer/personer"],
           ].map(([key, label]) => (
-            <label key={key} className="flex items-center gap-2 text-xs text-white/65">
+            <label
+              key={key}
+              className={`flex items-center gap-2 text-xs text-white/65 ${readOnly ? "cursor-default" : ""}`}
+            >
               <Checkbox
                 checked={Boolean(draft[key as keyof TravelDraft])}
+                disabled={readOnly}
                 onCheckedChange={(checked) => setDraft((d) => ({ ...d, [key]: checked === true }))}
               />
               {label}
             </label>
           ))}
         </div>
-        {!canClaimLodging && draft.lodgingAllowance ? (
+        {!readOnly && !canClaimLodging && draft.lodgingAllowance ? (
           <p className="rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
             Logigodtgørelse kan ikke kombineres med transport af varer/personer eller udlæg efter regning for logi.
           </p>
         ) : null}
-        {!draft.lodgingAllowance && allowanceHours >= 24 && !draft.lodgingByReceipt ? (
+        {!readOnly && !draft.lodgingAllowance && allowanceHours >= 24 && !draft.lodgingByReceipt ? (
           <p className="text-[11px] leading-snug text-white/40">
             Betaler du selv for overnatning uden kvitteringsudlæg, kan du få logigodtgørelse — markér «Logigodtgørelse»
             og lad logi-felterne i tabellen stå tomme.
@@ -415,12 +354,15 @@ function TravelClaimForm({
             value={draft.notes}
             onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
             placeholder="Notes / documentation"
-            className="mt-1 min-h-16 border-white/10 bg-white/5 text-white"
+            readOnly={readOnly}
+            className="mt-1 min-h-16 border-white/10 bg-white/5 text-white read-only:cursor-default read-only:opacity-100"
           />
         </div>
-        <Button type="button" onClick={onSubmit} disabled={isPending}>
-          {submitLabel}
-        </Button>
+        {!readOnly && submitLabel && onSubmit ? (
+          <Button type="button" onClick={onSubmit} disabled={isPending}>
+            {submitLabel}
+          </Button>
+        ) : null}
       </div>
     </div>
   );
@@ -462,6 +404,8 @@ function SavedTravelClaimCard({
   isSaving: boolean;
 }) {
   const projectNames = linkedProjectNames(claim, projectById);
+  const viewDraft = useMemo(() => claimToDraft(claim), [claim]);
+  const noopSetDraft = useCallback((_value: React.SetStateAction<TravelDraft>) => {}, []);
 
   return (
     <Collapsible open={expanded} onOpenChange={onExpandedChange} className="rounded-xl border border-white/10 bg-white/[0.02]">
@@ -547,22 +491,7 @@ function SavedTravelClaimCard({
             </Button>
           </div>
         ) : (
-          <div className="space-y-2">
-            {claim.notes ? <p className="text-[11px] text-white/50">{claim.notes}</p> : null}
-            <p className="text-[10px] leading-snug text-white/35">
-              Rate year {claim.rateYear} · Meals {money(claim.foodRateCents)}/day · Lodging {money(claim.lodgingRateCents)}
-              /day
-            </p>
-            {claim.totalAmountCents === 0 ? (
-              <p className="text-[10px] leading-snug text-amber-200/80">
-                Calculated as 0 — check trip length, meals covered, and allowance options.
-              </p>
-            ) : null}
-            <TravelClaimDayTable claim={claim} projectById={projectById} />
-            <p className="text-[10px] text-white/40">
-              Meals {money(claim.foodAmountCents)} · Lodging {money(claim.lodgingAmountCents)}
-            </p>
-          </div>
+          <TravelClaimForm draft={viewDraft} setDraft={noopSetDraft} projects={projects} readOnly />
         )}
       </CollapsibleContent>
     </Collapsible>
@@ -601,10 +530,13 @@ export function TravelClaimsPanel({
 
   const createClaim = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.post<TimeTravelClaim>("/api/time/travel-claims", body),
-    onSuccess: () => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["time-travel-claims"] });
       setDraft(createEmptyDraft());
       setDraftExpanded(false);
+      if (created?.id) {
+        setExpandedClaims((current) => ({ ...current, [created.id]: true }));
+      }
       toast({ title: "Travel claim saved and locked" });
     },
     onError: () => toast({ title: "Could not save travel claim", variant: "destructive" }),
@@ -617,7 +549,7 @@ export function TravelClaimsPanel({
       queryClient.invalidateQueries({ queryKey: ["time-travel-claims"] });
       setEditingClaimId(null);
       setEditDraft(null);
-      setExpandedClaims((current) => ({ ...current, [variables.id]: false }));
+      setExpandedClaims((current) => ({ ...current, [variables.id]: true }));
       toast({ title: "Travel claim updated and locked" });
     },
     onError: () => toast({ title: "Could not update travel claim", variant: "destructive" }),

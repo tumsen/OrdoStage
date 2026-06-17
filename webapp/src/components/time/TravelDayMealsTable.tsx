@@ -44,6 +44,7 @@ export function TravelDayMealsTable({
   transportsPeopleOrGoods,
   projects,
   onUpdateLine,
+  readOnly = false,
 }: {
   dayLines: TravelDayLine[];
   startsAt: Date;
@@ -57,6 +58,7 @@ export function TravelDayMealsTable({
   transportsPeopleOrGoods: boolean;
   projects: TimeProject[];
   onUpdateLine: (date: string, patch: Partial<TravelDayLine>) => void;
+  readOnly?: boolean;
 }) {
   const foodRateCents = foodRateCentsForYear(2026, allowanceType);
   const showMealReductions = allowanceType === "standard" && !foodCoveredByReceipts;
@@ -218,9 +220,10 @@ export function TravelDayMealsTable({
                     <Select
                       value={line.timeProjectId}
                       onValueChange={(timeProjectId) => onUpdateLine(line.date, { timeProjectId })}
+                      disabled={readOnly}
                     >
                       <SelectTrigger
-                        className="h-7 border-white/10 bg-white/5 px-2 text-[11px] text-white"
+                        className="h-7 border-white/10 bg-white/5 px-2 text-[11px] text-white disabled:cursor-default disabled:opacity-100"
                         title={lineIndex === 0 ? "Gælder alle dage indtil du ændrer dem enkeltvis" : undefined}
                       >
                         <SelectValue placeholder="No project" />
@@ -240,7 +243,8 @@ export function TravelDayMealsTable({
                       value={line.city}
                       onChange={(e) => onUpdateLine(line.date, { city: e.target.value })}
                       placeholder="City"
-                      className="h-7 border-white/10 bg-white/5 px-2 py-0 text-[11px] text-white"
+                      readOnly={readOnly}
+                      className="h-7 border-white/10 bg-white/5 px-2 py-0 text-[11px] text-white read-only:cursor-default read-only:opacity-100"
                     />
                   </td>
                   <td className="p-1">
@@ -248,7 +252,8 @@ export function TravelDayMealsTable({
                       value={line.hotel}
                       onChange={(e) => onUpdateLine(line.date, { hotel: e.target.value })}
                       placeholder="Hotel"
-                      className="h-7 border-white/10 bg-white/5 px-2 py-0 text-[11px] text-white"
+                      readOnly={readOnly}
+                      className="h-7 border-white/10 bg-white/5 px-2 py-0 text-[11px] text-white read-only:cursor-default read-only:opacity-100"
                     />
                   </td>
                   {(
@@ -259,10 +264,12 @@ export function TravelDayMealsTable({
                     ] as const
                   ).map(([key, ariaLabel]) => (
                     <td key={key} className="p-1 align-middle">
-                      <label className="flex items-center gap-1.5 text-[10px] text-white/55 cursor-pointer">
+                      <label
+                        className={`flex items-center gap-1.5 text-[10px] text-white/55 ${readOnly ? "cursor-default" : "cursor-pointer"}`}
+                      >
                         <Checkbox
                           checked={Boolean(line[key])}
-                          disabled={!showMealReductions}
+                          disabled={!showMealReductions || readOnly}
                           onCheckedChange={(checked) =>
                             onUpdateLine(line.date, { [key]: checked === true } as Partial<TravelDayLine>)
                           }
@@ -283,9 +290,12 @@ export function TravelDayMealsTable({
                   ) : null}
                   <td className="p-1 align-middle">
                     <div className="flex flex-col gap-1">
-                      <label className="flex items-center gap-1.5 text-[10px] text-white/55 cursor-pointer">
+                      <label
+                        className={`flex items-center gap-1.5 text-[10px] text-white/55 ${readOnly ? "cursor-default" : "cursor-pointer"}`}
+                      >
                         <Checkbox
                           checked={line.lodgingCovered}
+                          disabled={readOnly}
                           onCheckedChange={(checked) =>
                             onUpdateLine(line.date, { lodgingCovered: checked === true })
                           }
@@ -293,9 +303,12 @@ export function TravelDayMealsTable({
                         />
                         Frit logi
                       </label>
-                      <label className="flex items-center gap-1.5 text-[10px] text-white/55 cursor-pointer">
+                      <label
+                        className={`flex items-center gap-1.5 text-[10px] text-white/55 ${readOnly ? "cursor-default" : "cursor-pointer"}`}
+                      >
                         <Checkbox
                           checked={line.lodgingByReceipt}
+                          disabled={readOnly}
                           onCheckedChange={(checked) =>
                             onUpdateLine(line.date, { lodgingByReceipt: checked === true })
                           }
