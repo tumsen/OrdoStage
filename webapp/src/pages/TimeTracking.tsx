@@ -1319,8 +1319,7 @@ export default function TimeTracking() {
   if (!mePerson?.id) {
     return (
       <div className="p-6 max-w-lg">
-        <h2 className="text-lg font-semibold text-white">{t("time.title")}</h2>
-        <p className="text-sm text-white/55 mt-2">{t("time.needPersonLink")}</p>
+        <p className="text-sm text-white/55">{t("time.needPersonLink")}</p>
       </div>
     );
   }
@@ -1340,6 +1339,7 @@ export default function TimeTracking() {
   const mobileScheduleRunningMinutes = mobileScheduleDay
     ? (weekRunningTotalMinutes[gridWeekIndex(0)] ?? mobileScheduleDayTotalMinutes)
     : 0;
+  const isTimeSection = section === "time";
 
   return (
     <div
@@ -1348,17 +1348,11 @@ export default function TimeTracking() {
         mobileDaySchedule
           ? "h-full overflow-hidden gap-0 p-0"
           : "max-md:h-auto max-md:overflow-visible",
-        !mobileDaySchedule &&
-          (mode === "week" && section === "time"
-            ? "gap-2 p-2 sm:p-3 md:p-4"
-            : "gap-4 p-4 md:p-6")
+        !mobileDaySchedule && "gap-2 p-2 sm:p-3 md:p-4"
       )}
     >
       {!mobileDaySchedule ? (
-      <div className="relative z-20 shrink-0 flex flex-col gap-4 bg-[#0a0a0f] pb-0 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-white">{t("time.title")}</h2>
-        </div>
+      <div className="relative z-20 shrink-0 bg-[#0a0a0f] pb-0">
         <div className="flex flex-col gap-2 w-full sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 lg:flex-nowrap lg:overflow-x-auto lg:pb-1">
           <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
@@ -1403,6 +1397,7 @@ export default function TimeTracking() {
               </button>
             ) : null}
           </div>
+          {isTimeSection ? (
           <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
             <button
               type="button"
@@ -1431,6 +1426,8 @@ export default function TimeTracking() {
               {t("time.month")}
             </button>
           </div>
+          ) : null}
+          {isTimeSection ? (
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">
             <Label className="text-[10px] uppercase tracking-wide text-white/45 whitespace-nowrap">
               {t("time.gridStartsAt")}
@@ -1451,6 +1448,7 @@ export default function TimeTracking() {
               </SelectContent>
             </Select>
           </div>
+          ) : null}
           <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:gap-2">
           <Button
             type="button"
@@ -1498,14 +1496,14 @@ export default function TimeTracking() {
           <span className="text-xs text-white/50 tabular-nums whitespace-nowrap">
             W{periodWeek} · {periodMonth} · {periodYear}
           </span>
-          {mode === "week" ? (
+          {isTimeSection && mode === "week" ? (
             <span className="text-xs text-white/60 tabular-nums whitespace-nowrap">
               Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
               <span className="text-white/35"> · </span>
               {formatTotalMinutesAsHHMM(weekTotalMinutes)}
             </span>
           ) : null}
-          {mode === "week" ? (
+          {isTimeSection && mode === "week" ? (
             <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">
               {approvedTimesheet ? (
                 <>
@@ -1619,7 +1617,7 @@ export default function TimeTracking() {
           >
             Today
           </Button>
-          {mode === "week" ? (
+          {isTimeSection && mode === "week" ? (
             <span className="text-xs text-white/60 tabular-nums">
               Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
               <span className="text-white/35"> · </span>
@@ -1641,6 +1639,8 @@ export default function TimeTracking() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-[#16161f] border-white/10 text-white w-56">
+                {isTimeSection ? (
+                  <>
                 <DropdownMenuLabel className="text-white/50">{t("time.gridStartsAt")}</DropdownMenuLabel>
                 <div className="px-2 pb-2">
                   <Select
@@ -1679,6 +1679,8 @@ export default function TimeTracking() {
                         Approve week
                       </DropdownMenuItem>
                     )}
+                  </>
+                ) : null}
                   </>
                 ) : null}
                 {readAll && peopleForFilter && peopleForFilter.length > 0 ? (
