@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   computeTravelLinePayouts,
   describeSkatKostgodtgorelse,
@@ -15,6 +16,7 @@ import {
   SKAT_TRAVEL_ALLOWANCE_URL,
   travelAllowanceDayUnits,
 } from "@/lib/danishTravelAllowance";
+import type { TimeProject } from "@/contracts/backendTypes";
 
 export type TravelDayLine = {
   date: string;
@@ -25,6 +27,7 @@ export type TravelDayLine = {
   dinnerProvided: boolean;
   lodgingCovered: boolean;
   lodgingByReceipt: boolean;
+  timeProjectId: string;
 };
 
 export function TravelDayMealsTable({
@@ -37,6 +40,7 @@ export function TravelDayMealsTable({
   lodgingAllowance,
   lodgingByReceipt,
   transportsPeopleOrGoods,
+  projects,
   onUpdateLine,
 }: {
   dayLines: TravelDayLine[];
@@ -49,6 +53,7 @@ export function TravelDayMealsTable({
   lodgingAllowance: boolean;
   lodgingByReceipt: boolean;
   transportsPeopleOrGoods: boolean;
+  projects: TimeProject[];
   onUpdateLine: (date: string, patch: Partial<TravelDayLine>) => void;
 }) {
   const foodRateCents = foodRateCentsForYear(2026, allowanceType);
@@ -84,7 +89,7 @@ export function TravelDayMealsTable({
           <p className="text-xs font-semibold text-white">Rejsedage — måltider dækket af arbejdsgiver</p>
           <p className="mt-0.5 text-[10px] text-white/45 leading-snug max-w-2xl">
             Kalenderlinjer bruges til måltidsfradrag pr. dato. Kostgodtgørelse beregnes af påbegyndte rejsetimer
-            (÷ 24), ikke antal kalenderdage.
+            (÷ 24), ikke antal kalenderdage. Projekt/event på første dag gælder alle dage — kan ændres enkeltvis.
           </p>
           <a
             href={SKAT_TRAVEL_ALLOWANCE_URL}
@@ -142,10 +147,11 @@ export function TravelDayMealsTable({
       ) : null}
 
       <div className="mt-2 overflow-x-auto rounded-md border border-white/10">
-        <table className="w-full min-w-[44rem] border-collapse text-left text-[11px]">
+        <table className="w-full min-w-[52rem] border-collapse text-left text-[11px]">
           <thead>
             <tr className="border-b border-white/10 bg-black/25 text-[10px] font-medium uppercase tracking-wide text-white/40">
               <th className="whitespace-nowrap px-2 py-1.5">Date</th>
+              <th className="min-w-[8rem] px-1 py-1.5">Project / event</th>
               <th className="min-w-[5rem] px-1 py-1.5">City</th>
               <th className="min-w-[5rem] px-1 py-1.5">Hotel</th>
               <th className="min-w-[7rem] px-1 py-1.5">Breakfast</th>
@@ -157,7 +163,7 @@ export function TravelDayMealsTable({
             </tr>
           </thead>
           <tbody>
-            {dayLines.map((line) => {
+            {dayLines.map((line, lineIndex) => {
               const reduction = showMealReductions ? mealReductionCentsForDay(foodRateCents, line) : 0;
               const reductionNote = mealReductionLabel(line);
               const payout = payoutByDate.get(line.date);
@@ -166,6 +172,27 @@ export function TravelDayMealsTable({
                 <tr key={line.date} className="border-t border-white/10 hover:bg-white/[0.02]">
                   <td className="whitespace-nowrap px-2 py-1.5 text-white/70 tabular-nums">
                     <div>{format(parseISO(line.date), "EEE d MMM")}</div>
+                  </td>
+                  <td className="p-1">
+                    <Select
+                      value={line.timeProjectId}
+                      onValueChange={(timeProjectId) => onUpdateLine(line.date, { timeProjectId })}
+                    >
+                      <SelectTrigger
+                        className="h-7 border-white/10 bg-white/5 px-2 text-[11px] text-white"
+                        title={lineIndex === 0 ? "Gælder alle dage indtil du ændrer dem enkeltvis" : undefined}
+                      >
+                        <SelectValue placeholder="No project" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72 border-white/10 bg-[#16161f] text-white">
+                        <SelectItem value="__none__">No project</SelectItem>
+                        {projects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td className="p-1">
                     <Input
@@ -263,7 +290,7 @@ export function TravelDayMealsTable({
             <tfoot>
               <tr className="border-t border-white/15 bg-black/20 text-white/70">
                 <td
-                  colSpan={showMealReductions ? 8 : 7}
+                  colSpan={showMealReductions ? 9 : 8}
                   className="px-2 py-1.5 text-right text-[10px] font-medium uppercase tracking-wide text-white/40"
                 >
                   Total udbetaling

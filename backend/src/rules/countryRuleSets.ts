@@ -11,6 +11,7 @@ export type TravelClaimDayLine = {
   dinnerProvided?: boolean;
   lodgingCovered?: boolean;
   lodgingByReceipt?: boolean;
+  timeProjectId?: string | null;
 };
 
 export type TravelAllowanceInput = {

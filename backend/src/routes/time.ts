@@ -1036,6 +1036,8 @@ function normalizeTravelDayLines(value: unknown): TravelClaimDayLine[] {
       dinnerProvided: line.dinnerProvided === true,
       lodgingCovered: line.lodgingCovered === true,
       lodgingByReceipt: line.lodgingByReceipt === true,
+      timeProjectId:
+        typeof line.timeProjectId === "string" && line.timeProjectId.length > 0 ? line.timeProjectId : null,
     }))
     .filter((line) => line.date.length > 0);
 }

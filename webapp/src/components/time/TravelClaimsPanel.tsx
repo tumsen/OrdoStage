@@ -31,7 +31,6 @@ type TravelDraft = {
   purpose: string;
   country: "DK";
   allowanceType: "standard" | "tour_driver_denmark" | "tour_driver_abroad";
-  timeProjectId: string;
   lodgingAllowance: boolean;
   lodgingCovered: boolean;
   foodCoveredByReceipts: boolean;
@@ -80,7 +79,7 @@ function travelDates(startsAt: string, endsAt: string): string[] {
   return dates;
 }
 
-function makeDayLine(date: string, existing?: TravelDayLine): TravelDayLine {
+function makeDayLine(date: string, existing?: TravelDayLine, inheritTimeProjectId = "__none__"): TravelDayLine {
   return {
     date,
     city: existing?.city ?? "",
@@ -90,7 +89,15 @@ function makeDayLine(date: string, existing?: TravelDayLine): TravelDayLine {
     dinnerProvided: existing?.dinnerProvided ?? false,
     lodgingCovered: existing?.lodgingCovered ?? false,
     lodgingByReceipt: existing?.lodgingByReceipt ?? false,
+    timeProjectId: existing?.timeProjectId ?? inheritTimeProjectId,
   };
+}
+
+function serializeDayLinesForApi(dayLines: TravelDayLine[]) {
+  return dayLines.map((line) => ({
+    ...line,
+    timeProjectId: line.timeProjectId === "__none__" ? null : line.timeProjectId,
+  }));
 }
 
 export function TravelClaimsPanel({
@@ -122,7 +129,6 @@ export function TravelClaimsPanel({
       purpose: "",
       country: "DK",
       allowanceType: "standard",
-      timeProjectId: "__none__",
       lodgingAllowance: false,
       lodgingCovered: false,
       foodCoveredByReceipts: false,
@@ -137,7 +143,8 @@ export function TravelClaimsPanel({
     setDraft((current) => {
       const dates = travelDates(current.startsAt, current.endsAt);
       const byDate = new Map(current.dayLines.map((line) => [line.date, line]));
-      const nextLines = dates.map((date) => makeDayLine(date, byDate.get(date)));
+      const inheritTimeProjectId = current.dayLines[0]?.timeProjectId ?? "__none__";
+      const nextLines = dates.map((date) => makeDayLine(date, byDate.get(date), inheritTimeProjectId));
       const unchanged =
         nextLines.length === current.dayLines.length &&
         nextLines.every((line, idx) => line.date === current.dayLines[idx]?.date);
@@ -174,6 +181,7 @@ export function TravelClaimsPanel({
       toast({ title: "Destination and purpose are required", variant: "destructive" });
       return;
     }
+    const primaryProjectId = draft.dayLines[0]?.timeProjectId;
     createClaim.mutate({
       startsAt: new Date(draft.startsAt).toISOString(),
       endsAt: new Date(draft.endsAt).toISOString(),
@@ -181,7 +189,7 @@ export function TravelClaimsPanel({
       purpose: draft.purpose.trim(),
       country: draft.country,
       allowanceType: draft.allowanceType,
-      timeProjectId: draft.timeProjectId === "__none__" ? null : draft.timeProjectId,
+      timeProjectId: primaryProjectId && primaryProjectId !== "__none__" ? primaryProjectId : null,
       breakfastProvided: draft.dayLines.some((line) => line.breakfastProvided),
       lunchProvided: draft.dayLines.some((line) => line.lunchProvided),
       dinnerProvided: draft.dayLines.some((line) => line.dinnerProvided),
@@ -191,7 +199,7 @@ export function TravelClaimsPanel({
       ...TRAVEL_ELIGIBILITY_DEFAULTS,
       transportsPeopleOrGoods: draft.transportsPeopleOrGoods,
       lodgingByReceipt: draft.lodgingByReceipt,
-      dayLines: draft.dayLines,
+      dayLines: serializeDayLinesForApi(draft.dayLines),
       notes: draft.notes.trim() || null,
     });
   }
@@ -204,11 +212,19 @@ export function TravelClaimsPanel({
   );
   const canClaimLodging =
     draft.allowanceType === "standard" && !draft.transportsPeopleOrGoods && !draft.lodgingByReceipt;
+  const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const updateDayLine = (date: string, patch: Partial<TravelDayLine>) =>
-    setDraft((d) => ({
-      ...d,
-      dayLines: d.dayLines.map((line) => (line.date === date ? { ...line, ...patch } : line)),
-    }));
+    setDraft((d) => {
+      const isFirstDay = d.dayLines[0]?.date === date;
+      const dayLines = d.dayLines.map((line) => {
+        if (line.date === date) return { ...line, ...patch };
+        if (isFirstDay && patch.timeProjectId !== undefined) {
+          return { ...line, timeProjectId: patch.timeProjectId };
+        }
+        return line;
+      });
+      return { ...d, dayLines };
+    });
 
   return (
     <div className="space-y-4">
@@ -267,6 +283,7 @@ export function TravelClaimsPanel({
                 lodgingAllowance={draft.lodgingAllowance}
                 lodgingByReceipt={draft.lodgingByReceipt}
                 transportsPeopleOrGoods={draft.transportsPeopleOrGoods}
+                projects={projects}
                 onUpdateLine={updateDayLine}
               />
             )}
@@ -316,25 +333,6 @@ export function TravelClaimsPanel({
                 <p className="mt-1 text-[11px] text-white/40">
                   Denmark is the first country rule set. Other country-specific travel and vacation rules can be added here later.
                 </p>
-              </div>
-              <div className="sm:col-span-2">
-                <Label className="text-xs text-white/50">Project / event</Label>
-                <Select
-                  value={draft.timeProjectId}
-                  onValueChange={(timeProjectId) => setDraft((d) => ({ ...d, timeProjectId }))}
-                >
-                  <SelectTrigger className="mt-1 border-white/10 bg-white/5 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-72 border-white/10 bg-[#16161f] text-white">
-                    <SelectItem value="__none__">No project</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
             <div className="space-y-2">
@@ -442,6 +440,7 @@ export function TravelClaimsPanel({
                           <tr className="border-b border-white/10 bg-black/25 text-[10px] font-medium uppercase tracking-wide text-white/40">
                             <th className="whitespace-nowrap px-2 py-1">Date</th>
                             <th className="min-w-[5rem] px-1 py-1">City</th>
+                            <th className="min-w-[6rem] px-1 py-1">Project</th>
                             <th className="min-w-[5rem] px-1 py-1">Hotel</th>
                             <th className="px-2 py-1">Covered</th>
                             <th className="px-2 py-1 text-right">Udbetaling</th>
@@ -457,12 +456,17 @@ export function TravelClaimsPanel({
                               line.lodgingByReceipt ? "R" : null,
                             ].filter(Boolean);
                             const payout = payoutByDate.get(line.date);
+                            const projectName =
+                              line.timeProjectId && projectById.get(line.timeProjectId)?.name;
                             return (
                               <tr key={line.date} className="border-t border-white/10 text-white/65">
                                 <td className="whitespace-nowrap px-2 py-0.5 tabular-nums">
                                   {format(parseISO(line.date), "EEE d MMM")}
                                 </td>
                                 <td className="max-w-[10rem] truncate px-1 py-0.5">{line.city || "—"}</td>
+                                <td className="max-w-[8rem] truncate px-1 py-0.5 text-white/50">
+                                  {projectName || "—"}
+                                </td>
                                 <td className="max-w-[10rem] truncate px-1 py-0.5">{line.hotel || "—"}</td>
                                 <td className="px-2 py-0.5 text-white/50">
                                   {covered.length > 0 ? covered.join(" ") : "—"}
