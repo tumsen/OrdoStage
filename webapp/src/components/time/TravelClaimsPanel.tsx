@@ -177,6 +177,39 @@ function formatClaimRange(startsAt: string, endsAt: string): string {
   return `${format(parseISO(startsAt), "d MMM yyyy HH:mm")} – ${format(parseISO(endsAt), "d MMM yyyy HH:mm")}`;
 }
 
+function linkedProjectNames(
+  claim: { timeProjectId: string | null; dayLines: { timeProjectId?: string | null }[] },
+  projectById: Map<string, TimeProject>
+): string[] {
+  const ids = new Set<string>();
+  if (claim.timeProjectId) ids.add(claim.timeProjectId);
+  for (const line of claim.dayLines) {
+    if (line.timeProjectId) ids.add(line.timeProjectId);
+  }
+  return [...ids]
+    .map((id) => projectById.get(id)?.name)
+    .filter((name): name is string => Boolean(name));
+}
+
+function TravelClaimCollapsedMeta({
+  projectNames,
+  totalCents,
+}: {
+  projectNames: string[];
+  totalCents: number | null;
+}) {
+  return (
+    <div className="mt-1 space-y-0.5">
+      <p className="text-[11px] text-white/50">
+        {projectNames.length > 0 ? projectNames.join(" · ") : "Ingen projekt tilknyttet"}
+      </p>
+      {totalCents !== null ? (
+        <p className="text-[11px] font-medium tabular-nums text-white/80">{money(totalCents)}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function useSyncedDayLines(
   draft: TravelDraft,
   setDraft: React.Dispatch<React.SetStateAction<TravelDraft>>
@@ -428,6 +461,8 @@ function SavedTravelClaimCard({
   isDeleting: boolean;
   isSaving: boolean;
 }) {
+  const projectNames = linkedProjectNames(claim, projectById);
+
   return (
     <Collapsible open={expanded} onOpenChange={onExpandedChange} className="rounded-xl border border-white/10 bg-white/[0.02]">
       <div className="flex flex-wrap items-start gap-2 p-3">
@@ -456,17 +491,21 @@ function SavedTravelClaimCard({
                   </span>
                 ) : null}
               </div>
-              {claim.notes && !expanded ? (
+              {!expanded ? (
+                <TravelClaimCollapsedMeta projectNames={projectNames} totalCents={claim.totalAmountCents} />
+              ) : claim.notes ? (
                 <p className="mt-1 line-clamp-1 text-[11px] text-white/50">{claim.notes}</p>
               ) : null}
             </div>
           </button>
         </CollapsibleTrigger>
         <div className="flex shrink-0 items-start gap-2">
-          <div className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1.5 text-right">
-            <p className="text-[9px] uppercase tracking-wide text-white/35">Total</p>
-            <p className="text-sm font-semibold text-white">{money(claim.totalAmountCents)}</p>
-          </div>
+          {expanded ? (
+            <div className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1.5 text-right">
+              <p className="text-[9px] uppercase tracking-wide text-white/35">Total</p>
+              <p className="text-sm font-semibold text-white">{money(claim.totalAmountCents)}</p>
+            </div>
+          ) : null}
           {canEdit && locked && !isEditing ? (
             <Button type="button" variant="outline" size="sm" className="h-8 border-white/15 text-white hover:bg-white/10" onClick={onReopen}>
               Åbn til redigering
