@@ -60,6 +60,7 @@ import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
 import { TravelClaimsPanel } from "@/components/time/TravelClaimsPanel";
+import { MileageClaimsPanel } from "@/components/time/MileageClaimsPanel";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
@@ -319,20 +320,28 @@ export default function TimeTracking() {
     "DK",
     "travelAllowance"
   );
+  const mileageAllowanceEnabled = isCountryFeatureEnabled(
+    orgFeatures?.countryFeatures,
+    "DK",
+    "mileageAllowance"
+  );
 
   const [mode, setMode] = usePersistedViewMode(
     "ordo.viewMode.timeTracking",
     TIME_TRACKING_VIEW_MODES,
     "week",
   );
-  const [section, setSection] = useState<"time" | "travel">("time");
+  const [section, setSection] = useState<"time" | "travel" | "mileage">("time");
   const [anchor, setAnchor] = useState(() => new Date());
 
   useEffect(() => {
     if (!travelAllowanceEnabled && section === "travel") {
       setSection("time");
     }
-  }, [travelAllowanceEnabled, section]);
+    if (!mileageAllowanceEnabled && section === "mileage") {
+      setSection("time");
+    }
+  }, [travelAllowanceEnabled, mileageAllowanceEnabled, section]);
 
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [upcomingCollapsed, setUpcomingCollapsed] = useState(true);
@@ -1378,6 +1387,21 @@ export default function TimeTracking() {
                 Travel
               </button>
             ) : null}
+            {mileageAllowanceEnabled ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSection("mileage");
+                  setMode("week");
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm",
+                  section === "mileage" ? "bg-white/10 text-white" : "text-white/55"
+                )}
+              >
+                Mileage
+              </button>
+            ) : null}
           </div>
           <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
             <button
@@ -1702,6 +1726,16 @@ export default function TimeTracking() {
       {section === "travel" && travelAllowanceEnabled ? (
         <div className="min-h-0 flex-1 overflow-auto pr-1">
           <TravelClaimsPanel
+            rangeFrom={rangeFrom}
+            rangeTo={rangeTo}
+            personQuery={personQs}
+            canEdit={canEditVisiblePeriod}
+            projects={projects ?? []}
+          />
+        </div>
+      ) : section === "mileage" && mileageAllowanceEnabled ? (
+        <div className="min-h-0 flex-1 overflow-auto pr-1">
+          <MileageClaimsPanel
             rangeFrom={rangeFrom}
             rangeTo={rangeTo}
             personQuery={personQs}

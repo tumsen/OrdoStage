@@ -116,6 +116,7 @@ export default function Account() {
   });
   const [productionPlannerEnabled, setProductionPlannerEnabled] = useState(false);
   const [dkTravelAllowanceEnabled, setDkTravelAllowanceEnabled] = useState(false);
+  const [dkMileageAllowanceEnabled, setDkMileageAllowanceEnabled] = useState(false);
 
   const [confirmPhrase, setConfirmPhrase] = useState("");
   const [loading, setLoading] = useState(false);
@@ -196,6 +197,9 @@ export default function Account() {
     setProductionPlannerEnabled(Boolean(orgFeatureData?.productionPlannerEnabled));
     setDkTravelAllowanceEnabled(
       isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "travelAllowance")
+    );
+    setDkMileageAllowanceEnabled(
+      isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "mileageAllowance")
     );
   }, [orgFeatureData?.productionPlannerEnabled, orgFeatureData?.countryFeatures]);
 
@@ -295,14 +299,17 @@ export default function Account() {
   });
 
   const updateCountryFeaturesMutation = useMutation({
-    mutationFn: (travelAllowance: boolean) =>
+    mutationFn: (patch: { travelAllowance?: boolean; mileageAllowance?: boolean }) =>
       api.patch<{ ok: boolean; countryFeatures: OrganizationCountryFeatures }>("/api/org/country-features", {
         country: "DK",
-        travelAllowance,
+        ...patch,
       }),
     onSuccess: (data) => {
       setDkTravelAllowanceEnabled(
         isCountryFeatureEnabled(data.countryFeatures, "DK", "travelAllowance")
+      );
+      setDkMileageAllowanceEnabled(
+        isCountryFeatureEnabled(data.countryFeatures, "DK", "mileageAllowance")
       );
       queryClient.invalidateQueries({ queryKey: ["org"] });
       queryClient.invalidateQueries({ queryKey: ["org", "features"] });
@@ -311,6 +318,9 @@ export default function Account() {
     onError: (e: unknown) => {
       setDkTravelAllowanceEnabled(
         isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "travelAllowance")
+      );
+      setDkMileageAllowanceEnabled(
+        isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "mileageAllowance")
       );
       const msg = isApiError(e) ? e.message : "Could not update country feature.";
       toast({ title: "Feature update failed", description: msg, variant: "destructive" });
@@ -846,7 +856,25 @@ export default function Account() {
                 disabled={updateCountryFeaturesMutation.isPending}
                 onCheckedChange={(checked) => {
                   setDkTravelAllowanceEnabled(checked);
-                  updateCountryFeaturesMutation.mutate(checked);
+                  updateCountryFeaturesMutation.mutate({ travelAllowance: checked });
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
+              <div>
+                <p className="text-sm text-white">
+                  {COUNTRY_FEATURE_CATALOG.DK.label}: {COUNTRY_FEATURE_CATALOG.DK.features.mileageAllowance.label}
+                </p>
+                <p className="text-xs text-white/45">
+                  {COUNTRY_FEATURE_CATALOG.DK.features.mileageAllowance.description}
+                </p>
+              </div>
+              <Switch
+                checked={dkMileageAllowanceEnabled}
+                disabled={updateCountryFeaturesMutation.isPending}
+                onCheckedChange={(checked) => {
+                  setDkMileageAllowanceEnabled(checked);
+                  updateCountryFeaturesMutation.mutate({ mileageAllowance: checked });
                 }}
               />
             </div>

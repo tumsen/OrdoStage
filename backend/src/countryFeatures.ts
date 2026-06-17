@@ -13,6 +13,11 @@ export const COUNTRY_FEATURE_CATALOG = {
         description:
           "Tax-free travel allowance with day-by-day meal reductions per SKAT rules.",
       },
+      mileageAllowance: {
+        label: "SKAT mileage allowance (kørselsgodtgørelse)",
+        description:
+          "Tax-free mileage reimbursement per SKAT km rates (car tier at 20,000 km/year).",
+      },
     },
   },
 } as const;

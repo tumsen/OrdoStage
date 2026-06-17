@@ -47,6 +47,30 @@ export type TravelAllowanceResult = {
   totalAmountCents: number;
 };
 
+export type MileageVehicleType = "car" | "bicycle";
+
+export type MileageAllowanceInput = {
+  vehicleType: MileageVehicleType;
+  distanceKm: number;
+  rateYear?: number;
+  /** Car km already driven this calendar year (same employer), excluding the current claim. */
+  carKmYtdBeforeTrip?: number;
+  salaryReductionAgreement?: boolean;
+  receivesBIncome?: boolean;
+};
+
+export type MileageAllowanceResult = {
+  rateYear: number;
+  rateCentsPerKmHigh: number;
+  rateCentsPerKmLow: number;
+  bicycleRateCentsPerKm: number;
+  highRateKm: number;
+  lowRateKm: number;
+  totalAmountCents: number;
+};
+
+const CAR_KM_YEAR_LIMIT = 20_000;
+
 export type CountryRuleSet = {
   id: CountryRuleSetId;
   countryCode: string;
@@ -54,6 +78,10 @@ export type CountryRuleSet = {
   travel: {
     supportedAllowanceTypes: TravelAllowanceType[];
     calculateAllowance: (input: TravelAllowanceInput) => TravelAllowanceResult;
+  };
+  mileage: {
+    supportedVehicleTypes: MileageVehicleType[];
+    calculateAllowance: (input: MileageAllowanceInput) => MileageAllowanceResult;
   };
   vacation: {
     label: string;
@@ -141,6 +169,63 @@ function calculateDanishTravelAllowance(input: TravelAllowanceInput): TravelAllo
   };
 }
 
+function ratesForDanishMileage(rateYear: number) {
+  const year = rateYear === 2025 ? 2025 : 2026;
+  if (year === 2025) {
+    return {
+      rateYear: year,
+      rateCentsPerKmHigh: 381,
+      rateCentsPerKmLow: 223,
+      bicycleRateCentsPerKm: 63,
+    };
+  }
+  return {
+    rateYear: year,
+    rateCentsPerKmHigh: 394,
+    rateCentsPerKmLow: 228,
+    bicycleRateCentsPerKm: 64,
+  };
+}
+
+function calculateDanishMileageAllowance(input: MileageAllowanceInput): MileageAllowanceResult {
+  const rates = ratesForDanishMileage(input.rateYear ?? 2026);
+  const eligible = input.salaryReductionAgreement !== true && input.receivesBIncome !== true;
+  const distanceKm = Number.isFinite(input.distanceKm) ? Math.max(0, input.distanceKm) : 0;
+
+  if (!eligible || distanceKm <= 0) {
+    return {
+      ...rates,
+      highRateKm: 0,
+      lowRateKm: 0,
+      totalAmountCents: 0,
+    };
+  }
+
+  if (input.vehicleType === "bicycle") {
+    return {
+      ...rates,
+      highRateKm: 0,
+      lowRateKm: 0,
+      totalAmountCents: Math.round(distanceKm * rates.bicycleRateCentsPerKm),
+    };
+  }
+
+  const ytd = Math.max(0, input.carKmYtdBeforeTrip ?? 0);
+  const highRemaining = Math.max(0, CAR_KM_YEAR_LIMIT - ytd);
+  const highRateKm = Math.min(distanceKm, highRemaining);
+  const lowRateKm = distanceKm - highRateKm;
+  const totalAmountCents = Math.round(
+    highRateKm * rates.rateCentsPerKmHigh + lowRateKm * rates.rateCentsPerKmLow
+  );
+
+  return {
+    ...rates,
+    highRateKm,
+    lowRateKm,
+    totalAmountCents,
+  };
+}
+
 export const danishRuleSet: CountryRuleSet = {
   id: "DK",
   countryCode: "DK",
@@ -148,6 +233,10 @@ export const danishRuleSet: CountryRuleSet = {
   travel: {
     supportedAllowanceTypes: ["standard", "tour_driver_denmark", "tour_driver_abroad"],
     calculateAllowance: calculateDanishTravelAllowance,
+  },
+  mileage: {
+    supportedVehicleTypes: ["car", "bicycle"],
+    calculateAllowance: calculateDanishMileageAllowance,
   },
   vacation: {
     label: "Danish vacation rules",

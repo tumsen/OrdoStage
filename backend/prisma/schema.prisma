@@ -143,6 +143,7 @@ model Organization {
   productionPhaseDocuments ProductionPhaseDocument[]
   productionDocuments ProductionDocument[]
   timeTravelClaims TimeTravelClaim[]
+  timeMileageClaims TimeMileageClaim[]
   timesheetApprovals TimesheetApproval[]
 }
 
@@ -397,6 +398,7 @@ model Person {
   updatedAt        DateTime                @updatedAt
   timeEntries      TimeEntry[]
   timeTravelClaims TimeTravelClaim[]
+  timeMileageClaims TimeMileageClaim[]
   timesheetApprovals TimesheetApproval[]
   productionsLed     Production[]            @relation("ProductionLeadPerson")
   productionPhases   ProductionPhase[]       @relation("ProductionPhaseAssignee")
@@ -1084,6 +1086,40 @@ model TimeTravelClaim {
   @@index([organizationId, personId, startsAt])
   @@index([eventId])
   @@index([eventShowJobId])
+  @@index([timeProjectId])
+}
+
+model TimeMileageClaim {
+  id                       String       @id @default(cuid())
+  organizationId           String
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  personId                 String
+  person                   Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+  createdByUserId          String?
+  tripDate                 DateTime
+  fromPlace                String
+  toPlace                  String
+  purpose                  String       @default("")
+  country                  String       @default("DK")
+  vehicleType              String       @default("car")
+  distanceKm               Float
+  rateYear                 Int          @default(2026)
+  rateCentsPerKmHigh       Int          @default(394)
+  rateCentsPerKmLow        Int          @default(228)
+  bicycleRateCentsPerKm    Int          @default(64)
+  highRateKm               Float        @default(0)
+  lowRateKm                Float        @default(0)
+  salaryReductionAgreement Boolean      @default(false)
+  receivesBIncome          Boolean      @default(false)
+  timeProjectId            String?
+  eventId                  String?
+  notes                    String?
+  totalAmountCents         Int          @default(0)
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
+  @@index([organizationId, personId, tripDate])
+  @@index([eventId])
   @@index([timeProjectId])
 }
 

@@ -573,7 +573,8 @@ app.patch("/org/country-features", async (c) => {
     return c.json({ error: { message: "Organization not found", code: "NOT_FOUND" } }, 404);
   }
   const countryFeatures = patchCountryFeatures(existing.countryFeatures, body.country, {
-    travelAllowance: body.travelAllowance,
+    ...(body.travelAllowance !== undefined ? { travelAllowance: body.travelAllowance } : {}),
+    ...(body.mileageAllowance !== undefined ? { mileageAllowance: body.mileageAllowance } : {}),
   });
   await prisma.organization.update({
     where: { id: user.organizationId },

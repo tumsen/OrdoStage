@@ -143,9 +143,13 @@ function BillingTab({ org }: { org: OrgDetail }) {
   const [dkTravelEnabled, setDkTravelEnabled] = useState(
     isCountryFeatureEnabled(org.countryFeatures, "DK", "travelAllowance")
   );
+  const [dkMileageEnabled, setDkMileageEnabled] = useState(
+    isCountryFeatureEnabled(org.countryFeatures, "DK", "mileageAllowance")
+  );
   useEffect(() => {
     setPlannerEnabled(Boolean(org.productionPlannerEnabled));
     setDkTravelEnabled(isCountryFeatureEnabled(org.countryFeatures, "DK", "travelAllowance"));
+    setDkMileageEnabled(isCountryFeatureEnabled(org.countryFeatures, "DK", "mileageAllowance"));
   }, [org.productionPlannerEnabled, org.countryFeatures]);
 
   const updateFeaturesMutation = useMutation({
@@ -168,10 +172,10 @@ function BillingTab({ org }: { org: OrgDetail }) {
   });
 
   const updateCountryFeaturesMutation = useMutation({
-    mutationFn: (travelAllowance: boolean) =>
+    mutationFn: (patch: { travelAllowance?: boolean; mileageAllowance?: boolean }) =>
       api.patch<{ id: string; countryFeatures: OrganizationCountryFeatures }>(
         `/api/admin/orgs/${org.id}/country-features`,
-        { country: "DK", travelAllowance }
+        { country: "DK", ...patch }
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "orgs", org.id] });
@@ -179,6 +183,7 @@ function BillingTab({ org }: { org: OrgDetail }) {
     },
     onError: (err) => {
       setDkTravelEnabled(isCountryFeatureEnabled(org.countryFeatures, "DK", "travelAllowance"));
+      setDkMileageEnabled(isCountryFeatureEnabled(org.countryFeatures, "DK", "mileageAllowance"));
       toast({
         title: "Could not update country features",
         description: isApiError(err) ? err.message : "Try again.",
@@ -255,7 +260,25 @@ function BillingTab({ org }: { org: OrgDetail }) {
               disabled={updateCountryFeaturesMutation.isPending}
               onCheckedChange={(checked) => {
                 setDkTravelEnabled(checked);
-                updateCountryFeaturesMutation.mutate(checked);
+                updateCountryFeaturesMutation.mutate({ travelAllowance: checked });
+              }}
+            />
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <div>
+              <p className="text-sm font-medium text-white">
+                {COUNTRY_FEATURE_CATALOG.DK.label}: {COUNTRY_FEATURE_CATALOG.DK.features.mileageAllowance.label}
+              </p>
+              <p className="text-xs text-white/50">
+                {COUNTRY_FEATURE_CATALOG.DK.features.mileageAllowance.description}
+              </p>
+            </div>
+            <Switch
+              checked={dkMileageEnabled}
+              disabled={updateCountryFeaturesMutation.isPending}
+              onCheckedChange={(checked) => {
+                setDkMileageEnabled(checked);
+                updateCountryFeaturesMutation.mutate({ mileageAllowance: checked });
               }}
             />
           </div>

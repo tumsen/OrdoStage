@@ -4,16 +4,18 @@ export const LanguageSchema = z.enum(["en", "da", "de"]);
 export const TimeFormatSchema = z.enum(["12h", "24h"]);
 export const DistanceUnitSchema = z.enum(["km", "mi"]);
 
-/** Per-country optional modules, e.g. { DK: { travelAllowance: true } }. */
+/** Per-country optional modules, e.g. { DK: { travelAllowance: true, mileageAllowance: true } }. */
 export const CountryFeatureFlagsSchema = z.object({
   travelAllowance: z.boolean().optional(),
+  mileageAllowance: z.boolean().optional(),
 });
 
 export const OrganizationCountryFeaturesSchema = z.record(z.string(), CountryFeatureFlagsSchema);
 
 export const PatchOrgCountryFeaturesSchema = z.object({
   country: z.string().length(2),
-  travelAllowance: z.boolean(),
+  travelAllowance: z.boolean().optional(),
+  mileageAllowance: z.boolean().optional(),
 });
 
 export const UserPreferencesSchema = z.object({
@@ -1376,6 +1378,54 @@ export const CreateTimeTravelClaimSchema = z.object({
 
 export const PatchTimeTravelClaimSchema = CreateTimeTravelClaimSchema.partial();
 
+export const MileageVehicleTypeSchema = z.enum(["car", "bicycle"]);
+
+export const TimeMileageClaimSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  personId: z.string(),
+  createdByUserId: z.string().nullable(),
+  tripDate: z.string(),
+  fromPlace: z.string(),
+  toPlace: z.string(),
+  purpose: z.string(),
+  country: z.string(),
+  vehicleType: MileageVehicleTypeSchema,
+  distanceKm: z.number(),
+  rateYear: z.number().int(),
+  rateCentsPerKmHigh: z.number().int(),
+  rateCentsPerKmLow: z.number().int(),
+  bicycleRateCentsPerKm: z.number().int(),
+  highRateKm: z.number(),
+  lowRateKm: z.number(),
+  salaryReductionAgreement: z.boolean(),
+  receivesBIncome: z.boolean(),
+  timeProjectId: z.string().nullable(),
+  eventId: z.string().nullable(),
+  notes: z.string().nullable(),
+  totalAmountCents: z.number().int(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const CreateTimeMileageClaimSchema = z.object({
+  tripDate: z.string().min(1),
+  fromPlace: z.string().optional().default(""),
+  toPlace: z.string().optional().default(""),
+  purpose: z.string().optional().default(""),
+  country: z.string().min(1).default("DK"),
+  vehicleType: MileageVehicleTypeSchema.default("car"),
+  distanceKm: z.number().min(0).default(0),
+  rateYear: z.number().int().optional(),
+  salaryReductionAgreement: z.boolean().optional(),
+  receivesBIncome: z.boolean().optional(),
+  timeProjectId: z.string().nullable().optional(),
+  eventId: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export const PatchTimeMileageClaimSchema = CreateTimeMileageClaimSchema.partial();
+
 export const TimesheetApprovalSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
@@ -1482,6 +1532,7 @@ export type TimeProject = z.infer<typeof TimeProjectSchema>;
 export type TimeEntry = z.infer<typeof TimeEntrySchema>;
 export type TimeTrackingJob = z.infer<typeof TimeTrackingJobSchema>;
 export type TimeTravelClaim = z.infer<typeof TimeTravelClaimSchema>;
+export type TimeMileageClaim = z.infer<typeof TimeMileageClaimSchema>;
 export type TimesheetApproval = z.infer<typeof TimesheetApprovalSchema>;
 
 // Tour type exports

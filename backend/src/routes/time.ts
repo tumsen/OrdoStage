@@ -8,7 +8,7 @@ import { auth } from "../auth";
 import { canAction, canView } from "../requestRole";
 import type { EffectiveRole } from "../effectiveRole";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
-import { getCountryRuleSet, type TravelAllowanceType, type TravelClaimDayLine } from "../rules/countryRuleSets";
+import { getCountryRuleSet, type TravelAllowanceType, type TravelClaimDayLine, type MileageVehicleType } from "../rules/countryRuleSets";
 import { isCountryFeatureEnabled } from "../countryFeatures";
 import {
   CreateTimeTagSchema,
@@ -19,6 +19,8 @@ import {
   PatchTimeEntrySchema,
   CreateTimeTravelClaimSchema,
   PatchTimeTravelClaimSchema,
+  CreateTimeMileageClaimSchema,
+  PatchTimeMileageClaimSchema,
   ApproveTimesheetSchema,
   SetPersonContractSchema,
   TIME_CATEGORIES,
@@ -1023,6 +1025,128 @@ function serializeTravelClaim(row: {
     notes: row.notes,
     foodAmountCents: row.foodAmountCents,
     lodgingAmountCents: row.lodgingAmountCents,
+    totalAmountCents: row.totalAmountCents,
+    createdAt: iso(row.createdAt),
+    updatedAt: iso(row.updatedAt),
+  };
+}
+
+async function mileageAllowanceFeatureEnabled(organizationId: string, country: string): Promise<boolean> {
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { countryFeatures: true },
+  });
+  return isCountryFeatureEnabled(org?.countryFeatures, country, "mileageAllowance");
+}
+
+async function carKmYtdForPerson(params: {
+  organizationId: string;
+  personId: string;
+  rateYear: number;
+  excludeClaimId?: string;
+}): Promise<number> {
+  const yearStart = new Date(params.rateYear, 0, 1);
+  const yearEnd = new Date(params.rateYear + 1, 0, 1);
+  const rows = await prisma.timeMileageClaim.findMany({
+    where: {
+      organizationId: params.organizationId,
+      personId: params.personId,
+      vehicleType: "car",
+      tripDate: { gte: yearStart, lt: yearEnd },
+      ...(params.excludeClaimId ? { id: { not: params.excludeClaimId } } : {}),
+    },
+    select: { distanceKm: true },
+  });
+  return rows.reduce((sum, row) => sum + row.distanceKm, 0);
+}
+
+async function calculateMileageClaimAmounts(params: {
+  organizationId: string;
+  personId: string;
+  excludeClaimId?: string;
+  vehicleType: MileageVehicleType;
+  distanceKm: number;
+  tripDate: Date;
+  rateYear?: number;
+  salaryReductionAgreement?: boolean;
+  receivesBIncome?: boolean;
+  country?: string;
+}) {
+  const country = (params.country ?? "DK").trim().toUpperCase();
+  const ruleSet = getCountryRuleSet(country);
+  if (!ruleSet) {
+    throw new Error("UNSUPPORTED_RULE_SET");
+  }
+  const rateYear = params.rateYear ?? params.tripDate.getFullYear();
+  const carKmYtdBeforeTrip =
+    params.vehicleType === "car"
+      ? await carKmYtdForPerson({
+          organizationId: params.organizationId,
+          personId: params.personId,
+          rateYear,
+          excludeClaimId: params.excludeClaimId,
+        })
+      : 0;
+  return ruleSet.mileage.calculateAllowance({
+    vehicleType: params.vehicleType,
+    distanceKm: params.distanceKm,
+    rateYear,
+    carKmYtdBeforeTrip,
+    salaryReductionAgreement: params.salaryReductionAgreement,
+    receivesBIncome: params.receivesBIncome,
+  });
+}
+
+function serializeMileageClaim(row: {
+  id: string;
+  organizationId: string;
+  personId: string;
+  createdByUserId: string | null;
+  tripDate: Date;
+  fromPlace: string;
+  toPlace: string;
+  purpose: string;
+  country: string;
+  vehicleType: string;
+  distanceKm: number;
+  rateYear: number;
+  rateCentsPerKmHigh: number;
+  rateCentsPerKmLow: number;
+  bicycleRateCentsPerKm: number;
+  highRateKm: number;
+  lowRateKm: number;
+  salaryReductionAgreement: boolean;
+  receivesBIncome: boolean;
+  timeProjectId: string | null;
+  eventId: string | null;
+  notes: string | null;
+  totalAmountCents: number;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    personId: row.personId,
+    createdByUserId: row.createdByUserId,
+    tripDate: iso(row.tripDate),
+    fromPlace: row.fromPlace,
+    toPlace: row.toPlace,
+    purpose: row.purpose,
+    country: row.country,
+    vehicleType: row.vehicleType as MileageVehicleType,
+    distanceKm: row.distanceKm,
+    rateYear: row.rateYear,
+    rateCentsPerKmHigh: row.rateCentsPerKmHigh,
+    rateCentsPerKmLow: row.rateCentsPerKmLow,
+    bicycleRateCentsPerKm: row.bicycleRateCentsPerKm,
+    highRateKm: row.highRateKm,
+    lowRateKm: row.lowRateKm,
+    salaryReductionAgreement: row.salaryReductionAgreement,
+    receivesBIncome: row.receivesBIncome,
+    timeProjectId: row.timeProjectId,
+    eventId: row.eventId,
+    notes: row.notes,
     totalAmountCents: row.totalAmountCents,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
@@ -3643,6 +3767,255 @@ timeRouter.delete("/time/travel-claims/:id", async (c) => {
     );
   }
   await prisma.timeTravelClaim.delete({ where: { id } });
+  return c.json({ ok: true });
+});
+
+timeRouter.get("/time/mileage-claims", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  if (!(await mileageAllowanceFeatureEnabled(user.organizationId, "DK"))) {
+    return c.json({ data: [] });
+  }
+  const r = parseRange(c);
+  if ("error" in r) return c.json({ error: { message: r.error, code: "BAD_REQUEST" } }, 400);
+  const qPerson = c.req.query("personId");
+  const target = await resolveTargetPersonId(c, user.organizationId, qPerson);
+  if ("error" in target) {
+    return c.json({ error: { message: target.error, code: "BAD_REQUEST" } }, target.status);
+  }
+  const rows = await prisma.timeMileageClaim.findMany({
+    where: {
+      organizationId: user.organizationId,
+      personId: target.personId,
+      tripDate: { gte: r.rangeStart, lt: r.rangeEndExclusive },
+    },
+    orderBy: { tripDate: "asc" },
+  });
+  return c.json({ data: rows.map(serializeMileageClaim) });
+});
+
+timeRouter.post("/time/mileage-claims", zValidator("json", CreateTimeMileageClaimSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId || !user.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time") || !canAction(c, "time.write")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const body = c.req.valid("json");
+  const country = body.country.trim().toUpperCase();
+  if (!(await mileageAllowanceFeatureEnabled(user.organizationId, country))) {
+    return c.json(
+      {
+        error: {
+          message: "Mileage allowance is not enabled for this organization.",
+          code: "FEATURE_DISABLED",
+        },
+      },
+      403
+    );
+  }
+  const personId = await resolvePersonIdForUser(user.organizationId, user.email);
+  if (!personId) {
+    return c.json({ error: { message: "No linked person profile.", code: "BAD_REQUEST" } }, 400);
+  }
+  const tripDate = new Date(body.tripDate);
+  if (!Number.isFinite(tripDate.getTime())) {
+    return c.json({ error: { message: "Invalid trip date", code: "BAD_REQUEST" } }, 400);
+  }
+  if (await findApprovedTimesheet({ organizationId: user.organizationId, personId, startsAt: tripDate, endsAt: tripDate })) {
+    return c.json(
+      { error: { message: "Timesheet is approved. Ask an admin to reopen it before editing mileage.", code: "TIMESHEET_APPROVED" } },
+      423
+    );
+  }
+  const vehicleType = body.vehicleType as MileageVehicleType;
+  const distanceKm = body.distanceKm ?? 0;
+  let calc;
+  try {
+    calc = await calculateMileageClaimAmounts({
+      organizationId: user.organizationId,
+      personId,
+      vehicleType,
+      distanceKm,
+      tripDate,
+      rateYear: body.rateYear,
+      salaryReductionAgreement: body.salaryReductionAgreement,
+      receivesBIncome: body.receivesBIncome,
+      country,
+    });
+  } catch {
+    return c.json({ error: { message: "Country rule set is not supported yet.", code: "UNSUPPORTED_RULE_SET" } }, 400);
+  }
+  const row = await prisma.timeMileageClaim.create({
+    data: {
+      organizationId: user.organizationId,
+      personId,
+      createdByUserId: user.id,
+      tripDate,
+      fromPlace: body.fromPlace?.trim() ?? "",
+      toPlace: body.toPlace?.trim() ?? "",
+      purpose: body.purpose?.trim() ?? "",
+      country,
+      vehicleType,
+      distanceKm,
+      rateYear: calc.rateYear,
+      rateCentsPerKmHigh: calc.rateCentsPerKmHigh,
+      rateCentsPerKmLow: calc.rateCentsPerKmLow,
+      bicycleRateCentsPerKm: calc.bicycleRateCentsPerKm,
+      highRateKm: calc.highRateKm,
+      lowRateKm: calc.lowRateKm,
+      salaryReductionAgreement: body.salaryReductionAgreement ?? false,
+      receivesBIncome: body.receivesBIncome ?? false,
+      timeProjectId: body.timeProjectId ?? null,
+      eventId: body.eventId ?? null,
+      notes: body.notes ?? null,
+      totalAmountCents: calc.totalAmountCents,
+    },
+  });
+  return c.json({ data: serializeMileageClaim(row) }, 201);
+});
+
+timeRouter.patch("/time/mileage-claims/:id", zValidator("json", PatchTimeMileageClaimSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId || !user.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const existing = await prisma.timeMileageClaim.findFirst({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  if (!(await mileageAllowanceFeatureEnabled(user.organizationId, existing.country))) {
+    return c.json(
+      {
+        error: {
+          message: "Mileage allowance is not enabled for this organization.",
+          code: "FEATURE_DISABLED",
+        },
+      },
+      403
+    );
+  }
+  const myPersonId = await resolvePersonIdForUser(user.organizationId, user.email);
+  const canEditOwn = Boolean(myPersonId && existing.personId === myPersonId && canAction(c, "time.write"));
+  const canEditAny = canAction(c, "time.read_all");
+  if (!canEditOwn && !canEditAny) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const body = c.req.valid("json");
+  const tripDate = body.tripDate !== undefined ? new Date(body.tripDate) : existing.tripDate;
+  if (!Number.isFinite(tripDate.getTime())) {
+    return c.json({ error: { message: "Invalid trip date", code: "BAD_REQUEST" } }, 400);
+  }
+  if (await findApprovedTimesheet({
+    organizationId: user.organizationId,
+    personId: existing.personId,
+    startsAt: tripDate < existing.tripDate ? tripDate : existing.tripDate,
+    endsAt: tripDate > existing.tripDate ? tripDate : existing.tripDate,
+  })) {
+    return c.json(
+      { error: { message: "Timesheet is approved. Ask an admin to reopen it before editing mileage.", code: "TIMESHEET_APPROVED" } },
+      423
+    );
+  }
+  const vehicleType = (body.vehicleType ?? existing.vehicleType) as MileageVehicleType;
+  const distanceKm = body.distanceKm ?? existing.distanceKm;
+  const country = body.country !== undefined ? body.country.trim().toUpperCase() : existing.country;
+  let calc;
+  try {
+    calc = await calculateMileageClaimAmounts({
+      organizationId: user.organizationId,
+      personId: existing.personId,
+      excludeClaimId: existing.id,
+      vehicleType,
+      distanceKm,
+      tripDate,
+      rateYear: body.rateYear ?? existing.rateYear,
+      salaryReductionAgreement: body.salaryReductionAgreement ?? existing.salaryReductionAgreement,
+      receivesBIncome: body.receivesBIncome ?? existing.receivesBIncome,
+      country,
+    });
+  } catch {
+    return c.json({ error: { message: "Country rule set is not supported yet.", code: "UNSUPPORTED_RULE_SET" } }, 400);
+  }
+  const updated = await prisma.timeMileageClaim.update({
+    where: { id },
+    data: {
+      tripDate,
+      ...(body.fromPlace !== undefined ? { fromPlace: body.fromPlace.trim() } : {}),
+      ...(body.toPlace !== undefined ? { toPlace: body.toPlace.trim() } : {}),
+      ...(body.purpose !== undefined ? { purpose: body.purpose.trim() } : {}),
+      country,
+      vehicleType,
+      distanceKm,
+      rateYear: calc.rateYear,
+      rateCentsPerKmHigh: calc.rateCentsPerKmHigh,
+      rateCentsPerKmLow: calc.rateCentsPerKmLow,
+      bicycleRateCentsPerKm: calc.bicycleRateCentsPerKm,
+      highRateKm: calc.highRateKm,
+      lowRateKm: calc.lowRateKm,
+      ...(body.salaryReductionAgreement !== undefined ? { salaryReductionAgreement: body.salaryReductionAgreement } : {}),
+      ...(body.receivesBIncome !== undefined ? { receivesBIncome: body.receivesBIncome } : {}),
+      ...(body.timeProjectId !== undefined ? { timeProjectId: body.timeProjectId } : {}),
+      ...(body.eventId !== undefined ? { eventId: body.eventId } : {}),
+      ...(body.notes !== undefined ? { notes: body.notes } : {}),
+      totalAmountCents: calc.totalAmountCents,
+    },
+  });
+  return c.json({ data: serializeMileageClaim(updated) });
+});
+
+timeRouter.delete("/time/mileage-claims/:id", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const existing = await prisma.timeMileageClaim.findFirst({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  if (!(await mileageAllowanceFeatureEnabled(user.organizationId, existing.country))) {
+    return c.json(
+      {
+        error: {
+          message: "Mileage allowance is not enabled for this organization.",
+          code: "FEATURE_DISABLED",
+        },
+      },
+      403
+    );
+  }
+  const myPersonId = await resolvePersonIdForUser(user.organizationId, user.email);
+  const canDelOwn = Boolean(myPersonId && existing.personId === myPersonId && canAction(c, "time.write"));
+  const canDelAny = canAction(c, "time.read_all");
+  if (!canDelOwn && !canDelAny) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  if (await findApprovedTimesheet({
+    organizationId: user.organizationId,
+    personId: existing.personId,
+    startsAt: existing.tripDate,
+    endsAt: existing.tripDate,
+  })) {
+    return c.json(
+      { error: { message: "Timesheet is approved. Ask an admin to reopen it before deleting mileage.", code: "TIMESHEET_APPROVED" } },
+      423
+    );
+  }
+  await prisma.timeMileageClaim.delete({ where: { id } });
   return c.json({ ok: true });
 });
 
