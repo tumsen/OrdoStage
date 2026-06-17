@@ -107,6 +107,10 @@ function vehicleLabel(type: MileageVehicleType): string {
   return type === "bicycle" ? "Cykel/knallert" : "Bil/motorcykel";
 }
 
+function mileageRouteLookupKey(from: string, to: string, vehicleType: MileageVehicleType): string {
+  return `${from.trim().toLowerCase()}→${to.trim().toLowerCase()}|${vehicleType}`;
+}
+
 async function lookupMileageDistance(from: string, to: string, vehicleType: MileageVehicleType) {
   return api.get<{ distanceKm: number; durationMinutes?: number | null }>(
     `/api/time/mileage-distance?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&vehicleType=${vehicleType}`
@@ -127,6 +131,7 @@ function MileageClaimForm({
   carKmYtdBeforeTrip: number;
 }) {
   const distanceManualRef = useRef(false);
+  const lastAutoLookupKeyRef = useRef<string | null>(null);
   const [distanceLoading, setDistanceLoading] = useState(false);
   const [distanceError, setDistanceError] = useState<string | null>(null);
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
@@ -142,19 +147,24 @@ function MileageClaimForm({
     receivesBIncome: draft.receivesBIncome,
   });
 
-  const runDistanceLookup = useCallback(async () => {
+  const runDistanceLookup = useCallback(async (options?: { force?: boolean }) => {
     const from = draft.fromPlace.trim();
     const to = draft.toPlace.trim();
     if (from.length < 3 || to.length < 3 || from.toLowerCase() === to.toLowerCase()) {
       setDistanceError("Angiv start- og slutadresse for at beregne km.");
       return;
     }
+
+    const lookupKey = mileageRouteLookupKey(from, to, draft.vehicleType);
+    if (!options?.force && lastAutoLookupKeyRef.current === lookupKey) return;
+
     setDistanceLoading(true);
     setDistanceError(null);
     try {
       const result = await lookupMileageDistance(from, to, draft.vehicleType);
       setDraft((current) => ({ ...current, distanceKm: String(result.distanceKm) }));
       setDurationMinutes(result.durationMinutes ?? null);
+      lastAutoLookupKeyRef.current = lookupKey;
       distanceManualRef.current = false;
     } catch (error) {
       setDistanceError(
@@ -165,8 +175,12 @@ function MileageClaimForm({
     }
   }, [draft.fromPlace, draft.toPlace, draft.vehicleType, setDraft]);
 
+  const runDistanceLookupRef = useRef(runDistanceLookup);
+  runDistanceLookupRef.current = runDistanceLookup;
+
   useEffect(() => {
     distanceManualRef.current = false;
+    lastAutoLookupKeyRef.current = null;
   }, [draft.fromPlace, draft.toPlace, draft.vehicleType]);
 
   useEffect(() => {
@@ -175,11 +189,14 @@ function MileageClaimForm({
     const to = draft.toPlace.trim();
     if (from.length < 3 || to.length < 3 || from.toLowerCase() === to.toLowerCase()) return;
 
+    const lookupKey = mileageRouteLookupKey(from, to, draft.vehicleType);
+    if (lastAutoLookupKeyRef.current === lookupKey) return;
+
     const timer = window.setTimeout(() => {
-      void runDistanceLookup();
+      void runDistanceLookupRef.current();
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [draft.fromPlace, draft.toPlace, draft.vehicleType, readOnly, runDistanceLookup]);
+  }, [draft.fromPlace, draft.toPlace, draft.vehicleType, readOnly]);
 
   return (
     <div className="space-y-3">
@@ -261,7 +278,7 @@ function MileageClaimForm({
                 size="sm"
                 className="h-9 border-white/15 text-white hover:bg-white/10"
                 disabled={distanceLoading}
-                onClick={() => void runDistanceLookup()}
+                onClick={() => void runDistanceLookup({ force: true })}
               >
                 {distanceLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                 Beregn km
