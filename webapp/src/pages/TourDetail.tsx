@@ -867,6 +867,7 @@ function ShowFormDialog({
                     value={form.fromLocation}
                     onChange={(v) => setField("fromLocation", v)}
                     placeholder="Departing city / location"
+                    types="geocode"
                   />
                 </div>
                 <div className="space-y-2">
@@ -875,6 +876,7 @@ function ShowFormDialog({
                     value={form.toLocation}
                     onChange={(v) => setField("toLocation", v)}
                     placeholder="Arriving city / location"
+                    types="geocode"
                   />
                 </div>
               </div>

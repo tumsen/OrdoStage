@@ -158,7 +158,14 @@ venuesRouter.get("/venues/address-search", async (c) => {
 
   const url = new URL("https://maps.googleapis.com/maps/api/place/autocomplete/json");
   url.searchParams.set("input", query);
-  url.searchParams.set("types", "address");
+  const types = c.req.query("types")?.trim();
+  if (types) {
+    url.searchParams.set("types", types);
+  }
+  const country = c.req.query("country")?.trim().toLowerCase();
+  if (country && /^[a-z]{2}$/.test(country)) {
+    url.searchParams.set("components", `country:${country}`);
+  }
   url.searchParams.set("key", env.GOOGLE_MAPS_API_KEY);
 
   const response = await fetch(url.toString());

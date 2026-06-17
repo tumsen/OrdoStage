@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { ChevronDown, ChevronRight, ExternalLink, Loader2, Lock, Plus, Trash2 } from "lucide-react";
 
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -211,23 +212,31 @@ function MileageClaimForm({
         </div>
         <div>
           <Label className="text-xs text-white/50">Fra</Label>
-          <Input
-            value={draft.fromPlace}
-            onChange={(e) => setDraft((d) => ({ ...d, fromPlace: e.target.value }))}
-            placeholder="Startadresse"
-            readOnly={readOnly}
-            className="mt-1 border-white/10 bg-white/5 text-white read-only:cursor-default read-only:opacity-100"
-          />
+          <div className="mt-1">
+            <AddressAutocomplete
+              value={draft.fromPlace}
+              onChange={(fromPlace) => setDraft((d) => ({ ...d, fromPlace }))}
+              placeholder="Startadresse"
+              readOnly={readOnly}
+              country="dk"
+              types="geocode"
+              aria-label="Startadresse"
+            />
+          </div>
         </div>
         <div>
           <Label className="text-xs text-white/50">Til</Label>
-          <Input
-            value={draft.toPlace}
-            onChange={(e) => setDraft((d) => ({ ...d, toPlace: e.target.value }))}
-            placeholder="Slutadresse"
-            readOnly={readOnly}
-            className="mt-1 border-white/10 bg-white/5 text-white read-only:cursor-default read-only:opacity-100"
-          />
+          <div className="mt-1">
+            <AddressAutocomplete
+              value={draft.toPlace}
+              onChange={(toPlace) => setDraft((d) => ({ ...d, toPlace }))}
+              placeholder="Slutadresse"
+              readOnly={readOnly}
+              country="dk"
+              types="geocode"
+              aria-label="Slutadresse"
+            />
+          </div>
         </div>
         <div className="sm:col-span-2">
           <Label className="text-xs text-white/50">Kilometer</Label>
