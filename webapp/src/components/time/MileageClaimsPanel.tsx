@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { ChevronDown, ChevronRight, ExternalLink, Lock, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Loader2, Lock, Plus, Trash2 } from "lucide-react";
 
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { TimeMileageClaim, TimeProject } from "@/contracts/backendTypes";
 import { useAutoSave, type AutoSaveStatus as AutoSaveStatusType } from "@/hooks/useAutoSave";
 import { toast } from "@/hooks/use-toast";
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 import {
   CAR_KM_YEAR_LIMIT,
   computeMileagePayout,
@@ -106,6 +106,12 @@ function vehicleLabel(type: MileageVehicleType): string {
   return type === "bicycle" ? "Cykel/knallert" : "Bil/motorcykel";
 }
 
+async function lookupMileageDistance(from: string, to: string, vehicleType: MileageVehicleType) {
+  return api.get<{ distanceKm: number; durationMinutes?: number | null }>(
+    `/api/time/mileage-distance?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&vehicleType=${vehicleType}`
+  );
+}
+
 function MileageClaimForm({
   draft,
   setDraft,
@@ -119,6 +125,11 @@ function MileageClaimForm({
   readOnly?: boolean;
   carKmYtdBeforeTrip: number;
 }) {
+  const distanceManualRef = useRef(false);
+  const [distanceLoading, setDistanceLoading] = useState(false);
+  const [distanceError, setDistanceError] = useState<string | null>(null);
+  const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
+
   const rateYear = Number.parseInt(draft.tripDate.slice(0, 4), 10) || new Date().getFullYear();
   const distanceKm = parseDistanceKm(draft.distanceKm);
   const payout = computeMileagePayout({
@@ -129,6 +140,45 @@ function MileageClaimForm({
     salaryReductionAgreement: draft.salaryReductionAgreement,
     receivesBIncome: draft.receivesBIncome,
   });
+
+  const runDistanceLookup = useCallback(async () => {
+    const from = draft.fromPlace.trim();
+    const to = draft.toPlace.trim();
+    if (from.length < 3 || to.length < 3 || from.toLowerCase() === to.toLowerCase()) {
+      setDistanceError("Angiv start- og slutadresse for at beregne km.");
+      return;
+    }
+    setDistanceLoading(true);
+    setDistanceError(null);
+    try {
+      const result = await lookupMileageDistance(from, to, draft.vehicleType);
+      setDraft((current) => ({ ...current, distanceKm: String(result.distanceKm) }));
+      setDurationMinutes(result.durationMinutes ?? null);
+      distanceManualRef.current = false;
+    } catch (error) {
+      setDistanceError(
+        isApiError(error) ? error.message : "Kunne ikke beregne kørselsafstand mellem adresserne."
+      );
+    } finally {
+      setDistanceLoading(false);
+    }
+  }, [draft.fromPlace, draft.toPlace, draft.vehicleType, setDraft]);
+
+  useEffect(() => {
+    distanceManualRef.current = false;
+  }, [draft.fromPlace, draft.toPlace, draft.vehicleType]);
+
+  useEffect(() => {
+    if (readOnly || distanceManualRef.current) return;
+    const from = draft.fromPlace.trim();
+    const to = draft.toPlace.trim();
+    if (from.length < 3 || to.length < 3 || from.toLowerCase() === to.toLowerCase()) return;
+
+    const timer = window.setTimeout(() => {
+      void runDistanceLookup();
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [draft.fromPlace, draft.toPlace, draft.vehicleType, readOnly, runDistanceLookup]);
 
   return (
     <div className="space-y-3">
@@ -164,7 +214,7 @@ function MileageClaimForm({
           <Input
             value={draft.fromPlace}
             onChange={(e) => setDraft((d) => ({ ...d, fromPlace: e.target.value }))}
-            placeholder="Startsted"
+            placeholder="Startadresse"
             readOnly={readOnly}
             className="mt-1 border-white/10 bg-white/5 text-white read-only:cursor-default read-only:opacity-100"
           />
@@ -174,23 +224,57 @@ function MileageClaimForm({
           <Input
             value={draft.toPlace}
             onChange={(e) => setDraft((d) => ({ ...d, toPlace: e.target.value }))}
-            placeholder="Destination"
+            placeholder="Slutadresse"
             readOnly={readOnly}
             className="mt-1 border-white/10 bg-white/5 text-white read-only:cursor-default read-only:opacity-100"
           />
         </div>
-        <div>
+        <div className="sm:col-span-2">
           <Label className="text-xs text-white/50">Kilometer</Label>
-          <Input
-            type="number"
-            min={0}
-            step="0.1"
-            value={draft.distanceKm}
-            onChange={(e) => setDraft((d) => ({ ...d, distanceKm: e.target.value }))}
-            placeholder="0"
-            readOnly={readOnly}
-            className="mt-1 border-white/10 bg-white/5 text-white read-only:cursor-default read-only:opacity-100"
-          />
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              step="0.1"
+              value={draft.distanceKm}
+              onChange={(e) => {
+                distanceManualRef.current = true;
+                setDraft((d) => ({ ...d, distanceKm: e.target.value }));
+              }}
+              placeholder="0"
+              readOnly={readOnly}
+              className="h-9 w-28 border-white/10 bg-white/5 text-white read-only:cursor-default read-only:opacity-100"
+            />
+            {!readOnly ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 border-white/15 text-white hover:bg-white/10"
+                disabled={distanceLoading}
+                onClick={() => void runDistanceLookup()}
+              >
+                {distanceLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                Beregn km
+              </Button>
+            ) : null}
+            {distanceLoading ? (
+              <span className="inline-flex items-center gap-1 text-[11px] text-white/45">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Beregner rute…
+              </span>
+            ) : null}
+            {!distanceLoading && durationMinutes != null && distanceKm > 0 ? (
+              <span className="text-[11px] text-white/40">ca. {durationMinutes} min kørsel</span>
+            ) : null}
+          </div>
+          {distanceError && !readOnly ? (
+            <p className="mt-1 text-[11px] text-amber-200/90">{distanceError}</p>
+          ) : !readOnly ? (
+            <p className="mt-1 text-[11px] text-white/35">
+              Km beregnes automatisk fra adresserne (Google Maps). Du kan stadig rette tallet manuelt.
+            </p>
+          ) : null}
         </div>
         <div>
           <Label className="text-xs text-white/50">Projekt</Label>

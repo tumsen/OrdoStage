@@ -11,6 +11,11 @@ import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { getCountryRuleSet, type TravelAllowanceType, type TravelClaimDayLine, type MileageVehicleType } from "../rules/countryRuleSets";
 import { isCountryFeatureEnabled } from "../countryFeatures";
 import {
+  GoogleMapsNotConfiguredError,
+  GoogleMapsRouteNotFoundError,
+  googleRouteDistanceKm,
+} from "../lib/googleMapsDistance";
+import {
   CreateTimeTagSchema,
   PatchTimeTagSchema,
   CreateTimeProjectSchema,
@@ -3768,6 +3773,75 @@ timeRouter.delete("/time/travel-claims/:id", async (c) => {
   }
   await prisma.timeTravelClaim.delete({ where: { id } });
   return c.json({ ok: true });
+});
+
+timeRouter.get("/time/mileage-distance", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  if (!(await mileageAllowanceFeatureEnabled(user.organizationId, "DK"))) {
+    return c.json(
+      {
+        error: {
+          message: "Mileage allowance is not enabled for this organization.",
+          code: "FEATURE_DISABLED",
+        },
+      },
+      403
+    );
+  }
+
+  const from = c.req.query("from")?.trim() ?? "";
+  const to = c.req.query("to")?.trim() ?? "";
+  const vehicleType = c.req.query("vehicleType") === "bicycle" ? "bicycle" : "car";
+
+  if (from.length < 3 || to.length < 3) {
+    return c.json(
+      { error: { message: "Both from and to addresses are required.", code: "BAD_REQUEST" } },
+      400
+    );
+  }
+
+  try {
+    const result = await googleRouteDistanceKm({
+      from,
+      to,
+      mode: vehicleType === "bicycle" ? "bicycling" : "driving",
+    });
+    return c.json({
+      data: {
+        distanceKm: result.distanceKm,
+        durationMinutes:
+          result.durationSeconds != null ? Math.round(result.durationSeconds / 60) : null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof GoogleMapsNotConfiguredError) {
+      return c.json(
+        {
+          error: {
+            message: "Google Maps route calculation is not configured on the server.",
+            code: "GOOGLE_MAPS_NOT_CONFIGURED",
+          },
+        },
+        503
+      );
+    }
+    if (error instanceof GoogleMapsRouteNotFoundError) {
+      return c.json(
+        { error: { message: "Could not find a route between the addresses.", code: "ROUTE_NOT_FOUND" } },
+        404
+      );
+    }
+    return c.json(
+      { error: { message: "Could not calculate driving distance.", code: "DISTANCE_LOOKUP_FAILED" } },
+      502
+    );
+  }
 });
 
 timeRouter.get("/time/mileage-claims", async (c) => {

@@ -1426,6 +1426,11 @@ export const CreateTimeMileageClaimSchema = z.object({
 
 export const PatchTimeMileageClaimSchema = CreateTimeMileageClaimSchema.partial();
 
+export const MileageDistanceResultSchema = z.object({
+  distanceKm: z.number(),
+  durationMinutes: z.number().nullable().optional(),
+});
+
 export const TimesheetApprovalSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
