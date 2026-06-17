@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
@@ -27,10 +26,6 @@ function money(cents: number): string {
 type TravelDraft = {
   startsAt: string;
   endsAt: string;
-  destination: string;
-  purpose: string;
-  country: "DK";
-  allowanceType: "standard" | "tour_driver_denmark" | "tour_driver_abroad";
   lodgingAllowance: boolean;
   lodgingCovered: boolean;
   foodCoveredByReceipts: boolean;
@@ -51,6 +46,9 @@ const TRAVEL_ELIGIBILITY_DEFAULTS = {
   receivesBIncome: false,
   excludedWorkerType: false,
 } as const;
+
+const DEFAULT_ALLOWANCE_TYPE = "standard" as const;
+const DEFAULT_COUNTRY = "DK";
 
 function hasValidTravelTimeframe(startsAt: string, endsAt: string): boolean {
   const start = new Date(startsAt).getTime();
@@ -125,10 +123,6 @@ export function TravelClaimsPanel({
     return {
       startsAt,
       endsAt,
-      destination: "",
-      purpose: "",
-      country: "DK",
-      allowanceType: "standard",
       lodgingAllowance: false,
       lodgingCovered: false,
       foodCoveredByReceipts: false,
@@ -177,18 +171,12 @@ export function TravelClaimsPanel({
   });
 
   function submit() {
-    if (!draft.destination.trim() || !draft.purpose.trim()) {
-      toast({ title: "Destination and purpose are required", variant: "destructive" });
-      return;
-    }
     const primaryProjectId = draft.dayLines[0]?.timeProjectId;
     createClaim.mutate({
       startsAt: new Date(draft.startsAt).toISOString(),
       endsAt: new Date(draft.endsAt).toISOString(),
-      destination: draft.destination.trim(),
-      purpose: draft.purpose.trim(),
-      country: draft.country,
-      allowanceType: draft.allowanceType,
+      country: DEFAULT_COUNTRY,
+      allowanceType: DEFAULT_ALLOWANCE_TYPE,
       timeProjectId: primaryProjectId && primaryProjectId !== "__none__" ? primaryProjectId : null,
       breakfastProvided: draft.dayLines.some((line) => line.breakfastProvided),
       lunchProvided: draft.dayLines.some((line) => line.lunchProvided),
@@ -211,7 +199,7 @@ export function TravelClaimsPanel({
     new Date(draft.endsAt).getTime()
   );
   const canClaimLodging =
-    draft.allowanceType === "standard" && !draft.transportsPeopleOrGoods && !draft.lodgingByReceipt;
+    !draft.transportsPeopleOrGoods && !draft.lodgingByReceipt;
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const updateDayLine = (date: string, patch: Partial<TravelDayLine>) =>
     setDraft((d) => {
@@ -277,7 +265,7 @@ export function TravelClaimsPanel({
                 dayLines={draft.dayLines}
                 startsAt={new Date(draft.startsAt)}
                 endsAt={new Date(draft.endsAt)}
-                allowanceType={draft.allowanceType}
+                allowanceType={DEFAULT_ALLOWANCE_TYPE}
                 allowanceHours={allowanceHours}
                 foodCoveredByReceipts={draft.foodCoveredByReceipts}
                 lodgingAllowance={draft.lodgingAllowance}
@@ -288,64 +276,7 @@ export function TravelClaimsPanel({
               />
             )}
 
-            <div className="grid gap-3 lg:grid-cols-2">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <Label className="text-xs text-white/50">Destination</Label>
-                <Input
-                  value={draft.destination}
-                  onChange={(e) => setDraft((d) => ({ ...d, destination: e.target.value }))}
-                  placeholder="City / venue"
-                  className="mt-1 border-white/10 bg-white/5 text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-white/50">Allowance type</Label>
-                <Select
-                  value={draft.allowanceType}
-                  onValueChange={(allowanceType) =>
-                    setDraft((d) => ({ ...d, allowanceType: allowanceType as TravelDraft["allowanceType"] }))
-                  }
-                >
-                  <SelectTrigger className="mt-1 border-white/10 bg-white/5 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                    <SelectItem value="standard">Standard meals</SelectItem>
-                    <SelectItem value="tour_driver_denmark">Tour driver Denmark</SelectItem>
-                    <SelectItem value="tour_driver_abroad">Tour driver abroad</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="sm:col-span-2">
-                <Label className="text-xs text-white/50">Rule set</Label>
-                <Select
-                  value={draft.country}
-                  onValueChange={(country) => setDraft((d) => ({ ...d, country: country as TravelDraft["country"] }))}
-                >
-                  <SelectTrigger className="mt-1 border-white/10 bg-white/5 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                    <SelectItem value="DK">Denmark - SKAT travel allowance rules</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="mt-1 text-[11px] text-white/40">
-                  Denmark is the first country rule set. Other country-specific travel and vacation rules can be added here later.
-                </p>
-              </div>
-            </div>
             <div className="space-y-2">
-              <div>
-                <Label className="text-xs text-white/50">Purpose</Label>
-                <Textarea
-                  value={draft.purpose}
-                  onChange={(e) => setDraft((d) => ({ ...d, purpose: e.target.value }))}
-                  placeholder="What was this trip for?"
-                  className="mt-1 min-h-20 border-white/10 bg-white/5 text-white"
-                />
-              </div>
-
               <div className="grid gap-2 sm:grid-cols-2">
                 {[
                   ["foodCoveredByReceipts", "Meals by receipts"],
@@ -366,20 +297,22 @@ export function TravelClaimsPanel({
               </div>
               {!canClaimLodging && draft.lodgingAllowance ? (
                 <p className="rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
-                  Lodging allowance is not combined with tour-driver rates, transport of people/goods, or receipt-based lodging.
+                  Lodging allowance is not combined with transport of people/goods or receipt-based lodging.
                 </p>
               ) : null}
-              <Textarea
-                value={draft.notes}
-                onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
-                placeholder="Notes / documentation"
-                className="min-h-16 border-white/10 bg-white/5 text-white"
-              />
+              <div>
+                <Label className="text-xs text-white/50">Notes</Label>
+                <Textarea
+                  value={draft.notes}
+                  onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
+                  placeholder="Notes / documentation"
+                  className="mt-1 min-h-16 border-white/10 bg-white/5 text-white"
+                />
+              </div>
               <Button type="button" onClick={submit} disabled={createClaim.isPending}>
                 Add travel claim
               </Button>
             </div>
-          </div>
           </div>
         ) : (
           <p className="mt-4 rounded-lg border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
@@ -415,14 +348,12 @@ export function TravelClaimsPanel({
             <div key={claim.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-white">{claim.destination}</p>
-                  <p className="mt-0.5 text-[11px] text-white/45">
+                  <p className="text-sm font-medium text-white">
                     {format(parseISO(claim.startsAt), "d MMM yyyy HH:mm")} –{" "}
                     {format(parseISO(claim.endsAt), "d MMM yyyy HH:mm")}
                   </p>
-                  <p className="mt-1 line-clamp-2 text-xs text-white/65">{claim.purpose}</p>
                   {claim.notes ? (
-                    <p className="mt-1 line-clamp-2 text-[11px] text-white/40">{claim.notes}</p>
+                    <p className="mt-1 line-clamp-2 text-[11px] text-white/50">{claim.notes}</p>
                   ) : null}
                   <p className="mt-1.5 text-[10px] text-white/35 leading-snug">
                     Rate year {claim.rateYear} · Meals {money(claim.foodRateCents)}/day · Lodging{" "}

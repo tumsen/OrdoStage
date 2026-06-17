@@ -910,6 +910,14 @@ function serializeEntry(row: {
   };
 }
 
+function travelClaimDestinationFromDayLines(dayLines: TravelClaimDayLine[] | undefined): string {
+  if (!dayLines?.length) return "Travel";
+  const cities = [...new Set(dayLines.map((line) => line.city?.trim() ?? "").filter(Boolean))];
+  if (cities.length === 1) return cities[0]!;
+  if (cities.length > 1) return cities.join(" · ");
+  return "Travel";
+}
+
 function normalizeTravelDayLines(value: unknown): TravelClaimDayLine[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -3438,8 +3446,9 @@ timeRouter.post("/time/travel-claims", zValidator("json", CreateTimeTravelClaimS
       createdByUserId: user.id,
       startsAt,
       endsAt,
-      destination: body.destination.trim(),
-      purpose: body.purpose.trim(),
+      destination:
+        body.destination?.trim() || travelClaimDestinationFromDayLines(body.dayLines) || "Travel",
+      purpose: body.purpose?.trim() ?? "",
       country,
       allowanceType: body.allowanceType,
       ...calc,

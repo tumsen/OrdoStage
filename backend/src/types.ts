@@ -1336,8 +1336,8 @@ export const TimeTravelClaimSchema = z.object({
 export const CreateTimeTravelClaimSchema = z.object({
   startsAt: z.string().min(1),
   endsAt: z.string().min(1),
-  destination: z.string().min(1),
-  purpose: z.string().min(1),
+  destination: z.string().optional().default(""),
+  purpose: z.string().optional().default(""),
   country: z.string().min(1).default("DK"),
   allowanceType: z.enum(["standard", "tour_driver_denmark", "tour_driver_abroad"]).default("standard"),
   rateYear: z.number().int().optional(),
