@@ -1,19 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, format, parseISO } from "date-fns";
-import { ChevronDown, ChevronRight, Lock, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Lock, Plus, Trash2 } from "lucide-react";
 
+import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { TravelDayMealsTable, type TravelDayLine } from "@/components/time/TravelDayMealsTable";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -21,11 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { TimeProject, TimeTravelClaim } from "@/contracts/backendTypes";
+import { useAutoSave, type AutoSaveStatus as AutoSaveStatusType } from "@/hooks/useAutoSave";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
-import {
-  travelDurationHours,
-} from "@/lib/danishTravelAllowance";
+import { travelDurationHours } from "@/lib/danishTravelAllowance";
 
 function toDatetimeLocalValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -232,17 +222,11 @@ function TravelClaimForm({
   draft,
   setDraft,
   projects,
-  submitLabel,
-  onSubmit,
-  isPending,
   readOnly = false,
 }: {
   draft: TravelDraft;
   setDraft: React.Dispatch<React.SetStateAction<TravelDraft>>;
   projects: TimeProject[];
-  submitLabel?: string;
-  onSubmit?: () => void;
-  isPending?: boolean;
   readOnly?: boolean;
 }) {
   useSyncedDayLines(draft, setDraft, !readOnly);
@@ -358,11 +342,6 @@ function TravelClaimForm({
             className="mt-1 min-h-16 border-white/10 bg-white/5 text-white read-only:cursor-default read-only:opacity-100"
           />
         </div>
-        {!readOnly && submitLabel && onSubmit ? (
-          <Button type="button" onClick={onSubmit} disabled={isPending}>
-            {submitLabel}
-          </Button>
-        ) : null}
       </div>
     </div>
   );
@@ -380,11 +359,11 @@ function SavedTravelClaimCard({
   projectById,
   canEdit,
   onReopen,
-  onCancelEdit,
-  onRequestSave,
+  onCloseEdit,
   onDelete,
   isDeleting,
-  isSaving,
+  autoSaveStatus,
+  autoSaveError,
 }: {
   claim: TimeTravelClaim;
   expanded: boolean;
@@ -397,11 +376,11 @@ function SavedTravelClaimCard({
   projectById: Map<string, TimeProject>;
   canEdit: boolean;
   onReopen: () => void;
-  onCancelEdit: () => void;
-  onRequestSave: () => void;
+  onCloseEdit: () => void;
   onDelete: () => void;
   isDeleting: boolean;
-  isSaving: boolean;
+  autoSaveStatus: AutoSaveStatusType;
+  autoSaveError: string | null;
 }) {
   const projectNames = linkedProjectNames(claim, projectById);
   const viewDraft = useMemo(() => claimToDraft(claim), [claim]);
@@ -482,13 +461,13 @@ function SavedTravelClaimCard({
                 })
               }
               projects={projects}
-              submitLabel="Gem og lås"
-              onSubmit={onRequestSave}
-              isPending={isSaving}
             />
-            <Button type="button" variant="ghost" size="sm" className="text-white/50" onClick={onCancelEdit}>
-              Annuller redigering
-            </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <AutoSaveStatus status={autoSaveStatus} error={autoSaveError} />
+              <Button type="button" variant="ghost" size="sm" className="text-white/50" onClick={onCloseEdit}>
+                Luk redigering
+              </Button>
+            </div>
           </div>
         ) : (
           <TravelClaimForm draft={viewDraft} setDraft={noopSetDraft} projects={projects} readOnly />
@@ -497,8 +476,6 @@ function SavedTravelClaimCard({
     </Collapsible>
   );
 }
-
-type ConfirmAction = { type: "create" } | { type: "update"; claimId: string };
 
 export function TravelClaimsPanel({
   rangeFrom,
@@ -515,12 +492,15 @@ export function TravelClaimsPanel({
 }) {
   const queryClient = useQueryClient();
   const queryKey = ["time-travel-claims", rangeFrom, rangeTo, personQuery];
-  const [draft, setDraft] = useState<TravelDraft>(() => createEmptyDraft());
-  const [draftExpanded, setDraftExpanded] = useState(true);
   const [expandedClaims, setExpandedClaims] = useState<Record<string, boolean>>({});
   const [editingClaimId, setEditingClaimId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<TravelDraft | null>(null);
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+
+  const editingClaimIdRef = useRef(editingClaimId);
+  const editDraftRef = useRef(editDraft);
+  editingClaimIdRef.current = editingClaimId;
+  editDraftRef.current = editDraft;
 
   const { data: claims } = useQuery({
     queryKey,
@@ -528,31 +508,9 @@ export function TravelClaimsPanel({
       api.get<TimeTravelClaim[]>(`/api/time/travel-claims?from=${rangeFrom}&to=${rangeTo}${personQuery}`),
   });
 
-  const createClaim = useMutation({
-    mutationFn: (body: Record<string, unknown>) => api.post<TimeTravelClaim>("/api/time/travel-claims", body),
-    onSuccess: (created) => {
-      queryClient.invalidateQueries({ queryKey: ["time-travel-claims"] });
-      setDraft(createEmptyDraft());
-      setDraftExpanded(false);
-      if (created?.id) {
-        setExpandedClaims((current) => ({ ...current, [created.id]: true }));
-      }
-      toast({ title: "Travel claim saved and locked" });
-    },
-    onError: () => toast({ title: "Could not save travel claim", variant: "destructive" }),
-  });
-
   const updateClaim = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
       api.patch<TimeTravelClaim>(`/api/time/travel-claims/${id}`, body),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["time-travel-claims"] });
-      setEditingClaimId(null);
-      setEditDraft(null);
-      setExpandedClaims((current) => ({ ...current, [variables.id]: true }));
-      toast({ title: "Travel claim updated and locked" });
-    },
-    onError: () => toast({ title: "Could not update travel claim", variant: "destructive" }),
   });
 
   const deleteClaim = useMutation({
@@ -568,19 +526,62 @@ export function TravelClaimsPanel({
     onError: () => toast({ title: "Could not delete travel claim", variant: "destructive" }),
   });
 
-  function confirmLockAndSave() {
-    if (!confirmAction) return;
-    if (confirmAction.type === "create") {
-      createClaim.mutate(buildClaimBody(draft));
-    } else if (editDraft) {
-      updateClaim.mutate({ id: confirmAction.claimId, body: buildClaimBody(editDraft) });
+  const autoSave = useAutoSave({
+    enabled: canEdit && editingClaimId !== null && editDraft !== null,
+    resetKey: editingClaimId,
+    getSnapshot: () => editDraftRef.current,
+    save: async () => {
+      const id = editingClaimIdRef.current;
+      const draft = editDraftRef.current;
+      if (!id || !draft || !hasValidTravelTimeframe(draft.startsAt, draft.endsAt)) return;
+      const updated = await updateClaim.mutateAsync({ id, body: buildClaimBody(draft) });
+      queryClient.setQueryData<TimeTravelClaim[]>(queryKey, (current) =>
+        current ? current.map((claim) => (claim.id === updated.id ? updated : claim)) : current
+      );
+    },
+  });
+
+  const { schedule, flush, markSaved, status: autoSaveStatus, error: autoSaveError } = autoSave;
+
+  useEffect(() => {
+    if (editingClaimId && editDraft) {
+      schedule();
     }
-    setConfirmAction(null);
+  }, [editDraft, editingClaimId, schedule]);
+
+  async function closeEditing() {
+    await flush();
+    setEditingClaimId(null);
+    setEditDraft(null);
+    queryClient.invalidateQueries({ queryKey: ["time-travel-claims"] });
+  }
+
+  async function handleAddTravelClaim() {
+    if (!canEdit || isAdding) return;
+    setIsAdding(true);
+    try {
+      if (editingClaimId) {
+        await closeEditing();
+      }
+      const created = await api.post<TimeTravelClaim>(
+        "/api/time/travel-claims",
+        buildClaimBody(createEmptyDraft())
+      );
+      queryClient.invalidateQueries({ queryKey: ["time-travel-claims"] });
+      const draft = claimToDraft(created);
+      setEditingClaimId(created.id);
+      setEditDraft(draft);
+      setExpandedClaims((current) => ({ ...current, [created.id]: true }));
+      markSaved(draft);
+    } catch {
+      toast({ title: "Could not create travel claim", variant: "destructive" });
+    } finally {
+      setIsAdding(false);
+    }
   }
 
   const total = (claims ?? []).reduce((sum, claim) => sum + claim.totalAmountCents, 0);
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
-  const isSaving = createClaim.isPending || updateClaim.isPending;
 
   return (
     <div className="space-y-4">
@@ -592,9 +593,23 @@ export function TravelClaimsPanel({
               Register travel and employer-covered meals. Amounts use current Danish rates and your day-by-day input.
             </p>
           </div>
-          <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
-            <p className="text-[10px] uppercase tracking-wide text-white/35">Range total</p>
-            <p className="text-sm font-semibold text-white">{money(total)}</p>
+          <div className="flex flex-wrap items-start gap-2">
+            {canEdit ? (
+              <Button
+                type="button"
+                size="sm"
+                className="h-9 bg-white text-black hover:bg-white/90"
+                onClick={() => void handleAddTravelClaim()}
+                disabled={isAdding}
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                Add travel claim
+              </Button>
+            ) : null}
+            <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
+              <p className="text-[10px] uppercase tracking-wide text-white/35">Range total</p>
+              <p className="text-sm font-semibold text-white">{money(total)}</p>
+            </div>
           </div>
         </div>
 
@@ -604,45 +619,6 @@ export function TravelClaimsPanel({
           </p>
         ) : null}
       </div>
-
-      {canEdit ? (
-        <Collapsible
-          open={draftExpanded}
-          onOpenChange={setDraftExpanded}
-          className="rounded-xl border border-white/10 bg-white/[0.02]"
-        >
-          <div className="flex flex-wrap items-center gap-2 p-3">
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-white/[0.04]"
-              >
-                {draftExpanded ? (
-                  <ChevronDown className="h-4 w-4 shrink-0 text-white/45" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 shrink-0 text-white/45" />
-                )}
-                <div>
-                  <p className="text-sm font-medium text-white">Ny rejsegodtgørelse</p>
-                  {!draftExpanded ? (
-                    <p className="text-[11px] text-white/40">Udvid for at registrere en ny rejse</p>
-                  ) : null}
-                </div>
-              </button>
-            </CollapsibleTrigger>
-          </div>
-          <CollapsibleContent className="border-t border-white/10 px-3 pb-3 pt-3">
-            <TravelClaimForm
-              draft={draft}
-              setDraft={setDraft}
-              projects={projects}
-              submitLabel="Gem og lås rejsegodtgørelse"
-              onSubmit={() => setConfirmAction({ type: "create" })}
-              isPending={isSaving}
-            />
-          </CollapsibleContent>
-        </Collapsible>
-      ) : null}
 
       <div className="space-y-2">
         {(claims ?? []).length === 0 ? (
@@ -664,49 +640,24 @@ export function TravelClaimsPanel({
               projectById={projectById}
               canEdit={canEdit}
               onReopen={() => {
-                setEditingClaimId(claim.id);
-                setEditDraft(claimToDraft(claim));
-                setExpandedClaims((current) => ({ ...current, [claim.id]: true }));
+                void (async () => {
+                  if (editingClaimId && editingClaimId !== claim.id) {
+                    await closeEditing();
+                  }
+                  setEditingClaimId(claim.id);
+                  setEditDraft(claimToDraft(claim));
+                  setExpandedClaims((current) => ({ ...current, [claim.id]: true }));
+                })();
               }}
-              onCancelEdit={() => {
-                setEditingClaimId(null);
-                setEditDraft(null);
-              }}
-              onRequestSave={() => setConfirmAction({ type: "update", claimId: claim.id })}
+              onCloseEdit={() => void closeEditing()}
               onDelete={() => deleteClaim.mutate(claim.id)}
               isDeleting={deleteClaim.isPending}
-              isSaving={isSaving}
+              autoSaveStatus={editingClaimId === claim.id ? autoSaveStatus : "idle"}
+              autoSaveError={editingClaimId === claim.id ? autoSaveError : null}
             />
           ))
         )}
       </div>
-
-      <AlertDialog open={confirmAction !== null} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>
-        <AlertDialogContent className="border-white/10 bg-[#16161f] text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Gem og lås rejsegodtgørelse?</AlertDialogTitle>
-            <AlertDialogDescription className="text-white/50">
-              Når du gemmer, låses godtgørelsen. Den kan ikke redigeres, før du åbner den igen med «Åbn til
-              redigering».
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-white/10 bg-transparent text-white hover:bg-white/10">
-              Annuller
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-white text-black hover:bg-white/90"
-              onClick={(event) => {
-                event.preventDefault();
-                confirmLockAndSave();
-              }}
-              disabled={isSaving}
-            >
-              Gem og lås
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
