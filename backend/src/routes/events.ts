@@ -23,6 +23,7 @@ import {
 } from "../types";
 import { canAction } from "../requestRole";
 import { parseIncomingDateTime } from "../parseIncomingDateTime";
+import { ensureEventTimeProject } from "../timeProjectSync";
 import { wallClockInstantFromDateIsoAndHHMM } from "../clientWallClock";
 import {
   addJobAssignee,
@@ -763,6 +764,8 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
     );
   }
 
+  await ensureEventTimeProject(user.organizationId, { id: event.id, title: event.title });
+
   return c.json({ data: serializeFullEvent(event) }, 201);
 });
 
@@ -854,6 +857,8 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
     },
     include: eventInclude,
   });
+
+  await ensureEventTimeProject(user.organizationId, { id: event.id, title: event.title });
 
   return c.json({ data: serializeFullEvent(event) });
 });

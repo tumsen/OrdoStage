@@ -30,9 +30,13 @@ import {
   wallClockInstantFromDateIsoAndHHMM,
 } from "../clientWallClock";
 import {
+  archiveLegacyEventShowProjects,
   archiveLegacyTourShowProjects,
+  ensureEventTimeProject,
   ensureTourTimeProject,
+  loadEventProjectIdByEventId,
   loadTourProjectIdByTourId,
+  resolveEventTimeProjectId,
   resolveTourTimeProjectId,
 } from "../timeProjectSync";
 
@@ -47,98 +51,23 @@ function iso(d: Date) {
   return d.toISOString();
 }
 
-const MONTHS_SHORT = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
-
-/** Calendar day in UTC, e.g. "12 May 2026" — matches how show dates are stored. */
-function formatDayUtc(d: Date): string {
-  return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-}
-
 /**
- * Ensure every org event/performance and tour has a matching TimeProject row so
- * they appear in pickers without manual link steps. Tours use one project for the
- * whole tour (not per day).
+ * Ensure every org event and tour has a matching TimeProject row so they appear in
+ * pickers without manual link steps. One project per event/tour — not per show/day.
  */
 async function syncEventShowTimeProjects(organizationId: string) {
   const events = await prisma.event.findMany({
     where: { organizationId },
-    select: {
-      id: true,
-      title: true,
-      shows: {
-        select: { id: true, showDate: true, showTime: true },
-        orderBy: { showDate: "asc" },
-      },
-    },
+    select: { id: true, title: true },
     orderBy: { title: "asc" },
   });
 
   for (const ev of events) {
-    const eventTitle = ev.title.trim() || "Untitled event";
-
-    const existingEvProj = await prisma.timeProject.findFirst({
-      where: { organizationId, eventId: ev.id, eventShowId: null },
+    const eventProjectId = await ensureEventTimeProject(organizationId, {
+      id: ev.id,
+      title: ev.title,
     });
-    if (existingEvProj) {
-      if (existingEvProj.name !== eventTitle) {
-        await prisma.timeProject.update({
-          where: { id: existingEvProj.id },
-          data: { name: eventTitle },
-        });
-      }
-    } else {
-      await prisma.timeProject.create({
-        data: {
-          organizationId,
-          name: eventTitle,
-          eventId: ev.id,
-          eventShowId: null,
-          sortOrder: 0,
-        },
-      });
-    }
-
-    for (const show of ev.shows) {
-      const datePart = formatDayUtc(show.showDate);
-      const baseTitle = `${eventTitle} · ${datePart}`;
-      const targetName = show.showTime?.trim()
-        ? `${baseTitle} ${show.showTime.trim()}`
-        : baseTitle;
-      const existingShowProj = await prisma.timeProject.findFirst({
-        where: { organizationId, eventShowId: show.id },
-      });
-      if (existingShowProj) {
-        if (existingShowProj.name !== targetName || existingShowProj.eventId !== ev.id) {
-          await prisma.timeProject.update({
-            where: { id: existingShowProj.id },
-            data: { name: targetName, eventId: ev.id },
-          });
-        }
-      } else {
-        await prisma.timeProject.create({
-          data: {
-            organizationId,
-            name: targetName,
-            eventId: ev.id,
-            eventShowId: show.id,
-            sortOrder: 0,
-          },
-        });
-      }
-    }
+    await archiveLegacyEventShowProjects(organizationId, ev.id, eventProjectId);
   }
 
   const tours = await prisma.tour.findMany({
@@ -446,6 +375,40 @@ async function tourProjectIdMapForShows(
   return map;
 }
 
+async function eventProjectIdMapForEvents(
+  organizationId: string,
+  eventIds: string[]
+): Promise<Map<string, string>> {
+  let map = await loadEventProjectIdByEventId(organizationId, eventIds);
+  const missing = [...new Set(eventIds)].filter((id) => !map.has(id));
+  if (missing.length > 0) {
+    await syncEventShowTimeProjects(organizationId);
+    const again = await loadEventProjectIdByEventId(organizationId, missing);
+    for (const [eventId, projectId] of again) map.set(eventId, projectId);
+  }
+  return map;
+}
+
+async function resolveEventTimeProjectForShow(
+  organizationId: string,
+  eventId: string,
+  eventShowId: string
+): Promise<string | null> {
+  let resolved = await resolveEventTimeProjectId(organizationId, eventId);
+  if (!resolved) {
+    await syncEventShowTimeProjects(organizationId);
+    resolved = await resolveEventTimeProjectId(organizationId, eventId);
+  }
+  if (!resolved) {
+    const legacy = await prisma.timeProject.findFirst({
+      where: { organizationId, eventShowId, isArchived: false },
+      select: { id: true },
+    });
+    resolved = legacy?.id ?? null;
+  }
+  return resolved;
+}
+
 async function fetchEventStaffingPlanJobs(args: {
   organizationId: string;
   personId: string;
@@ -484,21 +447,15 @@ async function fetchEventStaffingPlanJobs(args: {
   });
 
   const rows: PlanJobRow[] = [];
+  const projectByEventId = await eventProjectIdMapForEvents(
+    args.organizationId,
+    staff.map((s) => s.show.event.id)
+  );
   for (const s of staff) {
     const dayKey = utcDayKeyFromDate(s.show.showDate);
     if (jobDayByShow.has(`${s.show.id}:${dayKey}`)) continue;
 
-    let proj = await prisma.timeProject.findFirst({
-      where: { organizationId: args.organizationId, eventShowId: s.show.id },
-      select: { id: true },
-    });
-    if (!proj) {
-      await syncEventShowTimeProjects(args.organizationId);
-      proj = await prisma.timeProject.findFirst({
-        where: { organizationId: args.organizationId, eventShowId: s.show.id },
-        select: { id: true },
-      });
-    }
+    const projId = projectByEventId.get(s.show.event.id) ?? null;
 
     const startHHMM =
       s.meetingTime?.trim() && /^\d{2}:\d{2}$/.test(s.meetingTime.trim())
@@ -531,7 +488,7 @@ async function fetchEventStaffingPlanJobs(args: {
       showId: s.show.id,
       showDate: jobDateIso,
       venueName: s.show.venue.name,
-      timeProjectId: proj?.id ?? null,
+      timeProjectId: projId,
       tourShowId: null,
       tourScheduleEventId: null,
       eventShowStaffingId: s.id,
@@ -1539,25 +1496,30 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
   let eventShowId: string | null = body.eventShowId ?? null;
 
   if (eventShowId) {
-    const existingShowProj = await prisma.timeProject.findFirst({
-      where: { organizationId: user.organizationId, eventShowId },
-    });
-    if (existingShowProj) {
-      return c.json({ data: serializeProject(existingShowProj) });
-    }
     const show = await prisma.eventShow.findFirst({
       where: {
         id: eventShowId,
         event: { organizationId: user.organizationId },
       },
-      select: { id: true, eventId: true },
+      select: { id: true, eventId: true, event: { select: { title: true } } },
     });
     if (!show) {
       return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
     }
     eventId = show.eventId;
+    eventShowId = null;
     if (body.eventId != null && body.eventId !== show.eventId) {
       return c.json({ error: { message: "Show does not belong to that event", code: "BAD_REQUEST" } }, 400);
+    }
+    const eventProjectId = await ensureEventTimeProject(user.organizationId, {
+      id: show.eventId,
+      title: show.event.title,
+    });
+    const existingEvProj = await prisma.timeProject.findFirst({
+      where: { id: eventProjectId, organizationId: user.organizationId },
+    });
+    if (existingEvProj) {
+      return c.json({ data: serializeProject(existingEvProj) });
     }
   } else if (eventId) {
     const ev = await prisma.event.findFirst({
@@ -1724,6 +1686,11 @@ timeRouter.get("/time/jobs", async (c) => {
     orderBy: [{ jobDate: "asc" }, { sortOrder: "asc" }],
   });
 
+  const projectByEventId = await eventProjectIdMapForEvents(
+    user.organizationId,
+    jobs.map((j) => j.show.event.id)
+  );
+
   const eventRows = jobs.map((j) => {
     const plannedStart = toDateTimeFromDateAndTime(j.jobDate.toISOString(), j.startTime);
     const plannedEnd =
@@ -1744,7 +1711,7 @@ timeRouter.get("/time/jobs", async (c) => {
       showId: j.show.id,
       showDate: iso(j.show.showDate),
       venueName: j.venue.name,
-      timeProjectId: null as string | null,
+      timeProjectId: projectByEventId.get(j.show.event.id) ?? null,
       tourShowId: null as string | null,
       tourScheduleEventId: null as string | null,
       eventShowStaffingId: null as string | null,
@@ -1818,6 +1785,11 @@ timeRouter.get("/time/jobs/upcoming", async (c) => {
     take: fetchCap,
   });
 
+  const projectByEventId = await eventProjectIdMapForEvents(
+    user.organizationId,
+    jobs.map((j) => j.show.event.id)
+  );
+
   const eventRows = jobs.map((j) => {
     const plannedStart = toDateTimeFromDateAndTime(j.jobDate.toISOString(), j.startTime);
     const plannedEnd =
@@ -1838,7 +1810,7 @@ timeRouter.get("/time/jobs/upcoming", async (c) => {
       showId: j.show.id,
       showDate: iso(j.show.showDate),
       venueName: j.venue.name,
-      timeProjectId: null as string | null,
+      timeProjectId: projectByEventId.get(j.show.event.id) ?? null,
       tourShowId: null as string | null,
       tourScheduleEventId: null as string | null,
       eventShowStaffingId: null as string | null,
@@ -2271,23 +2243,15 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         });
         if (!p) return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
       } else {
-        const p = await prisma.timeProject.findFirst({
-          where: { organizationId: user.organizationId, eventShowId: staffing.show.id },
-          select: { id: true },
-        });
-        resolvedProjectId = p?.id ?? null;
-      }
-      if (!resolvedProjectId) {
-        await syncEventShowTimeProjects(user.organizationId);
-        const p2 = await prisma.timeProject.findFirst({
-          where: { organizationId: user.organizationId, eventShowId: staffing.show.id },
-          select: { id: true },
-        });
-        resolvedProjectId = p2?.id ?? null;
+        resolvedProjectId = await resolveEventTimeProjectForShow(
+          user.organizationId,
+          staffing.show.eventId,
+          staffing.show.id
+        );
       }
       if (!resolvedProjectId) {
         return c.json(
-          { error: { message: "No time project for this show. Contact an admin.", code: "BAD_REQUEST" } },
+          { error: { message: "No time project for this event. Contact an admin.", code: "BAD_REQUEST" } },
           400
         );
       }
@@ -2640,24 +2604,36 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         personId: myPersonId,
         show: { event: { organizationId: user.organizationId } },
       },
-      include: { show: { select: { eventId: true } } },
+      include: { show: { select: { id: true, eventId: true } } },
     });
     if (!job) {
       return c.json({ error: { message: "Job not found or not assigned to you", code: "NOT_FOUND" } }, 404);
     }
     eventId = job.show.eventId;
     tourShowId = null;
+    let resolvedEventProjectId: string | null = body.timeProjectId ?? null;
+    if (resolvedEventProjectId) {
+      const p = await prisma.timeProject.findFirst({
+        where: { id: resolvedEventProjectId, organizationId: user.organizationId },
+      });
+      if (!p) return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
+    } else {
+      resolvedEventProjectId = await resolveEventTimeProjectForShow(
+        user.organizationId,
+        job.show.eventId,
+        job.show.id
+      );
+    }
+    if (!resolvedEventProjectId) {
+      return c.json(
+        { error: { message: "No time project for this event. Contact an admin.", code: "BAD_REQUEST" } },
+        400
+      );
+    }
     const existing = await prisma.timeEntry.findFirst({
       where: { personId: myPersonId, eventShowJobId },
       include: { tagLinks: { select: { timeTagId: true } } },
     });
-    if (body.timeProjectId) {
-      const p = await prisma.timeProject.findFirst({
-        where: { id: body.timeProjectId, organizationId: user.organizationId },
-      });
-      if (!p) return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
-    }
-
     if (existing) {
       const spans = await computeNonOverlappingSpans({
         organizationId: user.organizationId,
@@ -2688,7 +2664,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           startsAt: primary.startsAt,
           endsAt: primary.endsAt,
           category: body.category ?? "work",
-          timeProjectId: body.timeProjectId ?? null,
+          timeProjectId: resolvedEventProjectId,
           note: body.note ?? null,
           isLocked: body.isLocked ?? false,
           eventShowStaffingId: null,
@@ -2721,7 +2697,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
               eventShowStaffingId: null,
               internalBookingPersonId: null,
               internalBookingDayKey: null,
-              timeProjectId: body.timeProjectId ?? null,
+              timeProjectId: resolvedEventProjectId,
               note: body.note ?? null,
               isLocked: body.isLocked ?? false,
               ...segmentGroupPatchJob,
@@ -2770,7 +2746,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         eventShowStaffingId: null,
         internalBookingPersonId: null,
         internalBookingDayKey: null,
-        timeProjectId: body.timeProjectId ?? null,
+        timeProjectId: resolvedEventProjectId,
         note: body.note ?? null,
         isLocked: body.isLocked ?? false,
         ...segmentGroupPatchNewJob,
@@ -2796,7 +2772,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             eventShowStaffingId: null,
             internalBookingPersonId: null,
             internalBookingDayKey: null,
-            timeProjectId: body.timeProjectId ?? null,
+            timeProjectId: resolvedEventProjectId,
             note: body.note ?? null,
             isLocked: body.isLocked ?? false,
             ...segmentGroupPatchNewJob,

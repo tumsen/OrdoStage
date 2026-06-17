@@ -1,5 +1,87 @@
 import { prisma } from "./prisma";
 
+/** One TimeProject per event (not per performance/show). */
+export async function ensureEventTimeProject(
+  organizationId: string,
+  event: { id: string; title: string }
+): Promise<string> {
+  const title = event.title.trim() || "Untitled event";
+  const existing = await prisma.timeProject.findFirst({
+    where: { organizationId, eventId: event.id, eventShowId: null },
+    select: { id: true, name: true },
+  });
+  if (existing) {
+    if (existing.name !== title) {
+      await prisma.timeProject.update({
+        where: { id: existing.id },
+        data: { name: title },
+      });
+    }
+    return existing.id;
+  }
+  const created = await prisma.timeProject.create({
+    data: {
+      organizationId,
+      name: title,
+      eventId: event.id,
+      eventShowId: null,
+      sortOrder: 0,
+    },
+  });
+  return created.id;
+}
+
+/** Retire per-show event projects created by older sync logic. */
+export async function archiveLegacyEventShowProjects(
+  organizationId: string,
+  eventId: string,
+  eventProjectId: string
+): Promise<void> {
+  const legacy = await prisma.timeProject.findMany({
+    where: {
+      organizationId,
+      eventId,
+      eventShowId: { not: null },
+      isArchived: false,
+    },
+    select: { id: true },
+  });
+  if (legacy.length === 0) return;
+  const legacyIds = legacy.map((p) => p.id);
+  await prisma.timeEntry.updateMany({
+    where: { timeProjectId: { in: legacyIds } },
+    data: { timeProjectId: eventProjectId },
+  });
+  await prisma.timeProject.updateMany({
+    where: { id: { in: legacyIds } },
+    data: { isArchived: true },
+  });
+}
+
+export async function resolveEventTimeProjectId(
+  organizationId: string,
+  eventId: string
+): Promise<string | null> {
+  const eventProject = await prisma.timeProject.findFirst({
+    where: { organizationId, eventId, eventShowId: null },
+    select: { id: true },
+  });
+  return eventProject?.id ?? null;
+}
+
+export async function loadEventProjectIdByEventId(
+  organizationId: string,
+  eventIds: string[]
+): Promise<Map<string, string>> {
+  const unique = [...new Set(eventIds)];
+  if (unique.length === 0) return new Map();
+  const rows = await prisma.timeProject.findMany({
+    where: { organizationId, eventId: { in: unique }, eventShowId: null },
+    select: { id: true, eventId: true },
+  });
+  return new Map(rows.map((r) => [r.eventId!, r.id]));
+}
+
 /** One TimeProject per tour (not per tour day). */
 export async function ensureTourTimeProject(
   organizationId: string,
