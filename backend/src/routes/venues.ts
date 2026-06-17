@@ -10,6 +10,11 @@ import { filenameFromDisplayRename } from "../lib/documentFilenameRename";
 import { CreateVenueSchema, UpdateVenueSchema, UpdateVenueDocumentSchema, type VenueDocumentKind } from "../types";
 import { canAction } from "../requestRole";
 import { env } from "../env";
+import {
+  GoogleMapsNotConfiguredError,
+  googlePlaceAutocomplete,
+  googlePlaceStructuredAddress,
+} from "../lib/googlePlaces";
 
 const venuesRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -156,35 +161,27 @@ venuesRouter.get("/venues/address-search", async (c) => {
     );
   }
 
-  const url = new URL("https://maps.googleapis.com/maps/api/place/autocomplete/json");
-  url.searchParams.set("input", query);
-  const types = c.req.query("types")?.trim();
-  if (types) {
-    url.searchParams.set("types", types);
-  }
-  const country = c.req.query("country")?.trim().toLowerCase();
-  if (country && /^[a-z]{2}$/.test(country)) {
-    url.searchParams.set("components", `country:${country}`);
-  }
-  url.searchParams.set("key", env.GOOGLE_MAPS_API_KEY);
-
-  const response = await fetch(url.toString());
-  if (!response.ok) {
+  try {
+    const predictions = await googlePlaceAutocomplete({
+      input: query,
+      country: c.req.query("country")?.trim().toLowerCase(),
+      types: c.req.query("types")?.trim(),
+    });
+    return c.json({ data: predictions });
+  } catch (error) {
+    if (error instanceof GoogleMapsNotConfiguredError) {
+      return c.json(
+        {
+          error: {
+            message: "Google Maps address search is not configured on the server.",
+            code: "GOOGLE_MAPS_NOT_CONFIGURED",
+          },
+        },
+        503
+      );
+    }
     return c.json({ data: [] });
   }
-
-  const payload = (await response.json()) as {
-    predictions?: Array<{ place_id?: string; description?: string }>;
-  };
-
-  const predictions = (payload.predictions ?? [])
-    .filter((prediction) => prediction.place_id && prediction.description)
-    .map((prediction) => ({
-      placeId: prediction.place_id as string,
-      description: prediction.description as string,
-    }));
-
-  return c.json({ data: predictions });
 });
 
 // GET /api/venues/address-details?placeId=... — returns structured address components
@@ -209,36 +206,23 @@ venuesRouter.get("/venues/address-details", async (c) => {
     );
   }
 
-  const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
-  url.searchParams.set("place_id", placeId);
-  url.searchParams.set("fields", "address_components");
-  url.searchParams.set("key", env.GOOGLE_MAPS_API_KEY);
-
-  const response = await fetch(url.toString());
-  if (!response.ok) return c.json({ data: null });
-
-  type Component = { long_name: string; short_name: string; types: string[] };
-  const payload = (await response.json()) as {
-    result?: { address_components?: Component[] };
-  };
-
-  const components = payload.result?.address_components ?? [];
-
-  function get(type: string, short = false): string {
-    const c = components.find((comp) => comp.types.includes(type));
-    return c ? (short ? c.short_name : c.long_name) : "";
+  try {
+    const data = await googlePlaceStructuredAddress(placeId);
+    return c.json({ data });
+  } catch (error) {
+    if (error instanceof GoogleMapsNotConfiguredError) {
+      return c.json(
+        {
+          error: {
+            message: "Google Maps address details are not configured on the server.",
+            code: "GOOGLE_MAPS_NOT_CONFIGURED",
+          },
+        },
+        503
+      );
+    }
+    return c.json({ data: null });
   }
-
-  return c.json({
-    data: {
-      street: get("route"),
-      number: get("street_number"),
-      zip: get("postal_code"),
-      city: get("locality") || get("postal_town"),
-      state: get("administrative_area_level_1"),
-      country: get("country"),
-    },
-  });
 });
 
 // POST /api/venues
