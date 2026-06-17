@@ -19,6 +19,7 @@ import {
 import { dayKeyFromDateInput, normalizeTimeHHMM } from "../lib/timeHHMM";
 import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
 import { parseIncomingDateTime } from "../parseIncomingDateTime";
+import { ensureTourTimeProject } from "../timeProjectSync";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -330,6 +331,8 @@ toursRouter.post("/tours", zValidator("json", CreateTourSchema), async (c) => {
     },
   });
 
+  await ensureTourTimeProject(user.organizationId, { id: tour.id, name: tour.name });
+
   return c.json({ data: serializeTour(tour) }, 201);
 });
 
@@ -479,6 +482,8 @@ toursRouter.put("/tours/:id", zValidator("json", UpdateTourSchema), async (c) =>
       }),
     },
   });
+
+  await ensureTourTimeProject(user.organizationId, { id: tour.id, name: tour.name });
 
   return c.json({ data: serializeTour(tour) });
 });

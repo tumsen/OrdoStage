@@ -29,6 +29,12 @@ import {
   startOfLocalCalendarDayInZone,
   wallClockInstantFromDateIsoAndHHMM,
 } from "../clientWallClock";
+import {
+  archiveLegacyTourShowProjects,
+  ensureTourTimeProject,
+  loadTourProjectIdByTourId,
+  resolveTourTimeProjectId,
+} from "../timeProjectSync";
 
 const timeRouter = new Hono<{
   Variables: {
@@ -62,8 +68,9 @@ function formatDayUtc(d: Date): string {
 }
 
 /**
- * Ensure every org event/performance and tour/show has a matching TimeProject row so
- * they appear in pickers without manual link steps.
+ * Ensure every org event/performance and tour has a matching TimeProject row so
+ * they appear in pickers without manual link steps. Tours use one project for the
+ * whole tour (not per day).
  */
 async function syncEventShowTimeProjects(organizationId: string) {
   const events = await prisma.event.findMany({
@@ -136,70 +143,16 @@ async function syncEventShowTimeProjects(organizationId: string) {
 
   const tours = await prisma.tour.findMany({
     where: { organizationId },
-    select: {
-      id: true,
-      name: true,
-      shows: {
-        select: { id: true, date: true, showTime: true },
-        orderBy: { date: "asc" },
-      },
-    },
+    select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
 
   for (const tour of tours) {
-    const tourTitle = tour.name.trim() || "Untitled tour";
-    const tourProjectName = `Tour · ${tourTitle}`;
-    const existingTourProj = await prisma.timeProject.findFirst({
-      where: { organizationId, tourId: tour.id, tourShowId: null },
+    const tourProjectId = await ensureTourTimeProject(organizationId, {
+      id: tour.id,
+      name: tour.name,
     });
-    if (existingTourProj) {
-      if (existingTourProj.name !== tourProjectName) {
-        await prisma.timeProject.update({
-          where: { id: existingTourProj.id },
-          data: { name: tourProjectName },
-        });
-      }
-    } else {
-      await prisma.timeProject.create({
-        data: {
-          organizationId,
-          name: tourProjectName,
-          tourId: tour.id,
-          tourShowId: null,
-          sortOrder: 0,
-        },
-      });
-    }
-
-    for (const show of tour.shows) {
-      const datePart = formatDayUtc(show.date);
-      const baseTitle = `${tourTitle} · ${datePart}`;
-      const targetName = show.showTime?.trim()
-        ? `${baseTitle} ${show.showTime.trim()}`
-        : baseTitle;
-      const existingShowProj = await prisma.timeProject.findFirst({
-        where: { organizationId, tourShowId: show.id },
-      });
-      if (existingShowProj) {
-        if (existingShowProj.name !== targetName || existingShowProj.tourId !== tour.id) {
-          await prisma.timeProject.update({
-            where: { id: existingShowProj.id },
-            data: { name: targetName, tourId: tour.id },
-          });
-        }
-      } else {
-        await prisma.timeProject.create({
-          data: {
-            organizationId,
-            name: targetName,
-            tourId: tour.id,
-            tourShowId: show.id,
-            sortOrder: 0,
-          },
-        });
-      }
-    }
+    await archiveLegacyTourShowProjects(organizationId, tour.id, tourProjectId);
   }
 }
 
@@ -342,7 +295,7 @@ function buildTourPlanJobRow(
     toLocation: string | null;
     tour: { id: string; name: string };
   },
-  projectIdByShow: Map<string, string>
+  projectIdByTour: Map<string, string>
 ): PlanJobRow {
   const title = tourDayTitle(show);
   const startHHMM = tourDayStartHHMM(show);
@@ -372,7 +325,7 @@ function buildTourPlanJobRow(
     showId: show.id,
     showDate: jobDateIso,
     venueName: venueLabel,
-    timeProjectId: projectIdByShow.get(show.id) ?? null,
+    timeProjectId: projectIdByTour.get(show.tour.id) ?? null,
     tourShowId: show.id,
     tourScheduleEventId: null as string | null,
     eventShowStaffingId: null as string | null,
@@ -395,7 +348,7 @@ function buildTourScheduleEventPlanRow(
     tour: { id: string; name: string };
   },
   ev: { id: string; kind: string; customLabel: string | null; startTime: string; endTime: string },
-  projectIdByShow: Map<string, string>
+  projectIdByTour: Map<string, string>
 ): PlanJobRow {
   const startHHMM = ev.startTime.trim();
   const endHHMM = ev.endTime.trim();
@@ -427,7 +380,7 @@ function buildTourScheduleEventPlanRow(
     showId: show.id,
     showDate: jobDateIso,
     venueName: venueLabel,
-    timeProjectId: projectIdByShow.get(show.id) ?? null,
+    timeProjectId: projectIdByTour.get(show.tour.id) ?? null,
     tourShowId: show.id,
     tourScheduleEventId: ev.id,
     eventShowStaffingId: null as string | null,
@@ -457,7 +410,7 @@ function expandTourShowsToPlanJobRows(
       sortOrder: number;
     }[];
   }[],
-  projectIdByShow: Map<string, string>
+  projectIdByTour: Map<string, string>
 ): PlanJobRow[] {
   const rows: PlanJobRow[] = [];
   for (const show of shows) {
@@ -469,13 +422,28 @@ function expandTourShowsToPlanJobRows(
     evs.sort((a, b) => a.sortOrder - b.sortOrder || a.startTime.localeCompare(b.startTime));
     if (evs.length > 0) {
       for (const ev of evs) {
-        rows.push(buildTourScheduleEventPlanRow(show, ev, projectIdByShow));
+        rows.push(buildTourScheduleEventPlanRow(show, ev, projectIdByTour));
       }
     } else {
-      rows.push(buildTourPlanJobRow(show, projectIdByShow));
+      rows.push(buildTourPlanJobRow(show, projectIdByTour));
     }
   }
   return rows;
+}
+
+async function tourProjectIdMapForShows(
+  organizationId: string,
+  shows: { tour: { id: string } }[]
+): Promise<Map<string, string>> {
+  const tourIds = shows.map((s) => s.tour.id);
+  let map = await loadTourProjectIdByTourId(organizationId, tourIds);
+  const missingTourIds = [...new Set(tourIds)].filter((id) => !map.has(id));
+  if (missingTourIds.length > 0) {
+    await syncEventShowTimeProjects(organizationId);
+    const again = await loadTourProjectIdByTourId(organizationId, missingTourIds);
+    for (const [tourId, projectId] of again) map.set(tourId, projectId);
+  }
+  return map;
 }
 
 async function fetchEventStaffingPlanJobs(args: {
@@ -688,27 +656,8 @@ async function fetchTourPlanJobsForPerson(args: {
     orderBy: [{ date: "asc" }, { order: "asc" }],
   });
 
-  const showIds = shows.map((s) => s.id);
-  const projects =
-    showIds.length === 0
-      ? []
-      : await prisma.timeProject.findMany({
-          where: { organizationId: args.organizationId, tourShowId: { in: showIds } },
-          select: { id: true, tourShowId: true },
-        });
-  const projectIdByShow = new Map(projects.map((p) => [p.tourShowId!, p.id]));
-
-  const missing = shows.filter((s) => !projectIdByShow.has(s.id));
-  if (missing.length) {
-    await syncEventShowTimeProjects(args.organizationId);
-    const again = await prisma.timeProject.findMany({
-      where: { organizationId: args.organizationId, tourShowId: { in: missing.map((m) => m.id) } },
-      select: { id: true, tourShowId: true },
-    });
-    for (const p of again) projectIdByShow.set(p.tourShowId!, p.id);
-  }
-
-  return expandTourShowsToPlanJobRows(shows, projectIdByShow);
+  const projectIdByTour = await tourProjectIdMapForShows(args.organizationId, shows);
+  return expandTourShowsToPlanJobRows(shows, projectIdByTour);
 }
 
 async function fetchTourPlanJobsFromDate(args: {
@@ -751,27 +700,8 @@ async function fetchTourPlanJobsFromDate(args: {
     take: args.take,
   });
 
-  const showIds = shows.map((s) => s.id);
-  const projects =
-    showIds.length === 0
-      ? []
-      : await prisma.timeProject.findMany({
-          where: { organizationId: args.organizationId, tourShowId: { in: showIds } },
-          select: { id: true, tourShowId: true },
-        });
-  const projectIdByShow = new Map(projects.map((p) => [p.tourShowId!, p.id]));
-
-  const missing = shows.filter((s) => !projectIdByShow.has(s.id));
-  if (missing.length) {
-    await syncEventShowTimeProjects(args.organizationId);
-    const again = await prisma.timeProject.findMany({
-      where: { organizationId: args.organizationId, tourShowId: { in: missing.map((m) => m.id) } },
-      select: { id: true, tourShowId: true },
-    });
-    for (const p of again) projectIdByShow.set(p.tourShowId!, p.id);
-  }
-
-  return expandTourShowsToPlanJobRows(shows, projectIdByShow);
+  const projectIdByTour = await tourProjectIdMapForShows(args.organizationId, shows);
+  return expandTourShowsToPlanJobRows(shows, projectIdByTour);
 }
 
 async function resolvePersonIdForUser(organizationId: string, email: string | null | undefined) {
@@ -2096,7 +2026,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
             },
           ],
         },
-        select: { id: true },
+        select: { id: true, tourId: true },
       });
       if (!show) {
         return c.json(
@@ -2125,23 +2055,22 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         });
         if (!p) return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
       } else {
-        const p = await prisma.timeProject.findFirst({
-          where: { organizationId: user.organizationId, tourShowId: show.id },
-          select: { id: true },
-        });
-        resolvedProjectId = p?.id ?? null;
+        resolvedProjectId = await resolveTourTimeProjectId(user.organizationId, show.tourId);
       }
       if (!resolvedProjectId) {
         await syncEventShowTimeProjects(user.organizationId);
-        const p2 = await prisma.timeProject.findFirst({
-          where: { organizationId: user.organizationId, tourShowId: show.id },
+        resolvedProjectId = await resolveTourTimeProjectId(user.organizationId, show.tourId);
+      }
+      if (!resolvedProjectId) {
+        const legacy = await prisma.timeProject.findFirst({
+          where: { organizationId: user.organizationId, tourShowId: show.id, isArchived: false },
           select: { id: true },
         });
-        resolvedProjectId = p2?.id ?? null;
+        resolvedProjectId = legacy?.id ?? null;
       }
       if (!resolvedProjectId) {
         return c.json(
-          { error: { message: "No time project for this tour date. Contact an admin.", code: "BAD_REQUEST" } },
+          { error: { message: "No time project for this tour. Contact an admin.", code: "BAD_REQUEST" } },
           400
         );
       }
