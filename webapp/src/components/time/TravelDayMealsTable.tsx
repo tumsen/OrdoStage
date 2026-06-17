@@ -12,7 +12,9 @@ import {
   formatMoneyDkk,
   mealReductionCentsForDay,
   mealReductionLabel,
+  describeSkatLogigodtgorelse,
   SKAT_KOSTGODTGORELSE_SUMMARY,
+  SKAT_LOGIGODTGORELSE_SUMMARY,
   SKAT_TRAVEL_ALLOWANCE_URL,
   travelAllowanceDayUnits,
 } from "@/lib/danishTravelAllowance";
@@ -81,6 +83,15 @@ export function TravelDayMealsTable({
     foodCoveredByReceipts,
   });
   const foodOnlyTotalCents = linePayouts.reduce((sum, row) => sum + row.foodNetCents, 0);
+  const lodgingTotalCents = linePayouts.reduce((sum, row) => sum + row.lodgingCents, 0);
+  const logigodtgorelseNote = describeSkatLogigodtgorelse({
+    startsAt,
+    endsAt,
+    dayLines,
+    lodgingAllowance,
+    lodgingByReceipt,
+    transportsPeopleOrGoods,
+  });
 
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2 sm:p-3">
@@ -122,6 +133,15 @@ export function TravelDayMealsTable({
         </ul>
       </details>
 
+      <details className="mt-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-white/55">
+        <summary className="cursor-pointer font-medium text-white/70">Logigodtgørelse (SKAT)</summary>
+        <ul className="mt-1.5 list-disc space-y-1 pl-4 leading-snug">
+          {SKAT_LOGIGODTGORELSE_SUMMARY.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </details>
+
       {allowanceHours >= 24 ? (
         <p className="mt-2 rounded-md border border-blue-400/15 bg-blue-500/10 px-2 py-1.5 text-[11px] text-blue-100/90 leading-snug">
           <span className="font-medium text-blue-50">Kostgodtgørelse (brutto): </span>
@@ -133,6 +153,27 @@ export function TravelDayMealsTable({
               <span className="font-medium text-blue-50">{formatMoneyDkk(foodOnlyTotalCents)}</span>
             </>
           ) : null}
+        </p>
+      ) : null}
+
+      {allowanceHours >= 24 && lodgingAllowance && !lodgingByReceipt && !transportsPeopleOrGoods ? (
+        <p className="mt-2 rounded-md border border-emerald-400/15 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-100/90 leading-snug">
+          <span className="font-medium text-emerald-50">Logigodtgørelse: </span>
+          {logigodtgorelseNote ??
+            "Markér logigodtgørelse og lad logi-felter stå tomme, når du selv betaler uden kvitteringsudlæg."}
+          {lodgingTotalCents > 0 ? (
+            <>
+              {" "}
+              (i alt <span className="font-medium text-emerald-50">{formatMoneyDkk(lodgingTotalCents)}</span> i
+              udbetaling)
+            </>
+          ) : null}
+        </p>
+      ) : null}
+
+      {lodgingByReceipt ? (
+        <p className="mt-2 rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
+          Logi dækkes som udlæg efter regning — der udbetales ikke skattefri logigodtgørelse (268 kr./døgn).
         </p>
       ) : null}
 
@@ -158,7 +199,7 @@ export function TravelDayMealsTable({
               <th className="min-w-[7rem] px-1 py-1.5">Lunch</th>
               <th className="min-w-[7rem] px-1 py-1.5">Dinner</th>
               {showMealReductions ? <th className="min-w-[6rem] px-2 py-1.5">Reduction</th> : null}
-              <th className="min-w-[5rem] px-1 py-1.5">Lodging</th>
+              <th className="min-w-[5rem] px-1 py-1.5">Logi</th>
               <th className="min-w-[5.5rem] px-2 py-1.5 text-right">Udbetaling</th>
             </tr>
           </thead>
@@ -248,9 +289,9 @@ export function TravelDayMealsTable({
                           onCheckedChange={(checked) =>
                             onUpdateLine(line.date, { lodgingCovered: checked === true })
                           }
-                          aria-label="Free lodging provided"
+                          aria-label="Frit logi stillet til rådighed"
                         />
-                        Free lodging
+                        Frit logi
                       </label>
                       <label className="flex items-center gap-1.5 text-[10px] text-white/55 cursor-pointer">
                         <Checkbox
@@ -258,9 +299,9 @@ export function TravelDayMealsTable({
                           onCheckedChange={(checked) =>
                             onUpdateLine(line.date, { lodgingByReceipt: checked === true })
                           }
-                          aria-label="Lodging paid by receipt"
+                          aria-label="Logi dækket som udlæg efter regning"
                         />
-                        By receipt
+                        Udlæg (kvittering)
                       </label>
                     </div>
                   </td>

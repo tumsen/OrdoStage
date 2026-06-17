@@ -239,3 +239,35 @@ export const SKAT_KOSTGODTGORELSE_SUMMARY = [
   "Kost dækket som udlæg efter regning giver op til 25% af kostsatsen for hele rejsen.",
   "B-indkomst giver ikke ret til skattefri kostgodtgørelse.",
 ] as const;
+
+export const SKAT_LOGIGODTGORELSE_SUMMARY = [
+  "Logigodtgørelse dækker udokumenterede logiudgifter, når du selv betaler (hotel, camping, privat indlogering).",
+  "Sats 268 kr. pr. fulde døgn i 2026 — udbetales når rejsen har varet mindst 24 timer, derefter pr. fuldt døgn.",
+  "Ingen logigodtgørelse ved frit logi eller når logi dækkes som udlæg efter regning (kvittering).",
+  "Betaler du selv uden kvitteringsudlæg, er det logigodtgørelse — ikke «udlæg efter regning».",
+] as const;
+
+export function describeSkatLogigodtgorelse(params: {
+  startsAt: Date;
+  endsAt: Date;
+  dayLines: TravelDayLineInput[];
+  lodgingAllowance: boolean;
+  lodgingByReceipt: boolean;
+  transportsPeopleOrGoods: boolean;
+  rateYear?: number;
+}): string | null {
+  if (!params.lodgingAllowance || params.lodgingByReceipt || params.transportsPeopleOrGoods) return null;
+  const hours = travelDurationHours(params.startsAt.getTime(), params.endsAt.getTime());
+  if (hours < 24) return null;
+  const lodgingRate = lodgingRateCentsForYear(params.rateYear ?? 2026);
+  const fullDays = travelFullOvernightDays(params.startsAt.getTime(), params.endsAt.getTime());
+  if (fullDays <= 0) return null;
+  const eligibleNights = params.dayLines
+    .slice(0, fullDays)
+    .filter((line) => !line.lodgingCovered && !line.lodgingByReceipt).length;
+  if (eligibleNights <= 0) {
+    return "Ingen logigodtgørelse — frit logi eller udlæg efter regning er markeret på alle overnatningsdage.";
+  }
+  const total = eligibleNights * lodgingRate;
+  return `${eligibleNights} fuldt døgn × ${formatMoneyDkk(lodgingRate)} = ${formatMoneyDkk(total)}`;
+}

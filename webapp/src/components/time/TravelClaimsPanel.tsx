@@ -279,10 +279,10 @@ export function TravelClaimsPanel({
             <div className="space-y-2">
               <div className="grid gap-2 sm:grid-cols-2">
                 {[
-                  ["foodCoveredByReceipts", "Meals by receipts"],
-                  ["lodgingAllowance", "Claim lodging allowance"],
-                  ["lodgingByReceipt", "All lodging by receipt"],
-                  ["transportsPeopleOrGoods", "Transports people/goods"],
+                  ["foodCoveredByReceipts", "Kost som udlæg efter regning"],
+                  ["lodgingAllowance", "Logigodtgørelse (268 kr./døgn)"],
+                  ["lodgingByReceipt", "Alt logi som udlæg efter regning"],
+                  ["transportsPeopleOrGoods", "Transporterer varer/personer"],
                 ].map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 text-xs text-white/65">
                     <Checkbox
@@ -297,7 +297,14 @@ export function TravelClaimsPanel({
               </div>
               {!canClaimLodging && draft.lodgingAllowance ? (
                 <p className="rounded-md border border-amber-400/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-100">
-                  Lodging allowance is not combined with transport of people/goods or receipt-based lodging.
+                  Logigodtgørelse kan ikke kombineres med transport af varer/personer eller udlæg efter regning for
+                  logi.
+                </p>
+              ) : null}
+              {!draft.lodgingAllowance && allowanceHours >= 24 && !draft.lodgingByReceipt ? (
+                <p className="text-[11px] text-white/40 leading-snug">
+                  Betaler du selv for overnatning uden kvitteringsudlæg, kan du få logigodtgørelse — markér
+                  «Logigodtgørelse» og lad logi-felterne i tabellen stå tomme.
                 </p>
               ) : null}
               <div>
