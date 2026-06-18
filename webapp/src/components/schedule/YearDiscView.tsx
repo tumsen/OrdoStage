@@ -29,8 +29,11 @@ const RING_GAP = Math.round(3 * DISC_SCALE);
 const LABEL_R = OUTER_R + Math.round(22 * DISC_SCALE);
 const NEEDLE_OUTER_R = OUTER_R + Math.round(12 * DISC_SCALE);
 const INNER_RESERVE = Math.round(90 * DISC_SCALE);
-const RING_LABEL_ANGLE = 0;
-const MAX_RING_LABEL_CHARS = 22;
+const LABEL_RING_WIDTH = Math.round(10 * DISC_SCALE);
+const LABEL_RING_GAP = Math.round(2 * DISC_SCALE);
+const MAX_RING_LABEL_CHARS = 18;
+const RING_LABEL_ARC_START = 322;
+const RING_LABEL_ARC_END = 38;
 
 function dayToAngle(day: number, totalDays: number): number {
   return ((day - 0.5) / totalDays) * 360;
@@ -91,24 +94,64 @@ function dayAngles(startDay: number, endDay: number, totalDays: number): { start
   return { start, end };
 }
 
+function arcPath(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
+  const start = polar(cx, cy, r, startAngle);
+  const end = polar(cx, cy, r, endAngle);
+  let span = endAngle - startAngle;
+  if (span < 0) span += 360;
+  const largeArc = span > 180 ? 1 : 0;
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+}
+
+function fullRingBandPath(innerR: number, outerR: number): string {
+  return ringSectorPath(innerR, outerR, 0, 359.6);
+}
+
 function computeRingLayout(ringCount: number): {
   ringWidth: number;
-  ringRadii: (index: number) => { inner: number; outer: number };
+  labelRingWidth: number;
+  ringRadii: (index: number) => {
+    inner: number;
+    outer: number;
+    labelInner: number;
+    labelOuter: number;
+    labelMid: number;
+  };
   hubR: number;
   dayLineInnerR: number;
 } {
   const count = Math.max(1, ringCount);
+  const available = OUTER_R - INNER_RESERVE;
+  const slotOverhead = LABEL_RING_WIDTH + LABEL_RING_GAP + RING_GAP;
   const ringWidth = Math.min(
-    Math.round(34 * DISC_SCALE),
-    Math.floor((OUTER_R - INNER_RESERVE - RING_GAP * (count - 1)) / count)
+    Math.round(28 * DISC_SCALE),
+    Math.floor((available - count * slotOverhead) / count)
   );
+  const slotStride = LABEL_RING_WIDTH + LABEL_RING_GAP + ringWidth + RING_GAP;
+
   const ringRadii = (index: number) => {
-    const outer = OUTER_R - index * (ringWidth + RING_GAP);
-    return { inner: outer - ringWidth, outer };
+    const labelOuter = OUTER_R - index * slotStride;
+    const labelInner = labelOuter - LABEL_RING_WIDTH;
+    const outer = labelInner - LABEL_RING_GAP;
+    const inner = outer - ringWidth;
+    return {
+      inner,
+      outer,
+      labelInner,
+      labelOuter,
+      labelMid: (labelInner + labelOuter) / 2,
+    };
   };
+
   const innermost = ringRadii(count - 1).inner;
-  const hubR = innermost - 10;
-  return { ringWidth, ringRadii, hubR, dayLineInnerR: hubR };
+  const hubR = innermost - Math.round(10 * DISC_SCALE);
+  return {
+    ringWidth,
+    labelRingWidth: LABEL_RING_WIDTH,
+    ringRadii,
+    hubR,
+    dayLineInnerR: hubR,
+  };
 }
 
 type DiscSegment = {
@@ -313,13 +356,13 @@ export function YearDiscView({
 
   const ringLabels = useMemo(() => {
     return rings.map((ring, index) => {
-      const { inner, outer } = layout.ringRadii(index);
-      const midR = (inner + outer) / 2;
-      const pos = polar(CX, CY, midR, RING_LABEL_ANGLE);
+      const { labelInner, labelOuter, labelMid } = layout.ringRadii(index);
       return {
         id: ring.id,
-        x: pos.x,
-        y: pos.y,
+        pathId: `year-disc-label-path-${ring.id}`,
+        pathD: arcPath(CX, CY, labelMid, RING_LABEL_ARC_START, RING_LABEL_ARC_END),
+        labelInner,
+        labelOuter,
         text: truncateRingLabel(yearDiscRingLabel(ring, sources)),
         color: yearDiscRingColor(ring, index),
       };
@@ -376,6 +419,11 @@ export function YearDiscView({
           aria-label={`Year disc ${timeline.rangeLabel}`}
           onPointerDown={onDiscPointerDown}
         >
+          <defs>
+            {ringLabels.map((label) => (
+              <path key={label.pathId} id={label.pathId} d={label.pathD} fill="none" />
+            ))}
+          </defs>
           <circle cx={CX} cy={CY} r={OUTER_R + 14} fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
           <path
             d={dayLinesPath}
@@ -388,7 +436,7 @@ export function YearDiscView({
             const { inner, outer } = layout.ringRadii(index);
             return (
               <circle
-                key={ring.id}
+                key={`${ring.id}-data`}
                 cx={CX}
                 cy={CY}
                 r={(inner + outer) / 2}
@@ -399,6 +447,17 @@ export function YearDiscView({
               />
             );
           })}
+          {ringLabels.map((label) => (
+            <path
+              key={`${label.id}-label-band`}
+              d={fullRingBandPath(label.labelInner, label.labelOuter)}
+              fill="rgba(255,255,255,0.03)"
+              stroke={label.color}
+              strokeOpacity={0.45}
+              strokeWidth={1}
+              pointerEvents="none"
+            />
+          ))}
           {monthMarkers.map((marker) => (
             <g key={marker.key} pointerEvents="none">
               <line
@@ -435,28 +494,15 @@ export function YearDiscView({
             </path>
           ))}
           {ringLabels.map((label) => (
-            <g key={label.id} pointerEvents="none">
-              <rect
-                x={label.x - 52}
-                y={label.y - 9}
-                width={104}
-                height={18}
-                rx={4}
-                fill="rgba(10, 10, 15, 0.88)"
-                stroke={label.color}
-                strokeWidth={1}
-                strokeOpacity={0.55}
-              />
-              <text
-                x={label.x}
-                y={label.y}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="fill-white/85 text-[11px] font-medium"
-              >
+            <text
+              key={`${label.id}-label-text`}
+              className="fill-white/85 text-[10px] font-medium uppercase tracking-wide"
+              pointerEvents="none"
+            >
+              <textPath href={`#${label.pathId}`} startOffset="50%" textAnchor="middle">
                 {label.text}
-              </text>
-            </g>
+              </textPath>
+            </text>
           ))}
           <line
             x1={CX}
