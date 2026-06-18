@@ -138,6 +138,34 @@ function ringSectorPath(
   ].join(" ");
 }
 
+/** Circular arc for curved ring labels (`textPath`). */
+function ringLabelArcPath(cx: number, cy: number, r: number, centerAngle: number, spanDeg: number): string {
+  const half = spanDeg / 2;
+  const startPt = polar(cx, cy, r, centerAngle - half);
+  const endPt = polar(cx, cy, r, centerAngle + half);
+  const largeArc = spanDeg > 180 ? 1 : 0;
+  return `M ${startPt.x} ${startPt.y} A ${r} ${r} 0 ${largeArc} 1 ${endPt.x} ${endPt.y}`;
+}
+
+function ringLabelSpanDeg(label: string): number {
+  const len = label.trim().length;
+  return Math.min(150, Math.max(52, 28 + len * 5.5));
+}
+
+function ringLabelBandFill(color: string): string {
+  const match = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (!match) return "rgba(255,255,255,0.07)";
+  const [, r, g, b] = match;
+  return `rgba(${r}, ${g}, ${b}, 0.14)`;
+}
+
+function ringLabelBandStroke(color: string): string {
+  const match = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (!match) return "rgba(255,255,255,0.14)";
+  const [, r, g, b] = match;
+  return `rgba(${r}, ${g}, ${b}, 0.28)`;
+}
+
 function dayAngles(
   startDay: number,
   endDay: number,
@@ -500,6 +528,45 @@ export function YearDiscView({
               <title>{segment.span.title}</title>
             </path>
           ))}
+          {rings.map((ring, index) => {
+            const { inner, outer } = layout.ringRadii(index);
+            const color = yearDiscRingColor(ring, index);
+            const label = yearDiscRingLabel(ring, sources);
+            const midR = (inner + outer) / 2;
+            const bandInner = inner + layout.ringWidth * 0.08;
+            const bandOuter = outer - layout.ringWidth * 0.08;
+            const centerAngle = (index - (rings.length - 1) / 2) * 6;
+            const spanDeg = ringLabelSpanDeg(label);
+            const textPathId = `ring-label-${ring.id}`;
+            const startAngle = centerAngle - spanDeg / 2;
+            const endAngle = centerAngle + spanDeg / 2;
+            const fontSize = Math.min(14, Math.max(10, layout.ringWidth * 0.38));
+
+            return (
+              <g key={`ring-label-${ring.id}`} pointerEvents="none">
+                <defs>
+                  <path id={textPathId} d={ringLabelArcPath(CX, CY, midR, centerAngle, spanDeg * 0.92)} />
+                </defs>
+                <path
+                  d={ringSectorPath(bandInner, bandOuter, startAngle, endAngle)}
+                  fill={ringLabelBandFill(color)}
+                  stroke={ringLabelBandStroke(color)}
+                  strokeWidth={0.75}
+                />
+                <text
+                  fill="rgba(255,255,255,0.82)"
+                  fontSize={fontSize}
+                  fontWeight={600}
+                  letterSpacing="0.06em"
+                  style={{ textTransform: "uppercase" }}
+                >
+                  <textPath href={`#${textPathId}`} startOffset="50%" textAnchor="middle">
+                    {label}
+                  </textPath>
+                </text>
+              </g>
+            );
+          })}
           <line
             x1={CX}
             y1={CY}
