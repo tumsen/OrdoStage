@@ -6,14 +6,20 @@ import {
   toDateStr,
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
+import { YearDiscRangeEditor } from "@/components/schedule/YearDiscRangeEditor";
 import { YearDiscRingEditor } from "@/components/schedule/YearDiscRingEditor";
 import {
+  buildYearDiscTimeline,
+  defaultDiscDay,
+  DEFAULT_YEAR_DISC_RANGE,
   resolveYearDiscRingSpans,
   yearDiscRingColor,
   yearDiscRingLabel,
   type YearDiscConfig,
+  type YearDiscRangeSettings,
   type YearDiscResolveContext,
   type YearDiscSpan,
+  type YearDiscTimeline,
 } from "@/components/schedule/yearDiscConfig";
 
 const SIZE = 720;
@@ -24,19 +30,6 @@ const RING_GAP = 3;
 const LABEL_R = OUTER_R + 22;
 const NEEDLE_OUTER_R = OUTER_R + 12;
 const INNER_RESERVE = 90;
-
-function daysInYear(year: number): number {
-  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
-}
-
-function dayOfYear(date: Date): number {
-  const jan1 = new Date(date.getFullYear(), 0, 1);
-  return Math.floor((date.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-}
-
-function dateFromDayOfYear(year: number, day: number): Date {
-  return new Date(year, 0, day);
-}
 
 function dayToAngle(day: number, totalDays: number): number {
   return ((day - 0.5) / totalDays) * 360;
@@ -97,20 +90,6 @@ function dayAngles(startDay: number, endDay: number, totalDays: number): { start
   return { start, end };
 }
 
-function spanInYear(
-  span: YearDiscSpan,
-  year: number
-): { startDay: number; endDay: number } | null {
-  const start = new Date(span.startDate);
-  const end = new Date(span.endDate ?? span.startDate);
-  const yearStart = new Date(year, 0, 1);
-  const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
-  if (end < yearStart || start > yearEnd) return null;
-  const clippedStart = start < yearStart ? yearStart : start;
-  const clippedEnd = end > yearEnd ? yearEnd : end;
-  return { startDay: dayOfYear(clippedStart), endDay: dayOfYear(clippedEnd) };
-}
-
 function computeRingLayout(ringCount: number): {
   ringWidth: number;
   ringRadii: (index: number) => { inner: number; outer: number };
@@ -137,10 +116,50 @@ type DiscSegment = {
   opacity: number;
 };
 
-function defaultDayForYear(year: number, totalDays: number): number {
-  const now = new Date();
-  if (now.getFullYear() === year) return dayOfYear(now);
-  return Math.min(totalDays, 1);
+function monthMarkersForTimeline(timeline: YearDiscTimeline, locale: string) {
+  const { totalDays, startDate, endDate } = timeline;
+  const markers: Array<{
+    key: string;
+    angle: number;
+    tickOuter: { x: number; y: number };
+    tickInner: { x: number; y: number };
+    labelPos: { x: number; y: number };
+    label: string;
+  }> = [];
+
+  if (timeline.mode === "calendar_year" && timeline.year !== undefined) {
+    return Array.from({ length: 12 }, (_, month) => {
+      const day = timeline.discDayFromDate(new Date(timeline.year!, month, 1)) ?? 1;
+      const angle = ((day - 1) / totalDays) * 360;
+      const tickOuter = polar(CX, CY, OUTER_R + 6, angle);
+      const tickInner = polar(CX, CY, OUTER_R - 2, angle);
+      const labelPos = polar(CX, CY, LABEL_R, angle + 15 / totalDays);
+      const label = new Date(timeline.year!, month, 1).toLocaleDateString(locale, { month: "short" });
+      return { key: `m-${month}`, angle, tickOuter, tickInner, labelPos, label };
+    });
+  }
+
+  let cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  const endMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+  while (cursor <= endMonth) {
+    if (cursor >= startDate) {
+      const discDay = timeline.discDayFromDate(cursor);
+      if (discDay !== null) {
+        const angle = ((discDay - 1) / totalDays) * 360;
+        markers.push({
+          key: `${cursor.getFullYear()}-${cursor.getMonth()}`,
+          angle,
+          tickOuter: polar(CX, CY, OUTER_R + 6, angle),
+          tickInner: polar(CX, CY, OUTER_R - 2, angle),
+          labelPos: polar(CX, CY, LABEL_R, angle + 15 / totalDays),
+          label: cursor.toLocaleDateString(locale, { month: "short" }),
+        });
+      }
+    }
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  }
+
+  return markers;
 }
 
 function dayKeyFromField(raw: string): string {
@@ -181,14 +200,16 @@ function spanTimeLabel(span: YearDiscSpan): string {
 }
 
 export function YearDiscView({
-  year,
+  calendarYear,
+  onCalendarYearChange,
   config,
   onConfigChange,
   sources,
   locale,
   onItemClick,
 }: {
-  year: number;
+  calendarYear: number;
+  onCalendarYearChange: (year: number) => void;
   config: YearDiscConfig;
   onConfigChange: (config: YearDiscConfig) => void;
   sources: YearDiscResolveContext;
@@ -197,16 +218,24 @@ export function YearDiscView({
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const totalDays = daysInYear(year);
-  const [selectedDay, setSelectedDay] = useState(() => defaultDayForYear(year, totalDays));
+  const timeline = useMemo(
+    () => buildYearDiscTimeline(config.range ?? DEFAULT_YEAR_DISC_RANGE, calendarYear),
+    [config.range, calendarYear]
+  );
+  const range = config.range ?? DEFAULT_YEAR_DISC_RANGE;
+  const totalDays = timeline.totalDays;
+  const [selectedDay, setSelectedDay] = useState(() => defaultDiscDay(timeline));
   const rings = config.rings;
   const layout = useMemo(() => computeRingLayout(rings.length), [rings.length]);
 
   useEffect(() => {
-    setSelectedDay(defaultDayForYear(year, daysInYear(year)));
-  }, [year]);
+    setSelectedDay(defaultDiscDay(timeline));
+  }, [timeline]);
 
-  const selectedDate = useMemo(() => dateFromDayOfYear(year, selectedDay), [selectedDay, year]);
+  const selectedDate = useMemo(
+    () => timeline.dateFromDiscDay(selectedDay),
+    [selectedDay, timeline]
+  );
   const selectedAngle = dayToAngle(selectedDay, totalDays);
   const needleTip = polar(CX, CY, NEEDLE_OUTER_R, selectedAngle);
 
@@ -243,7 +272,7 @@ export function YearDiscView({
       const { inner, outer } = layout.ringRadii(ringIndex);
       const spans = resolveYearDiscRingSpans(ring, sources);
       for (const span of spans) {
-        const clip = spanInYear(span, year);
+        const clip = timeline.clipSpan(span);
         if (!clip) continue;
         const angles = dayAngles(clip.startDay, clip.endDay, totalDays);
         out.push({
@@ -257,7 +286,7 @@ export function YearDiscView({
       }
     });
     return out;
-  }, [rings, sources, layout, totalDays, year]);
+  }, [rings, sources, layout, totalDays, timeline]);
 
   const dayLinesPath = useMemo(() => {
     const outerR = OUTER_R + 6;
@@ -271,17 +300,10 @@ export function YearDiscView({
     return parts.join(" ");
   }, [layout.dayLineInnerR, totalDays]);
 
-  const monthMarkers = useMemo(() => {
-    return Array.from({ length: 12 }, (_, month) => {
-      const day = dayOfYear(new Date(year, month, 1));
-      const angle = ((day - 1) / totalDays) * 360;
-      const tickOuter = polar(CX, CY, OUTER_R + 6, angle);
-      const tickInner = polar(CX, CY, OUTER_R - 2, angle);
-      const labelPos = polar(CX, CY, LABEL_R, angle + 15 / totalDays);
-      const label = new Date(year, month, 1).toLocaleDateString(locale, { month: "short" });
-      return { month, angle, tickOuter, tickInner, labelPos, label };
-    });
-  }, [locale, totalDays, year]);
+  const monthMarkers = useMemo(
+    () => monthMarkersForTimeline(timeline, locale),
+    [locale, timeline]
+  );
 
   const allSpans = useMemo(() => {
     return rings.flatMap((ring) => resolveYearDiscRingSpans(ring, sources));
@@ -309,9 +331,13 @@ export function YearDiscView({
   const hovered = segments.find((segment) => segment.id === hoveredId)?.span ?? null;
 
   function handleSegmentClick(segment: DiscSegment) {
-    const clip = spanInYear(segment.span, year);
+    const clip = timeline.clipSpan(segment.span);
     if (clip) setSelectedDay(clip.startDay);
     if (segment.span.calendarItem) onItemClick(segment.span.calendarItem);
+  }
+
+  function handleRangeChange(nextRange: YearDiscRangeSettings) {
+    onConfigChange({ ...config, range: nextRange });
   }
 
   function ringColorForSpan(span: YearDiscSpan): string {
@@ -330,7 +356,7 @@ export function YearDiscView({
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           className="h-auto w-full touch-none select-none"
           role="img"
-          aria-label={`Year disc ${year}`}
+          aria-label={`Year disc ${timeline.rangeLabel}`}
           onPointerDown={onDiscPointerDown}
         >
           <circle cx={CX} cy={CY} r={OUTER_R + 14} fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" />
@@ -357,7 +383,7 @@ export function YearDiscView({
             );
           })}
           {monthMarkers.map((marker) => (
-            <g key={marker.month} pointerEvents="none">
+            <g key={marker.key} pointerEvents="none">
               <line
                 x1={marker.tickInner.x}
                 y1={marker.tickInner.y}
@@ -432,10 +458,10 @@ export function YearDiscView({
             y={CY + 16}
             textAnchor="middle"
             dominantBaseline="middle"
-            className="fill-white/40 text-[10px] uppercase tracking-[0.15em]"
+            className="fill-white/40 text-[10px] uppercase tracking-[0.12em]"
             pointerEvents="none"
           >
-            {year}
+            {timeline.mode === "calendar_year" ? timeline.rangeLabel : "→ today"}
           </text>
         </svg>
         {hovered ? (
@@ -446,6 +472,13 @@ export function YearDiscView({
       </div>
 
       <div className="mx-auto flex w-full max-w-sm shrink-0 flex-col gap-3 xl:mx-0">
+        <YearDiscRangeEditor
+          range={range}
+          calendarYear={calendarYear}
+          onRangeChange={handleRangeChange}
+          onCalendarYearChange={onCalendarYearChange}
+        />
+
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>

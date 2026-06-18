@@ -2,6 +2,7 @@ import type { EventDetail, Person, TimeCategory, TimeReportEntry, TourDetail, Ve
 import {
   calendarItemVenueIdForFilter,
   scheduleVisibilityFilterKey,
+  toDateStr,
   type CalendarItem,
   type ScheduleVisibilityFilterKey,
 } from "@/components/schedule/scheduleUtils";
@@ -26,6 +27,36 @@ export type YearDiscRingConfig = {
 
 export type YearDiscConfig = {
   rings: YearDiscRingConfig[];
+  /** How the disc maps days around the circle. Defaults to calendar year. */
+  range?: YearDiscRangeSettings;
+};
+
+/** Full calendar year (Jan 1–Dec 31) or a custom span from start date through today. */
+export type YearDiscRangeMode = "calendar_year" | "start_to_today";
+
+export type YearDiscRangeSettings = {
+  mode: YearDiscRangeMode;
+  /** ISO YYYY-MM-DD — used when mode is `start_to_today`. */
+  startDate?: string;
+};
+
+export const DEFAULT_YEAR_DISC_RANGE: YearDiscRangeSettings = {
+  mode: "calendar_year",
+};
+
+export type YearDiscTimeline = {
+  mode: YearDiscRangeMode;
+  totalDays: number;
+  from: string;
+  to: string;
+  rangeLabel: string;
+  startDate: Date;
+  endDate: Date;
+  /** Calendar year when mode is `calendar_year`. */
+  year?: number;
+  dateFromDiscDay: (day: number) => Date;
+  discDayFromDate: (date: Date) => number | null;
+  clipSpan: (span: YearDiscSpan) => { startDay: number; endDay: number } | null;
 };
 
 export type YearDiscSpan = {
@@ -88,6 +119,7 @@ export const DEFAULT_YEAR_DISC_CONFIG: YearDiscConfig = {
     { id: "ring-venue", source: { type: "schedule_filter", filter: "venue_booking" } },
     { id: "ring-other", source: { type: "schedule_filter", filter: "other" } },
   ],
+  range: DEFAULT_YEAR_DISC_RANGE,
 };
 
 export const YEAR_DISC_MAX_RINGS = 12;
@@ -228,10 +260,175 @@ function parseRingSource(raw: unknown): YearDiscRingSource | null {
   return null;
 }
 
+function parseRangeSettings(raw: unknown): YearDiscRangeSettings {
+  if (!raw || typeof raw !== "object") return DEFAULT_YEAR_DISC_RANGE;
+  const r = raw as Record<string, unknown>;
+  if (r.mode === "start_to_today") {
+    const startDate =
+      typeof r.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.startDate)
+        ? r.startDate
+        : `${new Date().getFullYear()}-01-01`;
+    return { mode: "start_to_today", startDate };
+  }
+  return { mode: "calendar_year" };
+}
+
+export function normalizeYearDiscRange(raw: unknown): YearDiscRangeSettings {
+  return parseRangeSettings(raw);
+}
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addLocalDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function daysInCalendarYear(year: number): number {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
+}
+
+function dayOfCalendarYear(date: Date): number {
+  const jan1 = new Date(date.getFullYear(), 0, 1);
+  return Math.floor((startOfLocalDay(date).getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+}
+
+export function daysBetweenInclusive(start: Date, end: Date): number {
+  const ms = startOfLocalDay(end).getTime() - startOfLocalDay(start).getTime();
+  return Math.max(1, Math.floor(ms / (24 * 60 * 60 * 1000)) + 1);
+}
+
+export function todayIsoDateLocal(): string {
+  return toDateStr(new Date());
+}
+
+export function parseIsoDateLocal(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}T00:00:00`);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+/** API from/to for schedule + time data given disc range settings. */
+export function yearDiscFetchRange(
+  settings: YearDiscRangeSettings,
+  calendarYear: number,
+  now: Date = new Date()
+): { from: string; to: string } {
+  if (settings.mode === "start_to_today") {
+    const today = toDateStr(now);
+    const start = settings.startDate ?? `${calendarYear}-01-01`;
+    return { from: start <= today ? start : today, to: today };
+  }
+  return { from: `${calendarYear}-01-01`, to: `${calendarYear}-12-31` };
+}
+
+/** Map disc settings to the timeline used for rendering. */
+export function buildYearDiscTimeline(
+  settings: YearDiscRangeSettings,
+  calendarYear: number,
+  now: Date = new Date()
+): YearDiscTimeline {
+  const today = startOfLocalDay(now);
+
+  if (settings.mode === "start_to_today") {
+    const parsedStart = settings.startDate ? parseIsoDateLocal(settings.startDate) : null;
+    const start = startOfLocalDay(parsedStart ?? new Date(calendarYear, 0, 1));
+    const end = today;
+    const effectiveStart = start > end ? end : start;
+    const totalDays = daysBetweenInclusive(effectiveStart, end);
+    const from = toDateStr(effectiveStart);
+    const to = toDateStr(end);
+
+    const dateFromDiscDay = (day: number): Date => addLocalDays(effectiveStart, day - 1);
+
+    const discDayFromDate = (date: Date): number | null => {
+      const d = startOfLocalDay(date);
+      if (d < effectiveStart || d > end) return null;
+      return daysBetweenInclusive(effectiveStart, d);
+    };
+
+    const clipSpan = (span: YearDiscSpan): { startDay: number; endDay: number } | null => {
+      const spanStart = startOfLocalDay(new Date(span.startDate));
+      const spanEnd = startOfLocalDay(new Date(span.endDate ?? span.startDate));
+      if (spanEnd < effectiveStart || spanStart > end) return null;
+      const clippedStart = spanStart < effectiveStart ? effectiveStart : spanStart;
+      const clippedEnd = spanEnd > end ? end : spanEnd;
+      const startDay = discDayFromDate(clippedStart);
+      const endDay = discDayFromDate(clippedEnd);
+      if (startDay === null || endDay === null) return null;
+      return { startDay, endDay };
+    };
+
+    const startLabel = effectiveStart.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    return {
+      mode: "start_to_today",
+      totalDays,
+      from,
+      to,
+      rangeLabel: `${startLabel} → today`,
+      startDate: effectiveStart,
+      endDate: end,
+      dateFromDiscDay,
+      discDayFromDate,
+      clipSpan,
+    };
+  }
+
+  const year = calendarYear;
+  const totalDays = daysInCalendarYear(year);
+  const startDate = new Date(year, 0, 1);
+  const endDate = new Date(year, 11, 31);
+
+  const dateFromDiscDay = (day: number): Date => new Date(year, 0, day);
+
+  const discDayFromDate = (date: Date): number | null => {
+    if (date.getFullYear() !== year) return null;
+    return dayOfCalendarYear(date);
+  };
+
+  const clipSpan = (span: YearDiscSpan): { startDay: number; endDay: number } | null => {
+    const spanStart = new Date(span.startDate);
+    const spanEnd = new Date(span.endDate ?? span.startDate);
+    const yearStart = new Date(year, 0, 1);
+    const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
+    if (spanEnd < yearStart || spanStart > yearEnd) return null;
+    const clippedStart = spanStart < yearStart ? yearStart : spanStart;
+    const clippedEnd = spanEnd > yearEnd ? yearEnd : spanEnd;
+    return { startDay: dayOfCalendarYear(clippedStart), endDay: dayOfCalendarYear(clippedEnd) };
+  };
+
+  return {
+    mode: "calendar_year",
+    year,
+    totalDays,
+    from: `${year}-01-01`,
+    to: `${year}-12-31`,
+    rangeLabel: String(year),
+    startDate,
+    endDate,
+    dateFromDiscDay,
+    discDayFromDate,
+    clipSpan,
+  };
+}
+
+export function defaultDiscDay(timeline: YearDiscTimeline, now: Date = new Date()): number {
+  const todayDay = timeline.discDayFromDate(now);
+  if (todayDay !== null) return todayDay;
+  return timeline.mode === "calendar_year" ? 1 : timeline.totalDays;
+}
+
 export function normalizeYearDiscConfig(raw: unknown): YearDiscConfig {
   if (!raw || typeof raw !== "object") return DEFAULT_YEAR_DISC_CONFIG;
   const ringsRaw = (raw as { rings?: unknown }).rings;
-  if (!Array.isArray(ringsRaw) || ringsRaw.length === 0) return DEFAULT_YEAR_DISC_CONFIG;
+  const rangeRaw = (raw as { range?: unknown }).range;
+  const range = rangeRaw !== undefined ? parseRangeSettings(rangeRaw) : DEFAULT_YEAR_DISC_RANGE;
+  if (!Array.isArray(ringsRaw) || ringsRaw.length === 0) {
+    return { ...DEFAULT_YEAR_DISC_CONFIG, range };
+  }
 
   const rings: YearDiscRingConfig[] = [];
   for (const entry of ringsRaw.slice(0, YEAR_DISC_MAX_RINGS)) {
@@ -247,7 +444,7 @@ export function normalizeYearDiscConfig(raw: unknown): YearDiscConfig {
     });
   }
 
-  return rings.length > 0 ? { rings } : DEFAULT_YEAR_DISC_CONFIG;
+  return rings.length > 0 ? { rings, range } : { ...DEFAULT_YEAR_DISC_CONFIG, range };
 }
 
 export function yearDiscRingColor(ring: YearDiscRingConfig, index: number): string {

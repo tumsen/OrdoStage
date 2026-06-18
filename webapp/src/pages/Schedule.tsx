@@ -41,7 +41,7 @@ import {
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
 import { YearDiscView } from "@/components/schedule/YearDiscView";
-import { ringUsesTimeData } from "@/components/schedule/yearDiscConfig";
+import { ringUsesTimeData, yearDiscFetchRange } from "@/components/schedule/yearDiscConfig";
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePersistedYearDiscConfig } from "@/hooks/usePersistedYearDiscConfig";
 import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
@@ -346,7 +346,10 @@ export default function Schedule() {
     }
   }
 
-  const { from, to } = getRange(viewMode, anchorDate);
+  const { from, to } =
+    viewMode === "yeardisc"
+      ? yearDiscFetchRange(yearDiscConfig.range ?? { mode: "calendar_year" }, anchorDate.getFullYear())
+      : getRange(viewMode, anchorDate);
 
   // Build query string
   const params = new URLSearchParams({ from, to });
@@ -391,15 +394,19 @@ export default function Schedule() {
     enabled: yearDiscNeedsTime && canView("time") && canReadAllTime,
   });
 
+  const yearDiscRangeMode = yearDiscConfig.range?.mode ?? "calendar_year";
+
   function moveBackward() {
-    if (viewMode === "year" || viewMode === "yeardisc") setAnchorDate((d) => addYears(d, -1));
+    if (viewMode === "yeardisc" && yearDiscRangeMode === "calendar_year") setAnchorDate((d) => addYears(d, -1));
+    else if (viewMode === "year") setAnchorDate((d) => addYears(d, -1));
     else if (viewMode === "month") setAnchorDate((d) => addMonths(d, -1));
     else if (viewMode === "week" || viewMode === "next7" || viewMode === "venueocc") setAnchorDate((d) => addDays(d, -7));
     else setAnchorDate((d) => addDays(d, -1));
   }
 
   function moveForward() {
-    if (viewMode === "year" || viewMode === "yeardisc") setAnchorDate((d) => addYears(d, 1));
+    if (viewMode === "yeardisc" && yearDiscRangeMode === "calendar_year") setAnchorDate((d) => addYears(d, 1));
+    else if (viewMode === "year") setAnchorDate((d) => addYears(d, 1));
     else if (viewMode === "month") setAnchorDate((d) => addMonths(d, 1));
     else if (viewMode === "week" || viewMode === "next7" || viewMode === "venueocc") setAnchorDate((d) => addDays(d, 7));
     else setAnchorDate((d) => addDays(d, 1));
@@ -442,31 +449,37 @@ export default function Schedule() {
       {/* Calendar navigation */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/5"
-            onClick={moveBackward}
-            aria-label="Previous"
-          >
-            <ChevronLeft size={16} />
-          </Button>
-          <DateInputWithWeekday
-            value={toISODate(anchorDate)}
-            onChange={(value) => {
-              const next = dateFromISODate(value);
-              if (next) setAnchorDate(next);
-            }}
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/5"
-            onClick={moveForward}
-            aria-label="Next"
-          >
-            <ChevronRight size={16} />
-          </Button>
+          {viewMode === "yeardisc" && yearDiscRangeMode === "start_to_today" ? (
+            <span className="text-sm text-white/60">Start date → today (set in disc panel)</span>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/5"
+                onClick={moveBackward}
+                aria-label="Previous"
+              >
+                <ChevronLeft size={16} />
+              </Button>
+              <DateInputWithWeekday
+                value={toISODate(anchorDate)}
+                onChange={(value) => {
+                  const next = dateFromISODate(value);
+                  if (next) setAnchorDate(next);
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/5"
+                onClick={moveForward}
+                aria-label="Next"
+              >
+                <ChevronRight size={16} />
+              </Button>
+            </>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -514,7 +527,10 @@ export default function Schedule() {
             ) : viewMode === "yeardisc" ? (
               <div className="h-full overflow-auto pr-1 py-2">
                 <YearDiscView
-                  year={anchorDate.getFullYear()}
+                  calendarYear={anchorDate.getFullYear()}
+                  onCalendarYearChange={(year) =>
+                    setAnchorDate(new Date(year, anchorDate.getMonth(), anchorDate.getDate()))
+                  }
                   config={yearDiscConfig}
                   onConfigChange={setYearDiscConfig}
                   sources={{
