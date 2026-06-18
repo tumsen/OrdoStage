@@ -6,9 +6,18 @@ import { Input } from "@/components/ui/input";
 import {
   DEFAULT_YEAR_DISC_RANGE,
   todayIsoDateLocal,
+  yearDiscRangeAnchorIso,
+  type YearDiscRangeMode,
   type YearDiscRangeSettings,
 } from "@/components/schedule/yearDiscConfig";
 import { cn } from "@/lib/utils";
+
+function modeButtonClass(active: boolean): string {
+  return cn(
+    "h-8 px-2.5 text-xs text-white/60 hover:text-white",
+    active ? "bg-white/10 text-white" : "hover:bg-white/5"
+  );
+}
 
 export function YearDiscRangeEditor({
   range,
@@ -22,16 +31,34 @@ export function YearDiscRangeEditor({
   onCalendarYearChange: (year: number) => void;
 }) {
   const effectiveRange = range ?? DEFAULT_YEAR_DISC_RANGE;
-  const isYearMode = effectiveRange.mode === "calendar_year";
-  const startDate = effectiveRange.startDate ?? todayIsoDateLocal();
+  const mode = effectiveRange.mode;
+  const today = todayIsoDateLocal();
+  const pickerValue = yearDiscRangeAnchorIso(effectiveRange);
 
-  function selectYearMode() {
-    onRangeChange({ mode: "calendar_year" });
+  function setMode(nextMode: YearDiscRangeMode) {
+    if (nextMode === "calendar_year") {
+      onRangeChange({ mode: "calendar_year" });
+      return;
+    }
+    if (nextMode === "today") {
+      onRangeChange({ mode: "today" });
+      return;
+    }
+    onRangeChange({
+      mode: "specific_date",
+      anchorDate: effectiveRange.anchorDate ?? pickerValue,
+    });
   }
 
-  function selectTodayMode() {
-    onRangeChange({ mode: "start_to_today", startDate: todayIsoDateLocal() });
+  function handleAnchorDateChange(value: string) {
+    if (value === today) {
+      onRangeChange({ mode: "today" });
+      return;
+    }
+    onRangeChange({ mode: "specific_date", anchorDate: value });
   }
+
+  const showDatePicker = mode === "today" || mode === "specific_date";
 
   return (
     <div className="flex shrink-0 items-center gap-1.5">
@@ -39,11 +66,8 @@ export function YearDiscRangeEditor({
         type="button"
         variant="ghost"
         size="sm"
-        className={cn(
-          "h-8 px-2.5 text-xs text-white/60 hover:text-white",
-          isYearMode ? "bg-white/10 text-white" : "hover:bg-white/5"
-        )}
-        onClick={selectYearMode}
+        className={modeButtonClass(mode === "calendar_year")}
+        onClick={() => setMode("calendar_year")}
       >
         Year
       </Button>
@@ -51,18 +75,24 @@ export function YearDiscRangeEditor({
         type="button"
         variant="ghost"
         size="sm"
-        className={cn(
-          "h-8 px-2.5 text-xs text-white/60 hover:text-white",
-          !isYearMode ? "bg-white/10 text-white" : "hover:bg-white/5"
-        )}
-        onClick={selectTodayMode}
+        className={modeButtonClass(mode === "today")}
+        onClick={() => setMode("today")}
       >
         Today
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className={modeButtonClass(mode === "specific_date")}
+        onClick={() => setMode("specific_date")}
+      >
+        Date
       </Button>
 
       <span className="mx-0.5 h-4 w-px shrink-0 bg-white/10" aria-hidden="true" />
 
-      {isYearMode ? (
+      {mode === "calendar_year" ? (
         <>
           <Button
             variant="ghost"
@@ -97,18 +127,11 @@ export function YearDiscRangeEditor({
             <ChevronRight size={16} />
           </Button>
         </>
-      ) : (
-        <DateInputWithWeekday
-          value={startDate}
-          onChange={(value) => {
-            const today = todayIsoDateLocal();
-            onRangeChange({
-              mode: "start_to_today",
-              startDate: value <= today ? value : today,
-            });
-          }}
-        />
-      )}
+      ) : null}
+
+      {showDatePicker ? (
+        <DateInputWithWeekday value={pickerValue} onChange={handleAnchorDateChange} />
+      ) : null}
     </div>
   );
 }

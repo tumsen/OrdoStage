@@ -452,7 +452,11 @@ export function YearDiscView({
             className="fill-white/40 text-[10px] uppercase tracking-[0.12em]"
             pointerEvents="none"
           >
-            {timeline.mode === "calendar_year" ? timeline.rangeLabel : "365 days"}
+            {timeline.mode === "calendar_year"
+              ? timeline.rangeLabel
+              : timeline.mode === "today"
+                ? "Today"
+                : "365 days"}
           </text>
         </svg>
         {hovered ? (

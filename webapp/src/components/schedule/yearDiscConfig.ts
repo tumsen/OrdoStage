@@ -31,13 +31,13 @@ export type YearDiscConfig = {
   range?: YearDiscRangeSettings;
 };
 
-/** Full calendar year (Jan 1–Dec 31) or a custom span from start date through today. */
-export type YearDiscRangeMode = "calendar_year" | "start_to_today";
+/** Full calendar year, 365 days ending today, or 365 days ending on a chosen date. */
+export type YearDiscRangeMode = "calendar_year" | "today" | "specific_date";
 
 export type YearDiscRangeSettings = {
   mode: YearDiscRangeMode;
-  /** ISO YYYY-MM-DD — used when mode is `start_to_today`. */
-  startDate?: string;
+  /** ISO YYYY-MM-DD — end anchor when mode is `specific_date`. */
+  anchorDate?: string;
 };
 
 export const DEFAULT_YEAR_DISC_RANGE: YearDiscRangeSettings = {
@@ -266,14 +266,79 @@ function parseRingSource(raw: unknown): YearDiscRingSource | null {
 function parseRangeSettings(raw: unknown): YearDiscRangeSettings {
   if (!raw || typeof raw !== "object") return DEFAULT_YEAR_DISC_RANGE;
   const r = raw as Record<string, unknown>;
+  const legacyStart =
+    typeof r.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.startDate)
+      ? r.startDate
+      : typeof r.anchorDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.anchorDate)
+        ? r.anchorDate
+        : undefined;
+
+  if (r.mode === "today") return { mode: "today" };
+  if (r.mode === "specific_date") {
+    return {
+      mode: "specific_date",
+      anchorDate: legacyStart ?? todayIsoDateLocal(),
+    };
+  }
   if (r.mode === "start_to_today") {
-    const startDate =
-      typeof r.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.startDate)
-        ? r.startDate
-        : `${new Date().getFullYear()}-01-01`;
-    return { mode: "start_to_today", startDate };
+    const anchor = legacyStart ?? todayIsoDateLocal();
+    if (anchor === todayIsoDateLocal()) return { mode: "today" };
+    return { mode: "specific_date", anchorDate: anchor };
   }
   return { mode: "calendar_year" };
+}
+
+function rollingWindowEndDate(settings: YearDiscRangeSettings, now: Date): Date {
+  if (settings.mode === "today") return startOfLocalDay(now);
+  if (settings.mode === "specific_date") {
+    const parsed = settings.anchorDate ? parseIsoDateLocal(settings.anchorDate) : null;
+    return startOfLocalDay(parsed ?? now);
+  }
+  return startOfLocalDay(now);
+}
+
+function buildRollingTimeline(
+  mode: "today" | "specific_date",
+  endDate: Date
+): Omit<YearDiscTimeline, "mode"> & { mode: "today" | "specific_date" } {
+  const startDate = addLocalDays(endDate, -(YEAR_DISC_DAYS - 1));
+  const from = toDateStr(startDate);
+  const to = toDateStr(endDate);
+  const totalDays = YEAR_DISC_DAYS;
+
+  const dateFromDiscDay = (day: number): Date => addLocalDays(startDate, day - 1);
+
+  const discDayFromDate = (date: Date): number | null => {
+    const d = startOfLocalDay(date);
+    if (d < startDate || d > endDate) return null;
+    return daysBetweenInclusive(startDate, d);
+  };
+
+  const clipSpan = (span: YearDiscSpan): { startDay: number; endDay: number } | null => {
+    const spanStart = startOfLocalDay(new Date(span.startDate));
+    const spanEnd = startOfLocalDay(new Date(span.endDate ?? span.startDate));
+    if (spanEnd < startDate || spanStart > endDate) return null;
+    const clippedStart = spanStart < startDate ? startDate : spanStart;
+    const clippedEnd = spanEnd > endDate ? endDate : spanEnd;
+    const startDay = discDayFromDate(clippedStart);
+    const endDay = discDayFromDate(clippedEnd);
+    if (startDay === null || endDay === null) return null;
+    return { startDay, endDay };
+  };
+
+  const endLabel = endDate.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return {
+    mode,
+    totalDays,
+    from,
+    to,
+    rangeLabel: mode === "today" ? "Today" : `365 days → ${endLabel}`,
+    startDate,
+    endDate,
+    dateFromDiscDay,
+    discDayFromDate,
+    clipSpan,
+  };
 }
 
 export function normalizeYearDiscRange(raw: unknown): YearDiscRangeSettings {
@@ -320,11 +385,10 @@ export function yearDiscFetchRange(
   calendarYear: number,
   now: Date = new Date()
 ): { from: string; to: string } {
-  if (settings.mode === "start_to_today") {
-    const anchorIso = settings.startDate ?? toDateStr(now);
-    const anchor = parseIsoDateLocal(anchorIso) ?? startOfLocalDay(now);
-    const start = addLocalDays(startOfLocalDay(anchor), -(YEAR_DISC_DAYS - 1));
-    return { from: toDateStr(start), to: toDateStr(startOfLocalDay(anchor)) };
+  if (settings.mode === "today" || settings.mode === "specific_date") {
+    const anchor = rollingWindowEndDate(settings, now);
+    const start = addLocalDays(anchor, -(YEAR_DISC_DAYS - 1));
+    return { from: toDateStr(start), to: toDateStr(anchor) };
   }
   return { from: `${calendarYear}-01-01`, to: `${calendarYear}-12-31` };
 }
@@ -353,49 +417,11 @@ export function buildYearDiscTimeline(
   calendarYear: number,
   now: Date = new Date()
 ): YearDiscTimeline {
-  const today = startOfLocalDay(now);
   const totalDays = YEAR_DISC_DAYS;
 
-  if (settings.mode === "start_to_today") {
-    const parsedAnchor = settings.startDate ? parseIsoDateLocal(settings.startDate) : null;
-    const endDate = startOfLocalDay(parsedAnchor ?? today);
-    const startDate = addLocalDays(endDate, -(YEAR_DISC_DAYS - 1));
-    const from = toDateStr(startDate);
-    const to = toDateStr(endDate);
-
-    const dateFromDiscDay = (day: number): Date => addLocalDays(startDate, day - 1);
-
-    const discDayFromDate = (date: Date): number | null => {
-      const d = startOfLocalDay(date);
-      if (d < startDate || d > endDate) return null;
-      return daysBetweenInclusive(startDate, d);
-    };
-
-    const clipSpan = (span: YearDiscSpan): { startDay: number; endDay: number } | null => {
-      const spanStart = startOfLocalDay(new Date(span.startDate));
-      const spanEnd = startOfLocalDay(new Date(span.endDate ?? span.startDate));
-      if (spanEnd < startDate || spanStart > endDate) return null;
-      const clippedStart = spanStart < startDate ? startDate : spanStart;
-      const clippedEnd = spanEnd > endDate ? endDate : spanEnd;
-      const startDay = discDayFromDate(clippedStart);
-      const endDay = discDayFromDate(clippedEnd);
-      if (startDay === null || endDay === null) return null;
-      return { startDay, endDay };
-    };
-
-    const endLabel = endDate.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-    return {
-      mode: "start_to_today",
-      totalDays,
-      from,
-      to,
-      rangeLabel: `365 days → ${endLabel}`,
-      startDate,
-      endDate,
-      dateFromDiscDay,
-      discDayFromDate,
-      clipSpan,
-    };
+  if (settings.mode === "today" || settings.mode === "specific_date") {
+    const endDate = rollingWindowEndDate(settings, now);
+    return buildRollingTimeline(settings.mode, endDate);
   }
 
   const year = calendarYear;
@@ -442,6 +468,10 @@ export function defaultDiscDay(timeline: YearDiscTimeline, now: Date = new Date(
   const todayDay = timeline.discDayFromDate(now);
   if (todayDay !== null) return todayDay;
   return timeline.mode === "calendar_year" ? 1 : YEAR_DISC_DAYS;
+}
+
+export function yearDiscRangeAnchorIso(settings: YearDiscRangeSettings, now: Date = new Date()): string {
+  return toDateStr(rollingWindowEndDate(settings, now));
 }
 
 export function normalizeYearDiscConfig(raw: unknown): YearDiscConfig {
