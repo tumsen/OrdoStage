@@ -54,6 +54,8 @@ export type YearDiscTimeline = {
   endDate: Date;
   /** Calendar year when mode is `calendar_year`. */
   year?: number;
+  /** Disc day drawn at 12 o'clock (Jan 1 in year mode, anchor day in Today/Date mode). */
+  northDiscDay: number;
   dateFromDiscDay: (day: number) => Date;
   discDayFromDate: (date: Date) => number | null;
   clipSpan: (span: YearDiscSpan) => { startDay: number; endDay: number } | null;
@@ -363,6 +365,7 @@ function buildRollingTimeline(
       return d ? discDayFromDate(d) : null;
     });
 
+  const northDiscDay = daysBetweenInclusive(startDate, anchor);
   const anchorLabel = anchor.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   return {
     mode,
@@ -372,6 +375,7 @@ function buildRollingTimeline(
     rangeLabel: mode === "today" ? "Today" : `365 days · ${anchorLabel}`,
     startDate,
     endDate,
+    northDiscDay,
     dateFromDiscDay,
     discDayFromDate,
     clipSpan,
@@ -491,10 +495,16 @@ export function buildYearDiscTimeline(
     rangeLabel: String(year),
     startDate,
     endDate,
+    northDiscDay: 1,
     dateFromDiscDay,
     discDayFromDate,
     clipSpan,
   };
+}
+
+/** Rotate disc so `northDiscDay` sits at 12 o'clock. */
+export function yearDiscAngleOffsetDeg(northDiscDay: number, totalDays: number = YEAR_DISC_DAYS): number {
+  return -(((northDiscDay - 0.5) / totalDays) * 360);
 }
 
 export function defaultDiscDay(timeline: YearDiscTimeline, now: Date = new Date()): number {

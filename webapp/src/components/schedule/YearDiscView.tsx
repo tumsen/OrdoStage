@@ -12,6 +12,7 @@ import {
   defaultDiscDay,
   DEFAULT_YEAR_DISC_RANGE,
   resolveYearDiscRingSpans,
+  yearDiscAngleOffsetDeg,
   yearDiscRingColor,
   yearDiscRingLabel,
   type YearDiscConfig,
@@ -30,13 +31,17 @@ const LABEL_R = OUTER_R + Math.round(22 * DISC_SCALE);
 const NEEDLE_OUTER_R = OUTER_R + Math.round(12 * DISC_SCALE);
 const INNER_RESERVE = Math.round(90 * DISC_SCALE);
 
-function dayToAngle(day: number, totalDays: number): number {
-  return ((day - 0.5) / totalDays) * 360;
+function normalizeAngle(deg: number): number {
+  return ((deg % 360) + 360) % 360;
 }
 
-function angleToDay(angle: number, totalDays: number): number {
-  const normalized = ((angle % 360) + 360) % 360;
-  const day = Math.floor((normalized / 360) * totalDays) + 1;
+function dayToAngle(day: number, totalDays: number, offsetDeg = 0): number {
+  return normalizeAngle(((day - 0.5) / totalDays) * 360 + offsetDeg);
+}
+
+function angleToDay(angle: number, totalDays: number, offsetDeg = 0): number {
+  const unrotated = normalizeAngle(angle - offsetDeg);
+  const day = Math.floor((unrotated / 360) * totalDays) + 1;
   return Math.max(1, Math.min(totalDays, day));
 }
 
@@ -81,11 +86,16 @@ function ringSectorPath(
   ].join(" ");
 }
 
-function dayAngles(startDay: number, endDay: number, totalDays: number): { start: number; end: number } {
+function dayAngles(
+  startDay: number,
+  endDay: number,
+  totalDays: number,
+  offsetDeg = 0
+): { start: number; end: number } {
   const minSpanDays = 1.2;
   const spanDays = Math.max(endDay - startDay + 1, minSpanDays);
-  const start = ((startDay - 1) / totalDays) * 360;
-  const end = ((startDay - 1 + spanDays) / totalDays) * 360;
+  const start = normalizeAngle(((startDay - 1) / totalDays) * 360 + offsetDeg);
+  const end = normalizeAngle(((startDay - 1 + spanDays) / totalDays) * 360 + offsetDeg);
   return { start, end };
 }
 
@@ -132,7 +142,7 @@ function formatWeekNumber(date: Date, locale: string): string {
   return `Week ${week}`;
 }
 
-function monthMarkersForTimeline(timeline: YearDiscTimeline, locale: string) {
+function monthMarkersForTimeline(timeline: YearDiscTimeline, locale: string, offsetDeg: number) {
   const { totalDays, startDate, endDate } = timeline;
   const markers: Array<{
     key: string;
@@ -146,7 +156,7 @@ function monthMarkersForTimeline(timeline: YearDiscTimeline, locale: string) {
   if (timeline.mode === "calendar_year" && timeline.year !== undefined) {
     return Array.from({ length: 12 }, (_, month) => {
       const day = timeline.discDayFromDate(new Date(timeline.year!, month, 1)) ?? 1;
-      const angle = ((day - 1) / totalDays) * 360;
+      const angle = normalizeAngle(((day - 1) / totalDays) * 360 + offsetDeg);
       const tickOuter = polar(CX, CY, OUTER_R + 6, angle);
       const tickInner = polar(CX, CY, OUTER_R - 2, angle);
       const labelPos = polar(CX, CY, LABEL_R, angle + 15 / totalDays);
@@ -237,6 +247,7 @@ export function YearDiscView({
     [config.range, calendarYear]
   );
   const totalDays = timeline.totalDays;
+  const angleOffset = yearDiscAngleOffsetDeg(timeline.northDiscDay, totalDays);
   const [selectedDay, setSelectedDay] = useState(() => defaultDiscDay(timeline));
   const rings = config.rings;
   const layout = useMemo(() => computeRingLayout(rings.length), [rings.length]);
@@ -249,16 +260,16 @@ export function YearDiscView({
     () => timeline.dateFromDiscDay(selectedDay),
     [selectedDay, timeline]
   );
-  const selectedAngle = dayToAngle(selectedDay, totalDays);
+  const selectedAngle = dayToAngle(selectedDay, totalDays, angleOffset);
   const needleTip = polar(CX, CY, NEEDLE_OUTER_R, selectedAngle);
 
   const updateDayFromPointer = useCallback(
     (clientX: number, clientY: number) => {
       const svg = svgRef.current;
       if (!svg) return;
-      setSelectedDay(angleToDay(clientToAngle(svg, clientX, clientY), totalDays));
+      setSelectedDay(angleToDay(clientToAngle(svg, clientX, clientY), totalDays, angleOffset));
     },
-    [totalDays]
+    [angleOffset, totalDays]
   );
 
   const onNeedlePointerDown = (event: React.PointerEvent) => {
@@ -287,7 +298,7 @@ export function YearDiscView({
       for (const span of spans) {
         const clip = timeline.clipSpan(span);
         if (!clip) continue;
-        const angles = dayAngles(clip.startDay, clip.endDay, totalDays);
+        const angles = dayAngles(clip.startDay, clip.endDay, totalDays, angleOffset);
         out.push({
           id: `${ring.id}:${span.id}`,
           span,
@@ -299,23 +310,23 @@ export function YearDiscView({
       }
     });
     return out;
-  }, [rings, sources, layout, totalDays, timeline]);
+  }, [angleOffset, rings, sources, layout, totalDays, timeline]);
 
   const dayLinesPath = useMemo(() => {
     const outerR = OUTER_R + 6;
     const parts: string[] = [];
     for (let day = 1; day <= totalDays; day++) {
-      const angle = ((day - 1) / totalDays) * 360;
+      const angle = normalizeAngle(((day - 1) / totalDays) * 360 + angleOffset);
       const inner = polar(CX, CY, layout.dayLineInnerR, angle);
       const outer = polar(CX, CY, outerR, angle);
       parts.push(`M ${inner.x} ${inner.y} L ${outer.x} ${outer.y}`);
     }
     return parts.join(" ");
-  }, [layout.dayLineInnerR, totalDays]);
+  }, [angleOffset, layout.dayLineInnerR, totalDays]);
 
   const monthMarkers = useMemo(
-    () => monthMarkersForTimeline(timeline, locale),
-    [locale, timeline]
+    () => monthMarkersForTimeline(timeline, locale, angleOffset),
+    [angleOffset, locale, timeline]
   );
 
   const allSpans = useMemo(() => {
