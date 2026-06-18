@@ -301,7 +301,7 @@ export function LodgingPlaceAutocomplete({
           <ul
             id={listboxId}
             role="listbox"
-            className="absolute z-50 mt-1 max-h-56 w-full min-w-[14rem] overflow-auto rounded-md border border-white/10 bg-[#16161f] py-1 shadow-lg"
+            className="absolute z-50 mt-1 max-h-56 w-full min-w-[20rem] overflow-auto rounded-md border border-white/10 bg-[#16161f] py-1 shadow-lg"
           >
             {loading && suggestions.length === 0 ? (
               <li className="px-3 py-2 text-sm text-white/45">Searching places…</li>

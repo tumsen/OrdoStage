@@ -195,17 +195,16 @@ export function TravelDayMealsTable({
       ) : null}
 
       <div className="mt-2 overflow-x-auto rounded-md border border-white/10">
-        <table className="w-full min-w-[46rem] border-collapse text-left text-[11px]">
+        <table className="w-full min-w-[44rem] border-collapse text-left text-[11px]">
           <thead>
             <tr className="border-b border-white/10 bg-black/25 text-[10px] font-medium uppercase tracking-wide text-white/40">
               <th className="whitespace-nowrap px-2 py-1.5">Date</th>
-              <th className="min-w-[8rem] px-1 py-1.5">Project / event</th>
-              <th className="min-w-[11rem] px-1 py-1.5">Where you stayed</th>
+              <th className="min-w-[7rem] px-1 py-1.5">Project / event</th>
+              <th className="min-w-[18rem] w-[38%] px-1 py-1.5">Where you stayed</th>
               <th className="min-w-[7rem] px-1 py-1.5">Breakfast</th>
               <th className="min-w-[7rem] px-1 py-1.5">Lunch</th>
               <th className="min-w-[7rem] px-1 py-1.5">Dinner</th>
               {showMealReductions ? <th className="min-w-[6rem] px-2 py-1.5">Reduction</th> : null}
-              <th className="min-w-[5rem] px-1 py-1.5">Logi</th>
               <th className="min-w-[5.5rem] px-2 py-1.5 text-right">Udbetaling</th>
             </tr>
           </thead>
@@ -242,7 +241,7 @@ export function TravelDayMealsTable({
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="p-1">
+                  <td className="min-w-[18rem] p-1">
                     <LodgingPlaceAutocomplete
                       value={lodgingPlaceDisplayLabel(line)}
                       placeId={line.lodgingPlaceId || undefined}
@@ -285,36 +284,6 @@ export function TravelDayMealsTable({
                       )}
                     </td>
                   ) : null}
-                  <td className="p-1 align-middle">
-                    <div className="flex flex-col gap-1">
-                      <label
-                        className={`flex items-center gap-1.5 text-[10px] text-white/55 ${readOnly ? "cursor-default" : "cursor-pointer"}`}
-                      >
-                        <Checkbox
-                          checked={line.lodgingCovered}
-                          disabled={readOnly}
-                          onCheckedChange={(checked) =>
-                            onUpdateLine(line.date, { lodgingCovered: checked === true })
-                          }
-                          aria-label="Frit logi stillet til rådighed"
-                        />
-                        Frit logi
-                      </label>
-                      <label
-                        className={`flex items-center gap-1.5 text-[10px] text-white/55 ${readOnly ? "cursor-default" : "cursor-pointer"}`}
-                      >
-                        <Checkbox
-                          checked={line.lodgingByReceipt}
-                          disabled={readOnly}
-                          onCheckedChange={(checked) =>
-                            onUpdateLine(line.date, { lodgingByReceipt: checked === true })
-                          }
-                          aria-label="Logi dækket som udlæg efter regning"
-                        />
-                        Udlæg (kvittering)
-                      </label>
-                    </div>
-                  </td>
                   <td className="px-2 py-1.5 text-right tabular-nums">
                     {payout && payout.payoutCents > 0 ? (
                       <span
@@ -341,7 +310,7 @@ export function TravelDayMealsTable({
             <tfoot>
               <tr className="border-t border-white/15 bg-black/20 text-white/70">
                 <td
-                  colSpan={showMealReductions ? 8 : 7}
+                  colSpan={showMealReductions ? 7 : 6}
                   className="px-2 py-1.5 text-right text-[10px] font-medium uppercase tracking-wide text-white/40"
                 >
                   Total udbetaling
