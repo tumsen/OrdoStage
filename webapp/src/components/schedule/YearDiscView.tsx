@@ -516,10 +516,9 @@ export function YearDiscView({
           ))}
           {rings.map((ring, index) => {
             const { inner, outer } = layout.ringRadii(index);
-            const color = yearDiscRingColor(ring, index);
             const label = yearDiscRingLabel(ring, sources);
             const midR = (inner + outer) / 2;
-            const centerAngle = (index - (rings.length - 1) / 2) * 6;
+            const centerAngle = 0;
             const spanDeg = ringLabelSpanDeg(label);
             const textPathId = `ring-label-${ring.id}`;
             const fontSize = Math.min(14, Math.max(10, layout.ringWidth * 0.38));
@@ -530,7 +529,10 @@ export function YearDiscView({
                   <path id={textPathId} d={ringLabelArcPath(CX, CY, midR, centerAngle, spanDeg * 0.92)} />
                 </defs>
                 <text
-                  fill={color}
+                  fill="rgba(255,255,255,0.92)"
+                  stroke="rgba(10,10,15,0.75)"
+                  strokeWidth={2.5}
+                  paintOrder="stroke fill"
                   fontSize={fontSize}
                   fontWeight={600}
                   letterSpacing="0.06em"
