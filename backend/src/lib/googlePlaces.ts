@@ -127,6 +127,65 @@ function structuredAddressFromComponents(
   };
 }
 
+const danishZipCityCache = new Map<string, string>();
+
+function isDenmarkCountry(country: string): boolean {
+  const c = country.trim().toLowerCase();
+  return c === "denmark" || c === "danmark" || c === "dk";
+}
+
+/** Official Danish post city for a 4-digit postnummer (DAWA). */
+async function danishPostCityFromZip(zip: string): Promise<string | null> {
+  const nr = zip.trim();
+  if (!/^\d{4}$/.test(nr)) return null;
+  const cached = danishZipCityCache.get(nr);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(`https://api.dataforsyningen.dk/postnumre/${nr}`);
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { navn?: string };
+    const navn = payload.navn?.trim();
+    if (!navn) return null;
+    danishZipCityCache.set(nr, navn);
+    return navn;
+  } catch {
+    return null;
+  }
+}
+
+function cleanMunicipalityName(name: string): string {
+  return name.replace(/\s+(Kommune|Municipality)$/i, "").trim();
+}
+
+/** Prefer post town (e.g. Svendborg) over village locality (e.g. Troense) for Danish addresses. */
+async function enrichDanishPostCity(
+  address: GoogleStructuredAddress,
+  components: Array<{ longText?: string; shortText?: string; types?: string[] }>
+): Promise<void> {
+  if (!isDenmarkCountry(address.country)) return;
+
+  const zip = address.zip.trim();
+  if (!/^\d{4}$/.test(zip)) return;
+
+  const village = address.locality.trim();
+  let postCity = address.postalTown.trim() || (await danishPostCityFromZip(zip)) || "";
+
+  if (!postCity) {
+    const admin2 = components.find((item) => item.types?.includes("administrative_area_level_2"));
+    postCity = cleanMunicipalityName(admin2?.longText ?? admin2?.shortText ?? "");
+  }
+
+  if (!postCity) return;
+
+  address.postalTown = postCity;
+  address.city = postCity;
+  // Keep village in locality when it differs — used for "(Troense)" in display labels.
+  if (village && village.toLowerCase() === postCity.toLowerCase()) {
+    address.locality = "";
+  }
+}
+
 function nameAlreadyInAddress(name: string, address: string): boolean {
   const n = name.trim().toLowerCase();
   const a = address.trim().toLowerCase();
@@ -144,19 +203,26 @@ export function formatLodgingPlaceLabel(details: GooglePlaceDetails): string {
     details.locality.toLowerCase() !== mainCity.toLowerCase()
       ? ` (${details.locality})`
       : "";
+  const cityPart = [details.zip, mainCity].filter(Boolean).join(" ") + suburb;
+  const name = details.name.trim();
 
   if (streetLine) {
-    const cityPart = [details.zip, mainCity].filter(Boolean).join(" ") + suburb;
     const structured = [streetLine, cityPart, details.country].filter(Boolean).join(", ");
-    const name = details.name.trim();
     if (name && name !== streetLine && !nameAlreadyInAddress(name, structured)) {
       return `${name}, ${structured}`;
     }
     return structured;
   }
 
+  if (cityPart.trim()) {
+    const locationLine = [cityPart, details.country].filter(Boolean).join(", ");
+    if (name && !nameAlreadyInAddress(name, locationLine)) {
+      return `${name}, ${locationLine}`;
+    }
+    return locationLine;
+  }
+
   const formatted = details.formattedAddress.trim();
-  const name = details.name.trim();
   if (formatted) {
     if (name && !nameAlreadyInAddress(name, formatted)) {
       return `${name}, ${formatted}`;
@@ -197,6 +263,7 @@ export async function googlePlaceDetails(placeId: string): Promise<GooglePlaceDe
 
   const components = payload.addressComponents ?? [];
   const structured = structuredAddressFromComponents(components);
+  await enrichDanishPostCity(structured, components);
   const name = payload.displayName?.text?.trim() ?? "";
   const formattedAddress = payload.formattedAddress?.trim() ?? "";
 
