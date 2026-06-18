@@ -2,30 +2,27 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   calendarItemTimeRangeLabel,
-  getItemTimeRange,
   itemsForDay,
-  scheduleVisibilityFilterKey,
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
-
-type RingId = "event" | "tour" | "rehearsal" | "venue_booking" | "other";
-
-const RINGS: Array<{ id: RingId; label: string; fill: string }> = [
-  { id: "event", label: "Events", fill: "rgba(79, 70, 229, 0.92)" },
-  { id: "tour", label: "Tours", fill: "rgba(162, 28, 175, 0.92)" },
-  { id: "rehearsal", label: "Rehearsals", fill: "rgba(217, 119, 6, 0.92)" },
-  { id: "venue_booking", label: "Venue", fill: "rgba(225, 29, 72, 0.92)" },
-  { id: "other", label: "Other", fill: "rgba(37, 99, 235, 0.88)" },
-];
+import { YearDiscRingEditor } from "@/components/schedule/YearDiscRingEditor";
+import {
+  resolveYearDiscRingSpans,
+  yearDiscRingColor,
+  yearDiscRingLabel,
+  type YearDiscConfig,
+  type YearDiscResolveContext,
+  type YearDiscSpan,
+} from "@/components/schedule/yearDiscConfig";
 
 const SIZE = 720;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
 const OUTER_R = 318;
-const RING_WIDTH = 34;
 const RING_GAP = 3;
 const LABEL_R = OUTER_R + 22;
 const NEEDLE_OUTER_R = OUTER_R + 12;
+const INNER_RESERVE = 90;
 
 function daysInYear(year: number): number {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
@@ -64,15 +61,6 @@ function clientToAngle(svg: SVGSVGElement, clientX: number, clientY: number): nu
   return deg;
 }
 
-function ringForItem(item: CalendarItem): RingId {
-  const key = scheduleVisibilityFilterKey(item);
-  if (key === "event") return "event";
-  if (key === "tour") return "tour";
-  if (key === "rehearsal") return "rehearsal";
-  if (key === "venue_booking") return "venue_booking";
-  return "other";
-}
-
 function polar(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
@@ -108,12 +96,12 @@ function dayAngles(startDay: number, endDay: number, totalDays: number): { start
   return { start, end };
 }
 
-function itemSpanInYear(
-  item: CalendarItem,
+function spanInYear(
+  span: YearDiscSpan,
   year: number
 ): { startDay: number; endDay: number } | null {
-  if (item.kind === "summary") return null;
-  const { start, end } = getItemTimeRange(item);
+  const start = new Date(span.startDate);
+  const end = new Date(span.endDate ?? span.startDate);
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
   if (end < yearStart || start > yearEnd) return null;
@@ -122,18 +110,27 @@ function itemSpanInYear(
   return { startDay: dayOfYear(clippedStart), endDay: dayOfYear(clippedEnd) };
 }
 
-function ringRadii(ringIndex: number): { inner: number; outer: number } {
-  const outer = OUTER_R - ringIndex * (RING_WIDTH + RING_GAP);
-  return { inner: outer - RING_WIDTH, outer };
+function computeRingLayout(ringCount: number): {
+  ringWidth: number;
+  ringRadii: (index: number) => { inner: number; outer: number };
+  hubR: number;
+  dayLineInnerR: number;
+} {
+  const count = Math.max(1, ringCount);
+  const ringWidth = Math.min(34, Math.floor((OUTER_R - INNER_RESERVE - RING_GAP * (count - 1)) / count));
+  const ringRadii = (index: number) => {
+    const outer = OUTER_R - index * (ringWidth + RING_GAP);
+    return { inner: outer - ringWidth, outer };
+  };
+  const innermost = ringRadii(count - 1).inner;
+  const hubR = innermost - 10;
+  return { ringWidth, ringRadii, hubR, dayLineInnerR: hubR };
 }
-
-const HUB_R = ringRadii(RINGS.length - 1).inner - 10;
-const DAY_LINE_INNER_R = HUB_R;
 
 type DiscSegment = {
   id: string;
-  item: CalendarItem;
-  ringId: RingId;
+  span: YearDiscSpan;
+  ringIndex: number;
   path: string;
   fill: string;
   opacity: number;
@@ -145,14 +142,45 @@ function defaultDayForYear(year: number, totalDays: number): number {
   return Math.min(totalDays, 1);
 }
 
+function spanOnDay(span: YearDiscSpan, date: Date): boolean {
+  if (span.calendarItem) {
+    return itemsForDay([span.calendarItem], date).length > 0;
+  }
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  const start = new Date(span.startDate);
+  const end = new Date(span.endDate ?? span.startDate);
+  return start < dayEnd && end >= dayStart;
+}
+
+function spanTimeLabel(span: YearDiscSpan): string {
+  if (span.calendarItem) return calendarItemTimeRangeLabel(span.calendarItem);
+  const start = new Date(span.startDate);
+  const end = new Date(span.endDate ?? span.startDate);
+  const sameDay =
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate();
+  const timeFmt: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" };
+  if (sameDay) {
+    return `${start.toLocaleTimeString(undefined, timeFmt)}–${end.toLocaleTimeString(undefined, timeFmt)}`;
+  }
+  return start.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 export function YearDiscView({
   year,
-  items,
+  config,
+  onConfigChange,
+  sources,
   locale,
   onItemClick,
 }: {
   year: number;
-  items: CalendarItem[];
+  config: YearDiscConfig;
+  onConfigChange: (config: YearDiscConfig) => void;
+  sources: YearDiscResolveContext;
   locale: string;
   onItemClick: (item: CalendarItem) => void;
 }) {
@@ -160,6 +188,8 @@ export function YearDiscView({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const totalDays = daysInYear(year);
   const [selectedDay, setSelectedDay] = useState(() => defaultDayForYear(year, totalDays));
+  const rings = config.rings;
+  const layout = useMemo(() => computeRingLayout(rings.length), [rings.length]);
 
   useEffect(() => {
     setSelectedDay(defaultDayForYear(year, daysInYear(year)));
@@ -196,41 +226,39 @@ export function YearDiscView({
   };
 
   const segments = useMemo(() => {
-    const ringIndex = new Map(RINGS.map((ring, index) => [ring.id, index]));
-    const fillByRing = new Map(RINGS.map((ring) => [ring.id, ring.fill]));
     const out: DiscSegment[] = [];
-
-    for (const item of items) {
-      const span = itemSpanInYear(item, year);
-      if (!span) continue;
-      const ringId = ringForItem(item);
-      const index = ringIndex.get(ringId) ?? 0;
-      const { inner, outer } = ringRadii(index);
-      const angles = dayAngles(span.startDay, span.endDay, totalDays);
-      out.push({
-        id: item.id,
-        item,
-        ringId,
-        path: ringSectorPath(inner, outer, angles.start, angles.end),
-        fill: fillByRing.get(ringId) ?? RINGS[0].fill,
-        opacity: item.disabled ? 0.35 : 1,
-      });
-    }
-
+    rings.forEach((ring, ringIndex) => {
+      const fill = yearDiscRingColor(ring, ringIndex);
+      const { inner, outer } = layout.ringRadii(ringIndex);
+      const spans = resolveYearDiscRingSpans(ring, sources);
+      for (const span of spans) {
+        const clip = spanInYear(span, year);
+        if (!clip) continue;
+        const angles = dayAngles(clip.startDay, clip.endDay, totalDays);
+        out.push({
+          id: `${ring.id}:${span.id}`,
+          span,
+          ringIndex,
+          path: ringSectorPath(inner, outer, angles.start, angles.end),
+          fill,
+          opacity: span.opacity ?? 1,
+        });
+      }
+    });
     return out;
-  }, [items, totalDays, year]);
+  }, [rings, sources, layout, totalDays, year]);
 
   const dayLinesPath = useMemo(() => {
     const outerR = OUTER_R + 6;
     const parts: string[] = [];
     for (let day = 1; day <= totalDays; day++) {
       const angle = ((day - 1) / totalDays) * 360;
-      const inner = polar(CX, CY, DAY_LINE_INNER_R, angle);
+      const inner = polar(CX, CY, layout.dayLineInnerR, angle);
       const outer = polar(CX, CY, outerR, angle);
       parts.push(`M ${inner.x} ${inner.y} L ${outer.x} ${outer.y}`);
     }
     return parts.join(" ");
-  }, [totalDays]);
+  }, [layout.dayLineInnerR, totalDays]);
 
   const monthMarkers = useMemo(() => {
     return Array.from({ length: 12 }, (_, month) => {
@@ -244,13 +272,15 @@ export function YearDiscView({
     });
   }, [locale, totalDays, year]);
 
-  const dayItems = useMemo(() => {
-    return itemsForDay(items, selectedDate).sort((a, b) => {
-      const aTime = new Date(a.startDate).getTime();
-      const bTime = new Date(b.startDate).getTime();
-      return aTime - bTime;
-    });
-  }, [items, selectedDate]);
+  const allSpans = useMemo(() => {
+    return rings.flatMap((ring) => resolveYearDiscRingSpans(ring, sources));
+  }, [rings, sources]);
+
+  const daySpans = useMemo(() => {
+    return allSpans
+      .filter((span) => spanOnDay(span, selectedDate))
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  }, [allSpans, selectedDate]);
 
   const selectedDayLabel = selectedDate.toLocaleDateString(locale, {
     weekday: "long",
@@ -259,7 +289,21 @@ export function YearDiscView({
     year: "numeric",
   });
 
-  const hovered = segments.find((segment) => segment.id === hoveredId)?.item ?? null;
+  const hovered = segments.find((segment) => segment.id === hoveredId)?.span ?? null;
+
+  function handleSegmentClick(segment: DiscSegment) {
+    const clip = spanInYear(segment.span, year);
+    if (clip) setSelectedDay(clip.startDay);
+    if (segment.span.calendarItem) onItemClick(segment.span.calendarItem);
+  }
+
+  function ringColorForSpan(span: YearDiscSpan): string {
+    const ringIndex = rings.findIndex((ring) =>
+      resolveYearDiscRingSpans(ring, sources).some((s) => s.id === span.id)
+    );
+    if (ringIndex < 0) return yearDiscRingColor(rings[0]!, 0);
+    return yearDiscRingColor(rings[ringIndex]!, ringIndex);
+  }
 
   return (
     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-center">
@@ -280,8 +324,8 @@ export function YearDiscView({
             strokeWidth={0.5}
             pointerEvents="none"
           />
-          {RINGS.map((ring, index) => {
-            const { inner, outer } = ringRadii(index);
+          {rings.map((ring, index) => {
+            const { inner, outer } = layout.ringRadii(index);
             return (
               <circle
                 key={ring.id}
@@ -290,7 +334,7 @@ export function YearDiscView({
                 r={(inner + outer) / 2}
                 fill="none"
                 stroke="rgba(255,255,255,0.06)"
-                strokeWidth={RING_WIDTH}
+                strokeWidth={layout.ringWidth}
                 pointerEvents="none"
               />
             );
@@ -325,13 +369,9 @@ export function YearDiscView({
               className="cursor-pointer transition-opacity"
               onMouseEnter={() => setHoveredId(segment.id)}
               onMouseLeave={() => setHoveredId(null)}
-              onClick={() => {
-                const span = itemSpanInYear(segment.item, year);
-                if (span) setSelectedDay(span.startDay);
-                onItemClick(segment.item);
-              }}
+              onClick={() => handleSegmentClick(segment)}
             >
-              <title>{segment.item.title}</title>
+              <title>{segment.span.title}</title>
             </path>
           ))}
           <line
@@ -359,7 +399,7 @@ export function YearDiscView({
               strokeWidth={2}
             />
           </g>
-          <circle cx={CX} cy={CY} r={HUB_R} fill="#0a0a0f" pointerEvents="none" />
+          <circle cx={CX} cy={CY} r={layout.hubR} fill="#0a0a0f" pointerEvents="none" />
           <text
             x={CX}
             y={CY - 8}
@@ -393,26 +433,26 @@ export function YearDiscView({
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
           <p className="mt-1 text-[11px] text-white/35">Drag the yellow handle around the disc to change day.</p>
-          <ul className="mt-3 max-h-[min(50vh,24rem)] space-y-2 overflow-y-auto pr-0.5">
-            {dayItems.length === 0 ? (
-              <li className="text-sm text-white/40">No events this day.</li>
+          <ul className="mt-3 max-h-[min(40vh,20rem)] space-y-2 overflow-y-auto pr-0.5">
+            {daySpans.length === 0 ? (
+              <li className="text-sm text-white/40">Nothing on this day.</li>
             ) : (
-              dayItems.map((item) => {
-                const time = calendarItemTimeRangeLabel(item);
-                const ring = RINGS.find((r) => r.id === ringForItem(item));
+              daySpans.map((span) => {
+                const time = spanTimeLabel(span);
                 return (
-                  <li key={item.id}>
+                  <li key={span.id}>
                     <button
                       type="button"
-                      onClick={() => onItemClick(item)}
-                      className="flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07]"
+                      onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
+                      disabled={!span.calendarItem}
+                      className="flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07] disabled:cursor-default disabled:opacity-80"
                     >
                       <span
                         className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
-                        style={{ backgroundColor: ring?.fill ?? RINGS[0].fill }}
+                        style={{ backgroundColor: ringColorForSpan(span) }}
                       />
                       <span className="min-w-0">
-                        <span className="block truncate text-sm text-white">{item.title}</span>
+                        <span className="block truncate text-sm text-white">{span.title}</span>
                         {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
                       </span>
                     </button>
@@ -423,13 +463,25 @@ export function YearDiscView({
           </ul>
         </div>
 
+        <YearDiscRingEditor
+          config={config}
+          onChange={onConfigChange}
+          events={sources.events}
+          tours={sources.tours}
+          venues={sources.venues}
+          people={sources.people}
+        />
+
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Rings</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Ring legend</p>
           <ul className="mt-2 space-y-2">
-            {RINGS.map((ring) => (
+            {rings.map((ring, index) => (
               <li key={ring.id} className="flex items-center gap-2 text-sm text-white/75">
-                <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: ring.fill }} />
-                {ring.label}
+                <span
+                  className="h-3 w-3 shrink-0 rounded-sm"
+                  style={{ backgroundColor: yearDiscRingColor(ring, index) }}
+                />
+                {yearDiscRingLabel(ring, sources)}
               </li>
             ))}
           </ul>

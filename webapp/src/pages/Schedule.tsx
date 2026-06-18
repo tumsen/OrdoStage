@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { usePersistedViewMode } from "@/hooks/usePersistedViewMode";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
@@ -7,7 +7,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import type { EventDetail, InternalBookingDetail, Venue, Person, TourDetail } from "../../../backend/src/types";
+import type {
+  EventDetail,
+  InternalBookingDetail,
+  Person,
+  TimeReport,
+  TourDetail,
+  Venue,
+} from "../../../backend/src/types";
 import {
   ScheduleFilters,
   type ScheduleViewMode,
@@ -34,6 +41,9 @@ import {
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
 import { YearDiscView } from "@/components/schedule/YearDiscView";
+import { ringUsesTimeData } from "@/components/schedule/yearDiscConfig";
+import { usePermissions } from "@/hooks/usePermissions";
+import { usePersistedYearDiscConfig } from "@/hooks/usePersistedYearDiscConfig";
 import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
 import { toast } from "@/hooks/use-toast";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -295,11 +305,14 @@ export default function Schedule() {
     event: true,
     tour: true,
     rehearsal: true,
-    maintenance: true,
     private: true,
+    maintenance: true,
     venue_booking: true,
     other: true,
   });
+  const [yearDiscConfig, setYearDiscConfig] = usePersistedYearDiscConfig();
+  const { canView, canAction } = usePermissions();
+  const canReadAllTime = canAction("time.read_all");
 
   const deleteBookingMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/bookings/${id}`),
@@ -362,6 +375,21 @@ export default function Schedule() {
     : [];
 
   const visibleItems = items.filter((item) => passesScheduleVisibilityFilters(visibility, item));
+
+  const yearDiscNeedsTime = useMemo(
+    () => viewMode === "yeardisc" && yearDiscConfig.rings.some((ring) => ringUsesTimeData(ring.source)),
+    [viewMode, yearDiscConfig]
+  );
+
+  const { data: yearDiscTimeReport } = useQuery({
+    queryKey: ["time-report", "year-disc", from, to, personId],
+    queryFn: () => {
+      const params = new URLSearchParams({ from, to });
+      if (personId !== "all") params.set("personIds", personId);
+      return api.get<TimeReport>(`/api/time/report?${params.toString()}`);
+    },
+    enabled: yearDiscNeedsTime && canView("time") && canReadAllTime,
+  });
 
   function moveBackward() {
     if (viewMode === "year" || viewMode === "yeardisc") setAnchorDate((d) => addYears(d, -1));
@@ -487,7 +515,16 @@ export default function Schedule() {
               <div className="h-full overflow-auto pr-1 py-2">
                 <YearDiscView
                   year={anchorDate.getFullYear()}
-                  items={visibleItems}
+                  config={yearDiscConfig}
+                  onConfigChange={setYearDiscConfig}
+                  sources={{
+                    calendarItems: visibleItems,
+                    events: scheduleData?.events ?? [],
+                    tours: scheduleData?.tours ?? [],
+                    venues: venues ?? [],
+                    people: people ?? [],
+                    timeEntries: yearDiscTimeReport?.entries,
+                  }}
                   locale={locale}
                   onItemClick={handleItemClick}
                 />
