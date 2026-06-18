@@ -438,7 +438,7 @@ export default function Schedule() {
     <div
       className={
         isYearDisc
-          ? "app-page-fill md:app-page-fill flex flex-col gap-2 p-3 md:p-4 max-md:app-page-fill-mobile"
+          ? "app-page-fill md:app-page-fill flex min-h-0 w-full flex-1 flex-col gap-2 overflow-hidden p-3 md:p-4 max-md:app-page-fill-mobile"
           : "app-page-fill md:app-page-fill flex flex-col gap-4 p-4 md:p-6 max-md:app-page-fill-mobile"
       }
     >
@@ -605,7 +605,7 @@ export default function Schedule() {
                 ))}
               </div>
             ) : viewMode === "yeardisc" ? (
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden py-2">
+              <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden py-2">
                 <YearDiscView
                   calendarYear={anchorDate.getFullYear()}
                   config={yearDiscConfig}

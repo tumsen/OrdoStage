@@ -358,8 +358,8 @@ export function YearDiscView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden xl:flex-row xl:items-start xl:justify-center">
-      <div className="relative mx-auto w-full max-w-[min(100%,50.4rem)] shrink-0">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden xl:flex-row xl:items-stretch xl:justify-center">
+      <div className="relative mx-auto w-full max-w-[min(100%,50.4rem)] shrink-0 self-start xl:self-center">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -492,7 +492,7 @@ export function YearDiscView({
         ) : null}
       </div>
 
-      <div className="touch-scroll-y mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5 xl:mx-0">
+      <div className="touch-scroll-y mx-auto flex min-h-0 w-full max-w-sm flex-1 basis-0 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5 xl:mx-0 xl:h-full xl:max-h-full">
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
