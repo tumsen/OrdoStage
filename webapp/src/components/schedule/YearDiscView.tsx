@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   calendarItemTimeRangeLabel,
@@ -23,6 +23,7 @@ import {
 
 const DISC_SCALE = 1.2;
 const SIZE = Math.round(720 * DISC_SCALE);
+const MIN_DISC_PX = 240;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
 const OUTER_R = Math.round(318 * DISC_SCALE);
@@ -30,6 +31,28 @@ const RING_GAP = Math.round(3 * DISC_SCALE);
 const LABEL_R = OUTER_R + Math.round(22 * DISC_SCALE);
 const NEEDLE_OUTER_R = OUTER_R + Math.round(12 * DISC_SCALE);
 const INNER_RESERVE = Math.round(90 * DISC_SCALE);
+
+function useSquareFitSize(containerRef: React.RefObject<HTMLElement | null>): number {
+  const [size, setSize] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const { width, height } = el.getBoundingClientRect();
+      const next = Math.floor(Math.min(width, height));
+      setSize(next >= MIN_DISC_PX ? next : next > 0 ? next : 0);
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [containerRef]);
+
+  return size;
+}
 
 function normalizeAngle(deg: number): number {
   return ((deg % 360) + 360) % 360;
@@ -266,6 +289,8 @@ export function YearDiscView({
   onItemClick: (item: CalendarItem) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const discHostRef = useRef<HTMLDivElement>(null);
+  const discPixelSize = useSquareFitSize(discHostRef);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const timeline = useMemo(
     () => buildYearDiscTimeline(config.range ?? DEFAULT_YEAR_DISC_RANGE, calendarYear),
@@ -394,12 +419,23 @@ export function YearDiscView({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden xl:flex-row xl:items-stretch xl:justify-center">
-      <div className="relative mx-auto w-full max-w-[min(100%,50.4rem)] shrink-0 self-start xl:self-center">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden xl:flex-row xl:items-stretch">
+      <div
+        ref={discHostRef}
+        className="flex min-h-0 min-w-0 flex-[1.15] items-center justify-center self-stretch xl:flex-1"
+      >
+        <div
+          className="relative shrink-0"
+          style={
+            discPixelSize > 0
+              ? { width: discPixelSize, height: discPixelSize }
+              : { width: "100%", maxWidth: "100%", aspectRatio: "1 / 1" }
+          }
+        >
         <svg
           ref={svgRef}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className="h-auto w-full touch-none select-none"
+          className="h-full w-full touch-none select-none"
           role="img"
           aria-label={`Year disc ${timeline.rangeLabel}`}
           onPointerDown={onDiscPointerDown}
@@ -526,9 +562,10 @@ export function YearDiscView({
             <p className="truncate text-sm font-medium text-white">{hovered.title}</p>
           </div>
         ) : null}
+        </div>
       </div>
 
-      <div className="touch-scroll-y mx-auto flex min-h-0 w-full max-w-sm flex-1 basis-0 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5 xl:mx-0 xl:h-full xl:max-h-full">
+      <div className="touch-scroll-y mx-auto flex min-h-0 w-full max-w-sm flex-1 basis-0 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5 xl:mx-0 xl:w-full xl:max-w-sm xl:shrink-0 xl:h-full xl:max-h-full">
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
