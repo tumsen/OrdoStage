@@ -154,14 +154,17 @@ function ringLabelSpanDeg(label: string): number {
 
 const RING_LABEL_STROKE = 2;
 
-/** Place the textPath on the ring midline — glyphs sit on the outer side of the arc at north. */
-function ringLabelTextPathRadius(inner: number, outer: number, fontSize: number): number {
-  const midR = (inner + outer) / 2;
-  const ringWidth = outer - inner;
-  const outwardBias = fontSize * 0.48 + RING_LABEL_STROKE * 0.6;
-  const labelR = midR - outwardBias;
-  const padding = Math.max(2, ringWidth * 0.1);
-  return Math.max(inner + padding, Math.min(outer - padding, labelR));
+/** Ring midline — textPath baseline sits here, then dy nudges ink to center. */
+function ringMidRadius(inner: number, outer: number): number {
+  return (inner + outer) / 2;
+}
+
+/**
+ * Perpendicular shift so glyph ink centers on the ring midline at north.
+ * Positive dy moves toward disc center; tuned for uppercase + stroke outline.
+ */
+function ringLabelTextPathDy(fontSize: number): number {
+  return fontSize * 0.34 + RING_LABEL_STROKE * 0.28;
 }
 
 function dayAngles(
@@ -533,7 +536,8 @@ export function YearDiscView({
             const spanDeg = ringLabelSpanDeg(label);
             const textPathId = `ring-label-${ring.id}`;
             const fontSize = Math.min(14, Math.max(10, layout.ringWidth * 0.36));
-            const labelPathR = ringLabelTextPathRadius(inner, outer, fontSize);
+            const labelPathR = ringMidRadius(inner, outer);
+            const labelDy = ringLabelTextPathDy(fontSize);
 
             return (
               <g key={`ring-label-${ring.id}`} pointerEvents="none">
@@ -550,7 +554,7 @@ export function YearDiscView({
                   letterSpacing="0.06em"
                   style={{ textTransform: "uppercase" }}
                 >
-                  <textPath href={`#${textPathId}`} startOffset="50%" textAnchor="middle">
+                  <textPath href={`#${textPathId}`} startOffset="50%" textAnchor="middle" dy={labelDy}>
                     {label}
                   </textPath>
                 </text>
