@@ -171,16 +171,32 @@ scheduleRouter.get("/schedule", async (c) => {
       },
     ];
   }
-  if (venueId) eventWhere.venueId = venueId;
+  if (venueId) {
+    const venueClause = {
+      OR: [
+        { venueId },
+        {
+          shows: {
+            some: {
+              venueId,
+              ...(showDateRange ? { showDate: showDateRange } : {}),
+            },
+          },
+        },
+      ],
+    };
+    if (!eventWhere.AND) eventWhere.AND = [];
+    (eventWhere.AND as unknown[]).push(venueClause);
+  }
   if (personId) {
-    eventWhere.AND = [
-      {
-        OR: [
-          { people: { some: { personId } } },
-          { shows: { some: { jobs: { some: { personId } } } } },
-        ],
-      },
-    ];
+    const personClause = {
+      OR: [
+        { people: { some: { personId } } },
+        { shows: { some: { jobs: { some: { personId } } } } },
+      ],
+    };
+    if (!eventWhere.AND) eventWhere.AND = [];
+    (eventWhere.AND as unknown[]).push(personClause);
   }
 
   // Build booking where clause (omit mirrored event job/staffing rows — same slots as show jobs)
@@ -218,7 +234,14 @@ scheduleRouter.get("/schedule", async (c) => {
         updatedAt: true,
         venue: true,
         shows: {
-          ...(showDateRange ? { where: { showDate: showDateRange } } : {}),
+          ...(showDateRange || venueId
+            ? {
+                where: {
+                  ...(showDateRange ? { showDate: showDateRange } : {}),
+                  ...(venueId ? { venueId } : {}),
+                },
+              }
+            : {}),
           select: {
             id: true,
             eventId: true,
