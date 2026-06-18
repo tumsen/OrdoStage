@@ -379,6 +379,7 @@ export default function Schedule() {
     : [];
 
   const visibleItems = items.filter((item) => passesScheduleVisibilityFilters(visibility, item));
+  const yearDiscItems = viewMode === "yeardisc" ? items : visibleItems;
 
   const yearDiscNeedsTime = useMemo(
     () => viewMode === "yeardisc" && yearDiscConfig.rings.some((ring) => ringUsesTimeData(ring.source)),
@@ -413,44 +414,39 @@ export default function Schedule() {
     else setAnchorDate((d) => addDays(d, 1));
   }
 
-  return (
-    <div className="app-page-fill md:app-page-fill flex flex-col gap-4 p-4 md:p-6 max-md:app-page-fill-mobile">
-      {/* Top bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between shrink-0">
-        <ScheduleFilters
-          venues={venues ?? []}
-          people={people ?? []}
-          viewMode={viewMode}
-          visibility={visibility}
-          venueId={venueId}
-          personId={personId}
-          onVenueChange={setVenueId}
-          onPersonChange={setPersonId}
-          onViewModeChange={(nextMode) => {
-            setViewMode(nextMode);
-            if (nextMode === "next7") {
-              const now = new Date();
-              setAnchorDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
-            }
-          }}
-          onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
-        />
-        <Button
-          onClick={() => {
-            setBookingSlot(null);
-            setBookingOpen(true);
-          }}
-          className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 flex-shrink-0"
-        >
-          <Plus size={14} />
-          New Booking
-        </Button>
-      </div>
+  const isYearDisc = viewMode === "yeardisc";
 
-      {/* Calendar navigation */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {viewMode === "yeardisc" ? (
+  return (
+    <div
+      className={
+        isYearDisc
+          ? "app-page-fill md:app-page-fill flex flex-col gap-2 p-3 md:p-4 max-md:app-page-fill-mobile"
+          : "app-page-fill md:app-page-fill flex flex-col gap-4 p-4 md:p-6 max-md:app-page-fill-mobile"
+      }
+    >
+      {isYearDisc ? (
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 justify-between shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+            <ScheduleFilters
+              venues={venues ?? []}
+              people={people ?? []}
+              viewMode={viewMode}
+              visibility={visibility}
+              venueId={venueId}
+              personId={personId}
+              hideEntityFilters
+              hideVisibility
+              onVenueChange={setVenueId}
+              onPersonChange={setPersonId}
+              onViewModeChange={(nextMode) => {
+                setViewMode(nextMode);
+                if (nextMode === "next7") {
+                  const now = new Date();
+                  setAnchorDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+                }
+              }}
+              onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
+            />
             <YearDiscRangeEditor
               range={yearDiscConfig.range ?? DEFAULT_YEAR_DISC_RANGE}
               calendarYear={anchorDate.getFullYear()}
@@ -459,8 +455,55 @@ export default function Schedule() {
                 setAnchorDate(new Date(year, anchorDate.getMonth(), anchorDate.getDate()))
               }
             />
-          ) : (
-            <>
+          </div>
+          <Button
+            onClick={() => {
+              setBookingSlot(null);
+              setBookingOpen(true);
+            }}
+            className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 flex-shrink-0 h-8"
+          >
+            <Plus size={14} />
+            New Booking
+          </Button>
+        </div>
+      ) : (
+        <>
+          {/* Top bar */}
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between shrink-0">
+            <ScheduleFilters
+              venues={venues ?? []}
+              people={people ?? []}
+              viewMode={viewMode}
+              visibility={visibility}
+              venueId={venueId}
+              personId={personId}
+              onVenueChange={setVenueId}
+              onPersonChange={setPersonId}
+              onViewModeChange={(nextMode) => {
+                setViewMode(nextMode);
+                if (nextMode === "next7") {
+                  const now = new Date();
+                  setAnchorDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+                }
+              }}
+              onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
+            />
+            <Button
+              onClick={() => {
+                setBookingSlot(null);
+                setBookingOpen(true);
+              }}
+              className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 flex-shrink-0"
+            >
+              <Plus size={14} />
+              New Booking
+            </Button>
+          </div>
+
+          {/* Calendar navigation */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <Button
                 variant="ghost"
                 size="icon"
@@ -496,14 +539,14 @@ export default function Schedule() {
               >
                 Today
               </Button>
-            </>
-          )}
-        </div>
+            </div>
 
-        <div className="self-start sm:self-center">
-          <ScheduleLegend />
-        </div>
-      </div>
+            <div className="self-start sm:self-center">
+              <ScheduleLegend />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Calendar (inner views supply their own surface; no wrapper bg — avoids a lighter ring in the padding). */}
       <div className={CALENDAR_PANEL_SHELL_CLASS}>
@@ -539,7 +582,7 @@ export default function Schedule() {
                   config={yearDiscConfig}
                   onConfigChange={setYearDiscConfig}
                   sources={{
-                    calendarItems: visibleItems,
+                    calendarItems: yearDiscItems,
                     events: scheduleData?.events ?? [],
                     tours: scheduleData?.tours ?? [],
                     venues: venues ?? [],
