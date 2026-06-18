@@ -85,7 +85,7 @@ export function YearDiscRangeEditor({
               }
             }}
             aria-label="Disc year"
-            className="h-8 w-[4.5rem] shrink-0 border-white/10 bg-white/5 text-center text-sm text-white [color-scheme:dark]"
+            className="h-8 w-[5.75rem] shrink-0 border-white/10 bg-white/5 text-center font-mono text-sm tabular-nums text-white [color-scheme:dark]"
           />
           <Button
             variant="ghost"

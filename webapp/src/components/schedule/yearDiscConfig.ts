@@ -487,6 +487,21 @@ export function calendarItemTourId(item: CalendarItem): string | null {
   return match?.[1] ?? null;
 }
 
+/** Optional header filters for year disc (venue uses API query param). */
+export function filterCalendarItemsForYearDisc(
+  items: CalendarItem[],
+  filters: { eventId: string; tourId: string }
+): CalendarItem[] {
+  let out = items;
+  if (filters.eventId !== "all") {
+    out = out.filter((item) => calendarItemEventId(item) === filters.eventId);
+  }
+  if (filters.tourId !== "all") {
+    out = out.filter((item) => calendarItemTourId(item) === filters.tourId);
+  }
+  return out;
+}
+
 function sourceOptionKey(source: YearDiscRingSource): string {
   if (source.type === "schedule_all") return "schedule_all";
   if (source.type === "schedule_filter") return `schedule_filter:${source.filter}`;

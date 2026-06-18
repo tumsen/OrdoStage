@@ -40,9 +40,15 @@ import {
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
+import { YearDiscEntityFilters } from "@/components/schedule/YearDiscEntityFilters";
 import { YearDiscRangeEditor } from "@/components/schedule/YearDiscRangeEditor";
 import { YearDiscView } from "@/components/schedule/YearDiscView";
-import { DEFAULT_YEAR_DISC_RANGE, ringUsesTimeData, yearDiscFetchRange } from "@/components/schedule/yearDiscConfig";
+import {
+  DEFAULT_YEAR_DISC_RANGE,
+  filterCalendarItemsForYearDisc,
+  ringUsesTimeData,
+  yearDiscFetchRange,
+} from "@/components/schedule/yearDiscConfig";
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePersistedYearDiscConfig } from "@/hooks/usePersistedYearDiscConfig";
 import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
@@ -311,6 +317,8 @@ export default function Schedule() {
     venue_booking: true,
     other: true,
   });
+  const [yearDiscEventId, setYearDiscEventId] = useState("all");
+  const [yearDiscTourId, setYearDiscTourId] = useState("all");
   const [yearDiscConfig, setYearDiscConfig] = usePersistedYearDiscConfig();
   const { canView, canAction } = usePermissions();
   const canReadAllTime = canAction("time.read_all");
@@ -372,14 +380,24 @@ export default function Schedule() {
     queryFn: () => api.get<Person[]>("/api/people"),
   });
 
-  const items: CalendarItem[] = scheduleData
-    ? toCalendarItems(scheduleData.events, scheduleData.bookings, scheduleData.tours ?? [], {
-        personIdFilter: personId !== "all" ? personId : undefined,
-      })
-    : [];
+  const items: CalendarItem[] = useMemo(
+    () =>
+      scheduleData
+        ? toCalendarItems(scheduleData.events, scheduleData.bookings, scheduleData.tours ?? [], {
+            personIdFilter: personId !== "all" ? personId : undefined,
+          })
+        : [],
+    [scheduleData, personId]
+  );
 
   const visibleItems = items.filter((item) => passesScheduleVisibilityFilters(visibility, item));
-  const yearDiscItems = viewMode === "yeardisc" ? items : visibleItems;
+  const yearDiscItems = useMemo(() => {
+    if (viewMode !== "yeardisc") return visibleItems;
+    return filterCalendarItemsForYearDisc(items, {
+      eventId: yearDiscEventId,
+      tourId: yearDiscTourId,
+    });
+  }, [viewMode, items, visibleItems, yearDiscEventId, yearDiscTourId]);
 
   const yearDiscNeedsTime = useMemo(
     () => viewMode === "yeardisc" && yearDiscConfig.rings.some((ring) => ringUsesTimeData(ring.source)),
@@ -454,6 +472,17 @@ export default function Schedule() {
             onCalendarYearChange={(year) =>
               setAnchorDate(new Date(year, anchorDate.getMonth(), anchorDate.getDate()))
             }
+          />
+          <YearDiscEntityFilters
+            venues={venues ?? []}
+            events={scheduleData?.events ?? []}
+            tours={scheduleData?.tours ?? []}
+            venueId={venueId}
+            eventId={yearDiscEventId}
+            tourId={yearDiscTourId}
+            onVenueChange={setVenueId}
+            onEventChange={setYearDiscEventId}
+            onTourChange={setYearDiscTourId}
           />
           <div className="flex-1 min-w-2" />
           <Button
