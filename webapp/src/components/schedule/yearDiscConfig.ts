@@ -98,20 +98,29 @@ const TIME_CATEGORY_LABELS: Record<TimeCategory, string> = {
   travel_allowance: "Travel allowance",
 };
 
-export const YEAR_DISC_RING_PALETTE = [
-  "rgba(79, 70, 229, 0.92)",
-  "rgba(162, 28, 175, 0.92)",
-  "rgba(217, 119, 6, 0.92)",
-  "rgba(225, 29, 72, 0.92)",
-  "rgba(37, 99, 235, 0.88)",
-  "rgba(13, 148, 136, 0.92)",
-  "rgba(234, 88, 12, 0.92)",
-  "rgba(100, 116, 139, 0.92)",
-  "rgba(168, 85, 247, 0.92)",
-  "rgba(22, 163, 74, 0.92)",
-  "rgba(244, 63, 94, 0.92)",
-  "rgba(14, 165, 233, 0.92)",
+/** OrdoStage wordmark / beam gradient (see tailwind `ordo.*`). */
+export const ORDO_STAGE_BRAND_COLORS = [
+  "#ff006e", // magenta
+  "#fb5607", // orange
+  "#ffbe0b", // yellow
+  "#3a86ff", // blue
+  "#8338ec", // violet
 ] as const;
+
+const ORDO_RING_OPACITY = 0.92;
+
+function brandColorToRgba(hex: string, opacity = ORDO_RING_OPACITY): string {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+/** Default ring colours — OrdoStage logo palette, repeated for extra rings. */
+export const YEAR_DISC_RING_PALETTE = ORDO_STAGE_BRAND_COLORS.map((hex) =>
+  brandColorToRgba(hex)
+) as unknown as readonly string[];
 
 export const DEFAULT_YEAR_DISC_CONFIG: YearDiscConfig = {
   rings: [
@@ -555,6 +564,18 @@ export function normalizeYearDiscConfig(raw: unknown): YearDiscConfig {
 
 export function yearDiscRingColor(ring: YearDiscRingConfig, index: number): string {
   return ring.color ?? YEAR_DISC_RING_PALETTE[index % YEAR_DISC_RING_PALETTE.length]!;
+}
+
+export function hasCustomYearDiscRingColors(config: YearDiscConfig): boolean {
+  return config.rings.some((ring) => Boolean(ring.color?.trim()));
+}
+
+/** Clear per-ring colour overrides so defaults from the OrdoStage palette apply. */
+export function resetYearDiscRingColors(config: YearDiscConfig): YearDiscConfig {
+  return {
+    ...config,
+    rings: config.rings.map(({ color: _color, ...ring }) => ring),
+  };
 }
 
 export function calendarItemEventId(item: CalendarItem): string | null {
