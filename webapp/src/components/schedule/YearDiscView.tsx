@@ -20,14 +20,17 @@ import {
   type YearDiscTimeline,
 } from "@/components/schedule/yearDiscConfig";
 
-const SIZE = 720;
+const DISC_SCALE = 1.2;
+const SIZE = Math.round(720 * DISC_SCALE);
 const CX = SIZE / 2;
 const CY = SIZE / 2;
-const OUTER_R = 318;
-const RING_GAP = 3;
-const LABEL_R = OUTER_R + 22;
-const NEEDLE_OUTER_R = OUTER_R + 12;
-const INNER_RESERVE = 90;
+const OUTER_R = Math.round(318 * DISC_SCALE);
+const RING_GAP = Math.round(3 * DISC_SCALE);
+const LABEL_R = OUTER_R + Math.round(22 * DISC_SCALE);
+const NEEDLE_OUTER_R = OUTER_R + Math.round(12 * DISC_SCALE);
+const INNER_RESERVE = Math.round(90 * DISC_SCALE);
+const RING_LABEL_ANGLE = 0;
+const MAX_RING_LABEL_CHARS = 22;
 
 function dayToAngle(day: number, totalDays: number): number {
   return ((day - 0.5) / totalDays) * 360;
@@ -95,7 +98,10 @@ function computeRingLayout(ringCount: number): {
   dayLineInnerR: number;
 } {
   const count = Math.max(1, ringCount);
-  const ringWidth = Math.min(34, Math.floor((OUTER_R - INNER_RESERVE - RING_GAP * (count - 1)) / count));
+  const ringWidth = Math.min(
+    Math.round(34 * DISC_SCALE),
+    Math.floor((OUTER_R - INNER_RESERVE - RING_GAP * (count - 1)) / count)
+  );
   const ringRadii = (index: number) => {
     const outer = OUTER_R - index * (ringWidth + RING_GAP);
     return { inner: outer - ringWidth, outer };
@@ -113,6 +119,11 @@ type DiscSegment = {
   fill: string;
   opacity: number;
 };
+
+function truncateRingLabel(text: string): string {
+  if (text.length <= MAX_RING_LABEL_CHARS) return text;
+  return `${text.slice(0, MAX_RING_LABEL_CHARS - 1)}…`;
+}
 
 function monthMarkersForTimeline(timeline: YearDiscTimeline, locale: string) {
   const { totalDays, startDate, endDate } = timeline;
@@ -300,6 +311,21 @@ export function YearDiscView({
     [locale, timeline]
   );
 
+  const ringLabels = useMemo(() => {
+    return rings.map((ring, index) => {
+      const { inner, outer } = layout.ringRadii(index);
+      const midR = (inner + outer) / 2;
+      const pos = polar(CX, CY, midR, RING_LABEL_ANGLE);
+      return {
+        id: ring.id,
+        x: pos.x,
+        y: pos.y,
+        text: truncateRingLabel(yearDiscRingLabel(ring, sources)),
+        color: yearDiscRingColor(ring, index),
+      };
+    });
+  }, [rings, layout, sources]);
+
   const allSpans = useMemo(() => {
     return rings.flatMap((ring) => resolveYearDiscRingSpans(ring, sources));
   }, [rings, sources]);
@@ -341,7 +367,7 @@ export function YearDiscView({
 
   return (
     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-center">
-      <div className="relative mx-auto w-full max-w-[min(100%,42rem)]">
+      <div className="relative mx-auto w-full max-w-[min(100%,50.4rem)]">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -407,6 +433,30 @@ export function YearDiscView({
             >
               <title>{segment.span.title}</title>
             </path>
+          ))}
+          {ringLabels.map((label) => (
+            <g key={label.id} pointerEvents="none">
+              <rect
+                x={label.x - 52}
+                y={label.y - 9}
+                width={104}
+                height={18}
+                rx={4}
+                fill="rgba(10, 10, 15, 0.88)"
+                stroke={label.color}
+                strokeWidth={1}
+                strokeOpacity={0.55}
+              />
+              <text
+                x={label.x}
+                y={label.y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="fill-white/85 text-[11px] font-medium"
+              >
+                {label.text}
+              </text>
+            </g>
           ))}
           <line
             x1={CX}
