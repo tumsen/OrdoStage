@@ -306,8 +306,44 @@ export function YearDiscView({
   }
 
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-center">
-      <div className="relative mx-auto w-full max-w-[min(100%,42rem)]">
+    <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(14rem,1fr)_minmax(0,42rem)_minmax(16rem,1fr)] xl:items-start xl:gap-5">
+      <div className="order-2 flex w-full min-w-0 flex-col xl:order-1">
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 xl:sticky xl:top-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
+          <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
+          <p className="mt-1 text-[11px] text-white/35">Drag the yellow handle around the disc to change day.</p>
+          <ul className="mt-3 max-h-[min(50vh,28rem)] space-y-2 overflow-y-auto pr-0.5 xl:max-h-[calc(100vh-16rem)]">
+            {daySpans.length === 0 ? (
+              <li className="text-sm text-white/40">Nothing on this day.</li>
+            ) : (
+              daySpans.map((span) => {
+                const time = spanTimeLabel(span);
+                return (
+                  <li key={span.id}>
+                    <button
+                      type="button"
+                      onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
+                      disabled={!span.calendarItem}
+                      className="flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07] disabled:cursor-default disabled:opacity-80"
+                    >
+                      <span
+                        className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
+                        style={{ backgroundColor: ringColorForSpan(span) }}
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-white">{span.title}</span>
+                        {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
+      </div>
+
+      <div className="relative order-1 mx-auto w-full min-w-0 xl:order-2">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -428,41 +464,7 @@ export function YearDiscView({
         ) : null}
       </div>
 
-      <div className="mx-auto flex w-full max-w-sm shrink-0 flex-col gap-3 xl:mx-0">
-        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
-          <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
-          <p className="mt-1 text-[11px] text-white/35">Drag the yellow handle around the disc to change day.</p>
-          <ul className="mt-3 max-h-[min(40vh,20rem)] space-y-2 overflow-y-auto pr-0.5">
-            {daySpans.length === 0 ? (
-              <li className="text-sm text-white/40">Nothing on this day.</li>
-            ) : (
-              daySpans.map((span) => {
-                const time = spanTimeLabel(span);
-                return (
-                  <li key={span.id}>
-                    <button
-                      type="button"
-                      onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
-                      disabled={!span.calendarItem}
-                      className="flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07] disabled:cursor-default disabled:opacity-80"
-                    >
-                      <span
-                        className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
-                        style={{ backgroundColor: ringColorForSpan(span) }}
-                      />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm text-white">{span.title}</span>
-                        {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })
-            )}
-          </ul>
-        </div>
-
+      <div className="order-3 flex w-full min-w-0 flex-col gap-3 xl:sticky xl:top-0">
         <YearDiscRingEditor
           config={config}
           onChange={onConfigChange}
