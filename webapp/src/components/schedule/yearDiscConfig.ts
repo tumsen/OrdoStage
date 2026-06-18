@@ -401,8 +401,12 @@ function daysInCalendarYear(year: number): number {
 }
 
 export function daysBetweenInclusive(start: Date, end: Date): number {
-  const ms = startOfLocalDay(end).getTime() - startOfLocalDay(start).getTime();
-  return Math.max(1, Math.floor(ms / (24 * 60 * 60 * 1000)) + 1);
+  const s = startOfLocalDay(start);
+  const e = startOfLocalDay(end);
+  // Calendar-day difference (immune to DST 23/25-hour local days).
+  const sUtc = Date.UTC(s.getFullYear(), s.getMonth(), s.getDate());
+  const eUtc = Date.UTC(e.getFullYear(), e.getMonth(), e.getDate());
+  return Math.max(1, Math.floor((eUtc - sUtc) / 86400000) + 1);
 }
 
 export function todayIsoDateLocal(): string {
@@ -467,20 +471,29 @@ export function buildYearDiscTimeline(
   }
 
   const year = calendarYear;
-  const startDate = new Date(year, 0, 1);
+  const yearLen = daysInCalendarYear(year);
+  const jan1 = startOfLocalDay(new Date(year, 0, 1));
+  const startDate = jan1;
   const endDate = new Date(year, 11, 31);
 
-  const dateFromDiscDay = (day: number): Date => calendarDateFromDiscDay(year, day);
+  const dateFromDiscDay = (day: number): Date =>
+    yearLen === YEAR_DISC_DAYS ? addLocalDays(jan1, day - 1) : calendarDateFromDiscDay(year, day);
 
   const discDayFromDate = (date: Date): number | null => {
     if (date.getFullYear() !== year) return null;
-    return discDayFromDateKey(year, toDateStr(startOfLocalDay(date)));
+    const d = startOfLocalDay(date);
+    if (yearLen === YEAR_DISC_DAYS) return daysBetweenInclusive(jan1, d);
+    return discDayFromDateKey(year, toDateStr(d));
   };
 
   const clipSpan = (span: YearDiscSpan): { startDay: number; endDay: number } | null => {
     const yearStartKey = `${year}-01-01`;
     const yearEndKey = `${year}-12-31`;
-    return clipSpanToDayRange(span, yearStartKey, yearEndKey, (key) => discDayFromDateKey(year, key));
+    return clipSpanToDayRange(span, yearStartKey, yearEndKey, (key) => {
+      const d = parseIsoDateLocal(key);
+      if (!d) return null;
+      return discDayFromDate(d);
+    });
   };
 
   return {
