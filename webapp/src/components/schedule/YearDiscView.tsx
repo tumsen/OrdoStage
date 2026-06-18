@@ -521,7 +521,7 @@ export function YearDiscView({
             const centerAngle = 0;
             const spanDeg = ringLabelSpanDeg(label);
             const textPathId = `ring-label-${ring.id}`;
-            const fontSize = Math.min(14, Math.max(10, layout.ringWidth * 0.38));
+            const fontSize = Math.min(14, Math.max(10, layout.ringWidth * 0.36));
 
             return (
               <g key={`ring-label-${ring.id}`} pointerEvents="none">
@@ -531,11 +531,12 @@ export function YearDiscView({
                 <text
                   fill="rgba(255,255,255,0.92)"
                   stroke="rgba(10,10,15,0.75)"
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   paintOrder="stroke fill"
                   fontSize={fontSize}
                   fontWeight={600}
                   letterSpacing="0.06em"
+                  dominantBaseline="middle"
                   style={{ textTransform: "uppercase" }}
                 >
                   <textPath href={`#${textPathId}`} startOffset="50%" textAnchor="middle">
