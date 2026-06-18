@@ -152,6 +152,18 @@ function ringLabelSpanDeg(label: string): number {
   return Math.min(150, Math.max(52, 28 + len * 5.5));
 }
 
+const RING_LABEL_STROKE = 2;
+
+/** Place the textPath on the ring midline — glyphs sit on the outer side of the arc at north. */
+function ringLabelTextPathRadius(inner: number, outer: number, fontSize: number): number {
+  const midR = (inner + outer) / 2;
+  const ringWidth = outer - inner;
+  const outwardBias = fontSize * 0.48 + RING_LABEL_STROKE * 0.6;
+  const labelR = midR - outwardBias;
+  const padding = Math.max(2, ringWidth * 0.1);
+  return Math.max(inner + padding, Math.min(outer - padding, labelR));
+}
+
 function dayAngles(
   startDay: number,
   endDay: number,
@@ -517,26 +529,25 @@ export function YearDiscView({
           {rings.map((ring, index) => {
             const { inner, outer } = layout.ringRadii(index);
             const label = yearDiscRingLabel(ring, sources);
-            const midR = (inner + outer) / 2;
             const centerAngle = 0;
             const spanDeg = ringLabelSpanDeg(label);
             const textPathId = `ring-label-${ring.id}`;
             const fontSize = Math.min(14, Math.max(10, layout.ringWidth * 0.36));
+            const labelPathR = ringLabelTextPathRadius(inner, outer, fontSize);
 
             return (
               <g key={`ring-label-${ring.id}`} pointerEvents="none">
                 <defs>
-                  <path id={textPathId} d={ringLabelArcPath(CX, CY, midR, centerAngle, spanDeg * 0.92)} />
+                  <path id={textPathId} d={ringLabelArcPath(CX, CY, labelPathR, centerAngle, spanDeg * 0.92)} />
                 </defs>
                 <text
                   fill="rgba(255,255,255,0.92)"
                   stroke="rgba(10,10,15,0.75)"
-                  strokeWidth={2}
+                  strokeWidth={RING_LABEL_STROKE}
                   paintOrder="stroke fill"
                   fontSize={fontSize}
                   fontWeight={600}
                   letterSpacing="0.06em"
-                  dominantBaseline="middle"
                   style={{ textTransform: "uppercase" }}
                 >
                   <textPath href={`#${textPathId}`} startOffset="50%" textAnchor="middle">
