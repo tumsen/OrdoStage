@@ -35,14 +35,41 @@ function normalizeAngle(deg: number): number {
   return ((deg % 360) + 360) % 360;
 }
 
-function dayToAngle(day: number, totalDays: number, offsetDeg = 0): number {
+/** Start boundary of a day slot (same angle as the radial tick for that day). */
+function daySlotStartAngle(day: number, totalDays: number, offsetDeg = 0): number {
+  return normalizeAngle(((day - 1) / totalDays) * 360 + offsetDeg);
+}
+
+/** End boundary of a day slot; may exceed 360 when building arc paths. */
+function daySlotEndAngle(day: number, totalDays: number, offsetDeg = 0): number {
+  return (day / totalDays) * 360 + offsetDeg;
+}
+
+/** Center of a day slot — where the selection needle points. */
+function daySlotCenterAngle(day: number, totalDays: number, offsetDeg = 0): number {
   return normalizeAngle(((day - 0.5) / totalDays) * 360 + offsetDeg);
+}
+
+function dayToAngle(day: number, totalDays: number, offsetDeg = 0): number {
+  return daySlotCenterAngle(day, totalDays, offsetDeg);
 }
 
 function angleToDay(angle: number, totalDays: number, offsetDeg = 0): number {
   const unrotated = normalizeAngle(angle - offsetDeg);
   const day = Math.floor((unrotated / 360) * totalDays) + 1;
   return Math.max(1, Math.min(totalDays, day));
+}
+
+function dayRangeAngles(
+  startDay: number,
+  endDay: number,
+  totalDays: number,
+  offsetDeg = 0
+): { start: number; end: number } {
+  const start = daySlotStartAngle(startDay, totalDays, offsetDeg);
+  let end = daySlotEndAngle(endDay, totalDays, offsetDeg);
+  if (end <= start) end += 360;
+  return { start, end };
 }
 
 function clientToAngle(svg: SVGSVGElement, clientX: number, clientY: number): number {
@@ -70,7 +97,8 @@ function ringSectorPath(
   startAngle: number,
   endAngle: number
 ): string {
-  const span = Math.max(endAngle - startAngle, 0.35);
+  let span = endAngle - startAngle;
+  if (span <= 0) span += 360;
   const end = startAngle + span;
   const largeArc = span > 180 ? 1 : 0;
   const oStart = polar(CX, CY, outerR, startAngle);
@@ -92,11 +120,7 @@ function dayAngles(
   totalDays: number,
   offsetDeg = 0
 ): { start: number; end: number } {
-  const minSpanDays = 1.2;
-  const spanDays = Math.max(endDay - startDay + 1, minSpanDays);
-  const start = normalizeAngle(((startDay - 1) / totalDays) * 360 + offsetDeg);
-  const end = normalizeAngle(((startDay - 1 + spanDays) / totalDays) * 360 + offsetDeg);
-  return { start, end };
+  return dayRangeAngles(startDay, endDay, totalDays, offsetDeg);
 }
 
 function computeRingLayout(ringCount: number): {
@@ -156,7 +180,7 @@ function monthMarkersForTimeline(timeline: YearDiscTimeline, locale: string, off
   if (timeline.mode === "calendar_year" && timeline.year !== undefined) {
     return Array.from({ length: 12 }, (_, month) => {
       const day = timeline.discDayFromDate(new Date(timeline.year!, month, 1)) ?? 1;
-      const angle = normalizeAngle(((day - 1) / totalDays) * 360 + offsetDeg);
+      const angle = daySlotStartAngle(day, totalDays, offsetDeg);
       const tickOuter = polar(CX, CY, OUTER_R + 6, angle);
       const tickInner = polar(CX, CY, OUTER_R - 2, angle);
       const labelPos = polar(CX, CY, LABEL_R, angle + 15 / totalDays);
@@ -171,7 +195,7 @@ function monthMarkersForTimeline(timeline: YearDiscTimeline, locale: string, off
     if (cursor >= startDate) {
       const discDay = timeline.discDayFromDate(cursor);
       if (discDay !== null) {
-        const angle = ((discDay - 1) / totalDays) * 360;
+        const angle = daySlotStartAngle(discDay, totalDays, offsetDeg);
         markers.push({
           key: `${cursor.getFullYear()}-${cursor.getMonth()}`,
           angle,
@@ -316,7 +340,7 @@ export function YearDiscView({
     const outerR = OUTER_R + 6;
     const parts: string[] = [];
     for (let day = 1; day <= totalDays; day++) {
-      const angle = normalizeAngle(((day - 1) / totalDays) * 360 + angleOffset);
+      const angle = daySlotStartAngle(day, totalDays, angleOffset);
       const inner = polar(CX, CY, layout.dayLineInnerR, angle);
       const outer = polar(CX, CY, outerR, angle);
       parts.push(`M ${inner.x} ${inner.y} L ${outer.x} ${outer.y}`);
