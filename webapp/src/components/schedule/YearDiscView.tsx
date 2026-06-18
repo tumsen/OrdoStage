@@ -152,20 +152,6 @@ function ringLabelSpanDeg(label: string): number {
   return Math.min(150, Math.max(52, 28 + len * 5.5));
 }
 
-function ringLabelBandFill(color: string): string {
-  const match = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-  if (!match) return "rgba(255,255,255,0.07)";
-  const [, r, g, b] = match;
-  return `rgba(${r}, ${g}, ${b}, 0.14)`;
-}
-
-function ringLabelBandStroke(color: string): string {
-  const match = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-  if (!match) return "rgba(255,255,255,0.14)";
-  const [, r, g, b] = match;
-  return `rgba(${r}, ${g}, ${b}, 0.28)`;
-}
-
 function dayAngles(
   startDay: number,
   endDay: number,
@@ -533,13 +519,9 @@ export function YearDiscView({
             const color = yearDiscRingColor(ring, index);
             const label = yearDiscRingLabel(ring, sources);
             const midR = (inner + outer) / 2;
-            const bandInner = inner + layout.ringWidth * 0.08;
-            const bandOuter = outer - layout.ringWidth * 0.08;
             const centerAngle = (index - (rings.length - 1) / 2) * 6;
             const spanDeg = ringLabelSpanDeg(label);
             const textPathId = `ring-label-${ring.id}`;
-            const startAngle = centerAngle - spanDeg / 2;
-            const endAngle = centerAngle + spanDeg / 2;
             const fontSize = Math.min(14, Math.max(10, layout.ringWidth * 0.38));
 
             return (
@@ -547,14 +529,8 @@ export function YearDiscView({
                 <defs>
                   <path id={textPathId} d={ringLabelArcPath(CX, CY, midR, centerAngle, spanDeg * 0.92)} />
                 </defs>
-                <path
-                  d={ringSectorPath(bandInner, bandOuter, startAngle, endAngle)}
-                  fill={ringLabelBandFill(color)}
-                  stroke={ringLabelBandStroke(color)}
-                  strokeWidth={0.75}
-                />
                 <text
-                  fill="rgba(255,255,255,0.82)"
+                  fill={color}
                   fontSize={fontSize}
                   fontWeight={600}
                   letterSpacing="0.06em"
