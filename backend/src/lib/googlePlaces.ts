@@ -16,7 +16,12 @@ export type GoogleStructuredAddress = {
   street: string;
   number: string;
   zip: string;
+  /** Main post city — prefer postal_town over locality (e.g. Svendborg not Troense). */
   city: string;
+  /** Suburb / village when distinct from post city (e.g. Troense). */
+  locality: string;
+  /** Post town when Google returns one separately from locality. */
+  postalTown: string;
   state: string;
   country: string;
 };
@@ -91,6 +96,7 @@ export async function googlePlaceAutocomplete(params: {
 export type GooglePlaceDetails = GoogleStructuredAddress & {
   name: string;
   formattedAddress: string;
+  displayLabel: string;
 };
 
 function structuredAddressFromComponents(
@@ -106,21 +112,66 @@ function structuredAddressFromComponents(
     return (short ? component.shortText : component.longText) ?? "";
   }
 
+  const locality = get("locality") || get("sublocality") || get("neighborhood");
+  const postalTown = get("postal_town");
+
   return {
     street: get("route"),
     number: get("street_number"),
     zip: get("postal_code"),
-    city: get("locality") || get("postal_town"),
+    locality,
+    postalTown,
+    city: postalTown || locality,
     state: get("administrative_area_level_1"),
     country: get("country"),
   };
+}
+
+function nameAlreadyInAddress(name: string, address: string): boolean {
+  const n = name.trim().toLowerCase();
+  const a = address.trim().toLowerCase();
+  if (!n || !a) return false;
+  return a === n || a.startsWith(`${n},`) || a.includes(`, ${n},`) || a.endsWith(`, ${n}`);
+}
+
+/** Human-readable lodging label — no duplicate street/name; post town + suburb. */
+export function formatLodgingPlaceLabel(details: GooglePlaceDetails): string {
+  const streetLine = [details.street, details.number].filter(Boolean).join(" ");
+  const mainCity = details.postalTown || details.city;
+  const suburb =
+    details.locality &&
+    mainCity &&
+    details.locality.toLowerCase() !== mainCity.toLowerCase()
+      ? ` (${details.locality})`
+      : "";
+
+  if (streetLine) {
+    const cityPart = [details.zip, mainCity].filter(Boolean).join(" ") + suburb;
+    const structured = [streetLine, cityPart, details.country].filter(Boolean).join(", ");
+    const name = details.name.trim();
+    if (name && name !== streetLine && !nameAlreadyInAddress(name, structured)) {
+      return `${name}, ${structured}`;
+    }
+    return structured;
+  }
+
+  const formatted = details.formattedAddress.trim();
+  const name = details.name.trim();
+  if (formatted) {
+    if (name && !nameAlreadyInAddress(name, formatted)) {
+      return `${name}, ${formatted}`;
+    }
+    return formatted;
+  }
+
+  return name;
 }
 
 /** Places API (New) place details — address components for venue forms. */
 export async function googlePlaceStructuredAddress(placeId: string): Promise<GoogleStructuredAddress | null> {
   const details = await googlePlaceDetails(placeId);
   if (!details) return null;
-  const { name: _name, formattedAddress: _formattedAddress, ...address } = details;
+  const { name: _n, formattedAddress: _f, displayLabel: _d, ...address } = details;
   return address;
 }
 
@@ -146,10 +197,16 @@ export async function googlePlaceDetails(placeId: string): Promise<GooglePlaceDe
 
   const components = payload.addressComponents ?? [];
   const structured = structuredAddressFromComponents(components);
+  const name = payload.displayName?.text?.trim() ?? "";
+  const formattedAddress = payload.formattedAddress?.trim() ?? "";
 
-  return {
+  const details: GooglePlaceDetails = {
     ...structured,
-    name: payload.displayName?.text?.trim() ?? "",
-    formattedAddress: payload.formattedAddress?.trim() ?? "",
+    name,
+    formattedAddress,
+    displayLabel: "",
   };
+  details.displayLabel = formatLodgingPlaceLabel(details);
+
+  return details;
 }

@@ -18,13 +18,32 @@ export type LodgingPlaceSelection = {
 type PlaceDetails = {
   name: string;
   formattedAddress: string;
+  displayLabel: string;
   city: string;
+  locality: string;
+  postalTown: string;
   street: string;
   number: string;
   zip: string;
   state: string;
   country: string;
 };
+
+function lodgingNameFromDetails(details: PlaceDetails, fallback: string): string {
+  const streetLine = [details.street, details.number].filter(Boolean).join(" ");
+  const name = details.name.trim();
+  if (name && name !== streetLine && !nameAlreadyInAddress(name, details.displayLabel)) {
+    return name;
+  }
+  return streetLine || name || fallback.split(",")[0]?.trim() || fallback;
+}
+
+function nameAlreadyInAddress(name: string, address: string): boolean {
+  const n = name.trim().toLowerCase();
+  const a = address.trim().toLowerCase();
+  if (!n || !a) return false;
+  return a === n || a.startsWith(`${n},`) || a.includes(`, ${n},`) || a.endsWith(`, ${n}`);
+}
 
 interface Props {
   value: string;
@@ -129,13 +148,9 @@ export function LodgingPlaceAutocomplete({
         const details = await api.get<PlaceDetails | null>(
           `/api/venues/address-details?placeId=${encodeURIComponent(suggestion.placeId)}`
         );
-        const name = details?.name?.trim() || suggestion.description.split(",")[0]?.trim() || suggestion.description;
+        const label = details?.displayLabel?.trim() || suggestion.description;
         const city = details?.city?.trim() ?? "";
-        const label = details?.formattedAddress
-          ? details.name
-            ? `${details.name}, ${details.formattedAddress}`
-            : details.formattedAddress
-          : suggestion.description;
+        const name = details ? lodgingNameFromDetails(details, suggestion.description) : suggestion.description;
 
         setInputValue(label);
         onChange({
