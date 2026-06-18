@@ -358,8 +358,8 @@ export function YearDiscView({
   }
 
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-center">
-      <div className="relative mx-auto w-full max-w-[min(100%,50.4rem)]">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden xl:flex-row xl:items-start xl:justify-center">
+      <div className="relative mx-auto w-full max-w-[min(100%,50.4rem)] shrink-0">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -492,12 +492,12 @@ export function YearDiscView({
         ) : null}
       </div>
 
-      <div className="mx-auto flex w-full max-w-sm shrink-0 flex-col gap-3 xl:mx-0">
+      <div className="touch-scroll-y mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5 xl:mx-0">
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
           <p className="mt-1 text-[11px] text-white/35">Drag the yellow handle around the disc to change day.</p>
-          <ul className="mt-3 max-h-[min(40vh,20rem)] space-y-2 overflow-y-auto pr-0.5">
+          <ul className="mt-3 space-y-2">
             {daySpans.length === 0 ? (
               <li className="text-sm text-white/40">Nothing on this day.</li>
             ) : (
