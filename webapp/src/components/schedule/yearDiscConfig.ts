@@ -400,11 +400,6 @@ function daysInCalendarYear(year: number): number {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
 }
 
-function dayOfCalendarYear(date: Date): number {
-  const jan1 = new Date(date.getFullYear(), 0, 1);
-  return Math.floor((startOfLocalDay(date).getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-}
-
 export function daysBetweenInclusive(start: Date, end: Date): number {
   const ms = startOfLocalDay(end).getTime() - startOfLocalDay(start).getTime();
   return Math.max(1, Math.floor(ms / (24 * 60 * 60 * 1000)) + 1);
@@ -443,13 +438,19 @@ function calendarDayFromDiscDay(year: number, discDay: number): number {
   );
 }
 
-function discDayFromCalendarDay(year: number, calendarDay: number): number {
-  const yearLen = daysInCalendarYear(year);
-  if (yearLen === YEAR_DISC_DAYS) return calendarDay;
-  return Math.min(
-    YEAR_DISC_DAYS,
-    Math.round(((calendarDay - 1) * (YEAR_DISC_DAYS - 1)) / (yearLen - 1)) + 1
-  );
+function calendarDateFromDiscDay(year: number, discDay: number): Date {
+  const calDay = calendarDayFromDiscDay(year, discDay);
+  return addLocalDays(startOfLocalDay(new Date(year, 0, 1)), calDay - 1);
+}
+
+/** Disc day whose calendar date matches `YYYY-MM-DD` (inverse of dateFromDiscDay). */
+function discDayFromDateKey(year: number, dateKey: string): number | null {
+  const parsed = parseIsoDateLocal(dateKey);
+  if (!parsed || parsed.getFullYear() !== year) return null;
+  for (let discDay = 1; discDay <= YEAR_DISC_DAYS; discDay++) {
+    if (toDateStr(calendarDateFromDiscDay(year, discDay)) === dateKey) return discDay;
+  }
+  return null;
 }
 
 /** Map disc settings to the timeline used for rendering. */
@@ -469,21 +470,17 @@ export function buildYearDiscTimeline(
   const startDate = new Date(year, 0, 1);
   const endDate = new Date(year, 11, 31);
 
-  const dateFromDiscDay = (day: number): Date => new Date(year, 0, calendarDayFromDiscDay(year, day));
+  const dateFromDiscDay = (day: number): Date => calendarDateFromDiscDay(year, day);
 
   const discDayFromDate = (date: Date): number | null => {
     if (date.getFullYear() !== year) return null;
-    return discDayFromCalendarDay(year, dayOfCalendarYear(date));
+    return discDayFromDateKey(year, toDateStr(startOfLocalDay(date)));
   };
 
   const clipSpan = (span: YearDiscSpan): { startDay: number; endDay: number } | null => {
     const yearStartKey = `${year}-01-01`;
     const yearEndKey = `${year}-12-31`;
-    return clipSpanToDayRange(span, yearStartKey, yearEndKey, (key) => {
-      const d = parseIsoDateLocal(key);
-      if (!d || d.getFullYear() !== year) return null;
-      return discDayFromCalendarDay(year, dayOfCalendarYear(d));
-    });
+    return clipSpanToDayRange(span, yearStartKey, yearEndKey, (key) => discDayFromDateKey(year, key));
   };
 
   return {

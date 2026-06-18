@@ -56,7 +56,8 @@ function dayToAngle(day: number, totalDays: number, offsetDeg = 0): number {
 
 function angleToDay(angle: number, totalDays: number, offsetDeg = 0): number {
   const unrotated = normalizeAngle(angle - offsetDeg);
-  const day = Math.floor((unrotated / 360) * totalDays) + 1;
+  // Inverse of daySlotCenterAngle: center of day N sits at (N - 0.5) / totalDays turns.
+  const day = Math.round((unrotated / 360) * totalDays + 0.5);
   return Math.max(1, Math.min(totalDays, day));
 }
 
