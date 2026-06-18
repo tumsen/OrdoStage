@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Lock, Plus, Trash2 } from "lucide-react";
 
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { TravelDayMealsTable, type TravelDayLine } from "@/components/time/TravelDayMealsTable";
+import { lodgingPlaceDisplayLabel } from "@/components/LodgingPlaceAutocomplete";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -85,6 +86,8 @@ function makeDayLine(date: string, existing?: TravelDayLine, inheritTimeProjectI
     date,
     city: existing?.city ?? "",
     hotel: existing?.hotel ?? "",
+    lodgingPlaceId: existing?.lodgingPlaceId ?? "",
+    lodgingLabel: existing?.lodgingLabel ?? "",
     breakfastProvided: existing?.breakfastProvided ?? false,
     lunchProvided: existing?.lunchProvided ?? false,
     dinnerProvided: existing?.dinnerProvided ?? false,
@@ -132,6 +135,7 @@ function claimToDraft(claim: TimeTravelClaim): TravelDraft {
     dayLines: claim.dayLines.map((line) =>
       makeDayLine(line.date, {
         ...line,
+        lodgingLabel: line.lodgingLabel || lodgingPlaceDisplayLabel(line),
         timeProjectId: line.timeProjectId ?? "__none__",
       })
     ),
@@ -297,6 +301,7 @@ function TravelClaimForm({
           projects={projects}
           onUpdateLine={updateDayLine}
           readOnly={readOnly}
+          country={DEFAULT_COUNTRY.toLowerCase()}
         />
       )}
 

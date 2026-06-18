@@ -6,6 +6,8 @@ export type TravelClaimDayLine = {
   date: string;
   city?: string;
   hotel?: string;
+  lodgingPlaceId?: string;
+  lodgingLabel?: string;
   breakfastProvided?: boolean;
   lunchProvided?: boolean;
   dinnerProvided?: boolean;

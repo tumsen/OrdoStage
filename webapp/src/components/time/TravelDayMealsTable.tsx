@@ -2,7 +2,7 @@ import { format, parseISO } from "date-fns";
 import { ExternalLink } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { LodgingPlaceAutocomplete, lodgingPlaceDisplayLabel } from "@/components/LodgingPlaceAutocomplete";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   computeTravelLinePayouts,
@@ -24,6 +24,8 @@ export type TravelDayLine = {
   date: string;
   city: string;
   hotel: string;
+  lodgingPlaceId: string;
+  lodgingLabel: string;
   breakfastProvided: boolean;
   lunchProvided: boolean;
   dinnerProvided: boolean;
@@ -45,6 +47,7 @@ export function TravelDayMealsTable({
   projects,
   onUpdateLine,
   readOnly = false,
+  country = "dk",
 }: {
   dayLines: TravelDayLine[];
   startsAt: Date;
@@ -59,6 +62,8 @@ export function TravelDayMealsTable({
   projects: TimeProject[];
   onUpdateLine: (date: string, patch: Partial<TravelDayLine>) => void;
   readOnly?: boolean;
+  /** ISO 3166-1 alpha-2 — biases Google Places lodging search */
+  country?: string;
 }) {
   const foodRateCents = foodRateCentsForYear(2026, allowanceType);
   const showMealReductions = allowanceType === "standard" && !foodCoveredByReceipts;
@@ -190,13 +195,12 @@ export function TravelDayMealsTable({
       ) : null}
 
       <div className="mt-2 overflow-x-auto rounded-md border border-white/10">
-        <table className="w-full min-w-[52rem] border-collapse text-left text-[11px]">
+        <table className="w-full min-w-[46rem] border-collapse text-left text-[11px]">
           <thead>
             <tr className="border-b border-white/10 bg-black/25 text-[10px] font-medium uppercase tracking-wide text-white/40">
               <th className="whitespace-nowrap px-2 py-1.5">Date</th>
               <th className="min-w-[8rem] px-1 py-1.5">Project / event</th>
-              <th className="min-w-[5rem] px-1 py-1.5">City</th>
-              <th className="min-w-[5rem] px-1 py-1.5">Hotel</th>
+              <th className="min-w-[11rem] px-1 py-1.5">Where you stayed</th>
               <th className="min-w-[7rem] px-1 py-1.5">Breakfast</th>
               <th className="min-w-[7rem] px-1 py-1.5">Lunch</th>
               <th className="min-w-[7rem] px-1 py-1.5">Dinner</th>
@@ -239,21 +243,14 @@ export function TravelDayMealsTable({
                     </Select>
                   </td>
                   <td className="p-1">
-                    <Input
-                      value={line.city}
-                      onChange={(e) => onUpdateLine(line.date, { city: e.target.value })}
-                      placeholder="City"
+                    <LodgingPlaceAutocomplete
+                      value={lodgingPlaceDisplayLabel(line)}
+                      placeId={line.lodgingPlaceId || undefined}
                       readOnly={readOnly}
-                      className="h-7 border-white/10 bg-white/5 px-2 py-0 text-[11px] text-white read-only:cursor-default read-only:opacity-100"
-                    />
-                  </td>
-                  <td className="p-1">
-                    <Input
-                      value={line.hotel}
-                      onChange={(e) => onUpdateLine(line.date, { hotel: e.target.value })}
-                      placeholder="Hotel"
-                      readOnly={readOnly}
-                      className="h-7 border-white/10 bg-white/5 px-2 py-0 text-[11px] text-white read-only:cursor-default read-only:opacity-100"
+                      country={country}
+                      placeholder="Search hotel or lodging…"
+                      aria-label={`Lodging on ${line.date}`}
+                      onChange={(patch) => onUpdateLine(line.date, patch)}
                     />
                   </td>
                   {(
@@ -344,7 +341,7 @@ export function TravelDayMealsTable({
             <tfoot>
               <tr className="border-t border-white/15 bg-black/20 text-white/70">
                 <td
-                  colSpan={showMealReductions ? 9 : 8}
+                  colSpan={showMealReductions ? 8 : 7}
                   className="px-2 py-1.5 text-right text-[10px] font-medium uppercase tracking-wide text-white/40"
                 >
                   Total udbetaling

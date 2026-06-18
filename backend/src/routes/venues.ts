@@ -13,7 +13,7 @@ import { env } from "../env";
 import {
   GoogleMapsNotConfiguredError,
   googlePlaceAutocomplete,
-  googlePlaceStructuredAddress,
+  googlePlaceDetails,
 } from "../lib/googlePlaces";
 
 const venuesRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
@@ -207,7 +207,7 @@ venuesRouter.get("/venues/address-details", async (c) => {
   }
 
   try {
-    const data = await googlePlaceStructuredAddress(placeId);
+    const data = await googlePlaceDetails(placeId);
     return c.json({ data });
   } catch (error) {
     if (error instanceof GoogleMapsNotConfiguredError) {

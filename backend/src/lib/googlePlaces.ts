@@ -53,6 +53,19 @@ export async function googlePlaceAutocomplete(params: {
     body.includedPrimaryTypes = ["street_address", "premise", "subpremise"];
   }
 
+  if (params.types === "lodging") {
+    body.includedPrimaryTypes = [
+      "lodging",
+      "hotel",
+      "motel",
+      "hostel",
+      "resort_hotel",
+      "guest_house",
+      "bed_and_breakfast",
+      "extended_stay_hotel",
+    ];
+  }
+
   const response = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
     method: "POST",
     headers: googlePlacesHeaders(
@@ -83,26 +96,18 @@ export async function googlePlaceAutocomplete(params: {
     }));
 }
 
-/** Places API (New) place details — address components for venue forms. */
-export async function googlePlaceStructuredAddress(placeId: string): Promise<GoogleStructuredAddress | null> {
-  const encodedPlaceId = encodeURIComponent(placeId);
-  const response = await fetch(`https://places.googleapis.com/v1/places/${encodedPlaceId}`, {
-    method: "GET",
-    headers: googlePlacesHeaders("addressComponents"),
-  });
+export type GooglePlaceDetails = GoogleStructuredAddress & {
+  name: string;
+  formattedAddress: string;
+};
 
-  if (!response.ok) return null;
-
-  const payload = (await response.json()) as {
-    addressComponents?: Array<{
-      longText?: string;
-      shortText?: string;
-      types?: string[];
-    }>;
-  };
-
-  const components = payload.addressComponents ?? [];
-
+function structuredAddressFromComponents(
+  components: Array<{
+    longText?: string;
+    shortText?: string;
+    types?: string[];
+  }>
+): GoogleStructuredAddress {
   function get(type: string, short = false): string {
     const component = components.find((item) => item.types?.includes(type));
     if (!component) return "";
@@ -116,5 +121,43 @@ export async function googlePlaceStructuredAddress(placeId: string): Promise<Goo
     city: get("locality") || get("postal_town"),
     state: get("administrative_area_level_1"),
     country: get("country"),
+  };
+}
+
+/** Places API (New) place details — address components for venue forms. */
+export async function googlePlaceStructuredAddress(placeId: string): Promise<GoogleStructuredAddress | null> {
+  const details = await googlePlaceDetails(placeId);
+  if (!details) return null;
+  const { name: _name, formattedAddress: _formattedAddress, ...address } = details;
+  return address;
+}
+
+/** Place name, formatted address, and structured components (hotels, venues, etc.). */
+export async function googlePlaceDetails(placeId: string): Promise<GooglePlaceDetails | null> {
+  const encodedPlaceId = encodeURIComponent(placeId);
+  const response = await fetch(`https://places.googleapis.com/v1/places/${encodedPlaceId}`, {
+    method: "GET",
+    headers: googlePlacesHeaders("displayName,formattedAddress,addressComponents"),
+  });
+
+  if (!response.ok) return null;
+
+  const payload = (await response.json()) as {
+    displayName?: { text?: string };
+    formattedAddress?: string;
+    addressComponents?: Array<{
+      longText?: string;
+      shortText?: string;
+      types?: string[];
+    }>;
+  };
+
+  const components = payload.addressComponents ?? [];
+  const structured = structuredAddressFromComponents(components);
+
+  return {
+    ...structured,
+    name: payload.displayName?.text?.trim() ?? "",
+    formattedAddress: payload.formattedAddress?.trim() ?? "",
   };
 }

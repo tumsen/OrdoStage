@@ -919,9 +919,24 @@ function serializeEntry(row: {
 
 function travelClaimDestinationFromDayLines(dayLines: TravelClaimDayLine[] | undefined): string {
   if (!dayLines?.length) return "Travel";
-  const cities = [...new Set(dayLines.map((line) => line.city?.trim() ?? "").filter(Boolean))];
+  const cities = [
+    ...new Set(
+      dayLines
+        .map((line) => line.city?.trim() || "")
+        .filter(Boolean)
+    ),
+  ];
   if (cities.length === 1) return cities[0]!;
   if (cities.length > 1) return cities.join(" · ");
+  const labels = [
+    ...new Set(
+      dayLines
+        .map((line) => line.lodgingLabel?.trim() || line.hotel?.trim() || "")
+        .filter(Boolean)
+    ),
+  ];
+  if (labels.length === 1) return labels[0]!;
+  if (labels.length > 1) return labels.join(" · ");
   return "Travel";
 }
 
@@ -933,6 +948,8 @@ function normalizeTravelDayLines(value: unknown): TravelClaimDayLine[] {
       date: typeof line.date === "string" ? line.date : "",
       city: typeof line.city === "string" ? line.city : "",
       hotel: typeof line.hotel === "string" ? line.hotel : "",
+      lodgingPlaceId: typeof line.lodgingPlaceId === "string" ? line.lodgingPlaceId : "",
+      lodgingLabel: typeof line.lodgingLabel === "string" ? line.lodgingLabel : "",
       breakfastProvided: line.breakfastProvided === true,
       lunchProvided: line.lunchProvided === true,
       dinnerProvided: line.dinnerProvided === true,
