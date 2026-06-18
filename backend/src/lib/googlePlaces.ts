@@ -54,16 +54,8 @@ export async function googlePlaceAutocomplete(params: {
   }
 
   if (params.types === "lodging") {
-    body.includedPrimaryTypes = [
-      "lodging",
-      "hotel",
-      "motel",
-      "hostel",
-      "resort_hotel",
-      "guest_house",
-      "bed_and_breakfast",
-      "extended_stay_hotel",
-    ];
+    // Places API (New) allows at most 5 primary types per request.
+    body.includedPrimaryTypes = ["lodging", "hotel", "motel", "guest_house", "bed_and_breakfast"];
   }
 
   const response = await fetch("https://places.googleapis.com/v1/places:autocomplete", {

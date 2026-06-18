@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ExternalLink, Loader2, MapPin } from "lucide-react";
 
-import { api } from "@/lib/api";
+import { api, isApiError } from "@/lib/api";
 
 type PlaceSuggestion = {
   placeId: string;
@@ -47,8 +47,19 @@ export function lodgingPlaceDisplayLabel(line: {
   hotel?: string;
   city?: string;
 }): string {
-  if (line.lodgingLabel?.trim()) return line.lodgingLabel.trim();
+  if (line.lodgingLabel != null && line.lodgingLabel.length > 0) return line.lodgingLabel;
   return [line.hotel?.trim(), line.city?.trim()].filter(Boolean).join(", ");
+}
+
+async function fetchLodgingSuggestions(query: string, country?: string): Promise<PlaceSuggestion[]> {
+  const params = new URLSearchParams({ q: query, types: "lodging" });
+  if (country) params.set("country", country);
+  const lodging = await api.get<PlaceSuggestion[]>(`/api/venues/address-search?${params.toString()}`);
+  if (lodging.length > 0) return lodging;
+
+  const broadParams = new URLSearchParams({ q: query });
+  if (country) broadParams.set("country", country);
+  return api.get<PlaceSuggestion[]>(`/api/venues/address-search?${broadParams.toString()}`);
 }
 
 export function LodgingPlaceAutocomplete({
@@ -71,12 +82,19 @@ export function LodgingPlaceAutocomplete({
   const blurTimerRef = useRef<number | null>(null);
   const requestIdRef = useRef(0);
 
+  const [focused, setFocused] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const inputCls = `w-full h-7 px-2 pr-7 text-[11px] rounded-md border bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:outline-none focus:border-white/30 disabled:opacity-50 read-only:cursor-default read-only:opacity-100 ${className}`;
+
+  useEffect(() => {
+    if (!focused) setInputValue(value);
+  }, [focused, value]);
 
   const clearBlurTimer = useCallback(() => {
     if (blurTimerRef.current != null) {
@@ -106,6 +124,7 @@ export function LodgingPlaceAutocomplete({
     async (suggestion: PlaceSuggestion) => {
       closeSuggestions();
       setLoading(true);
+      setSearchError(null);
       try {
         const details = await api.get<PlaceDetails | null>(
           `/api/venues/address-details?placeId=${encodeURIComponent(suggestion.placeId)}`
@@ -118,6 +137,7 @@ export function LodgingPlaceAutocomplete({
             : details.formattedAddress
           : suggestion.description;
 
+        setInputValue(label);
         onChange({
           lodgingPlaceId: suggestion.placeId,
           lodgingLabel: label,
@@ -125,6 +145,7 @@ export function LodgingPlaceAutocomplete({
           city,
         });
       } catch {
+        setInputValue(suggestion.description);
         onChange({
           lodgingPlaceId: suggestion.placeId,
           lodgingLabel: suggestion.description,
@@ -139,39 +160,44 @@ export function LodgingPlaceAutocomplete({
   );
 
   useEffect(() => {
-    if (disabled || readOnly) {
-      setSuggestions([]);
-      closeSuggestions();
-      return;
-    }
-
-    const query = value.trim();
-    if (query.length < MIN_QUERY_LENGTH) {
+    if (disabled || readOnly || !focused) {
       setSuggestions([]);
       setLoading(false);
       closeSuggestions();
       return;
     }
 
+    const query = inputValue.trim();
+    if (query.length < MIN_QUERY_LENGTH) {
+      setSuggestions([]);
+      setLoading(false);
+      setSearchError(null);
+      closeSuggestions();
+      return;
+    }
+
     const requestId = ++requestIdRef.current;
     setLoading(true);
+    setSearchError(null);
 
     const timer = window.setTimeout(() => {
-      const params = new URLSearchParams({ q: query, types: "lodging" });
-      if (country) params.set("country", country);
-
-      void api
-        .get<PlaceSuggestion[]>(`/api/venues/address-search?${params.toString()}`)
+      void fetchLodgingSuggestions(query, country)
         .then((data) => {
           if (requestId !== requestIdRef.current) return;
           setSuggestions(data);
-          setOpen(data.length > 0);
+          setOpen(true);
           setActiveIndex(-1);
+          if (data.length === 0) {
+            setSearchError("No places found — you can still type the name manually.");
+          }
         })
-        .catch(() => {
+        .catch((err: unknown) => {
           if (requestId !== requestIdRef.current) return;
           setSuggestions([]);
           closeSuggestions();
+          if (isApiError(err) && (err.data as { code?: string } | undefined)?.code === "GOOGLE_MAPS_NOT_CONFIGURED") {
+            setSearchError("Place search is not configured — type lodging manually.");
+          }
         })
         .finally(() => {
           if (requestId === requestIdRef.current) setLoading(false);
@@ -181,13 +207,14 @@ export function LodgingPlaceAutocomplete({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [closeSuggestions, country, disabled, readOnly, value]);
+  }, [closeSuggestions, country, disabled, focused, inputValue, readOnly]);
 
   useEffect(() => {
     return () => clearBlurTimer();
   }, [clearBlurTimer]);
 
-  const showDropdown = open && !readOnly && !disabled && (suggestions.length > 0 || loading);
+  const showDropdown =
+    open && focused && !readOnly && !disabled && (suggestions.length > 0 || loading || Boolean(searchError));
   const mapsUrl = placeId
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(value)}&query_place_id=${encodeURIComponent(placeId)}`
     : value.trim()
@@ -200,7 +227,7 @@ export function LodgingPlaceAutocomplete({
         <input
           id={inputId}
           type="text"
-          value={value}
+          value={inputValue}
           disabled={disabled}
           readOnly={readOnly}
           placeholder={placeholder}
@@ -213,12 +240,18 @@ export function LodgingPlaceAutocomplete({
           }
           autoComplete="off"
           className={inputCls}
-          onChange={(e) => applyManualText(e.target.value)}
+          onChange={(e) => {
+            const text = e.target.value;
+            setInputValue(text);
+            applyManualText(text);
+          }}
           onFocus={() => {
             clearBlurTimer();
+            setFocused(true);
             if (suggestions.length > 0) setOpen(true);
           }}
           onBlur={() => {
+            setFocused(false);
             clearBlurTimer();
             blurTimerRef.current = window.setTimeout(() => {
               closeSuggestions();
@@ -272,6 +305,9 @@ export function LodgingPlaceAutocomplete({
           >
             {loading && suggestions.length === 0 ? (
               <li className="px-3 py-2 text-sm text-white/45">Searching places…</li>
+            ) : null}
+            {!loading && searchError && suggestions.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-white/45">{searchError}</li>
             ) : null}
             {suggestions.map((suggestion, index) => (
               <li
