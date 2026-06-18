@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { usePersistedViewMode } from "@/hooks/usePersistedViewMode";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
@@ -41,6 +41,7 @@ import {
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
 import { YearDiscEntityFilters } from "@/components/schedule/YearDiscEntityFilters";
+import { YearDiscViewPicker } from "@/components/schedule/YearDiscViewPicker";
 import { YearDiscRangeEditor } from "@/components/schedule/YearDiscRangeEditor";
 import { YearDiscView } from "@/components/schedule/YearDiscView";
 import {
@@ -50,7 +51,7 @@ import {
   yearDiscFetchRange,
 } from "@/components/schedule/yearDiscConfig";
 import { usePermissions } from "@/hooks/usePermissions";
-import { usePersistedYearDiscConfig } from "@/hooks/usePersistedYearDiscConfig";
+import { usePersistedYearDiscViews } from "@/hooks/usePersistedYearDiscViews";
 import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
 import { toast } from "@/hooks/use-toast";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -317,9 +318,22 @@ export default function Schedule() {
     venue_booking: true,
     other: true,
   });
-  const [yearDiscEventId, setYearDiscEventId] = useState("all");
-  const [yearDiscTourId, setYearDiscTourId] = useState("all");
-  const [yearDiscConfig, setYearDiscConfig] = usePersistedYearDiscConfig();
+  const {
+    activeView: yearDiscView,
+    views: yearDiscViews,
+    setConfig: setYearDiscConfig,
+    setFilters: setYearDiscFilters,
+    selectView: selectYearDiscView,
+    saveAs: saveYearDiscViewAs,
+    renameView: renameYearDiscView,
+    deleteView: deleteYearDiscView,
+  } = usePersistedYearDiscViews();
+  const yearDiscConfig = yearDiscView.config;
+
+  useEffect(() => {
+    if (viewMode !== "yeardisc") return;
+    setVenueId(yearDiscView.filters.venueId);
+  }, [viewMode, yearDiscView.id, yearDiscView.filters.venueId]);
   const { canView, canAction } = usePermissions();
   const canReadAllTime = canAction("time.read_all");
 
@@ -394,10 +408,10 @@ export default function Schedule() {
   const yearDiscItems = useMemo(() => {
     if (viewMode !== "yeardisc") return visibleItems;
     return filterCalendarItemsForYearDisc(items, {
-      eventId: yearDiscEventId,
-      tourId: yearDiscTourId,
+      eventId: yearDiscView.filters.eventId,
+      tourId: yearDiscView.filters.tourId,
     });
-  }, [viewMode, items, visibleItems, yearDiscEventId, yearDiscTourId]);
+  }, [viewMode, items, visibleItems, yearDiscView.filters.eventId, yearDiscView.filters.tourId]);
 
   const yearDiscNeedsTime = useMemo(
     () => viewMode === "yeardisc" && yearDiscConfig.rings.some((ring) => ringUsesTimeData(ring.source)),
@@ -465,6 +479,25 @@ export default function Schedule() {
             onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
           />
           <span className="h-4 w-px shrink-0 bg-white/10" aria-hidden="true" />
+          <YearDiscViewPicker
+            views={yearDiscViews}
+            activeViewId={yearDiscView.id}
+            onSelect={(viewId) => {
+              const view = yearDiscViews.find((v) => v.id === viewId);
+              selectYearDiscView(viewId);
+              if (view) setVenueId(view.filters.venueId);
+            }}
+            onSaveAs={saveYearDiscViewAs}
+            onRename={renameYearDiscView}
+            onDelete={(viewId) => {
+              if (yearDiscViews.length <= 1) return;
+              const remaining = yearDiscViews.filter((v) => v.id !== viewId);
+              const nextActive =
+                yearDiscView.id === viewId ? remaining[0]! : yearDiscView;
+              deleteYearDiscView(viewId);
+              if (yearDiscView.id === viewId) setVenueId(nextActive.filters.venueId);
+            }}
+          />
           <YearDiscRangeEditor
             range={yearDiscConfig.range ?? DEFAULT_YEAR_DISC_RANGE}
             calendarYear={anchorDate.getFullYear()}
@@ -478,11 +511,14 @@ export default function Schedule() {
             events={scheduleData?.events ?? []}
             tours={scheduleData?.tours ?? []}
             venueId={venueId}
-            eventId={yearDiscEventId}
-            tourId={yearDiscTourId}
-            onVenueChange={setVenueId}
-            onEventChange={setYearDiscEventId}
-            onTourChange={setYearDiscTourId}
+            eventId={yearDiscView.filters.eventId}
+            tourId={yearDiscView.filters.tourId}
+            onVenueChange={(id) => {
+              setVenueId(id);
+              setYearDiscFilters({ venueId: id });
+            }}
+            onEventChange={(id) => setYearDiscFilters({ eventId: id })}
+            onTourChange={(id) => setYearDiscFilters({ tourId: id })}
           />
           <div className="flex-1 min-w-2" />
           <Button
