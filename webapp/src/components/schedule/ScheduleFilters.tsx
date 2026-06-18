@@ -69,7 +69,7 @@ export function ScheduleFilters({
   );
 
   if (hideEntityFilters && hideVisibility) {
-    return <div className="flex flex-wrap items-center gap-2 sm:gap-3">{viewModeSelect}</div>;
+    return viewModeSelect;
   }
 
   return (

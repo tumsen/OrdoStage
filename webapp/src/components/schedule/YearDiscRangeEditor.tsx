@@ -1,18 +1,14 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   DEFAULT_YEAR_DISC_RANGE,
   todayIsoDateLocal,
-  type YearDiscRangeMode,
   type YearDiscRangeSettings,
 } from "@/components/schedule/yearDiscConfig";
+import { cn } from "@/lib/utils";
 
 export function YearDiscRangeEditor({
   range,
@@ -26,42 +22,58 @@ export function YearDiscRangeEditor({
   onCalendarYearChange: (year: number) => void;
 }) {
   const effectiveRange = range ?? DEFAULT_YEAR_DISC_RANGE;
+  const isYearMode = effectiveRange.mode === "calendar_year";
+  const startDate = effectiveRange.startDate ?? todayIsoDateLocal();
 
-  function setMode(mode: YearDiscRangeMode) {
-    if (mode === "start_to_today") {
-      onRangeChange({
-        mode,
-        startDate: effectiveRange.startDate ?? `${calendarYear}-01-01`,
-      });
-      return;
-    }
+  function selectYearMode() {
     onRangeChange({ mode: "calendar_year" });
   }
 
-  return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Disc period</p>
-      <Select value={effectiveRange.mode} onValueChange={(value) => setMode(value as YearDiscRangeMode)}>
-        <SelectTrigger className="mt-2 h-8 border-white/10 bg-white/5 text-xs text-white">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent className="bg-[#16161f] border-white/10 text-white">
-          <SelectItem value="calendar_year" className="text-xs">
-            Calendar year
-          </SelectItem>
-          <SelectItem value="start_to_today" className="text-xs">
-            Start date → today
-          </SelectItem>
-        </SelectContent>
-      </Select>
+  function selectTodayMode() {
+    onRangeChange({ mode: "start_to_today", startDate: todayIsoDateLocal() });
+  }
 
-      {effectiveRange.mode === "calendar_year" ? (
-        <div className="mt-3 space-y-1.5">
-          <label className="text-[11px] text-white/45" htmlFor="year-disc-year">
-            Year
-          </label>
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className={cn(
+          "h-8 px-2.5 text-xs text-white/60 hover:text-white",
+          isYearMode ? "bg-white/10 text-white" : "hover:bg-white/5"
+        )}
+        onClick={selectYearMode}
+      >
+        Year
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className={cn(
+          "h-8 px-2.5 text-xs text-white/60 hover:text-white",
+          !isYearMode ? "bg-white/10 text-white" : "hover:bg-white/5"
+        )}
+        onClick={selectTodayMode}
+      >
+        Today
+      </Button>
+
+      <span className="mx-0.5 h-4 w-px shrink-0 bg-white/10" aria-hidden="true" />
+
+      {isYearMode ? (
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-white/50 hover:text-white hover:bg-white/5"
+            onClick={() => onCalendarYearChange(calendarYear - 1)}
+            aria-label="Previous year"
+          >
+            <ChevronLeft size={16} />
+          </Button>
           <Input
-            id="year-disc-year"
             type="number"
             min={1970}
             max={2100}
@@ -72,25 +84,30 @@ export function YearDiscRangeEditor({
                 onCalendarYearChange(next);
               }
             }}
-            className="h-8 border-white/10 bg-white/5 text-sm text-white [color-scheme:dark]"
+            aria-label="Disc year"
+            className="h-8 w-[4.5rem] shrink-0 border-white/10 bg-white/5 text-center text-sm text-white [color-scheme:dark]"
           />
-          <p className="text-[11px] text-white/35">The disc shows Jan 1 – Dec 31 for this year.</p>
-        </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-white/50 hover:text-white hover:bg-white/5"
+            onClick={() => onCalendarYearChange(calendarYear + 1)}
+            aria-label="Next year"
+          >
+            <ChevronRight size={16} />
+          </Button>
+        </>
       ) : (
-        <div className="mt-3 space-y-1.5">
-          <label className="text-[11px] text-white/45">Start date</label>
-          <DateInputWithWeekday
-            value={effectiveRange.startDate ?? `${calendarYear}-01-01`}
-            onChange={(value) => {
-              const today = todayIsoDateLocal();
-              const startDate = value <= today ? value : today;
-              onRangeChange({ mode: "start_to_today", startDate });
-            }}
-          />
-          <p className="text-[11px] text-white/35">
-            The disc spans from the start date through today ({todayIsoDateLocal()}).
-          </p>
-        </div>
+        <DateInputWithWeekday
+          value={startDate}
+          onChange={(value) => {
+            const today = todayIsoDateLocal();
+            onRangeChange({
+              mode: "start_to_today",
+              startDate: value <= today ? value : today,
+            });
+          }}
+        />
       )}
     </div>
   );

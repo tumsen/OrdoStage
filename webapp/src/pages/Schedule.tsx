@@ -425,43 +425,43 @@ export default function Schedule() {
       }
     >
       {isYearDisc ? (
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 justify-between shrink-0">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
-            <ScheduleFilters
-              venues={venues ?? []}
-              people={people ?? []}
-              viewMode={viewMode}
-              visibility={visibility}
-              venueId={venueId}
-              personId={personId}
-              hideEntityFilters
-              hideVisibility
-              onVenueChange={setVenueId}
-              onPersonChange={setPersonId}
-              onViewModeChange={(nextMode) => {
-                setViewMode(nextMode);
-                if (nextMode === "next7") {
-                  const now = new Date();
-                  setAnchorDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
-                }
-              }}
-              onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
-            />
-            <YearDiscRangeEditor
-              range={yearDiscConfig.range ?? DEFAULT_YEAR_DISC_RANGE}
-              calendarYear={anchorDate.getFullYear()}
-              onRangeChange={(range) => setYearDiscConfig({ ...yearDiscConfig, range })}
-              onCalendarYearChange={(year) =>
-                setAnchorDate(new Date(year, anchorDate.getMonth(), anchorDate.getDate()))
+        <div className="flex shrink-0 items-center gap-2 overflow-x-auto">
+          <ScheduleFilters
+            venues={venues ?? []}
+            people={people ?? []}
+            viewMode={viewMode}
+            visibility={visibility}
+            venueId={venueId}
+            personId={personId}
+            hideEntityFilters
+            hideVisibility
+            onVenueChange={setVenueId}
+            onPersonChange={setPersonId}
+            onViewModeChange={(nextMode) => {
+              setViewMode(nextMode);
+              if (nextMode === "next7") {
+                const now = new Date();
+                setAnchorDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
               }
-            />
-          </div>
+            }}
+            onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
+          />
+          <span className="h-4 w-px shrink-0 bg-white/10" aria-hidden="true" />
+          <YearDiscRangeEditor
+            range={yearDiscConfig.range ?? DEFAULT_YEAR_DISC_RANGE}
+            calendarYear={anchorDate.getFullYear()}
+            onRangeChange={(range) => setYearDiscConfig({ ...yearDiscConfig, range })}
+            onCalendarYearChange={(year) =>
+              setAnchorDate(new Date(year, anchorDate.getMonth(), anchorDate.getDate()))
+            }
+          />
+          <div className="flex-1 min-w-2" />
           <Button
             onClick={() => {
               setBookingSlot(null);
               setBookingOpen(true);
             }}
-            className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 flex-shrink-0 h-8"
+            className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 shrink-0 h-8"
           >
             <Plus size={14} />
             New Booking
