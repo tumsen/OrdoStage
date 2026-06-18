@@ -124,6 +124,9 @@ export const DEFAULT_YEAR_DISC_CONFIG: YearDiscConfig = {
 
 export const YEAR_DISC_MAX_RINGS = 12;
 
+/** The disc always has one tick per day on a full circle. */
+export const YEAR_DISC_DAYS = 365;
+
 const SCHEDULE_FILTERS: ScheduleVisibilityFilterKey[] = [
   "event",
   "tour",
@@ -318,11 +321,30 @@ export function yearDiscFetchRange(
   now: Date = new Date()
 ): { from: string; to: string } {
   if (settings.mode === "start_to_today") {
-    const today = toDateStr(now);
-    const start = settings.startDate ?? `${calendarYear}-01-01`;
-    return { from: start <= today ? start : today, to: today };
+    const anchorIso = settings.startDate ?? toDateStr(now);
+    const anchor = parseIsoDateLocal(anchorIso) ?? startOfLocalDay(now);
+    const start = addLocalDays(startOfLocalDay(anchor), -(YEAR_DISC_DAYS - 1));
+    return { from: toDateStr(start), to: toDateStr(startOfLocalDay(anchor)) };
   }
   return { from: `${calendarYear}-01-01`, to: `${calendarYear}-12-31` };
+}
+
+function calendarDayFromDiscDay(year: number, discDay: number): number {
+  const yearLen = daysInCalendarYear(year);
+  if (yearLen === YEAR_DISC_DAYS) return discDay;
+  return Math.min(
+    yearLen,
+    Math.round(((discDay - 1) * (yearLen - 1)) / (YEAR_DISC_DAYS - 1)) + 1
+  );
+}
+
+function discDayFromCalendarDay(year: number, calendarDay: number): number {
+  const yearLen = daysInCalendarYear(year);
+  if (yearLen === YEAR_DISC_DAYS) return calendarDay;
+  return Math.min(
+    YEAR_DISC_DAYS,
+    Math.round(((calendarDay - 1) * (YEAR_DISC_DAYS - 1)) / (yearLen - 1)) + 1
+  );
 }
 
 /** Map disc settings to the timeline used for rendering. */
@@ -332,45 +354,44 @@ export function buildYearDiscTimeline(
   now: Date = new Date()
 ): YearDiscTimeline {
   const today = startOfLocalDay(now);
+  const totalDays = YEAR_DISC_DAYS;
 
   if (settings.mode === "start_to_today") {
-    const parsedStart = settings.startDate ? parseIsoDateLocal(settings.startDate) : null;
-    const start = startOfLocalDay(parsedStart ?? new Date(calendarYear, 0, 1));
-    const end = today;
-    const effectiveStart = start > end ? end : start;
-    const totalDays = daysBetweenInclusive(effectiveStart, end);
-    const from = toDateStr(effectiveStart);
-    const to = toDateStr(end);
+    const parsedAnchor = settings.startDate ? parseIsoDateLocal(settings.startDate) : null;
+    const endDate = startOfLocalDay(parsedAnchor ?? today);
+    const startDate = addLocalDays(endDate, -(YEAR_DISC_DAYS - 1));
+    const from = toDateStr(startDate);
+    const to = toDateStr(endDate);
 
-    const dateFromDiscDay = (day: number): Date => addLocalDays(effectiveStart, day - 1);
+    const dateFromDiscDay = (day: number): Date => addLocalDays(startDate, day - 1);
 
     const discDayFromDate = (date: Date): number | null => {
       const d = startOfLocalDay(date);
-      if (d < effectiveStart || d > end) return null;
-      return daysBetweenInclusive(effectiveStart, d);
+      if (d < startDate || d > endDate) return null;
+      return daysBetweenInclusive(startDate, d);
     };
 
     const clipSpan = (span: YearDiscSpan): { startDay: number; endDay: number } | null => {
       const spanStart = startOfLocalDay(new Date(span.startDate));
       const spanEnd = startOfLocalDay(new Date(span.endDate ?? span.startDate));
-      if (spanEnd < effectiveStart || spanStart > end) return null;
-      const clippedStart = spanStart < effectiveStart ? effectiveStart : spanStart;
-      const clippedEnd = spanEnd > end ? end : spanEnd;
+      if (spanEnd < startDate || spanStart > endDate) return null;
+      const clippedStart = spanStart < startDate ? startDate : spanStart;
+      const clippedEnd = spanEnd > endDate ? endDate : spanEnd;
       const startDay = discDayFromDate(clippedStart);
       const endDay = discDayFromDate(clippedEnd);
       if (startDay === null || endDay === null) return null;
       return { startDay, endDay };
     };
 
-    const startLabel = effectiveStart.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    const endLabel = endDate.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
     return {
       mode: "start_to_today",
       totalDays,
       from,
       to,
-      rangeLabel: `${startLabel} → today`,
-      startDate: effectiveStart,
-      endDate: end,
+      rangeLabel: `365 days → ${endLabel}`,
+      startDate,
+      endDate,
       dateFromDiscDay,
       discDayFromDate,
       clipSpan,
@@ -378,15 +399,14 @@ export function buildYearDiscTimeline(
   }
 
   const year = calendarYear;
-  const totalDays = daysInCalendarYear(year);
   const startDate = new Date(year, 0, 1);
   const endDate = new Date(year, 11, 31);
 
-  const dateFromDiscDay = (day: number): Date => new Date(year, 0, day);
+  const dateFromDiscDay = (day: number): Date => new Date(year, 0, calendarDayFromDiscDay(year, day));
 
   const discDayFromDate = (date: Date): number | null => {
     if (date.getFullYear() !== year) return null;
-    return dayOfCalendarYear(date);
+    return discDayFromCalendarDay(year, dayOfCalendarYear(date));
   };
 
   const clipSpan = (span: YearDiscSpan): { startDay: number; endDay: number } | null => {
@@ -397,7 +417,10 @@ export function buildYearDiscTimeline(
     if (spanEnd < yearStart || spanStart > yearEnd) return null;
     const clippedStart = spanStart < yearStart ? yearStart : spanStart;
     const clippedEnd = spanEnd > yearEnd ? yearEnd : spanEnd;
-    return { startDay: dayOfCalendarYear(clippedStart), endDay: dayOfCalendarYear(clippedEnd) };
+    return {
+      startDay: discDayFromCalendarDay(year, dayOfCalendarYear(clippedStart)),
+      endDay: discDayFromCalendarDay(year, dayOfCalendarYear(clippedEnd)),
+    };
   };
 
   return {
@@ -418,7 +441,7 @@ export function buildYearDiscTimeline(
 export function defaultDiscDay(timeline: YearDiscTimeline, now: Date = new Date()): number {
   const todayDay = timeline.discDayFromDate(now);
   if (todayDay !== null) return todayDay;
-  return timeline.mode === "calendar_year" ? 1 : timeline.totalDays;
+  return timeline.mode === "calendar_year" ? 1 : YEAR_DISC_DAYS;
 }
 
 export function normalizeYearDiscConfig(raw: unknown): YearDiscConfig {

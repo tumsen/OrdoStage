@@ -6,7 +6,6 @@ import {
   toDateStr,
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
-import { YearDiscRangeEditor } from "@/components/schedule/YearDiscRangeEditor";
 import { YearDiscRingEditor } from "@/components/schedule/YearDiscRingEditor";
 import {
   buildYearDiscTimeline,
@@ -16,7 +15,6 @@ import {
   yearDiscRingColor,
   yearDiscRingLabel,
   type YearDiscConfig,
-  type YearDiscRangeSettings,
   type YearDiscResolveContext,
   type YearDiscSpan,
   type YearDiscTimeline,
@@ -201,7 +199,6 @@ function spanTimeLabel(span: YearDiscSpan): string {
 
 export function YearDiscView({
   calendarYear,
-  onCalendarYearChange,
   config,
   onConfigChange,
   sources,
@@ -209,7 +206,6 @@ export function YearDiscView({
   onItemClick,
 }: {
   calendarYear: number;
-  onCalendarYearChange: (year: number) => void;
   config: YearDiscConfig;
   onConfigChange: (config: YearDiscConfig) => void;
   sources: YearDiscResolveContext;
@@ -222,7 +218,6 @@ export function YearDiscView({
     () => buildYearDiscTimeline(config.range ?? DEFAULT_YEAR_DISC_RANGE, calendarYear),
     [config.range, calendarYear]
   );
-  const range = config.range ?? DEFAULT_YEAR_DISC_RANGE;
   const totalDays = timeline.totalDays;
   const [selectedDay, setSelectedDay] = useState(() => defaultDiscDay(timeline));
   const rings = config.rings;
@@ -334,10 +329,6 @@ export function YearDiscView({
     const clip = timeline.clipSpan(segment.span);
     if (clip) setSelectedDay(clip.startDay);
     if (segment.span.calendarItem) onItemClick(segment.span.calendarItem);
-  }
-
-  function handleRangeChange(nextRange: YearDiscRangeSettings) {
-    onConfigChange({ ...config, range: nextRange });
   }
 
   function ringColorForSpan(span: YearDiscSpan): string {
@@ -461,7 +452,7 @@ export function YearDiscView({
             className="fill-white/40 text-[10px] uppercase tracking-[0.12em]"
             pointerEvents="none"
           >
-            {timeline.mode === "calendar_year" ? timeline.rangeLabel : "→ today"}
+            {timeline.mode === "calendar_year" ? timeline.rangeLabel : "365 days"}
           </text>
         </svg>
         {hovered ? (
@@ -472,13 +463,6 @@ export function YearDiscView({
       </div>
 
       <div className="mx-auto flex w-full max-w-sm shrink-0 flex-col gap-3 xl:mx-0">
-        <YearDiscRangeEditor
-          range={range}
-          calendarYear={calendarYear}
-          onRangeChange={handleRangeChange}
-          onCalendarYearChange={onCalendarYearChange}
-        />
-
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>

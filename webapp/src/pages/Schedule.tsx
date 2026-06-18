@@ -40,8 +40,9 @@ import {
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
+import { YearDiscRangeEditor } from "@/components/schedule/YearDiscRangeEditor";
 import { YearDiscView } from "@/components/schedule/YearDiscView";
-import { ringUsesTimeData, yearDiscFetchRange } from "@/components/schedule/yearDiscConfig";
+import { DEFAULT_YEAR_DISC_RANGE, ringUsesTimeData, yearDiscFetchRange } from "@/components/schedule/yearDiscConfig";
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePersistedYearDiscConfig } from "@/hooks/usePersistedYearDiscConfig";
 import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
@@ -449,8 +450,15 @@ export default function Schedule() {
       {/* Calendar navigation */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {viewMode === "yeardisc" && yearDiscRangeMode === "start_to_today" ? (
-            <span className="text-sm text-white/60">Start date → today (set in disc panel)</span>
+          {viewMode === "yeardisc" ? (
+            <YearDiscRangeEditor
+              range={yearDiscConfig.range ?? DEFAULT_YEAR_DISC_RANGE}
+              calendarYear={anchorDate.getFullYear()}
+              onRangeChange={(range) => setYearDiscConfig({ ...yearDiscConfig, range })}
+              onCalendarYearChange={(year) =>
+                setAnchorDate(new Date(year, anchorDate.getMonth(), anchorDate.getDate()))
+              }
+            />
           ) : (
             <>
               <Button
@@ -478,18 +486,18 @@ export default function Schedule() {
               >
                 <ChevronRight size={16} />
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-white/40 hover:text-white/70 hover:bg-white/5 ml-1"
+                onClick={() => {
+                  setAnchorDate(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+                }}
+              >
+                Today
+              </Button>
             </>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-white/40 hover:text-white/70 hover:bg-white/5 ml-1"
-            onClick={() => {
-              setAnchorDate(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
-            }}
-          >
-            Today
-          </Button>
         </div>
 
         <div className="self-start sm:self-center">
@@ -528,9 +536,6 @@ export default function Schedule() {
               <div className="h-full overflow-auto pr-1 py-2">
                 <YearDiscView
                   calendarYear={anchorDate.getFullYear()}
-                  onCalendarYearChange={(year) =>
-                    setAnchorDate(new Date(year, anchorDate.getMonth(), anchorDate.getDate()))
-                  }
                   config={yearDiscConfig}
                   onConfigChange={setYearDiscConfig}
                   sources={{
