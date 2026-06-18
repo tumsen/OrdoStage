@@ -154,17 +154,13 @@ function ringLabelSpanDeg(label: string): number {
 
 const RING_LABEL_STROKE = 2;
 
-/** Ring midline — textPath baseline sits here, then dy nudges ink to center. */
-function ringMidRadius(inner: number, outer: number): number {
-  return (inner + outer) / 2;
-}
-
-/**
- * Perpendicular shift so glyph ink centers on the ring midline at north.
- * Positive dy moves toward disc center; tuned for uppercase + stroke outline.
- */
-function ringLabelTextPathDy(fontSize: number): number {
-  return fontSize * 0.34 + RING_LABEL_STROKE * 0.28;
+/** Radius for the label arc so glyph ink centers on the coloured ring band. */
+function ringLabelTextPathRadius(inner: number, outer: number, fontSize: number): number {
+  const midR = (inner + outer) / 2;
+  // Baseline sits on outer side of path at north; shift path inward (~40% em) to center ink in band.
+  // (0.34em too high, 0.48em too low — split the difference.)
+  const inward = fontSize * 0.405 + RING_LABEL_STROKE * 0.25;
+  return midR - inward;
 }
 
 function dayAngles(
@@ -536,8 +532,7 @@ export function YearDiscView({
             const spanDeg = ringLabelSpanDeg(label);
             const textPathId = `ring-label-${ring.id}`;
             const fontSize = Math.min(14, Math.max(10, layout.ringWidth * 0.36));
-            const labelPathR = ringMidRadius(inner, outer);
-            const labelDy = ringLabelTextPathDy(fontSize);
+            const labelPathR = ringLabelTextPathRadius(inner, outer, fontSize);
 
             return (
               <g key={`ring-label-${ring.id}`} pointerEvents="none">
@@ -554,7 +549,7 @@ export function YearDiscView({
                   letterSpacing="0.06em"
                   style={{ textTransform: "uppercase" }}
                 >
-                  <textPath href={`#${textPathId}`} startOffset="50%" textAnchor="middle" dy={labelDy}>
+                  <textPath href={`#${textPathId}`} startOffset="50%" textAnchor="middle">
                     {label}
                   </textPath>
                 </text>
