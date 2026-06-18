@@ -33,6 +33,7 @@ import {
 } from "@/components/schedule/scheduleUtils";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
+import { YearDiscView } from "@/components/schedule/YearDiscView";
 import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS } from "@/lib/weekGridColumns";
 import { toast } from "@/hooks/use-toast";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -254,54 +255,6 @@ function VenueOccupationView({
           )}
         </div>
       ))}
-    </div>
-  );
-}
-
-function YearDiscView({ year, items }: { year: number; items: CalendarItem[] }) {
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {Array.from({ length: 12 }).map((_, month) => {
-        const end = new Date(year, month + 1, 0);
-        const daysInMonth = end.getDate();
-        let occupiedDays = 0;
-        for (let d = 1; d <= daysInMonth; d++) {
-          const date = new Date(year, month, d);
-          if (itemsForDay(items, date).length > 0) occupiedDays += 1;
-        }
-        const pct = Math.round((occupiedDays / daysInMonth) * 100);
-        const radius = 32;
-        const circumference = 2 * Math.PI * radius;
-        const offset = circumference - (pct / 100) * circumference;
-
-        return (
-          <div key={month} className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-            <div className="text-xs text-white/50 mb-2">{formatMonthLabel(year, month)}</div>
-            <div className="flex items-center gap-4">
-              <svg width="84" height="84" viewBox="0 0 84 84" className="-rotate-90">
-                <circle cx="42" cy="42" r={radius} stroke="rgba(255,255,255,0.12)" strokeWidth="8" fill="none" />
-                <circle
-                  cx="42"
-                  cy="42"
-                  r={radius}
-                  stroke="rgba(244,63,94,0.95)"
-                  strokeWidth="8"
-                  fill="none"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={offset}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div>
-                <div className="text-2xl font-semibold text-white">{pct}%</div>
-                <div className="text-xs text-white/40">
-                  {occupiedDays}/{daysInMonth} days occupied
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -531,8 +484,13 @@ export default function Schedule() {
                 ))}
               </div>
             ) : viewMode === "yeardisc" ? (
-              <div className="h-full overflow-auto pr-1">
-                <YearDiscView year={anchorDate.getFullYear()} items={visibleItems} />
+              <div className="h-full overflow-auto pr-1 py-2">
+                <YearDiscView
+                  year={anchorDate.getFullYear()}
+                  items={visibleItems}
+                  locale={locale}
+                  onItemClick={handleItemClick}
+                />
               </div>
             ) : viewMode === "month" ? (
               <div className="h-full overflow-auto pr-1">
