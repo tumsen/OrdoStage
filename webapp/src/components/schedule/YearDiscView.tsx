@@ -118,6 +118,20 @@ type DiscSegment = {
   opacity: number;
 };
 
+function isoWeekNumber(date: Date): number {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+function formatWeekNumber(date: Date, locale: string): string {
+  const week = isoWeekNumber(date);
+  if (locale.startsWith("da")) return `Uge ${week}`;
+  if (locale.startsWith("de")) return `KW ${week}`;
+  return `Week ${week}`;
+}
+
 function monthMarkersForTimeline(timeline: YearDiscTimeline, locale: string) {
   const { totalDays, startDate, endDate } = timeline;
   const markers: Array<{
@@ -442,27 +456,33 @@ export function YearDiscView({
           <circle cx={CX} cy={CY} r={layout.hubR} fill="#0a0a0f" pointerEvents="none" />
           <text
             x={CX}
-            y={CY - 8}
+            y={CY - 22}
             textAnchor="middle"
             dominantBaseline="middle"
-            className="fill-white text-3xl font-semibold"
+            className="fill-white/55 text-[11px] font-medium uppercase tracking-wide"
+            pointerEvents="none"
+          >
+            {selectedDate.toLocaleDateString(locale, { weekday: "long" })}
+          </text>
+          <text
+            x={CX}
+            y={CY + 2}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="fill-white text-2xl font-semibold"
             pointerEvents="none"
           >
             {selectedDate.toLocaleDateString(locale, { day: "numeric", month: "short" })}
           </text>
           <text
             x={CX}
-            y={CY + 16}
+            y={CY + 24}
             textAnchor="middle"
             dominantBaseline="middle"
-            className="fill-white/40 text-[10px] uppercase tracking-[0.12em]"
+            className="fill-white/45 text-[11px] font-medium tracking-wide"
             pointerEvents="none"
           >
-            {timeline.mode === "calendar_year"
-              ? timeline.rangeLabel
-              : timeline.mode === "today"
-                ? "Today"
-                : "365 days"}
+            {formatWeekNumber(selectedDate, locale)}
           </text>
         </svg>
         {hovered ? (
