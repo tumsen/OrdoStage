@@ -298,14 +298,12 @@ toursRouter.post("/tours", zValidator("json", CreateTourSchema), async (c) => {
   }
 
   const body = c.req.valid("json");
-  if (body.productionId) {
-    const production = await prisma.production.findFirst({
-      where: { id: body.productionId, organizationId: user.organizationId },
-      select: { id: true },
-    });
-    if (!production) {
-      return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
-    }
+  const production = await prisma.production.findFirst({
+    where: { id: body.productionId, organizationId: user.organizationId },
+    select: { id: true },
+  });
+  if (!production) {
+    return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
   }
   const tour = await prisma.tour.create({
     data: {
@@ -326,7 +324,7 @@ toursRouter.post("/tours", zValidator("json", CreateTourSchema), async (c) => {
       riderVisibility: body.riderVisibility
         ? JSON.stringify({ ...DEFAULT_RIDER_VISIBILITY, ...body.riderVisibility })
         : JSON.stringify(DEFAULT_RIDER_VISIBILITY),
-      productionId: body.productionId ?? null,
+      productionId: body.productionId,
       organizationId: user.organizationId,
     },
   });

@@ -1127,7 +1127,7 @@ export const CreateTourSchema = z.object({
   riderNotes: z.string().optional(),
   customFields: z.array(CustomFieldSchema).optional(),
   riderVisibility: RiderVisibilitySchema.partial().optional(),
-  productionId: z.string().nullable().optional(),
+  productionId: z.string().min(1),
 });
 
 export const UpdateTourSchema = CreateTourSchema.partial();

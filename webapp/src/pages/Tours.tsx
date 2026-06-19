@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink, Plus, Trash2, Route } from "lucide-react";
-import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import type { Tour, CreateTour, TourListItem } from "../../../backend/src/types";
+import type { Production } from "@/lib/types";
 import { TourShowsOverviewGrid } from "@/components/tour/TourShowsOverviewGrid";
 import { computeTourCrewTotals } from "@/lib/tourShowListStats";
 import { Button } from "@/components/ui/button";
@@ -166,6 +166,7 @@ interface NewTourDialogProps {
 function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [productionId, setProductionId] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"draft" | "active" | "completed">("draft");
@@ -174,10 +175,18 @@ function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
   const [tourManagerEmail, setTourManagerEmail] = useState("");
   const [notes, setNotes] = useState("");
 
+  const { data: shows, isLoading: showsLoading } = useQuery({
+    queryKey: ["shows", "productions"],
+    queryFn: () => api.get<Production[]>("/api/productions"),
+    enabled: open,
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: CreateTour) => api.post<Tour>("/api/tours", data),
     onSuccess: (tour) => {
       queryClient.invalidateQueries({ queryKey: ["tours"] });
+      queryClient.invalidateQueries({ queryKey: ["shows", "productions"] });
+      queryClient.invalidateQueries({ queryKey: ["productions"] });
       onOpenChange(false);
       resetForm();
       navigate(`/tours/${tour.id}`);
@@ -185,6 +194,7 @@ function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
   });
 
   function resetForm() {
+    setProductionId("");
     setName("");
     setDescription("");
     setStatus("draft");
@@ -196,10 +206,11 @@ function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!productionId || !name.trim()) return;
     const payload: CreateTour = {
       name: name.trim(),
       status,
+      productionId,
     };
     if (description.trim()) payload.description = description.trim();
     if (tourManagerName.trim()) payload.tourManagerName = tourManagerName.trim();
@@ -216,6 +227,37 @@ function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
           <DialogTitle>New Tour</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label className="text-white/60 text-xs uppercase tracking-wide">
+              Show <span className="text-red-400">*</span>
+            </Label>
+            <Select
+              value={productionId}
+              onValueChange={setProductionId}
+              disabled={showsLoading || (shows ?? []).length === 0}
+            >
+              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                <SelectValue placeholder={showsLoading ? "Loading shows..." : "Select a show"} />
+              </SelectTrigger>
+              <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                {(shows ?? []).map((show) => (
+                  <SelectItem key={show.id} value={show.id}>
+                    {show.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!showsLoading && (shows ?? []).length === 0 ? (
+              <p className="text-xs text-white/40">
+                Create an in-house show first on the{" "}
+                <Link to="/shows" className="text-white/70 underline hover:text-white">
+                  Shows
+                </Link>{" "}
+                page.
+              </p>
+            ) : null}
+          </div>
+
           <div className="space-y-2">
             <Label className="text-white/60 text-xs uppercase tracking-wide">
               Tour Name <span className="text-red-400">*</span>
@@ -318,7 +360,7 @@ function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
             </Button>
             <Button
               type="submit"
-              disabled={!name.trim() || createMutation.isPending}
+              disabled={!productionId || !name.trim() || createMutation.isPending}
               className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
             >
               {createMutation.isPending ? "Creating..." : "Create Tour"}
