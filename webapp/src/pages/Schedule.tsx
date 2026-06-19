@@ -17,6 +17,7 @@ import type {
 } from "../../../backend/src/types";
 import {
   ScheduleFilters,
+  ScheduleViewModeSelect,
   type ScheduleViewMode,
   type VisibilityFilters,
 } from "@/components/schedule/ScheduleFilters";
@@ -448,36 +449,25 @@ export default function Schedule() {
 
   const isYearDisc = viewMode === "yeardisc";
 
+  function handleViewModeChange(nextMode: ScheduleViewMode) {
+    setViewMode(nextMode);
+    if (nextMode === "next7") {
+      const now = new Date();
+      setAnchorDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+    }
+  }
+
   return (
     <div
       className={
         isYearDisc
           ? "app-page-fill md:app-page-fill flex min-h-0 w-full flex-1 flex-col gap-2 overflow-hidden p-3 md:p-4 max-md:app-page-fill-mobile"
-          : "app-page-fill md:app-page-fill flex flex-col gap-4 p-4 md:p-6 max-md:app-page-fill-mobile"
+          : "app-page-fill md:app-page-fill flex flex-col gap-3 p-3 md:p-4 max-md:app-page-fill-mobile"
       }
     >
       {isYearDisc ? (
         <div className="flex shrink-0 items-center gap-2 overflow-x-auto">
-          <ScheduleFilters
-            venues={venues ?? []}
-            people={people ?? []}
-            viewMode={viewMode}
-            visibility={visibility}
-            venueId={venueId}
-            personId={personId}
-            hideEntityFilters
-            hideVisibility
-            onVenueChange={setVenueId}
-            onPersonChange={setPersonId}
-            onViewModeChange={(nextMode) => {
-              setViewMode(nextMode);
-              if (nextMode === "next7") {
-                const now = new Date();
-                setAnchorDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
-              }
-            }}
-            onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
-          />
+          <ScheduleViewModeSelect viewMode={viewMode} onViewModeChange={handleViewModeChange} />
           <span className="h-4 w-px shrink-0 bg-white/10" aria-hidden="true" />
           <YearDiscViewPicker
             views={yearDiscViews}
@@ -535,7 +525,8 @@ export default function Schedule() {
       ) : (
         <>
           {/* Top bar */}
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between shrink-0">
+          <div className="flex shrink-0 items-start gap-2">
+            <ScheduleViewModeSelect viewMode={viewMode} onViewModeChange={handleViewModeChange} />
             <ScheduleFilters
               venues={venues ?? []}
               people={people ?? []}
@@ -543,23 +534,19 @@ export default function Schedule() {
               visibility={visibility}
               venueId={venueId}
               personId={personId}
+              hideViewMode
               onVenueChange={setVenueId}
               onPersonChange={setPersonId}
-              onViewModeChange={(nextMode) => {
-                setViewMode(nextMode);
-                if (nextMode === "next7") {
-                  const now = new Date();
-                  setAnchorDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
-                }
-              }}
+              onViewModeChange={handleViewModeChange}
               onVisibilityChange={(key, value) => setVisibility((prev) => ({ ...prev, [key]: value }))}
             />
+            <div className="flex-1 min-w-2" />
             <Button
               onClick={() => {
                 setBookingSlot(null);
                 setBookingOpen(true);
               }}
-              className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 flex-shrink-0"
+              className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2 shrink-0 h-8"
             >
               <Plus size={14} />
               New Booking
