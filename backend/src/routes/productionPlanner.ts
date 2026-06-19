@@ -30,6 +30,7 @@ import {
 } from "../lib/productionPlannerBuild";
 import { validatePhaseDates, type SchedulePhaseInput } from "../lib/productionSchedule";
 import { parseIncomingDateTime, parseIncomingDateTimeOrNull } from "../parseIncomingDateTime";
+import { ensureOrphanToursHaveProductions } from "../lib/ensureTourProductionShows";
 
 const productionPlannerRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -641,6 +642,8 @@ productionPlannerRouter.get("/productions", async (c) => {
   if (!canRead(c)) {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
+
+  await ensureOrphanToursHaveProductions(user.organizationId);
 
   const productions = await prisma.production.findMany({
     where: { organizationId: user.organizationId },

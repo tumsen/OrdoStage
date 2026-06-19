@@ -20,6 +20,7 @@ import { dayKeyFromDateInput, normalizeTimeHHMM } from "../lib/timeHHMM";
 import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
 import { parseIncomingDateTime } from "../parseIncomingDateTime";
 import { ensureTourTimeProject } from "../timeProjectSync";
+import { ensureOrphanToursHaveProductions } from "../lib/ensureTourProductionShows";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
 
@@ -260,6 +261,8 @@ toursRouter.get("/tours", async (c) => {
   if (!user?.organizationId)
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
+  await ensureOrphanToursHaveProductions(user.organizationId);
+
   const tours = await prisma.tour.findMany({
     where: { organizationId: user.organizationId },
     orderBy: { createdAt: "desc" },
@@ -341,6 +344,8 @@ toursRouter.get("/tours/:id", async (c) => {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
 
   const { id } = c.req.param();
+  await ensureOrphanToursHaveProductions(user.organizationId);
+
   const tour = await prisma.tour.findUnique({
     where: { id, organizationId: user.organizationId },
     include: {
