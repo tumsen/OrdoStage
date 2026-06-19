@@ -75,7 +75,6 @@ export function ScheduleFilters({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs text-white/40 uppercase tracking-wide">Filter:</span>
         {viewModeSelect}
 
         {hideEntityFilters ? null : (
@@ -113,7 +112,6 @@ export function ScheduleFilters({
 
       {hideVisibility ? null : (
         <div className="flex flex-wrap items-center gap-4">
-          <span className="text-xs text-white/40 uppercase tracking-wide">Show:</span>
           {(
             [
               ["event", "Events"],
