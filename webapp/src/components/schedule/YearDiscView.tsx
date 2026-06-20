@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { YearDiscSpanHoverCard } from "@/components/schedule/YearDiscSpanHoverCard";
+import type { EventDetail, InternalBookingDetail } from "../../../../backend/src/types";
 import {
   calendarItemTimeRangeLabel,
   itemsForDay,
@@ -321,19 +321,60 @@ function spanOnDay(span: YearDiscSpan, date: Date): boolean {
   return dateStr >= startKey && dateStr <= endKey;
 }
 
-function spanTimeLabel(span: YearDiscSpan): string {
-  if (span.calendarItem) return calendarItemTimeRangeLabel(span.calendarItem);
+function parseEventCalendarId(id: string): { eventId: string; showId?: string; jobId?: string } {
+  const jobM = /^(.+):show:([^:]+):job:([^:]+)$/.exec(id);
+  if (jobM?.[1] && jobM[2] && jobM[3]) return { eventId: jobM[1], showId: jobM[2], jobId: jobM[3] };
+  const showM = /^(.+):show:([^:]+)$/.exec(id);
+  if (showM?.[1] && showM[2]) return { eventId: showM[1], showId: showM[2] };
+  return { eventId: id };
+}
+
+function calendarItemAssignedPeopleLabel(item: CalendarItem): string | null {
+  if (item.kind === "booking") {
+    const people = (item.raw as InternalBookingDetail).people;
+    if (!people?.length) return null;
+    return people.map((p) => p.person.name).join(", ");
+  }
+  if (item.kind === "event" || item.kind === "job") {
+    const ev = item.raw as EventDetail;
+    const { showId, jobId } = parseEventCalendarId(item.id);
+    if (jobId) {
+      const show = showId ? ev.shows?.find((s) => s.id === showId) : undefined;
+      const job = show?.jobs?.find((j) => j.id === jobId);
+      if (!job) return null;
+      if (job.people?.length) return job.people.map((p) => p.name).join(", ");
+      return job.person?.name ?? null;
+    }
+    if (!ev.people?.length) return null;
+    return ev.people.map((p) => p.person.name).join(", ");
+  }
+  return null;
+}
+
+function spanInlineMetaLines(span: YearDiscSpan): string[] {
+  if (span.calendarItem) {
+    const people = calendarItemAssignedPeopleLabel(span.calendarItem);
+    return people ? [people] : [];
+  }
+  const lines: string[] = [];
+  if (span.projectName) lines.push(span.projectName);
+  if (span.note) lines.push(span.note);
+  return lines;
+}
+
+function spanTimeLabel(span: YearDiscSpan, hour12: boolean): string {
+  if (span.calendarItem) return calendarItemTimeRangeLabel(span.calendarItem, hour12);
   const start = new Date(span.startDate);
   const end = new Date(span.endDate ?? span.startDate);
   const sameDay =
     start.getFullYear() === end.getFullYear() &&
     start.getMonth() === end.getMonth() &&
     start.getDate() === end.getDate();
-  const timeFmt: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" };
+  const timeFmt: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", hour12 };
   if (sameDay) {
     return `${start.toLocaleTimeString(undefined, timeFmt)}–${end.toLocaleTimeString(undefined, timeFmt)}`;
   }
-  return start.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return start.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12 });
 }
 
 export function YearDiscView({
@@ -356,7 +397,6 @@ export function YearDiscView({
   const svgRef = useRef<SVGSVGElement>(null);
   const discHostRef = useRef<HTMLDivElement>(null);
   const discPixelSize = useSquareFitSize(discHostRef);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [ringSettingsOpen, setRingSettingsOpen] = useState(false);
   const [focusedRingId, setFocusedRingId] = useState<string | null>(null);
   const timeline = useMemo(
@@ -567,8 +607,8 @@ export function YearDiscView({
               key={segment.id}
               d={segment.path}
               fill={segment.fill}
-              opacity={hoveredId && hoveredId !== segment.id ? segment.opacity * 0.45 : segment.opacity}
-              className="pointer-events-none transition-opacity"
+              opacity={segment.opacity}
+              className="pointer-events-none"
             />
           ))}
           {rings.map((ring, index) => {
@@ -671,30 +711,16 @@ export function YearDiscView({
             {formatWeekNumber(selectedDate, locale)}
           </text>
         </svg>
-        <div className="pointer-events-none absolute inset-0">
+        <div className="pointer-events-none absolute inset-0 z-10">
           {segments.map((segment) => (
-            <YearDiscSpanHoverCard
-              key={`hover-${segment.id}`}
-              span={segment.span}
-              ringColor={segment.fill}
-              locale={locale}
-              hour12={hour12}
-              side="right"
-              onHoverChange={(open) => {
-                setHoveredId((current) => {
-                  if (open) return segment.id;
-                  return current === segment.id ? null : current;
-                });
-              }}
-            >
-              <button
-                type="button"
-                aria-label={segment.span.title}
-                className="pointer-events-auto absolute inset-0 cursor-pointer border-0 bg-transparent p-0"
-                style={{ clipPath: segment.clipPath, WebkitClipPath: segment.clipPath }}
-                onClick={() => handleSegmentClick(segment)}
-              />
-            </YearDiscSpanHoverCard>
+            <button
+              key={`hit-${segment.id}`}
+              type="button"
+              aria-label={segment.span.title}
+              className="pointer-events-auto absolute inset-0 cursor-pointer border-0 bg-transparent p-0"
+              style={{ clipPath: segment.clipPath, WebkitClipPath: segment.clipPath }}
+              onClick={() => handleSegmentClick(segment)}
+            />
           ))}
         </div>
         <div
@@ -724,40 +750,37 @@ export function YearDiscView({
               <li className="text-sm text-white/40">Nothing on this day.</li>
             ) : (
               daySpanGroups.map(({ key, span, ringIndices }) => {
-                const time = spanTimeLabel(span);
-                const primaryRingColor = yearDiscRingColor(rings[ringIndices[0]!]!, ringIndices[0]!);
+                const time = spanTimeLabel(span, hour12);
+                const metaLines = spanInlineMetaLines(span);
                 return (
                   <li key={key}>
-                    <YearDiscSpanHoverCard
-                      span={span}
-                      ringColor={primaryRingColor}
-                      locale={locale}
-                      hour12={hour12}
-                      side="left"
+                    <button
+                      type="button"
+                      onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
+                      className={cn(
+                        "flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07]",
+                        span.calendarItem ? "cursor-pointer" : "cursor-default opacity-80",
+                      )}
                     >
-                      <button
-                        type="button"
-                        onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
-                        className={cn(
-                          "flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07]",
-                          span.calendarItem ? "cursor-pointer" : "cursor-default opacity-80",
-                        )}
-                      >
-                        <span className="mt-1 flex shrink-0 flex-wrap gap-0.5">
-                          {ringIndices.map((ringIndex) => (
-                            <span
-                              key={ringIndex}
-                              className="h-2.5 w-2.5 rounded-full ring-1 ring-white/10"
-                              style={{ backgroundColor: yearDiscRingColor(rings[ringIndex]!, ringIndex) }}
-                            />
-                          ))}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm text-white">{span.title}</span>
-                          {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
-                        </span>
-                      </button>
-                    </YearDiscSpanHoverCard>
+                      <span className="mt-1 flex shrink-0 flex-wrap gap-0.5">
+                        {ringIndices.map((ringIndex) => (
+                          <span
+                            key={ringIndex}
+                            className="h-2.5 w-2.5 rounded-full ring-1 ring-white/10"
+                            style={{ backgroundColor: yearDiscRingColor(rings[ringIndex]!, ringIndex) }}
+                          />
+                        ))}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-white">{span.title}</span>
+                        {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
+                        {metaLines.map((line, index) => (
+                          <span key={index} className="block truncate text-[11px] text-white/40">
+                            {line}
+                          </span>
+                        ))}
+                      </span>
+                    </button>
                   </li>
                 );
               })

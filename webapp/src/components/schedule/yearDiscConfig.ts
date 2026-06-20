@@ -69,6 +69,10 @@ export type YearDiscSpan = {
   opacity?: number;
   calendarItem?: CalendarItem;
   timeEntryId?: string;
+  /** Time-report project name (time entries only). */
+  projectName?: string | null;
+  /** Time-report note (time entries only). */
+  note?: string | null;
 };
 
 export type YearDiscResolveContext = {
@@ -708,15 +712,14 @@ function calendarItemToSpan(item: CalendarItem): YearDiscSpan {
 }
 
 function timeEntryToSpan(entry: TimeReportEntry): YearDiscSpan {
-  const title = entry.note?.trim()
-    ? `${entry.personName} · ${entry.note}`
-    : `${entry.personName} · ${TIME_CATEGORY_LABELS[entry.category] ?? entry.category}`;
   return {
     id: `time:${entry.id}`,
-    title,
+    title: `${entry.personName} · ${TIME_CATEGORY_LABELS[entry.category] ?? entry.category}`,
     startDate: entry.startsAt,
     endDate: entry.endsAt,
     timeEntryId: entry.id,
+    projectName: entry.projectName?.trim() || null,
+    note: entry.note?.trim() || null,
   };
 }
 
