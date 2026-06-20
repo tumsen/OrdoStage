@@ -443,6 +443,9 @@ function YearDiscEntryCard({
   locale,
   hour12,
   offSelectedDay,
+  highlighted = false,
+  onMouseEnter,
+  onMouseLeave,
   onClick,
 }: {
   group: DaySpanGroup;
@@ -450,19 +453,28 @@ function YearDiscEntryCard({
   locale: string;
   hour12: boolean;
   offSelectedDay: boolean;
+  highlighted?: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   onClick: () => void;
 }) {
   const { span, ringIndices } = group;
   const time = spanTimeLabel(span, hour12);
   const { people, lines } = spanInlineMeta(span);
   const staffingLines = span.calendarItem ? calendarItemStaffingLines(span.calendarItem) : [];
+  const showDetails = highlighted || offSelectedDay;
 
   return (
     <button
       type="button"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       onClick={onClick}
       className={cn(
-        "flex w-full items-start gap-2 rounded-md border border-white/25 bg-white/[0.08] px-2.5 py-2 text-left ring-1 ring-white/15 transition-colors hover:bg-white/[0.11]",
+        "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
+        highlighted || offSelectedDay
+          ? "border-white/25 bg-white/[0.08] ring-1 ring-white/15 hover:bg-white/[0.11]"
+          : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]",
         span.calendarItem ? "cursor-pointer" : "cursor-default opacity-80",
       )}
     >
@@ -483,15 +495,17 @@ function YearDiscEntryCard({
         ) : null}
         <span className="block text-sm leading-snug text-white">{span.title}</span>
         {time ? <span className="mt-0.5 block text-[11px] text-white/45">{time}</span> : null}
-        {staffingLines.map((line, index) => (
-          <span
-            key={`staff-${index}`}
-            className={cn("mt-1 block text-[11px] leading-snug", staffingLineClassName(line.tone))}
-          >
-            {line.text}
-          </span>
-        ))}
-        {people.length > 0 ? (
+        {showDetails
+          ? staffingLines.map((line, index) => (
+              <span
+                key={`staff-${index}`}
+                className={cn("mt-1 block text-[11px] leading-snug", staffingLineClassName(line.tone))}
+              >
+                {line.text}
+              </span>
+            ))
+          : null}
+        {showDetails && people.length > 0 ? (
           <ul className="mt-1 space-y-0.5">
             {people.map((name, index) => (
               <li key={index} className="text-[11px] leading-snug text-white/40">
@@ -500,14 +514,16 @@ function YearDiscEntryCard({
             ))}
           </ul>
         ) : null}
-        {lines.map((line, index) => (
-          <span
-            key={index}
-            className="mt-1 block whitespace-pre-wrap break-words text-[11px] leading-snug text-white/40"
-          >
-            {line}
-          </span>
-        ))}
+        {showDetails
+          ? lines.map((line, index) => (
+              <span
+                key={index}
+                className="mt-1 block whitespace-pre-wrap break-words text-[11px] leading-snug text-white/40"
+              >
+                {line}
+              </span>
+            ))
+          : null}
       </span>
     </button>
   );
@@ -569,6 +585,7 @@ export function YearDiscView({
   const [ringSettingsOpen, setRingSettingsOpen] = useState(false);
   const [focusedRingId, setFocusedRingId] = useState<string | null>(null);
   const [discHoveredSegment, setDiscHoveredSegment] = useState<DiscSegment | null>(null);
+  const [sidebarHoveredEntryKey, setSidebarHoveredEntryKey] = useState<string | null>(null);
   const timeline = useMemo(
     () => buildYearDiscTimeline(config.range ?? DEFAULT_YEAR_DISC_RANGE, calendarYear),
     [config.range, calendarYear]
@@ -657,9 +674,33 @@ export function YearDiscView({
     [angleOffset, locale, timeline]
   );
 
+  const daySpanGroups = useMemo((): DaySpanGroup[] => {
+    const groups = new Map<string, DaySpanGroup>();
+
+    rings.forEach((ring, ringIndex) => {
+      for (const span of resolveYearDiscRingSpans(ring, sources)) {
+        if (!spanOnDay(span, selectedDate)) continue;
+        const key = spanGroupKey(span);
+        const existing = groups.get(key);
+        if (existing) {
+          if (!existing.ringIndices.includes(ringIndex)) {
+            existing.ringIndices.push(ringIndex);
+          }
+        } else {
+          groups.set(key, { key, span, ringIndices: [ringIndex] });
+        }
+      }
+    });
+
+    return Array.from(groups.values()).sort(
+      (a, b) => new Date(a.span.startDate).getTime() - new Date(b.span.startDate).getTime(),
+    );
+  }, [rings, sources, selectedDate]);
+
   const hoveredSidebarEntry = useMemo((): SidebarEntry | null => {
     if (!discHoveredSegment) return null;
     const { span } = discHoveredSegment;
+    if (spanOnDay(span, selectedDate)) return null;
     const key = spanGroupKey(span);
     return {
       group: {
@@ -667,11 +708,21 @@ export function YearDiscView({
         span,
         ringIndices: ringIndicesForSpan(span, rings, sources),
       },
-      offSelectedDay: !spanOnDay(span, selectedDate),
+      offSelectedDay: true,
     };
   }, [discHoveredSegment, rings, sources, selectedDate]);
 
   const discHoveredEntryKey = discHoveredSegment ? spanGroupKey(discHoveredSegment.span) : null;
+
+  const entryListRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    if (!discHoveredEntryKey) return;
+    const node = entryListRef.current?.querySelector<HTMLElement>(
+      `[data-entry-key="${discHoveredEntryKey}"]`,
+    );
+    node?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [discHoveredEntryKey, daySpanGroups]);
 
   const selectedDayLabel = selectedDate.toLocaleDateString(locale, {
     weekday: "long",
@@ -701,6 +752,7 @@ export function YearDiscView({
         const next = event.relatedTarget;
         if (next instanceof Node && event.currentTarget.contains(next)) return;
         setDiscHoveredSegment(null);
+        setSidebarHoveredEntryKey(null);
       }}
     >
       <div
@@ -915,26 +967,52 @@ export function YearDiscView({
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
           <p className="mt-1 text-[11px] text-white/35">
-            Drag the yellow handle to change day. Hover a ring entry to preview; click to open details.
+            Drag the yellow handle to change day. Hover a ring entry for full details; click to open.
           </p>
-          <div className="mt-3">
-            {hoveredSidebarEntry ? (
+          {hoveredSidebarEntry ? (
+            <div className="mt-3">
               <YearDiscEntryCard
                 group={hoveredSidebarEntry.group}
                 rings={rings}
                 locale={locale}
                 hour12={hour12}
-                offSelectedDay={hoveredSidebarEntry.offSelectedDay}
+                offSelectedDay
+                highlighted
                 onClick={() => {
                   if (hoveredSidebarEntry.group.span.calendarItem) {
                     onItemClick(hoveredSidebarEntry.group.span.calendarItem);
                   }
                 }}
               />
+            </div>
+          ) : null}
+          <ul ref={entryListRef} className="mt-3 space-y-2">
+            {daySpanGroups.length === 0 ? (
+              <li className="text-sm text-white/40">Nothing on this day.</li>
             ) : (
-              <p className="text-sm text-white/40">Hover a ring entry to see details.</p>
+              daySpanGroups.map((group) => {
+                const highlighted =
+                  (discHoveredEntryKey ?? sidebarHoveredEntryKey) === group.key;
+                return (
+                  <li key={group.key} data-entry-key={group.key}>
+                    <YearDiscEntryCard
+                      group={group}
+                      rings={rings}
+                      locale={locale}
+                      hour12={hour12}
+                      offSelectedDay={false}
+                      highlighted={highlighted}
+                      onMouseEnter={() => setSidebarHoveredEntryKey(group.key)}
+                      onMouseLeave={() => setSidebarHoveredEntryKey(null)}
+                      onClick={() => {
+                        if (group.span.calendarItem) onItemClick(group.span.calendarItem);
+                      }}
+                    />
+                  </li>
+                );
+              })
             )}
-          </div>
+          </ul>
         </div>
       </div>
 
