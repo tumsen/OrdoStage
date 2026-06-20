@@ -18,7 +18,6 @@ import {
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { CALENDAR_PANEL_FLEX_COLUMN_CLASS, CALENDAR_PANEL_SHELL_CLASS, CALENDAR_PANEL_SHELL_INSET_X_CLASS } from "@/lib/weekGridColumns";
 import { ScheduleItemDetailSheet } from "@/components/schedule/ScheduleItemDetailSheet";
-import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { VenueCalendarContextStrip } from "@/components/venue/VenueCalendarContextStrip";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -95,7 +94,6 @@ export default function VenueDetail() {
   );
   const [next31Start, setNext31Start] = useState(() => startOfLocalDay(new Date()));
   const [detailItem, setDetailItem] = useState<CalendarItem | null>(null);
-  const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [bookingSlot, setBookingSlot] = useState<{ startDate: string; endDate: string } | null>(null);
 
@@ -349,12 +347,6 @@ export default function VenueDetail() {
         item={detailItem}
         locale={locale}
         onClose={() => setDetailItem(null)}
-        onEdit={(item) => setSelectedItem(item)}
-      />
-
-      <EditItemSheet
-        item={selectedItem}
-        onClose={() => setSelectedItem(null)}
         venues={venues ?? []}
         people={people ?? []}
       />

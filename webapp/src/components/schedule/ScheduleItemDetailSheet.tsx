@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Sheet,
   SheetContent,
@@ -8,15 +8,18 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, Pencil, UserCircle, Users } from "lucide-react";
+import { Calendar, Clock, MapPin, UserCircle, Users } from "lucide-react";
 import type { CalendarItem } from "./scheduleUtils";
 import { getItemTimeRange, itemColor } from "./scheduleUtils";
+import { EventScheduleSummary, ScheduleBookingEditForm } from "./EditItemSheet";
 import { cn } from "@/lib/utils";
 import type {
   EventDetail,
   InternalBookingDetail,
+  Person,
   TourDetail,
   TourShow,
+  Venue,
 } from "../../../../backend/src/types";
 import {
   scheduleEventLabel,
@@ -124,16 +127,27 @@ export function ScheduleItemDetailSheet({
   locale,
   onClose,
   onEdit,
+  venues,
+  people,
 }: {
   item: CalendarItem | null;
   locale: string;
   onClose: () => void;
   onEdit?: (item: CalendarItem) => void;
+  venues?: Venue[];
+  people?: Person[];
 }) {
+  const navigate = useNavigate();
   const open = item !== null;
-  const canEdit = Boolean(onEdit) && item && item.kind !== "tour";
+  const editable = Boolean(item && venues && people && item.kind !== "tour");
+  const canEditLegacy = Boolean(onEdit) && item && item.kind !== "tour" && !editable;
   const { effective } = usePreferences();
   const hour12 = effective?.timeFormat !== "24h";
+
+  const showMatch = item ? /^[^:]+:show:([^:]+)/.exec(item.id) : null;
+  const selectedShowId = showMatch?.[1] ?? null;
+  const jobMatch = item ? /:job:([^:]+)$/.exec(item.id) : null;
+  const selectedJobId = jobMatch?.[1] ?? null;
 
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
@@ -168,22 +182,52 @@ export function ScheduleItemDetailSheet({
                 ) : null}
               </div>
               <SheetTitle className="text-white text-lg font-semibold leading-snug pr-8">
-                {item.title}
+                {editable && item.kind === "booking" ? "Edit booking" : item.title}
               </SheetTitle>
+              {editable && item.kind === "booking" ? (
+                <p className="text-xs text-white/45">Changes save automatically when you leave a field.</p>
+              ) : null}
             </SheetHeader>
 
             <div className="flex-1 overflow-y-auto min-h-0 py-4 space-y-5">
-              <ScheduleStartEndBlock item={item} locale={locale} hour12={hour12} />
-
-              {item.kind === "booking" ? (
-                <BookingBody item={item} />
-              ) : item.kind === "tour" ? (
-                <TourBody item={item} locale={locale} />
+              {editable && item.kind === "booking" ? (
+                <ScheduleBookingEditForm
+                  key={(item.raw as InternalBookingDetail).id}
+                  booking={item.raw as InternalBookingDetail}
+                  venues={venues!}
+                  people={people!}
+                  onClose={onClose}
+                  onSaved={onClose}
+                />
+              ) : editable && (item.kind === "event" || item.kind === "job") ? (
+                <>
+                  <ScheduleStartEndBlock item={item} locale={locale} hour12={hour12} />
+                  <EventScheduleSummary
+                    event={item.raw as EventDetail}
+                    selectedShowId={selectedShowId}
+                    highlightJobId={selectedJobId}
+                    onOpenEvent={() => {
+                      navigate(`/events/${(item.raw as EventDetail).id}`);
+                      onClose();
+                    }}
+                  />
+                </>
               ) : (
-                <EventJobBody item={item} locale={locale} />
+                <>
+                  <ScheduleStartEndBlock item={item} locale={locale} hour12={hour12} />
+
+                  {item.kind === "booking" ? (
+                    <BookingBody item={item} />
+                  ) : item.kind === "tour" ? (
+                    <TourBody item={item} locale={locale} />
+                  ) : (
+                    <EventJobBody item={item} locale={locale} />
+                  )}
+                </>
               )}
             </div>
 
+            {editable && item.kind === "booking" ? null : (
             <SheetFooter className="border-t border-white/10 pt-3 pb-1 gap-2 flex-row flex-wrap shrink-0">
               {item.kind === "tour" ? (
                 <Button asChild variant="secondary" className="bg-white/10 border-white/15 text-white hover:bg-white/15">
@@ -199,7 +243,7 @@ export function ScheduleItemDetailSheet({
                   </Link>
                 </Button>
               ) : null}
-              {canEdit ? (
+              {canEditLegacy ? (
                 <Button
                   type="button"
                   variant="default"
@@ -209,11 +253,11 @@ export function ScheduleItemDetailSheet({
                     onClose();
                   }}
                 >
-                  <Pencil size={14} />
                   Edit
                 </Button>
               ) : null}
             </SheetFooter>
+            )}
           </>
         )}
       </SheetContent>

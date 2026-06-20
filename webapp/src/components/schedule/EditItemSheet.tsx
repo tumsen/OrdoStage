@@ -75,7 +75,7 @@ function eventMetaFromCustomFields(customFields: string | null | undefined): {
   return { contacts, smokeFx, hazeFx, strobeFx };
 }
 
-function EventScheduleSummary({
+export function EventScheduleSummary({
   event,
   selectedShowId,
   highlightJobId,
@@ -289,7 +289,7 @@ interface BookingFormProps {
   onClose: () => void;
 }
 
-function BookingForm({ booking, venues, people, onClose }: BookingFormProps) {
+export function ScheduleBookingEditForm({ booking, venues, people, onClose }: BookingFormProps) {
   const queryClient = useQueryClient();
 
   const { marker, displayTitle: titleInitial } = splitInternalBookingSyncMarker(booking.title);
@@ -364,7 +364,7 @@ function BookingForm({ booking, venues, people, onClose }: BookingFormProps) {
   const lbl = "text-white/50 text-xs uppercase tracking-wide";
 
   return (
-    <div className="space-y-5 mt-4 pb-8" onBlurCapture={bookingAutoSave.onBlurCapture}>
+    <div className="space-y-5 pb-8" onBlurCapture={bookingAutoSave.onBlurCapture}>
       <AutoSaveStatus status={bookingAutoSave.status} error={bookingAutoSave.error} />
       <div>
         <Label className={lbl}>Title</Label>
@@ -549,7 +549,7 @@ export function EditItemSheet({ item, onClose, venues, people }: EditItemSheetPr
             }}
           />
         ) : (
-          <BookingForm
+          <ScheduleBookingEditForm
             key={(raw as InternalBookingDetail).id}
             booking={raw as InternalBookingDetail}
             venues={venues}

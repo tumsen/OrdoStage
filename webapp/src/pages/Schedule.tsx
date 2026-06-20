@@ -22,7 +22,6 @@ import {
   type VisibilityFilters,
 } from "@/components/schedule/ScheduleFilters";
 import { CalendarGrid } from "@/components/schedule/CalendarGrid";
-import { EditItemSheet } from "@/components/schedule/EditItemSheet";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { ScheduleItemDetailSheet } from "@/components/schedule/ScheduleItemDetailSheet";
 import { ScheduleLegend } from "@/components/schedule/ScheduleLegend";
@@ -306,7 +305,6 @@ export default function Schedule() {
   );
   const [venueId, setVenueId] = useState("all");
   const [personId, setPersonId] = useState("all");
-  const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   const [detailItem, setDetailItem] = useState<CalendarItem | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [bookingSlot, setBookingSlot] = useState<{ startDate: string; endDate: string } | null>(null);
@@ -642,7 +640,6 @@ export default function Schedule() {
                     timeEntries: yearDiscTimeReport?.entries,
                   }}
                   locale={locale}
-                  onEdit={(item) => setSelectedItem(item)}
                 />
               </div>
             ) : viewMode === "month" ? (
@@ -761,13 +758,6 @@ export default function Schedule() {
         item={detailItem}
         locale={locale}
         onClose={() => setDetailItem(null)}
-        onEdit={(item) => setSelectedItem(item)}
-      />
-
-      {/* Edit sheet — events and bookings (from detail “Edit”) */}
-      <EditItemSheet
-        item={selectedItem}
-        onClose={() => setSelectedItem(null)}
         venues={venues ?? []}
         people={people ?? []}
       />

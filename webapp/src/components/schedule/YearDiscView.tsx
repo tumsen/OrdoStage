@@ -569,15 +569,12 @@ export function YearDiscView({
   onConfigChange,
   sources,
   locale,
-  onEdit,
 }: {
   calendarYear: number;
   config: YearDiscConfig;
   onConfigChange: (config: YearDiscConfig) => void;
   sources: YearDiscResolveContext;
   locale: string;
-  /** Opens the edit sheet for events and bookings. */
-  onEdit?: (item: CalendarItem) => void;
 }) {
   const { effective } = usePreferences();
   const hour12 = effective?.timeFormat === "12h";
@@ -1059,7 +1056,8 @@ export function YearDiscView({
         item={detailItem}
         locale={locale}
         onClose={() => setDetailItem(null)}
-        onEdit={onEdit}
+        venues={sources.venues}
+        people={sources.people}
       />
 
       <YearDiscRingSettingsDialog
