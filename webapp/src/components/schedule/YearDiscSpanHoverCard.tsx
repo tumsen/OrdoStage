@@ -6,7 +6,7 @@ import type { YearDiscSpan } from "@/components/schedule/yearDiscConfig";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 export const YEAR_DISC_SPAN_HOVER_CONTENT_CLASS =
-  "w-[min(22rem,calc(100vw-2rem))] max-h-[min(24rem,70vh)] overflow-y-auto border border-white/10 bg-[#14141c] p-3 text-white shadow-xl";
+  "w-[min(24rem,calc(100vw-2rem))] max-h-[min(32rem,80vh)] overflow-y-auto border border-white/10 bg-[#14141c] p-3 text-white shadow-xl";
 
 function spanTimeLabel(span: YearDiscSpan, hour12: boolean): string {
   if (span.calendarItem) return calendarItemTimeRangeLabel(span.calendarItem, hour12);

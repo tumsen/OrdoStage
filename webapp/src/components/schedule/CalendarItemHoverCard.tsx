@@ -3,11 +3,21 @@ import { Link } from "react-router-dom";
 import type { EventDetail, InternalBookingDetail, TourDetail } from "../../../../backend/src/types";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
+import { internalBookingDisplayTitle, type CalendarItem } from "./scheduleUtils";
 import {
-  getItemTimeRange,
-  internalBookingDisplayTitle,
-  type CalendarItem,
-} from "./scheduleUtils";
+  BookingBody,
+  EventJobBody,
+  ScheduleStartEndBlock,
+  TourBody,
+} from "./ScheduleItemDetailSheet";
+
+const BOOKING_TYPE_LABELS: Record<string, string> = {
+  rehearsal: "Rehearsal",
+  maintenance: "Maintenance",
+  private: "Private",
+  venue_booking: "Venue booking",
+  other: "Other",
+};
 
 function parseEventCalendarId(id: string): { eventId: string; showId?: string; jobId?: string } {
   const jobM = /^(.+):show:([^:]+):job:([^:]+)$/.exec(id);
@@ -17,146 +27,57 @@ function parseEventCalendarId(id: string): { eventId: string; showId?: string; j
   return { eventId: id };
 }
 
-const TOUR_CAL_RE = /^tour:([^:]+):show:([^:]+)(?::ev:([^:]+))?$/;
-
-function parseTourCalendarId(
-  id: string,
-): { tourId: string; showId: string; scheduleEventId?: string } | null {
-  const m = TOUR_CAL_RE.exec(id);
-  if (!m?.[1] || !m[2]) return null;
-  return { tourId: m[1], showId: m[2], scheduleEventId: m[3] };
+function kindLabel(item: CalendarItem): string {
+  if (item.kind === "booking") return BOOKING_TYPE_LABELS[item.type ?? "other"] ?? "Booking";
+  if (item.kind === "event") return "Event";
+  if (item.kind === "job") return "Show job";
+  if (item.kind === "tour") return "Tour";
+  return item.kind;
 }
 
-function formatAssignedPeople(entries: Array<{ name: string; role?: string | null }>): string | null {
-  if (entries.length === 0) return null;
-  return entries
-    .map(({ name, role }) => (role?.trim() ? `${name} (${role.trim()})` : name))
-    .join(", ");
-}
-
-function assignedPeopleLabel(item: CalendarItem): string | null {
+function itemTitle(item: CalendarItem): string {
   if (item.kind === "booking") {
-    const b = item.raw as InternalBookingDetail;
-    return formatAssignedPeople(
-      (b.people ?? []).map((p) => ({ name: p.person.name, role: p.role })),
-    );
+    return internalBookingDisplayTitle((item.raw as InternalBookingDetail).title);
   }
+  return item.title;
+}
 
-  if (item.kind === "event") {
-    const ev = item.raw as EventDetail;
-    return formatAssignedPeople((ev.people ?? []).map((p) => ({ name: p.person.name, role: p.role })));
-  }
-
-  if (item.kind === "job") {
-    const ev = item.raw as EventDetail;
-    const { showId, jobId } = parseEventCalendarId(item.id);
-    const job =
-      showId && jobId
-        ? ev.shows?.find((s) => s.id === showId)?.jobs?.find((j) => j.id === jobId)
-        : undefined;
-    if (!job) return null;
-    if (job.people?.length) return job.people.map((p) => p.name).join(", ");
-    if (job.person?.name) return job.person.name;
+function FooterLinks({ item }: { item: CalendarItem }) {
+  if (item.kind === "booking") {
     return null;
   }
 
   if (item.kind === "tour") {
     const tour = item.raw as TourDetail;
-    const parts = parseTourCalendarId(item.id);
-    const show = parts ? tour.shows?.find((s) => s.id === parts.showId) : undefined;
-    const showPeople = formatAssignedPeople(
-      (show?.showPeople ?? []).map((p) => ({ name: p.person.name, role: p.role })),
+    return (
+      <div className="border-t border-white/10 pt-2">
+        <Link
+          to={`/tours/${tour.id}`}
+          className="text-[11px] font-medium text-sky-300 hover:text-sky-200 underline underline-offset-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Open tour
+        </Link>
+      </div>
     );
-    if (showPeople) return showPeople;
-    return formatAssignedPeople((tour.people ?? []).map((p) => ({ name: p.person.name, role: p.role })));
+  }
+
+  if (item.kind === "event" || item.kind === "job") {
+    const eventId = parseEventCalendarId(item.id).eventId;
+    return (
+      <div className="border-t border-white/10 pt-2">
+        <Link
+          to={`/events/${eventId}`}
+          className="text-[11px] font-medium text-sky-300 hover:text-sky-200 underline underline-offset-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Open event
+        </Link>
+      </div>
+    );
   }
 
   return null;
-}
-
-function bookingTypeLabel(type: string): string {
-  switch (type) {
-    case "rehearsal":
-      return "Rehearsal";
-    case "maintenance":
-      return "Maintenance";
-    case "private":
-      return "Private";
-    case "venue_booking":
-      return "Venue booking";
-    case "other":
-      return "Other";
-    default:
-      return type;
-  }
-}
-
-function formatDateTime(d: Date, locale: string, hour12: boolean): string {
-  return d.toLocaleString(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-    hour12,
-  });
-}
-
-function formatDate(d: Date, locale: string): string {
-  return d.toLocaleDateString(locale, { dateStyle: "medium" });
-}
-
-function DetailRow({ label, children }: { label: string; children: ReactNode }) {
-  if (children == null || children === "") return null;
-  return (
-    <div className="grid grid-cols-[5.75rem_minmax(0,1fr)] gap-x-2 text-[11px] leading-snug">
-      <div className="text-white/45 font-medium">{label}</div>
-      <div className="text-white/90 min-w-0 break-words">{children}</div>
-    </div>
-  );
-}
-
-function StartEndRows({
-  start,
-  end,
-  hasExplicitTime,
-  locale,
-  hour12,
-}: {
-  start: Date;
-  end: Date;
-  hasExplicitTime: boolean;
-  locale: string;
-  hour12: boolean;
-}) {
-  if (hasExplicitTime) {
-    return (
-      <>
-        <DetailRow label="Start:">{formatDateTime(start, locale, hour12)}</DetailRow>
-        <DetailRow label="End:">{formatDateTime(end, locale, hour12)}</DetailRow>
-      </>
-    );
-  }
-  return (
-    <>
-      <DetailRow label="Start:">{formatDate(start, locale)}</DetailRow>
-      <DetailRow label="End:">
-        {end.getTime() !== start.getTime() ? formatDate(end, locale) : formatDate(end, locale)}
-      </DetailRow>
-    </>
-  );
-}
-
-function GoToEventLink({ eventId }: { eventId: string }) {
-  if (!eventId) return null;
-  return (
-    <div className="pt-2 border-t border-white/10 mt-2">
-      <Link
-        to={`/events/${eventId}`}
-        className="text-[11px] font-medium text-sky-300 hover:text-sky-200 underline underline-offset-2"
-        onClick={(e) => e.stopPropagation()}
-      >
-        Go to event
-      </Link>
-    </div>
-  );
 }
 
 export function CalendarItemHoverBody({
@@ -168,125 +89,29 @@ export function CalendarItemHoverBody({
   locale: string;
   hour12: boolean;
 }) {
-  const { start, end, hasExplicitTime } = getItemTimeRange(item);
-
-  const kindLabel =
-    item.kind === "booking"
-      ? "Booking"
-      : item.kind === "event"
-        ? "Event"
-        : item.kind === "job"
-          ? "Show job"
-          : item.kind === "tour"
-            ? "Tour"
-            : item.kind;
-
-  if (item.kind === "booking") {
-    const b = item.raw as InternalBookingDetail & { eventId?: string | null };
-    const title = internalBookingDisplayTitle(b.title);
-    const people = assignedPeopleLabel(item);
-
-    return (
-      <div className="space-y-2.5">
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">{kindLabel}</div>
-          <div className="text-sm font-semibold text-white leading-tight mt-0.5">{title}</div>
-        </div>
-        <div className="space-y-1.5 border-t border-white/10 pt-2">
-          <DetailRow label="Type">{bookingTypeLabel(b.type)}</DetailRow>
-          <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
-          <DetailRow label="Status">{item.status}</DetailRow>
-          <DetailRow label="Venue">{b.venue?.name}</DetailRow>
-          {(b.venue?.addressCity || b.venue?.addressStreet) && (
-            <DetailRow label="Address">
-              {[b.venue?.addressStreet, b.venue?.addressNumber, b.venue?.addressZip, b.venue?.addressCity]
-                .filter(Boolean)
-                .join(", ")}
-            </DetailRow>
-          )}
-          <DetailRow label="Assigned">{people}</DetailRow>
-          <DetailRow label="Description">{b.description?.trim()}</DetailRow>
-          <DetailRow label="Created by">{b.createdBy?.name}</DetailRow>
-          <DetailRow label="Created">{b.createdAt ? formatDateTime(new Date(b.createdAt), locale, hour12) : null}</DetailRow>
-          <DetailRow label="Updated">{b.updatedAt ? formatDateTime(new Date(b.updatedAt), locale, hour12) : null}</DetailRow>
-          {b.isLocked ? <DetailRow label="Lock">Locked</DetailRow> : null}
-        </div>
-        {b.eventId ? <GoToEventLink eventId={b.eventId} /> : null}
-      </div>
-    );
-  }
-
-  if (item.kind === "event") {
-    const ev = item.raw as EventDetail;
-    const assigned = assignedPeopleLabel(item);
-    return (
-      <div className="space-y-2.5">
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">{kindLabel}</div>
-          <div className="text-sm font-semibold text-white leading-tight mt-0.5">{item.title}</div>
-        </div>
-        <div className="space-y-1.5 border-t border-white/10 pt-2">
-          <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
-          <DetailRow label="Status">{item.status ?? ev.status}</DetailRow>
-          <DetailRow label="Venue">{ev.venue?.name}</DetailRow>
-          <DetailRow label="Assigned">{assigned}</DetailRow>
-          <DetailRow label="Description">{ev.description?.trim()}</DetailRow>
-        </div>
-        <GoToEventLink eventId={ev.id} />
-      </div>
-    );
-  }
-
-  if (item.kind === "job") {
-    const ev = item.raw as EventDetail;
-    const assigned = assignedPeopleLabel(item);
-    return (
-      <div className="space-y-2.5">
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">{kindLabel}</div>
-          <div className="text-sm font-semibold text-white leading-tight mt-0.5">{item.title}</div>
-        </div>
-        <div className="space-y-1.5 border-t border-white/10 pt-2">
-          <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
-          <DetailRow label="Status">{item.status}</DetailRow>
-          <DetailRow label="Venue">{item.venueLabel ?? ev.venue?.name}</DetailRow>
-          <DetailRow label="Event">{ev.title}</DetailRow>
-          <DetailRow label="Assigned">{assigned}</DetailRow>
-        </div>
-        <GoToEventLink eventId={ev.id} />
-      </div>
-    );
-  }
-
-  if (item.kind === "tour") {
-    const tour = item.raw as TourDetail;
-    const assigned = assignedPeopleLabel(item);
-    return (
-      <div className="space-y-2.5">
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">{kindLabel}</div>
-          <div className="text-sm font-semibold text-white leading-tight mt-0.5">{item.title}</div>
-        </div>
-        <div className="space-y-1.5 border-t border-white/10 pt-2">
-          <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
-          <DetailRow label="Status">{item.status ?? tour.status}</DetailRow>
-          <DetailRow label="Venue / city">{item.venueLabel}</DetailRow>
-          <DetailRow label="Assigned">{assigned}</DetailRow>
-        </div>
-      </div>
-    );
-  }
+  const status = item.status ?? (item.kind === "event" ? (item.raw as EventDetail).status : undefined);
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-3">
       <div>
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">{kindLabel}</div>
-        <div className="text-sm font-semibold text-white leading-tight mt-0.5">{item.title}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">{kindLabel(item)}</div>
+          {status ? (
+            <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] capitalize text-white/55">
+              {status}
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-0.5 text-sm font-semibold leading-snug text-white">{itemTitle(item)}</div>
       </div>
-      <div className="space-y-1.5 border-t border-white/10 pt-2">
-        <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
-        <DetailRow label="Status">{item.status}</DetailRow>
-      </div>
+
+      <ScheduleStartEndBlock item={item} locale={locale} hour12={hour12} />
+
+      {item.kind === "booking" ? <BookingBody item={item} /> : null}
+      {item.kind === "tour" ? <TourBody item={item} locale={locale} /> : null}
+      {item.kind === "event" || item.kind === "job" ? <EventJobBody item={item} locale={locale} /> : null}
+
+      <FooterLinks item={item} />
     </div>
   );
 }
@@ -329,7 +154,7 @@ export function CalendarItemHoverCard({
       <HoverCardContent
         side={side}
         align={align}
-        className="w-[min(22rem,calc(100vw-2rem))] max-h-[min(24rem,70vh)] overflow-y-auto border border-white/10 bg-[#14141c] p-3 text-white shadow-xl"
+        className="w-[min(24rem,calc(100vw-2rem))] max-h-[min(32rem,80vh)] overflow-y-auto border border-white/10 bg-[#14141c] p-3 text-white shadow-xl"
         onPointerDown={(e) => e.stopPropagation()}
       >
         <CalendarItemHoverBody item={item} locale={locale} hour12={hour12} />

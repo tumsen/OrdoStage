@@ -49,7 +49,7 @@ function formatScheduleInstant(d: Date, locale: string, hasTime: boolean, hour12
   return d.toLocaleDateString(locale, { dateStyle: "medium" });
 }
 
-function ScheduleStartEndBlock({ item, locale, hour12 }: { item: CalendarItem; locale: string; hour12: boolean }) {
+export function ScheduleStartEndBlock({ item, locale, hour12 }: { item: CalendarItem; locale: string; hour12: boolean }) {
   const { start, end, hasExplicitTime } = getItemTimeRange(item);
   const startStr = formatScheduleInstant(start, locale, hasExplicitTime, hour12);
   const endStr = formatScheduleInstant(end, locale, hasExplicitTime, hour12);
@@ -221,7 +221,7 @@ export function ScheduleItemDetailSheet({
   );
 }
 
-function BookingBody({ item }: { item: CalendarItem }) {
+export function BookingBody({ item }: { item: CalendarItem }) {
   const b = item.raw as InternalBookingDetail;
   return (
     <>
@@ -291,7 +291,7 @@ function BookingBody({ item }: { item: CalendarItem }) {
   );
 }
 
-function TourBody({ item, locale }: { item: CalendarItem; locale: string }) {
+export function TourBody({ item, locale }: { item: CalendarItem; locale: string }) {
   const tour = item.raw as TourDetail;
   const parts = parseTourCalendarId(item.id);
   const show =
@@ -387,7 +387,7 @@ function TourBody({ item, locale }: { item: CalendarItem; locale: string }) {
   );
 }
 
-function EventJobBody({ item, locale }: { item: CalendarItem; locale: string }) {
+export function EventJobBody({ item, locale }: { item: CalendarItem; locale: string }) {
   const ev = item.raw as EventDetail;
   const { showId, jobId } = parseEventCalendarId(item.id);
   const show = showId ? ev.shows?.find((s) => s.id === showId) : undefined;
