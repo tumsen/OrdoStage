@@ -435,7 +435,6 @@ export function YearDiscView({
 
   const hoveredSegment = segments.find((segment) => segment.id === hoveredId) ?? null;
   const hovered = hoveredSegment?.span ?? null;
-  const hubDiameterRatio = (layout.hubR * 2) / SIZE;
 
   function handleSegmentClick(segment: DiscSegment) {
     const clip = timeline.clipSpan(segment.span);
@@ -609,47 +608,55 @@ export function YearDiscView({
             />
           </g>
           <circle cx={CX} cy={CY} r={layout.hubR} fill="#0a0a0f" pointerEvents="none" />
-          {hovered ? null : (
-            <>
-              <text
-                x={CX}
-                y={CY - 22}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="fill-white/55 text-[11px] font-medium uppercase tracking-wide"
-                pointerEvents="none"
-              >
-                {selectedDate.toLocaleDateString(locale, { weekday: "long" })}
-              </text>
-              <text
-                x={CX}
-                y={CY + 2}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="fill-white text-2xl font-semibold"
-                pointerEvents="none"
-              >
-                {selectedDate.toLocaleDateString(locale, { day: "numeric", month: "short" })}
-              </text>
-              <text
-                x={CX}
-                y={CY + 24}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="fill-white/45 text-[11px] font-medium tracking-wide"
-                pointerEvents="none"
-              >
-                {formatWeekNumber(selectedDate, locale)}
-              </text>
-            </>
-          )}
-        </svg>
-        {hovered ? (
-          <div
-            className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-            style={{ width: `${hubDiameterRatio * 100}%`, height: `${hubDiameterRatio * 100}%` }}
+          <text
+            x={CX}
+            y={CY - 26}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="fill-white/55 text-[11px] font-medium uppercase tracking-wide"
+            pointerEvents="none"
           >
-            <div className="max-h-full w-full overflow-y-auto overscroll-contain rounded-full px-[12%] py-[10%] text-left">
+            {selectedDate.toLocaleDateString(locale, { weekday: "long" })}
+          </text>
+          <text
+            x={CX}
+            y={CY - 2}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="fill-white text-2xl font-semibold"
+            pointerEvents="none"
+          >
+            {selectedDate.toLocaleDateString(locale, { day: "numeric", month: "short" })}
+          </text>
+          <text
+            x={CX}
+            y={CY + 18}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="fill-white/70 text-sm font-medium tracking-wide"
+            pointerEvents="none"
+          >
+            {selectedDate.toLocaleDateString(locale, { year: "numeric" })}
+          </text>
+          <text
+            x={CX}
+            y={CY + 34}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="fill-white/45 text-[11px] font-medium tracking-wide"
+            pointerEvents="none"
+          >
+            {formatWeekNumber(selectedDate, locale)}
+          </text>
+        </svg>
+        </div>
+      </div>
+
+      <div className="touch-scroll-y mx-auto flex min-h-0 w-full max-w-sm flex-1 basis-0 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5 xl:mx-0 xl:w-full xl:max-w-sm xl:shrink-0 xl:h-full xl:max-h-full">
+        {hovered ? (
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Hovered item</p>
+            <div className="mt-3">
               {hovered.calendarItem ? (
                 <CalendarItemHoverBody item={hovered.calendarItem} locale={locale} hour12={hour12} />
               ) : (
@@ -678,10 +685,6 @@ export function YearDiscView({
             </div>
           </div>
         ) : null}
-        </div>
-      </div>
-
-      <div className="touch-scroll-y mx-auto flex min-h-0 w-full max-w-sm flex-1 basis-0 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5 xl:mx-0 xl:w-full xl:max-w-sm xl:shrink-0 xl:h-full xl:max-h-full">
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
