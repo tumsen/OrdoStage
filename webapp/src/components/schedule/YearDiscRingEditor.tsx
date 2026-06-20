@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { ChevronDown, ChevronUp, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -161,40 +164,70 @@ export function YearDiscRingEditor({
     people,
   };
   const hasCustomColors = hasCustomYearDiscRingColors(config);
+  const [open, setOpen] = useState(false);
+  const ringSummary = config.rings
+    .map((ring) => ring.label?.trim() || yearDiscRingLabel(ring, ctx))
+    .join(" · ");
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Disc rings</p>
-        <div className="flex items-center gap-1">
-          <Button
+    <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border border-white/10 bg-white/[0.02]">
+      <div className="flex items-start gap-2 p-3">
+        <CollapsibleTrigger asChild>
+          <button
             type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 px-2 text-xs text-white/70 hover:text-white"
-            disabled={!hasCustomColors}
-            onClick={() => onChange(resetYearDiscRingColors(config))}
+            className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-1 py-0.5 text-left hover:bg-white/[0.04]"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset colours
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 px-2 text-xs text-white/70 hover:text-white"
-            disabled={config.rings.length >= YEAR_DISC_MAX_RINGS}
-            onClick={() => onChange({ rings: [...config.rings, createYearDiscRing()] })}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add ring
-          </Button>
-        </div>
+            <ChevronDown
+              className={cn(
+                "mt-0.5 h-4 w-4 shrink-0 text-white/40 transition-transform",
+                open && "rotate-180",
+              )}
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Disc rings</p>
+              {!open ? (
+                <p className="mt-1 truncate text-[11px] text-white/35">
+                  {config.rings.length} {config.rings.length === 1 ? "ring" : "rings"}
+                  {ringSummary ? ` · ${ringSummary}` : ""}
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] text-white/35">
+                  Outer rings are listed first. Each ring can show schedule or time-tracking data.
+                </p>
+              )}
+            </div>
+          </button>
+        </CollapsibleTrigger>
+        {open ? (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs text-white/70 hover:text-white"
+              disabled={!hasCustomColors}
+              onClick={() => onChange(resetYearDiscRingColors(config))}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset colours
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs text-white/70 hover:text-white"
+              disabled={config.rings.length >= YEAR_DISC_MAX_RINGS}
+              onClick={() => onChange({ rings: [...config.rings, createYearDiscRing()] })}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add ring
+            </Button>
+          </div>
+        ) : null}
       </div>
-      <p className="mt-1 text-[11px] text-white/35">
-        Outer rings are listed first. Each ring can show schedule or time-tracking data.
-      </p>
-      <ul className="mt-3 space-y-3">
+      <CollapsibleContent className="border-t border-white/10 px-3 pb-3 pt-3">
+      <ul className="space-y-3">
         {config.rings.map((ring, index) => {
           const entityType = ringNeedsEntityPicker(ring.source);
           const entityId = entityIdFromSource(ring.source);
@@ -393,7 +426,8 @@ export function YearDiscRingEditor({
           );
         })}
       </ul>
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
