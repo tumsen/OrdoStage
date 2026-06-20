@@ -110,6 +110,7 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
                   item={item}
                   locale={locale}
                   hour12={hour12}
+                  side="right"
                   label={
                     <>
                       {item.title}
