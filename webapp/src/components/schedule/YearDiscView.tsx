@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { CalendarItemHoverBody } from "@/components/schedule/CalendarItemHoverCard";
+import { YearDiscSpanHoverCard } from "@/components/schedule/YearDiscSpanHoverCard";
 import {
   calendarItemTimeRangeLabel,
   itemsForDay,
@@ -8,7 +8,6 @@ import {
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
 import { YearDiscRingSettingsDialog } from "@/components/schedule/YearDiscRingEditor";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { usePreferences } from "@/hooks/usePreferences";
 import { cn } from "@/lib/utils";
 import {
@@ -196,11 +195,36 @@ function computeRingLayout(ringCount: number): {
   return { ringWidth, ringRadii, hubR, dayLineInnerR: hubR };
 }
 
+function ringSectorClipPath(
+  innerR: number,
+  outerR: number,
+  startAngle: number,
+  endAngle: number,
+  size: number
+): string {
+  let span = endAngle - startAngle;
+  if (span <= 0) span += 360;
+  const steps = Math.max(3, Math.ceil(span / 12));
+  const points: string[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const angle = startAngle + (span * i) / steps;
+    const p = polar(CX, CY, innerR, angle);
+    points.push(`${(p.x / size) * 100}% ${(p.y / size) * 100}%`);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const angle = startAngle + (span * i) / steps;
+    const p = polar(CX, CY, outerR, angle);
+    points.push(`${(p.x / size) * 100}% ${(p.y / size) * 100}%`);
+  }
+  return `polygon(${points.join(", ")})`;
+}
+
 type DiscSegment = {
   id: string;
   span: YearDiscSpan;
   ringIndex: number;
   path: string;
+  clipPath: string;
   fill: string;
   opacity: number;
 };
@@ -387,6 +411,7 @@ export function YearDiscView({
           span,
           ringIndex,
           path: ringSectorPath(inner, outer, angles.start, angles.end),
+          clipPath: ringSectorClipPath(inner, outer, angles.start, angles.end, SIZE),
           fill,
           opacity: span.opacity ?? 1,
         });
@@ -434,9 +459,6 @@ export function YearDiscView({
     month: "long",
     year: "numeric",
   });
-
-  const hoveredSegment = segments.find((segment) => segment.id === hoveredId) ?? null;
-  const hovered = hoveredSegment?.span ?? null;
 
   function handleSegmentClick(segment: DiscSegment) {
     const clip = timeline.clipSpan(segment.span);
@@ -537,13 +559,8 @@ export function YearDiscView({
               d={segment.path}
               fill={segment.fill}
               opacity={hoveredId && hoveredId !== segment.id ? segment.opacity * 0.45 : segment.opacity}
-              className="cursor-pointer transition-opacity"
-              onMouseEnter={() => setHoveredId(segment.id)}
-              onMouseLeave={() => setHoveredId(null)}
-              onClick={() => handleSegmentClick(segment)}
-            >
-              <title>{segment.span.title}</title>
-            </path>
+              className="pointer-events-none transition-opacity"
+            />
           ))}
           {rings.map((ring, index) => {
             const { inner, outer } = layout.ringRadii(index);
@@ -651,42 +668,36 @@ export function YearDiscView({
             {formatWeekNumber(selectedDate, locale)}
           </text>
         </svg>
+        <div className="absolute inset-0">
+          {segments.map((segment) => (
+            <YearDiscSpanHoverCard
+              key={`hover-${segment.id}`}
+              span={segment.span}
+              ringColor={segment.fill}
+              locale={locale}
+              hour12={hour12}
+              side="right"
+              onHoverChange={(open) => {
+                setHoveredId((current) => {
+                  if (open) return segment.id;
+                  return current === segment.id ? null : current;
+                });
+              }}
+            >
+              <button
+                type="button"
+                aria-label={segment.span.title}
+                className="absolute inset-0 cursor-pointer border-0 bg-transparent p-0"
+                style={{ clipPath: segment.clipPath, WebkitClipPath: segment.clipPath }}
+                onClick={() => handleSegmentClick(segment)}
+              />
+            </YearDiscSpanHoverCard>
+          ))}
+        </div>
         </div>
       </div>
 
       <div className="touch-scroll-y mx-auto flex min-h-0 w-full max-w-sm flex-1 basis-0 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5 xl:mx-0 xl:w-full xl:max-w-sm xl:shrink-0 xl:h-full xl:max-h-full">
-        {hovered ? (
-          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Hovered item</p>
-            <div className="mt-3">
-              {hovered.calendarItem ? (
-                <CalendarItemHoverBody item={hovered.calendarItem} locale={locale} hour12={hour12} />
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2">
-                    {hoveredSegment ? (
-                      <span
-                        className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
-                        style={{ backgroundColor: hoveredSegment.fill }}
-                      />
-                    ) : null}
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
-                        Time tracking
-                      </div>
-                      <div className="mt-0.5 text-sm font-semibold leading-tight text-white">{hovered.title}</div>
-                    </div>
-                  </div>
-                  {spanTimeLabel(hovered) ? (
-                    <div className="border-t border-white/10 pt-2 text-[11px] leading-snug text-white/90">
-                      {spanTimeLabel(hovered)}
-                    </div>
-                  ) : null}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : null}
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
@@ -699,56 +710,31 @@ export function YearDiscView({
                 const time = spanTimeLabel(span);
                 return (
                   <li key={span.id}>
-                    <HoverCard openDelay={200} closeDelay={100}>
-                      <HoverCardTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
-                          className={cn(
-                            "flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07]",
-                            span.calendarItem ? "cursor-pointer" : "cursor-default opacity-80",
-                          )}
-                        >
-                          <span
-                            className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
-                            style={{ backgroundColor: ringColorForSpan(span) }}
-                          />
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm text-white">{span.title}</span>
-                            {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
-                          </span>
-                        </button>
-                      </HoverCardTrigger>
-                      <HoverCardContent
-                        side="left"
-                        align="start"
-                        className="w-[min(22rem,calc(100vw-2rem))] max-h-[min(24rem,70vh)] overflow-y-auto border border-white/10 bg-[#14141c] p-3 text-white shadow-xl"
-                      >
-                        {span.calendarItem ? (
-                          <CalendarItemHoverBody item={span.calendarItem} locale={locale} hour12={hour12} />
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <span
-                                className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
-                                style={{ backgroundColor: ringColorForSpan(span) }}
-                              />
-                              <div className="min-w-0">
-                                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
-                                  Time tracking
-                                </div>
-                                <div className="mt-0.5 text-sm font-semibold leading-tight text-white">{span.title}</div>
-                              </div>
-                            </div>
-                            {time ? (
-                              <div className="border-t border-white/10 pt-2 text-[11px] leading-snug text-white/90">
-                                {time}
-                              </div>
-                            ) : null}
-                          </div>
+                    <YearDiscSpanHoverCard
+                      span={span}
+                      ringColor={ringColorForSpan(span)}
+                      locale={locale}
+                      hour12={hour12}
+                      side="left"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
+                        className={cn(
+                          "flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07]",
+                          span.calendarItem ? "cursor-pointer" : "cursor-default opacity-80",
                         )}
-                      </HoverCardContent>
-                    </HoverCard>
+                      >
+                        <span
+                          className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
+                          style={{ backgroundColor: ringColorForSpan(span) }}
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm text-white">{span.title}</span>
+                          {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
+                        </span>
+                      </button>
+                    </YearDiscSpanHoverCard>
                   </li>
                 );
               })
