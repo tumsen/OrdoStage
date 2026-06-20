@@ -398,6 +398,9 @@ export function YearDiscView({
   const discPixelSize = useSquareFitSize(discHostRef);
   const [ringSettingsOpen, setRingSettingsOpen] = useState(false);
   const [focusedRingId, setFocusedRingId] = useState<string | null>(null);
+  const [discHoveredEntryKey, setDiscHoveredEntryKey] = useState<string | null>(null);
+  const [sidebarHoveredEntryKey, setSidebarHoveredEntryKey] = useState<string | null>(null);
+  const entryListRef = useRef<HTMLUListElement>(null);
   const timeline = useMemo(
     () => buildYearDiscTimeline(config.range ?? DEFAULT_YEAR_DISC_RANGE, calendarYear),
     [config.range, calendarYear]
@@ -509,6 +512,24 @@ export function YearDiscView({
     );
   }, [rings, sources, selectedDate]);
 
+  const sortedDaySpanGroups = useMemo((): DaySpanGroup[] => {
+    if (!discHoveredEntryKey) return daySpanGroups;
+    const index = daySpanGroups.findIndex((group) => group.key === discHoveredEntryKey);
+    if (index <= 0) return daySpanGroups;
+    const hovered = daySpanGroups[index]!;
+    return [hovered, ...daySpanGroups.filter((_, i) => i !== index)];
+  }, [daySpanGroups, discHoveredEntryKey]);
+
+  const highlightedEntryKey = discHoveredEntryKey ?? sidebarHoveredEntryKey;
+
+  useEffect(() => {
+    if (!discHoveredEntryKey) return;
+    const node = entryListRef.current?.querySelector<HTMLElement>(
+      `[data-entry-key="${discHoveredEntryKey}"]`,
+    );
+    node?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [discHoveredEntryKey, sortedDaySpanGroups]);
+
   const selectedDayLabel = selectedDate.toLocaleDateString(locale, {
     weekday: "long",
     day: "numeric",
@@ -516,9 +537,13 @@ export function YearDiscView({
     year: "numeric",
   });
 
-  function handleSegmentClick(segment: DiscSegment) {
-    const clip = timeline.clipSpan(segment.span);
-    if (clip) setSelectedDay(clip.startDay);
+  function handleSegmentPointerHover(segment: DiscSegment, clientX: number, clientY: number) {
+    updateDayFromPointer(clientX, clientY);
+    setDiscHoveredEntryKey(spanGroupKey(segment.span));
+  }
+
+  function handleSegmentClick(segment: DiscSegment, clientX: number, clientY: number) {
+    updateDayFromPointer(clientX, clientY);
     if (segment.span.calendarItem) onItemClick(segment.span.calendarItem);
   }
 
@@ -601,15 +626,20 @@ export function YearDiscView({
               </text>
             </g>
           ))}
-          {segments.map((segment) => (
+          {segments.map((segment) => {
+            const entryKey = spanGroupKey(segment.span);
+            const isHighlighted = discHoveredEntryKey === entryKey;
+            const isDimmed = discHoveredEntryKey !== null && !isHighlighted;
+            return (
             <path
               key={segment.id}
               d={segment.path}
               fill={segment.fill}
-              opacity={segment.opacity}
-              className="pointer-events-none"
+              opacity={isDimmed ? segment.opacity * 0.45 : segment.opacity}
+              className="pointer-events-none transition-opacity"
             />
-          ))}
+            );
+          })}
           {rings.map((ring, index) => {
             const { inner, outer } = layout.ringRadii(index);
             const label = yearDiscRingLabel(ring, sources);
@@ -710,7 +740,10 @@ export function YearDiscView({
             {formatWeekNumber(selectedDate, locale)}
           </text>
         </svg>
-        <div className="pointer-events-none absolute inset-0 z-10">
+        <div
+          className="pointer-events-none absolute inset-0 z-10"
+          onMouseLeave={() => setDiscHoveredEntryKey(null)}
+        >
           {segments.map((segment) => (
             <button
               key={`hit-${segment.id}`}
@@ -718,7 +751,9 @@ export function YearDiscView({
               aria-label={segment.span.title}
               className="pointer-events-auto absolute inset-0 cursor-pointer border-0 bg-transparent p-0"
               style={{ clipPath: segment.clipPath, WebkitClipPath: segment.clipPath }}
-              onClick={() => handleSegmentClick(segment)}
+              onMouseEnter={(event) => handleSegmentPointerHover(segment, event.clientX, event.clientY)}
+              onMouseMove={(event) => handleSegmentPointerHover(segment, event.clientX, event.clientY)}
+              onClick={(event) => handleSegmentClick(segment, event.clientX, event.clientY)}
             />
           ))}
         </div>
@@ -744,20 +779,26 @@ export function YearDiscView({
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
           <p className="mt-1 text-[11px] text-white/35">Drag the yellow handle around the disc to change day.</p>
-          <ul className="mt-3 space-y-2">
-            {daySpanGroups.length === 0 ? (
+          <ul ref={entryListRef} className="mt-3 space-y-2">
+            {sortedDaySpanGroups.length === 0 ? (
               <li className="text-sm text-white/40">Nothing on this day.</li>
             ) : (
-              daySpanGroups.map(({ key, span, ringIndices }) => {
+              sortedDaySpanGroups.map(({ key, span, ringIndices }) => {
                 const time = spanTimeLabel(span, hour12);
                 const { people, lines } = spanInlineMeta(span);
+                const isHighlighted = highlightedEntryKey === key;
                 return (
-                  <li key={key}>
+                  <li key={key} data-entry-key={key}>
                     <button
                       type="button"
+                      onMouseEnter={() => setSidebarHoveredEntryKey(key)}
+                      onMouseLeave={() => setSidebarHoveredEntryKey(null)}
                       onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
                       className={cn(
-                        "flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07]",
+                        "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
+                        isHighlighted
+                          ? "border-white/25 bg-white/[0.08] ring-1 ring-white/15"
+                          : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]",
                         span.calendarItem ? "cursor-pointer" : "cursor-default opacity-80",
                       )}
                     >
