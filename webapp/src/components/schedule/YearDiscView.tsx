@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { CalendarItemHoverBody } from "@/components/schedule/CalendarItemHoverCard";
 import {
   calendarItemTimeRangeLabel,
   itemsForDay,
@@ -7,6 +8,7 @@ import {
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
 import { YearDiscRingSettingsDialog } from "@/components/schedule/YearDiscRingEditor";
+import { usePreferences } from "@/hooks/usePreferences";
 import {
   buildYearDiscTimeline,
   defaultDiscDay,
@@ -313,6 +315,8 @@ export function YearDiscView({
   locale: string;
   onItemClick: (item: CalendarItem) => void;
 }) {
+  const { effective } = usePreferences();
+  const hour12 = effective?.timeFormat === "12h";
   const svgRef = useRef<SVGSVGElement>(null);
   const discHostRef = useRef<HTMLDivElement>(null);
   const discPixelSize = useSquareFitSize(discHostRef);
@@ -429,7 +433,9 @@ export function YearDiscView({
     year: "numeric",
   });
 
-  const hovered = segments.find((segment) => segment.id === hoveredId)?.span ?? null;
+  const hoveredSegment = segments.find((segment) => segment.id === hoveredId) ?? null;
+  const hovered = hoveredSegment?.span ?? null;
+  const hubDiameterRatio = (layout.hubR * 2) / SIZE;
 
   function handleSegmentClick(segment: DiscSegment) {
     const clip = timeline.clipSpan(segment.span);
@@ -603,40 +609,73 @@ export function YearDiscView({
             />
           </g>
           <circle cx={CX} cy={CY} r={layout.hubR} fill="#0a0a0f" pointerEvents="none" />
-          <text
-            x={CX}
-            y={CY - 22}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className="fill-white/55 text-[11px] font-medium uppercase tracking-wide"
-            pointerEvents="none"
-          >
-            {selectedDate.toLocaleDateString(locale, { weekday: "long" })}
-          </text>
-          <text
-            x={CX}
-            y={CY + 2}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className="fill-white text-2xl font-semibold"
-            pointerEvents="none"
-          >
-            {selectedDate.toLocaleDateString(locale, { day: "numeric", month: "short" })}
-          </text>
-          <text
-            x={CX}
-            y={CY + 24}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className="fill-white/45 text-[11px] font-medium tracking-wide"
-            pointerEvents="none"
-          >
-            {formatWeekNumber(selectedDate, locale)}
-          </text>
+          {hovered ? null : (
+            <>
+              <text
+                x={CX}
+                y={CY - 22}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="fill-white/55 text-[11px] font-medium uppercase tracking-wide"
+                pointerEvents="none"
+              >
+                {selectedDate.toLocaleDateString(locale, { weekday: "long" })}
+              </text>
+              <text
+                x={CX}
+                y={CY + 2}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="fill-white text-2xl font-semibold"
+                pointerEvents="none"
+              >
+                {selectedDate.toLocaleDateString(locale, { day: "numeric", month: "short" })}
+              </text>
+              <text
+                x={CX}
+                y={CY + 24}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="fill-white/45 text-[11px] font-medium tracking-wide"
+                pointerEvents="none"
+              >
+                {formatWeekNumber(selectedDate, locale)}
+              </text>
+            </>
+          )}
         </svg>
         {hovered ? (
-          <div className="pointer-events-none absolute bottom-3 left-1/2 max-w-[90%] -translate-x-1/2 rounded-lg border border-white/10 bg-[#16161f]/95 px-3 py-2 text-center shadow-lg">
-            <p className="truncate text-sm font-medium text-white">{hovered.title}</p>
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+            style={{ width: `${hubDiameterRatio * 100}%`, height: `${hubDiameterRatio * 100}%` }}
+          >
+            <div className="max-h-full w-full overflow-y-auto overscroll-contain rounded-full px-[12%] py-[10%] text-left">
+              {hovered.calendarItem ? (
+                <CalendarItemHoverBody item={hovered.calendarItem} locale={locale} hour12={hour12} />
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    {hoveredSegment ? (
+                      <span
+                        className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
+                        style={{ backgroundColor: hoveredSegment.fill }}
+                      />
+                    ) : null}
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
+                        Time tracking
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold leading-tight text-white">{hovered.title}</div>
+                    </div>
+                  </div>
+                  {spanTimeLabel(hovered) ? (
+                    <div className="border-t border-white/10 pt-2 text-[11px] leading-snug text-white/90">
+                      {spanTimeLabel(hovered)}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
         ) : null}
         </div>

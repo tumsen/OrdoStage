@@ -94,7 +94,7 @@ function GoToEventLink({ eventId }: { eventId: string }) {
   );
 }
 
-function CalendarItemHoverBody({
+export function CalendarItemHoverBody({
   item,
   locale,
   hour12,
