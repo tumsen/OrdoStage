@@ -613,6 +613,17 @@ export function YearDiscView({
   const selectedAngle = dayToAngle(selectedDay, totalDays, angleOffset);
   const needleTip = polar(CX, CY, NEEDLE_OUTER_R, selectedAngle);
 
+  const todayMarker = useMemo(() => {
+    const todayDay = timeline.discDayFromDate(new Date());
+    if (todayDay === null) return null;
+    const angle = daySlotCenterAngle(todayDay, totalDays, angleOffset);
+    return {
+      day: todayDay,
+      inner: polar(CX, CY, layout.dayLineInnerR, angle),
+      outer: polar(CX, CY, OUTER_R + 6, angle),
+    };
+  }, [timeline, totalDays, angleOffset, layout.dayLineInnerR]);
+
   const updateDayFromPointer = useCallback(
     (clientX: number, clientY: number) => {
       const svg = svgRef.current;
@@ -909,6 +920,36 @@ export function YearDiscView({
               </g>
             );
           })}
+          {todayMarker ? (
+            <g
+              className="cursor-pointer"
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedDay(todayMarker.day);
+                setPinnedRingSegment(null);
+              }}
+            >
+              <title>Go to today</title>
+              <line
+                x1={todayMarker.inner.x}
+                y1={todayMarker.inner.y}
+                x2={todayMarker.outer.x}
+                y2={todayMarker.outer.y}
+                stroke="rgba(255,255,255,0.38)"
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                pointerEvents="none"
+              />
+              <line
+                x1={todayMarker.inner.x}
+                y1={todayMarker.inner.y}
+                x2={todayMarker.outer.x}
+                y2={todayMarker.outer.y}
+                stroke="transparent"
+                strokeWidth={14}
+              />
+            </g>
+          ) : null}
           <g className="pointer-events-none">
             <line
               x1={CX}
@@ -1005,7 +1046,7 @@ export function YearDiscView({
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
           <p className="mt-1 text-[11px] text-white/35">
-            Drag the yellow handle to change day. Hover a ring entry for a preview; click to open full details.
+            Drag the yellow handle to change day. The grey line marks today — click it to jump there.
           </p>
           {ringSidebarEntry ? (
             <div className="mt-3">
