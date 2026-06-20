@@ -601,22 +601,16 @@ export function YearDiscView({
               </g>
             );
           })}
-          <line
-            x1={CX}
-            y1={CY}
-            x2={needleTip.x}
-            y2={needleTip.y}
-            stroke="rgba(250, 204, 21, 0.95)"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            pointerEvents="none"
-          />
-          <g
-            className="cursor-grab active:cursor-grabbing"
-            onPointerDown={onNeedlePointerDown}
-            onPointerMove={onNeedlePointerMove}
-          >
-            <circle cx={needleTip.x} cy={needleTip.y} r={18} fill="transparent" />
+          <g className="pointer-events-none">
+            <line
+              x1={CX}
+              y1={CY}
+              x2={needleTip.x}
+              y2={needleTip.y}
+              stroke="rgba(250, 204, 21, 0.95)"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+            />
             <circle
               cx={needleTip.x}
               cy={needleTip.y}
@@ -668,7 +662,7 @@ export function YearDiscView({
             {formatWeekNumber(selectedDate, locale)}
           </text>
         </svg>
-        <div className="absolute inset-0">
+        <div className="pointer-events-none absolute inset-0">
           {segments.map((segment) => (
             <YearDiscSpanHoverCard
               key={`hover-${segment.id}`}
@@ -687,13 +681,27 @@ export function YearDiscView({
               <button
                 type="button"
                 aria-label={segment.span.title}
-                className="absolute inset-0 cursor-pointer border-0 bg-transparent p-0"
+                className="pointer-events-auto absolute inset-0 cursor-pointer border-0 bg-transparent p-0"
                 style={{ clipPath: segment.clipPath, WebkitClipPath: segment.clipPath }}
                 onClick={() => handleSegmentClick(segment)}
               />
             </YearDiscSpanHoverCard>
           ))}
         </div>
+        <div
+          className="pointer-events-auto absolute z-20 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none active:cursor-grabbing"
+          style={{
+            left: `${(needleTip.x / SIZE) * 100}%`,
+            top: `${(needleTip.y / SIZE) * 100}%`,
+            width: `${(36 / SIZE) * 100}%`,
+            height: `${(36 / SIZE) * 100}%`,
+          }}
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            onNeedlePointerDown(event);
+          }}
+          onPointerMove={onNeedlePointerMove}
+        />
         </div>
       </div>
 
