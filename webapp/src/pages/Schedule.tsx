@@ -642,7 +642,7 @@ export default function Schedule() {
                     timeEntries: yearDiscTimeReport?.entries,
                   }}
                   locale={locale}
-                  onItemClick={handleItemClick}
+                  onEdit={(item) => setSelectedItem(item)}
                 />
               </div>
             ) : viewMode === "month" ? (

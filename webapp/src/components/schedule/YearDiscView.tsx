@@ -8,6 +8,7 @@ import {
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
 import { YearDiscRingSettingsDialog } from "@/components/schedule/YearDiscRingEditor";
+import { ScheduleItemDetailSheet } from "@/components/schedule/ScheduleItemDetailSheet";
 import {
   computeShowJobStaffingStats,
   computeShowTeamStaffingRows,
@@ -568,20 +569,22 @@ export function YearDiscView({
   onConfigChange,
   sources,
   locale,
-  onItemClick,
+  onEdit,
 }: {
   calendarYear: number;
   config: YearDiscConfig;
   onConfigChange: (config: YearDiscConfig) => void;
   sources: YearDiscResolveContext;
   locale: string;
-  onItemClick: (item: CalendarItem) => void;
+  /** Opens the edit sheet for events and bookings. */
+  onEdit?: (item: CalendarItem) => void;
 }) {
   const { effective } = usePreferences();
   const hour12 = effective?.timeFormat === "12h";
   const svgRef = useRef<SVGSVGElement>(null);
   const discHostRef = useRef<HTMLDivElement>(null);
   const discPixelSize = useSquareFitSize(discHostRef);
+  const [detailItem, setDetailItem] = useState<CalendarItem | null>(null);
   const [ringSettingsOpen, setRingSettingsOpen] = useState(false);
   const [focusedRingId, setFocusedRingId] = useState<string | null>(null);
   const [discHoveredSegment, setDiscHoveredSegment] = useState<DiscSegment | null>(null);
@@ -737,19 +740,28 @@ export function YearDiscView({
     node?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [activeRingEntryKey, dayListGroups]);
 
-  function openSidebarEntry(span: YearDiscSpan) {
-    if (span.calendarItem) onItemClick(span.calendarItem);
+  function openDetailSheet(item: CalendarItem) {
+    setDetailItem(item);
+  }
+
+  function openSpanDetail(span: YearDiscSpan) {
+    if (span.calendarItem) openDetailSheet(span.calendarItem);
   }
 
   function handleSegmentPointerHover(segment: DiscSegment) {
     setDiscHoveredSegment(segment);
   }
 
-  function handleSegmentClick(event: React.MouseEvent, segment: DiscSegment) {
-    event.stopPropagation();
+  function handleSegmentActivate(segment: DiscSegment) {
     setPinnedRingSegment(segment);
     setDiscHoveredSegment(segment);
-    openSidebarEntry(segment.span);
+    openSpanDetail(segment.span);
+  }
+
+  function handleSegmentClick(event: React.MouseEvent, segment: DiscSegment) {
+    event.stopPropagation();
+    event.preventDefault();
+    handleSegmentActivate(segment);
   }
 
   const selectedDayLabel = selectedDate.toLocaleDateString(locale, {
@@ -856,12 +868,8 @@ export function YearDiscView({
                 d={segment.path}
                 fill={segment.fill}
                 opacity={isDimmed ? segment.opacity * 0.45 : segment.opacity}
-                className="cursor-pointer transition-opacity"
-                onMouseEnter={() => handleSegmentPointerHover(segment)}
-                onClick={(event) => handleSegmentClick(event, segment)}
-              >
-                <title>{segment.span.title}</title>
-              </path>
+                className="pointer-events-none transition-opacity"
+              />
             );
           })}
           {rings.map((ring, index) => {
@@ -964,6 +972,19 @@ export function YearDiscView({
             {formatWeekNumber(selectedDate, locale)}
           </text>
         </svg>
+        <div className="pointer-events-none absolute inset-0 z-[15]">
+          {segments.map((segment) => (
+            <button
+              key={`hit-${segment.id}`}
+              type="button"
+              aria-label={segment.span.title}
+              className="pointer-events-auto absolute inset-0 cursor-pointer border-0 bg-transparent p-0"
+              style={{ clipPath: segment.clipPath, WebkitClipPath: segment.clipPath }}
+              onMouseEnter={() => handleSegmentPointerHover(segment)}
+              onClick={(event) => handleSegmentClick(event, segment)}
+            />
+          ))}
+        </div>
         <div
           className="pointer-events-auto absolute z-20 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none active:cursor-grabbing"
           style={{
@@ -986,7 +1007,7 @@ export function YearDiscView({
           <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Selected day</p>
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
           <p className="mt-1 text-[11px] text-white/35">
-            Drag the yellow handle to change day. Hover or click a ring entry for details below.
+            Drag the yellow handle to change day. Hover a ring entry for a preview; click to open full details.
           </p>
           {ringSidebarEntry ? (
             <div className="mt-3">
@@ -1000,7 +1021,7 @@ export function YearDiscView({
                 hour12={hour12}
                 offSelectedDay={ringSidebarEntry.offSelectedDay}
                 highlighted
-                onClick={() => openSidebarEntry(ringSidebarEntry.group.span)}
+                onClick={() => openSpanDetail(ringSidebarEntry.group.span)}
               />
             </div>
           ) : null}
@@ -1023,7 +1044,7 @@ export function YearDiscView({
                       onMouseLeave={() => setSidebarHoveredEntryKey(null)}
                       onClick={() => {
                         setPinnedRingSegment(null);
-                        openSidebarEntry(group.span);
+                        openSpanDetail(group.span);
                       }}
                     />
                   </li>
@@ -1033,6 +1054,13 @@ export function YearDiscView({
           </ul>
         </div>
       </div>
+
+      <ScheduleItemDetailSheet
+        item={detailItem}
+        locale={locale}
+        onClose={() => setDetailItem(null)}
+        onEdit={onEdit}
+      />
 
       <YearDiscRingSettingsDialog
         open={ringSettingsOpen}
