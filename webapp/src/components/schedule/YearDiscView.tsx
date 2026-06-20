@@ -679,7 +679,6 @@ export function YearDiscView({
               ringColor={segment.fill}
               locale={locale}
               hour12={hour12}
-              side="right"
               onHoverChange={(open) => {
                 setHoveredId((current) => {
                   if (open) return segment.id;
@@ -733,7 +732,6 @@ export function YearDiscView({
                       ringColor={primaryRingColor}
                       locale={locale}
                       hour12={hour12}
-                      side="left"
                     >
                       <button
                         type="button"

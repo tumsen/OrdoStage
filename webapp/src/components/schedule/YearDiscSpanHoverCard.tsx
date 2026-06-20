@@ -1,12 +1,10 @@
 import type { ReactElement } from "react";
 
 import { CalendarItemHoverBody } from "@/components/schedule/CalendarItemHoverCard";
+import { ScheduleHoverCardContent } from "@/components/schedule/ScheduleHoverCardContent";
 import { calendarItemTimeRangeLabel } from "@/components/schedule/scheduleUtils";
 import type { YearDiscSpan } from "@/components/schedule/yearDiscConfig";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-
-export const YEAR_DISC_SPAN_HOVER_CONTENT_CLASS =
-  "w-[min(24rem,calc(100vw-2rem))] max-h-[min(32rem,80vh)] overflow-y-auto border border-white/10 bg-[#14141c] p-3 text-white shadow-xl";
+import { HoverCard, HoverCardTrigger } from "@/components/ui/hover-card";
 
 function spanTimeLabel(span: YearDiscSpan, hour12: boolean): string {
   if (span.calendarItem) return calendarItemTimeRangeLabel(span.calendarItem, hour12);
@@ -61,7 +59,6 @@ export function YearDiscSpanHoverCard({
   ringColor,
   locale,
   hour12,
-  side = "left",
   children,
   onHoverChange,
 }: {
@@ -69,22 +66,21 @@ export function YearDiscSpanHoverCard({
   ringColor: string;
   locale: string;
   hour12: boolean;
-  side?: "top" | "right" | "bottom" | "left";
   children: ReactElement;
   onHoverChange?: (hovered: boolean) => void;
 }) {
   return (
     <HoverCard
       openDelay={200}
-      closeDelay={100}
+      closeDelay={300}
       onOpenChange={(open) => {
         onHoverChange?.(open);
       }}
     >
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
-      <HoverCardContent side={side} align="start" className={YEAR_DISC_SPAN_HOVER_CONTENT_CLASS}>
+      <ScheduleHoverCardContent>
         <YearDiscSpanHoverContent span={span} ringColor={ringColor} locale={locale} hour12={hour12} />
-      </HoverCardContent>
+      </ScheduleHoverCardContent>
     </HoverCard>
   );
 }

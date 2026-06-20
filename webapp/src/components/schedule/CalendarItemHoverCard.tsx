@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { EventDetail, InternalBookingDetail, TourDetail } from "../../../../backend/src/types";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { HoverCard, HoverCardTrigger } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import { internalBookingDisplayTitle, type CalendarItem } from "./scheduleUtils";
+import { ScheduleHoverCardContent } from "./ScheduleHoverCardContent";
 import {
   BookingBody,
   EventJobBody,
@@ -92,7 +93,7 @@ export function CalendarItemHoverBody({
   const status = item.status ?? (item.kind === "event" ? (item.raw as EventDetail).status : undefined);
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">{kindLabel(item)}</div>
@@ -124,21 +125,17 @@ export function CalendarItemHoverCard({
   item,
   locale,
   hour12,
-  side = "right",
-  align = "start",
   label,
   labelClassName,
 }: {
   item: CalendarItem;
   locale: string;
   hour12: boolean;
-  side?: "top" | "right" | "bottom" | "left";
-  align?: "start" | "center" | "end";
   label: ReactNode;
   labelClassName?: string;
 }) {
   return (
-    <HoverCard openDelay={200} closeDelay={100}>
+    <HoverCard openDelay={200} closeDelay={300}>
       <HoverCardTrigger asChild>
         <span
           data-entry-name-label
@@ -151,14 +148,9 @@ export function CalendarItemHoverCard({
           {label}
         </span>
       </HoverCardTrigger>
-      <HoverCardContent
-        side={side}
-        align={align}
-        className="w-[min(24rem,calc(100vw-2rem))] max-h-[min(32rem,80vh)] overflow-y-auto border border-white/10 bg-[#14141c] p-3 text-white shadow-xl"
-        onPointerDown={(e) => e.stopPropagation()}
-      >
+      <ScheduleHoverCardContent>
         <CalendarItemHoverBody item={item} locale={locale} hour12={hour12} />
-      </HoverCardContent>
+      </ScheduleHoverCardContent>
     </HoverCard>
   );
 }
