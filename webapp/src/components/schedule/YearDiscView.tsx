@@ -8,7 +8,9 @@ import {
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
 import { YearDiscRingSettingsDialog } from "@/components/schedule/YearDiscRingEditor";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { usePreferences } from "@/hooks/usePreferences";
+import { cn } from "@/lib/utils";
 import {
   buildYearDiscTimeline,
   defaultDiscDay,
@@ -697,21 +699,56 @@ export function YearDiscView({
                 const time = spanTimeLabel(span);
                 return (
                   <li key={span.id}>
-                    <button
-                      type="button"
-                      onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
-                      disabled={!span.calendarItem}
-                      className="flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07] disabled:cursor-default disabled:opacity-80"
-                    >
-                      <span
-                        className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
-                        style={{ backgroundColor: ringColorForSpan(span) }}
-                      />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm text-white">{span.title}</span>
-                        {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
-                      </span>
-                    </button>
+                    <HoverCard openDelay={200} closeDelay={100}>
+                      <HoverCardTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
+                          className={cn(
+                            "flex w-full items-start gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left hover:bg-white/[0.07]",
+                            span.calendarItem ? "cursor-pointer" : "cursor-default opacity-80",
+                          )}
+                        >
+                          <span
+                            className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
+                            style={{ backgroundColor: ringColorForSpan(span) }}
+                          />
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm text-white">{span.title}</span>
+                            {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
+                          </span>
+                        </button>
+                      </HoverCardTrigger>
+                      <HoverCardContent
+                        side="left"
+                        align="start"
+                        className="w-[min(22rem,calc(100vw-2rem))] max-h-[min(24rem,70vh)] overflow-y-auto border border-white/10 bg-[#14141c] p-3 text-white shadow-xl"
+                      >
+                        {span.calendarItem ? (
+                          <CalendarItemHoverBody item={span.calendarItem} locale={locale} hour12={hour12} />
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-start gap-2">
+                              <span
+                                className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
+                                style={{ backgroundColor: ringColorForSpan(span) }}
+                              />
+                              <div className="min-w-0">
+                                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
+                                  Time tracking
+                                </div>
+                                <div className="mt-0.5 text-sm font-semibold leading-tight text-white">{span.title}</div>
+                              </div>
+                            </div>
+                            {time ? (
+                              <div className="border-t border-white/10 pt-2 text-[11px] leading-snug text-white/90">
+                                {time}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                      </HoverCardContent>
+                    </HoverCard>
                   </li>
                 );
               })
