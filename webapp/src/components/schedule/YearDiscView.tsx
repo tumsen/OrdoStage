@@ -329,11 +329,11 @@ function parseEventCalendarId(id: string): { eventId: string; showId?: string; j
   return { eventId: id };
 }
 
-function calendarItemAssignedPeopleLabel(item: CalendarItem): string | null {
+function calendarItemAssignedPeopleNames(item: CalendarItem): string[] {
   if (item.kind === "booking") {
     const people = (item.raw as InternalBookingDetail).people;
-    if (!people?.length) return null;
-    return people.map((p) => p.person.name).join(", ");
+    if (!people?.length) return [];
+    return people.map((p) => p.person.name);
   }
   if (item.kind === "event" || item.kind === "job") {
     const ev = item.raw as EventDetail;
@@ -341,25 +341,24 @@ function calendarItemAssignedPeopleLabel(item: CalendarItem): string | null {
     if (jobId) {
       const show = showId ? ev.shows?.find((s) => s.id === showId) : undefined;
       const job = show?.jobs?.find((j) => j.id === jobId);
-      if (!job) return null;
-      if (job.people?.length) return job.people.map((p) => p.name).join(", ");
-      return job.person?.name ?? null;
+      if (!job) return [];
+      if (job.people?.length) return job.people.map((p) => p.name);
+      return job.person?.name ? [job.person.name] : [];
     }
-    if (!ev.people?.length) return null;
-    return ev.people.map((p) => p.person.name).join(", ");
+    if (!ev.people?.length) return [];
+    return ev.people.map((p) => p.person.name);
   }
-  return null;
+  return [];
 }
 
-function spanInlineMetaLines(span: YearDiscSpan): string[] {
+function spanInlineMeta(span: YearDiscSpan): { people: string[]; lines: string[] } {
   if (span.calendarItem) {
-    const people = calendarItemAssignedPeopleLabel(span.calendarItem);
-    return people ? [people] : [];
+    return { people: calendarItemAssignedPeopleNames(span.calendarItem), lines: [] };
   }
   const lines: string[] = [];
   if (span.projectName) lines.push(span.projectName);
   if (span.note) lines.push(span.note);
-  return lines;
+  return { people: [], lines };
 }
 
 function spanTimeLabel(span: YearDiscSpan, hour12: boolean): string {
@@ -751,7 +750,7 @@ export function YearDiscView({
             ) : (
               daySpanGroups.map(({ key, span, ringIndices }) => {
                 const time = spanTimeLabel(span, hour12);
-                const metaLines = spanInlineMetaLines(span);
+                const { people, lines } = spanInlineMeta(span);
                 return (
                   <li key={key}>
                     <button
@@ -771,11 +770,23 @@ export function YearDiscView({
                           />
                         ))}
                       </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm text-white">{span.title}</span>
-                        {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
-                        {metaLines.map((line, index) => (
-                          <span key={index} className="block truncate text-[11px] text-white/40">
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm leading-snug text-white">{span.title}</span>
+                        {time ? <span className="mt-0.5 block text-[11px] text-white/45">{time}</span> : null}
+                        {people.length > 0 ? (
+                          <ul className="mt-1 space-y-0.5">
+                            {people.map((name, index) => (
+                              <li key={index} className="text-[11px] leading-snug text-white/40">
+                                {name}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                        {lines.map((line, index) => (
+                          <span
+                            key={index}
+                            className="mt-1 block whitespace-pre-wrap break-words text-[11px] leading-snug text-white/40"
+                          >
                             {line}
                           </span>
                         ))}
