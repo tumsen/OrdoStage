@@ -81,7 +81,7 @@ export function JobNeededField({
   );
 }
 
-/** Person assignment slots on one wrapping row below job settings. */
+/** Person assignment slots — grid (5-up) or one picker per row. */
 export function JobPersonSlotsRow({
   peopleNeeded,
   slotPersonIds,
@@ -90,6 +90,7 @@ export function JobPersonSlotsRow({
   disabled,
   onSlotChange,
   className,
+  layout = "grid",
 }: {
   peopleNeeded: number;
   slotPersonIds: (string | null)[];
@@ -98,6 +99,7 @@ export function JobPersonSlotsRow({
   disabled?: boolean;
   onSlotChange: (slotIndex: number, personId: string | null) => void;
   className?: string;
+  layout?: "grid" | "stack";
 }) {
   const filled = slotPersonIds.filter(Boolean).length;
   const slots = Math.max(MIN_JOB_PEOPLE_NEEDED, peopleNeeded);
@@ -110,7 +112,13 @@ export function JobPersonSlotsRow({
         className
       )}
     >
-      <div className="grid grid-cols-5 gap-2 sm:gap-3 items-end min-w-0">
+      <div
+        className={cn(
+          layout === "stack"
+            ? "grid grid-cols-1 gap-2"
+            : "grid grid-cols-5 gap-2 sm:gap-3 items-end min-w-0",
+        )}
+      >
         {Array.from({ length: slots }, (_, slotIndex) => {
           const takenElsewhere = new Set(
             slotPersonIds.flatMap((id, i) => (i !== slotIndex && id ? [id] : []))

@@ -80,6 +80,7 @@ export function JobPeopleAssignees({
   people,
   canEdit,
   onChanged,
+  slotsLayout = "grid",
 }: {
   eventId: string;
   showId: string;
@@ -88,6 +89,7 @@ export function JobPeopleAssignees({
   people: Person[] | undefined;
   canEdit: boolean;
   onChanged: () => void;
+  slotsLayout?: "grid" | "stack";
 }) {
   const needed = jobPeopleNeeded(job);
   const slots = jobSlotPersonIds(job);
@@ -133,6 +135,7 @@ export function JobPeopleAssignees({
       overlapBusy={overlapBusy}
       disabled={!canEdit || updateJob.isPending}
       onSlotChange={setSlot}
+      layout={slotsLayout}
     />
   );
 }

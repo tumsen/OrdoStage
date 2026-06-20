@@ -305,6 +305,7 @@ function ScheduleJobEditForm({
           people={people}
           canEdit
           onChanged={invalidate}
+          slotsLayout="stack"
         />
       </div>
     </div>

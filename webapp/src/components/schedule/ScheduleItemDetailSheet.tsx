@@ -146,7 +146,12 @@ export function ScheduleItemDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <SheetContent className="bg-[#0d0d14] border-white/10 text-white w-full sm:max-w-lg flex flex-col max-h-[90vh]">
+      <SheetContent
+        className={cn(
+          "bg-[#0d0d14] border-white/10 text-white w-full flex flex-col max-h-[90vh]",
+          editable ? "sm:max-w-2xl" : "sm:max-w-lg",
+        )}
+      >
         {!item ? null : (
           <>
             <SheetHeader className="space-y-3 pb-3 border-b border-white/10 shrink-0 text-left">
