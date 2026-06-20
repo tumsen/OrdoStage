@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Sheet,
   SheetContent,
@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Clock, MapPin, UserCircle, Users } from "lucide-react";
 import type { CalendarItem } from "./scheduleUtils";
 import { getItemTimeRange, itemColor } from "./scheduleUtils";
-import { EventScheduleSummary, ScheduleBookingEditForm } from "./EditItemSheet";
+import { ScheduleBookingEditForm } from "./EditItemSheet";
+import { ScheduleEventJobEditForm } from "./ScheduleEventJobEditForm";
 import { cn } from "@/lib/utils";
 import type {
   EventDetail,
@@ -137,17 +138,11 @@ export function ScheduleItemDetailSheet({
   venues?: Venue[];
   people?: Person[];
 }) {
-  const navigate = useNavigate();
   const open = item !== null;
   const editable = Boolean(item && venues && people && item.kind !== "tour");
   const canEditLegacy = Boolean(onEdit) && item && item.kind !== "tour" && !editable;
   const { effective } = usePreferences();
   const hour12 = effective?.timeFormat !== "24h";
-
-  const showMatch = item ? /^[^:]+:show:([^:]+)/.exec(item.id) : null;
-  const selectedShowId = showMatch?.[1] ?? null;
-  const jobMatch = item ? /:job:([^:]+)$/.exec(item.id) : null;
-  const selectedJobId = jobMatch?.[1] ?? null;
 
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
@@ -182,9 +177,15 @@ export function ScheduleItemDetailSheet({
                 ) : null}
               </div>
               <SheetTitle className="text-white text-lg font-semibold leading-snug pr-8">
-                {editable && item.kind === "booking" ? "Edit booking" : item.title}
+                {editable && item.kind === "booking"
+                  ? "Edit booking"
+                  : editable && item.kind === "job"
+                    ? "Edit job"
+                    : editable && item.kind === "event"
+                      ? "Edit event"
+                      : item.title}
               </SheetTitle>
-              {editable && item.kind === "booking" ? (
+              {editable && (item.kind === "booking" || item.kind === "event" || item.kind === "job") ? (
                 <p className="text-xs text-white/45">Changes save automatically when you leave a field.</p>
               ) : null}
             </SheetHeader>
@@ -200,18 +201,12 @@ export function ScheduleItemDetailSheet({
                   onSaved={onClose}
                 />
               ) : editable && (item.kind === "event" || item.kind === "job") ? (
-                <>
-                  <ScheduleStartEndBlock item={item} locale={locale} hour12={hour12} />
-                  <EventScheduleSummary
-                    event={item.raw as EventDetail}
-                    selectedShowId={selectedShowId}
-                    highlightJobId={selectedJobId}
-                    onOpenEvent={() => {
-                      navigate(`/events/${(item.raw as EventDetail).id}`);
-                      onClose();
-                    }}
-                  />
-                </>
+                <ScheduleEventJobEditForm
+                  key={item.id}
+                  item={item}
+                  venues={venues!}
+                  people={people!}
+                />
               ) : (
                 <>
                   <ScheduleStartEndBlock item={item} locale={locale} hour12={hour12} />
