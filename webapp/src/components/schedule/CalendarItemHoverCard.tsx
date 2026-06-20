@@ -9,6 +9,71 @@ import {
   type CalendarItem,
 } from "./scheduleUtils";
 
+function parseEventCalendarId(id: string): { eventId: string; showId?: string; jobId?: string } {
+  const jobM = /^(.+):show:([^:]+):job:([^:]+)$/.exec(id);
+  if (jobM?.[1] && jobM[2] && jobM[3]) return { eventId: jobM[1], showId: jobM[2], jobId: jobM[3] };
+  const showM = /^(.+):show:([^:]+)$/.exec(id);
+  if (showM?.[1] && showM[2]) return { eventId: showM[1], showId: showM[2] };
+  return { eventId: id };
+}
+
+const TOUR_CAL_RE = /^tour:([^:]+):show:([^:]+)(?::ev:([^:]+))?$/;
+
+function parseTourCalendarId(
+  id: string,
+): { tourId: string; showId: string; scheduleEventId?: string } | null {
+  const m = TOUR_CAL_RE.exec(id);
+  if (!m?.[1] || !m[2]) return null;
+  return { tourId: m[1], showId: m[2], scheduleEventId: m[3] };
+}
+
+function formatAssignedPeople(entries: Array<{ name: string; role?: string | null }>): string | null {
+  if (entries.length === 0) return null;
+  return entries
+    .map(({ name, role }) => (role?.trim() ? `${name} (${role.trim()})` : name))
+    .join(", ");
+}
+
+function assignedPeopleLabel(item: CalendarItem): string | null {
+  if (item.kind === "booking") {
+    const b = item.raw as InternalBookingDetail;
+    return formatAssignedPeople(
+      (b.people ?? []).map((p) => ({ name: p.person.name, role: p.role })),
+    );
+  }
+
+  if (item.kind === "event") {
+    const ev = item.raw as EventDetail;
+    return formatAssignedPeople((ev.people ?? []).map((p) => ({ name: p.person.name, role: p.role })));
+  }
+
+  if (item.kind === "job") {
+    const ev = item.raw as EventDetail;
+    const { showId, jobId } = parseEventCalendarId(item.id);
+    const job =
+      showId && jobId
+        ? ev.shows?.find((s) => s.id === showId)?.jobs?.find((j) => j.id === jobId)
+        : undefined;
+    if (!job) return null;
+    if (job.people?.length) return job.people.map((p) => p.name).join(", ");
+    if (job.person?.name) return job.person.name;
+    return null;
+  }
+
+  if (item.kind === "tour") {
+    const tour = item.raw as TourDetail;
+    const parts = parseTourCalendarId(item.id);
+    const show = parts ? tour.shows?.find((s) => s.id === parts.showId) : undefined;
+    const showPeople = formatAssignedPeople(
+      (show?.showPeople ?? []).map((p) => ({ name: p.person.name, role: p.role })),
+    );
+    if (showPeople) return showPeople;
+    return formatAssignedPeople((tour.people ?? []).map((p) => ({ name: p.person.name, role: p.role })));
+  }
+
+  return null;
+}
+
 function bookingTypeLabel(type: string): string {
   switch (type) {
     case "rehearsal":
@@ -119,10 +184,7 @@ export function CalendarItemHoverBody({
   if (item.kind === "booking") {
     const b = item.raw as InternalBookingDetail & { eventId?: string | null };
     const title = internalBookingDisplayTitle(b.title);
-    const people =
-      b.people?.length > 0
-        ? b.people.map((p) => (p.role ? `${p.person.name} (${p.role})` : p.person.name)).join(", ")
-        : null;
+    const people = assignedPeopleLabel(item);
 
     return (
       <div className="space-y-2.5">
@@ -142,7 +204,7 @@ export function CalendarItemHoverBody({
                 .join(", ")}
             </DetailRow>
           )}
-          <DetailRow label="People">{people}</DetailRow>
+          <DetailRow label="Assigned">{people}</DetailRow>
           <DetailRow label="Description">{b.description?.trim()}</DetailRow>
           <DetailRow label="Created by">{b.createdBy?.name}</DetailRow>
           <DetailRow label="Created">{b.createdAt ? formatDateTime(new Date(b.createdAt), locale, hour12) : null}</DetailRow>
@@ -156,6 +218,7 @@ export function CalendarItemHoverBody({
 
   if (item.kind === "event") {
     const ev = item.raw as EventDetail;
+    const assigned = assignedPeopleLabel(item);
     return (
       <div className="space-y-2.5">
         <div>
@@ -166,6 +229,7 @@ export function CalendarItemHoverBody({
           <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
           <DetailRow label="Status">{item.status ?? ev.status}</DetailRow>
           <DetailRow label="Venue">{ev.venue?.name}</DetailRow>
+          <DetailRow label="Assigned">{assigned}</DetailRow>
           <DetailRow label="Description">{ev.description?.trim()}</DetailRow>
         </div>
         <GoToEventLink eventId={ev.id} />
@@ -175,6 +239,7 @@ export function CalendarItemHoverBody({
 
   if (item.kind === "job") {
     const ev = item.raw as EventDetail;
+    const assigned = assignedPeopleLabel(item);
     return (
       <div className="space-y-2.5">
         <div>
@@ -186,6 +251,7 @@ export function CalendarItemHoverBody({
           <DetailRow label="Status">{item.status}</DetailRow>
           <DetailRow label="Venue">{item.venueLabel ?? ev.venue?.name}</DetailRow>
           <DetailRow label="Event">{ev.title}</DetailRow>
+          <DetailRow label="Assigned">{assigned}</DetailRow>
         </div>
         <GoToEventLink eventId={ev.id} />
       </div>
@@ -194,6 +260,7 @@ export function CalendarItemHoverBody({
 
   if (item.kind === "tour") {
     const tour = item.raw as TourDetail;
+    const assigned = assignedPeopleLabel(item);
     return (
       <div className="space-y-2.5">
         <div>
@@ -204,6 +271,7 @@ export function CalendarItemHoverBody({
           <StartEndRows start={start} end={end} hasExplicitTime={hasExplicitTime} locale={locale} hour12={hour12} />
           <DetailRow label="Status">{item.status ?? tour.status}</DetailRow>
           <DetailRow label="Venue / city">{item.venueLabel}</DetailRow>
+          <DetailRow label="Assigned">{assigned}</DetailRow>
         </div>
       </div>
     );
