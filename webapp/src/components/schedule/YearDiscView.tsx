@@ -463,7 +463,8 @@ function YearDiscEntryCard({
   const time = spanTimeLabel(span, hour12);
   const { people, lines } = spanInlineMeta(span);
   const staffingLines = span.calendarItem ? calendarItemStaffingLines(span.calendarItem) : [];
-  const showDetails = highlighted || offSelectedDay;
+  // Needle-day list entries always show the expanded card (same content as hover).
+  const showDetails = !offSelectedDay || highlighted || offSelectedDay;
 
   return (
     <button
