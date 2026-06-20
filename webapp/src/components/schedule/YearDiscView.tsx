@@ -6,7 +6,7 @@ import {
   toDateStr,
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
-import { YearDiscRingEditor } from "@/components/schedule/YearDiscRingEditor";
+import { YearDiscRingSettingsDialog } from "@/components/schedule/YearDiscRingEditor";
 import {
   buildYearDiscTimeline,
   defaultDiscDay,
@@ -317,6 +317,8 @@ export function YearDiscView({
   const discHostRef = useRef<HTMLDivElement>(null);
   const discPixelSize = useSquareFitSize(discHostRef);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [ringSettingsOpen, setRingSettingsOpen] = useState(false);
+  const [focusedRingId, setFocusedRingId] = useState<string | null>(null);
   const timeline = useMemo(
     () => buildYearDiscTimeline(config.range ?? DEFAULT_YEAR_DISC_RANGE, calendarYear),
     [config.range, calendarYear]
@@ -435,6 +437,11 @@ export function YearDiscView({
     if (segment.span.calendarItem) onItemClick(segment.span.calendarItem);
   }
 
+  function openRingSettings(ringId: string) {
+    setFocusedRingId(ringId);
+    setRingSettingsOpen(true);
+  }
+
   function ringColorForSpan(span: YearDiscSpan): string {
     const ringIndex = rings.findIndex((ring) =>
       resolveYearDiscRingSpans(ring, sources).some((s) => s.id === span.id)
@@ -486,8 +493,14 @@ export function YearDiscView({
                 stroke={color}
                 strokeOpacity={0.55}
                 strokeWidth={layout.ringWidth}
-                pointerEvents="none"
-              />
+                className="cursor-pointer"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openRingSettings(ring.id);
+                }}
+              >
+                <title>{yearDiscRingLabel(ring, sources)} — click to edit ring</title>
+              </circle>
             );
           })}
           {monthMarkers.map((marker) => (
@@ -535,7 +548,14 @@ export function YearDiscView({
             const labelPathR = ringLabelTextPathRadius(inner, outer, fontSize);
 
             return (
-              <g key={`ring-label-${ring.id}`} pointerEvents="none">
+              <g
+                key={`ring-label-${ring.id}`}
+                className="cursor-pointer"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openRingSettings(ring.id);
+                }}
+              >
                 <defs>
                   <path id={textPathId} d={ringLabelArcPath(CX, CY, labelPathR, centerAngle, spanDeg * 0.92)} />
                 </defs>
@@ -553,6 +573,7 @@ export function YearDiscView({
                     {label}
                   </textPath>
                 </text>
+                <title>{label} — click to edit ring</title>
               </g>
             );
           })}
@@ -655,31 +676,22 @@ export function YearDiscView({
             )}
           </ul>
         </div>
-
-        <YearDiscRingEditor
-          config={config}
-          onChange={onConfigChange}
-          events={sources.events}
-          tours={sources.tours}
-          venues={sources.venues}
-          people={sources.people}
-        />
-
-        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Ring legend</p>
-          <ul className="mt-2 space-y-2">
-            {rings.map((ring, index) => (
-              <li key={ring.id} className="flex items-center gap-2 text-sm text-white/75">
-                <span
-                  className="h-3 w-3 shrink-0 rounded-sm"
-                  style={{ backgroundColor: yearDiscRingColor(ring, index) }}
-                />
-                {yearDiscRingLabel(ring, sources)}
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
+
+      <YearDiscRingSettingsDialog
+        open={ringSettingsOpen}
+        onOpenChange={(nextOpen) => {
+          setRingSettingsOpen(nextOpen);
+          if (!nextOpen) setFocusedRingId(null);
+        }}
+        focusedRingId={focusedRingId}
+        config={config}
+        onChange={onConfigChange}
+        events={sources.events}
+        tours={sources.tours}
+        venues={sources.venues}
+        people={sources.people}
+      />
     </div>
   );
 }

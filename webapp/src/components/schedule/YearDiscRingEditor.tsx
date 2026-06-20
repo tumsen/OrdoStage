@@ -1,9 +1,14 @@
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -14,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import type { EventDetail, Person, TimeCategory, TourDetail, Venue } from "../../../../backend/src/types";
 import {
   ORDO_STAGE_BRAND_COLORS,
@@ -141,7 +147,10 @@ function moveRing(config: YearDiscConfig, ringId: string, direction: -1 | 1): Ye
   return { rings };
 }
 
-export function YearDiscRingEditor({
+export function YearDiscRingSettingsDialog({
+  open,
+  onOpenChange,
+  focusedRingId,
   config,
   onChange,
   events,
@@ -149,6 +158,9 @@ export function YearDiscRingEditor({
   venues,
   people,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  focusedRingId: string | null;
   config: YearDiscConfig;
   onChange: (config: YearDiscConfig) => void;
   events: EventDetail[];
@@ -164,270 +176,259 @@ export function YearDiscRingEditor({
     people,
   };
   const hasCustomColors = hasCustomYearDiscRingColors(config);
-  const [open, setOpen] = useState(false);
-  const ringSummary = config.rings
-    .map((ring) => ring.label?.trim() || yearDiscRingLabel(ring, ctx))
-    .join(" · ");
+  const ringItemRefs = useRef<Map<string, HTMLLIElement>>(new Map());
+
+  useEffect(() => {
+    if (!open || !focusedRingId) return;
+    const el = ringItemRefs.current.get(focusedRingId);
+    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [open, focusedRingId, config.rings.length]);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border border-white/10 bg-white/[0.02]">
-      <div className="flex items-start gap-2 p-3">
-        <CollapsibleTrigger asChild>
-          <button
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-[#16161f] text-white sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-white">Disc rings</DialogTitle>
+          <DialogDescription className="text-white/45">
+            Outer rings are listed first. Click a ring on the disc to edit it here.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          <Button
             type="button"
-            className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-1 py-0.5 text-left hover:bg-white/[0.04]"
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs text-white/70 hover:text-white"
+            disabled={!hasCustomColors}
+            onClick={() => onChange(resetYearDiscRingColors(config))}
           >
-            <ChevronDown
-              className={cn(
-                "mt-0.5 h-4 w-4 shrink-0 text-white/40 transition-transform",
-                open && "rotate-180",
-              )}
-              aria-hidden
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">Disc rings</p>
-              {!open ? (
-                <p className="mt-1 truncate text-[11px] text-white/35">
-                  {config.rings.length} {config.rings.length === 1 ? "ring" : "rings"}
-                  {ringSummary ? ` · ${ringSummary}` : ""}
-                </p>
-              ) : (
-                <p className="mt-1 text-[11px] text-white/35">
-                  Outer rings are listed first. Each ring can show schedule or time-tracking data.
-                </p>
-              )}
-            </div>
-          </button>
-        </CollapsibleTrigger>
-        {open ? (
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 px-2 text-xs text-white/70 hover:text-white"
-              disabled={!hasCustomColors}
-              onClick={() => onChange(resetYearDiscRingColors(config))}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset colours
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 px-2 text-xs text-white/70 hover:text-white"
-              disabled={config.rings.length >= YEAR_DISC_MAX_RINGS}
-              onClick={() => onChange({ rings: [...config.rings, createYearDiscRing()] })}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add ring
-            </Button>
-          </div>
-        ) : null}
-      </div>
-      <CollapsibleContent className="border-t border-white/10 px-3 pb-3 pt-3">
-      <ul className="space-y-3">
-        {config.rings.map((ring, index) => {
-          const entityType = ringNeedsEntityPicker(ring.source);
-          const entityId = entityIdFromSource(ring.source);
-          const selectValue = sourceSelectValue(ring.source);
-          return (
-            <li key={ring.id} className="rounded-md border border-white/10 bg-white/[0.03] p-2.5">
-              <div className="flex items-start gap-2">
-                <input
-                  type="color"
-                  aria-label="Ring color"
-                  value={rgbaToHex(yearDiscRingColor(ring, index))}
-                  onChange={(e) =>
-                    onChange(updateRing(config, ring.id, { color: hexToRgba(e.target.value) }))
-                  }
-                  className="mt-1 h-8 w-8 shrink-0 cursor-pointer rounded border border-white/10 bg-transparent p-0"
-                />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Input
-                    value={ring.label ?? ""}
-                    placeholder={yearDiscRingLabel(ring, ctx)}
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset colours
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs text-white/70 hover:text-white"
+            disabled={config.rings.length >= YEAR_DISC_MAX_RINGS}
+            onClick={() => onChange({ rings: [...config.rings, createYearDiscRing()] })}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add ring
+          </Button>
+        </div>
+        <ul className="space-y-3">
+          {config.rings.map((ring, index) => {
+            const entityType = ringNeedsEntityPicker(ring.source);
+            const entityId = entityIdFromSource(ring.source);
+            const selectValue = sourceSelectValue(ring.source);
+            const isFocused = ring.id === focusedRingId;
+            return (
+              <li
+                key={ring.id}
+                ref={(node) => {
+                  if (node) ringItemRefs.current.set(ring.id, node);
+                  else ringItemRefs.current.delete(ring.id);
+                }}
+                className={cn(
+                  "rounded-md border bg-white/[0.03] p-2.5 transition-colors",
+                  isFocused ? "border-amber-400/40 ring-1 ring-amber-400/25" : "border-white/10",
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  <input
+                    type="color"
+                    aria-label="Ring color"
+                    value={rgbaToHex(yearDiscRingColor(ring, index))}
                     onChange={(e) =>
-                      onChange(updateRing(config, ring.id, { label: e.target.value || undefined }))
+                      onChange(updateRing(config, ring.id, { color: hexToRgba(e.target.value) }))
                     }
-                    className="h-8 border-white/10 bg-white/5 text-sm text-white placeholder:text-white/30"
+                    className="mt-1 h-8 w-8 shrink-0 cursor-pointer rounded border border-white/10 bg-transparent p-0"
                   />
-                  <Select
-                    value={selectValue}
-                    onValueChange={(value) => {
-                      const nextSource = parseSourceSelectValue(value);
-                      if (!nextSource) return;
-                      const merged = mergeSourceWithEntity(nextSource, ringNeedsEntityPicker(nextSource), entityId);
-                      onChange(updateRing(config, ring.id, { source: merged }));
-                    }}
-                  >
-                    <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
-                      <SelectValue placeholder="What to show" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-72 bg-[#16161f] border-white/10 text-white">
-                      <SelectGroup>
-                        <SelectLabel className="text-white/40">Schedule</SelectLabel>
-                        {SOURCE_OPTIONS.filter((o) => o.group === "schedule").map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                      <SelectGroup>
-                        <SelectLabel className="text-white/40">Time tracking</SelectLabel>
-                        {SOURCE_OPTIONS.filter((o) => o.group === "time").map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {entityType === "event" ? (
-                    <Select
-                      value={entityId || "__none__"}
-                      onValueChange={(value) =>
-                        onChange(
-                          updateRing(config, ring.id, {
-                            source: mergeSourceWithEntity(ring.source, "event", value === "__none__" ? "" : value),
-                          })
-                        )
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Input
+                      value={ring.label ?? ""}
+                      placeholder={yearDiscRingLabel(ring, ctx)}
+                      onChange={(e) =>
+                        onChange(updateRing(config, ring.id, { label: e.target.value || undefined }))
                       }
+                      className="h-8 border-white/10 bg-white/5 text-sm text-white placeholder:text-white/30"
+                    />
+                    <Select
+                      value={selectValue}
+                      onValueChange={(value) => {
+                        const nextSource = parseSourceSelectValue(value);
+                        if (!nextSource) return;
+                        const merged = mergeSourceWithEntity(nextSource, ringNeedsEntityPicker(nextSource), entityId);
+                        onChange(updateRing(config, ring.id, { source: merged }));
+                      }}
                     >
                       <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
-                        <SelectValue placeholder="Choose event" />
+                        <SelectValue placeholder="What to show" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-60 bg-[#16161f] border-white/10 text-white">
-                        <SelectItem value="__none__">Select event…</SelectItem>
-                        {events.map((event) => (
-                          <SelectItem key={event.id} value={event.id}>
-                            {event.title}
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="max-h-72 border-white/10 bg-[#16161f] text-white">
+                        <SelectGroup>
+                          <SelectLabel className="text-white/40">Schedule</SelectLabel>
+                          {SOURCE_OPTIONS.filter((o) => o.group === "schedule").map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel className="text-white/40">Time tracking</SelectLabel>
+                          {SOURCE_OPTIONS.filter((o) => o.group === "time").map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
-                  ) : null}
-                  {entityType === "tour" ? (
-                    <Select
-                      value={entityId || "__none__"}
-                      onValueChange={(value) =>
-                        onChange(
-                          updateRing(config, ring.id, {
-                            source: mergeSourceWithEntity(ring.source, "tour", value === "__none__" ? "" : value),
-                          })
-                        )
-                      }
+                    {entityType === "event" ? (
+                      <Select
+                        value={entityId || "__none__"}
+                        onValueChange={(value) =>
+                          onChange(
+                            updateRing(config, ring.id, {
+                              source: mergeSourceWithEntity(ring.source, "event", value === "__none__" ? "" : value),
+                            })
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
+                          <SelectValue placeholder="Choose event" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60 border-white/10 bg-[#16161f] text-white">
+                          <SelectItem value="__none__">Select event…</SelectItem>
+                          {events.map((event) => (
+                            <SelectItem key={event.id} value={event.id}>
+                              {event.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                    {entityType === "tour" ? (
+                      <Select
+                        value={entityId || "__none__"}
+                        onValueChange={(value) =>
+                          onChange(
+                            updateRing(config, ring.id, {
+                              source: mergeSourceWithEntity(ring.source, "tour", value === "__none__" ? "" : value),
+                            })
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
+                          <SelectValue placeholder="Choose tour" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60 border-white/10 bg-[#16161f] text-white">
+                          <SelectItem value="__none__">Select tour…</SelectItem>
+                          {tours.map((tour) => (
+                            <SelectItem key={tour.id} value={tour.id}>
+                              {tour.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                    {entityType === "venue" ? (
+                      <Select
+                        value={entityId || "__none__"}
+                        onValueChange={(value) =>
+                          onChange(
+                            updateRing(config, ring.id, {
+                              source: mergeSourceWithEntity(ring.source, "venue", value === "__none__" ? "" : value),
+                            })
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
+                          <SelectValue placeholder="Choose venue" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60 border-white/10 bg-[#16161f] text-white">
+                          <SelectItem value="__none__">Select venue…</SelectItem>
+                          {venues.map((venue) => (
+                            <SelectItem key={venue.id} value={venue.id}>
+                              {venue.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                    {entityType === "person" ? (
+                      <Select
+                        value={entityId || "__none__"}
+                        onValueChange={(value) =>
+                          onChange(
+                            updateRing(config, ring.id, {
+                              source: mergeSourceWithEntity(ring.source, "person", value === "__none__" ? "" : value),
+                            })
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
+                          <SelectValue placeholder="Choose person" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60 border-white/10 bg-[#16161f] text-white">
+                          <SelectItem value="__none__">Select person…</SelectItem>
+                          {people.map((person) => (
+                            <SelectItem key={person.id} value={person.id}>
+                              {person.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 flex-col gap-0.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-white/50 hover:text-white"
+                      disabled={index === 0}
+                      onClick={() => onChange(moveRing(config, ring.id, -1))}
+                      aria-label="Move ring outward"
                     >
-                      <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
-                        <SelectValue placeholder="Choose tour" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60 bg-[#16161f] border-white/10 text-white">
-                        <SelectItem value="__none__">Select tour…</SelectItem>
-                        {tours.map((tour) => (
-                          <SelectItem key={tour.id} value={tour.id}>
-                            {tour.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : null}
-                  {entityType === "venue" ? (
-                    <Select
-                      value={entityId || "__none__"}
-                      onValueChange={(value) =>
-                        onChange(
-                          updateRing(config, ring.id, {
-                            source: mergeSourceWithEntity(ring.source, "venue", value === "__none__" ? "" : value),
-                          })
-                        )
-                      }
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-white/50 hover:text-white"
+                      disabled={index === config.rings.length - 1}
+                      onClick={() => onChange(moveRing(config, ring.id, 1))}
+                      aria-label="Move ring inward"
                     >
-                      <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
-                        <SelectValue placeholder="Choose venue" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60 bg-[#16161f] border-white/10 text-white">
-                        <SelectItem value="__none__">Select venue…</SelectItem>
-                        {venues.map((venue) => (
-                          <SelectItem key={venue.id} value={venue.id}>
-                            {venue.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : null}
-                  {entityType === "person" ? (
-                    <Select
-                      value={entityId || "__none__"}
-                      onValueChange={(value) =>
-                        onChange(
-                          updateRing(config, ring.id, {
-                            source: mergeSourceWithEntity(ring.source, "person", value === "__none__" ? "" : value),
-                          })
-                        )
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-white/50 hover:text-red-400"
+                      disabled={config.rings.length <= 1}
+                      onClick={() =>
+                        onChange({ rings: config.rings.filter((r) => r.id !== ring.id) })
                       }
+                      aria-label="Remove ring"
                     >
-                      <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
-                        <SelectValue placeholder="Choose person" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60 bg-[#16161f] border-white/10 text-white">
-                        <SelectItem value="__none__">Select person…</SelectItem>
-                        {people.map((person) => (
-                          <SelectItem key={person.id} value={person.id}>
-                            {person.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : null}
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex shrink-0 flex-col gap-0.5">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-white/50 hover:text-white"
-                    disabled={index === 0}
-                    onClick={() => onChange(moveRing(config, ring.id, -1))}
-                    aria-label="Move ring outward"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-white/50 hover:text-white"
-                    disabled={index === config.rings.length - 1}
-                    onClick={() => onChange(moveRing(config, ring.id, 1))}
-                    aria-label="Move ring inward"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-white/50 hover:text-red-400"
-                    disabled={config.rings.length <= 1}
-                    onClick={() =>
-                      onChange({ rings: config.rings.filter((r) => r.id !== ring.id) })
-                    }
-                    aria-label="Remove ring"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <p className="mt-2 text-[10px] text-white/30">
-                {index === 0 ? "Outermost" : index === config.rings.length - 1 ? "Innermost" : `Ring ${index + 1}`}
-              </p>
-            </li>
-          );
-        })}
-      </ul>
-      </CollapsibleContent>
-    </Collapsible>
+                <p className="mt-2 text-[10px] text-white/30">
+                  {index === 0 ? "Outermost" : index === config.rings.length - 1 ? "Innermost" : `Ring ${index + 1}`}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      </DialogContent>
+    </Dialog>
   );
 }
 
