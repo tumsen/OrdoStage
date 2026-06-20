@@ -229,6 +229,16 @@ type DiscSegment = {
   opacity: number;
 };
 
+type DaySpanGroup = {
+  key: string;
+  span: YearDiscSpan;
+  ringIndices: number[];
+};
+
+function spanGroupKey(span: YearDiscSpan): string {
+  return span.calendarItem?.id ?? span.id;
+}
+
 function isoWeekNumber(date: Date): number {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   d.setDate(d.getDate() + 4 - (d.getDay() || 7));
@@ -437,21 +447,28 @@ export function YearDiscView({
     [angleOffset, locale, timeline]
   );
 
-  const allSpans = useMemo(() => {
-    return rings.flatMap((ring) => resolveYearDiscRingSpans(ring, sources));
-  }, [rings, sources]);
+  const daySpanGroups = useMemo((): DaySpanGroup[] => {
+    const groups = new Map<string, DaySpanGroup>();
 
-  const daySpans = useMemo(() => {
-    const seen = new Set<string>();
-    return allSpans
-      .filter((span) => spanOnDay(span, selectedDate))
-      .filter((span) => {
-        if (seen.has(span.id)) return false;
-        seen.add(span.id);
-        return true;
-      })
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-  }, [allSpans, selectedDate]);
+    rings.forEach((ring, ringIndex) => {
+      for (const span of resolveYearDiscRingSpans(ring, sources)) {
+        if (!spanOnDay(span, selectedDate)) continue;
+        const key = spanGroupKey(span);
+        const existing = groups.get(key);
+        if (existing) {
+          if (!existing.ringIndices.includes(ringIndex)) {
+            existing.ringIndices.push(ringIndex);
+          }
+        } else {
+          groups.set(key, { key, span, ringIndices: [ringIndex] });
+        }
+      }
+    });
+
+    return Array.from(groups.values()).sort(
+      (a, b) => new Date(a.span.startDate).getTime() - new Date(b.span.startDate).getTime(),
+    );
+  }, [rings, sources, selectedDate]);
 
   const selectedDayLabel = selectedDate.toLocaleDateString(locale, {
     weekday: "long",
@@ -469,14 +486,6 @@ export function YearDiscView({
   function openRingSettings(ringId: string) {
     setFocusedRingId(ringId);
     setRingSettingsOpen(true);
-  }
-
-  function ringColorForSpan(span: YearDiscSpan): string {
-    const ringIndex = rings.findIndex((ring) =>
-      resolveYearDiscRingSpans(ring, sources).some((s) => s.id === span.id)
-    );
-    if (ringIndex < 0) return yearDiscRingColor(rings[0]!, 0);
-    return yearDiscRingColor(rings[ringIndex]!, ringIndex);
   }
 
   return (
@@ -711,16 +720,17 @@ export function YearDiscView({
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
           <p className="mt-1 text-[11px] text-white/35">Drag the yellow handle around the disc to change day.</p>
           <ul className="mt-3 space-y-2">
-            {daySpans.length === 0 ? (
+            {daySpanGroups.length === 0 ? (
               <li className="text-sm text-white/40">Nothing on this day.</li>
             ) : (
-              daySpans.map((span) => {
+              daySpanGroups.map(({ key, span, ringIndices }) => {
                 const time = spanTimeLabel(span);
+                const primaryRingColor = yearDiscRingColor(rings[ringIndices[0]!]!, ringIndices[0]!);
                 return (
-                  <li key={span.id}>
+                  <li key={key}>
                     <YearDiscSpanHoverCard
                       span={span}
-                      ringColor={ringColorForSpan(span)}
+                      ringColor={primaryRingColor}
                       locale={locale}
                       hour12={hour12}
                       side="left"
@@ -733,10 +743,15 @@ export function YearDiscView({
                           span.calendarItem ? "cursor-pointer" : "cursor-default opacity-80",
                         )}
                       >
-                        <span
-                          className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
-                          style={{ backgroundColor: ringColorForSpan(span) }}
-                        />
+                        <span className="mt-1 flex shrink-0 flex-wrap gap-0.5">
+                          {ringIndices.map((ringIndex) => (
+                            <span
+                              key={ringIndex}
+                              className="h-2.5 w-2.5 rounded-full ring-1 ring-white/10"
+                              style={{ backgroundColor: yearDiscRingColor(rings[ringIndex]!, ringIndex) }}
+                            />
+                          ))}
+                        </span>
                         <span className="min-w-0">
                           <span className="block truncate text-sm text-white">{span.title}</span>
                           {time ? <span className="block text-[11px] text-white/45">{time}</span> : null}
