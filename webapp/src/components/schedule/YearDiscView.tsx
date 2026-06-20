@@ -8,6 +8,13 @@ import {
   type CalendarItem,
 } from "@/components/schedule/scheduleUtils";
 import { YearDiscRingSettingsDialog } from "@/components/schedule/YearDiscRingEditor";
+import {
+  computeShowJobStaffingStats,
+  computeShowTeamStaffingRows,
+  isJobFullyAssigned,
+  jobPeopleNeeded,
+  jobSlotPersonIds,
+} from "@/lib/eventShowStaffing";
 import { usePreferences } from "@/hooks/usePreferences";
 import { cn } from "@/lib/utils";
 import {
@@ -361,6 +368,162 @@ function spanInlineMeta(span: YearDiscSpan): { people: string[]; lines: string[]
   return { people: [], lines };
 }
 
+type StaffingLine = {
+  text: string;
+  tone: "ok" | "warn" | "neutral";
+};
+
+function calendarItemStaffingLines(item: CalendarItem): StaffingLine[] {
+  if (item.kind !== "event" && item.kind !== "job") return [];
+  const ev = item.raw as EventDetail;
+  const teams = ev.teams ?? [];
+  const { showId, jobId } = parseEventCalendarId(item.id);
+  const show = showId ? ev.shows?.find((s) => s.id === showId) : undefined;
+  if (!show) return [];
+
+  if (jobId) {
+    const job = show.jobs?.find((j) => j.id === jobId);
+    if (!job) return [];
+    const needed = jobPeopleNeeded(job);
+    const filled = jobSlotPersonIds(job).filter(Boolean).length;
+    return [
+      {
+        text: isJobFullyAssigned(job)
+          ? `Staffing OK · ${filled}/${needed}`
+          : `Needs staff · ${filled}/${needed}`,
+        tone: isJobFullyAssigned(job) ? "ok" : "warn",
+      },
+    ];
+  }
+
+  const lines: StaffingLine[] = [];
+  const { jobsStaffed, jobsTotal } = computeShowJobStaffingStats(show);
+  if (jobsTotal > 0) {
+    lines.push({
+      text: `${jobsStaffed}/${jobsTotal} jobs staffed`,
+      tone: jobsStaffed === jobsTotal ? "ok" : "warn",
+    });
+  }
+  for (const row of computeShowTeamStaffingRows(show, teams)) {
+    if (row.state === "ok") {
+      lines.push({ text: `${row.name}: OK`, tone: "ok" });
+    } else if (row.state === "incomplete") {
+      lines.push({
+        text: `${row.name}: needs staff${row.slotsNeeded > 0 ? ` · ${row.slotsFilled}/${row.slotsNeeded}` : ""}`,
+        tone: "warn",
+      });
+    } else {
+      lines.push({ text: `${row.name}: no jobs`, tone: "neutral" });
+    }
+  }
+  return lines;
+}
+
+function staffingLineClassName(tone: StaffingLine["tone"]): string {
+  if (tone === "ok") return "text-emerald-400/80";
+  if (tone === "warn") return "text-amber-400/85";
+  return "text-white/35";
+}
+
+function spanPrimaryDateLabel(span: YearDiscSpan, locale: string): string {
+  const d = new Date(span.startDate);
+  if (!Number.isFinite(d.getTime())) return "";
+  return d.toLocaleDateString(locale, { weekday: "short", month: "short", day: "numeric" });
+}
+
+type SidebarEntry = {
+  group: DaySpanGroup;
+  /** Hovered from the disc but not on the needle's selected day. */
+  offSelectedDay: boolean;
+};
+
+function YearDiscEntryCard({
+  group,
+  rings,
+  locale,
+  hour12,
+  highlighted,
+  offSelectedDay,
+  onMouseEnter,
+  onMouseLeave,
+  onClick,
+}: {
+  group: DaySpanGroup;
+  rings: YearDiscConfig["rings"];
+  locale: string;
+  hour12: boolean;
+  highlighted: boolean;
+  offSelectedDay: boolean;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  onClick: () => void;
+}) {
+  const { span, ringIndices } = group;
+  const time = spanTimeLabel(span, hour12);
+  const { people, lines } = spanInlineMeta(span);
+  const staffingLines = span.calendarItem ? calendarItemStaffingLines(span.calendarItem) : [];
+
+  return (
+    <button
+      type="button"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
+        highlighted
+          ? "border-white/25 bg-white/[0.08] ring-1 ring-white/15"
+          : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]",
+        span.calendarItem ? "cursor-pointer" : "cursor-default opacity-80",
+      )}
+    >
+      <span className="mt-1 flex shrink-0 flex-wrap gap-0.5">
+        {ringIndices.map((ringIndex) => (
+          <span
+            key={ringIndex}
+            className="h-2.5 w-2.5 rounded-full ring-1 ring-white/10"
+            style={{ backgroundColor: yearDiscRingColor(rings[ringIndex]!, ringIndex) }}
+          />
+        ))}
+      </span>
+      <span className="min-w-0 flex-1">
+        {offSelectedDay ? (
+          <span className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-sky-300/70">
+            On {spanPrimaryDateLabel(span, locale)}
+          </span>
+        ) : null}
+        <span className="block text-sm leading-snug text-white">{span.title}</span>
+        {time ? <span className="mt-0.5 block text-[11px] text-white/45">{time}</span> : null}
+        {staffingLines.map((line, index) => (
+          <span
+            key={`staff-${index}`}
+            className={cn("mt-1 block text-[11px] leading-snug", staffingLineClassName(line.tone))}
+          >
+            {line.text}
+          </span>
+        ))}
+        {people.length > 0 ? (
+          <ul className="mt-1 space-y-0.5">
+            {people.map((name, index) => (
+              <li key={index} className="text-[11px] leading-snug text-white/40">
+                {name}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {lines.map((line, index) => (
+          <span
+            key={index}
+            className="mt-1 block whitespace-pre-wrap break-words text-[11px] leading-snug text-white/40"
+          >
+            {line}
+          </span>
+        ))}
+      </span>
+    </button>
+  );
+}
+
 function spanTimeLabel(span: YearDiscSpan, hour12: boolean): string {
   if (span.calendarItem) return calendarItemTimeRangeLabel(span.calendarItem, hour12);
   const start = new Date(span.startDate);
@@ -398,7 +561,7 @@ export function YearDiscView({
   const discPixelSize = useSquareFitSize(discHostRef);
   const [ringSettingsOpen, setRingSettingsOpen] = useState(false);
   const [focusedRingId, setFocusedRingId] = useState<string | null>(null);
-  const [discHoveredEntryKey, setDiscHoveredEntryKey] = useState<string | null>(null);
+  const [discHoveredSegment, setDiscHoveredSegment] = useState<DiscSegment | null>(null);
   const [sidebarHoveredEntryKey, setSidebarHoveredEntryKey] = useState<string | null>(null);
   const entryListRef = useRef<HTMLUListElement>(null);
   const timeline = useMemo(
@@ -512,13 +675,39 @@ export function YearDiscView({
     );
   }, [rings, sources, selectedDate]);
 
-  const sortedDaySpanGroups = useMemo((): DaySpanGroup[] => {
-    if (!discHoveredEntryKey) return daySpanGroups;
+  const discHoveredEntryKey = discHoveredSegment ? spanGroupKey(discHoveredSegment.span) : null;
+
+  const sidebarEntries = useMemo((): SidebarEntry[] => {
+    if (!discHoveredEntryKey) {
+      return daySpanGroups.map((group) => ({ group, offSelectedDay: false }));
+    }
+
+    const existing = daySpanGroups.find((group) => group.key === discHoveredEntryKey);
+    if (!existing) {
+      if (!discHoveredSegment) return daySpanGroups.map((group) => ({ group, offSelectedDay: false }));
+      return [
+        {
+          group: {
+            key: discHoveredEntryKey,
+            span: discHoveredSegment.span,
+            ringIndices: [discHoveredSegment.ringIndex],
+          },
+          offSelectedDay: true,
+        },
+        ...daySpanGroups.map((group) => ({ group, offSelectedDay: false })),
+      ];
+    }
+
     const index = daySpanGroups.findIndex((group) => group.key === discHoveredEntryKey);
-    if (index <= 0) return daySpanGroups;
+    if (index <= 0) {
+      return daySpanGroups.map((group) => ({ group, offSelectedDay: false }));
+    }
     const hovered = daySpanGroups[index]!;
-    return [hovered, ...daySpanGroups.filter((_, i) => i !== index)];
-  }, [daySpanGroups, discHoveredEntryKey]);
+    return [
+      { group: hovered, offSelectedDay: false },
+      ...daySpanGroups.filter((_, i) => i !== index).map((group) => ({ group, offSelectedDay: false })),
+    ];
+  }, [daySpanGroups, discHoveredEntryKey, discHoveredSegment]);
 
   const highlightedEntryKey = discHoveredEntryKey ?? sidebarHoveredEntryKey;
 
@@ -528,7 +717,7 @@ export function YearDiscView({
       `[data-entry-key="${discHoveredEntryKey}"]`,
     );
     node?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [discHoveredEntryKey, sortedDaySpanGroups]);
+  }, [discHoveredEntryKey, sidebarEntries]);
 
   const selectedDayLabel = selectedDate.toLocaleDateString(locale, {
     weekday: "long",
@@ -538,10 +727,11 @@ export function YearDiscView({
   });
 
   function handleSegmentPointerHover(segment: DiscSegment) {
-    setDiscHoveredEntryKey(spanGroupKey(segment.span));
+    setDiscHoveredSegment(segment);
   }
 
-  function handleSegmentClick(segment: DiscSegment) {
+  function handleSegmentClick(event: React.MouseEvent, segment: DiscSegment) {
+    event.stopPropagation();
     if (segment.span.calendarItem) onItemClick(segment.span.calendarItem);
   }
 
@@ -555,6 +745,7 @@ export function YearDiscView({
       <div
         ref={discHostRef}
         className="flex min-h-0 min-w-0 flex-[1.15] items-center justify-center self-stretch xl:flex-1"
+        onMouseLeave={() => setDiscHoveredSegment(null)}
       >
         <div
           className="relative shrink-0"
@@ -629,13 +820,17 @@ export function YearDiscView({
             const isHighlighted = discHoveredEntryKey === entryKey;
             const isDimmed = discHoveredEntryKey !== null && !isHighlighted;
             return (
-            <path
-              key={segment.id}
-              d={segment.path}
-              fill={segment.fill}
-              opacity={isDimmed ? segment.opacity * 0.45 : segment.opacity}
-              className="pointer-events-none transition-opacity"
-            />
+              <path
+                key={segment.id}
+                d={segment.path}
+                fill={segment.fill}
+                opacity={isDimmed ? segment.opacity * 0.45 : segment.opacity}
+                className="cursor-pointer transition-opacity"
+                onMouseEnter={() => handleSegmentPointerHover(segment)}
+                onClick={(event) => handleSegmentClick(event, segment)}
+              >
+                <title>{segment.span.title}</title>
+              </path>
             );
           })}
           {rings.map((ring, index) => {
@@ -739,22 +934,6 @@ export function YearDiscView({
           </text>
         </svg>
         <div
-          className="pointer-events-none absolute inset-0 z-10"
-          onMouseLeave={() => setDiscHoveredEntryKey(null)}
-        >
-          {segments.map((segment) => (
-            <button
-              key={`hit-${segment.id}`}
-              type="button"
-              aria-label={segment.span.title}
-              className="pointer-events-auto absolute inset-0 cursor-pointer border-0 bg-transparent p-0"
-              style={{ clipPath: segment.clipPath, WebkitClipPath: segment.clipPath }}
-              onMouseEnter={() => handleSegmentPointerHover(segment)}
-              onClick={() => handleSegmentClick(segment)}
-            />
-          ))}
-        </div>
-        <div
           className="pointer-events-auto absolute z-20 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none active:cursor-grabbing"
           style={{
             left: `${(needleTip.x / SIZE) * 100}%`,
@@ -777,59 +956,24 @@ export function YearDiscView({
           <p className="mt-1 text-sm font-medium text-white">{selectedDayLabel}</p>
           <p className="mt-1 text-[11px] text-white/35">Drag the yellow handle around the disc to change day.</p>
           <ul ref={entryListRef} className="mt-3 space-y-2">
-            {sortedDaySpanGroups.length === 0 ? (
+            {sidebarEntries.length === 0 ? (
               <li className="text-sm text-white/40">Nothing on this day.</li>
             ) : (
-              sortedDaySpanGroups.map(({ key, span, ringIndices }) => {
-                const time = spanTimeLabel(span, hour12);
-                const { people, lines } = spanInlineMeta(span);
-                const isHighlighted = highlightedEntryKey === key;
+              sidebarEntries.map(({ group, offSelectedDay }) => {
+                const isHighlighted = highlightedEntryKey === group.key;
                 return (
-                  <li key={key} data-entry-key={key}>
-                    <button
-                      type="button"
-                      onMouseEnter={() => setSidebarHoveredEntryKey(key)}
+                  <li key={offSelectedDay ? `preview-${group.key}` : group.key} data-entry-key={group.key}>
+                    <YearDiscEntryCard
+                      group={group}
+                      rings={rings}
+                      locale={locale}
+                      hour12={hour12}
+                      highlighted={isHighlighted}
+                      offSelectedDay={offSelectedDay}
+                      onMouseEnter={() => setSidebarHoveredEntryKey(group.key)}
                       onMouseLeave={() => setSidebarHoveredEntryKey(null)}
-                      onClick={() => span.calendarItem && onItemClick(span.calendarItem)}
-                      className={cn(
-                        "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
-                        isHighlighted
-                          ? "border-white/25 bg-white/[0.08] ring-1 ring-white/15"
-                          : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]",
-                        span.calendarItem ? "cursor-pointer" : "cursor-default opacity-80",
-                      )}
-                    >
-                      <span className="mt-1 flex shrink-0 flex-wrap gap-0.5">
-                        {ringIndices.map((ringIndex) => (
-                          <span
-                            key={ringIndex}
-                            className="h-2.5 w-2.5 rounded-full ring-1 ring-white/10"
-                            style={{ backgroundColor: yearDiscRingColor(rings[ringIndex]!, ringIndex) }}
-                          />
-                        ))}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm leading-snug text-white">{span.title}</span>
-                        {time ? <span className="mt-0.5 block text-[11px] text-white/45">{time}</span> : null}
-                        {people.length > 0 ? (
-                          <ul className="mt-1 space-y-0.5">
-                            {people.map((name, index) => (
-                              <li key={index} className="text-[11px] leading-snug text-white/40">
-                                {name}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                        {lines.map((line, index) => (
-                          <span
-                            key={index}
-                            className="mt-1 block whitespace-pre-wrap break-words text-[11px] leading-snug text-white/40"
-                          >
-                            {line}
-                          </span>
-                        ))}
-                      </span>
-                    </button>
+                      onClick={() => group.span.calendarItem && onItemClick(group.span.calendarItem)}
+                    />
                   </li>
                 );
               })
