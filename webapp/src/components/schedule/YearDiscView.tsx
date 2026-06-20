@@ -537,13 +537,11 @@ export function YearDiscView({
     year: "numeric",
   });
 
-  function handleSegmentPointerHover(segment: DiscSegment, clientX: number, clientY: number) {
-    updateDayFromPointer(clientX, clientY);
+  function handleSegmentPointerHover(segment: DiscSegment) {
     setDiscHoveredEntryKey(spanGroupKey(segment.span));
   }
 
-  function handleSegmentClick(segment: DiscSegment, clientX: number, clientY: number) {
-    updateDayFromPointer(clientX, clientY);
+  function handleSegmentClick(segment: DiscSegment) {
     if (segment.span.calendarItem) onItemClick(segment.span.calendarItem);
   }
 
@@ -751,9 +749,8 @@ export function YearDiscView({
               aria-label={segment.span.title}
               className="pointer-events-auto absolute inset-0 cursor-pointer border-0 bg-transparent p-0"
               style={{ clipPath: segment.clipPath, WebkitClipPath: segment.clipPath }}
-              onMouseEnter={(event) => handleSegmentPointerHover(segment, event.clientX, event.clientY)}
-              onMouseMove={(event) => handleSegmentPointerHover(segment, event.clientX, event.clientY)}
-              onClick={(event) => handleSegmentClick(segment, event.clientX, event.clientY)}
+              onMouseEnter={() => handleSegmentPointerHover(segment)}
+              onClick={() => handleSegmentClick(segment)}
             />
           ))}
         </div>
