@@ -20,6 +20,9 @@ import {
   PatchTimeTagSchema,
   CreateTimeProjectSchema,
   PatchTimeProjectSchema,
+  CreateTimeParentCategorySchema,
+  PatchTimeParentCategorySchema,
+  LinkTimeParentCategoryItemSchema,
   CreateTimeEntrySchema,
   PatchTimeEntrySchema,
   CreateTimeTravelClaimSchema,
@@ -65,7 +68,7 @@ function iso(d: Date) {
 async function syncEventShowTimeProjects(organizationId: string) {
   const events = await prisma.event.findMany({
     where: { organizationId },
-    select: { id: true, title: true },
+    select: { id: true, title: true, timeParentCategoryId: true },
     orderBy: { title: "asc" },
   });
 
@@ -73,13 +76,14 @@ async function syncEventShowTimeProjects(organizationId: string) {
     const eventProjectId = await ensureEventTimeProject(organizationId, {
       id: ev.id,
       title: ev.title,
+      timeParentCategoryId: ev.timeParentCategoryId,
     });
     await archiveLegacyEventShowProjects(organizationId, ev.id, eventProjectId);
   }
 
   const tours = await prisma.tour.findMany({
     where: { organizationId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, timeParentCategoryId: true },
     orderBy: { name: "asc" },
   });
 
@@ -87,6 +91,7 @@ async function syncEventShowTimeProjects(organizationId: string) {
     const tourProjectId = await ensureTourTimeProject(organizationId, {
       id: tour.id,
       name: tour.name,
+      timeParentCategoryId: tour.timeParentCategoryId,
     });
     await archiveLegacyTourShowProjects(organizationId, tour.id, tourProjectId);
   }
@@ -846,6 +851,22 @@ function serializeTag(row: {
   };
 }
 
+function serializeParentCategory(row: {
+  id: string;
+  organizationId: string;
+  name: string;
+  color: string | null;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    ...row,
+    createdAt: iso(row.createdAt),
+    updatedAt: iso(row.updatedAt),
+  };
+}
+
 function serializeProject(row: {
   id: string;
   organizationId: string;
@@ -855,6 +876,7 @@ function serializeProject(row: {
   eventShowId: string | null;
   tourId: string | null;
   tourShowId: string | null;
+  timeParentCategoryId: string | null;
   isArchived: boolean;
   sortOrder: number;
   createdAt: Date;
@@ -1617,6 +1639,228 @@ timeRouter.delete("/time/tags/:id", async (c) => {
   return c.json({ ok: true });
 });
 
+async function resolveOrgParentCategoryId(
+  organizationId: string,
+  id: string | null | undefined
+): Promise<{ ok: true; value: string | null | undefined } | { ok: false }> {
+  if (id === undefined) return { ok: true, value: undefined };
+  if (id === null || id === "") return { ok: true, value: null };
+  const row = await prisma.timeParentCategory.findFirst({
+    where: { id, organizationId },
+    select: { id: true },
+  });
+  if (!row) return { ok: false };
+  return { ok: true, value: id };
+}
+
+timeRouter.get("/time/parent-category-catalog", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "time.manage_catalog")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  await syncEventShowTimeProjects(user.organizationId);
+  const [categories, events, tours, standaloneProjects] = await Promise.all([
+    prisma.timeParentCategory.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
+    prisma.event.findMany({
+      where: { organizationId: user.organizationId },
+      select: { id: true, title: true, timeParentCategoryId: true },
+      orderBy: { title: "asc" },
+    }),
+    prisma.tour.findMany({
+      where: { organizationId: user.organizationId },
+      select: { id: true, name: true, timeParentCategoryId: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.timeProject.findMany({
+      where: {
+        organizationId: user.organizationId,
+        isArchived: false,
+        eventId: null,
+        tourId: null,
+      },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
+  ]);
+  return c.json({
+    data: {
+      categories: categories.map(serializeParentCategory),
+      events,
+      tours,
+      standaloneProjects: standaloneProjects.map(serializeProject),
+    },
+  });
+});
+
+timeRouter.get("/time/parent-categories", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const rows = await prisma.timeParentCategory.findMany({
+    where: { organizationId: user.organizationId },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+  return c.json({ data: rows.map(serializeParentCategory) });
+});
+
+timeRouter.post("/time/parent-categories", zValidator("json", CreateTimeParentCategorySchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "time.manage_catalog")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const body = c.req.valid("json");
+  const row = await prisma.timeParentCategory.create({
+    data: {
+      organizationId: user.organizationId,
+      name: body.name.trim(),
+      sortOrder: body.sortOrder ?? 0,
+      color: body.color ?? null,
+    },
+  });
+  return c.json({ data: serializeParentCategory(row) });
+});
+
+timeRouter.patch("/time/parent-categories/:id", zValidator("json", PatchTimeParentCategorySchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "time.manage_catalog")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const body = c.req.valid("json");
+  const existing = await prisma.timeParentCategory.findFirst({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  const row = await prisma.timeParentCategory.update({
+    where: { id },
+    data: {
+      ...(body.name !== undefined ? { name: body.name.trim() } : {}),
+      ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
+      ...(body.color !== undefined ? { color: body.color } : {}),
+    },
+  });
+  return c.json({ data: serializeParentCategory(row) });
+});
+
+timeRouter.delete("/time/parent-categories/:id", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "time.manage_catalog")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const existing = await prisma.timeParentCategory.findFirst({
+    where: { id, organizationId: user.organizationId },
+  });
+  if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  await prisma.$transaction([
+    prisma.event.updateMany({
+      where: { organizationId: user.organizationId, timeParentCategoryId: id },
+      data: { timeParentCategoryId: null },
+    }),
+    prisma.tour.updateMany({
+      where: { organizationId: user.organizationId, timeParentCategoryId: id },
+      data: { timeParentCategoryId: null },
+    }),
+    prisma.timeProject.updateMany({
+      where: { organizationId: user.organizationId, timeParentCategoryId: id },
+      data: { timeParentCategoryId: null },
+    }),
+    prisma.timeParentCategory.delete({ where: { id } }),
+  ]);
+  return c.json({ ok: true });
+});
+
+timeRouter.patch("/time/parent-category-link", zValidator("json", LinkTimeParentCategoryItemSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "time.manage_catalog")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const body = c.req.valid("json");
+  const parentResolved = await resolveOrgParentCategoryId(
+    user.organizationId,
+    body.timeParentCategoryId
+  );
+  if (!parentResolved.ok) {
+    return c.json({ error: { message: "Parent category not found", code: "NOT_FOUND" } }, 404);
+  }
+  const parentId = parentResolved.value ?? null;
+
+  if (body.type === "event") {
+    const ev = await prisma.event.findFirst({
+      where: { id: body.id, organizationId: user.organizationId },
+      select: { id: true, title: true, timeParentCategoryId: true },
+    });
+    if (!ev) return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
+    await prisma.event.update({
+      where: { id: ev.id },
+      data: { timeParentCategoryId: parentId },
+    });
+    await ensureEventTimeProject(user.organizationId, {
+      id: ev.id,
+      title: ev.title,
+      timeParentCategoryId: parentId,
+    });
+    return c.json({ ok: true });
+  }
+
+  if (body.type === "tour") {
+    const tour = await prisma.tour.findFirst({
+      where: { id: body.id, organizationId: user.organizationId },
+      select: { id: true, name: true },
+    });
+    if (!tour) return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
+    await prisma.tour.update({
+      where: { id: tour.id },
+      data: { timeParentCategoryId: parentId },
+    });
+    await ensureTourTimeProject(user.organizationId, {
+      id: tour.id,
+      name: tour.name,
+      timeParentCategoryId: parentId,
+    });
+    return c.json({ ok: true });
+  }
+
+  const project = await prisma.timeProject.findFirst({
+    where: {
+      id: body.id,
+      organizationId: user.organizationId,
+      eventId: null,
+      tourId: null,
+      isArchived: false,
+    },
+  });
+  if (!project) {
+    return c.json({ error: { message: "Standalone project not found", code: "NOT_FOUND" } }, 404);
+  }
+  await prisma.timeProject.update({
+    where: { id: project.id },
+    data: { timeParentCategoryId: parentId },
+  });
+  return c.json({ ok: true });
+});
+
 timeRouter.get("/time/projects", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
@@ -1710,6 +1954,15 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
     if (!tour) return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
   }
 
+  const parentResolved = await resolveOrgParentCategoryId(
+    user.organizationId,
+    body.timeParentCategoryId
+  );
+  if (!parentResolved.ok) {
+    return c.json({ error: { message: "Parent category not found", code: "NOT_FOUND" } }, 404);
+  }
+  const isStandalone = !eventId && !eventShowId && !body.tourId && !body.tourShowId;
+
   const row = await prisma.timeProject.create({
     data: {
       organizationId: user.organizationId,
@@ -1718,6 +1971,7 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
       eventShowId,
       tourId: body.tourId ?? null,
       tourShowId: body.tourShowId ?? null,
+      timeParentCategoryId: isStandalone ? (parentResolved.value ?? null) : null,
       sortOrder: body.sortOrder ?? 0,
       color: body.color ?? null,
     },
@@ -1777,6 +2031,28 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
     });
     if (!tour) return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
   }
+  let parentCategoryPatch: string | null | undefined;
+  if (body.timeParentCategoryId !== undefined) {
+    if (existing.eventId || existing.tourId) {
+      return c.json(
+        {
+          error: {
+            message: "Link events and tours to a parent category from the catalog page",
+            code: "BAD_REQUEST",
+          },
+        },
+        400
+      );
+    }
+    const parentResolved = await resolveOrgParentCategoryId(
+      user.organizationId,
+      body.timeParentCategoryId
+    );
+    if (!parentResolved.ok) {
+      return c.json({ error: { message: "Parent category not found", code: "NOT_FOUND" } }, 404);
+    }
+    parentCategoryPatch = parentResolved.value ?? null;
+  }
   const row = await prisma.timeProject.update({
     where: { id },
     data: {
@@ -1785,6 +2061,7 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
       ...(body.eventShowId !== undefined ? { eventShowId: body.eventShowId } : {}),
       ...(body.tourId !== undefined ? { tourId: body.tourId } : {}),
       ...(body.tourShowId !== undefined ? { tourShowId: body.tourShowId } : {}),
+      ...(parentCategoryPatch !== undefined ? { timeParentCategoryId: parentCategoryPatch } : {}),
       ...(body.isArchived !== undefined ? { isArchived: body.isArchived } : {}),
       ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
       ...(body.color !== undefined ? { color: body.color } : {}),

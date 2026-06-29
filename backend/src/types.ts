@@ -616,6 +616,7 @@ export const CreateEventSchema = z.object({
   leadPersonId: z.string().nullable().optional(),
   teamIds: z.array(z.string()).optional(),
   productionId: z.string().nullable().optional(),
+  timeParentCategoryId: z.string().nullable().optional(),
 });
 
 export const UpdateEventSchema = CreateEventSchema.partial();
@@ -1128,6 +1129,7 @@ export const CreateTourSchema = z.object({
   customFields: z.array(CustomFieldSchema).optional(),
   riderVisibility: RiderVisibilitySchema.partial().optional(),
   productionId: z.string().min(1),
+  timeParentCategoryId: z.string().nullable().optional(),
 });
 
 export const UpdateTourSchema = CreateTourSchema.partial();
@@ -1158,10 +1160,40 @@ export const TimeProjectSchema = z.object({
   eventShowId: z.string().nullable(),
   tourId: z.string().nullable(),
   tourShowId: z.string().nullable(),
+  timeParentCategoryId: z.string().nullable(),
   isArchived: z.boolean(),
   sortOrder: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+export const TimeParentCategorySchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  name: z.string(),
+  color: z.union([TimeCatalogHexColorSchema, z.null()]),
+  sortOrder: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const TimeParentCategoryCatalogEventSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  timeParentCategoryId: z.string().nullable(),
+});
+
+export const TimeParentCategoryCatalogTourSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  timeParentCategoryId: z.string().nullable(),
+});
+
+export const TimeParentCategoryCatalogSchema = z.object({
+  categories: z.array(TimeParentCategorySchema),
+  events: z.array(TimeParentCategoryCatalogEventSchema),
+  tours: z.array(TimeParentCategoryCatalogTourSchema),
+  standaloneProjects: z.array(TimeProjectSchema),
 });
 
 export const TIME_CATEGORIES = ["work", "vacation", "sick", "holiday", "travel_allowance"] as const;
@@ -1232,6 +1264,7 @@ export const CreateTimeProjectSchema = z.object({
   eventShowId: z.string().nullable().optional(),
   tourId: z.string().nullable().optional(),
   tourShowId: z.string().nullable().optional(),
+  timeParentCategoryId: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
   color: z.union([TimeCatalogHexColorSchema, z.null()]).optional(),
 });
@@ -1242,9 +1275,24 @@ export const PatchTimeProjectSchema = z.object({
   eventShowId: z.string().nullable().optional(),
   tourId: z.string().nullable().optional(),
   tourShowId: z.string().nullable().optional(),
+  timeParentCategoryId: z.string().nullable().optional(),
   isArchived: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   color: z.union([TimeCatalogHexColorSchema, z.null()]).optional(),
+});
+
+export const CreateTimeParentCategorySchema = z.object({
+  name: z.string().min(1),
+  sortOrder: z.number().int().optional(),
+  color: z.union([TimeCatalogHexColorSchema, z.null()]).optional(),
+});
+
+export const PatchTimeParentCategorySchema = CreateTimeParentCategorySchema.partial();
+
+export const LinkTimeParentCategoryItemSchema = z.object({
+  type: z.enum(["event", "tour", "project"]),
+  id: z.string().min(1),
+  timeParentCategoryId: z.string().nullable(),
 });
 
 export const CreateTimeEntrySchema = z.object({
@@ -1538,6 +1586,8 @@ export type TimeReportEntry = z.infer<typeof TimeReportEntrySchema>;
 
 export type TimeTag = z.infer<typeof TimeTagSchema>;
 export type TimeProject = z.infer<typeof TimeProjectSchema>;
+export type TimeParentCategory = z.infer<typeof TimeParentCategorySchema>;
+export type TimeParentCategoryCatalog = z.infer<typeof TimeParentCategoryCatalogSchema>;
 export type TimeEntry = z.infer<typeof TimeEntrySchema>;
 export type TimeTrackingJob = z.infer<typeof TimeTrackingJobSchema>;
 export type TimeTravelClaim = z.infer<typeof TimeTravelClaimSchema>;

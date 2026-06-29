@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,12 @@ export function TimeCatalogSettings() {
       <div>
         <p className="text-sm font-medium text-white">{t("time.catalogTitle")}</p>
         <p className="text-xs text-white/50 mt-1">{t("time.catalogHint")}</p>
+        <Link
+          to="/time/catalog"
+          className="mt-2 inline-block text-xs font-medium text-indigo-300/90 hover:text-indigo-200"
+        >
+          {t("time.parentCategoryCatalogLink")} →
+        </Link>
       </div>
 
       <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">

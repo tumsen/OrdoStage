@@ -29,6 +29,7 @@ import {
   MoreHorizontal,
   Pencil,
   BarChart2,
+  FolderKanban,
   Trash2,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -1569,6 +1570,19 @@ export default function TimeTracking() {
               >
                 <BarChart2 className="h-4 w-4" />
                 {t("time.reportsLink")}
+              </Button>
+            </Link>
+          )}
+          {canManageTimeCatalog && (
+            <Link to="/time/catalog" className="hidden sm:inline-flex">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
+              >
+                <FolderKanban className="h-4 w-4" />
+                {t("time.parentCategoryCatalogLink")}
               </Button>
             </Link>
           )}

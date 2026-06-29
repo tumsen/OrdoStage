@@ -136,6 +136,7 @@ model Organization {
   invoices         BillingInvoice[]
   usageSnapshots   BillingUsageSnapshot[]
   timeTags         TimeTag[]
+  timeParentCategories TimeParentCategory[]
   timeProjects     TimeProject[]
   timeEntries      TimeEntry[]
   productions      Production[]
@@ -488,10 +489,13 @@ model Event {
   /** Optional parent show/production; enables one production to own many in-house runs. */
   productionId   String?
   productionRef  Production?   @relation("ProductionEvents", fields: [productionId], references: [id], onDelete: SetNull)
+  timeParentCategoryId String?
+  timeParentCategory   TimeParentCategory? @relation(fields: [timeParentCategoryId], references: [id], onDelete: SetNull)
 
   @@index([ownerTeamId])
   @@index([organizationId, startDate])
   @@index([productionId])
+  @@index([timeParentCategoryId])
 }
 
 model EventTeam {
@@ -801,10 +805,13 @@ model Tour {
   /** Optional parent show/production; enables one production to own many tours/legs. */
   productionId     String?
   productionRef    Production? @relation("ProductionTours", fields: [productionId], references: [id], onDelete: SetNull)
+  timeParentCategoryId String?
+  timeParentCategory   TimeParentCategory? @relation(fields: [timeParentCategoryId], references: [id], onDelete: SetNull)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
   @@index([productionId])
+  @@index([timeParentCategoryId])
 }
 
 model TourTeam {
@@ -953,6 +960,23 @@ model TimeTag {
   @@index([organizationId, sortOrder])
 }
 
+model TimeParentCategory {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  /** Optional UI colour (#RRGGBB). When null, clients use a stable fallback by id. */
+  color          String?
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  projects       TimeProject[]
+  events         Event[]
+  tours          Tour[]
+
+  @@index([organizationId, sortOrder])
+}
+
 model TimeProject {
   id             String       @id @default(cuid())
   organizationId String
@@ -968,6 +992,8 @@ model TimeProject {
   tour           Tour?        @relation(fields: [tourId], references: [id], onDelete: SetNull)
   tourShowId     String?
   tourShow       TourShow?    @relation(fields: [tourShowId], references: [id], onDelete: SetNull)
+  timeParentCategoryId String?
+  timeParentCategory   TimeParentCategory? @relation(fields: [timeParentCategoryId], references: [id], onDelete: SetNull)
   isArchived     Boolean      @default(false)
   sortOrder      Int          @default(0)
   createdAt      DateTime     @default(now())
@@ -979,6 +1005,7 @@ model TimeProject {
   @@index([eventShowId])
   @@index([tourId])
   @@index([tourShowId])
+  @@index([timeParentCategoryId])
 }
 
 model TimeEntry {

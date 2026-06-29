@@ -3,18 +3,24 @@ import { prisma } from "./prisma";
 /** One TimeProject per event (not per performance/show). */
 export async function ensureEventTimeProject(
   organizationId: string,
-  event: { id: string; title: string }
+  event: { id: string; title: string; timeParentCategoryId?: string | null }
 ): Promise<string> {
   const title = event.title.trim() || "Untitled event";
+  const parentCategoryId = event.timeParentCategoryId ?? null;
   const existing = await prisma.timeProject.findFirst({
     where: { organizationId, eventId: event.id, eventShowId: null },
-    select: { id: true, name: true },
+    select: { id: true, name: true, timeParentCategoryId: true },
   });
   if (existing) {
-    if (existing.name !== title) {
+    const updates: { name?: string; timeParentCategoryId?: string | null } = {};
+    if (existing.name !== title) updates.name = title;
+    if (existing.timeParentCategoryId !== parentCategoryId) {
+      updates.timeParentCategoryId = parentCategoryId;
+    }
+    if (Object.keys(updates).length > 0) {
       await prisma.timeProject.update({
         where: { id: existing.id },
-        data: { name: title },
+        data: updates,
       });
     }
     return existing.id;
@@ -25,6 +31,7 @@ export async function ensureEventTimeProject(
       name: title,
       eventId: event.id,
       eventShowId: null,
+      timeParentCategoryId: parentCategoryId,
       sortOrder: 0,
     },
   });
@@ -85,19 +92,25 @@ export async function loadEventProjectIdByEventId(
 /** One TimeProject per tour (not per tour day). */
 export async function ensureTourTimeProject(
   organizationId: string,
-  tour: { id: string; name: string }
+  tour: { id: string; name: string; timeParentCategoryId?: string | null }
 ): Promise<string> {
   const tourTitle = tour.name.trim() || "Untitled tour";
   const tourProjectName = `Tour · ${tourTitle}`;
+  const parentCategoryId = tour.timeParentCategoryId ?? null;
   const existing = await prisma.timeProject.findFirst({
     where: { organizationId, tourId: tour.id, tourShowId: null },
-    select: { id: true, name: true },
+    select: { id: true, name: true, timeParentCategoryId: true },
   });
   if (existing) {
-    if (existing.name !== tourProjectName) {
+    const updates: { name?: string; timeParentCategoryId?: string | null } = {};
+    if (existing.name !== tourProjectName) updates.name = tourProjectName;
+    if (existing.timeParentCategoryId !== parentCategoryId) {
+      updates.timeParentCategoryId = parentCategoryId;
+    }
+    if (Object.keys(updates).length > 0) {
       await prisma.timeProject.update({
         where: { id: existing.id },
-        data: { name: tourProjectName },
+        data: updates,
       });
     }
     return existing.id;
@@ -108,10 +121,33 @@ export async function ensureTourTimeProject(
       name: tourProjectName,
       tourId: tour.id,
       tourShowId: null,
+      timeParentCategoryId: parentCategoryId,
       sortOrder: 0,
     },
   });
   return created.id;
+}
+
+export async function syncEventTimeProjectParentCategory(
+  organizationId: string,
+  eventId: string,
+  timeParentCategoryId: string | null
+): Promise<void> {
+  await prisma.timeProject.updateMany({
+    where: { organizationId, eventId, eventShowId: null },
+    data: { timeParentCategoryId },
+  });
+}
+
+export async function syncTourTimeProjectParentCategory(
+  organizationId: string,
+  tourId: string,
+  timeParentCategoryId: string | null
+): Promise<void> {
+  await prisma.timeProject.updateMany({
+    where: { organizationId, tourId, tourShowId: null },
+    data: { timeParentCategoryId },
+  });
 }
 
 /** Retire per-day tour projects created by older sync logic. */
