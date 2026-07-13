@@ -295,8 +295,10 @@ type CreateDragRef = {
   thresholdPassed: boolean;
 };
 
-function formatDurationShort(totalMin: number): string {
-  const m = Math.round(totalMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
+function formatDurationShort(totalMin: number, exact = false): string {
+  const m = exact
+    ? Math.round(totalMin)
+    : Math.round(totalMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
   if (!Number.isFinite(m) || m <= 0) return "0 min";
   if (m < 60) return `${m} min`;
   const h = Math.floor(m / 60);
@@ -2420,11 +2422,13 @@ export default function TimeTracking() {
                         const endDisp = snapLocalClockToGrid(spanEnd);
                         const startTimeLabel = format(startDisp, timeTf);
                         const endTimeLabel = format(endDisp, timeTf);
-                        const durForLabel = Math.max(
-                          TIME_SNAP_MINUTES,
-                          Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
-                        );
-                        const durationLabel = formatDurationShort(durForLabel);
+                        const durForLabel = isDayOff
+                          ? Math.round(durMin)
+                          : Math.max(
+                              TIME_SNAP_MINUTES,
+                              Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
+                            );
+                        const durationLabel = formatDurationShort(durForLabel, isDayOff);
                         const gapPx = 2;
                         const leftPct = (layout.colIndex / layout.totalCols) * 100;
                         const widthPct = (1 / layout.totalCols) * 100;

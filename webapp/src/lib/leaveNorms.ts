@@ -9,7 +9,9 @@ export function hoursPerWorkDayFromWeekly(weeklyHours: number | null | undefined
 
 /** Whole-minute duration for one vacation/sick day (avoids float drift in ISO timestamps). */
 export function workDayDurationMinutes(weeklyHours: number | null | undefined): number {
-  return Math.round(hoursPerWorkDayFromWeekly(weeklyHours) * 60);
+  const weekly =
+    weeklyHours != null && weeklyHours > 0 ? weeklyHours : DEFAULT_WEEKLY_CONTRACT_HOURS;
+  return Math.round((weekly * 60) / 5);
 }
 
 export function formatWorkDayDuration(minutes: number): string {
