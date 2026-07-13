@@ -8,6 +8,11 @@ import type {
 
 const DEFAULT_WEEKLY_HOURS = 37;
 
+export function hoursPerWorkDayFromWeekly(weeklyHours: number | null | undefined): number {
+  if (weeklyHours != null && weeklyHours > 0) return weeklyHours / 5;
+  return DEFAULT_WEEKLY_HOURS / 5;
+}
+
 export function resolveVacationYear(
   date: Date,
   policy: Pick<OrganizationLeavePolicyData, "vacationYearStartMonth" | "vacationYearStartDay">
@@ -58,7 +63,7 @@ export function resolveLeaveNorms(
   if (policy.hoursPerVacationDayMode === "fixed" && policy.hoursPerVacationDayFixed != null) {
     hoursPerVacationDay = policy.hoursPerVacationDayFixed;
   } else {
-    hoursPerVacationDay = weekly / 5;
+    hoursPerVacationDay = hoursPerWorkDayFromWeekly(weekly);
   }
 
   const monthlyContractHours =

@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { isDayOffCategory } from "@/lib/timeCategoryI18n";
 import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
@@ -76,6 +77,8 @@ export function TimeEntryEditSheet(props: {
   deleting: boolean;
   entrySummary?: string | null;
   leaveManagementEnabled?: boolean;
+  /** One vacation/sick day in minutes (weekly contract ÷ 5). */
+  workDayDurationMinutes?: number;
 }) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
@@ -95,6 +98,7 @@ export function TimeEntryEditSheet(props: {
     deleting,
     entrySummary,
     leaveManagementEnabled = false,
+    workDayDurationMinutes = 0,
   } = props;
 
   const liveRangeRef = useRef(liveRange);
@@ -240,6 +244,19 @@ export function TimeEntryEditSheet(props: {
     onDelete(entry.id);
   }
 
+  const applyWorkDayDuration = (nextCategory: TimeCategory) => {
+    if (!workDayDurationMinutes || !isDayOffCategory(nextCategory)) return;
+    const m = /^(\d{1,2}):(\d{2})$/.exec(startHm.trim());
+    if (!m) return;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return;
+    const start = new Date();
+    start.setHours(hh, mm, 0, 0);
+    const end = new Date(start.getTime() + workDayDurationMinutes * 60_000);
+    setEndHm(hmFromDate(end));
+  };
+
   const categoryOptions: { value: TimeCategory; label: string; color: string }[] = [
     { value: "work", label: t("time.categoryWork"), color: "text-blue-300" },
     { value: "vacation", label: t("time.categoryVacation"), color: "text-emerald-300" },
@@ -330,7 +347,10 @@ export function TimeEntryEditSheet(props: {
                   key={opt.value}
                   type="button"
                   disabled={entry?.isLocked}
-                  onClick={() => setCategory(opt.value)}
+                  onClick={() => {
+                    setCategory(opt.value);
+                    applyWorkDayDuration(opt.value);
+                  }}
                   className={cn(
                     "rounded-md border font-medium transition-colors text-center",
                     isMobile ? "px-1 py-1.5 text-[9px] leading-tight" : "px-3 py-2 text-sm text-left",

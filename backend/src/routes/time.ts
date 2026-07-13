@@ -10,6 +10,7 @@ import type { EffectiveRole } from "../effectiveRole";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { getCountryRuleSet, type TravelAllowanceType, type TravelClaimDayLine, type MileageVehicleType } from "../rules/countryRuleSets";
 import { isCountryFeatureEnabled } from "../countryFeatures";
+import { hoursPerWorkDayFromWeekly } from "../rules/leave/danishLeave";
 import {
   applyTimeEntryToLeaveLedger,
   getLeaveBalanceSummary,
@@ -1497,8 +1498,8 @@ timeRouter.get("/time/report", async (c) => {
       pa.travelAllowanceMinutes;
     const contractMinutes =
       pa.weeklyContractHours != null ? (rangeDays / 7) * pa.weeklyContractHours * 60 : null;
-    // Vacation days: use hoursPerWorkDay = weeklyContractHours / 5; fall back to 8h
-    const hoursPerDay = pa.weeklyContractHours != null ? pa.weeklyContractHours / 5 : 8;
+    // Vacation days: weekly contract ÷ 5 (37h → 7.4h/day; 30h → 6h/day)
+    const hoursPerDay = hoursPerWorkDayFromWeekly(pa.weeklyContractHours);
     const vacationDaysUsed = Math.round((pa.vacationMinutes / 60 / hoursPerDay) * 10) / 10;
     const vacationDaysRemaining =
       pa.vacationDaysPerYear != null ? Math.round((pa.vacationDaysPerYear - vacationDaysUsed) * 10) / 10 : null;

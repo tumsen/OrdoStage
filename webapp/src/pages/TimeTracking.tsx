@@ -80,6 +80,11 @@ import type {
 } from "@/contracts/backendTypes";
 import type { Language, TimeFormat } from "@/lib/preferences";
 import { calendarDateKeyFromJobDate } from "@/lib/showTiming";
+import { addMinutesToUtcIso, wallClockYmdHhMmToUtcIso } from "@/lib/browserUserTime";
+import {
+  formatWorkDayDuration,
+  workDayDurationMinutes,
+} from "@/lib/leaveNorms";
 import {
   MINUTES_PER_DAY,
   TIME_SNAP_MINUTES,
@@ -519,7 +524,14 @@ export default function TimeTracking() {
   const { data: peopleForFilter } = useQuery({
     queryKey: ["time-people"],
     queryFn: () =>
-      api.get<Array<{ id: string; name: string; email: string | null }>>("/api/time/people"),
+      api.get<
+        Array<{
+          id: string;
+          name: string;
+          email: string | null;
+          weeklyContractHours?: number | null;
+        }>
+      >("/api/time/people"),
     enabled: readAll,
   });
 
@@ -1251,6 +1263,16 @@ export default function TimeTracking() {
   const periodMonth = format(anchor, "MMMM", { locale: dfLocale });
   const periodYear = format(anchor, "yyyy");
 
+  const activePersonWeeklyHours = useMemo(() => {
+    const targetId = readAll && selectedPersonId ? selectedPersonId : mePerson?.id;
+    if (!targetId) return mePerson?.weeklyContractHours ?? null;
+    if (targetId === mePerson?.id) return mePerson.weeklyContractHours ?? null;
+    return peopleForFilter?.find((p) => p.id === targetId)?.weeklyContractHours ?? null;
+  }, [readAll, selectedPersonId, mePerson, peopleForFilter]);
+
+  const workDayMinutes = workDayDurationMinutes(activePersonWeeklyHours);
+  const workDayDurationLabel = formatWorkDayDuration(workDayMinutes);
+
   function jumpToJobWeek(job: TimeTrackingJob) {
     const { start } = plannedJobDisplayRange(job);
     if (Number.isFinite(start.getTime())) setAnchor(start);
@@ -1353,10 +1375,6 @@ export default function TimeTracking() {
       </div>
     );
   }
-
-  // Hours per work day (for vacation/sick day sizing). Danish default: 37h/wk ÷ 5 = 7.4h
-  const hoursPerWorkDay =
-    mePerson.weeklyContractHours != null ? mePerson.weeklyContractHours / 5 : 7.4;
 
   const weekJobIds = new Set((jobs ?? []).map((j) => j.id));
   const hasUpcomingUnlogged =
@@ -2021,12 +2039,12 @@ export default function TimeTracking() {
 
                       const addDayOff = (category: "vacation" | "sick" | "extra_vacation" | "comp_time") => {
                         if (!canEditVisiblePeriod) return;
-                        const [y, m, d] = dayYmd.split("-").map(Number);
-                        const startsAt = new Date(Date.UTC(y!, m! - 1, d!, 8, 0, 0));
-                        const endsAt = new Date(startsAt.getTime() + hoursPerWorkDay * 60 * 60 * 1000);
+                        const startsAt = wallClockYmdHhMmToUtcIso(dayYmd, "08:00");
+                        const endsAt = addMinutesToUtcIso(startsAt, workDayMinutes);
+                        if (!endsAt) return;
                         createEntry.mutate({
-                          startsAt: startsAt.toISOString(),
-                          endsAt: endsAt.toISOString(),
+                          startsAt,
+                          endsAt,
                           kind: "custom",
                           category,
                         });
@@ -2083,7 +2101,7 @@ export default function TimeTracking() {
                               <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                                 <button
                                   type="button"
-                                  title={t("time.addVacationDay")}
+                                  title={`${t("time.addVacationDay")} (${workDayDurationLabel})`}
                                   onClick={() => addDayOff("vacation")}
                                   className="rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-emerald-300/70 hover:bg-emerald-500/30 hover:text-emerald-200"
                                 >
@@ -2093,7 +2111,7 @@ export default function TimeTracking() {
                                   <>
                                     <button
                                       type="button"
-                                      title={t("time.addExtraVacationDay")}
+                                      title={`${t("time.addExtraVacationDay")} (${workDayDurationLabel})`}
                                       onClick={() => addDayOff("extra_vacation")}
                                       className="rounded bg-teal-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-teal-300/70 hover:bg-teal-500/30 hover:text-teal-200"
                                     >
@@ -2101,7 +2119,7 @@ export default function TimeTracking() {
                                     </button>
                                     <button
                                       type="button"
-                                      title={t("time.addCompTimeDay")}
+                                      title={`${t("time.addCompTimeDay")} (${workDayDurationLabel})`}
                                       onClick={() => addDayOff("comp_time")}
                                       className="rounded bg-cyan-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-cyan-300/70 hover:bg-cyan-500/30 hover:text-cyan-200"
                                     >
@@ -2111,7 +2129,7 @@ export default function TimeTracking() {
                                 ) : null}
                                 <button
                                   type="button"
-                                  title={t("time.addSickDay")}
+                                  title={`${t("time.addSickDay")} (${workDayDurationLabel})`}
                                   onClick={() => addDayOff("sick")}
                                   className="rounded bg-orange-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-orange-300/70 hover:bg-orange-500/30 hover:text-orange-200"
                                 >
@@ -2802,6 +2820,7 @@ export default function TimeTracking() {
         deleting={deleteEntry.isPending}
         entrySummary={editingEntryJobSummary}
         leaveManagementEnabled={leaveManagementEnabled}
+        workDayDurationMinutes={workDayMinutes}
       />
     </div>
   );
