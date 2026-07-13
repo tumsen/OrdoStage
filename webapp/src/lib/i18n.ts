@@ -195,7 +195,10 @@ const en = {
     dayOffSetFullDay: "Full day",
     dayOffSetHalfDay: "Half day",
     dayOffEditHint:
-      "Default is a full work day. Adjust start and end — or use the shortcuts — for partial leave (e.g. half day). Leave balances update proportionally.",
+      "Default is one full work day (your daily norm). Set the start time — end time follows automatically. Duration can be reduced (e.g. half day) but not above the daily norm.",
+    dayOffDurationLabel: "Duration",
+    dayOffDurationMax: "Max {{max}}",
+    dayOffEndTimeAuto: "End (automatic)",
     leavePolicyTitle: "Leave policy",
     leavePolicyHint: "Organization defaults for vacation year, norms, and comp time from overtime.",
     leavePolicyVacationYearStart: "Vacation year starts",
@@ -424,7 +427,10 @@ const da: DeepPartial<typeof en> = {
     dayOffSetFullDay: "Hel dag",
     dayOffSetHalfDay: "Halv dag",
     dayOffEditHint:
-      "Standard er en hel arbejdsdag. Juster start og slut — eller brug genvejene — ved delvis fravær (fx halv dag). Saldi opdateres forholdsmæssigt.",
+      "Standard er en hel arbejdsdag (din dagsnorm). Vælg starttid — sluttid beregnes automatisk. Varighed kan sættes lavere (fx halv dag), men ikke over dagsnormen.",
+    dayOffDurationLabel: "Varighed",
+    dayOffDurationMax: "Maks {{max}}",
+    dayOffEndTimeAuto: "Slut (automatisk)",
     leaveTransactionLog: "Ændringslog",
     leaveAdjustmentSave: "Gem justering",
     leaveSource_manual_adjustment: "Manuel justering",

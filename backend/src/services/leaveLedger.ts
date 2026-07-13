@@ -206,11 +206,14 @@ export async function applyTimeEntryToLeaveLedger(
     0,
     Math.round((entry.endsAt.getTime() - entry.startsAt.getTime()) / 60_000)
   );
+  const maxDayMin = Math.round(norms.hoursPerVacationDay * 60);
+  const cappedDurationMin =
+    maxDayMin > 0 ? Math.min(durationMin, maxDayMin) : durationMin;
 
   const amount =
     balanceType === "comp_time_used"
-      ? durationMin
-      : minutesToVacationDays(durationMin, norms.hoursPerVacationDay);
+      ? cappedDurationMin
+      : minutesToVacationDays(cappedDurationMin, norms.hoursPerVacationDay);
   if (amount <= 0) return;
 
   await syncVacationEarnedForPerson(entry.organizationId, entry.personId, entry.startsAt);

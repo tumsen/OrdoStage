@@ -29,3 +29,24 @@ export function isFullWorkDayDuration(
   if (workDayMinutes <= 0) return false;
   return Math.abs(Math.round(actualMinutes) - workDayMinutes) < 1;
 }
+
+/** Clamp leave-day duration to 1 minute … daily norm (weekly ÷ 5). */
+export function clampDayOffDurationMinutes(
+  minutes: number,
+  workDayMinutes: number
+): number {
+  const max = workDayMinutes > 0 ? workDayMinutes : Math.max(1, Math.round(minutes));
+  return Math.min(max, Math.max(1, Math.round(minutes)));
+}
+
+export function durationMinutesToHm(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+export function durationHmToMinutes(hm: string): number {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
+  if (!m) return 0;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
