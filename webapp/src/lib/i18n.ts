@@ -195,7 +195,7 @@ const en = {
     dayOffSetFullDay: "Full day",
     dayOffSetHalfDay: "Half day",
     dayOffEditHint:
-      "Default is one full work day (your daily norm). Set the start time — end time follows automatically. Duration can be reduced (e.g. half day) but not above the daily norm.",
+      "Default is one full work day (your daily norm). Set start time and duration — end time follows automatically. Duration cannot exceed the daily norm.",
     dayOffDurationLabel: "Duration",
     dayOffDurationMax: "Max {{max}}",
     dayOffEndTimeAuto: "End (automatic)",
@@ -427,7 +427,7 @@ const da: DeepPartial<typeof en> = {
     dayOffSetFullDay: "Hel dag",
     dayOffSetHalfDay: "Halv dag",
     dayOffEditHint:
-      "Standard er en hel arbejdsdag (din dagsnorm). Vælg starttid — sluttid beregnes automatisk. Varighed kan sættes lavere (fx halv dag), men ikke over dagsnormen.",
+      "Standard er en hel arbejdsdag (din dagsnorm). Vælg starttid og varighed — sluttid beregnes automatisk. Varighed kan ikke overstige dagsnormen.",
     dayOffDurationLabel: "Varighed",
     dayOffDurationMax: "Maks {{max}}",
     dayOffEndTimeAuto: "Slut (automatisk)",

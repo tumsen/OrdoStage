@@ -6,14 +6,17 @@ import { durationHhMmToTotalMinutes, totalMinutesToDurationHhMm } from "@/lib/sh
 
 /** Same outer height as shadcn `Input` / `DateInputWithWeekday` (`h-10`). */
 const WRAPPER =
-  "inline-flex h-10 items-center gap-0.5 shrink-0 w-[5.75rem] justify-center rounded-md border border-white/10 bg-white/5 px-0.5";
+  "inline-flex h-10 items-center gap-0.5 shrink-0 w-[6.5rem] justify-center rounded-md border border-white/10 bg-white/5 px-0.5";
 
 const SEG = cn(
-  "h-9 w-7 text-center font-mono text-sm tabular-nums",
+  "h-9 text-center font-mono text-sm tabular-nums",
   "border-0 bg-transparent text-white",
   "rounded px-0.5 focus:outline-none focus:ring-1 focus:ring-red-500/50",
   "placeholder:text-white/20",
 );
+
+const SEG_HOURS = cn(SEG, "w-9");
+const SEG_MINUTES = cn(SEG, "w-7");
 
 const AMPM_BTN = "h-full min-h-0 flex-1 px-1.5 text-[10px] font-medium inline-flex items-center justify-center";
 
@@ -23,6 +26,10 @@ type Mode = "clock" | "duration";
 
 function dig2(s: string) {
   return s.replace(/\D/g, "").slice(0, 2);
+}
+
+function dig4(s: string) {
+  return s.replace(/\D/g, "").slice(0, 4);
 }
 
 function focusAndSelect(el: HTMLInputElement | null) {
@@ -130,25 +137,56 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
     };
 
     const onHChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const next = dig2(e.target.value);
-      setHh(next);
-      if (next.length === 2) {
-        const n = parseInt(next, 10);
+      const raw = dig4(e.target.value);
+      if (raw.length === 4) {
+        const ph = raw.slice(0, 2);
+        const pm = raw.slice(2, 4);
+        if (parseInt(pm, 10) > 59) {
+          setHh(ph);
+          return;
+        }
+        const n = parseInt(ph, 10);
         const valid = is12h ? n >= 1 && n <= 12 : n >= 0 && n <= 23;
-        if (!valid) { setHh(""); return; }
-        // Flag BEFORE focus() — focus() fires onHBlur synchronously with stale state
+        if (!valid) {
+          setHh("");
+          return;
+        }
+        setHh(ph);
+        setMm(pm);
         skipHBlur.current = true;
+        commit(ph, pm, false);
         jumpingToMM.current = true;
         focusAndSelect(mRef.current);
-        if (mm.length === 2) commit(next, mm, false);
+        return;
       }
+      setHh(raw);
     };
 
     const onHBlur = () => {
-      if (skipHBlur.current) { skipHBlur.current = false; return; }
-      if (hh === "") { setHh(savedHh.current); return; }
-      if (hh.length === 1) { setHh(""); return; }
-      if (hh.length === 2 && mm.length === 2) commit(hh, mm, false);
+      if (skipHBlur.current) {
+        skipHBlur.current = false;
+        return;
+      }
+      if (hh === "") {
+        setHh(savedHh.current);
+        return;
+      }
+      if (hh.length === 1) {
+        setHh("");
+        return;
+      }
+      if (hh.length === 2) {
+        const n = parseInt(hh, 10);
+        const valid = is12h ? n >= 1 && n <= 12 : n >= 0 && n <= 23;
+        if (!valid) {
+          setHh(savedHh.current);
+          return;
+        }
+        if (mm.length === 2) commit(hh, mm, false);
+        skipHBlur.current = true;
+        jumpingToMM.current = true;
+        focusAndSelect(mRef.current);
+      }
     };
 
     const onHKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -179,8 +217,11 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
       const next = dig2(e.target.value);
       setMm(next);
       if (next.length === 2) {
-        if (parseInt(next, 10) > 59) { setMm(""); return; }
-        commit(hh, next, true);
+        if (parseInt(next, 10) > 59) {
+          setMm("");
+          return;
+        }
+        commit(hh, next, false);
       }
     };
 
@@ -206,30 +247,35 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
         e.preventDefault();
         const newMm = "00";
         setMm(newMm);
-        // use current hh (or "00" if empty) to commit
         const h = hh.length === 2 ? hh : "";
-        commit(h, newMm, true);
+        commit(h, newMm, false);
       }
     };
 
     /* ── Paste ── */
     const onPasteH = (e: React.ClipboardEvent<HTMLInputElement>) => {
       e.preventDefault();
-      const m = (e.clipboardData.getData("text") || "").match(/(\d{1,2})[:\s]?(\d{2})/);
+      const text = (e.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, 4);
+      const m = text.match(/^(\d{2})(\d{2})$/) ?? (e.clipboardData.getData("text") || "").match(/(\d{1,2})[:\s]?(\d{2})/);
       if (!m) return;
-      const ph = dig2(m[1] ?? ""); const pm = dig2(m[2] ?? "");
-      setHh(ph); setMm(pm);
+      const ph = dig2(m[1] ?? "");
+      const pm = dig2(m[2] ?? "");
+      setHh(ph);
+      setMm(pm);
       if (ph.length === 2 && pm.length === 2) commit(ph, pm, false);
       else focusAndSelect(mRef.current);
     };
 
     const onPasteM = (e: React.ClipboardEvent<HTMLInputElement>) => {
       e.preventDefault();
-      const m = (e.clipboardData.getData("text") || "").match(/(\d{1,2})[:\s]?(\d{2})/);
+      const text = (e.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, 4);
+      const m = text.match(/^(\d{2})(\d{2})$/) ?? (e.clipboardData.getData("text") || "").match(/(\d{1,2})[:\s]?(\d{2})/);
       if (!m) return;
-      const ph = dig2(m[1] ?? ""); const pm = dig2(m[2] ?? "");
-      setHh(ph); setMm(pm);
-      if (ph.length === 2 && pm.length === 2) commit(ph, pm, true);
+      const ph = dig2(m[1] ?? "");
+      const pm = dig2(m[2] ?? "");
+      setHh(ph);
+      setMm(pm);
+      if (ph.length === 2 && pm.length === 2) commit(ph, pm, false);
     };
 
     return (
@@ -242,7 +288,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
         <input
           id={`${uid}-h`} ref={hRef}
           type="text" inputMode="numeric" autoComplete="off"
-          maxLength={2} placeholder="00" className={SEG}
+          maxLength={4} placeholder="00" className={SEG_HOURS}
           value={hh}
           disabled={disabled}
           onFocus={onHFocus} onChange={onHChange} onBlur={onHBlur}
@@ -253,7 +299,7 @@ const SplitHhMmInner = forwardRef<SplitTimeFieldHandle, SplitHhMmProps>(
         <input
           id={`${uid}-m`} ref={mRef}
           type="text" inputMode="numeric" autoComplete="off"
-          maxLength={2} placeholder="00" className={SEG}
+          maxLength={2} placeholder="00" className={SEG_MINUTES}
           value={mm}
           disabled={disabled}
           onFocus={onMFocus} onChange={onMChange} onBlur={onMBlur}

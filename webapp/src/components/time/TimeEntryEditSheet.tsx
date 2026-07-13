@@ -32,14 +32,15 @@ import { cn } from "@/lib/utils";
 import { isDayOffCategory } from "@/lib/timeCategoryI18n";
 import {
   clampDayOffDurationMinutes,
-  durationHmToMinutes,
-  durationMinutesToHm,
   formatWorkDayDuration,
-  isFullWorkDayDuration,
 } from "@/lib/leaveNorms";
 import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
+import {
+  SplitDurationHhMmInput,
+  SplitTimeInput,
+} from "@/components/SplitTimeField";
 
 type PatchBody = {
   note: string | null;
@@ -448,120 +449,56 @@ export function TimeEntryEditSheet(props: {
 
           {isDayOff && workDayDurationMinutes > 0 ? (
             <>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 items-end">
                 <div className="grid gap-1">
                   <Label className={cn("text-white/80", isMobile && "text-xs")}>
                     {t("time.startTimeLabel")}
                   </Label>
-                  <input
-                    type="time"
-                    step={60}
+                  <SplitTimeInput
                     value={startHm}
-                    onChange={(e) => handleStartHmChange(e.target.value)}
+                    onChange={handleStartHmChange}
                     disabled={entry?.isLocked}
-                    className={cn(
-                      "rounded-md border border-white/10 bg-white/5 px-2 text-white [color-scheme:dark]",
-                      isMobile ? "h-8 text-xs" : "h-10 px-3 text-sm"
-                    )}
+                    aria-label={t("time.startTimeLabel")}
+                    className={isMobile ? "h-8" : undefined}
                   />
                 </div>
                 <div className="grid gap-1">
                   <Label className={cn("text-white/80", isMobile && "text-xs")}>
-                    {t("time.dayOffEndTimeAuto")}
+                    {t("time.dayOffDurationLabel")}{" "}
+                    <span className="text-white/40 font-normal">
+                      ({t("time.dayOffDurationMax", { max: dayOffMaxLabel })})
+                    </span>
                   </Label>
-                  <input
-                    type="time"
-                    step={60}
-                    value={endHm}
-                    readOnly
-                    tabIndex={-1}
-                    className={cn(
-                      "rounded-md border border-white/10 bg-white/[0.02] px-2 text-white/55 [color-scheme:dark] cursor-default",
-                      isMobile ? "h-8 text-xs" : "h-10 px-3 text-sm"
-                    )}
+                  <SplitDurationHhMmInput
+                    valueMinutes={dayOffDurationMin}
+                    onChangeMinutes={(mins) => setDayOffDuration(mins)}
+                    disabled={entry?.isLocked}
+                    aria-label={t("time.dayOffDurationLabel")}
+                    className={isMobile ? "h-8" : undefined}
                   />
                 </div>
               </div>
-              <div className="grid gap-1.5 -mt-1">
-                <Label className={cn("text-white/80", isMobile && "text-xs")}>
-                  {t("time.dayOffDurationLabel")}{" "}
-                  <span className="text-white/40 font-normal">
-                    ({t("time.dayOffDurationMax", { max: dayOffMaxLabel })})
-                  </span>
-                </Label>
-                <input
-                  type="time"
-                  step={60}
-                  value={durationMinutesToHm(dayOffDurationMin)}
-                  onChange={(e) => setDayOffDuration(durationHmToMinutes(e.target.value))}
-                  disabled={entry?.isLocked}
-                  className={cn(
-                    "rounded-md border border-white/10 bg-white/5 px-2 text-white [color-scheme:dark]",
-                    isMobile ? "h-8 text-xs" : "h-10 px-3 text-sm"
-                  )}
-                />
-              </div>
-              <div className="flex flex-wrap gap-2 -mt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={entry?.isLocked}
-                  className={cn(
-                    "border-white/15 text-white/75 bg-transparent hover:bg-white/5",
-                    isFullWorkDayDuration(dayOffDurationMin, workDayDurationMinutes) &&
-                      "border-ordo-yellow/50 bg-ordo-yellow/10 text-white"
-                  )}
-                  onClick={() => setDayOffDuration(workDayDurationMinutes)}
-                >
-                  {t("time.dayOffSetFullDay")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={entry?.isLocked}
-                  className={cn(
-                    "border-white/15 text-white/75 bg-transparent hover:bg-white/5",
-                    isFullWorkDayDuration(
-                      dayOffDurationMin,
-                      Math.round(workDayDurationMinutes / 2)
-                    ) && "border-ordo-yellow/50 bg-ordo-yellow/10 text-white"
-                  )}
-                  onClick={() => setDayOffDuration(Math.round(workDayDurationMinutes / 2))}
-                >
-                  {t("time.dayOffSetHalfDay")}
-                </Button>
-              </div>
             </>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 items-end">
               <div className="grid gap-1">
                 <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.startTimeLabel")}</Label>
-                <input
-                  type="time"
-                  step={60}
+                <SplitTimeInput
                   value={startHm}
-                  onChange={(e) => setStartHm(e.target.value)}
+                  onChange={setStartHm}
                   disabled={entry?.isLocked}
-                  className={cn(
-                    "rounded-md border border-white/10 bg-white/5 px-2 text-white [color-scheme:dark]",
-                    isMobile ? "h-8 text-xs" : "h-10 px-3 text-sm"
-                  )}
+                  aria-label={t("time.startTimeLabel")}
+                  className={isMobile ? "h-8" : undefined}
                 />
               </div>
               <div className="grid gap-1">
                 <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.endTimeLabel")}</Label>
-                <input
-                  type="time"
-                  step={60}
+                <SplitTimeInput
                   value={endHm}
-                  onChange={(e) => setEndHm(e.target.value)}
+                  onChange={setEndHm}
                   disabled={entry?.isLocked}
-                  className={cn(
-                    "rounded-md border border-white/10 bg-white/5 px-2 text-white [color-scheme:dark]",
-                    isMobile ? "h-8 text-xs" : "h-10 px-3 text-sm"
-                  )}
+                  aria-label={t("time.endTimeLabel")}
+                  className={isMobile ? "h-8" : undefined}
                 />
               </div>
             </div>

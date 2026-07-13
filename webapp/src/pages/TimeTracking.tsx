@@ -84,7 +84,6 @@ import { calendarDateKeyFromJobDate } from "@/lib/showTiming";
 import { addMinutesToUtcIso, wallClockYmdHhMmToUtcIso } from "@/lib/browserUserTime";
 import {
   formatWorkDayDuration,
-  isFullWorkDayDuration,
   workDayDurationMinutes,
 } from "@/lib/leaveNorms";
 import {
@@ -282,6 +281,8 @@ type EntryDragRef = {
   origStartsAtIso: string;
   origEndsAtIso: string;
   durationMin: number;
+  /** Keep leave-day length exact while dragging (end = start + duration). */
+  preserveExactDuration?: boolean;
   moveStartClientX?: number;
   moveStartClientY?: number;
   moveThresholdPassed?: boolean;
@@ -308,21 +309,18 @@ function formatDurationShort(totalMin: number, exact = false): string {
   return mm > 0 ? `${h}h ${mm}m` : `${h}h`;
 }
 
-function dayOffDisplayParts(
+function dayOffHeaderLabel(
   startsAt: string,
   endsAt: string,
-  workDayMinutes: number,
   timeFormat: TimeFormat
-): { isFullDay: boolean; timeLabel: string; durationLabel: string } {
+): { range: string; duration: string } {
   const s = parseISO(startsAt);
   const e = parseISO(endsAt);
-  const durMin = Math.round((e.getTime() - s.getTime()) / 60000);
-  const isFullDay = isFullWorkDayDuration(durMin, workDayMinutes);
   const tf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
+  const durMin = Math.round((e.getTime() - s.getTime()) / 60000);
   return {
-    isFullDay,
-    timeLabel: isFullDay ? "full" : `${format(s, tf)} – ${format(e, tf)}`,
-    durationLabel: formatDurationShort(durMin, true),
+    range: `${format(s, tf)} – ${format(e, tf)}`,
+    duration: formatDurationShort(durMin, true),
   };
 }
 
@@ -1097,8 +1095,12 @@ export default function TimeTracking() {
           if (dx * dx + dy * dy < WEEK_GRID_MIN_DRAG_PX * WEEK_GRID_MIN_DRAG_PX) return;
           cur.moveThresholdPassed = true;
         }
-        const dur =
-          Math.max(TIME_SNAP_MINUTES, Math.round(cur.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES);
+        const dur = cur.preserveExactDuration
+          ? Math.max(1, Math.round(cur.durationMin))
+          : Math.max(
+              TIME_SNAP_MINUTES,
+              Math.round(cur.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
+            );
         const newStartWin = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, mSnap)));
         const newStart = dateFromColumnAndWindowMinutes(ymd, newStartWin, sh);
         const newEnd = new Date(newStart.getTime() + dur * 60000);
@@ -1198,8 +1200,12 @@ export default function TimeTracking() {
         return;
       }
 
-      const dur =
-        Math.max(TIME_SNAP_MINUTES, Math.round(d.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES);
+      const dur = d.preserveExactDuration
+        ? Math.max(1, Math.round(d.durationMin))
+        : Math.max(
+            TIME_SNAP_MINUTES,
+            Math.round(d.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
+          );
       const newStartWin = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, m)));
       const newStart = dateFromColumnAndWindowMinutes(ymd, newStartWin, sh);
       const newEnd = new Date(newStart.getTime() + dur * 60000);
@@ -2185,18 +2191,17 @@ export default function TimeTracking() {
                             >
                               {t(timeCategoryMessageId(dayOffEntry.category as TimeCategory) as never)}
                               {(() => {
-                                const parts = dayOffDisplayParts(
+                                const parts = dayOffHeaderLabel(
                                   dayOffEntry.startsAt,
                                   dayOffEntry.endsAt,
-                                  workDayMinutes,
                                   timeFormat
                                 );
                                 return (
                                   <>
                                     {" · "}
-                                    {parts.isFullDay ? t("time.dayOffFullDay") : parts.timeLabel}
+                                    {parts.range}
                                     {" · "}
-                                    {parts.durationLabel}
+                                    {parts.duration}
                                   </>
                                 );
                               })()}
@@ -2411,9 +2416,6 @@ export default function TimeTracking() {
                               : null;
                           const spanStart = preview?.start ?? parseISO(e.startsAt);
                           const spanEnd = preview?.end ?? parseISO(e.endsAt);
-                          const isDayOffEntry = isDayOffCategory(
-                            (e.category ?? "work") as TimeCategory
-                          );
                           const segment = rangeMetricsInColumn(
                             spanStart,
                             spanEnd,
@@ -2421,21 +2423,13 @@ export default function TimeTracking() {
                             displayStartHour
                           );
                           if (!segment) return null;
-                          const dayOffDurMin = isDayOffEntry
-                            ? Math.round((spanEnd.getTime() - spanStart.getTime()) / 60000)
-                            : 0;
-                          const isFullDayOff =
-                            isDayOffEntry &&
-                            isFullWorkDayDuration(dayOffDurMin, workDayMinutes);
                           return {
                             id: e.id,
                             timeProjectId: e.timeProjectId,
                             start: spanStart,
                             end: spanEnd,
-                            topPct: isFullDayOff ? 0 : segment.topPct,
-                            heightPct: isFullDayOff
-                              ? 100
-                              : Math.max(segment.heightPct, 0.35),
+                            topPct: segment.topPct,
+                            heightPct: Math.max(segment.heightPct, 0.35),
                             data: e,
                           };
                         })
@@ -2461,14 +2455,6 @@ export default function TimeTracking() {
                         const isLocked = e.isLocked === true;
                         const cat = (e.category ?? "work") as TimeCategory;
                         const isDayOff = isDayOffCategory(cat);
-                        const dayOffParts = isDayOff
-                          ? dayOffDisplayParts(
-                              e.startsAt,
-                              e.endsAt,
-                              workDayMinutes,
-                              timeFormat
-                            )
-                          : null;
                         const jobKey = plannedJobKeyFromEntry(e);
                         const tourJobTitle =
                           isJob && e.tourShowId
@@ -2515,7 +2501,7 @@ export default function TimeTracking() {
                               "absolute rounded border px-1 pt-1 pb-2 text-[10px] overflow-hidden shadow-sm select-none",
                               timeEntryBlockSurfaceClass(cat, isJob, layout.stackIndex, layout.stackCount),
                               isLocked ? "opacity-90" : "",
-                              isDayOff && canEditVisiblePeriod && !isLocked ? "cursor-pointer" : ""
+                              canEditVisiblePeriod && !isLocked ? "cursor-grab active:cursor-grabbing" : ""
                             )}
                             data-entry-block={e.id}
                             style={{
@@ -2528,15 +2514,9 @@ export default function TimeTracking() {
                                 ? { boxShadow: `inset 4px 0 0 0 ${projStripe}` }
                                 : {}),
                             }}
-                            onClick={(ev) => {
-                              if (!canEditVisiblePeriod || isLocked || !isDayOff) return;
-                              if ((ev.target as HTMLElement).closest("[data-handle]")) return;
-                              setEditingEntryId(e.id);
-                            }}
                             onPointerDown={(ev) => {
                               if (!canEditVisiblePeriod) return;
                               if (isLocked) return;
-                              if (isDayOff) return;
                               if ((ev.target as HTMLElement).closest("[data-handle]")) return;
                               ev.preventDefault();
                               registerDayColumnRef(
@@ -2554,6 +2534,7 @@ export default function TimeTracking() {
                                 origStartsAtIso: e.startsAt,
                                 origEndsAtIso: e.endsAt,
                                 durationMin: entryDurMin,
+                                preserveExactDuration: isDayOff,
                                 moveStartClientX: ev.clientX,
                                 moveStartClientY: ev.clientY,
                                 moveThresholdPassed: false,
@@ -2634,18 +2615,7 @@ export default function TimeTracking() {
                             ) : null}
                             {label ? <div className="font-medium truncate pr-4">{label}</div> : null}
                             <div className="text-[9px] tabular-nums text-white/90 leading-tight pr-4">
-                              {isDayOff && dayOffParts ? (
-                                <>
-                                  {dayOffParts.isFullDay
-                                    ? t("time.dayOffFullDay")
-                                    : dayOffParts.timeLabel}{" "}
-                                  · {dayOffParts.durationLabel}
-                                </>
-                              ) : (
-                                <>
-                                  {startTimeLabel} – {endTimeLabel} · {durationLabel}
-                                </>
-                              )}
+                              {startTimeLabel} – {endTimeLabel} · {durationLabel}
                             </div>
                             {proj ? (
                               <div
