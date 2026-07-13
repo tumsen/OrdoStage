@@ -63,7 +63,7 @@ import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
 import { TravelClaimsPanel } from "@/components/time/TravelClaimsPanel";
 import { MileageClaimsPanel } from "@/components/time/MileageClaimsPanel";
-import { LeaveLedgerPanel } from "@/components/time/LeaveLedgerPanel";
+import { LeaveLedgerMenu } from "@/components/time/LeaveLedgerPanel";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
@@ -1807,8 +1807,8 @@ export default function TimeTracking() {
       ) : null}
 
       {leaveManagementEnabled && leaveBalances && isTimeSection ? (
-        <div className="shrink-0 space-y-2">
-          <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap gap-x-4 gap-y-1">
+        <div className="shrink-0">
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap items-center gap-x-4 gap-y-1">
             <span className="text-white/40 font-medium">{t("time.leaveBalancesTitle")}</span>
             <span>
               {t("time.leaveVacationRemaining")}:{" "}
@@ -1835,17 +1835,17 @@ export default function TimeTracking() {
               </span>
             </span>
             <span className="text-white/35">({leaveBalances.vacationYearKey})</span>
+            {balancePersonId ? (
+              <span className="ml-auto">
+                <LeaveLedgerMenu
+                  personId={balancePersonId}
+                  vacationYearKey={leaveBalances.vacationYearKey}
+                  canAdjust={readAll}
+                  variant="compact"
+                />
+              </span>
+            ) : null}
           </div>
-          {balancePersonId ? (
-            <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
-              <LeaveLedgerPanel
-                personId={balancePersonId}
-                vacationYearKey={leaveBalances.vacationYearKey}
-                canAdjust={readAll}
-                compact
-              />
-            </div>
-          ) : null}
         </div>
       ) : null}
 

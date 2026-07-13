@@ -15,6 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { ScrollText } from "lucide-react";
 import type { LeaveBalanceSummary, LeaveTransaction } from "@/contracts/backendTypes";
 
 const ADJUSTMENT_BALANCE_TYPES = [
@@ -50,8 +58,11 @@ export function LeaveLedgerPanel(props: {
   vacationYearKey?: string;
   canAdjust: boolean;
   compact?: boolean;
+  /** When false, skip fetching until opened (e.g. in a sheet). */
+  enabled?: boolean;
+  showTitle?: boolean;
 }) {
-  const { personId, vacationYearKey, canAdjust, compact } = props;
+  const { personId, vacationYearKey, canAdjust, compact, enabled = true, showTitle = true } = props;
   const { t } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -67,7 +78,7 @@ export function LeaveLedgerPanel(props: {
   const { data: transactions, isLoading } = useQuery({
     queryKey: ["time-leave-transactions", personId, vacationYearKey],
     queryFn: () => api.get<LeaveTransaction[]>(`/api/time/leave-transactions/${personId}${qs}`),
-    enabled: Boolean(personId),
+    enabled: Boolean(personId) && enabled,
   });
 
   const adjustMutation = useMutation({
@@ -106,9 +117,15 @@ export function LeaveLedgerPanel(props: {
 
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
-      <p className={compact ? "text-[10px] uppercase tracking-wide text-white/35" : "text-xs font-medium text-white/55"}>
-        {t("time.leaveTransactionLog")}
-      </p>
+      {showTitle ? (
+        <p
+          className={
+            compact ? "text-[10px] uppercase tracking-wide text-white/35" : "text-xs font-medium text-white/55"
+          }
+        >
+          {t("time.leaveTransactionLog")}
+        </p>
+      ) : null}
 
       {canAdjust ? (
         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2">
@@ -176,7 +193,7 @@ export function LeaveLedgerPanel(props: {
       ) : !transactions?.length ? (
         <p className="text-xs text-white/40">{t("time.leaveTransactionEmpty")}</p>
       ) : (
-        <div className="max-h-48 overflow-y-auto rounded-lg border border-white/10">
+        <div className="max-h-[min(60vh,28rem)] overflow-y-auto rounded-lg border border-white/10">
           <table className="w-full text-left text-[11px]">
             <thead className="sticky top-0 bg-[#12121a] text-white/40">
               <tr>
@@ -214,5 +231,54 @@ export function LeaveLedgerPanel(props: {
         </div>
       )}
     </div>
+  );
+}
+
+export function LeaveLedgerMenu(props: {
+  personId: string;
+  vacationYearKey?: string;
+  canAdjust: boolean;
+  /** Compact icon+label button for the time header strip. */
+  variant?: "compact" | "default";
+}) {
+  const { personId, vacationYearKey, canAdjust, variant = "default" } = props;
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size={variant === "compact" ? "sm" : "default"}
+          className={
+            variant === "compact"
+              ? "h-7 shrink-0 border-white/15 bg-transparent text-white/55 hover:bg-white/5 hover:text-white/80 gap-1.5 px-2 text-[11px]"
+              : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/5"
+          }
+        >
+          <ScrollText className="h-3.5 w-3.5" />
+          {t("time.leaveTransactionLog")}
+        </Button>
+      </SheetTrigger>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-lg bg-[#12121a] border-white/10 text-white overflow-y-auto"
+      >
+        <SheetHeader>
+          <SheetTitle className="text-white">{t("time.leaveTransactionLog")}</SheetTitle>
+        </SheetHeader>
+        <div className="mt-4">
+          <LeaveLedgerPanel
+            personId={personId}
+            vacationYearKey={vacationYearKey}
+            canAdjust={canAdjust}
+            enabled={open}
+            showTitle={false}
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
