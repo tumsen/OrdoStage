@@ -1333,42 +1333,88 @@ export default function TimeTracking() {
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
-          <Calendar
-            mode="single"
-            selected={anchorDate}
-            month={month}
-            onMonthChange={setMonth}
-            showWeekNumber={mode === "week"}
-            weekStartsOn={WEEK_STARTS_ON}
-            onSelect={(d) => {
-              if (!d) return;
-              onPick(d);
-            }}
-            classNames={{
-              months: "flex flex-col",
-              month: "space-y-3",
-              caption: "flex justify-center pt-1 relative items-center",
-              caption_label: "text-sm font-medium text-white",
-              nav: "space-x-1 flex items-center",
-              nav_button:
-                "inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent p-0 text-white/70 hover:bg-white/10 hover:text-white",
-              nav_button_previous: "absolute left-1",
-              nav_button_next: "absolute right-1",
-              table: "w-full border-collapse space-y-1",
-              head_row: "flex",
-              head_cell: "w-9 font-normal text-[0.8rem] text-white/45",
-              row: "flex w-full mt-2",
-              cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
-              day: "h-9 w-9 p-0 font-normal text-white/90 hover:bg-white/10 hover:text-white aria-selected:opacity-100",
-              day_selected:
-                "bg-red-900 text-white hover:bg-red-800 hover:text-white focus:bg-red-900 focus:text-white",
-              day_today: "bg-white/10 text-white",
-              day_outside: "text-white/30 opacity-50",
-              day_disabled: "text-white/20 opacity-50",
-              day_hidden: "invisible",
-            }}
-            initialFocus
-          />
+          {mode === "week" ? (
+            <Calendar
+              mode="single"
+              selected={anchorDate}
+              month={month}
+              onMonthChange={setMonth}
+              showWeekNumber
+              weekStartsOn={WEEK_STARTS_ON}
+              onSelect={(d) => {
+                if (!d) return;
+                onPick(d);
+              }}
+              classNames={{
+                months: "flex flex-col",
+                month: "space-y-3",
+                caption: "flex justify-center pt-1 relative items-center",
+                caption_label: "text-sm font-medium text-white",
+                nav: "space-x-1 flex items-center",
+                nav_button:
+                  "inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent p-0 text-white/70 hover:bg-white/10 hover:text-white",
+                nav_button_previous: "absolute left-1",
+                nav_button_next: "absolute right-1",
+                table: "w-full border-collapse space-y-1",
+                head_row: "flex",
+                head_cell: "w-9 font-normal text-[0.8rem] text-white/45",
+                row: "flex w-full mt-2",
+                cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+                day:
+                  "h-9 w-9 p-0 font-normal text-white/90 hover:bg-white/10 hover:text-white aria-selected:opacity-100",
+                day_selected:
+                  "bg-red-900 text-white hover:bg-red-800 hover:text-white focus:bg-red-900 focus:text-white",
+                day_today: "bg-white/10 text-white",
+                day_outside: "text-white/30 opacity-50",
+                day_disabled: "text-white/20 opacity-50",
+                day_hidden: "invisible",
+              }}
+              initialFocus
+            />
+          ) : (
+            <div className="p-3 w-[18rem]">
+              <div className="flex items-center justify-between pb-2">
+                <button
+                  type="button"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+                  onClick={() => setMonth((m) => new Date(m.getFullYear() - 1, m.getMonth(), 1))}
+                  aria-label="Previous year"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <div className="text-sm font-medium text-white">{month.getFullYear()}</div>
+                <button
+                  type="button"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+                  onClick={() => setMonth((m) => new Date(m.getFullYear() + 1, m.getMonth(), 1))}
+                  aria-label="Next year"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {Array.from({ length: 12 }).map((_, i) => {
+                  const year = month.getFullYear();
+                  const d = new Date(year, i, 1);
+                  const isSelected = anchorDate.getFullYear() === year && anchorDate.getMonth() === i;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={cn(
+                        "h-9 rounded-md border border-white/10 bg-white/[0.02] text-xs text-white/80 hover:bg-white/10",
+                        isSelected && "bg-white/10 text-white border-white/20"
+                      )}
+                      onClick={() => onPick(d)}
+                    >
+                      {format(d, "MMM", { locale: dfLocale })}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
     );
