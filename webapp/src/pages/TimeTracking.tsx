@@ -1526,7 +1526,8 @@ export default function TimeTracking() {
             </Select>
           </div>
           ) : null}
-          <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+          <div className="hidden sm:flex sm:flex-col sm:gap-2 min-w-0">
+          <div className="flex flex-nowrap items-center gap-2 min-w-0 overflow-x-auto">
           <Button
             type="button"
             variant="outline"
@@ -1539,13 +1540,19 @@ export default function TimeTracking() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <DateInputWithWeekday
-            value={format(anchor, "yyyy-MM-dd")}
-            onChange={(value) => {
-              const next = dateFromISODate(value);
-              if (next) setAnchor(next);
-            }}
-          />
+          {mode === "week" ? (
+            <DateInputWithWeekday
+              value={format(anchor, "yyyy-MM-dd")}
+              onChange={(value) => {
+                const next = dateFromISODate(value);
+                if (next) setAnchor(next);
+              }}
+            />
+          ) : (
+            <span className="inline-flex h-8 items-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap">
+              {format(anchor, "MMMM yyyy", { locale: dfLocale })}
+            </span>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -1642,71 +1649,75 @@ export default function TimeTracking() {
             </Select>
           ) : null}
           </div>
-          {readAll && (
-            <Link to="/time/import" className="hidden sm:inline-flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
-              >
-                <Upload className="h-4 w-4" />
-                {t("time.importLink")}
-              </Button>
-            </Link>
-          )}
-          {canManageTimeCatalog && (
-            <Link to="/time/bulk" className="hidden sm:inline-flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
-              >
-                <ArrowRightLeft className="h-4 w-4" />
-                {t("time.bulkToolsLink")}
-              </Button>
-            </Link>
-          )}
-          {readAll && (
-            <Link to="/time/reports" className="hidden sm:inline-flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
-              >
-                <BarChart2 className="h-4 w-4" />
-                {t("time.reportsLink")}
-              </Button>
-            </Link>
-          )}
-          {readAll && leaveManagementEnabled && (
-            <Link to="/time/payroll" className="hidden sm:inline-flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                {t("time.payrollLink")}
-              </Button>
-            </Link>
-          )}
-          {canManageTimeCatalog && (
-            <Link to="/time/catalog" className="hidden sm:inline-flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
-              >
-                <FolderKanban className="h-4 w-4" />
-                {t("time.parentCategoryCatalogLink")}
-              </Button>
-            </Link>
-          )}
+
+          <div className="flex flex-nowrap items-center gap-2 min-w-0 overflow-x-auto">
+            {readAll ? (
+              <Link to="/time/reports" className="shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
+                >
+                  <BarChart2 className="h-4 w-4" />
+                  {t("time.reportsLink")}
+                </Button>
+              </Link>
+            ) : null}
+            {readAll && leaveManagementEnabled ? (
+              <Link to="/time/payroll" className="shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  {t("time.payrollLink")}
+                </Button>
+              </Link>
+            ) : null}
+            {canManageTimeCatalog ? (
+              <Link to="/time/catalog" className="shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
+                >
+                  <FolderKanban className="h-4 w-4" />
+                  {t("time.parentCategoryCatalogLink")}
+                </Button>
+              </Link>
+            ) : null}
+            {readAll ? (
+              <Link to="/time/import" className="shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
+                >
+                  <Upload className="h-4 w-4" />
+                  {t("time.importLink")}
+                </Button>
+              </Link>
+            ) : null}
+            {canManageTimeCatalog ? (
+              <Link to="/time/bulk" className="shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
+                >
+                  <ArrowRightLeft className="h-4 w-4" />
+                  {t("time.bulkToolsLink")}
+                </Button>
+              </Link>
+            ) : null}
+          </div>
+          </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:hidden">
           <Button
