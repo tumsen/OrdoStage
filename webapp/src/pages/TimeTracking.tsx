@@ -68,7 +68,6 @@ import { MileageClaimsPanel } from "@/components/time/MileageClaimsPanel";
 import { LeaveLedgerMenu } from "@/components/time/LeaveLedgerPanel";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
-import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { CalendarGrid } from "@/components/schedule/CalendarGrid";
 import type { CalendarItem } from "@/components/schedule/scheduleUtils";
 import { internalBookingDisplayTitle } from "@/components/schedule/scheduleUtils";
@@ -1511,13 +1510,15 @@ export default function TimeTracking() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <DateInputWithWeekday
-            value={format(anchor, "yyyy-MM-dd")}
-            onChange={(value) => {
-              const next = dateFromISODate(value);
-              if (next) setAnchor(next);
-            }}
-          />
+          <span className="inline-flex h-8 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[14rem]">
+            {mode === "week"
+              ? `W${periodWeek} · ${format(weekStart, "d MMM", { locale: dfLocale })} – ${format(
+                  weekEnd,
+                  "d MMM yyyy",
+                  { locale: dfLocale }
+                )}`
+              : format(anchor, "MMMM yyyy", { locale: dfLocale })}
+          </span>
           <Button
             type="button"
             variant="outline"
@@ -1569,16 +1570,6 @@ export default function TimeTracking() {
               {t("time.month")}
             </button>
           </div>
-          </div>
-          {/* Period label slot (fixed width) */}
-          <div className="w-[260px] max-w-full text-xs text-white/50 tabular-nums whitespace-nowrap overflow-hidden text-ellipsis">
-            {mode === "week"
-              ? `W${periodWeek} · ${format(weekStart, "d MMM", { locale: dfLocale })} – ${format(
-                  weekEnd,
-                  "d MMM yyyy",
-                  { locale: dfLocale }
-                )}`
-              : format(anchor, "MMMM yyyy", { locale: dfLocale })}
           </div>
           {/* Week total slot (reserved space, only visible in week mode + time section) */}
           <div
@@ -1737,13 +1728,15 @@ export default function TimeTracking() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <DateInputWithWeekday
-            value={format(anchor, "yyyy-MM-dd")}
-            onChange={(value) => {
-              const next = dateFromISODate(value);
-              if (next) setAnchor(next);
-            }}
-          />
+          <span className="inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[14rem]">
+            {mode === "week"
+              ? `W${periodWeek} · ${format(weekStart, "d MMM", { locale: dfLocale })} – ${format(
+                  weekEnd,
+                  "d MMM yyyy",
+                  { locale: dfLocale }
+                )}`
+              : format(anchor, "MMMM yyyy", { locale: dfLocale })}
+          </span>
           <Button
             type="button"
             variant="outline"
