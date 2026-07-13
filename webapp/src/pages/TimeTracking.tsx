@@ -1290,8 +1290,7 @@ export default function TimeTracking() {
   }, [weekDays, totalsByColumnDay]);
 
   const periodWeek = getISOWeek(anchor);
-  const periodMonth = format(anchor, "MMMM", { locale: dfLocale });
-  const periodYear = format(anchor, "yyyy");
+  // Note: month/year label is formatted inline where used (depends on view mode).
 
   const activePersonWeeklyHours = useMemo(() => {
     const targetId = readAll && selectedPersonId ? selectedPersonId : mePerson?.id;
@@ -1572,7 +1571,13 @@ export default function TimeTracking() {
             Today
           </Button>
           <span className="text-xs text-white/50 tabular-nums whitespace-nowrap">
-            W{periodWeek} · {periodMonth} · {periodYear}
+            {mode === "week"
+              ? `W${periodWeek} · ${format(weekStart, "d MMM", { locale: dfLocale })} – ${format(
+                  weekEnd,
+                  "d MMM yyyy",
+                  { locale: dfLocale }
+                )}`
+              : format(anchor, "MMMM yyyy", { locale: dfLocale })}
           </span>
           {isTimeSection && mode === "week" ? (
             <span className="text-xs text-white/60 tabular-nums whitespace-nowrap">
