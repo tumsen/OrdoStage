@@ -379,8 +379,6 @@ export default function TimeTracking() {
   );
   const [section, setSection] = useState<"time" | "travel" | "mileage">("time");
   const [anchor, setAnchor] = useState(() => new Date());
-  const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
-  const [periodPickerMonth, setPeriodPickerMonth] = useState<Date>(() => anchor);
 
   useEffect(() => {
     if (!travelAllowanceEnabled && section === "travel") {
@@ -1294,11 +1292,6 @@ export default function TimeTracking() {
 
   const periodWeek = getISOWeek(anchor);
 
-  useEffect(() => {
-    // Keep the calendar popover month in sync with the current anchor.
-    setPeriodPickerMonth(anchor);
-  }, [anchor]);
-
   const periodLabel =
     mode === "week"
       ? `W${periodWeek} · ${format(weekStart, "d MMM", { locale: dfLocale })} – ${format(weekEnd, "d MMM yyyy", {
@@ -1306,16 +1299,80 @@ export default function TimeTracking() {
         })}`
       : format(anchor, "MMMM yyyy", { locale: dfLocale });
 
-  const onPickPeriodDate = (d: Date) => {
-    if (mode === "week") {
-      setAnchor(d);
-    } else {
-      // Month mode: anchor to the month (day doesn't matter).
-      setAnchor(new Date(d.getFullYear(), d.getMonth(), 1));
-      setSection("time");
-    }
-    setPeriodPickerOpen(false);
-  };
+  function PeriodPickerButton({ heightClassName, anchorDate }: { heightClassName: string; anchorDate: Date }) {
+    const [open, setOpen] = useState(false);
+    const [month, setMonth] = useState<Date>(() => anchorDate);
+
+    useEffect(() => {
+      setMonth(anchorDate);
+    }, [anchorDate]);
+
+    const onPick = (d: Date) => {
+      if (mode === "week") {
+        setAnchor(d);
+      } else {
+        setAnchor(new Date(d.getFullYear(), d.getMonth(), 1));
+        setSection("time");
+      }
+      setOpen(false);
+    };
+
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[14rem] hover:bg-white/[0.06]",
+              heightClassName
+            )}
+            aria-label="Choose week or month"
+            aria-expanded={open}
+          >
+            {periodLabel}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
+          <Calendar
+            mode="single"
+            selected={anchorDate}
+            month={month}
+            onMonthChange={setMonth}
+            showWeekNumber={mode === "week"}
+            weekStartsOn={WEEK_STARTS_ON}
+            onSelect={(d) => {
+              if (!d) return;
+              onPick(d);
+            }}
+            classNames={{
+              months: "flex flex-col",
+              month: "space-y-3",
+              caption: "flex justify-center pt-1 relative items-center",
+              caption_label: "text-sm font-medium text-white",
+              nav: "space-x-1 flex items-center",
+              nav_button:
+                "inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent p-0 text-white/70 hover:bg-white/10 hover:text-white",
+              nav_button_previous: "absolute left-1",
+              nav_button_next: "absolute right-1",
+              table: "w-full border-collapse space-y-1",
+              head_row: "flex",
+              head_cell: "w-9 font-normal text-[0.8rem] text-white/45",
+              row: "flex w-full mt-2",
+              cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+              day: "h-9 w-9 p-0 font-normal text-white/90 hover:bg-white/10 hover:text-white aria-selected:opacity-100",
+              day_selected:
+                "bg-red-900 text-white hover:bg-red-800 hover:text-white focus:bg-red-900 focus:text-white",
+              day_today: "bg-white/10 text-white",
+              day_outside: "text-white/30 opacity-50",
+              day_disabled: "text-white/20 opacity-50",
+              day_hidden: "invisible",
+            }}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+    );
+  }
   // Note: month/year label is formatted inline where used (depends on view mode).
 
   const activePersonWeeklyHours = useMemo(() => {
@@ -1537,58 +1594,7 @@ export default function TimeTracking() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Popover open={periodPickerOpen} onOpenChange={setPeriodPickerOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex h-8 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[14rem] hover:bg-white/[0.06]"
-                aria-label="Choose week or month"
-                aria-expanded={periodPickerOpen}
-              >
-                {periodLabel}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
-              <Calendar
-                mode="single"
-                selected={anchor}
-                month={periodPickerMonth}
-                onMonthChange={setPeriodPickerMonth}
-                showWeekNumber={mode === "week"}
-                weekStartsOn={WEEK_STARTS_ON}
-                onSelect={(d) => {
-                  if (!d) return;
-                  onPickPeriodDate(d);
-                }}
-                classNames={{
-                  months: "flex flex-col",
-                  month: "space-y-3",
-                  caption: "flex justify-center pt-1 relative items-center",
-                  caption_label: "text-sm font-medium text-white",
-                  nav: "space-x-1 flex items-center",
-                  nav_button:
-                    "inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent p-0 text-white/70 hover:bg-white/10 hover:text-white",
-                  nav_button_previous: "absolute left-1",
-                  nav_button_next: "absolute right-1",
-                  table: "w-full border-collapse space-y-1",
-                  head_row: "flex",
-                  head_cell: "w-9 font-normal text-[0.8rem] text-white/45",
-                  row: "flex w-full mt-2",
-                  cell:
-                    "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
-                  day:
-                    "h-9 w-9 p-0 font-normal text-white/90 hover:bg-white/10 hover:text-white aria-selected:opacity-100",
-                  day_selected:
-                    "bg-red-900 text-white hover:bg-red-800 hover:text-white focus:bg-red-900 focus:text-white",
-                  day_today: "bg-white/10 text-white",
-                  day_outside: "text-white/30 opacity-50",
-                  day_disabled: "text-white/20 opacity-50",
-                  day_hidden: "invisible",
-                }}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+          <PeriodPickerButton heightClassName="h-8" anchorDate={anchor} />
           <Button
             type="button"
             variant="outline"
@@ -1798,58 +1804,7 @@ export default function TimeTracking() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Popover open={periodPickerOpen} onOpenChange={setPeriodPickerOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[14rem] hover:bg-white/[0.06]"
-                aria-label="Choose week or month"
-                aria-expanded={periodPickerOpen}
-              >
-                {periodLabel}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
-              <Calendar
-                mode="single"
-                selected={anchor}
-                month={periodPickerMonth}
-                onMonthChange={setPeriodPickerMonth}
-                showWeekNumber={mode === "week"}
-                weekStartsOn={WEEK_STARTS_ON}
-                onSelect={(d) => {
-                  if (!d) return;
-                  onPickPeriodDate(d);
-                }}
-                classNames={{
-                  months: "flex flex-col",
-                  month: "space-y-3",
-                  caption: "flex justify-center pt-1 relative items-center",
-                  caption_label: "text-sm font-medium text-white",
-                  nav: "space-x-1 flex items-center",
-                  nav_button:
-                    "inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent p-0 text-white/70 hover:bg-white/10 hover:text-white",
-                  nav_button_previous: "absolute left-1",
-                  nav_button_next: "absolute right-1",
-                  table: "w-full border-collapse space-y-1",
-                  head_row: "flex",
-                  head_cell: "w-9 font-normal text-[0.8rem] text-white/45",
-                  row: "flex w-full mt-2",
-                  cell:
-                    "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
-                  day:
-                    "h-9 w-9 p-0 font-normal text-white/90 hover:bg-white/10 hover:text-white aria-selected:opacity-100",
-                  day_selected:
-                    "bg-red-900 text-white hover:bg-red-800 hover:text-white focus:bg-red-900 focus:text-white",
-                  day_today: "bg-white/10 text-white",
-                  day_outside: "text-white/30 opacity-50",
-                  day_disabled: "text-white/20 opacity-50",
-                  day_hidden: "invisible",
-                }}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+          <PeriodPickerButton heightClassName="h-9" anchorDate={anchor} />
           <Button
             type="button"
             variant="outline"
