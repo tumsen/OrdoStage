@@ -139,6 +139,7 @@ model Organization {
   timeParentCategories TimeParentCategory[]
   timeProjects     TimeProject[]
   timeEntries      TimeEntry[]
+  timeImportBatches TimeImportBatch[]
   productions      Production[]
   productionCostLines ProductionCostLine[]
   productionPhaseDocuments ProductionPhaseDocument[]
@@ -1053,6 +1054,13 @@ model TimeEntry {
   isLocked       Boolean      @default(false)
   /** Shared id for segments split from one logical block (overlap carve); metadata PATCH syncs across the group. */
   segmentGroupId String?
+  /** When set, entry came from an external time system import (see TimeImportBatch). */
+  importBatchId         String?
+  importBatch           TimeImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  /** Original project name from import file (for remapping). */
+  importExternalProject String?
+  /** Comma-separated original tag names from import file. */
+  importExternalTags    String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   tagLinks       TimeEntryTag[]
@@ -1067,6 +1075,24 @@ model TimeEntry {
   @@index([internalBookingPersonId])
   @@index([organizationId, category])
   @@index([organizationId, personId, segmentGroupId])
+  @@index([importBatchId])
+  @@index([organizationId, importExternalProject])
+}
+
+/** Batch metadata for CSV / external time imports. */
+model TimeImportBatch {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /** timerly | generic */
+  source          String
+  fileName        String?
+  entryCount      Int          @default(0)
+  createdByUserId String?
+  createdAt       DateTime     @default(now())
+  entries         TimeEntry[]
+
+  @@index([organizationId, createdAt])
 }
 
 model TimeEntryTag {

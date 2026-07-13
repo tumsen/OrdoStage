@@ -31,6 +31,7 @@ import {
   BarChart2,
   FolderKanban,
   FileSpreadsheet,
+  Upload,
   Trash2,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -1635,6 +1636,19 @@ export default function TimeTracking() {
             </Select>
           ) : null}
           </div>
+          {readAll && (
+            <Link to="/time/import" className="hidden sm:inline-flex">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
+              >
+                <Upload className="h-4 w-4" />
+                {t("time.importLink")}
+              </Button>
+            </Link>
+          )}
           {readAll && (
             <Link to="/time/reports" className="hidden sm:inline-flex">
               <Button

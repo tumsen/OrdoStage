@@ -1408,6 +1408,53 @@ export const SetLeaveOpeningBalancesSchema = z.object({
   sickDays: z.number().min(0).max(365).optional(),
 });
 
+export const TimeImportProjectMappingSchema = z.object({
+  externalName: z.string().min(1),
+  action: z.enum(["map", "create", "skip"]),
+  timeProjectId: z.string().optional(),
+  newProjectName: z.string().optional(),
+  category: z.enum(TIME_CATEGORIES).optional(),
+});
+
+export const TimeImportTagMappingSchema = z.object({
+  externalName: z.string().min(1),
+  action: z.enum(["map", "create", "skip"]),
+  timeTagId: z.string().optional(),
+  newTagName: z.string().optional(),
+});
+
+export const TimeImportPersonMappingSchema = z.object({
+  externalName: z.string().min(1),
+  personId: z.string().min(1),
+});
+
+export const TimeImportPreviewRequestSchema = z.object({
+  csvText: z.string().min(1),
+  fileName: z.string().optional(),
+});
+
+export const TimeImportRunRequestSchema = z.object({
+  csvText: z.string().min(1),
+  fileName: z.string().optional(),
+  personMappings: z.array(TimeImportPersonMappingSchema).min(1),
+  projectMappings: z.array(TimeImportProjectMappingSchema),
+  tagMappings: z.array(TimeImportTagMappingSchema),
+});
+
+export const TimeImportRemapRequestSchema = z.object({
+  batchId: z.string().optional(),
+  projectMappings: z.array(TimeImportProjectMappingSchema).optional(),
+  tagMappings: z.array(TimeImportTagMappingSchema).optional(),
+});
+
+export const TimeImportBatchSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  fileName: z.string().nullable(),
+  entryCount: z.number(),
+  createdAt: z.string(),
+});
+
 export const LeaveTransactionSchema = z.object({
   id: z.string(),
   personId: z.string(),
