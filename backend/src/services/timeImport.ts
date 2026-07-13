@@ -182,12 +182,26 @@ async function resolveProjectId(
   organizationId: string,
   mapping: ImportProjectMapping | undefined,
   projectCache: Map<string, string>
-): Promise<{ projectId: string | null; category?: TimeCategory }> {
-  if (!mapping || mapping.action === "skip") return { projectId: null };
-  const key = mapping.externalName;
-  if (projectCache.has(key)) return { projectId: projectCache.get(key)!, category: mapping.category };
+): Promise<{ projectId: string | null; category?: TimeCategory; skip?: boolean }> {
+  if (!mapping) return { projectId: null };
+  if (mapping.action === "skip") return { projectId: null, skip: true, category: mapping.category };
 
-  if (mapping.action === "map" && mapping.timeProjectId) {
+  const key = mapping.externalName;
+  if (projectCache.has(key)) {
+    return { projectId: projectCache.get(key)!, category: mapping.category };
+  }
+
+  if (mapping.action === "map") {
+    if (!mapping.timeProjectId) {
+      throw new Error(`Project "${mapping.externalName}": choose a target project for "map"`);
+    }
+    const exists = await prisma.timeProject.findFirst({
+      where: { id: mapping.timeProjectId, organizationId, isArchived: false },
+      select: { id: true },
+    });
+    if (!exists) {
+      throw new Error(`Project "${mapping.externalName}": target project not found`);
+    }
     projectCache.set(key, mapping.timeProjectId);
     return { projectId: mapping.timeProjectId, category: mapping.category };
   }
@@ -219,6 +233,54 @@ async function resolveProjectId(
   }
 
   return { projectId: null, category: mapping.category };
+}
+
+async function buildProjectResolutionMap(
+  organizationId: string,
+  projectMappings: ImportProjectMapping[]
+) {
+  const cache = new Map<string, string>();
+  const out = new Map<string, { projectId: string | null; category?: TimeCategory; skip?: boolean }>();
+  for (const mapping of projectMappings) {
+    out.set(mapping.externalName, await resolveProjectId(organizationId, mapping, cache));
+  }
+  return out;
+}
+
+async function buildTagIdLookup(organizationId: string, tagMappings: ImportTagMapping[]) {
+  const out = new Map<string, string | null>();
+  for (const mapping of tagMappings) {
+    if (mapping.action === "skip") {
+      out.set(mapping.externalName, null);
+      continue;
+    }
+    if (mapping.action === "map") {
+      if (!mapping.timeTagId) {
+        throw new Error(`Tag "${mapping.externalName}": choose a target tag for "map"`);
+      }
+      out.set(mapping.externalName, mapping.timeTagId);
+      continue;
+    }
+    if (mapping.action === "create") {
+      const name = mapping.newTagName?.trim() || mapping.externalName;
+      let row = await prisma.timeTag.findFirst({
+        where: { organizationId, name },
+        select: { id: true },
+      });
+      if (!row) {
+        const maxSort = await prisma.timeTag.aggregate({
+          where: { organizationId },
+          _max: { sortOrder: true },
+        });
+        row = await prisma.timeTag.create({
+          data: { organizationId, name, sortOrder: (maxSort._max.sortOrder ?? 0) + 1 },
+          select: { id: true },
+        });
+      }
+      out.set(mapping.externalName, row.id);
+    }
+  }
+  return out;
 }
 
 async function resolveTagIds(
@@ -278,106 +340,167 @@ export async function runTimerlyImport(input: {
   personMappings: ImportPersonMapping[];
   projectMappings: ImportProjectMapping[];
   tagMappings: ImportTagMapping[];
+  batchId?: string;
+  offset?: number;
+  limit?: number;
 }) {
   const parsed = parseTimerlyCsv(input.csvText);
   const slots = parsed.entries.flatMap(expandTimerlyTimeSlots);
+  const offset = input.offset ?? 0;
+  const limit = Math.min(input.limit ?? 200, 500);
+  const slice = slots.slice(offset, offset + limit);
+
+  let batchId = input.batchId;
+  if (batchId) {
+    const existing = await prisma.timeImportBatch.findFirst({
+      where: { id: batchId, organizationId: input.organizationId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new Error("Import batch not found");
+    }
+  } else {
+    const batch = await prisma.timeImportBatch.create({
+      data: {
+        organizationId: input.organizationId,
+        source: "timerly",
+        fileName: input.fileName ?? null,
+        createdByUserId: input.userId,
+      },
+    });
+    batchId = batch.id;
+  }
 
   const personByExternal = new Map(input.personMappings.map((m) => [m.externalName, m.personId]));
-  const projectByExternal = new Map(input.projectMappings.map((m) => [m.externalName, m]));
+  const projectResolution =
+    offset === 0
+      ? await buildProjectResolutionMap(input.organizationId, input.projectMappings)
+      : null;
+  const tagIdLookup =
+    offset === 0 ? await buildTagIdLookup(input.organizationId, input.tagMappings) : null;
 
-  const batch = await prisma.timeImportBatch.create({
-    data: {
-      organizationId: input.organizationId,
-      source: "timerly",
-      fileName: input.fileName ?? null,
-      createdByUserId: input.userId,
-    },
-  });
+  // Re-use cached maps on continuation chunks via DB isn't needed — projects/tags already exist.
+  const projectRes =
+    projectResolution ??
+    (await buildProjectResolutionMap(input.organizationId, input.projectMappings));
+  const tagLookup =
+    tagIdLookup ?? (await buildTagIdLookup(input.organizationId, input.tagMappings));
 
-  const projectCache = new Map<string, string>();
-  const tagCache = new Map<string, string | null>();
   let imported = 0;
   let skipped = 0;
   const errors: { rowIndex: number; reason: string }[] = [];
+  const creates: {
+    organizationId: string;
+    userId: string;
+    personId: string;
+    startsAt: Date;
+    endsAt: Date;
+    kind: string;
+    category: string;
+    timeProjectId: string | null;
+    note: string | null;
+    importBatchId: string;
+    importExternalProject: string | null;
+    importExternalTags: string | null;
+    tagIds: string[];
+  }[] = [];
 
-  const CHUNK = 40;
-  for (let i = 0; i < slots.length; i += CHUNK) {
-    const chunk = slots.slice(i, i + CHUNK);
-    await prisma.$transaction(async (tx) => {
-      for (const slot of chunk) {
-        const personId = personByExternal.get(slot.personName);
-        if (!personId) {
-          skipped++;
-          errors.push({ rowIndex: slot.rowIndex, reason: `No person mapping for "${slot.personName}"` });
-          continue;
-        }
+  for (const slot of slice) {
+    const personId = personByExternal.get(slot.personName);
+    if (!personId) {
+      skipped++;
+      errors.push({ rowIndex: slot.rowIndex, reason: `No person mapping for "${slot.personName}"` });
+      continue;
+    }
 
-        const projMapping = projectByExternal.get(slot.project);
-        if (projMapping?.action === "skip") {
-          skipped++;
-          continue;
-        }
+    const proj = projectRes.get(slot.project);
+    if (proj?.skip) {
+      skipped++;
+      continue;
+    }
 
-        const range = slot.timeRanges[0];
-        if (!range) {
-          skipped++;
-          continue;
-        }
+    const range = slot.timeRanges[0];
+    if (!range) {
+      skipped++;
+      continue;
+    }
 
-        const times = computeEntryTimes(slot.dateIso, range.start, range.end, slot.loggedHours);
-        if (!times) {
-          errors.push({ rowIndex: slot.rowIndex, reason: "Could not compute start/end time" });
-          skipped++;
-          continue;
-        }
+    const times = computeEntryTimes(slot.dateIso, range.start, range.end, slot.loggedHours);
+    if (!times) {
+      errors.push({ rowIndex: slot.rowIndex, reason: "Could not compute start/end time" });
+      skipped++;
+      continue;
+    }
 
-        const { projectId, category: mappedCategory } = await resolveProjectId(
-          input.organizationId,
-          projMapping,
-          projectCache
-        );
+    const tagIds = slot.tags
+      .map((t) => tagLookup.get(t))
+      .filter((id): id is string => Boolean(id));
 
-        const tagIds = await resolveTagIds(
-          input.organizationId,
-          slot.tags,
-          input.tagMappings,
-          tagCache
-        );
-
-        await tx.timeEntry.create({
-          data: {
-            organizationId: input.organizationId,
-            userId: input.userId,
-            personId,
-            startsAt: times.startsAt,
-            endsAt: times.endsAt,
-            kind: "custom",
-            category: mappedCategory ?? "work",
-            timeProjectId: projectId,
-            note: slot.note || null,
-            isLocked: false,
-            importBatchId: batch.id,
-            importExternalProject: slot.project || null,
-            importExternalTags: slot.tags.length ? slot.tags.join(", ") : null,
-            tagLinks: tagIds.length
-              ? { createMany: { data: tagIds.map((timeTagId) => ({ timeTagId })) } }
-              : undefined,
-          },
-        });
-        imported++;
-      }
+    creates.push({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      personId,
+      startsAt: times.startsAt,
+      endsAt: times.endsAt,
+      kind: "custom",
+      category: proj?.category ?? "work",
+      timeProjectId: proj?.projectId ?? null,
+      note: slot.note || null,
+      importBatchId: batchId,
+      importExternalProject: slot.project || null,
+      importExternalTags: slot.tags.length ? slot.tags.join(", ") : null,
+      tagIds,
     });
   }
 
-  await prisma.timeImportBatch.update({
-    where: { id: batch.id },
-    data: { entryCount: imported },
-  });
+  if (creates.length > 0) {
+    await prisma.$transaction(
+      creates.map((row) =>
+        prisma.timeEntry.create({
+          data: {
+            organizationId: row.organizationId,
+            userId: row.userId,
+            personId: row.personId,
+            startsAt: row.startsAt,
+            endsAt: row.endsAt,
+            kind: row.kind,
+            category: row.category,
+            timeProjectId: row.timeProjectId,
+            note: row.note,
+            isLocked: false,
+            importBatchId: row.importBatchId,
+            importExternalProject: row.importExternalProject,
+            importExternalTags: row.importExternalTags,
+            tagLinks: row.tagIds.length
+              ? { createMany: { data: row.tagIds.map((timeTagId) => ({ timeTagId })) } }
+              : undefined,
+          },
+        })
+      )
+    );
+    imported = creates.length;
+  }
+
+  const nextOffset = offset + limit;
+  const done = nextOffset >= slots.length;
+
+  if (done) {
+    const entryCount = await prisma.timeEntry.count({
+      where: { importBatchId: batchId, organizationId: input.organizationId },
+    });
+    await prisma.timeImportBatch.update({
+      where: { id: batchId },
+      data: { entryCount },
+    });
+  }
 
   return {
-    batchId: batch.id,
+    batchId,
     imported,
     skipped,
+    done,
+    nextOffset: done ? slots.length : nextOffset,
+    totalSlots: slots.length,
     errors: errors.slice(0, 50),
     invalidRows: parsed.invalidRows.slice(0, 20),
   };

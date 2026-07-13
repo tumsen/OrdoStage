@@ -1439,6 +1439,22 @@ export const TimeImportRunRequestSchema = z.object({
   personMappings: z.array(TimeImportPersonMappingSchema).min(1),
   projectMappings: z.array(TimeImportProjectMappingSchema),
   tagMappings: z.array(TimeImportTagMappingSchema),
+  /** Continue an in-progress import batch. */
+  batchId: z.string().optional(),
+  /** Slice offset into expanded rows (default 0). */
+  offset: z.number().int().min(0).optional(),
+  /** Rows per request (default 200, max 500). */
+  limit: z.number().int().min(1).max(500).optional(),
+});
+
+export const TimeImportRunResultSchema = z.object({
+  batchId: z.string(),
+  imported: z.number(),
+  skipped: z.number(),
+  done: z.boolean(),
+  nextOffset: z.number(),
+  totalSlots: z.number(),
+  errors: z.array(z.object({ rowIndex: z.number(), reason: z.string() })),
 });
 
 export const TimeImportRemapRequestSchema = z.object({

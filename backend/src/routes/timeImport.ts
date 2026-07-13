@@ -52,16 +52,29 @@ timeImportRouter.post(
       return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
     }
     const body = c.req.valid("json");
-    const data = await runTimerlyImport({
-      organizationId: user.organizationId,
-      userId: user.id,
-      csvText: body.csvText,
-      fileName: body.fileName,
-      personMappings: body.personMappings,
-      projectMappings: body.projectMappings,
-      tagMappings: body.tagMappings,
-    });
-    return c.json({ data });
+    try {
+      const data = await runTimerlyImport({
+        organizationId: user.organizationId,
+        userId: user.id,
+        csvText: body.csvText,
+        fileName: body.fileName,
+        personMappings: body.personMappings,
+        projectMappings: body.projectMappings,
+        tagMappings: body.tagMappings,
+        batchId: body.batchId,
+        offset: body.offset,
+        limit: body.limit,
+      });
+      return c.json({ data });
+    } catch (err) {
+      console.error("[time-import]", err);
+      const message = err instanceof Error ? err.message : "Import failed";
+      const code =
+        message.includes("TimeImportBatch") || message.includes("importBatchId")
+          ? "MIGRATION_REQUIRED"
+          : "IMPORT_FAILED";
+      return c.json({ error: { message, code } }, code === "MIGRATION_REQUIRED" ? 503 : 500);
+    }
   }
 );
 

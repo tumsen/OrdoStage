@@ -121,6 +121,9 @@ export default function TimeImport() {
   const [projectMappings, setProjectMappings] = useState<ProjectMappingState>({});
   const [tagMappings, setTagMappings] = useState<TagMappingState>({});
   const [remapBatchId, setRemapBatchId] = useState("");
+  const [importProgress, setImportProgress] = useState<{ imported: number; total: number } | null>(
+    null
+  );
   const [importResult, setImportResult] = useState<{
     batchId: string;
     imported: number;
@@ -184,8 +187,8 @@ export default function TimeImport() {
   });
 
   const importMutation = useMutation({
-    mutationFn: () =>
-      api.post<{ batchId: string; imported: number; skipped: number }>("/api/time/import/run", {
+    mutationFn: async () => {
+      const payload = {
         csvText,
         fileName: fileName || undefined,
         personMappings: Object.entries(personMappings).map(([externalName, personId]) => ({
@@ -204,9 +207,54 @@ export default function TimeImport() {
           ...(m.action === "map" ? { timeTagId: m.timeTagId } : {}),
           ...(m.action === "create" ? { newTagName: m.newTagName || externalName } : {}),
         })),
-      }),
+      };
+
+      for (const [, m] of Object.entries(projectMappings)) {
+        if (m.action === "map" && !m.timeProjectId) {
+          throw new Error(t("time.importMapProjectRequired"));
+        }
+      }
+      for (const [, m] of Object.entries(tagMappings)) {
+        if (m.action === "map" && !m.timeTagId) {
+          throw new Error(t("time.importMapTagRequired"));
+        }
+      }
+
+      let batchId: string | undefined;
+      let offset = 0;
+      let totalImported = 0;
+      let totalSkipped = 0;
+      const limit = 200;
+
+      setImportProgress({ imported: 0, total: preview?.entryCount ?? 0 });
+
+      while (true) {
+        const data = await api.post<{
+          batchId: string;
+          imported: number;
+          skipped: number;
+          done: boolean;
+          nextOffset: number;
+          totalSlots: number;
+        }>("/api/time/import/run", {
+          ...payload,
+          batchId,
+          offset,
+          limit,
+        });
+        batchId = data.batchId;
+        totalImported += data.imported;
+        totalSkipped += data.skipped;
+        setImportProgress({ imported: totalImported, total: data.totalSlots });
+        if (data.done) {
+          return { batchId: data.batchId, imported: totalImported, skipped: totalSkipped };
+        }
+        offset = data.nextOffset;
+      }
+    },
     onSuccess: (data) => {
       setImportResult(data);
+      setImportProgress(null);
       queryClient.invalidateQueries({ queryKey: ["time-import-batches"] });
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       toast({
@@ -215,6 +263,7 @@ export default function TimeImport() {
       });
     },
     onError: (e: Error) => {
+      setImportProgress(null);
       toast({ title: t("time.importRunError"), description: e.message, variant: "destructive" });
     },
   });
@@ -566,6 +615,12 @@ export default function TimeImport() {
                   </table>
                 </div>
               </section>
+
+              {importProgress ? (
+                <p className="text-xs text-white/50 tabular-nums">
+                  {t("time.importProgress")}: {importProgress.imported} / {importProgress.total}
+                </p>
+              ) : null}
 
               <Button
                 type="button"
