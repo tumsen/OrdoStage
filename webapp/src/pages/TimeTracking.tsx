@@ -1430,8 +1430,9 @@ export default function TimeTracking() {
     >
       {!mobileDaySchedule ? (
       <div className="relative z-20 shrink-0 bg-[#0a0a0f] pb-0">
-        <div className="flex flex-col gap-2 w-full sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 lg:flex-nowrap lg:overflow-x-auto lg:pb-1">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 w-full">
+          {/* Desktop: fixed slots so controls never shift position */}
+          <div className="hidden sm:grid grid-cols-[auto_auto_auto_auto_1fr_auto_auto_auto] items-center gap-2">
           <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
             <button
               type="button"
@@ -1526,8 +1527,8 @@ export default function TimeTracking() {
             </Select>
           </div>
           ) : null}
-          <div className="hidden sm:flex sm:flex-col sm:gap-2 min-w-0">
-          <div className="flex flex-nowrap items-center gap-2 min-w-0 overflow-x-auto">
+          {/* Date nav slot */}
+          <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
           <Button
             type="button"
             variant="outline"
@@ -1540,19 +1541,13 @@ export default function TimeTracking() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          {mode === "week" ? (
-            <DateInputWithWeekday
-              value={format(anchor, "yyyy-MM-dd")}
-              onChange={(value) => {
-                const next = dateFromISODate(value);
-                if (next) setAnchor(next);
-              }}
-            />
-          ) : (
-            <span className="inline-flex h-8 items-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap">
-              {format(anchor, "MMMM yyyy", { locale: dfLocale })}
-            </span>
-          )}
+          <DateInputWithWeekday
+            value={format(anchor, "yyyy-MM-dd")}
+            onChange={(value) => {
+              const next = dateFromISODate(value);
+              if (next) setAnchor(next);
+            }}
+          />
           <Button
             type="button"
             variant="outline"
@@ -1577,7 +1572,9 @@ export default function TimeTracking() {
           >
             Today
           </Button>
-          <span className="text-xs text-white/50 tabular-nums whitespace-nowrap">
+          </div>
+          {/* Period label slot (fixed width) */}
+          <div className="w-[260px] text-xs text-white/50 tabular-nums whitespace-nowrap overflow-hidden text-ellipsis">
             {mode === "week"
               ? `W${periodWeek} · ${format(weekStart, "d MMM", { locale: dfLocale })} – ${format(
                   weekEnd,
@@ -1585,15 +1582,15 @@ export default function TimeTracking() {
                   { locale: dfLocale }
                 )}`
               : format(anchor, "MMMM yyyy", { locale: dfLocale })}
-          </span>
-          {isTimeSection && mode === "week" ? (
-            <span className="text-xs text-white/60 tabular-nums whitespace-nowrap">
-              Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
-              <span className="text-white/35"> · </span>
-              {formatTotalMinutesAsHHMM(weekTotalMinutes)}
-            </span>
-          ) : null}
-          {isTimeSection && mode === "week" ? (
+          </div>
+          {/* Week total slot (reserved space, only visible in week mode + time section) */}
+          <div className={cn("w-[260px] text-xs tabular-nums whitespace-nowrap", isTimeSection && mode === "week" ? "text-white/60" : "text-white/0 select-none")} aria-hidden={!(isTimeSection && mode === "week")}>
+            Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
+            <span className={cn("text-white/35", !(isTimeSection && mode === "week") && "text-white/0")}> · </span>
+            {formatTotalMinutesAsHHMM(weekTotalMinutes)}
+          </div>
+          {/* Approve slot (reserved space) */}
+          <div className={cn("w-[190px]", isTimeSection && mode === "week" ? "" : "invisible pointer-events-none")} aria-hidden={!(isTimeSection && mode === "week")}>
             <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">
               {approvedTimesheet ? (
                 <>
@@ -1608,7 +1605,7 @@ export default function TimeTracking() {
                       size="sm"
                       className="h-6 px-2 text-xs text-white/55 hover:text-white"
                       onClick={() => reopenTimesheet.mutate(approvedTimesheet.id)}
-                      disabled={reopenTimesheet.isPending}
+                      disabled={reopenTimesheet.isPending || !(isTimeSection && mode === "week")}
                     >
                       Reopen
                     </Button>
@@ -1621,36 +1618,42 @@ export default function TimeTracking() {
                   size="sm"
                   className="h-6 px-2 text-xs text-white/65 hover:text-white"
                   onClick={() => approveTimesheet.mutate()}
-                  disabled={!canEdit || approveTimesheet.isPending}
+                  disabled={!canEdit || approveTimesheet.isPending || !(isTimeSection && mode === "week")}
                 >
                   Approve week
                 </Button>
               )}
             </div>
-          ) : null}
-          {readAll && peopleForFilter && peopleForFilter.length > 0 ? (
-            <Select
-              value={selectedPersonId ?? mePerson.id}
-              onValueChange={(v) => setSelectedPersonId(v === mePerson.id ? null : v)}
-            >
-              <SelectTrigger className="w-[220px] bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder={t("time.personFilter")} />
-              </SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                <SelectItem value={mePerson.id}>{t("time.me")}</SelectItem>
-                {peopleForFilter
-                  .filter((p) => p.id !== mePerson.id)
-                  .map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          ) : null}
+          </div>
+          {/* Person selector slot (fixed width) */}
+          <div className="w-[220px]">
+            {readAll && peopleForFilter && peopleForFilter.length > 0 ? (
+              <Select
+                value={selectedPersonId ?? mePerson.id}
+                onValueChange={(v) => setSelectedPersonId(v === mePerson.id ? null : v)}
+              >
+                <SelectTrigger className="w-[220px] bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder={t("time.personFilter")} />
+                </SelectTrigger>
+                <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                  <SelectItem value={mePerson.id}>{t("time.me")}</SelectItem>
+                  {peopleForFilter
+                    .filter((p) => p.id !== mePerson.id)
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="h-8" />
+            )}
+          </div>
           </div>
 
-          <div className="flex flex-nowrap items-center gap-2 min-w-0 overflow-x-auto">
+          {/* Desktop row 2: secondary links */}
+          <div className="hidden sm:flex flex-nowrap items-center gap-2 min-w-0 overflow-x-auto">
             {readAll ? (
               <Link to="/time/reports" className="shrink-0">
                 <Button
@@ -1717,8 +1720,7 @@ export default function TimeTracking() {
               </Link>
             ) : null}
           </div>
-          </div>
-          </div>
+
           <div className="flex flex-wrap items-center gap-2 sm:hidden">
           <Button
             type="button"

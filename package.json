@@ -2,7 +2,7 @@
   "name": "ordostage",
   "scripts": {
     "railway:logs": "bash scripts/railway-logs.sh",
-    "verify": "sh -c 'test -f backend/src/billingPaddle.ts' && cd webapp && bun run check && bun run build' && sh -c 'cd backend && bun run typecheck'"
+    "verify": "sh -c 'test -f backend/src/billingPaddle.ts' && cd webapp && bun run check && bun run build && cd ../backend && bun run typecheck"
   },
   "dependencies": {},
   "devDependencies": {
