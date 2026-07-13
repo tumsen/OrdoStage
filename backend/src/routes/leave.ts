@@ -285,6 +285,7 @@ leaveRouter.post(
       vacationYearKey: body.vacationYearKey,
       note: body.note,
       createdByUserId: user.id,
+      effectiveDate: body.effectiveDate,
       vacationRemainingDays: body.vacationRemainingDays,
       extraVacationRemainingDays: body.extraVacationRemainingDays,
       compTimeRemainingMinutes: body.compTimeRemainingMinutes,
@@ -324,6 +325,7 @@ leaveRouter.post("/time/leave-adjustments", zValidator("json", CreateLeaveAdjust
     source: "manual_adjustment",
     note: body.note,
     createdByUserId: user.id,
+    effectiveDate: body.effectiveDate,
   });
 
   const leave = await getLeaveBalanceSummary(user.organizationId, body.personId);

@@ -110,8 +110,13 @@ export async function postLeaveTransaction(input: {
   periodEnd?: Date | null;
   note?: string | null;
   createdByUserId?: string | null;
+  effectiveDate?: string | null;
 }) {
   if (input.amount === 0) return;
+  const periodStart =
+    input.periodStart ??
+    (input.effectiveDate ? new Date(`${input.effectiveDate}T12:00:00`) : null);
+  const periodEnd = input.periodEnd ?? periodStart;
   await prisma.leaveTransaction.create({
     data: {
       organizationId: input.organizationId,
@@ -121,8 +126,8 @@ export async function postLeaveTransaction(input: {
       amount: input.amount,
       source: input.source,
       timeEntryId: input.timeEntryId ?? null,
-      periodStart: input.periodStart ?? null,
-      periodEnd: input.periodEnd ?? null,
+      periodStart,
+      periodEnd,
       note: input.note ?? null,
       createdByUserId: input.createdByUserId ?? null,
     },
@@ -290,6 +295,7 @@ export async function applyOpeningBalances(input: {
   vacationYearKey?: string;
   note: string;
   createdByUserId?: string | null;
+  effectiveDate?: string;
   vacationRemainingDays?: number;
   extraVacationRemainingDays?: number;
   compTimeRemainingMinutes?: number;
@@ -336,6 +342,7 @@ export async function applyOpeningBalances(input: {
       source: "opening_balance",
       note: input.note,
       createdByUserId: input.createdByUserId ?? null,
+      effectiveDate: input.effectiveDate,
     });
   };
 

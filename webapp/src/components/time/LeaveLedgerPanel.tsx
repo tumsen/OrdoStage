@@ -25,6 +25,8 @@ import {
 import { ScrollText } from "lucide-react";
 import type { LeaveBalanceSummary, LeaveTransaction } from "@/contracts/backendTypes";
 import { LeaveOpeningBalanceForm } from "@/components/time/LeaveOpeningBalanceForm";
+import { CompTimeHhhMmField } from "@/components/time/CompTimeHhhMmField";
+import { formatCompTimeHhhMm } from "@/lib/compTimeInput";
 
 const ADJUSTMENT_BALANCE_TYPES = [
   "vacation_earned",
@@ -43,12 +45,8 @@ function isCompTimeType(t: string) {
 
 function formatAmount(amount: number, balanceType: string): string {
   if (isCompTimeType(balanceType)) {
-    const sign = amount < 0 ? "-" : "";
-    const m = Math.abs(Math.round(amount));
-    const h = Math.floor(m / 60);
-    const mm = m % 60;
-    if (mm === 0) return `${sign}${h}h`;
-    return `${sign}${h}h ${mm}m`;
+    const sign = amount < 0 ? "-" : amount > 0 ? "+" : "";
+    return `${sign}${formatCompTimeHhhMm(Math.abs(Math.round(amount)))}`;
   }
   const sign = amount < 0 ? "" : amount > 0 ? "+" : "";
   return `${sign}${amount.toFixed(2).replace(/\.?0+$/, "")}d`;
@@ -81,8 +79,8 @@ export function LeaveLedgerPanel(props: {
 
   const [balanceType, setBalanceType] = useState<AdjustmentBalanceType>("vacation_earned");
   const [amount, setAmount] = useState("");
-  const [compAdjustHours, setCompAdjustHours] = useState("");
-  const [compAdjustMinutes, setCompAdjustMinutes] = useState("");
+  const [compAdjustMinutes, setCompAdjustMinutes] = useState(0);
+  const [effectiveDate, setEffectiveDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [note, setNote] = useState("");
 
   const compTimeAdjustMode = isCompTimeType(balanceType);
@@ -99,17 +97,9 @@ export function LeaveLedgerPanel(props: {
 
   const adjustMutation = useMutation({
     mutationFn: () => {
-      let parsedAmount: number;
-      if (compTimeAdjustMode) {
-        const h = compAdjustHours.trim() === "" ? 0 : parseFloat(compAdjustHours);
-        const m = compAdjustMinutes.trim() === "" ? 0 : parseInt(compAdjustMinutes, 10);
-        if (Number.isNaN(h) || Number.isNaN(m)) {
-          throw new Error(t("time.leaveOpeningBalanceInvalidCompTime"));
-        }
-        const sign = h < 0 || Object.is(h, -0) ? -1 : 1;
-        parsedAmount = h * 60 + sign * Math.abs(m);
-      } else {
-        parsedAmount = parseFloat(amount);
+      const parsedAmount = compTimeAdjustMode ? compAdjustMinutes : parseFloat(amount);
+      if (compTimeAdjustMode && parsedAmount === 0) {
+        throw new Error(t("time.leaveOpeningBalanceInvalidCompTime"));
       }
       return api.post<LeaveBalanceSummary>("/api/time/leave-adjustments", {
         personId,
@@ -117,12 +107,12 @@ export function LeaveLedgerPanel(props: {
         amount: parsedAmount,
         vacationYearKey,
         note: note.trim(),
+        ...(compTimeAdjustMode && effectiveDate ? { effectiveDate } : {}),
       });
     },
     onSuccess: () => {
       setAmount("");
-      setCompAdjustHours("");
-      setCompAdjustMinutes("");
+      setCompAdjustMinutes(0);
       setNote("");
       queryClient.invalidateQueries({ queryKey: ["time-leave-transactions", personId] });
       queryClient.invalidateQueries({ queryKey: ["time-leave-balances", personId] });
@@ -184,31 +174,28 @@ export function LeaveLedgerPanel(props: {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 sm:col-span-2">
               <Label className="text-[10px] text-white/45">
                 {compTimeAdjustMode ? t("time.leaveAdjustmentCompTimeAmount") : t("time.leaveAdjustmentAmount")}
               </Label>
               {compTimeAdjustMode ? (
-                <div className="flex gap-1.5 items-center">
-                  <Input
-                    type="number"
-                    value={compAdjustHours}
-                    onChange={(e) => setCompAdjustHours(e.target.value)}
-                    placeholder="0"
-                    className="h-8 bg-white/5 border-white/10 text-white text-xs"
+                <div className="flex flex-wrap gap-3 items-start">
+                  <CompTimeHhhMmField
+                    valueMinutes={compAdjustMinutes}
+                    onChangeMinutes={setCompAdjustMinutes}
+                    allowNegative
+                    aria-label={t("time.leaveAdjustmentCompTimeAmount")}
                   />
-                  <span className="text-[10px] text-white/35">h</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="59"
-                    value={compAdjustMinutes}
-                    onChange={(e) => setCompAdjustMinutes(e.target.value)}
-                    placeholder="0"
-                    className="h-8 bg-white/5 border-white/10 text-white text-xs w-16"
-                  />
-                  <span className="text-[10px] text-white/35">m</span>
-                  <span className="text-[10px] text-white/30 ml-1">{t("time.leaveAdjustmentCompTimeHint")}</span>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-white/45">{t("time.leaveOpeningBalanceEffectiveDate")}</Label>
+                    <Input
+                      type="date"
+                      value={effectiveDate}
+                      onChange={(e) => setEffectiveDate(e.target.value)}
+                      className="h-8 bg-white/5 border-white/10 text-white text-xs [color-scheme:dark]"
+                    />
+                  </div>
+                  <p className="self-end pb-1 text-[10px] text-white/30">{t("time.leaveAdjustmentCompTimeHint")}</p>
                 </div>
               ) : (
                 <Input
@@ -239,9 +226,7 @@ export function LeaveLedgerPanel(props: {
             disabled={
               adjustMutation.isPending ||
               !note.trim() ||
-              (compTimeAdjustMode
-                ? compAdjustHours.trim() === "" && compAdjustMinutes.trim() === ""
-                : amount.trim() === "" || Number.isNaN(parseFloat(amount)))
+              (compTimeAdjustMode ? compAdjustMinutes === 0 : amount.trim() === "" || Number.isNaN(parseFloat(amount)))
             }
             onClick={() => adjustMutation.mutate()}
           >

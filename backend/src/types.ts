@@ -1392,6 +1392,8 @@ export const CreateLeaveAdjustmentSchema = z.object({
   amount: z.number(),
   vacationYearKey: z.string().optional(),
   note: z.string().min(1),
+  /** Calendar date for when overtime was earned (stored as periodStart). */
+  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 /** Set target leave balances when onboarding or migrating from another system. */
@@ -1399,9 +1401,10 @@ export const SetLeaveOpeningBalancesSchema = z.object({
   personId: z.string().min(1),
   vacationYearKey: z.string().optional(),
   note: z.string().min(1),
+  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   vacationRemainingDays: z.number().min(-365).max(365).optional(),
   extraVacationRemainingDays: z.number().min(-365).max(365).optional(),
-  compTimeRemainingMinutes: z.number().int().min(-87600).max(87600).optional(),
+  compTimeRemainingMinutes: z.number().int().min(-59999).max(59999).optional(),
   sickDays: z.number().min(0).max(365).optional(),
 });
 

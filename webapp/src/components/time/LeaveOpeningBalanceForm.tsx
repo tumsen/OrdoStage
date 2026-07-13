@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
@@ -7,19 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { CompTimeHhhMmField } from "@/components/time/CompTimeHhhMmField";
 import type { LeaveBalanceSummary } from "@/contracts/backendTypes";
 
-function minutesToHoursMinutes(totalMinutes: number) {
-  const sign = totalMinutes < 0 ? -1 : 1;
-  const m = Math.abs(Math.round(totalMinutes));
-  return { sign, hours: Math.floor(m / 60), minutes: m % 60 };
-}
-
-function hoursMinutesToTotal(sign: number, hours: string, minutes: string): number | null {
-  const h = hours.trim() === "" ? 0 : parseInt(hours, 10);
-  const m = minutes.trim() === "" ? 0 : parseInt(minutes, 10);
-  if (Number.isNaN(h) || Number.isNaN(m)) return null;
-  return sign * (h * 60 + m);
+function todayIsoDate(): string {
+  return format(new Date(), "yyyy-MM-dd");
 }
 
 export function LeaveOpeningBalanceForm(props: {
@@ -34,41 +27,32 @@ export function LeaveOpeningBalanceForm(props: {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const compParts = minutesToHoursMinutes(leave.compTimeRemainingMinutes);
-
   const [vacationRemaining, setVacationRemaining] = useState("");
   const [extraVacationRemaining, setExtraVacationRemaining] = useState("");
-  const [compHours, setCompHours] = useState("");
-  const [compMinutes, setCompMinutes] = useState("");
+  const [compTimeMinutes, setCompTimeMinutes] = useState(leave.compTimeRemainingMinutes);
   const [sickDays, setSickDays] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState(todayIsoDate);
   const [note, setNote] = useState("");
 
   useEffect(() => {
     setVacationRemaining(leave.vacationRemainingDays.toFixed(1));
     setExtraVacationRemaining(leave.extraVacationRemainingDays.toFixed(1));
-    setCompHours(String(compParts.hours));
-    setCompMinutes(String(compParts.minutes));
+    setCompTimeMinutes(leave.compTimeRemainingMinutes);
     setSickDays(String(leave.sickDays));
   }, [
     leave.vacationRemainingDays,
     leave.extraVacationRemainingDays,
     leave.compTimeRemainingMinutes,
     leave.sickDays,
-    compParts.hours,
-    compParts.minutes,
   ]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const compTotal = hoursMinutesToTotal(compParts.sign, compHours, compMinutes);
-      if (compTotal === null) {
-        throw new Error(t("time.leaveOpeningBalanceInvalidCompTime"));
-      }
-
       const payload: {
         personId: string;
         vacationYearKey: string;
         note: string;
+        effectiveDate?: string;
         vacationRemainingDays?: number;
         extraVacationRemainingDays?: number;
         compTimeRemainingMinutes?: number;
@@ -77,6 +61,7 @@ export function LeaveOpeningBalanceForm(props: {
         personId,
         vacationYearKey: leave.vacationYearKey,
         note: note.trim(),
+        effectiveDate,
       };
 
       const vac = parseFloat(vacationRemaining);
@@ -89,8 +74,8 @@ export function LeaveOpeningBalanceForm(props: {
         payload.extraVacationRemainingDays = extra;
       }
 
-      if (compTotal !== leave.compTimeRemainingMinutes) {
-        payload.compTimeRemainingMinutes = compTotal;
+      if (compTimeMinutes !== leave.compTimeRemainingMinutes) {
+        payload.compTimeRemainingMinutes = compTimeMinutes;
       }
 
       const sick = parseFloat(sickDays);
@@ -165,27 +150,20 @@ export function LeaveOpeningBalanceForm(props: {
         </div>
         <div className="space-y-1">
           <Label className="text-[10px] text-white/45">{t("time.leaveOpeningBalanceCompTime")}</Label>
-          <div className="flex gap-1.5">
-            <Input
-              type="number"
-              min="0"
-              value={compHours}
-              onChange={(e) => setCompHours(e.target.value)}
-              placeholder="0"
-              className="h-8 bg-white/5 border-white/10 text-white text-xs"
-            />
-            <span className="self-center text-[10px] text-white/35">h</span>
-            <Input
-              type="number"
-              min="0"
-              max="59"
-              value={compMinutes}
-              onChange={(e) => setCompMinutes(e.target.value)}
-              placeholder="0"
-              className="h-8 bg-white/5 border-white/10 text-white text-xs w-16"
-            />
-            <span className="self-center text-[10px] text-white/35">m</span>
-          </div>
+          <CompTimeHhhMmField
+            valueMinutes={compTimeMinutes}
+            onChangeMinutes={setCompTimeMinutes}
+            aria-label={t("time.leaveOpeningBalanceCompTime")}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[10px] text-white/45">{t("time.leaveOpeningBalanceEffectiveDate")}</Label>
+          <Input
+            type="date"
+            value={effectiveDate}
+            onChange={(e) => setEffectiveDate(e.target.value)}
+            className="h-8 bg-white/5 border-white/10 text-white text-xs [color-scheme:dark]"
+          />
         </div>
         <div className="space-y-1">
           <Label className="text-[10px] text-white/45">{t("time.leaveSickDays")}</Label>
