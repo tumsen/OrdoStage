@@ -1,3 +1,10 @@
+import {
+  accrueVacationEarnedDays,
+  resolveLeaveNorms,
+  resolveVacationYear,
+  summarizeLeaveBalances,
+} from "./leave/danishLeave";
+
 export type CountryRuleSetId = "DK";
 
 export type TravelAllowanceType = "standard" | "tour_driver_denmark" | "tour_driver_abroad";
@@ -87,7 +94,10 @@ export type CountryRuleSet = {
   };
   vacation: {
     label: string;
-    status: "planned";
+    resolveVacationYear: typeof import("./leave/danishLeave").resolveVacationYear;
+    resolveLeaveNorms: typeof import("./leave/danishLeave").resolveLeaveNorms;
+    accrueVacationEarnedDays: typeof import("./leave/danishLeave").accrueVacationEarnedDays;
+    summarizeLeaveBalances: typeof import("./leave/danishLeave").summarizeLeaveBalances;
   };
 };
 
@@ -242,7 +252,10 @@ export const danishRuleSet: CountryRuleSet = {
   },
   vacation: {
     label: "Danish vacation rules",
-    status: "planned",
+    resolveVacationYear,
+    resolveLeaveNorms,
+    accrueVacationEarnedDays,
+    summarizeLeaveBalances,
   },
 };
 

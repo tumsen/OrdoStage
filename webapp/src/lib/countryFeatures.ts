@@ -17,6 +17,11 @@ export const COUNTRY_FEATURE_CATALOG = {
         description:
           "Tax-free mileage reimbursement per SKAT km rates (car tier at 20,000 km/year).",
       },
+      leaveManagement: {
+        label: "Leave management (fravær og løn)",
+        description:
+          "Danish vacation, feriefridage, comp time, and sick leave with payroll data export.",
+      },
     },
   },
 } as const;

@@ -30,6 +30,7 @@ import {
   Pencil,
   BarChart2,
   FolderKanban,
+  FileSpreadsheet,
   Trash2,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -56,7 +57,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useI18n } from "@/lib/i18n";
 import { toast, useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { timeCategoryMessageId } from "@/lib/timeCategoryI18n";
+import { timeCategoryMessageId, isDayOffCategory } from "@/lib/timeCategoryI18n";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
@@ -75,6 +76,7 @@ import type {
   TimeTag,
   TimeTrackingJob,
   TimesheetApproval,
+  LeaveBalanceSummary,
 } from "@/contracts/backendTypes";
 import type { Language, TimeFormat } from "@/lib/preferences";
 import { calendarDateKeyFromJobDate } from "@/lib/showTiming";
@@ -148,6 +150,16 @@ function timeEntryBlockSurfaceClass(
     return behind
       ? "border-purple-400/30 bg-purple-500/12 text-purple-50/85"
       : "border-purple-400/60 bg-purple-500/30 text-purple-50";
+  }
+  if (cat === "extra_vacation") {
+    return behind
+      ? "border-teal-400/30 bg-teal-500/12 text-teal-50/85"
+      : "border-teal-400/60 bg-teal-500/30 text-teal-50";
+  }
+  if (cat === "comp_time") {
+    return behind
+      ? "border-cyan-400/30 bg-cyan-500/12 text-cyan-50/85"
+      : "border-cyan-400/60 bg-cyan-500/30 text-cyan-50";
   }
   if (cat === "travel_allowance") {
     return behind
@@ -325,6 +337,11 @@ export default function TimeTracking() {
     orgFeatures?.countryFeatures,
     "DK",
     "mileageAllowance"
+  );
+  const leaveManagementEnabled = isCountryFeatureEnabled(
+    orgFeatures?.countryFeatures,
+    "DK",
+    "leaveManagement"
   );
 
   const [mode, setMode] = usePersistedViewMode(
@@ -512,6 +529,15 @@ export default function TimeTracking() {
     queryFn: () => api.get<MePerson | null>("/api/people/me"),
   });
 
+  const balancePersonId = readAll && selectedPersonId ? selectedPersonId : mePerson?.id ?? null;
+
+  const { data: leaveBalances } = useQuery({
+    queryKey: ["time-leave-balances", balancePersonId],
+    queryFn: () => api.get<LeaveBalanceSummary>(`/api/time/leave-balances/${balancePersonId}`),
+    enabled: leaveManagementEnabled && Boolean(balancePersonId),
+    staleTime: 30_000,
+  });
+
   const personQs =
     readAll && selectedPersonId
       ? `&personId=${encodeURIComponent(selectedPersonId)}`
@@ -640,6 +666,7 @@ export default function TimeTracking() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["time-leave-balances"] });
     },
   });
 
@@ -698,6 +725,7 @@ export default function TimeTracking() {
       });
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       queryClient.invalidateQueries({ queryKey: ["time-jobs-upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["time-leave-balances"] });
       timeNotify({ title: t("time.entryCreated") });
     },
   });
@@ -707,6 +735,7 @@ export default function TimeTracking() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       queryClient.invalidateQueries({ queryKey: ["time-jobs-upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["time-leave-balances"] });
       timeNotify({ title: t("time.entryDeleted") });
       setEditingEntryId(null);
     },
@@ -1573,6 +1602,19 @@ export default function TimeTracking() {
               </Button>
             </Link>
           )}
+          {readAll && leaveManagementEnabled && (
+            <Link to="/time/payroll" className="hidden sm:inline-flex">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                {t("time.payrollLink")}
+              </Button>
+            </Link>
+          )}
           {canManageTimeCatalog && (
             <Link to="/time/catalog" className="hidden sm:inline-flex">
               <Button
@@ -1729,6 +1771,11 @@ export default function TimeTracking() {
                     <DropdownMenuItem asChild className="focus:bg-white/10">
                       <Link to="/time/reports">{t("time.reportsLink")}</Link>
                     </DropdownMenuItem>
+                    {leaveManagementEnabled ? (
+                      <DropdownMenuItem asChild className="focus:bg-white/10">
+                        <Link to="/time/payroll">{t("time.payrollLink")}</Link>
+                      </DropdownMenuItem>
+                    ) : null}
                   </>
                 ) : null}
               </DropdownMenuContent>
@@ -1736,6 +1783,37 @@ export default function TimeTracking() {
           ) : null}
         </div>
       </div>
+      ) : null}
+
+      {leaveManagementEnabled && leaveBalances && isTimeSection ? (
+        <div className="shrink-0 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap gap-x-4 gap-y-1">
+          <span className="text-white/40 font-medium">{t("time.leaveBalancesTitle")}</span>
+          <span>
+            {t("time.leaveVacationRemaining")}:{" "}
+            <span
+              className={cn(
+                "tabular-nums font-medium",
+                leaveBalances.vacationRemainingDays < 0 ? "text-red-300" : "text-emerald-300"
+              )}
+            >
+              {leaveBalances.vacationRemainingDays.toFixed(1)}d
+            </span>
+          </span>
+          <span>
+            {t("time.leaveExtraRemaining")}:{" "}
+            <span className="tabular-nums text-teal-300 font-medium">
+              {leaveBalances.extraVacationRemainingDays.toFixed(1)}d
+            </span>
+          </span>
+          <span>
+            {t("time.leaveCompRemaining")}:{" "}
+            <span className="tabular-nums text-cyan-300 font-medium">
+              {Math.floor(leaveBalances.compTimeRemainingMinutes / 60)}h{" "}
+              {leaveBalances.compTimeRemainingMinutes % 60}m
+            </span>
+          </span>
+          <span className="text-white/35">({leaveBalances.vacationYearKey})</span>
+        </div>
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col">
@@ -1908,7 +1986,7 @@ export default function TimeTracking() {
                       const runningMinutes = weekRunningTotalMinutes[dayIdx] ?? dayTotalMinutes;
                       const dayOffEntry = (entries ?? []).find(
                         (e) =>
-                          (e.category === "vacation" || e.category === "sick" || e.category === "holiday") &&
+                          isDayOffCategory(e.category ?? "work") &&
                           columnDayYmdForInstant(parseISO(e.startsAt), displayStartHour) === dayYmd
                       );
                       const dayOffCategory = dayOffEntry?.category ?? null;
@@ -1917,6 +1995,16 @@ export default function TimeTracking() {
                           bg: "bg-emerald-500/8",
                           text: "text-emerald-300",
                           border: "border-emerald-500/25",
+                        },
+                        extra_vacation: {
+                          bg: "bg-teal-500/8",
+                          text: "text-teal-300",
+                          border: "border-teal-500/25",
+                        },
+                        comp_time: {
+                          bg: "bg-cyan-500/8",
+                          text: "text-cyan-300",
+                          border: "border-cyan-500/25",
                         },
                         sick: {
                           bg: "bg-orange-500/8",
@@ -1931,7 +2019,7 @@ export default function TimeTracking() {
                       };
                       const col = dayOffCategory ? dayOffColors[dayOffCategory] : null;
 
-                      const addDayOff = (category: "vacation" | "sick") => {
+                      const addDayOff = (category: "vacation" | "sick" | "extra_vacation" | "comp_time") => {
                         if (!canEditVisiblePeriod) return;
                         const [y, m, d] = dayYmd.split("-").map(Number);
                         const startsAt = new Date(Date.UTC(y!, m! - 1, d!, 8, 0, 0));
@@ -2001,6 +2089,26 @@ export default function TimeTracking() {
                                 >
                                   V
                                 </button>
+                                {leaveManagementEnabled ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      title={t("time.addExtraVacationDay")}
+                                      onClick={() => addDayOff("extra_vacation")}
+                                      className="rounded bg-teal-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-teal-300/70 hover:bg-teal-500/30 hover:text-teal-200"
+                                    >
+                                      FF
+                                    </button>
+                                    <button
+                                      type="button"
+                                      title={t("time.addCompTimeDay")}
+                                      onClick={() => addDayOff("comp_time")}
+                                      className="rounded bg-cyan-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-cyan-300/70 hover:bg-cyan-500/30 hover:text-cyan-200"
+                                    >
+                                      A
+                                    </button>
+                                  </>
+                                ) : null}
                                 <button
                                   type="button"
                                   title={t("time.addSickDay")}
@@ -2075,12 +2183,14 @@ export default function TimeTracking() {
               const dayYmd = format(day, "yyyy-MM-dd");
               const dayOffEntry = (entries ?? []).find(
                 (e) =>
-                  (e.category === "vacation" || e.category === "sick" || e.category === "holiday") &&
+                  isDayOffCategory(e.category ?? "work") &&
                   columnDayYmdForInstant(parseISO(e.startsAt), displayStartHour) === dayYmd
               );
               const dayOffCategory = dayOffEntry?.category ?? null;
               const dayOffColors: Record<string, { bg: string; text: string; border: string }> = {
                 vacation: { bg: "bg-emerald-500/8", text: "text-emerald-300", border: "border-emerald-500/25" },
+                extra_vacation: { bg: "bg-teal-500/8", text: "text-teal-300", border: "border-teal-500/25" },
+                comp_time: { bg: "bg-cyan-500/8", text: "text-cyan-300", border: "border-cyan-500/25" },
                 sick: { bg: "bg-orange-500/8", text: "text-orange-300", border: "border-orange-500/25" },
                 holiday: { bg: "bg-purple-500/8", text: "text-purple-300", border: "border-purple-500/25" },
               };
@@ -2262,7 +2372,7 @@ export default function TimeTracking() {
                         const isJob = e.kind === "job";
                         const isLocked = e.isLocked === true;
                         const cat = (e.category ?? "work") as TimeCategory;
-                        const isDayOff = cat === "vacation" || cat === "sick" || cat === "holiday";
+                        const isDayOff = isDayOffCategory(cat);
                         const jobKey = plannedJobKeyFromEntry(e);
                         const tourJobTitle =
                           isJob && e.tourShowId
@@ -2691,6 +2801,7 @@ export default function TimeTracking() {
         onDelete={(id) => deleteEntry.mutate(id)}
         deleting={deleteEntry.isPending}
         entrySummary={editingEntryJobSummary}
+        leaveManagementEnabled={leaveManagementEnabled}
       />
     </div>
   );

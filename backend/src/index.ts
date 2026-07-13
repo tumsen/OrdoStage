@@ -19,6 +19,7 @@ import toursRouter from "./routes/tours";
 import publicRouter from "./routes/public";
 import siteContentRouter from "./routes/site-content";
 import timeRouter from "./routes/time";
+import leaveRouter from "./routes/leave";
 import staffingRouter from "./routes/staffing";
 import accountRouter from "./routes/account";
 import roleDefinitionsRouter from "./routes/roleDefinitions";
@@ -281,6 +282,7 @@ app.route("/api", teamRouter);
 app.route("/api", toursRouter);
 app.route("/api", siteContentRouter);
 app.route("/api", timeRouter);
+app.route("/api", leaveRouter);
 app.route("/api", staffingRouter);
 app.route("/api", productionPlannerRouter);
 

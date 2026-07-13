@@ -11,6 +11,11 @@ import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { getCountryRuleSet, type TravelAllowanceType, type TravelClaimDayLine, type MileageVehicleType } from "../rules/countryRuleSets";
 import { isCountryFeatureEnabled } from "../countryFeatures";
 import {
+  applyTimeEntryToLeaveLedger,
+  getLeaveBalanceSummary,
+  removeTimeEntryFromLeaveLedger,
+} from "../services/leaveLedger";
+import {
   GoogleMapsNotConfiguredError,
   GoogleMapsRouteNotFoundError,
   googleRouteDistanceKm,
@@ -95,6 +100,35 @@ async function syncEventShowTimeProjects(organizationId: string) {
     });
     await archiveLegacyTourShowProjects(organizationId, tour.id, tourProjectId);
   }
+}
+
+async function maybeSyncLeaveLedger(
+  organizationId: string,
+  entry: {
+    id: string;
+    organizationId: string;
+    personId: string;
+    startsAt: Date;
+    endsAt: Date;
+    category: string;
+  },
+  userId?: string | null
+) {
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { countryFeatures: true },
+  });
+  if (!isCountryFeatureEnabled(org?.countryFeatures, "DK", "leaveManagement")) return;
+  await applyTimeEntryToLeaveLedger(entry, { createdByUserId: userId });
+}
+
+async function maybeRemoveLeaveLedger(timeEntryId: string, organizationId: string) {
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { countryFeatures: true },
+  });
+  if (!isCountryFeatureEnabled(org?.countryFeatures, "DK", "leaveManagement")) return;
+  await removeTimeEntryFromLeaveLedger(timeEntryId);
 }
 
 const toDateTimeFromDateAndTime = wallClockInstantFromDateIsoAndHHMM;
@@ -1353,6 +1387,8 @@ timeRouter.get("/time/report", async (c) => {
     personName: string;
     workMinutes: number;
     vacationMinutes: number;
+    extraVacationMinutes: number;
+    compTimeMinutes: number;
     sickMinutes: number;
     holidayMinutes: number;
     travelAllowanceMinutes: number;
@@ -1363,6 +1399,8 @@ timeRouter.get("/time/report", async (c) => {
   type DayAgg = {
     workMinutes: number;
     vacationMinutes: number;
+    extraVacationMinutes: number;
+    compTimeMinutes: number;
     sickMinutes: number;
     holidayMinutes: number;
     travelAllowanceMinutes: number;
@@ -1383,6 +1421,8 @@ timeRouter.get("/time/report", async (c) => {
         personName: row.person.name,
         workMinutes: 0,
         vacationMinutes: 0,
+        extraVacationMinutes: 0,
+        compTimeMinutes: 0,
         sickMinutes: 0,
         holidayMinutes: 0,
         travelAllowanceMinutes: 0,
@@ -1393,6 +1433,8 @@ timeRouter.get("/time/report", async (c) => {
     const pa = byPerson.get(row.personId)!;
     if (cat === "work") pa.workMinutes += durMin;
     else if (cat === "vacation") pa.vacationMinutes += durMin;
+    else if (cat === "extra_vacation") pa.extraVacationMinutes += durMin;
+    else if (cat === "comp_time") pa.compTimeMinutes += durMin;
     else if (cat === "sick") pa.sickMinutes += durMin;
     else if (cat === "holiday") pa.holidayMinutes += durMin;
     else if (cat === "travel_allowance") pa.travelAllowanceMinutes += durMin;
@@ -1415,6 +1457,8 @@ timeRouter.get("/time/report", async (c) => {
       byDay.set(dateKey, {
         workMinutes: 0,
         vacationMinutes: 0,
+        extraVacationMinutes: 0,
+        compTimeMinutes: 0,
         sickMinutes: 0,
         holidayMinutes: 0,
         travelAllowanceMinutes: 0,
@@ -1423,15 +1467,31 @@ timeRouter.get("/time/report", async (c) => {
     const dp = byDay.get(dateKey)!;
     if (cat === "work") dp.workMinutes += durMin;
     else if (cat === "vacation") dp.vacationMinutes += durMin;
+    else if (cat === "extra_vacation") dp.extraVacationMinutes += durMin;
+    else if (cat === "comp_time") dp.compTimeMinutes += durMin;
     else if (cat === "sick") dp.sickMinutes += durMin;
     else if (cat === "holiday") dp.holidayMinutes += durMin;
     else if (cat === "travel_allowance") dp.travelAllowanceMinutes += durMin;
   }
 
-  const byPersonArr = [...byPerson.entries()].map(([personId, pa]) => {
+  const leaveEnabled = await isCountryFeatureEnabled(
+    (
+      await prisma.organization.findUnique({
+        where: { id: user.organizationId },
+        select: { countryFeatures: true },
+      })
+    )?.countryFeatures,
+    "DK",
+    "leaveManagement"
+  );
+
+  const byPersonArr = await Promise.all(
+    [...byPerson.entries()].map(async ([personId, pa]) => {
     const total =
       pa.workMinutes +
       pa.vacationMinutes +
+      pa.extraVacationMinutes +
+      pa.compTimeMinutes +
       pa.sickMinutes +
       pa.holidayMinutes +
       pa.travelAllowanceMinutes;
@@ -1448,6 +1508,8 @@ timeRouter.get("/time/report", async (c) => {
       totalMinutes: total,
       workMinutes: pa.workMinutes,
       vacationMinutes: pa.vacationMinutes,
+      extraVacationMinutes: pa.extraVacationMinutes,
+      compTimeMinutes: pa.compTimeMinutes,
       sickMinutes: pa.sickMinutes,
       holidayMinutes: pa.holidayMinutes,
       travelAllowanceMinutes: pa.travelAllowanceMinutes,
@@ -1457,8 +1519,16 @@ timeRouter.get("/time/report", async (c) => {
       vacationDaysPerYear: pa.vacationDaysPerYear,
       vacationDaysUsed: pa.vacationDaysPerYear != null || pa.vacationMinutes > 0 ? vacationDaysUsed : null,
       vacationDaysRemaining,
+      leave: leaveEnabled
+        ? await getLeaveBalanceSummary(
+            user.organizationId!,
+            personId,
+            new Date(rangeEndExclusive.getTime() - 1)
+          )
+        : undefined,
     };
-  });
+  })
+  );
 
   const byProjectArr = [...byProject.entries()].map(([projectId, pp]) => ({
     projectId,
@@ -1474,11 +1544,15 @@ timeRouter.get("/time/report", async (c) => {
       totalMinutes:
         dp.workMinutes +
         dp.vacationMinutes +
+        dp.extraVacationMinutes +
+        dp.compTimeMinutes +
         dp.sickMinutes +
         dp.holidayMinutes +
         dp.travelAllowanceMinutes,
       workMinutes: dp.workMinutes,
       vacationMinutes: dp.vacationMinutes,
+      extraVacationMinutes: dp.extraVacationMinutes,
+      compTimeMinutes: dp.compTimeMinutes,
       sickMinutes: dp.sickMinutes,
       holidayMinutes: dp.holidayMinutes,
       travelAllowanceMinutes: dp.travelAllowanceMinutes,
@@ -1486,6 +1560,8 @@ timeRouter.get("/time/report", async (c) => {
 
   const summaryWork = byPersonArr.reduce((s, p) => s + p.workMinutes, 0);
   const summaryVac = byPersonArr.reduce((s, p) => s + p.vacationMinutes, 0);
+  const summaryExtraVac = byPersonArr.reduce((s, p) => s + p.extraVacationMinutes, 0);
+  const summaryComp = byPersonArr.reduce((s, p) => s + p.compTimeMinutes, 0);
   const summarySick = byPersonArr.reduce((s, p) => s + p.sickMinutes, 0);
   const summaryHoliday = byPersonArr.reduce((s, p) => s + p.holidayMinutes, 0);
   const summaryTravelAllowance = byPersonArr.reduce((s, p) => s + p.travelAllowanceMinutes, 0);
@@ -1510,9 +1586,17 @@ timeRouter.get("/time/report", async (c) => {
     data: {
       summary: {
         totalMinutes:
-          summaryWork + summaryVac + summarySick + summaryHoliday + summaryTravelAllowance,
+          summaryWork +
+          summaryVac +
+          summaryExtraVac +
+          summaryComp +
+          summarySick +
+          summaryHoliday +
+          summaryTravelAllowance,
         workMinutes: summaryWork,
         vacationMinutes: summaryVac,
+        extraVacationMinutes: summaryExtraVac,
+        compTimeMinutes: summaryComp,
         sickMinutes: summarySick,
         holidayMinutes: summaryHoliday,
         travelAllowanceMinutes: summaryTravelAllowance,
@@ -3341,6 +3425,18 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       });
     }
   }
+  await maybeSyncLeaveLedger(user.organizationId, created, user.id);
+  if (spans.length > 1) {
+    const extra = await prisma.timeEntry.findMany({
+      where: {
+        organizationId: user.organizationId,
+        personId: myPersonId,
+        segmentGroupId: nextGroupIdCustom ?? undefined,
+        id: { not: created.id },
+      },
+    });
+    for (const e of extra) await maybeSyncLeaveLedger(user.organizationId, e, user.id);
+  }
   return c.json({ data: serializeEntry(created) });
 });
 
@@ -3721,6 +3817,8 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
     });
   }
 
+  await maybeSyncLeaveLedger(user.organizationId, updated, user.id);
+
   return c.json({ data: serializeEntry(updated) });
 });
 
@@ -3765,6 +3863,7 @@ timeRouter.delete("/time/entries/:id", async (c) => {
       423
     );
   }
+  await maybeRemoveLeaveLedger(id, user.organizationId);
   await prisma.timeEntry.delete({ where: { id } });
   return c.json({ ok: true });
 });

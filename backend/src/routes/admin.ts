@@ -633,6 +633,7 @@ app.patch("/admin/orgs/:id/country-features", async (c) => {
   const countryFeatures = patchCountryFeatures(org.countryFeatures, body.country, {
     ...(body.travelAllowance !== undefined ? { travelAllowance: body.travelAllowance } : {}),
     ...(body.mileageAllowance !== undefined ? { mileageAllowance: body.mileageAllowance } : {}),
+    ...(body.leaveManagement !== undefined ? { leaveManagement: body.leaveManagement } : {}),
   });
   const updated = await prisma.organization.update({
     where: { id: orgId },

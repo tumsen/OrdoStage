@@ -97,6 +97,8 @@ const SCHEDULE_FILTER_LABELS: Record<ScheduleVisibilityFilterKey, string> = {
 const TIME_CATEGORY_LABELS: Record<TimeCategory, string> = {
   work: "Work time",
   vacation: "Vacation",
+  extra_vacation: "Extra vacation",
+  comp_time: "Comp time",
   sick: "Sick leave",
   holiday: "Holiday",
   travel_allowance: "Travel allowance",

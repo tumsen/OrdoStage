@@ -20,7 +20,7 @@ import { signOut } from "@/lib/auth-client";
 import { usePreferences } from "@/hooks/usePreferences";
 import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
 import { useI18n } from "@/lib/i18n";
-import type { Person, PersonDocument } from "../../../backend/src/types";
+import type { Person, PersonDocument, OrganizationLeavePolicy } from "../../../backend/src/types";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/AddressFields";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
@@ -117,6 +117,7 @@ export default function Account() {
   const [productionPlannerEnabled, setProductionPlannerEnabled] = useState(false);
   const [dkTravelAllowanceEnabled, setDkTravelAllowanceEnabled] = useState(false);
   const [dkMileageAllowanceEnabled, setDkMileageAllowanceEnabled] = useState(false);
+  const [dkLeaveManagementEnabled, setDkLeaveManagementEnabled] = useState(false);
 
   const [confirmPhrase, setConfirmPhrase] = useState("");
   const [loading, setLoading] = useState(false);
@@ -200,6 +201,9 @@ export default function Account() {
     );
     setDkMileageAllowanceEnabled(
       isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "mileageAllowance")
+    );
+    setDkLeaveManagementEnabled(
+      isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "leaveManagement")
     );
   }, [orgFeatureData?.productionPlannerEnabled, orgFeatureData?.countryFeatures]);
 
@@ -299,7 +303,11 @@ export default function Account() {
   });
 
   const updateCountryFeaturesMutation = useMutation({
-    mutationFn: (patch: { travelAllowance?: boolean; mileageAllowance?: boolean }) =>
+    mutationFn: (patch: {
+      travelAllowance?: boolean;
+      mileageAllowance?: boolean;
+      leaveManagement?: boolean;
+    }) =>
       api.patch<{ ok: boolean; countryFeatures: OrganizationCountryFeatures }>("/api/org/country-features", {
         country: "DK",
         ...patch,
@@ -310,6 +318,9 @@ export default function Account() {
       );
       setDkMileageAllowanceEnabled(
         isCountryFeatureEnabled(data.countryFeatures, "DK", "mileageAllowance")
+      );
+      setDkLeaveManagementEnabled(
+        isCountryFeatureEnabled(data.countryFeatures, "DK", "leaveManagement")
       );
       queryClient.invalidateQueries({ queryKey: ["org"] });
       queryClient.invalidateQueries({ queryKey: ["org", "features"] });
@@ -322,8 +333,58 @@ export default function Account() {
       setDkMileageAllowanceEnabled(
         isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "mileageAllowance")
       );
+      setDkLeaveManagementEnabled(
+        isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "leaveManagement")
+      );
       const msg = isApiError(e) ? e.message : "Could not update country feature.";
       toast({ title: "Feature update failed", description: msg, variant: "destructive" });
+    },
+  });
+
+  const { data: leavePolicy } = useQuery({
+    queryKey: ["org-leave-policy"],
+    queryFn: () => api.get<OrganizationLeavePolicy>("/api/org/leave-policy"),
+    enabled: canManageOrgFeatures && dkLeaveManagementEnabled,
+  });
+
+  const [leavePolicyDraft, setLeavePolicyDraft] = useState({
+    vacationYearStartMonth: "9",
+    vacationYearStartDay: "1",
+    defaultVacationDaysPerYear: "25",
+    defaultExtraVacationDays: "5",
+    defaultWeeklyContractHours: "37",
+    compTimeFromOvertimeEnabled: true,
+  });
+
+  useEffect(() => {
+    if (!leavePolicy) return;
+    setLeavePolicyDraft({
+      vacationYearStartMonth: String(leavePolicy.vacationYearStartMonth),
+      vacationYearStartDay: String(leavePolicy.vacationYearStartDay),
+      defaultVacationDaysPerYear: String(leavePolicy.defaultVacationDaysPerYear),
+      defaultExtraVacationDays: String(leavePolicy.defaultExtraVacationDays),
+      defaultWeeklyContractHours: String(leavePolicy.defaultWeeklyContractHours),
+      compTimeFromOvertimeEnabled: leavePolicy.compTimeFromOvertimeEnabled,
+    });
+  }, [leavePolicy]);
+
+  const saveLeavePolicyMutation = useMutation({
+    mutationFn: () =>
+      api.patch<OrganizationLeavePolicy>("/api/org/leave-policy", {
+        vacationYearStartMonth: parseInt(leavePolicyDraft.vacationYearStartMonth, 10),
+        vacationYearStartDay: parseInt(leavePolicyDraft.vacationYearStartDay, 10),
+        defaultVacationDaysPerYear: parseFloat(leavePolicyDraft.defaultVacationDaysPerYear),
+        defaultExtraVacationDays: parseFloat(leavePolicyDraft.defaultExtraVacationDays),
+        defaultWeeklyContractHours: parseFloat(leavePolicyDraft.defaultWeeklyContractHours),
+        compTimeFromOvertimeEnabled: leavePolicyDraft.compTimeFromOvertimeEnabled,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["org-leave-policy"] });
+      toast({ title: "Leave policy saved" });
+    },
+    onError: (e: unknown) => {
+      const msg = isApiError(e) ? e.message : "Could not save leave policy.";
+      toast({ title: "Save failed", description: msg, variant: "destructive" });
     },
   });
 
@@ -878,7 +939,117 @@ export default function Account() {
                 }}
               />
             </div>
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
+              <div>
+                <p className="text-sm text-white">
+                  {COUNTRY_FEATURE_CATALOG.DK.label}: {COUNTRY_FEATURE_CATALOG.DK.features.leaveManagement.label}
+                </p>
+                <p className="text-xs text-white/45">
+                  {COUNTRY_FEATURE_CATALOG.DK.features.leaveManagement.description}
+                </p>
+              </div>
+              <Switch
+                checked={dkLeaveManagementEnabled}
+                disabled={updateCountryFeaturesMutation.isPending}
+                onCheckedChange={(checked) => {
+                  setDkLeaveManagementEnabled(checked);
+                  updateCountryFeaturesMutation.mutate({ leaveManagement: checked });
+                }}
+              />
+            </div>
           </div>
+        </div>
+      ) : null}
+
+      {canManageOrgFeatures && dkLeaveManagementEnabled ? (
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-white">{t("time.leavePolicyTitle")}</p>
+            <p className="text-xs text-white/50 mt-1">{t("time.leavePolicyHint")}</p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-white/55 text-xs">{t("time.leavePolicyVacationYearStart")} (month)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                value={leavePolicyDraft.vacationYearStartMonth}
+                onChange={(e) =>
+                  setLeavePolicyDraft((s) => ({ ...s, vacationYearStartMonth: e.target.value }))
+                }
+                className="bg-white/5 border-white/10 text-white h-8"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/55 text-xs">{t("time.leavePolicyVacationYearStart")} (day)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={31}
+                value={leavePolicyDraft.vacationYearStartDay}
+                onChange={(e) =>
+                  setLeavePolicyDraft((s) => ({ ...s, vacationYearStartDay: e.target.value }))
+                }
+                className="bg-white/5 border-white/10 text-white h-8"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/55 text-xs">{t("time.leavePolicyDefaultVacation")}</Label>
+              <Input
+                type="number"
+                min={0}
+                value={leavePolicyDraft.defaultVacationDaysPerYear}
+                onChange={(e) =>
+                  setLeavePolicyDraft((s) => ({ ...s, defaultVacationDaysPerYear: e.target.value }))
+                }
+                className="bg-white/5 border-white/10 text-white h-8"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/55 text-xs">{t("time.leavePolicyDefaultExtraVacation")}</Label>
+              <Input
+                type="number"
+                min={0}
+                value={leavePolicyDraft.defaultExtraVacationDays}
+                onChange={(e) =>
+                  setLeavePolicyDraft((s) => ({ ...s, defaultExtraVacationDays: e.target.value }))
+                }
+                className="bg-white/5 border-white/10 text-white h-8"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/55 text-xs">{t("time.leavePolicyDefaultWeeklyHours")}</Label>
+              <Input
+                type="number"
+                min={0}
+                step={0.5}
+                value={leavePolicyDraft.defaultWeeklyContractHours}
+                onChange={(e) =>
+                  setLeavePolicyDraft((s) => ({ ...s, defaultWeeklyContractHours: e.target.value }))
+                }
+                className="bg-white/5 border-white/10 text-white h-8"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 sm:col-span-2 lg:col-span-1">
+              <Label className="text-white/55 text-xs">{t("time.leavePolicyCompFromOvertime")}</Label>
+              <Switch
+                checked={leavePolicyDraft.compTimeFromOvertimeEnabled}
+                onCheckedChange={(checked) =>
+                  setLeavePolicyDraft((s) => ({ ...s, compTimeFromOvertimeEnabled: checked }))
+                }
+              />
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="bg-white/10 hover:bg-white/15 text-white"
+            disabled={saveLeavePolicyMutation.isPending}
+            onClick={() => saveLeavePolicyMutation.mutate()}
+          >
+            Save leave policy
+          </Button>
         </div>
       ) : null}
 

@@ -75,6 +75,7 @@ export function TimeEntryEditSheet(props: {
   onDelete: (id: string) => void;
   deleting: boolean;
   entrySummary?: string | null;
+  leaveManagementEnabled?: boolean;
 }) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
@@ -93,6 +94,7 @@ export function TimeEntryEditSheet(props: {
     onDelete,
     deleting,
     entrySummary,
+    leaveManagementEnabled = false,
   } = props;
 
   const liveRangeRef = useRef(liveRange);
@@ -241,6 +243,12 @@ export function TimeEntryEditSheet(props: {
   const categoryOptions: { value: TimeCategory; label: string; color: string }[] = [
     { value: "work", label: t("time.categoryWork"), color: "text-blue-300" },
     { value: "vacation", label: t("time.categoryVacation"), color: "text-emerald-300" },
+    ...(leaveManagementEnabled
+      ? [
+          { value: "extra_vacation" as const, label: t("time.categoryExtraVacation"), color: "text-teal-300" },
+          { value: "comp_time" as const, label: t("time.categoryCompTime"), color: "text-cyan-300" },
+        ]
+      : []),
     { value: "sick", label: t("time.categorySick"), color: "text-orange-300" },
     { value: "holiday", label: t("time.categoryHoliday"), color: "text-purple-300" },
     { value: "travel_allowance", label: t("time.categoryTravelAllowance"), color: "text-amber-300" },

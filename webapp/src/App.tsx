@@ -33,6 +33,7 @@ const Schedule = lazy(() => import("./pages/Schedule"));
 const Staffing = lazy(() => import("./pages/Staffing"));
 const TimeTracking = lazy(() => import("./pages/TimeTracking"));
 const TimeReport = lazy(() => import("./pages/TimeReport"));
+const TimePayroll = lazy(() => import("./pages/TimePayroll"));
 const TimeParentCategoryCatalog = lazy(() => import("./pages/TimeParentCategoryCatalog"));
 const Login = lazy(() => import("./pages/Login"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
@@ -404,6 +405,16 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <TimeReport />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/time/payroll"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TimePayroll />
                 </Layout>
               </ProtectedRoute>
             }

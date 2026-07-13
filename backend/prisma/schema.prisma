@@ -146,6 +146,8 @@ model Organization {
   timeTravelClaims TimeTravelClaim[]
   timeMileageClaims TimeMileageClaim[]
   timesheetApprovals TimesheetApproval[]
+  leavePolicy        OrganizationLeavePolicy?
+  leaveTransactions  LeaveTransaction[]
 }
 
 model BillingConfig {
@@ -404,6 +406,9 @@ model Person {
   productionsLed     Production[]            @relation("ProductionLeadPerson")
   productionPhases   ProductionPhase[]       @relation("ProductionPhaseAssignee")
   productionAssignments ProductionPerson[]
+  leaveProfile       PersonLeaveProfile?
+  leaveBalances      LeaveBalance[]
+  leaveTransactions  LeaveTransaction[]
 }
 
 model PersonDocument {
@@ -1045,6 +1050,7 @@ model TimeEntry {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   tagLinks       TimeEntryTag[]
+  leaveTransactions LeaveTransaction[]
 
   @@index([organizationId, personId, startsAt])
   @@index([personId, startsAt])
@@ -1169,6 +1175,92 @@ model TimesheetApproval {
 
   @@unique([organizationId, personId, periodStart, periodEnd])
   @@index([organizationId, personId, status])
+}
+
+/** Org-wide leave defaults (Danish ferieår, norms, feriefridage). */
+model OrganizationLeavePolicy {
+  id                        String       @id @default(cuid())
+  organizationId            String       @unique
+  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  countryCode               String       @default("DK")
+  vacationYearStartMonth    Int          @default(9)
+  vacationYearStartDay      Int          @default(1)
+  defaultVacationDaysPerYear Float       @default(25)
+  defaultExtraVacationDays  Float        @default(5)
+  defaultWeeklyContractHours Float       @default(37)
+  /** contract_fifth | fixed */
+  hoursPerVacationDayMode   String       @default("contract_fifth")
+  hoursPerVacationDayFixed  Float?
+  compTimeFromOvertimeEnabled Boolean    @default(true)
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+  personProfiles            PersonLeaveProfile[]
+}
+
+/** Per-person leave settings and norm overrides. */
+model PersonLeaveProfile {
+  id                        String       @id @default(cuid())
+  personId                  String       @unique
+  person                    Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+  organizationId            String
+  leaveCountryCode          String       @default("DK")
+  useOrgDefaults            Boolean      @default(true)
+  weeklyContractHours       Float?
+  monthlyContractHours      Float?
+  annualContractHours       Float?
+  vacationDaysPerYear       Float?
+  extraVacationDaysPerYear  Float?
+  /** none | active */
+  sickLeaveStatus           String       @default("none")
+  sickLeaveNote             String?
+  organizationLeavePolicyId String?
+  organizationLeavePolicy   OrganizationLeavePolicy? @relation(fields: [organizationLeavePolicyId], references: [id], onDelete: SetNull)
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+/** Running leave balance per person, type, and vacation year. */
+model LeaveBalance {
+  id              String   @id @default(cuid())
+  organizationId  String
+  personId        String
+  person          Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  vacationYearKey String
+  /** vacation_earned | vacation_used | extra_vacation_used | comp_time_earned | comp_time_used | sick_days */
+  balanceType     String
+  /** Days for vacation types; minutes for comp_time; days for sick_days */
+  amount          Float    @default(0)
+  updatedAt       DateTime @updatedAt
+
+  @@unique([personId, vacationYearKey, balanceType])
+  @@index([organizationId, personId, vacationYearKey])
+}
+
+/** Audit log for leave balance changes. */
+model LeaveTransaction {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  personId        String
+  person          Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+  vacationYearKey String
+  balanceType     String
+  amount          Float
+  /** time_entry | overtime_accrual | manual_adjustment | opening_balance | reversal */
+  source          String
+  timeEntryId     String?
+  timeEntry       TimeEntry?   @relation(fields: [timeEntryId], references: [id], onDelete: SetNull)
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  note            String?
+  createdByUserId String?
+  createdAt       DateTime     @default(now())
+
+  @@index([organizationId, personId, vacationYearKey])
+  @@index([timeEntryId])
+  @@index([organizationId, personId, source, periodStart, periodEnd])
 }
 
 /** Budget / actual cost line for a show production (shown on production planner). */

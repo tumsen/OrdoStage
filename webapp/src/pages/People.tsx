@@ -58,6 +58,10 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSession } from "@/lib/auth-client";
+import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
+import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
+import { useI18n } from "@/lib/i18n";
+import type { LeaveBalanceSummary, PersonLeaveProfile } from "@/contracts/backendTypes";
 import {
   PersonDocumentListRow,
   type PersonDocumentListRowHandle,
@@ -297,11 +301,29 @@ function PersonFormDialog({
   const queryClient = useQueryClient();
   const { canWrite: canWriteOrg, canAction } = usePermissions();
   const canManageContracts = canAction("time.read_all");
+  const { t } = useI18n();
   const { data: session } = useSession();
 
   // Work contract state (separate from main form — saved independently)
   const [contractWeeklyHours, setContractWeeklyHours] = useState<string>("");
   const [contractVacationDays, setContractVacationDays] = useState<string>("");
+  const [leaveUseOrgDefaults, setLeaveUseOrgDefaults] = useState(true);
+  const [leaveExtraVacationDays, setLeaveExtraVacationDays] = useState("");
+  const [leaveMonthlyHours, setLeaveMonthlyHours] = useState("");
+  const [leaveAnnualHours, setLeaveAnnualHours] = useState("");
+  const [leaveSickStatus, setLeaveSickStatus] = useState<"none" | "active">("none");
+  const [leaveSickNote, setLeaveSickNote] = useState("");
+
+  const { data: orgFeatures } = useQuery({
+    queryKey: ["org", "features"],
+    queryFn: () => api.get<{ countryFeatures?: OrganizationCountryFeatures }>("/api/org"),
+    enabled: canManageContracts,
+  });
+  const leaveManagementEnabled = isCountryFeatureEnabled(
+    orgFeatures?.countryFeatures,
+    "DK",
+    "leaveManagement"
+  );
   const { data: teams } = useQuery({
     queryKey: ["departments"],
     queryFn: () => api.get<Team[]>("/api/departments"),
@@ -442,6 +464,15 @@ function PersonFormDialog({
     enabled: Boolean(person?.id),
   });
 
+  const { data: leaveProfileData } = useQuery({
+    queryKey: ["people", person?.id, "leave-profile"],
+    queryFn: () =>
+      api.get<{ profile: PersonLeaveProfile; leave: LeaveBalanceSummary }>(
+        `/api/people/${person!.id}/leave-profile`
+      ),
+    enabled: Boolean(person?.id) && canManageContracts && leaveManagementEnabled,
+  });
+
   const { data: permissionOptions } = useQuery<DocumentPermissionOptions>({
     queryKey: ["people", "documents", permissionsDoc?.id, "permission-options"],
     queryFn: () =>
@@ -475,6 +506,23 @@ function PersonFormDialog({
     setContractVacationDays(vacation);
     return { contractWeeklyHours: weekly, contractVacationDays: vacation };
   }, []);
+
+  useEffect(() => {
+    const profile = leaveProfileData?.profile;
+    if (!profile) return;
+    setLeaveUseOrgDefaults(profile.useOrgDefaults);
+    setLeaveExtraVacationDays(
+      profile.extraVacationDaysPerYear != null ? String(profile.extraVacationDaysPerYear) : ""
+    );
+    setLeaveMonthlyHours(
+      profile.monthlyContractHours != null ? String(profile.monthlyContractHours) : ""
+    );
+    setLeaveAnnualHours(
+      profile.annualContractHours != null ? String(profile.annualContractHours) : ""
+    );
+    setLeaveSickStatus(profile.sickLeaveStatus);
+    setLeaveSickNote(profile.sickLeaveNote ?? "");
+  }, [leaveProfileData?.profile]);
 
   const watchedAssignments = form.watch("teamAssignments");
   const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
@@ -788,7 +836,16 @@ function PersonFormDialog({
   const contractAutoSave = useAutoSave({
     enabled: Boolean(person?.id) && canManageContracts,
     resetKey: person?.id ? `${person.id}-contract` : null,
-    getSnapshot: () => ({ contractWeeklyHours, contractVacationDays }),
+    getSnapshot: () => ({
+      contractWeeklyHours,
+      contractVacationDays,
+      leaveUseOrgDefaults,
+      leaveExtraVacationDays,
+      leaveMonthlyHours,
+      leaveAnnualHours,
+      leaveSickStatus,
+      leaveSickNote,
+    }),
     save: async () => {
       const personId = person?.id;
       if (!personId) return;
@@ -800,6 +857,23 @@ function PersonFormDialog({
         weeklyContractHours: wh,
         vacationDaysPerYear: vd,
       });
+      if (leaveManagementEnabled) {
+        const extra =
+          leaveExtraVacationDays.trim() === "" ? null : parseFloat(leaveExtraVacationDays);
+        const monthly = leaveMonthlyHours.trim() === "" ? null : parseFloat(leaveMonthlyHours);
+        const annual = leaveAnnualHours.trim() === "" ? null : parseFloat(leaveAnnualHours);
+        await api.patch(`/api/people/${personId}/leave-profile`, {
+          useOrgDefaults: leaveUseOrgDefaults,
+          weeklyContractHours: wh,
+          vacationDaysPerYear: vd,
+          extraVacationDaysPerYear: extra,
+          monthlyContractHours: monthly,
+          annualContractHours: annual,
+          sickLeaveStatus: leaveSickStatus,
+          sickLeaveNote: leaveSickNote.trim() === "" ? null : leaveSickNote.trim(),
+        });
+        await queryClient.invalidateQueries({ queryKey: ["people", personId, "leave-profile"] });
+      }
       const updated = await api.get<Person>(`/api/people/${personId}`);
       queryClient.setQueryData(["people", personId], updated);
       onPersonUpdated?.(updated);
@@ -1272,10 +1346,26 @@ function PersonFormDialog({
                 className={`${cardClass} space-y-4 min-w-0`}
                 onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
               >
-                <p className={sectionTitle}>Work contract</p>
-                <p className="text-[11px] text-white/30">
-                  Used for overtime and vacation tracking in time reports.
+                <p className={sectionTitle}>
+                  {leaveManagementEnabled ? t("time.leaveProfileTitle") : "Work contract"}
                 </p>
+                <p className="text-[11px] text-white/30">
+                  {leaveManagementEnabled
+                    ? t("time.leaveProfileHint")
+                    : "Used for overtime and vacation tracking in time reports."}
+                </p>
+                {leaveManagementEnabled ? (
+                  <label className="flex items-center gap-2 text-xs text-white/55">
+                    <Checkbox
+                      checked={leaveUseOrgDefaults}
+                      onCheckedChange={(v) => {
+                        setLeaveUseOrgDefaults(v === true);
+                        contractAutoSave.schedule();
+                      }}
+                    />
+                    {t("time.leaveProfileUseOrgDefaults")}
+                  </label>
+                ) : null}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label className="text-white/55 text-xs">Weekly hours</Label>
@@ -1306,6 +1396,80 @@ function PersonFormDialog({
                     />
                   </div>
                 </div>
+                {leaveManagementEnabled ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-white/55 text-xs">{t("time.leaveProfileExtraVacation")}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={leaveExtraVacationDays}
+                        onChange={(e) => setLeaveExtraVacationDays(e.target.value)}
+                        onBlur={() => contractAutoSave.schedule()}
+                        placeholder="e.g. 5"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-white/55 text-xs">{t("time.leaveProfileMonthlyHours")}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={leaveMonthlyHours}
+                        onChange={(e) => setLeaveMonthlyHours(e.target.value)}
+                        onBlur={() => contractAutoSave.schedule()}
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-white/55 text-xs">{t("time.leaveProfileAnnualHours")}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={leaveAnnualHours}
+                        onChange={(e) => setLeaveAnnualHours(e.target.value)}
+                        onBlur={() => contractAutoSave.schedule()}
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-white/55 text-xs">{t("time.leaveProfileSickStatus")}</Label>
+                      <Select
+                        value={leaveSickStatus}
+                        onValueChange={(v) => {
+                          setLeaveSickStatus(v as "none" | "active");
+                          contractAutoSave.schedule();
+                        }}
+                      >
+                        <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                          <SelectItem value="none">{t("time.leaveProfileSickNone")}</SelectItem>
+                          <SelectItem value="active">{t("time.leaveProfileSickActive")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ) : null}
+                {leaveManagementEnabled && leaveProfileData?.leave ? (
+                  <div className="rounded border border-white/8 bg-white/[0.02] px-3 py-2 text-xs text-white/50 space-y-1">
+                    <p className="text-white/35 uppercase tracking-wide text-[10px]">{t("time.leaveBalancesTitle")}</p>
+                    <p>
+                      {t("time.leaveVacationRemaining")}:{" "}
+                      <span className="text-emerald-300 tabular-nums">
+                        {leaveProfileData.leave.vacationRemainingDays.toFixed(1)}d
+                      </span>
+                    </p>
+                    <p>
+                      {t("time.leaveCompRemaining")}:{" "}
+                      <span className="text-cyan-300 tabular-nums">
+                        {Math.floor(leaveProfileData.leave.compTimeRemainingMinutes / 60)}h{" "}
+                        {leaveProfileData.leave.compTimeRemainingMinutes % 60}m
+                      </span>
+                    </p>
+                  </div>
+                ) : null}
                 {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) ? (
                   <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
                     {[
@@ -1561,11 +1725,27 @@ function PersonFormDialog({
             onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
           >
             <div>
-              <p className={sectionTitle}>Work contract</p>
+              <p className={sectionTitle}>
+                {leaveManagementEnabled ? t("time.leaveProfileTitle") : "Work contract"}
+              </p>
               <p className="text-[11px] text-white/30 mt-0.5">
-                Used for overtime and vacation tracking in time reports.
+                {leaveManagementEnabled
+                  ? t("time.leaveProfileHint")
+                  : "Used for overtime and vacation tracking in time reports."}
               </p>
             </div>
+            {leaveManagementEnabled ? (
+              <label className="flex items-center gap-2 text-xs text-white/55">
+                <Checkbox
+                  checked={leaveUseOrgDefaults}
+                  onCheckedChange={(v) => {
+                    setLeaveUseOrgDefaults(v === true);
+                    contractAutoSave.schedule();
+                  }}
+                />
+                {t("time.leaveProfileUseOrgDefaults")}
+              </label>
+            ) : null}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-white/55 text-xs">Weekly hours</Label>
@@ -1596,6 +1776,39 @@ function PersonFormDialog({
                 />
               </div>
             </div>
+            {leaveManagementEnabled ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-white/55 text-xs">{t("time.leaveProfileExtraVacation")}</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={leaveExtraVacationDays}
+                    onChange={(e) => setLeaveExtraVacationDays(e.target.value)}
+                    onBlur={() => contractAutoSave.schedule()}
+                    className="bg-white/5 border-white/10 text-white h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-white/55 text-xs">{t("time.leaveProfileSickStatus")}</Label>
+                  <Select
+                    value={leaveSickStatus}
+                    onValueChange={(v) => {
+                      setLeaveSickStatus(v as "none" | "active");
+                      contractAutoSave.schedule();
+                    }}
+                  >
+                    <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                      <SelectItem value="none">{t("time.leaveProfileSickNone")}</SelectItem>
+                      <SelectItem value="active">{t("time.leaveProfileSickActive")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : null}
             {/* Derived display */}
             {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) && (
               <div className="grid grid-cols-3 gap-2 text-xs text-white/45">

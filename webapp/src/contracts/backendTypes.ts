@@ -8,6 +8,7 @@ export const DistanceUnitSchema = z.enum(["km", "mi"]);
 export const CountryFeatureFlagsSchema = z.object({
   travelAllowance: z.boolean().optional(),
   mileageAllowance: z.boolean().optional(),
+  leaveManagement: z.boolean().optional(),
 });
 
 export const OrganizationCountryFeaturesSchema = z.record(z.string(), CountryFeatureFlagsSchema);
@@ -16,6 +17,7 @@ export const PatchOrgCountryFeaturesSchema = z.object({
   country: z.string().length(2),
   travelAllowance: z.boolean().optional(),
   mileageAllowance: z.boolean().optional(),
+  leaveManagement: z.boolean().optional(),
 });
 
 export const UserPreferencesSchema = z.object({
@@ -1196,7 +1198,15 @@ export const TimeParentCategoryCatalogSchema = z.object({
   standaloneProjects: z.array(TimeProjectSchema),
 });
 
-export const TIME_CATEGORIES = ["work", "vacation", "sick", "holiday", "travel_allowance"] as const;
+export const TIME_CATEGORIES = [
+  "work",
+  "vacation",
+  "extra_vacation",
+  "comp_time",
+  "sick",
+  "holiday",
+  "travel_allowance",
+] as const;
 export type TimeCategory = (typeof TIME_CATEGORIES)[number];
 
 export const TimeEntrySchema = z.object({
@@ -1293,6 +1303,119 @@ export const LinkTimeParentCategoryItemSchema = z.object({
   type: z.enum(["event", "tour", "project"]),
   id: z.string().min(1),
   timeParentCategoryId: z.string().nullable(),
+});
+
+export const OrganizationLeavePolicySchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  countryCode: z.string(),
+  vacationYearStartMonth: z.number().int().min(1).max(12),
+  vacationYearStartDay: z.number().int().min(1).max(31),
+  defaultVacationDaysPerYear: z.number(),
+  defaultExtraVacationDays: z.number(),
+  defaultWeeklyContractHours: z.number(),
+  hoursPerVacationDayMode: z.enum(["contract_fifth", "fixed"]),
+  hoursPerVacationDayFixed: z.number().nullable(),
+  compTimeFromOvertimeEnabled: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const PatchOrganizationLeavePolicySchema = z.object({
+  countryCode: z.string().length(2).optional(),
+  vacationYearStartMonth: z.number().int().min(1).max(12).optional(),
+  vacationYearStartDay: z.number().int().min(1).max(31).optional(),
+  defaultVacationDaysPerYear: z.number().min(0).max(365).optional(),
+  defaultExtraVacationDays: z.number().min(0).max(365).optional(),
+  defaultWeeklyContractHours: z.number().min(0).max(168).optional(),
+  hoursPerVacationDayMode: z.enum(["contract_fifth", "fixed"]).optional(),
+  hoursPerVacationDayFixed: z.number().min(0).max(24).nullable().optional(),
+  compTimeFromOvertimeEnabled: z.boolean().optional(),
+});
+
+export const PersonLeaveProfileSchema = z.object({
+  id: z.string(),
+  personId: z.string(),
+  organizationId: z.string(),
+  leaveCountryCode: z.string(),
+  useOrgDefaults: z.boolean(),
+  weeklyContractHours: z.number().nullable(),
+  monthlyContractHours: z.number().nullable(),
+  annualContractHours: z.number().nullable(),
+  vacationDaysPerYear: z.number().nullable(),
+  extraVacationDaysPerYear: z.number().nullable(),
+  sickLeaveStatus: z.enum(["none", "active"]),
+  sickLeaveNote: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const PatchPersonLeaveProfileSchema = z.object({
+  useOrgDefaults: z.boolean().optional(),
+  weeklyContractHours: z.number().min(0).max(168).nullable().optional(),
+  monthlyContractHours: z.number().min(0).max(744).nullable().optional(),
+  annualContractHours: z.number().min(0).max(8760).nullable().optional(),
+  vacationDaysPerYear: z.number().min(0).max(365).nullable().optional(),
+  extraVacationDaysPerYear: z.number().min(0).max(365).nullable().optional(),
+  sickLeaveStatus: z.enum(["none", "active"]).optional(),
+  sickLeaveNote: z.string().nullable().optional(),
+});
+
+export const LeaveBalanceSummarySchema = z.object({
+  vacationYearKey: z.string(),
+  vacationEarnedDays: z.number(),
+  vacationUsedDays: z.number(),
+  vacationRemainingDays: z.number(),
+  extraVacationAllowanceDays: z.number(),
+  extraVacationUsedDays: z.number(),
+  extraVacationRemainingDays: z.number(),
+  compTimeEarnedMinutes: z.number(),
+  compTimeUsedMinutes: z.number(),
+  compTimeRemainingMinutes: z.number(),
+  sickDays: z.number(),
+});
+
+export const CreateLeaveAdjustmentSchema = z.object({
+  personId: z.string().min(1),
+  balanceType: z.enum([
+    "vacation_earned",
+    "vacation_used",
+    "extra_vacation_used",
+    "comp_time_earned",
+    "comp_time_used",
+    "sick_days",
+  ]),
+  amount: z.number(),
+  vacationYearKey: z.string().optional(),
+  note: z.string().min(1),
+});
+
+export const PayrollExportPersonSchema = z.object({
+  personId: z.string(),
+  personName: z.string(),
+  weeklyContractHours: z.number().nullable(),
+  monthlyContractHours: z.number().nullable(),
+  annualContractHours: z.number().nullable(),
+  workMinutes: z.number(),
+  overtimeMinutes: z.number().nullable(),
+  vacationEarnedDays: z.number(),
+  vacationUsedDays: z.number(),
+  vacationRemainingDays: z.number(),
+  extraVacationUsedDays: z.number(),
+  extraVacationRemainingDays: z.number(),
+  compTimeEarnedMinutes: z.number(),
+  compTimeUsedMinutes: z.number(),
+  compTimeRemainingMinutes: z.number(),
+  sickDays: z.number(),
+  timesheetApproved: z.boolean(),
+  leave: LeaveBalanceSummarySchema,
+});
+
+export const PayrollExportSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  vacationYearKey: z.string(),
+  people: z.array(PayrollExportPersonSchema),
 });
 
 export const CreateTimeEntrySchema = z.object({
@@ -1517,6 +1640,8 @@ export const TimeReportPersonSchema = z.object({
   totalMinutes: z.number(),
   workMinutes: z.number(),
   vacationMinutes: z.number(),
+  extraVacationMinutes: z.number(),
+  compTimeMinutes: z.number(),
   sickMinutes: z.number(),
   holidayMinutes: z.number(),
   travelAllowanceMinutes: z.number(),
@@ -1526,6 +1651,7 @@ export const TimeReportPersonSchema = z.object({
   vacationDaysPerYear: z.number().nullable(),
   vacationDaysUsed: z.number().nullable(),
   vacationDaysRemaining: z.number().nullable(),
+  leave: LeaveBalanceSummarySchema.optional(),
 });
 
 export const TimeReportProjectSchema = z.object({
@@ -1540,6 +1666,8 @@ export const TimeReportDaySchema = z.object({
   totalMinutes: z.number(),
   workMinutes: z.number(),
   vacationMinutes: z.number(),
+  extraVacationMinutes: z.number(),
+  compTimeMinutes: z.number(),
   sickMinutes: z.number(),
   holidayMinutes: z.number(),
   travelAllowanceMinutes: z.number(),
@@ -1566,6 +1694,8 @@ export const TimeReportSchema = z.object({
     totalMinutes: z.number(),
     workMinutes: z.number(),
     vacationMinutes: z.number(),
+    extraVacationMinutes: z.number(),
+    compTimeMinutes: z.number(),
     sickMinutes: z.number(),
     holidayMinutes: z.number(),
     travelAllowanceMinutes: z.number(),
@@ -1578,6 +1708,10 @@ export const TimeReportSchema = z.object({
   entries: z.array(TimeReportEntrySchema),
 });
 
+export type PayrollExport = z.infer<typeof PayrollExportSchema>;
+export type OrganizationLeavePolicy = z.infer<typeof OrganizationLeavePolicySchema>;
+export type PersonLeaveProfile = z.infer<typeof PersonLeaveProfileSchema>;
+export type LeaveBalanceSummary = z.infer<typeof LeaveBalanceSummarySchema>;
 export type TimeReport = z.infer<typeof TimeReportSchema>;
 export type TimeReportPerson = z.infer<typeof TimeReportPersonSchema>;
 export type TimeReportProject = z.infer<typeof TimeReportProjectSchema>;

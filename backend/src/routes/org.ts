@@ -575,6 +575,7 @@ app.patch("/org/country-features", async (c) => {
   const countryFeatures = patchCountryFeatures(existing.countryFeatures, body.country, {
     ...(body.travelAllowance !== undefined ? { travelAllowance: body.travelAllowance } : {}),
     ...(body.mileageAllowance !== undefined ? { mileageAllowance: body.mileageAllowance } : {}),
+    ...(body.leaveManagement !== undefined ? { leaveManagement: body.leaveManagement } : {}),
   });
   await prisma.organization.update({
     where: { id: user.organizationId },

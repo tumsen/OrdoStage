@@ -77,6 +77,8 @@ function fmtDate(iso: string): string {
 const CATEGORY_COLORS: Record<string, string> = {
   work: "#3b82f6",
   vacation: "#10b981",
+  extra_vacation: "#14b8a6",
+  comp_time: "#06b6d4",
   sick: "#f97316",
   holiday: "#a855f7",
   travelAllowance: "#d97706",
@@ -85,6 +87,8 @@ const CATEGORY_COLORS: Record<string, string> = {
 const CATEGORY_BG: Record<string, string> = {
   work: "bg-blue-500/20 text-blue-300 border-blue-500/30",
   vacation: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  extra_vacation: "bg-teal-500/20 text-teal-300 border-teal-500/30",
+  comp_time: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
   sick: "bg-orange-500/20 text-orange-300 border-orange-500/30",
   holiday: "bg-purple-500/20 text-purple-300 border-purple-500/30",
   travel_allowance: "bg-amber-500/20 text-amber-300 border-amber-500/30",
