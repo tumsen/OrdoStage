@@ -30,6 +30,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { isDayOffCategory } from "@/lib/timeCategoryI18n";
+import { isFullWorkDayDuration } from "@/lib/leaveNorms";
 import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
@@ -246,6 +247,10 @@ export function TimeEntryEditSheet(props: {
 
   const applyWorkDayDuration = (nextCategory: TimeCategory) => {
     if (!workDayDurationMinutes || !isDayOffCategory(nextCategory)) return;
+    setDayOffDurationMinutes(workDayDurationMinutes);
+  };
+
+  const setDayOffDurationMinutes = (minutes: number) => {
     const m = /^(\d{1,2}):(\d{2})$/.exec(startHm.trim());
     if (!m) return;
     const hh = Number(m[1]);
@@ -253,9 +258,21 @@ export function TimeEntryEditSheet(props: {
     if (!Number.isFinite(hh) || !Number.isFinite(mm)) return;
     const start = new Date();
     start.setHours(hh, mm, 0, 0);
-    const end = new Date(start.getTime() + workDayDurationMinutes * 60_000);
+    const end = new Date(start.getTime() + minutes * 60_000);
     setEndHm(hmFromDate(end));
   };
+
+  const isDayOff = isDayOffCategory(category);
+  const dayOffDurationMin = useMemo(() => {
+    if (!entry) return 0;
+    const startBase = parseISO(entry.startsAt);
+    const sExact = applyExactHm(startBase, startHm);
+    let eExact = applyExactHm(parseISO(entry.endsAt), endHm);
+    if (eExact.getTime() <= sExact.getTime()) {
+      eExact = new Date(eExact.getTime() + 24 * 60 * 60 * 1000);
+    }
+    return Math.max(1, Math.round((eExact.getTime() - sExact.getTime()) / 60000));
+  }, [entry, startHm, endHm]);
 
   const categoryOptions: { value: TimeCategory; label: string; color: string }[] = [
     { value: "work", label: t("time.categoryWork"), color: "text-blue-300" },
@@ -396,8 +413,44 @@ export function TimeEntryEditSheet(props: {
               />
             </div>
           </div>
+          {isDayOff && workDayDurationMinutes > 0 ? (
+            <div className="flex flex-wrap gap-2 -mt-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={entry?.isLocked}
+                className={cn(
+                  "border-white/15 text-white/75 bg-transparent hover:bg-white/5",
+                  isFullWorkDayDuration(dayOffDurationMin, workDayDurationMinutes) &&
+                    "border-ordo-yellow/50 bg-ordo-yellow/10 text-white"
+                )}
+                onClick={() => setDayOffDurationMinutes(workDayDurationMinutes)}
+              >
+                {t("time.dayOffSetFullDay")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={entry?.isLocked}
+                className={cn(
+                  "border-white/15 text-white/75 bg-transparent hover:bg-white/5",
+                  isFullWorkDayDuration(dayOffDurationMin, Math.round(workDayDurationMinutes / 2)) &&
+                    "border-ordo-yellow/50 bg-ordo-yellow/10 text-white"
+                )}
+                onClick={() =>
+                  setDayOffDurationMinutes(Math.round(workDayDurationMinutes / 2))
+                }
+              >
+                {t("time.dayOffSetHalfDay")}
+              </Button>
+            </div>
+          ) : null}
           {!isMobile ? (
-            <p className="text-[11px] text-white/40 -mt-1">{t("time.editTimePreciseHint")}</p>
+            <p className="text-[11px] text-white/40 -mt-1">
+              {isDayOff ? t("time.dayOffEditHint") : t("time.editTimePreciseHint")}
+            </p>
           ) : null}
 
           <div className="grid gap-1.5">

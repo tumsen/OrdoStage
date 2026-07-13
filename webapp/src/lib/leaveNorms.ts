@@ -20,3 +20,12 @@ export function formatWorkDayDuration(minutes: number): string {
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
 }
+
+/** True when a time entry spans a full contract work day (weekly ÷ 5). */
+export function isFullWorkDayDuration(
+  actualMinutes: number,
+  workDayMinutes: number
+): boolean {
+  if (workDayMinutes <= 0) return false;
+  return Math.abs(Math.round(actualMinutes) - workDayMinutes) < 1;
+}

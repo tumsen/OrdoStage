@@ -191,6 +191,11 @@ const en = {
     addCompTimeDay: "Add comp time",
     addSickDay: "Add sick day",
     dayOffFullDay: "Full day",
+    dayOffHalfDay: "Half day",
+    dayOffSetFullDay: "Full day",
+    dayOffSetHalfDay: "Half day",
+    dayOffEditHint:
+      "Default is a full work day. Adjust start and end — or use the shortcuts — for partial leave (e.g. half day). Leave balances update proportionally.",
     leavePolicyTitle: "Leave policy",
     leavePolicyHint: "Organization defaults for vacation year, norms, and comp time from overtime.",
     leavePolicyVacationYearStart: "Vacation year starts",
@@ -415,6 +420,11 @@ const da: DeepPartial<typeof en> = {
     leavePolicyTitle: "Fraværspolitik",
     leaveProfileTitle: "Fravær og norm",
     dayOffFullDay: "Hel dag",
+    dayOffHalfDay: "Halv dag",
+    dayOffSetFullDay: "Hel dag",
+    dayOffSetHalfDay: "Halv dag",
+    dayOffEditHint:
+      "Standard er en hel arbejdsdag. Juster start og slut — eller brug genvejene — ved delvis fravær (fx halv dag). Saldi opdateres forholdsmæssigt.",
     leaveTransactionLog: "Ændringslog",
     leaveAdjustmentSave: "Gem justering",
     leaveSource_manual_adjustment: "Manuel justering",

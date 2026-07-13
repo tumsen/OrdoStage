@@ -84,6 +84,7 @@ import { calendarDateKeyFromJobDate } from "@/lib/showTiming";
 import { addMinutesToUtcIso, wallClockYmdHhMmToUtcIso } from "@/lib/browserUserTime";
 import {
   formatWorkDayDuration,
+  isFullWorkDayDuration,
   workDayDurationMinutes,
 } from "@/lib/leaveNorms";
 import {
@@ -305,6 +306,24 @@ function formatDurationShort(totalMin: number, exact = false): string {
   const h = Math.floor(m / 60);
   const mm = m % 60;
   return mm > 0 ? `${h}h ${mm}m` : `${h}h`;
+}
+
+function dayOffDisplayParts(
+  startsAt: string,
+  endsAt: string,
+  workDayMinutes: number,
+  timeFormat: TimeFormat
+): { isFullDay: boolean; timeLabel: string; durationLabel: string } {
+  const s = parseISO(startsAt);
+  const e = parseISO(endsAt);
+  const durMin = Math.round((e.getTime() - s.getTime()) / 60000);
+  const isFullDay = isFullWorkDayDuration(durMin, workDayMinutes);
+  const tf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
+  return {
+    isFullDay,
+    timeLabel: isFullDay ? "full" : `${format(s, tf)} – ${format(e, tf)}`,
+    durationLabel: formatDurationShort(durMin, true),
+  };
 }
 
 /** Snap local wall-clock to grid for on-block labels. */
@@ -2154,9 +2173,34 @@ export default function TimeTracking() {
                             ) : null}
                           </div>
                           {dayOffEntry ? (
-                            <div className={cn("mt-1 text-[9px] font-medium capitalize", col?.text)}>
+                            <button
+                              type="button"
+                              disabled={!canEditVisiblePeriod}
+                              onClick={() => setEditingEntryId(dayOffEntry.id)}
+                              className={cn(
+                                "mt-1 text-[9px] font-medium text-left",
+                                col?.text,
+                                canEditVisiblePeriod && "hover:underline cursor-pointer"
+                              )}
+                            >
                               {t(timeCategoryMessageId(dayOffEntry.category as TimeCategory) as never)}
-                            </div>
+                              {(() => {
+                                const parts = dayOffDisplayParts(
+                                  dayOffEntry.startsAt,
+                                  dayOffEntry.endsAt,
+                                  workDayMinutes,
+                                  timeFormat
+                                );
+                                return (
+                                  <>
+                                    {" · "}
+                                    {parts.isFullDay ? t("time.dayOffFullDay") : parts.timeLabel}
+                                    {" · "}
+                                    {parts.durationLabel}
+                                  </>
+                                );
+                              })()}
+                            </button>
                           ) : null}
                         </div>
                       );
@@ -2377,13 +2421,21 @@ export default function TimeTracking() {
                             displayStartHour
                           );
                           if (!segment) return null;
+                          const dayOffDurMin = isDayOffEntry
+                            ? Math.round((spanEnd.getTime() - spanStart.getTime()) / 60000)
+                            : 0;
+                          const isFullDayOff =
+                            isDayOffEntry &&
+                            isFullWorkDayDuration(dayOffDurMin, workDayMinutes);
                           return {
                             id: e.id,
                             timeProjectId: e.timeProjectId,
                             start: spanStart,
                             end: spanEnd,
-                            topPct: isDayOffEntry ? 0 : segment.topPct,
-                            heightPct: isDayOffEntry ? 100 : Math.max(segment.heightPct, 0.35),
+                            topPct: isFullDayOff ? 0 : segment.topPct,
+                            heightPct: isFullDayOff
+                              ? 100
+                              : Math.max(segment.heightPct, 0.35),
                             data: e,
                           };
                         })
@@ -2409,6 +2461,14 @@ export default function TimeTracking() {
                         const isLocked = e.isLocked === true;
                         const cat = (e.category ?? "work") as TimeCategory;
                         const isDayOff = isDayOffCategory(cat);
+                        const dayOffParts = isDayOff
+                          ? dayOffDisplayParts(
+                              e.startsAt,
+                              e.endsAt,
+                              workDayMinutes,
+                              timeFormat
+                            )
+                          : null;
                         const jobKey = plannedJobKeyFromEntry(e);
                         const tourJobTitle =
                           isJob && e.tourShowId
@@ -2454,7 +2514,8 @@ export default function TimeTracking() {
                             className={cn(
                               "absolute rounded border px-1 pt-1 pb-2 text-[10px] overflow-hidden shadow-sm select-none",
                               timeEntryBlockSurfaceClass(cat, isJob, layout.stackIndex, layout.stackCount),
-                              isLocked ? "opacity-90" : ""
+                              isLocked ? "opacity-90" : "",
+                              isDayOff && canEditVisiblePeriod && !isLocked ? "cursor-pointer" : ""
                             )}
                             data-entry-block={e.id}
                             style={{
@@ -2466,6 +2527,11 @@ export default function TimeTracking() {
                               ...(projStripe
                                 ? { boxShadow: `inset 4px 0 0 0 ${projStripe}` }
                                 : {}),
+                            }}
+                            onClick={(ev) => {
+                              if (!canEditVisiblePeriod || isLocked || !isDayOff) return;
+                              if ((ev.target as HTMLElement).closest("[data-handle]")) return;
+                              setEditingEntryId(e.id);
                             }}
                             onPointerDown={(ev) => {
                               if (!canEditVisiblePeriod) return;
@@ -2568,9 +2634,12 @@ export default function TimeTracking() {
                             ) : null}
                             {label ? <div className="font-medium truncate pr-4">{label}</div> : null}
                             <div className="text-[9px] tabular-nums text-white/90 leading-tight pr-4">
-                              {isDayOff ? (
+                              {isDayOff && dayOffParts ? (
                                 <>
-                                  {t("time.dayOffFullDay")} · {durationLabel}
+                                  {dayOffParts.isFullDay
+                                    ? t("time.dayOffFullDay")
+                                    : dayOffParts.timeLabel}{" "}
+                                  · {dayOffParts.durationLabel}
                                 </>
                               ) : (
                                 <>
