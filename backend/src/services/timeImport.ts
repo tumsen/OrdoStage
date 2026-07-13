@@ -283,6 +283,10 @@ async function buildTagIdLookup(organizationId: string, tagMappings: ImportTagMa
   return out;
 }
 
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
+}
+
 async function resolveTagIds(
   organizationId: string,
   externalTags: string[],
@@ -292,7 +296,7 @@ async function resolveTagIds(
   const mapByName = new Map(tagMappings.map((m) => [m.externalName, m]));
   const ids: string[] = [];
 
-  for (const ext of externalTags) {
+  for (const ext of uniqueStrings(externalTags)) {
     if (tagCache.has(ext)) {
       const cached = tagCache.get(ext);
       if (cached) ids.push(cached);
@@ -329,7 +333,7 @@ async function resolveTagIds(
     }
   }
 
-  return ids;
+  return uniqueStrings(ids);
 }
 
 export async function runTimerlyImport(input: {
@@ -432,9 +436,11 @@ export async function runTimerlyImport(input: {
       continue;
     }
 
-    const tagIds = slot.tags
-      .map((t) => tagLookup.get(t))
-      .filter((id): id is string => Boolean(id));
+    const tagIds = uniqueStrings(
+      slot.tags
+        .map((t) => tagLookup.get(t))
+        .filter((id): id is string => Boolean(id))
+    );
 
     creates.push({
       organizationId: input.organizationId,
@@ -563,14 +569,14 @@ export async function remapImportedEntries(input: {
         .filter(Boolean);
       const tagIds = await resolveTagIds(
         input.organizationId,
-        externalTags,
+        uniqueStrings(externalTags),
         input.tagMappings,
         tagCache
       );
       await prisma.timeEntryTag.deleteMany({ where: { timeEntryId: entry.id } });
       if (tagIds.length) {
         await prisma.timeEntryTag.createMany({
-          data: tagIds.map((timeTagId) => ({ timeEntryId: entry.id, timeTagId })),
+          data: uniqueStrings(tagIds).map((timeTagId) => ({ timeEntryId: entry.id, timeTagId })),
         });
       }
       tagsUpdated++;
