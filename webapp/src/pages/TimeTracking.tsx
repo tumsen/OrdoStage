@@ -29,6 +29,7 @@ import {
   MoreHorizontal,
   Pencil,
   BarChart2,
+  ArrowRightLeft,
   FolderKanban,
   FileSpreadsheet,
   Upload,
@@ -1646,6 +1647,19 @@ export default function TimeTracking() {
               >
                 <Upload className="h-4 w-4" />
                 {t("time.importLink")}
+              </Button>
+            </Link>
+          )}
+          {canManageTimeCatalog && (
+            <Link to="/time/bulk" className="hidden sm:inline-flex">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-white/15 text-white/60 hover:bg-white/5 gap-1.5"
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+                {t("time.bulkToolsLink")}
               </Button>
             </Link>
           )}

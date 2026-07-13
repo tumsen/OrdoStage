@@ -1471,6 +1471,37 @@ export const TimeImportBatchSchema = z.object({
   createdAt: z.string(),
 });
 
+export const BulkTimeEntryFilterSchema = z.object({
+  personId: z.string().optional(),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  projectId: z.string().nullable().optional(),
+  tagId: z.string().optional(),
+});
+
+export const BulkTimeEntryActionSchema = z.object({
+  /** Set/clear project on matching entries. */
+  setProjectId: z.string().nullable().optional(),
+  /** Set category on matching entries. If set to leave-type, project is cleared. */
+  setCategory: z.enum(TIME_CATEGORIES).optional(),
+  /** Add a tag to all matching entries. */
+  addTagId: z.string().optional(),
+  /** Remove a tag from all matching entries. */
+  removeTagId: z.string().optional(),
+});
+
+export const BulkTimeEntryUpdateSchema = z.object({
+  filter: BulkTimeEntryFilterSchema,
+  action: BulkTimeEntryActionSchema,
+});
+
+export const BulkMergeTagsSchema = z.object({
+  /** Merge fromTagId into toTagId across all entries, then optionally delete fromTagId. */
+  fromTagId: z.string().min(1),
+  toTagId: z.string().min(1),
+  deleteFromTag: z.boolean().optional().default(false),
+});
+
 export const LeaveTransactionSchema = z.object({
   id: z.string(),
   personId: z.string(),

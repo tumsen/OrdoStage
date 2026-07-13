@@ -50,6 +50,8 @@ import {
   SetPersonContractSchema,
   TIME_CATEGORIES,
   type TimeCategory,
+  BulkTimeEntryUpdateSchema,
+  BulkMergeTagsSchema,
 } from "../types";
 import {
   getClientWallClockZone,
@@ -1793,6 +1795,117 @@ timeRouter.delete("/time/tags/:id", async (c) => {
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
   await prisma.timeTag.delete({ where: { id } });
   return c.json({ ok: true });
+});
+
+timeRouter.post("/time/bulk-update", zValidator("json", BulkTimeEntryUpdateSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId || !user.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "time.manage_catalog")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const body = c.req.valid("json");
+
+  const where: any = { organizationId: user.organizationId, isLocked: false };
+  if (body.filter.personId) where.personId = body.filter.personId;
+  if (body.filter.projectId !== undefined) where.timeProjectId = body.filter.projectId;
+  if (body.filter.from || body.filter.to) {
+    where.startsAt = {
+      ...(body.filter.from ? { gte: new Date(`${body.filter.from}T00:00:00.000Z`) } : {}),
+      ...(body.filter.to ? { lte: new Date(`${body.filter.to}T23:59:59.999Z`) } : {}),
+    };
+  }
+  if (body.filter.tagId) {
+    where.tagLinks = { some: { timeTagId: body.filter.tagId } };
+  }
+
+  const data: any = {};
+  if (body.action.setProjectId !== undefined) {
+    data.timeProjectId = body.action.setProjectId;
+  }
+  if (body.action.setCategory) {
+    data.category = body.action.setCategory;
+    if (
+      body.action.setCategory !== "work" &&
+      body.action.setCategory !== "travel_allowance"
+    ) {
+      data.timeProjectId = null;
+    }
+  }
+
+  // Update the entries themselves
+  const updated = Object.keys(data).length ? await prisma.timeEntry.updateMany({ where, data }) : { count: 0 };
+
+  // Tag operations across matches
+  if (body.action.addTagId || body.action.removeTagId) {
+    const ids = await prisma.timeEntry.findMany({
+      where,
+      select: { id: true },
+      take: 5000,
+    });
+    const entryIds = ids.map((r) => r.id);
+    if (entryIds.length === 0) return c.json({ data: { updatedCount: updated.count } });
+
+    if (body.action.removeTagId) {
+      await prisma.timeEntryTag.deleteMany({
+        where: { timeEntryId: { in: entryIds }, timeTagId: body.action.removeTagId },
+      });
+    }
+    if (body.action.addTagId) {
+      // createMany with skipDuplicates avoids unique constraint errors
+      await prisma.timeEntryTag.createMany({
+        data: entryIds.map((timeEntryId) => ({ timeEntryId, timeTagId: body.action.addTagId! })),
+        skipDuplicates: true,
+      });
+    }
+  }
+
+  return c.json({ data: { updatedCount: updated.count } });
+});
+
+timeRouter.post("/time/tags/merge", zValidator("json", BulkMergeTagsSchema), async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId || !user.id) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "time.manage_catalog")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const body = c.req.valid("json");
+  if (body.fromTagId === body.toTagId) {
+    return c.json({ error: { message: "fromTagId and toTagId must differ", code: "BAD_REQUEST" } }, 400);
+  }
+
+  const [fromTag, toTag] = await Promise.all([
+    prisma.timeTag.findFirst({ where: { id: body.fromTagId, organizationId: user.organizationId }, select: { id: true } }),
+    prisma.timeTag.findFirst({ where: { id: body.toTagId, organizationId: user.organizationId }, select: { id: true } }),
+  ]);
+  if (!fromTag || !toTag) {
+    return c.json({ error: { message: "Tag not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const affected = await prisma.timeEntryTag.findMany({
+    where: { timeTagId: body.fromTagId, timeEntry: { organizationId: user.organizationId } },
+    select: { timeEntryId: true },
+  });
+  const entryIds = [...new Set(affected.map((a) => a.timeEntryId))];
+
+  if (entryIds.length) {
+    await prisma.timeEntryTag.createMany({
+      data: entryIds.map((timeEntryId) => ({ timeEntryId, timeTagId: body.toTagId })),
+      skipDuplicates: true,
+    });
+  }
+  const removed = await prisma.timeEntryTag.deleteMany({
+    where: { timeTagId: body.fromTagId, timeEntryId: { in: entryIds } },
+  });
+
+  if (body.deleteFromTag) {
+    await prisma.timeTag.delete({ where: { id: body.fromTagId } });
+  }
+
+  return c.json({ data: { mergedEntryCount: entryIds.length, removedLinks: removed.count } });
 });
 
 timeRouter.get("/time/parent-category-catalog", async (c) => {
