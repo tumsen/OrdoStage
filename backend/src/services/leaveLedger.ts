@@ -284,6 +284,86 @@ export async function accrueCompTimeFromOvertime(input: {
   });
 }
 
+export async function applyOpeningBalances(input: {
+  organizationId: string;
+  personId: string;
+  vacationYearKey?: string;
+  note: string;
+  createdByUserId?: string | null;
+  vacationRemainingDays?: number;
+  extraVacationRemainingDays?: number;
+  compTimeRemainingMinutes?: number;
+  sickDays?: number;
+}): Promise<LeaveBalanceSummary> {
+  const asOf = new Date();
+  const policyRow = await ensureOrgLeavePolicy(input.organizationId);
+  const policy = mapOrgLeavePolicy(policyRow);
+  const vacationYearKey =
+    input.vacationYearKey ?? resolveVacationYear(asOf, policy).key;
+
+  await syncVacationEarnedForPerson(input.organizationId, input.personId, asOf);
+
+  const profileRow = await prisma.personLeaveProfile.findUnique({
+    where: { personId: input.personId },
+  });
+  const person = await prisma.person.findFirst({
+    where: { id: input.personId, organizationId: input.organizationId },
+    select: { weeklyContractHours: true, vacationDaysPerYear: true },
+  });
+  const norms = resolveLeaveNorms(policy, mapPersonLeaveProfile(profileRow), person ?? undefined);
+
+  const rows = await prisma.leaveBalance.findMany({
+    where: { personId: input.personId, vacationYearKey },
+  });
+  const map: Record<string, number> = {};
+  for (const r of rows) map[r.balanceType] = r.amount;
+
+  const earned = accrueVacationEarnedDays(
+    norms,
+    resolveVacationYear(asOf, policy),
+    asOf
+  );
+  const current = summarizeLeaveBalances(vacationYearKey, norms, earned, map);
+
+  const postDelta = async (balanceType: LeaveBalanceType, delta: number) => {
+    if (Math.abs(delta) < 0.001) return;
+    await postLeaveTransaction({
+      organizationId: input.organizationId,
+      personId: input.personId,
+      vacationYearKey,
+      balanceType,
+      amount: delta,
+      source: "opening_balance",
+      note: input.note,
+      createdByUserId: input.createdByUserId ?? null,
+    });
+  };
+
+  if (input.vacationRemainingDays !== undefined) {
+    const delta = input.vacationRemainingDays - current.vacationRemainingDays;
+    await postDelta("vacation_earned", delta);
+  }
+
+  if (input.extraVacationRemainingDays !== undefined) {
+    const targetUsed =
+      norms.extraVacationDaysPerYear - input.extraVacationRemainingDays;
+    const delta = targetUsed - current.extraVacationUsedDays;
+    await postDelta("extra_vacation_used", delta);
+  }
+
+  if (input.compTimeRemainingMinutes !== undefined) {
+    const delta = input.compTimeRemainingMinutes - current.compTimeRemainingMinutes;
+    await postDelta("comp_time_earned", delta);
+  }
+
+  if (input.sickDays !== undefined) {
+    const delta = input.sickDays - current.sickDays;
+    await postDelta("sick_days", delta);
+  }
+
+  return getLeaveBalanceSummary(input.organizationId, input.personId, asOf);
+}
+
 export async function getLeaveBalanceSummary(
   organizationId: string,
   personId: string,

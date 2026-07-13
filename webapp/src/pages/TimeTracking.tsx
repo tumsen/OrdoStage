@@ -1865,6 +1865,7 @@ export default function TimeTracking() {
                 <LeaveLedgerMenu
                   personId={balancePersonId}
                   vacationYearKey={leaveBalances.vacationYearKey}
+                  leave={leaveBalances}
                   canAdjust={readAll}
                   variant="compact"
                 />

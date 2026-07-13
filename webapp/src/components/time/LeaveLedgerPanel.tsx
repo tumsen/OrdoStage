@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollText } from "lucide-react";
 import type { LeaveBalanceSummary, LeaveTransaction } from "@/contracts/backendTypes";
+import { LeaveOpeningBalanceForm } from "@/components/time/LeaveOpeningBalanceForm";
 
 const ADJUSTMENT_BALANCE_TYPES = [
   "vacation_earned",
@@ -56,20 +57,35 @@ function formatAmount(amount: number, balanceType: string): string {
 export function LeaveLedgerPanel(props: {
   personId: string;
   vacationYearKey?: string;
+  leave?: LeaveBalanceSummary | null;
   canAdjust: boolean;
   compact?: boolean;
   /** When false, skip fetching until opened (e.g. in a sheet). */
   enabled?: boolean;
   showTitle?: boolean;
+  showOpeningBalance?: boolean;
 }) {
-  const { personId, vacationYearKey, canAdjust, compact, enabled = true, showTitle = true } = props;
+  const {
+    personId,
+    vacationYearKey,
+    leave,
+    canAdjust,
+    compact,
+    enabled = true,
+    showTitle = true,
+    showOpeningBalance = true,
+  } = props;
   const { t } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [balanceType, setBalanceType] = useState<AdjustmentBalanceType>("vacation_earned");
   const [amount, setAmount] = useState("");
+  const [compAdjustHours, setCompAdjustHours] = useState("");
+  const [compAdjustMinutes, setCompAdjustMinutes] = useState("");
   const [note, setNote] = useState("");
+
+  const compTimeAdjustMode = isCompTimeType(balanceType);
 
   const qs = vacationYearKey
     ? `?vacationYearKey=${encodeURIComponent(vacationYearKey)}`
@@ -82,16 +98,31 @@ export function LeaveLedgerPanel(props: {
   });
 
   const adjustMutation = useMutation({
-    mutationFn: () =>
-      api.post<LeaveBalanceSummary>("/api/time/leave-adjustments", {
+    mutationFn: () => {
+      let parsedAmount: number;
+      if (compTimeAdjustMode) {
+        const h = compAdjustHours.trim() === "" ? 0 : parseFloat(compAdjustHours);
+        const m = compAdjustMinutes.trim() === "" ? 0 : parseInt(compAdjustMinutes, 10);
+        if (Number.isNaN(h) || Number.isNaN(m)) {
+          throw new Error(t("time.leaveOpeningBalanceInvalidCompTime"));
+        }
+        const sign = h < 0 || Object.is(h, -0) ? -1 : 1;
+        parsedAmount = h * 60 + sign * Math.abs(m);
+      } else {
+        parsedAmount = parseFloat(amount);
+      }
+      return api.post<LeaveBalanceSummary>("/api/time/leave-adjustments", {
         personId,
         balanceType,
-        amount: parseFloat(amount),
+        amount: parsedAmount,
         vacationYearKey,
         note: note.trim(),
-      }),
+      });
+    },
     onSuccess: () => {
       setAmount("");
+      setCompAdjustHours("");
+      setCompAdjustMinutes("");
       setNote("");
       queryClient.invalidateQueries({ queryKey: ["time-leave-transactions", personId] });
       queryClient.invalidateQueries({ queryKey: ["time-leave-balances", personId] });
@@ -117,6 +148,10 @@ export function LeaveLedgerPanel(props: {
 
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
+      {showOpeningBalance && leave && canAdjust ? (
+        <LeaveOpeningBalanceForm personId={personId} leave={leave} canEdit={canAdjust} compact={compact} />
+      ) : null}
+
       {showTitle ? (
         <p
           className={
@@ -150,15 +185,41 @@ export function LeaveLedgerPanel(props: {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] text-white/45">{t("time.leaveAdjustmentAmount")}</Label>
-              <Input
-                type="number"
-                step="any"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={isCompTimeType(balanceType) ? "60" : "1"}
-                className="h-8 bg-white/5 border-white/10 text-white text-xs"
-              />
+              <Label className="text-[10px] text-white/45">
+                {compTimeAdjustMode ? t("time.leaveAdjustmentCompTimeAmount") : t("time.leaveAdjustmentAmount")}
+              </Label>
+              {compTimeAdjustMode ? (
+                <div className="flex gap-1.5 items-center">
+                  <Input
+                    type="number"
+                    value={compAdjustHours}
+                    onChange={(e) => setCompAdjustHours(e.target.value)}
+                    placeholder="0"
+                    className="h-8 bg-white/5 border-white/10 text-white text-xs"
+                  />
+                  <span className="text-[10px] text-white/35">h</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={compAdjustMinutes}
+                    onChange={(e) => setCompAdjustMinutes(e.target.value)}
+                    placeholder="0"
+                    className="h-8 bg-white/5 border-white/10 text-white text-xs w-16"
+                  />
+                  <span className="text-[10px] text-white/35">m</span>
+                  <span className="text-[10px] text-white/30 ml-1">{t("time.leaveAdjustmentCompTimeHint")}</span>
+                </div>
+              ) : (
+                <Input
+                  type="number"
+                  step="any"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="1"
+                  className="h-8 bg-white/5 border-white/10 text-white text-xs"
+                />
+              )}
             </div>
           </div>
           <div className="space-y-1">
@@ -178,8 +239,9 @@ export function LeaveLedgerPanel(props: {
             disabled={
               adjustMutation.isPending ||
               !note.trim() ||
-              amount.trim() === "" ||
-              Number.isNaN(parseFloat(amount))
+              (compTimeAdjustMode
+                ? compAdjustHours.trim() === "" && compAdjustMinutes.trim() === ""
+                : amount.trim() === "" || Number.isNaN(parseFloat(amount)))
             }
             onClick={() => adjustMutation.mutate()}
           >
@@ -237,11 +299,20 @@ export function LeaveLedgerPanel(props: {
 export function LeaveLedgerMenu(props: {
   personId: string;
   vacationYearKey?: string;
+  leave?: LeaveBalanceSummary | null;
   canAdjust: boolean;
   /** Compact icon+label button for the time header strip. */
   variant?: "compact" | "default";
+  showOpeningBalance?: boolean;
 }) {
-  const { personId, vacationYearKey, canAdjust, variant = "default" } = props;
+  const {
+    personId,
+    vacationYearKey,
+    leave,
+    canAdjust,
+    variant = "default",
+    showOpeningBalance = true,
+  } = props;
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
@@ -273,9 +344,11 @@ export function LeaveLedgerMenu(props: {
           <LeaveLedgerPanel
             personId={personId}
             vacationYearKey={vacationYearKey}
+            leave={leave}
             canAdjust={canAdjust}
             enabled={open}
             showTitle={false}
+            showOpeningBalance={showOpeningBalance}
           />
         </div>
       </SheetContent>

@@ -10,8 +10,10 @@ import {
   CreateLeaveAdjustmentSchema,
   PatchOrganizationLeavePolicySchema,
   PatchPersonLeaveProfileSchema,
+  SetLeaveOpeningBalancesSchema,
 } from "../types";
 import {
+  applyOpeningBalances,
   ensureOrgLeavePolicy,
   ensurePersonLeaveProfile,
   getLeaveBalanceSummary,
@@ -246,6 +248,52 @@ leaveRouter.get("/time/leave-balances/:personId", async (c) => {
   const leave = await getLeaveBalanceSummary(user.organizationId, personId);
   return c.json({ data: leave });
 });
+
+leaveRouter.post(
+  "/time/leave-opening-balances",
+  zValidator("json", SetLeaveOpeningBalancesSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId || !user.id) {
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    }
+    if (!canAction(c, "time.read_all")) {
+      return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+    }
+    const body = c.req.valid("json");
+    const person = await prisma.person.findFirst({
+      where: { id: body.personId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+    if (!person) return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+
+    const hasField =
+      body.vacationRemainingDays !== undefined ||
+      body.extraVacationRemainingDays !== undefined ||
+      body.compTimeRemainingMinutes !== undefined ||
+      body.sickDays !== undefined;
+    if (!hasField) {
+      return c.json(
+        { error: { message: "At least one balance field is required", code: "BAD_REQUEST" } },
+        400
+      );
+    }
+
+    const leave = await applyOpeningBalances({
+      organizationId: user.organizationId,
+      personId: body.personId,
+      vacationYearKey: body.vacationYearKey,
+      note: body.note,
+      createdByUserId: user.id,
+      vacationRemainingDays: body.vacationRemainingDays,
+      extraVacationRemainingDays: body.extraVacationRemainingDays,
+      compTimeRemainingMinutes: body.compTimeRemainingMinutes,
+      sickDays: body.sickDays,
+    });
+
+    return c.json({ data: leave });
+  }
+);
 
 leaveRouter.post("/time/leave-adjustments", zValidator("json", CreateLeaveAdjustmentSchema), async (c) => {
   const user = c.get("user");
