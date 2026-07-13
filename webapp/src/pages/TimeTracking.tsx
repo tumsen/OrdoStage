@@ -2354,6 +2354,9 @@ export default function TimeTracking() {
                               : null;
                           const spanStart = preview?.start ?? parseISO(e.startsAt);
                           const spanEnd = preview?.end ?? parseISO(e.endsAt);
+                          const isDayOffEntry = isDayOffCategory(
+                            (e.category ?? "work") as TimeCategory
+                          );
                           const segment = rangeMetricsInColumn(
                             spanStart,
                             spanEnd,
@@ -2366,8 +2369,8 @@ export default function TimeTracking() {
                             timeProjectId: e.timeProjectId,
                             start: spanStart,
                             end: spanEnd,
-                            topPct: segment.topPct,
-                            heightPct: Math.max(segment.heightPct, 0.35),
+                            topPct: isDayOffEntry ? 0 : segment.topPct,
+                            heightPct: isDayOffEntry ? 100 : Math.max(segment.heightPct, 0.35),
                             data: e,
                           };
                         })
@@ -2454,6 +2457,7 @@ export default function TimeTracking() {
                             onPointerDown={(ev) => {
                               if (!canEditVisiblePeriod) return;
                               if (isLocked) return;
+                              if (isDayOff) return;
                               if ((ev.target as HTMLElement).closest("[data-handle]")) return;
                               ev.preventDefault();
                               registerDayColumnRef(
@@ -2551,7 +2555,15 @@ export default function TimeTracking() {
                             ) : null}
                             {label ? <div className="font-medium truncate pr-4">{label}</div> : null}
                             <div className="text-[9px] tabular-nums text-white/90 leading-tight pr-4">
-                              {startTimeLabel} – {endTimeLabel} · {durationLabel}
+                              {isDayOff ? (
+                                <>
+                                  {t("time.dayOffFullDay")} · {durationLabel}
+                                </>
+                              ) : (
+                                <>
+                                  {startTimeLabel} – {endTimeLabel} · {durationLabel}
+                                </>
+                              )}
                             </div>
                             {proj ? (
                               <div
@@ -2587,7 +2599,7 @@ export default function TimeTracking() {
                                 {e.note}
                               </div>
                             ) : null}
-                            {canEditVisiblePeriod ? (
+                            {canEditVisiblePeriod && !isDayOff ? (
                               <>
                                 <button
                                   type="button"

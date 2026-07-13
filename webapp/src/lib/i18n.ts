@@ -190,6 +190,7 @@ const en = {
     addExtraVacationDay: "Add extra vacation day",
     addCompTimeDay: "Add comp time",
     addSickDay: "Add sick day",
+    dayOffFullDay: "Full day",
     leavePolicyTitle: "Leave policy",
     leavePolicyHint: "Organization defaults for vacation year, norms, and comp time from overtime.",
     leavePolicyVacationYearStart: "Vacation year starts",
@@ -387,6 +388,7 @@ const da: DeepPartial<typeof en> = {
     addCompTimeDay: "Tilføj afspadsering",
     leavePolicyTitle: "Fraværspolitik",
     leaveProfileTitle: "Fravær og norm",
+    dayOffFullDay: "Hel dag",
   },
   account: {
     title: "Konto",
