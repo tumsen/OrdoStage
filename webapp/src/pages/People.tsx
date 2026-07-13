@@ -62,6 +62,7 @@ import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 import { useI18n } from "@/lib/i18n";
 import type { LeaveBalanceSummary, PersonLeaveProfile } from "@/contracts/backendTypes";
+import { LeaveLedgerPanel } from "@/components/time/LeaveLedgerPanel";
 import {
   PersonDocumentListRow,
   type PersonDocumentListRowHandle,
@@ -1469,6 +1470,13 @@ function PersonFormDialog({
                       </span>
                     </p>
                   </div>
+                ) : null}
+                {leaveManagementEnabled && person ? (
+                  <LeaveLedgerPanel
+                    personId={person.id}
+                    vacationYearKey={leaveProfileData?.leave?.vacationYearKey}
+                    canAdjust={canManageContracts}
+                  />
                 ) : null}
                 {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) ? (
                   <div className="grid grid-cols-3 gap-2 text-xs text-white/45">

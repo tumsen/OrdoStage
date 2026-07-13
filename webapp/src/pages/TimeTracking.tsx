@@ -63,6 +63,7 @@ import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
 import { TravelClaimsPanel } from "@/components/time/TravelClaimsPanel";
 import { MileageClaimsPanel } from "@/components/time/MileageClaimsPanel";
+import { LeaveLedgerPanel } from "@/components/time/LeaveLedgerPanel";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
@@ -1806,33 +1807,45 @@ export default function TimeTracking() {
       ) : null}
 
       {leaveManagementEnabled && leaveBalances && isTimeSection ? (
-        <div className="shrink-0 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap gap-x-4 gap-y-1">
-          <span className="text-white/40 font-medium">{t("time.leaveBalancesTitle")}</span>
-          <span>
-            {t("time.leaveVacationRemaining")}:{" "}
-            <span
-              className={cn(
-                "tabular-nums font-medium",
-                leaveBalances.vacationRemainingDays < 0 ? "text-red-300" : "text-emerald-300"
-              )}
-            >
-              {leaveBalances.vacationRemainingDays.toFixed(1)}d
+        <div className="shrink-0 space-y-2">
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap gap-x-4 gap-y-1">
+            <span className="text-white/40 font-medium">{t("time.leaveBalancesTitle")}</span>
+            <span>
+              {t("time.leaveVacationRemaining")}:{" "}
+              <span
+                className={cn(
+                  "tabular-nums font-medium",
+                  leaveBalances.vacationRemainingDays < 0 ? "text-red-300" : "text-emerald-300"
+                )}
+              >
+                {leaveBalances.vacationRemainingDays.toFixed(1)}d
+              </span>
             </span>
-          </span>
-          <span>
-            {t("time.leaveExtraRemaining")}:{" "}
-            <span className="tabular-nums text-teal-300 font-medium">
-              {leaveBalances.extraVacationRemainingDays.toFixed(1)}d
+            <span>
+              {t("time.leaveExtraRemaining")}:{" "}
+              <span className="tabular-nums text-teal-300 font-medium">
+                {leaveBalances.extraVacationRemainingDays.toFixed(1)}d
+              </span>
             </span>
-          </span>
-          <span>
-            {t("time.leaveCompRemaining")}:{" "}
-            <span className="tabular-nums text-cyan-300 font-medium">
-              {Math.floor(leaveBalances.compTimeRemainingMinutes / 60)}h{" "}
-              {leaveBalances.compTimeRemainingMinutes % 60}m
+            <span>
+              {t("time.leaveCompRemaining")}:{" "}
+              <span className="tabular-nums text-cyan-300 font-medium">
+                {Math.floor(leaveBalances.compTimeRemainingMinutes / 60)}h{" "}
+                {leaveBalances.compTimeRemainingMinutes % 60}m
+              </span>
             </span>
-          </span>
-          <span className="text-white/35">({leaveBalances.vacationYearKey})</span>
+            <span className="text-white/35">({leaveBalances.vacationYearKey})</span>
+          </div>
+          {balancePersonId ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+              <LeaveLedgerPanel
+                personId={balancePersonId}
+                vacationYearKey={leaveBalances.vacationYearKey}
+                canAdjust={readAll}
+                compact
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 

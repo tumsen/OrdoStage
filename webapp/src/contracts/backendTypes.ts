@@ -1390,6 +1390,23 @@ export const CreateLeaveAdjustmentSchema = z.object({
   note: z.string().min(1),
 });
 
+export const LeaveTransactionSchema = z.object({
+  id: z.string(),
+  personId: z.string(),
+  vacationYearKey: z.string(),
+  balanceType: z.string(),
+  amount: z.number(),
+  source: z.string(),
+  note: z.string().nullable(),
+  timeEntryId: z.string().nullable(),
+  periodStart: z.string().nullable(),
+  periodEnd: z.string().nullable(),
+  createdByUserId: z.string().nullable(),
+  createdByName: z.string().nullable(),
+  createdByEmail: z.string().nullable(),
+  createdAt: z.string(),
+});
+
 export const PayrollExportPersonSchema = z.object({
   personId: z.string(),
   personName: z.string(),
@@ -1712,6 +1729,7 @@ export type PayrollExport = z.infer<typeof PayrollExportSchema>;
 export type OrganizationLeavePolicy = z.infer<typeof OrganizationLeavePolicySchema>;
 export type PersonLeaveProfile = z.infer<typeof PersonLeaveProfileSchema>;
 export type LeaveBalanceSummary = z.infer<typeof LeaveBalanceSummarySchema>;
+export type LeaveTransaction = z.infer<typeof LeaveTransactionSchema>;
 export type TimeReport = z.infer<typeof TimeReportSchema>;
 export type TimeReportPerson = z.infer<typeof TimeReportPersonSchema>;
 export type TimeReportProject = z.infer<typeof TimeReportProjectSchema>;

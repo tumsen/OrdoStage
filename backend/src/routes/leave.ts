@@ -1,9 +1,11 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { prisma } from "../prisma";
 import { auth } from "../auth";
 import { canAction, canView } from "../requestRole";
 import { isCountryFeatureEnabled } from "../countryFeatures";
+import { isPostgresDatabaseUrl } from "../databaseUrl";
 import {
   CreateLeaveAdjustmentSchema,
   PatchOrganizationLeavePolicySchema,
@@ -51,6 +53,32 @@ async function leaveEnabled(organizationId: string) {
     select: { countryFeatures: true },
   });
   return isCountryFeatureEnabled(org?.countryFeatures, "DK", "leaveManagement");
+}
+
+async function resolvePersonIdForUser(organizationId: string, email: string | null | undefined) {
+  if (!email?.trim()) return null;
+  let person = await prisma.person.findFirst({
+    where: { organizationId, email },
+    select: { id: true },
+  });
+  if (!person && isPostgresDatabaseUrl(process.env.DATABASE_URL)) {
+    person = await prisma.person.findFirst({
+      where: { organizationId, email: { equals: email, mode: "insensitive" } },
+      select: { id: true },
+    });
+  }
+  return person?.id ?? null;
+}
+
+async function canReadPersonLeave(
+  c: Context,
+  personId: string,
+  organizationId: string,
+  userEmail: string | null | undefined
+) {
+  if (canAction(c, "time.read_all")) return true;
+  const myPersonId = await resolvePersonIdForUser(organizationId, userEmail);
+  return myPersonId === personId;
 }
 
 leaveRouter.get("/org/leave-policy", async (c) => {
@@ -211,6 +239,10 @@ leaveRouter.get("/time/leave-balances/:personId", async (c) => {
     select: { id: true },
   });
   if (!person) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  const allowed = await canReadPersonLeave(c, personId, user.organizationId, user.email);
+  if (!allowed) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
   const leave = await getLeaveBalanceSummary(user.organizationId, personId);
   return c.json({ data: leave });
 });
@@ -248,6 +280,70 @@ leaveRouter.post("/time/leave-adjustments", zValidator("json", CreateLeaveAdjust
 
   const leave = await getLeaveBalanceSummary(user.organizationId, body.personId);
   return c.json({ data: leave });
+});
+
+leaveRouter.get("/time/leave-transactions/:personId", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canView(c, "time")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const personId = c.req.param("personId");
+  const person = await prisma.person.findFirst({
+    where: { id: personId, organizationId: user.organizationId },
+    select: { id: true },
+  });
+  if (!person) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  const allowed = await canReadPersonLeave(c, personId, user.organizationId, user.email);
+  if (!allowed) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+
+  const vacationYearKey = c.req.query("vacationYearKey");
+  const rows = await prisma.leaveTransaction.findMany({
+    where: {
+      organizationId: user.organizationId,
+      personId,
+      ...(vacationYearKey ? { vacationYearKey } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+
+  const userIds = [...new Set(rows.map((r) => r.createdByUserId).filter(Boolean))] as string[];
+  const users =
+    userIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+  const userById = new Map(users.map((u) => [u.id, u]));
+
+  const data = rows.map((r) => {
+    const creator = r.createdByUserId ? userById.get(r.createdByUserId) : undefined;
+    return {
+      id: r.id,
+      personId: r.personId,
+      vacationYearKey: r.vacationYearKey,
+      balanceType: r.balanceType,
+      amount: r.amount,
+      source: r.source,
+      note: r.note,
+      timeEntryId: r.timeEntryId,
+      periodStart: r.periodStart ? iso(r.periodStart) : null,
+      periodEnd: r.periodEnd ? iso(r.periodEnd) : null,
+      createdByUserId: r.createdByUserId,
+      createdByName: creator?.name ?? null,
+      createdByEmail: creator?.email ?? null,
+      createdAt: iso(r.createdAt),
+    };
+  });
+
+  return c.json({ data });
 });
 
 leaveRouter.get("/time/payroll-export", async (c) => {
