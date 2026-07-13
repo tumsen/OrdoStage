@@ -57,7 +57,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useI18n } from "@/lib/i18n";
 import { toast, useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { timeCategoryMessageId, isDayOffCategory } from "@/lib/timeCategoryI18n";
+import { timeCategoryMessageId, isDayOffCategory, isLeaveAutoProjectCategory } from "@/lib/timeCategoryI18n";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
@@ -2472,9 +2472,10 @@ export default function TimeTracking() {
                                 tourJobTitle ??
                                 t("time.job")
                               : "";
-                        const projEntity = e.timeProjectId
-                          ? projectById.get(e.timeProjectId)
-                          : undefined;
+                        const projEntity =
+                          !isLeaveAutoProjectCategory(cat) && e.timeProjectId
+                            ? projectById.get(e.timeProjectId)
+                            : undefined;
                         const projStripe = projEntity
                           ? displayHex(projEntity.color, projEntity.id)
                           : null;

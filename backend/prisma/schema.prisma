@@ -999,6 +999,8 @@ model TimeProject {
   tourShow       TourShow?    @relation(fields: [tourShowId], references: [id], onDelete: SetNull)
   timeParentCategoryId String?
   timeParentCategory   TimeParentCategory? @relation(fields: [timeParentCategoryId], references: [id], onDelete: SetNull)
+  /** Stable key for org system projects (e.g. leave_vacation). */
+  systemKey      String?
   isArchived     Boolean      @default(false)
   sortOrder      Int          @default(0)
   createdAt      DateTime     @default(now())
@@ -1011,6 +1013,7 @@ model TimeProject {
   @@index([tourId])
   @@index([tourShowId])
   @@index([timeParentCategoryId])
+  @@unique([organizationId, systemKey])
 }
 
 model TimeEntry {

@@ -1163,6 +1163,7 @@ export const TimeProjectSchema = z.object({
   tourId: z.string().nullable(),
   tourShowId: z.string().nullable(),
   timeParentCategoryId: z.string().nullable(),
+  systemKey: z.string().nullable(),
   isArchived: z.boolean(),
   sortOrder: z.number(),
   createdAt: z.string(),

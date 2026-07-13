@@ -184,7 +184,7 @@ export function TimeCatalogSettings() {
             </Button>
           </div>
           <ul className="space-y-1.5 text-sm">
-            {(projects ?? []).map((x) => (
+            {(projects ?? []).filter((x) => !x.systemKey).map((x) => (
               <li
                 key={x.id}
                 className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5"

@@ -19,6 +19,18 @@ export const DAY_OFF_CATEGORIES: TimeCategory[] = [
   "holiday",
 ];
 
+/** Leave types that always map to a system time project (not user-selectable). */
+export const LEAVE_AUTO_PROJECT_CATEGORIES = [
+  "vacation",
+  "extra_vacation",
+  "sick",
+  "comp_time",
+] as const satisfies readonly TimeCategory[];
+
+export function isLeaveAutoProjectCategory(cat: string): cat is TimeCategory {
+  return (LEAVE_AUTO_PROJECT_CATEGORIES as readonly string[]).includes(cat);
+}
+
 export function isDayOffCategory(cat: string): cat is TimeCategory {
   return (DAY_OFF_CATEGORIES as string[]).includes(cat);
 }

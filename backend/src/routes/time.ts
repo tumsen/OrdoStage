@@ -17,6 +17,12 @@ import {
   removeTimeEntryFromLeaveLedger,
 } from "../services/leaveLedger";
 import {
+  backfillLeaveEntryProjects,
+  ensureAllLeaveTimeProjects,
+  isLeaveSystemProjectKey,
+  resolveEntryTimeProjectId,
+} from "../services/leaveTimeProjects";
+import {
   GoogleMapsNotConfiguredError,
   GoogleMapsRouteNotFoundError,
   googleRouteDistanceKm,
@@ -912,6 +918,7 @@ function serializeProject(row: {
   tourId: string | null;
   tourShowId: string | null;
   timeParentCategoryId: string | null;
+  systemKey: string | null;
   isArchived: boolean;
   sortOrder: number;
   createdAt: Date;
@@ -1955,6 +1962,8 @@ timeRouter.get("/time/projects", async (c) => {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
   await syncEventShowTimeProjects(user.organizationId);
+  await ensureAllLeaveTimeProjects(user.organizationId);
+  await backfillLeaveEntryProjects(user.organizationId);
   const archived = c.req.query("archived") === "1";
   const rows = await prisma.timeProject.findMany({
     where: {
@@ -2078,6 +2087,17 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
     where: { id, organizationId: user.organizationId },
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  if (isLeaveSystemProjectKey(existing.systemKey)) {
+    return c.json(
+      {
+        error: {
+          message: "System leave projects cannot be edited.",
+          code: "FORBIDDEN",
+        },
+      },
+      403
+    );
+  }
   if (body.eventShowId !== undefined && body.eventShowId !== null) {
     const show = await prisma.eventShow.findFirst({
       where: {
@@ -2168,6 +2188,17 @@ timeRouter.delete("/time/projects/:id", async (c) => {
     where: { id, organizationId: user.organizationId },
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  if (isLeaveSystemProjectKey(existing.systemKey)) {
+    return c.json(
+      {
+        error: {
+          message: "System leave projects cannot be deleted.",
+          code: "FORBIDDEN",
+        },
+      },
+      403
+    );
+  }
   await prisma.timeProject.delete({ where: { id } });
   return c.json({ ok: true });
 });
@@ -3338,7 +3369,18 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
     });
     if (!ev) return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
-  if (body.timeProjectId) {
+  const entryCategory = body.category ?? "work";
+  const resolvedCustomProjectId = await resolveEntryTimeProjectId(
+    user.organizationId,
+    entryCategory,
+    body.timeProjectId ?? null
+  );
+  if (resolvedCustomProjectId) {
+    const p = await prisma.timeProject.findFirst({
+      where: { id: resolvedCustomProjectId, organizationId: user.organizationId },
+    });
+    if (!p) return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
+  } else if (body.timeProjectId) {
     const p = await prisma.timeProject.findFirst({
       where: { id: body.timeProjectId, organizationId: user.organizationId },
     });
@@ -3383,7 +3425,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       startsAt: primary.startsAt,
       endsAt: primary.endsAt,
       kind: "custom",
-      category: body.category ?? "work",
+      category: entryCategory,
       eventShowJobId: null,
       eventId,
       tourShowId: null,
@@ -3391,7 +3433,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       eventShowStaffingId: null,
       internalBookingPersonId: null,
       internalBookingDayKey: null,
-      timeProjectId: body.timeProjectId ?? null,
+      timeProjectId: resolvedCustomProjectId,
       note: body.note ?? null,
       isLocked: body.isLocked ?? false,
       ...segmentGroupPatchCustom,
@@ -3409,7 +3451,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           startsAt: s.startsAt,
           endsAt: s.endsAt,
           kind: "custom",
-          category: body.category ?? "work",
+          category: entryCategory,
           eventShowJobId: null,
           eventId,
           tourShowId: null,
@@ -3417,7 +3459,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           eventShowStaffingId: null,
           internalBookingPersonId: null,
           internalBookingDayKey: null,
-          timeProjectId: body.timeProjectId ?? null,
+          timeProjectId: resolvedCustomProjectId,
           note: body.note ?? null,
           isLocked: body.isLocked ?? false,
           ...segmentGroupPatchCustom,
@@ -3711,7 +3753,13 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
 
   const finalCategory = body.category ?? existing.category;
   const finalEventId = body.eventId !== undefined ? body.eventId : existing.eventId;
-  const finalProjectId = body.timeProjectId !== undefined ? body.timeProjectId : existing.timeProjectId;
+  const requestedProjectId =
+    body.timeProjectId !== undefined ? body.timeProjectId : existing.timeProjectId;
+  const finalProjectId = await resolveEntryTimeProjectId(
+    user.organizationId,
+    finalCategory,
+    requestedProjectId
+  );
   const finalNote = body.note !== undefined ? body.note : existing.note;
   const finalIsLocked = body.isLocked !== undefined ? body.isLocked : existing.isLocked;
   const finalTagIds = body.tagIds !== undefined ? body.tagIds : existing.tagLinks.map((t) => t.timeTagId);
