@@ -1431,8 +1431,8 @@ export default function TimeTracking() {
       {!mobileDaySchedule ? (
       <div className="relative z-20 shrink-0 bg-[#0a0a0f] pb-0">
         <div className="flex flex-col gap-2 w-full">
-          {/* Desktop: fixed slots so controls never shift position */}
-          <div className="hidden sm:grid grid-cols-[auto_auto_auto_auto_1fr_auto_auto_auto] items-center gap-2">
+          {/* Desktop: stable slots, but wrap responsively (no overflow off-screen). */}
+          <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:gap-2">
           <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
             <button
               type="button"
@@ -1476,36 +1476,6 @@ export default function TimeTracking() {
             ) : null}
           </div>
           {isTimeSection ? (
-          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
-            <button
-              type="button"
-              onClick={() => {
-                setMode("week");
-                setSection("time");
-              }}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-sm",
-                mode === "week" ? "bg-white/10 text-white" : "text-white/55"
-              )}
-            >
-              {t("time.week")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode("month");
-                setSection("time");
-              }}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-sm",
-                mode === "month" ? "bg-white/10 text-white" : "text-white/55"
-              )}
-            >
-              {t("time.month")}
-            </button>
-          </div>
-          ) : null}
-          {isTimeSection ? (
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">
             <Label className="text-[10px] uppercase tracking-wide text-white/45 whitespace-nowrap">
               {t("time.gridStartsAt")}
@@ -1528,7 +1498,7 @@ export default function TimeTracking() {
           </div>
           ) : null}
           {/* Date nav slot */}
-          <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
+          <div className="flex items-center gap-2 shrink-0">
           <Button
             type="button"
             variant="outline"
@@ -1572,9 +1542,36 @@ export default function TimeTracking() {
           >
             Today
           </Button>
+          {/* Week/month toggle lives next to date navigation (like before). */}
+          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setMode("week")}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                mode === "week" ? "bg-white/10 text-white" : "text-white/55"
+              )}
+            >
+              {t("time.week")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSection("time");
+                setMode("month");
+              }}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                mode === "month" ? "bg-white/10 text-white" : "text-white/55",
+                section !== "time" && "opacity-60"
+              )}
+            >
+              {t("time.month")}
+            </button>
+          </div>
           </div>
           {/* Period label slot (fixed width) */}
-          <div className="w-[260px] text-xs text-white/50 tabular-nums whitespace-nowrap overflow-hidden text-ellipsis">
+          <div className="w-[260px] max-w-full text-xs text-white/50 tabular-nums whitespace-nowrap overflow-hidden text-ellipsis">
             {mode === "week"
               ? `W${periodWeek} · ${format(weekStart, "d MMM", { locale: dfLocale })} – ${format(
                   weekEnd,
@@ -1584,7 +1581,13 @@ export default function TimeTracking() {
               : format(anchor, "MMMM yyyy", { locale: dfLocale })}
           </div>
           {/* Week total slot (reserved space, only visible in week mode + time section) */}
-          <div className={cn("w-[260px] text-xs tabular-nums whitespace-nowrap", isTimeSection && mode === "week" ? "text-white/60" : "text-white/0 select-none")} aria-hidden={!(isTimeSection && mode === "week")}>
+          <div
+            className={cn(
+              "w-[260px] max-w-full text-xs tabular-nums whitespace-nowrap overflow-hidden text-ellipsis",
+              isTimeSection && mode === "week" ? "text-white/60" : "text-white/0 select-none"
+            )}
+            aria-hidden={!(isTimeSection && mode === "week")}
+          >
             Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
             <span className={cn("text-white/35", !(isTimeSection && mode === "week") && "text-white/0")}> · </span>
             {formatTotalMinutesAsHHMM(weekTotalMinutes)}
@@ -1653,7 +1656,7 @@ export default function TimeTracking() {
           </div>
 
           {/* Desktop row 2: secondary links */}
-          <div className="hidden sm:flex flex-nowrap items-center gap-2 min-w-0 overflow-x-auto">
+          <div className="hidden sm:flex sm:flex-wrap items-center gap-2">
             {readAll ? (
               <Link to="/time/reports" className="shrink-0">
                 <Button
@@ -1765,36 +1768,32 @@ export default function TimeTracking() {
           >
             Today
           </Button>
-          {isTimeSection ? (
-            <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("week");
-                  setSection("time");
-                }}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-sm",
-                  mode === "week" ? "bg-white/10 text-white" : "text-white/55"
-                )}
-              >
-                {t("time.week")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("month");
-                  setSection("time");
-                }}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-sm",
-                  mode === "month" ? "bg-white/10 text-white" : "text-white/55"
-                )}
-              >
-                {t("time.month")}
-              </button>
-            </div>
-          ) : null}
+          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+            <button
+              type="button"
+              onClick={() => setMode("week")}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                mode === "week" ? "bg-white/10 text-white" : "text-white/55"
+              )}
+            >
+              {t("time.week")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSection("time");
+                setMode("month");
+              }}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                mode === "month" ? "bg-white/10 text-white" : "text-white/55",
+                section !== "time" && "opacity-60"
+              )}
+            >
+              {t("time.month")}
+            </button>
+          </div>
           {isTimeSection && mode === "week" ? (
             <span className="text-xs text-white/60 tabular-nums">
               Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
