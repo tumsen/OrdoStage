@@ -972,6 +972,8 @@ model TimeParentCategory {
   name           String
   /** Optional UI colour (#RRGGBB). When null, clients use a stable fallback by id. */
   color          String?
+  /** Stable key for preset categories (e.g. guest_play, tour). */
+  systemKey      String?
   sortOrder      Int          @default(0)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -980,6 +982,7 @@ model TimeParentCategory {
   tours          Tour[]
 
   @@index([organizationId, sortOrder])
+  @@unique([organizationId, systemKey])
 }
 
 model TimeProject {

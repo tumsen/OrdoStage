@@ -1,12 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, Link } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink, Plus, Trash2, Route } from "lucide-react";
 import { api } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
-import type { Tour, CreateTour, TourListItem } from "../../../backend/src/types";
+import type { Tour, CreateTour, TourListItem, TimeParentCategory } from "../../../backend/src/types";
 import type { Production } from "@/lib/types";
 import { TourShowsOverviewGrid } from "@/components/tour/TourShowsOverviewGrid";
+import { TimeParentCategorySelect } from "@/components/time/TimeParentCategorySelect";
 import { computeTourCrewTotals } from "@/lib/tourShowListStats";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -164,9 +166,11 @@ interface NewTourDialogProps {
 }
 
 function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [productionId, setProductionId] = useState("");
+  const [timeParentCategoryId, setTimeParentCategoryId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"draft" | "active" | "completed">("draft");
@@ -180,6 +184,18 @@ function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
     queryFn: () => api.get<Production[]>("/api/productions"),
     enabled: open,
   });
+
+  const { data: parentCategories } = useQuery({
+    queryKey: ["time-parent-categories"],
+    queryFn: () => api.get<TimeParentCategory[]>("/api/time/parent-categories"),
+    enabled: open,
+  });
+
+  useEffect(() => {
+    if (!open || !parentCategories?.length) return;
+    const tourPreset = parentCategories.find((c) => c.systemKey === "tour");
+    if (tourPreset) setTimeParentCategoryId(tourPreset.id);
+  }, [open, parentCategories]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateTour) => api.post<Tour>("/api/tours", data),
@@ -195,6 +211,7 @@ function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
 
   function resetForm() {
     setProductionId("");
+    setTimeParentCategoryId(null);
     setName("");
     setDescription("");
     setStatus("draft");
@@ -217,6 +234,7 @@ function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
     if (tourManagerPhone.trim()) payload.tourManagerPhone = tourManagerPhone.trim();
     if (tourManagerEmail.trim()) payload.tourManagerEmail = tourManagerEmail.trim();
     if (notes.trim()) payload.notes = notes.trim();
+    if (timeParentCategoryId) payload.timeParentCategoryId = timeParentCategoryId;
     createMutation.mutate(payload);
   }
 
@@ -256,6 +274,16 @@ function NewTourDialog({ open, onOpenChange }: NewTourDialogProps) {
                 page.
               </p>
             ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-white/60 text-xs uppercase tracking-wide">
+              {t("time.parentCategoryLabel")}
+            </Label>
+            <TimeParentCategorySelect
+              value={timeParentCategoryId}
+              onValueChange={setTimeParentCategoryId}
+            />
           </div>
 
           <div className="space-y-2">

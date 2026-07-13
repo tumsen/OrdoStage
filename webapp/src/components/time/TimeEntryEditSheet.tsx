@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { format, parseISO } from "date-fns";
 import { ChevronsUpDown, Lock, LockOpen } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { api } from "@/lib/api";
 import { usePreferences } from "@/hooks/usePreferences";
-import type { TimeEntry, TimeProject, TimeTag } from "@/contracts/backendTypes";
+import type { TimeEntry, TimeParentCategory, TimeProject, TimeTag } from "@/contracts/backendTypes";
 import type { TimeCategory } from "@/contracts/backendTypes";
 import type { TimeFormat } from "@/lib/preferences";
 import { Button } from "@/components/ui/button";
@@ -163,6 +165,38 @@ export function TimeEntryEditSheet(props: {
         .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
     [projects]
   );
+
+  const { data: parentCategories = [] } = useQuery({
+    queryKey: ["time-parent-categories"],
+    queryFn: () => api.get<TimeParentCategory[]>("/api/time/parent-categories"),
+    enabled: open,
+  });
+
+  const projectsByParentCategory = useMemo(() => {
+    const categoryNameById = new Map(parentCategories.map((c) => [c.id, c.name]));
+    const groups = new Map<string, { label: string; projects: TimeProject[] }>();
+    for (const project of activeProjects) {
+      const key = project.timeParentCategoryId ?? "__none__";
+      const label = project.timeParentCategoryId
+        ? (categoryNameById.get(project.timeParentCategoryId) ?? t("time.parentCategoryNone"))
+        : t("time.parentCategoryNone");
+      if (!groups.has(key)) groups.set(key, { label, projects: [] });
+      groups.get(key)!.projects.push(project);
+    }
+    const ordered: Array<{ key: string; label: string; projects: TimeProject[] }> = [];
+    for (const cat of parentCategories) {
+      const group = groups.get(cat.id);
+      if (group) ordered.push({ key: cat.id, ...group });
+    }
+    const uncategorized = groups.get("__none__");
+    if (uncategorized) ordered.push({ key: "__none__", ...uncategorized });
+    for (const [key, group] of groups) {
+      if (key !== "__none__" && !parentCategories.some((c) => c.id === key)) {
+        ordered.push({ key, ...group });
+      }
+    }
+    return ordered;
+  }, [activeProjects, parentCategories, t]);
 
   const sortedTags = useMemo(
     () => [...tags].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
@@ -565,30 +599,34 @@ export function TimeEntryEditSheet(props: {
                       >
                         {t("time.noProject")}
                       </CommandItem>
-                      {activeProjects.map((p) => {
-                        const c = displayHex(p.color, p.id);
-                        return (
-                          <CommandItem
-                            key={p.id}
-                            value={`${p.name} ${p.id}`}
-                            onSelect={() => {
-                              setProjectId(p.id);
-                              setProjectOpen(false);
-                            }}
-                            className="text-white aria-selected:bg-white/10"
-                          >
-                            <span className="flex items-center gap-2 min-w-0">
-                              <span
-                                className="h-2.5 w-2.5 shrink-0 rounded-full border border-white/20"
-                                style={{ backgroundColor: c }}
-                                aria-hidden
-                              />
-                              <span className="truncate">{p.name}</span>
-                            </span>
-                          </CommandItem>
-                        );
-                      })}
                     </CommandGroup>
+                    {projectsByParentCategory.map((group) => (
+                      <CommandGroup key={group.key} heading={group.label}>
+                        {group.projects.map((p) => {
+                          const c = displayHex(p.color, p.id);
+                          return (
+                            <CommandItem
+                              key={p.id}
+                              value={`${group.label} ${p.name} ${p.id}`}
+                              onSelect={() => {
+                                setProjectId(p.id);
+                                setProjectOpen(false);
+                              }}
+                              className="text-white aria-selected:bg-white/10"
+                            >
+                              <span className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className="h-2.5 w-2.5 shrink-0 rounded-full border border-white/20"
+                                  style={{ backgroundColor: c }}
+                                  aria-hidden
+                                />
+                                <span className="truncate">{p.name}</span>
+                              </span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    ))}
                   </CommandList>
                 </Command>
               </PopoverContent>

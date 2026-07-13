@@ -416,6 +416,7 @@ export const EventSchema = z.object({
   ownerTeamId: z.string().nullable().optional(),
   leadPersonId: z.string().nullable().optional(),
   productionId: z.string().nullable().optional(),
+  timeParentCategoryId: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -1050,6 +1051,7 @@ export const TourSchema = z.object({
   riderVisibility: RiderVisibilitySchema,
   techRiderPdfName: z.string().nullable(),
   productionId: z.string().nullable().optional(),
+  timeParentCategoryId: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -1175,6 +1177,7 @@ export const TimeParentCategorySchema = z.object({
   organizationId: z.string(),
   name: z.string(),
   color: z.union([TimeCatalogHexColorSchema, z.null()]),
+  systemKey: z.string().nullable(),
   sortOrder: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -1679,6 +1682,13 @@ export const TimeReportProjectSchema = z.object({
   workMinutes: z.number(),
 });
 
+export const TimeReportParentCategorySchema = z.object({
+  parentCategoryId: z.string().nullable(),
+  parentCategoryName: z.string(),
+  totalMinutes: z.number(),
+  workMinutes: z.number(),
+});
+
 export const TimeReportDaySchema = z.object({
   date: z.string(),
   totalMinutes: z.number(),
@@ -1722,6 +1732,7 @@ export const TimeReportSchema = z.object({
   }),
   byPerson: z.array(TimeReportPersonSchema),
   byProject: z.array(TimeReportProjectSchema),
+  byParentCategory: z.array(TimeReportParentCategorySchema),
   byDay: z.array(TimeReportDaySchema),
   entries: z.array(TimeReportEntrySchema),
 });
@@ -1734,6 +1745,7 @@ export type LeaveTransaction = z.infer<typeof LeaveTransactionSchema>;
 export type TimeReport = z.infer<typeof TimeReportSchema>;
 export type TimeReportPerson = z.infer<typeof TimeReportPersonSchema>;
 export type TimeReportProject = z.infer<typeof TimeReportProjectSchema>;
+export type TimeReportParentCategory = z.infer<typeof TimeReportParentCategorySchema>;
 export type TimeReportDay = z.infer<typeof TimeReportDaySchema>;
 export type TimeReportEntry = z.infer<typeof TimeReportEntrySchema>;
 

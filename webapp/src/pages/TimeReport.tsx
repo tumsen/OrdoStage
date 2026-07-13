@@ -382,6 +382,7 @@ export default function TimeReport() {
   const [customTo, setCustomTo] = useState("");
   const [selectedPersonIds, setSelectedPersonIds] = useState<string[]>([]);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [selectedParentCategoryIds, setSelectedParentCategoryIds] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [entryPage, setEntryPage] = useState(0);
   const ENTRIES_PER_PAGE = 50;
@@ -409,6 +410,12 @@ export default function TimeReport() {
     enabled: canReadAll,
   });
 
+  const { data: parentCategories } = useQuery({
+    queryKey: ["time-parent-categories"],
+    queryFn: () => api.get<Array<{ id: string; name: string }>>("/api/time/parent-categories"),
+    enabled: canReadAll,
+  });
+
   const personOptions = useMemo(
     () => (people ?? []).map((p) => ({ id: p.id, label: p.name })),
     [people]
@@ -419,6 +426,10 @@ export default function TimeReport() {
         .filter((p) => !p.isArchived)
         .map((p) => ({ id: p.id, label: p.name })),
     [projects]
+  );
+  const parentCategoryOptions = useMemo(
+    () => (parentCategories ?? []).map((c) => ({ id: c.id, label: c.name })),
+    [parentCategories]
   );
   const categoryOptions = [
     { id: "work", label: t("time.categoryWork") },
@@ -432,9 +443,12 @@ export default function TimeReport() {
     const params = new URLSearchParams({ from, to });
     if (selectedPersonIds.length) params.set("personIds", selectedPersonIds.join(","));
     if (selectedProjectIds.length) params.set("projectIds", selectedProjectIds.join(","));
+    if (selectedParentCategoryIds.length) {
+      params.set("parentCategoryIds", selectedParentCategoryIds.join(","));
+    }
     if (selectedCategories.length) params.set("categories", selectedCategories.join(","));
     return params.toString();
-  }, [from, to, selectedPersonIds, selectedProjectIds, selectedCategories]);
+  }, [from, to, selectedPersonIds, selectedProjectIds, selectedParentCategoryIds, selectedCategories]);
 
   const { data: report, isFetching } = useQuery({
     queryKey: ["time-report", qs],
@@ -605,16 +619,27 @@ export default function TimeReport() {
             onChange={setSelectedProjectIds}
           />
           <MultiSelect
+            label={t("time.reportFilterParentCategories")}
+            options={parentCategoryOptions}
+            selected={selectedParentCategoryIds}
+            onChange={setSelectedParentCategoryIds}
+          />
+          <MultiSelect
             label="Category"
             options={categoryOptions}
             selected={selectedCategories}
             onChange={setSelectedCategories}
           />
-          {(selectedPersonIds.length + selectedProjectIds.length + selectedCategories.length > 0) && (
+          {(selectedPersonIds.length +
+            selectedProjectIds.length +
+            selectedParentCategoryIds.length +
+            selectedCategories.length >
+            0) && (
             <button
               onClick={() => {
                 setSelectedPersonIds([]);
                 setSelectedProjectIds([]);
+                setSelectedParentCategoryIds([]);
                 setSelectedCategories([]);
               }}
               className="text-xs text-white/40 hover:text-white/70 underline"
@@ -748,6 +773,9 @@ export default function TimeReport() {
             </TabsTrigger>
             <TabsTrigger value="projects" className="text-sm data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
               {t("time.reportTabProjects")} ({report.byProject.length})
+            </TabsTrigger>
+            <TabsTrigger value="parentCategories" className="text-sm data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+              {t("time.reportTabParentCategories")} ({report.byParentCategory.length})
             </TabsTrigger>
             <TabsTrigger value="entries" className="text-sm data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
               {t("time.reportTabEntries")} ({report.entries.length})
@@ -987,6 +1015,63 @@ export default function TimeReport() {
                             <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
                               <div
                                 className="h-full bg-ordo-yellow/60 rounded-full"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* By Parent Category */}
+          <TabsContent value="parentCategories">
+            {report.byParentCategory.length === 0 ? (
+              <div className="text-center py-16 text-white/35">{t("time.reportNoData")}</div>
+            ) : (
+              <div className="rounded-xl border border-white/8 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/8 bg-white/[0.02]">
+                      <th className="text-left px-4 py-3 font-medium text-white/50">
+                        {t("time.parentCategoryLabel")}
+                      </th>
+                      <th className="text-right px-4 py-3 font-medium text-white/50">{t("time.reportColTotal")}</th>
+                      <th className="text-right px-4 py-3 font-medium text-white/35 text-xs">{t("time.reportColShare")}</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.byParentCategory.map((row, i) => {
+                      const pct =
+                        report.summary.totalMinutes > 0
+                          ? (row.totalMinutes / report.summary.totalMinutes) * 100
+                          : 0;
+                      return (
+                        <tr
+                          key={row.parentCategoryId ?? "__none__"}
+                          className={cn(
+                            "border-b border-white/5 hover:bg-white/[0.03]",
+                            i % 2 === 0 ? "" : "bg-white/[0.015]"
+                          )}
+                        >
+                          <td className="px-4 py-3 font-medium text-white/90">
+                            {row.parentCategoryName}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums font-semibold text-white">
+                            {fmtMins(row.totalMinutes)}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums text-white/40 text-xs">
+                            {pct.toFixed(1)}%
+                          </td>
+                          <td className="px-4 py-3 w-32">
+                            <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-indigo-400/60 rounded-full"
                                 style={{ width: `${pct}%` }}
                               />
                             </div>

@@ -30,6 +30,7 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import {
   formatScheduleEventTimes,
@@ -87,6 +88,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { downloadTourPDF } from "@/components/TourSchedulePDF";
+import { TimeParentCategorySelect } from "@/components/time/TimeParentCategorySelect";
 import { AddressFields, type Address } from "@/components/AddressFields";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { downloadVenueTechRider, printVenueTechRider, uploadVenueTechRiderForSharing } from "@/lib/downloadVenueTechRider";
@@ -269,8 +271,12 @@ interface EditTourDialogProps {
 }
 
 function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [name, setName] = useState(tour.name);
+  const [timeParentCategoryId, setTimeParentCategoryId] = useState<string | null>(
+    tour.timeParentCategoryId ?? null
+  );
   const [description, setDescription] = useState(tour.description ?? "");
   const [status, setStatus] = useState<TourDetail["status"]>(tour.status);
   const [tourManagerName, setTourManagerName] = useState(tour.tourManagerName ?? "");
@@ -291,6 +297,10 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
     ...(tour.riderVisibility ?? {}),
   });
 
+  useEffect(() => {
+    setTimeParentCategoryId(tour.timeParentCategoryId ?? null);
+  }, [tour.id, tour.timeParentCategoryId]);
+
   const updateMutation = useMutation({
     mutationFn: (data: UpdateTour) => api.put<TourDetail>(`/api/tours/${tour.id}`, data),
   });
@@ -299,6 +309,7 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
     return {
       name: name.trim(),
       status,
+      timeParentCategoryId,
       description: description.trim() || undefined,
       tourManagerName: tourManagerName.trim() || undefined,
       tourManagerPhone: tourManagerPhone.trim() || undefined,
@@ -369,6 +380,15 @@ function EditTourDialog({ tour, open, onOpenChange }: EditTourDialogProps) {
                 <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-white/60 text-xs uppercase tracking-wide">
+              {t("time.parentCategoryLabel")}
+            </Label>
+            <TimeParentCategorySelect
+              value={timeParentCategoryId}
+              onValueChange={setTimeParentCategoryId}
+            />
           </div>
 
           <div className="pt-2 border-t border-white/10">

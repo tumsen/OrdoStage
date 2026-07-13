@@ -20,6 +20,7 @@ import { dayKeyFromDateInput, normalizeTimeHHMM } from "../lib/timeHHMM";
 import { mergedScheduleEvents } from "../lib/tourScheduleEvents";
 import { parseIncomingDateTime } from "../parseIncomingDateTime";
 import { ensureTourTimeProject } from "../timeProjectSync";
+import { resolveOrgParentCategoryId } from "../services/parentCategoryPresets";
 import { ensureOrphanToursHaveProductions } from "../lib/ensureTourProductionShows";
 
 const toursRouter = new Hono<{ Variables: { user: typeof auth.$Infer.Session.user | null } }>();
@@ -250,6 +251,7 @@ function serializeTour(tour: any) {
     riderVisibility: parseRiderVisibility(tour.riderVisibility),
     techRiderPdfName: tour.techRiderPdfName ?? null,
     productionId: tour.productionId ?? null,
+    timeParentCategoryId: tour.timeParentCategoryId ?? null,
     createdAt: tour.createdAt instanceof Date ? tour.createdAt.toISOString() : tour.createdAt,
     updatedAt: tour.updatedAt instanceof Date ? tour.updatedAt.toISOString() : tour.updatedAt,
   };
@@ -308,6 +310,15 @@ toursRouter.post("/tours", zValidator("json", CreateTourSchema), async (c) => {
   if (!production) {
     return c.json({ error: { message: "Show not found", code: "NOT_FOUND" } }, 404);
   }
+  if (body.timeParentCategoryId !== undefined && body.timeParentCategoryId !== null) {
+    const parentResolved = await resolveOrgParentCategoryId(
+      user.organizationId,
+      body.timeParentCategoryId
+    );
+    if (!parentResolved.ok) {
+      return c.json({ error: { message: "Overkategori ikke fundet", code: "NOT_FOUND" } }, 404);
+    }
+  }
   const tour = await prisma.tour.create({
     data: {
       name: body.name,
@@ -328,11 +339,19 @@ toursRouter.post("/tours", zValidator("json", CreateTourSchema), async (c) => {
         ? JSON.stringify({ ...DEFAULT_RIDER_VISIBILITY, ...body.riderVisibility })
         : JSON.stringify(DEFAULT_RIDER_VISIBILITY),
       productionId: body.productionId,
+      timeParentCategoryId:
+        body.timeParentCategoryId && body.timeParentCategoryId !== ""
+          ? body.timeParentCategoryId
+          : null,
       organizationId: user.organizationId,
     },
   });
 
-  await ensureTourTimeProject(user.organizationId, { id: tour.id, name: tour.name });
+  await ensureTourTimeProject(user.organizationId, {
+    id: tour.id,
+    name: tour.name,
+    timeParentCategoryId: tour.timeParentCategoryId,
+  });
 
   return c.json({ data: serializeTour(tour) }, 201);
 });
@@ -454,6 +473,15 @@ toursRouter.put("/tours/:id", zValidator("json", UpdateTourSchema), async (c) =>
   if (!existing) {
     return c.json({ error: { message: "Tour not found", code: "NOT_FOUND" } }, 404);
   }
+  if (body.timeParentCategoryId !== undefined) {
+    const parentResolved = await resolveOrgParentCategoryId(
+      user.organizationId,
+      body.timeParentCategoryId
+    );
+    if (!parentResolved.ok) {
+      return c.json({ error: { message: "Overkategori ikke fundet", code: "NOT_FOUND" } }, 404);
+    }
+  }
 
   const tour = await prisma.tour.update({
     where: { id },
@@ -483,10 +511,20 @@ toursRouter.put("/tours/:id", zValidator("json", UpdateTourSchema), async (c) =>
       ...(body.productionId !== undefined && {
         productionId: body.productionId === "" ? null : body.productionId,
       }),
+      ...(body.timeParentCategoryId !== undefined && {
+        timeParentCategoryId:
+          body.timeParentCategoryId === null || body.timeParentCategoryId === ""
+            ? null
+            : body.timeParentCategoryId,
+      }),
     },
   });
 
-  await ensureTourTimeProject(user.organizationId, { id: tour.id, name: tour.name });
+  await ensureTourTimeProject(user.organizationId, {
+    id: tour.id,
+    name: tour.name,
+    timeParentCategoryId: tour.timeParentCategoryId,
+  });
 
   return c.json({ data: serializeTour(tour) });
 });

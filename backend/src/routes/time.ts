@@ -23,6 +23,11 @@ import {
   resolveEntryTimeProjectId,
 } from "../services/leaveTimeProjects";
 import {
+  ensureDefaultParentCategories,
+  isPresetParentCategoryKey,
+  resolveOrgParentCategoryId,
+} from "../services/parentCategoryPresets";
+import {
   GoogleMapsNotConfiguredError,
   GoogleMapsRouteNotFoundError,
   googleRouteDistanceKm,
@@ -897,12 +902,14 @@ function serializeParentCategory(row: {
   organizationId: string;
   name: string;
   color: string | null;
+  systemKey?: string | null;
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
 }) {
   return {
     ...row,
+    systemKey: row.systemKey ?? null,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
   };
@@ -1354,11 +1361,15 @@ timeRouter.get("/time/report", async (c) => {
 
   const qPersonIds = c.req.query("personIds");
   const qProjectIds = c.req.query("projectIds");
+  const qParentCategoryIds = c.req.query("parentCategoryIds");
   const qTagIds = c.req.query("tagIds");
   const qCategories = c.req.query("categories");
 
   const personIdFilter = qPersonIds ? qPersonIds.split(",").filter(Boolean) : [];
   const projectIdFilter = qProjectIds ? qProjectIds.split(",").filter(Boolean) : [];
+  const parentCategoryIdFilter = qParentCategoryIds
+    ? qParentCategoryIds.split(",").filter(Boolean)
+    : [];
   const tagIdFilter = qTagIds ? qTagIds.split(",").filter(Boolean) : [];
   const categoryFilter = qCategories
     ? qCategories.split(",").filter((x) => TIME_CATEGORIES.includes(x as never))
@@ -1376,6 +1387,17 @@ timeRouter.get("/time/report", async (c) => {
     if (projectIdFilter.includes("__none__")) pf.push({ timeProjectId: null });
     where.OR = pf;
   }
+  if (parentCategoryIdFilter.length) {
+    const pcFilter: unknown[] = parentCategoryIdFilter.map((id) => ({
+      timeProject: { timeParentCategoryId: id },
+    }));
+    if (parentCategoryIdFilter.includes("__none__")) {
+      pcFilter.push({
+        OR: [{ timeProjectId: null }, { timeProject: { timeParentCategoryId: null } }],
+      });
+    }
+    where.AND = [...((where.AND as unknown[]) ?? []), { OR: pcFilter }];
+  }
   if (tagIdFilter.length) {
     where.tagLinks = { some: { timeTagId: { in: tagIdFilter } } };
   }
@@ -1384,12 +1406,23 @@ timeRouter.get("/time/report", async (c) => {
     where,
     include: {
       person: { select: { id: true, name: true, weeklyContractHours: true, vacationDaysPerYear: true } },
-      timeProject: { select: { id: true, name: true } },
+      timeProject: {
+        select: { id: true, name: true, timeParentCategoryId: true },
+      },
       tagLinks: { include: { timeTag: { select: { id: true, name: true } } } },
     },
     orderBy: { startsAt: "asc" },
     take: 5000,
   });
+
+  const parentCategoryNameById = new Map(
+    (
+      await prisma.timeParentCategory.findMany({
+        where: { organizationId: user.organizationId },
+        select: { id: true, name: true },
+      })
+    ).map((cat) => [cat.id, cat.name] as const)
+  );
 
   type PersonAgg = {
     personName: string;
@@ -1404,6 +1437,11 @@ timeRouter.get("/time/report", async (c) => {
     vacationDaysPerYear: number | null;
   };
   type ProjectAgg = { projectName: string; workMinutes: number; totalMinutes: number };
+  type ParentCategoryAgg = {
+    parentCategoryName: string;
+    workMinutes: number;
+    totalMinutes: number;
+  };
   type DayAgg = {
     workMinutes: number;
     vacationMinutes: number;
@@ -1416,6 +1454,7 @@ timeRouter.get("/time/report", async (c) => {
 
   const byPerson = new Map<string, PersonAgg>();
   const byProject = new Map<string | null, ProjectAgg>();
+  const byParentCategory = new Map<string | null, ParentCategoryAgg>();
   const byDay = new Map<string, DayAgg>();
 
   for (const row of rows) {
@@ -1459,6 +1498,21 @@ timeRouter.get("/time/report", async (c) => {
     const pp = byProject.get(projKey)!;
     pp.totalMinutes += durMin;
     if (cat === "work") pp.workMinutes += durMin;
+
+    // byParentCategory
+    const parentCatKey = row.timeProject?.timeParentCategoryId ?? null;
+    if (!byParentCategory.has(parentCatKey)) {
+      byParentCategory.set(parentCatKey, {
+        parentCategoryName: parentCatKey
+          ? (parentCategoryNameById.get(parentCatKey) ?? "Ukendt")
+          : "Ingen overkategori",
+        workMinutes: 0,
+        totalMinutes: 0,
+      });
+    }
+    const pca = byParentCategory.get(parentCatKey)!;
+    pca.totalMinutes += durMin;
+    if (cat === "work") pca.workMinutes += durMin;
 
     // byDay
     if (!byDay.has(dateKey)) {
@@ -1545,6 +1599,15 @@ timeRouter.get("/time/report", async (c) => {
     workMinutes: pp.workMinutes,
   })).sort((a, b) => b.totalMinutes - a.totalMinutes);
 
+  const byParentCategoryArr = [...byParentCategory.entries()]
+    .map(([parentCategoryId, pc]) => ({
+      parentCategoryId,
+      parentCategoryName: pc.parentCategoryName,
+      totalMinutes: pc.totalMinutes,
+      workMinutes: pc.workMinutes,
+    }))
+    .sort((a, b) => b.totalMinutes - a.totalMinutes);
+
   const byDayArr = [...byDay.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, dp]) => ({
@@ -1613,6 +1676,7 @@ timeRouter.get("/time/report", async (c) => {
       },
       byPerson: byPersonArr,
       byProject: byProjectArr,
+      byParentCategory: byParentCategoryArr,
       byDay: byDayArr,
       entries,
     },
@@ -1731,20 +1795,6 @@ timeRouter.delete("/time/tags/:id", async (c) => {
   return c.json({ ok: true });
 });
 
-async function resolveOrgParentCategoryId(
-  organizationId: string,
-  id: string | null | undefined
-): Promise<{ ok: true; value: string | null | undefined } | { ok: false }> {
-  if (id === undefined) return { ok: true, value: undefined };
-  if (id === null || id === "") return { ok: true, value: null };
-  const row = await prisma.timeParentCategory.findFirst({
-    where: { id, organizationId },
-    select: { id: true },
-  });
-  if (!row) return { ok: false };
-  return { ok: true, value: id };
-}
-
 timeRouter.get("/time/parent-category-catalog", async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
@@ -1753,6 +1803,7 @@ timeRouter.get("/time/parent-category-catalog", async (c) => {
   if (!canAction(c, "time.manage_catalog")) {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
+  await ensureDefaultParentCategories(user.organizationId);
   await syncEventShowTimeProjects(user.organizationId);
   const [categories, events, tours, standaloneProjects] = await Promise.all([
     prisma.timeParentCategory.findMany({
@@ -1797,6 +1848,7 @@ timeRouter.get("/time/parent-categories", async (c) => {
   if (!canView(c, "time")) {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
+  await ensureDefaultParentCategories(user.organizationId);
   const rows = await prisma.timeParentCategory.findMany({
     where: { organizationId: user.organizationId },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -1862,6 +1914,12 @@ timeRouter.delete("/time/parent-categories/:id", async (c) => {
     where: { id, organizationId: user.organizationId },
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  if (isPresetParentCategoryKey(existing.systemKey)) {
+    return c.json(
+      { error: { message: "Systemkategorier kan ikke slettes", code: "FORBIDDEN" } },
+      403
+    );
+  }
   await prisma.$transaction([
     prisma.event.updateMany({
       where: { organizationId: user.organizationId, timeParentCategoryId: id },

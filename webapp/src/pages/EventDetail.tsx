@@ -18,6 +18,7 @@ import {
   Upload,
 } from "lucide-react";
 import { api, isApiError } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
@@ -52,6 +53,7 @@ import {
 } from "@/components/DateInputWithWeekday";
 import { SplitDurationHhMmInput, SplitTimeInput, type SplitTimeFieldHandle } from "@/components/SplitTimeField";
 import { ShowJobsEditor } from "@/components/event/ShowJobsEditor";
+import { TimeParentCategorySelect } from "@/components/time/TimeParentCategorySelect";
 import { NewBookingDialog } from "@/components/schedule/NewBookingDialog";
 import { OutlookTimeGrid } from "@/components/schedule/OutlookTimeGrid";
 import { EditItemSheet } from "@/components/schedule/EditItemSheet";
@@ -153,6 +155,7 @@ const EventEditSchema = z.object({
   primaryContactNote: z.string().optional(),
   actorCount: z.string().optional(),
   leadPersonId: z.string().optional(),
+  timeParentCategoryId: z.string().optional(),
   allergies: z.string().optional(),
   stageWidth: z.string().optional(),
   stageDepth: z.string().optional(),
@@ -195,6 +198,7 @@ function emptyEventFormValues(): EventEditValues {
     primaryContactNote: "",
     actorCount: "",
     leadPersonId: "",
+    timeParentCategoryId: "",
     allergies: "",
     ...decodeToFormFields(null),
     getInDate: "",
@@ -261,6 +265,7 @@ function formValuesFromEvent(e: EventDetail, g: GeneralEventFields): EventEditVa
     primaryContactNote: primary.note,
     actorCount: e.actorCount != null ? String(e.actorCount) : "",
     leadPersonId: e.leadPersonId ?? e.leadPerson?.id ?? "",
+    timeParentCategoryId: e.timeParentCategoryId ?? "",
     allergies: e.allergies ?? "",
     ...decodeToFormFields(e.stageSize),
     getInDate: isoDatePrefix(g.getInDate) || g.getInDate,
@@ -496,6 +501,7 @@ function DetailsTab({
   onCreated: (id: string) => void;
   onDeleted: () => void;
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -671,6 +677,10 @@ function DetailsTab({
     if (values.actorCount) payload.actorCount = Number(values.actorCount);
     payload.leadPersonId =
       values.leadPersonId && values.leadPersonId !== "__none__" ? values.leadPersonId : null;
+    payload.timeParentCategoryId =
+      values.timeParentCategoryId && values.timeParentCategoryId !== "__none__"
+        ? values.timeParentCategoryId
+        : null;
     payload.customFields = mergedCustomFields.length > 0 ? JSON.stringify(mergedCustomFields) : undefined;
     return payload;
   }
@@ -792,6 +802,9 @@ function DetailsTab({
       if (values.leadPersonId && values.leadPersonId !== "__none__") {
         payload.leadPersonId = values.leadPersonId;
       }
+      if (values.timeParentCategoryId && values.timeParentCategoryId !== "__none__") {
+        payload.timeParentCategoryId = values.timeParentCategoryId;
+      }
       if (mergedCustomFields.length > 0) payload.customFields = JSON.stringify(mergedCustomFields);
       createMutation.mutate(payload);
       return;
@@ -813,6 +826,10 @@ function DetailsTab({
     if (values.actorCount) payload.actorCount = Number(values.actorCount);
     payload.leadPersonId =
       values.leadPersonId && values.leadPersonId !== "__none__" ? values.leadPersonId : null;
+    payload.timeParentCategoryId =
+      values.timeParentCategoryId && values.timeParentCategoryId !== "__none__"
+        ? values.timeParentCategoryId
+        : null;
     payload.customFields = mergedCustomFields.length > 0 ? JSON.stringify(mergedCustomFields) : undefined;
     updateMutation.mutate(payload);
   }
@@ -1300,6 +1317,23 @@ function DetailsTab({
 
             <div className={cn(DETAIL_CARD_CLASS, "gap-4")}>
             <SectionHeader>Production</SectionHeader>
+            <FormField
+              control={form.control}
+              name="timeParentCategoryId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-white/60 text-xs uppercase tracking-wide">
+                    {t("time.parentCategoryLabel")}
+                  </FormLabel>
+                  <FormControl>
+                    <TimeParentCategorySelect
+                      value={field.value || null}
+                      onValueChange={(id) => field.onChange(id ?? "")}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormField
               control={form.control}

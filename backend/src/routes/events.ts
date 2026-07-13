@@ -24,6 +24,7 @@ import {
 import { canAction } from "../requestRole";
 import { parseIncomingDateTime } from "../parseIncomingDateTime";
 import { ensureEventTimeProject } from "../timeProjectSync";
+import { resolveOrgParentCategoryId } from "../services/parentCategoryPresets";
 import { wallClockInstantFromDateIsoAndHHMM } from "../clientWallClock";
 import {
   addJobAssignee,
@@ -272,6 +273,7 @@ function serializeEvent(event: {
   ownerTeamId?: string | null;
   leadPersonId?: string | null;
   productionId?: string | null;
+  timeParentCategoryId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -294,6 +296,7 @@ function serializeEvent(event: {
     ownerTeamId: event.ownerTeamId ?? null,
     leadPersonId: event.leadPersonId ?? null,
     productionId: event.productionId ?? null,
+    timeParentCategoryId: event.timeParentCategoryId ?? null,
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
   };
@@ -698,6 +701,15 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
       return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
     }
   }
+  if (body.timeParentCategoryId !== undefined && body.timeParentCategoryId !== null) {
+    const parentResolved = await resolveOrgParentCategoryId(
+      user.organizationId,
+      body.timeParentCategoryId
+    );
+    if (!parentResolved.ok) {
+      return c.json({ error: { message: "Overkategori ikke fundet", code: "NOT_FOUND" } }, 404);
+    }
+  }
   const event = await prismaAny.event.create({
     data: {
       title: body.title,
@@ -719,6 +731,10 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
         body.leadPersonId && body.leadPersonId !== "" ? body.leadPersonId : null,
       productionId:
         body.productionId && body.productionId !== "" ? body.productionId : null,
+      timeParentCategoryId:
+        body.timeParentCategoryId && body.timeParentCategoryId !== ""
+          ? body.timeParentCategoryId
+          : null,
       organizationId: user.organizationId,
     },
     include: eventInclude,
@@ -764,7 +780,11 @@ eventsRouter.post("/events", zValidator("json", CreateEventSchema), async (c) =>
     );
   }
 
-  await ensureEventTimeProject(user.organizationId, { id: event.id, title: event.title });
+  await ensureEventTimeProject(user.organizationId, {
+    id: event.id,
+    title: event.title,
+    timeParentCategoryId: event.timeParentCategoryId,
+  });
 
   return c.json({ data: serializeFullEvent(event) }, 201);
 });
@@ -826,6 +846,15 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
       return c.json({ error: { message: "Production not found", code: "NOT_FOUND" } }, 404);
     }
   }
+  if (body.timeParentCategoryId !== undefined) {
+    const parentResolved = await resolveOrgParentCategoryId(
+      user.organizationId,
+      body.timeParentCategoryId
+    );
+    if (!parentResolved.ok) {
+      return c.json({ error: { message: "Overkategori ikke fundet", code: "NOT_FOUND" } }, 404);
+    }
+  }
 
   const event = await prisma.event.update({
     where: { id },
@@ -854,11 +883,21 @@ eventsRouter.put("/events/:id", zValidator("json", UpdateEventSchema), async (c)
       ...(body.productionId !== undefined && {
         productionId: body.productionId === null || body.productionId === "" ? null : body.productionId,
       }),
+      ...(body.timeParentCategoryId !== undefined && {
+        timeParentCategoryId:
+          body.timeParentCategoryId === null || body.timeParentCategoryId === ""
+            ? null
+            : body.timeParentCategoryId,
+      }),
     },
     include: eventInclude,
   });
 
-  await ensureEventTimeProject(user.organizationId, { id: event.id, title: event.title });
+  await ensureEventTimeProject(user.organizationId, {
+    id: event.id,
+    title: event.title,
+    timeParentCategoryId: event.timeParentCategoryId,
+  });
 
   return c.json({ data: serializeFullEvent(event) });
 });

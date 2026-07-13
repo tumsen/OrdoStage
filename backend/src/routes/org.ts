@@ -5,6 +5,7 @@ import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { auth } from "../auth";
 import { canAction } from "../requestRole";
 import { ensureSystemRoles, resolveEffectiveRole } from "../effectiveRole";
+import { ensureDefaultParentCategories } from "../services/parentCategoryPresets";
 import { wipeOrganizationCompletely } from "../deleteOrganizationWipe";
 import { verifyUserCredentialPassword } from "../verifyCredentialPassword";
 import { DistanceUnitSchema, LanguageSchema, PatchOrgCountryFeaturesSchema, TimeFormatSchema } from "../types";
@@ -969,6 +970,7 @@ app.post("/org", async (c) => {
   });
 
   await ensureSystemRoles(prisma, org.id);
+  await ensureDefaultParentCategories(org.id);
 
   return c.json({ data: org }, 201);
 });

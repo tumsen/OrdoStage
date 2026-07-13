@@ -60,6 +60,25 @@ function MemberRow({
   );
 }
 
+function LinkedResourceRow({
+  label,
+  sublabel,
+  href,
+}: {
+  label: string;
+  sublabel?: string;
+  href: string;
+}) {
+  return (
+    <li className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2">
+      <Link to={href} className="block min-w-0 hover:text-white">
+        <p className="truncate text-sm text-white/90">{label}</p>
+        {sublabel ? <p className="truncate text-[10px] text-white/40">{sublabel}</p> : null}
+      </Link>
+    </li>
+  );
+}
+
 export default function TimeParentCategoryCatalog() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
@@ -243,6 +262,11 @@ export default function TimeParentCategoryCatalog() {
                         style={{ backgroundColor: displayHex(cat.color, cat.id) }}
                       />
                       <span className="truncate">{cat.name}</span>
+                      {cat.systemKey ? (
+                        <span className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-white/35 ring-1 ring-white/10">
+                          {t("time.parentCategorySystemBadge")}
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 ))
@@ -297,7 +321,14 @@ export default function TimeParentCategoryCatalog() {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9 text-red-400/70 hover:text-red-400"
+                      disabled={Boolean(selected.systemKey)}
+                      title={
+                        selected.systemKey
+                          ? t("time.parentCategoryCannotDeleteSystem")
+                          : undefined
+                      }
                       onClick={() => {
+                        if (selected.systemKey) return;
                         if (!confirm(t("time.parentCategoryDeleteConfirm"))) return;
                         deleteCategory.mutate(selected.id);
                       }}
@@ -392,18 +423,11 @@ export default function TimeParentCategoryCatalog() {
                   ) : null}
                   <ul className="space-y-1.5">
                     {members.events.map((e) => (
-                      <MemberRow
+                      <LinkedResourceRow
                         key={e.id}
                         label={e.title}
-                        sublabel={t("time.projectLinkedEvent")}
-                        onRemove={() =>
-                          linkItem.mutate({
-                            type: "event",
-                            id: e.id,
-                            timeParentCategoryId: null,
-                          })
-                        }
-                        removing={linkItem.isPending}
+                        sublabel={t("time.parentCategoryAutoEvent")}
+                        href={`/events/${e.id}`}
                       />
                     ))}
                     {members.events.length === 0 ? (
@@ -451,18 +475,11 @@ export default function TimeParentCategoryCatalog() {
                   ) : null}
                   <ul className="space-y-1.5">
                     {members.tours.map((tour) => (
-                      <MemberRow
+                      <LinkedResourceRow
                         key={tour.id}
                         label={tour.name}
                         sublabel={t("time.parentCategoryLinkedTour")}
-                        onRemove={() =>
-                          linkItem.mutate({
-                            type: "tour",
-                            id: tour.id,
-                            timeParentCategoryId: null,
-                          })
-                        }
-                        removing={linkItem.isPending}
+                        href={`/tours/${tour.id}`}
                       />
                     ))}
                     {members.tours.length === 0 ? (
@@ -475,6 +492,87 @@ export default function TimeParentCategoryCatalog() {
           </main>
         </div>
       )}
+
+      {!isLoading && (unassignedEvents.length > 0 || unassignedTours.length > 0) ? (
+        <section className="rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-5 space-y-4">
+          <div>
+            <h2 className="text-sm font-medium text-amber-100/90">{t("time.parentCategoryUnassignedHeading")}</h2>
+            <p className="mt-1 text-xs text-white/45">{t("time.parentCategoryUnassignedHint")}</p>
+          </div>
+          {unassignedEvents.length > 0 ? (
+            <ul className="space-y-1.5">
+              {unassignedEvents.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2"
+                >
+                  <Link to={`/events/${e.id}`} className="min-w-0 flex-1 truncate text-sm text-white/90 hover:text-white">
+                    {e.title}
+                  </Link>
+                  <Select
+                    value=""
+                    onValueChange={(categoryId) => {
+                      if (!categoryId) return;
+                      linkItem.mutate({
+                        type: "event",
+                        id: e.id,
+                        timeParentCategoryId: categoryId,
+                      });
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-44 border-white/10 bg-white/5 text-xs text-white">
+                      <SelectValue placeholder={t("time.parentCategorySelectPlaceholder")} />
+                    </SelectTrigger>
+                    <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {unassignedTours.length > 0 ? (
+            <ul className="space-y-1.5">
+              {unassignedTours.map((tour) => (
+                <li
+                  key={tour.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2"
+                >
+                  <Link to={`/tours/${tour.id}`} className="min-w-0 flex-1 truncate text-sm text-white/90 hover:text-white">
+                    {tour.name}
+                  </Link>
+                  <Select
+                    value=""
+                    onValueChange={(categoryId) => {
+                      if (!categoryId) return;
+                      linkItem.mutate({
+                        type: "tour",
+                        id: tour.id,
+                        timeParentCategoryId: categoryId,
+                      });
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-44 border-white/10 bg-white/5 text-xs text-white">
+                      <SelectValue placeholder={t("time.parentCategorySelectPlaceholder")} />
+                    </SelectTrigger>
+                    <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }
