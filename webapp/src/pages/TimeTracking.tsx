@@ -1765,6 +1765,36 @@ export default function TimeTracking() {
           >
             Today
           </Button>
+          {isTimeSection ? (
+            <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("week");
+                  setSection("time");
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm",
+                  mode === "week" ? "bg-white/10 text-white" : "text-white/55"
+                )}
+              >
+                {t("time.week")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("month");
+                  setSection("time");
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm",
+                  mode === "month" ? "bg-white/10 text-white" : "text-white/55"
+                )}
+              >
+                {t("time.month")}
+              </button>
+            </div>
+          ) : null}
           {isTimeSection && mode === "week" ? (
             <span className="text-xs text-white/60 tabular-nums">
               Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
