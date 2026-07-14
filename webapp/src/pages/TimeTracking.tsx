@@ -87,6 +87,7 @@ import type { Language, TimeFormat } from "@/lib/preferences";
 import { calendarDateKeyFromJobDate } from "@/lib/showTiming";
 import {
   addMinutesToUtcIso,
+  localCalendarYmdFromUtcIso,
   localHhMmFromUtcIso,
   wallClockYmdHhMmToUtcIso,
 } from "@/lib/browserUserTime";
@@ -665,7 +666,8 @@ export default function TimeTracking() {
   const canEditVisiblePeriod = canEdit && !isApprovedWeek;
 
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
-  const [copySourceEntryId, setCopySourceEntryId] = useState<string | null>(null);
+  /** Snapshot kept while navigating weeks/months so copy mode survives outside the loaded range. */
+  const [copySourceEntry, setCopySourceEntry] = useState<TimeEntry | null>(null);
 
   const updateEntry = useMutation({
     mutationFn: ({
@@ -945,31 +947,23 @@ export default function TimeTracking() {
     if (editingEntryId && !editingEntry) setEditingEntryId(null);
   }, [editingEntryId, editingEntry]);
 
-  const copySourceEntry = useMemo(
-    () => (entries ?? []).find((x) => x.id === copySourceEntryId) ?? null,
-    [entries, copySourceEntryId]
-  );
-
   useEffect(() => {
-    if (copySourceEntryId && !copySourceEntry) setCopySourceEntryId(null);
-  }, [copySourceEntryId, copySourceEntry]);
-
-  useEffect(() => {
-    if (!copySourceEntryId) return;
-    const onKey = () => setCopySourceEntryId(null);
+    if (!copySourceEntry) return;
+    const onKey = () => setCopySourceEntry(null);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [copySourceEntryId]);
+  }, [copySourceEntry]);
 
   useEffect(() => {
-    if (!canEditVisiblePeriod) setCopySourceEntryId(null);
+    if (!canEditVisiblePeriod) setCopySourceEntry(null);
   }, [canEditVisiblePeriod]);
 
   const pasteCopyToDay = useCallback(
-    (targetDayYmd: string) => {
-      if (!copySourceEntry || !canEditVisiblePeriod) return;
+    (targetDayYmd: string, source?: TimeEntry | null) => {
+      const entry = source ?? copySourceEntry;
+      if (!entry || !canEditVisiblePeriod) return;
       try {
-        createEntry.mutate(buildCopiedEntryBody(copySourceEntry, targetDayYmd), {
+        createEntry.mutate(buildCopiedEntryBody(entry, targetDayYmd), {
           onSuccess: () => {
             timeNotify({ title: t("time.entryCopied") });
           },
@@ -979,6 +973,33 @@ export default function TimeTracking() {
       }
     },
     [copySourceEntry, canEditVisiblePeriod, createEntry, timeNotify, t]
+  );
+
+  const localDateFromEntryStart = useCallback((iso: string) => {
+    const ymd = localCalendarYmdFromUtcIso(iso);
+    const [yy, mo, dd] = ymd.split("-").map((x) => Number.parseInt(x, 10));
+    return new Date(yy, mo - 1, dd);
+  }, []);
+
+  const shiftViewPeriod = useCallback(
+    (delta: -1 | 1) => {
+      if (copySourceEntry && canEditVisiblePeriod) {
+        const sourceDate = localDateFromEntryStart(copySourceEntry.startsAt);
+        const targetDate =
+          mode === "week" ? addWeeks(sourceDate, delta) : addMonths(sourceDate, delta);
+        pasteCopyToDay(format(targetDate, "yyyy-MM-dd"), copySourceEntry);
+      }
+      setAnchor((d) =>
+        mode === "week"
+          ? delta === -1
+            ? subWeeks(d, 1)
+            : addWeeks(d, 1)
+          : delta === -1
+            ? subMonths(d, 1)
+            : addMonths(d, 1)
+      );
+    },
+    [copySourceEntry, canEditVisiblePeriod, localDateFromEntryStart, mode, pasteCopyToDay]
   );
 
   const attachCreateDragListeners = useCallback(
@@ -1773,9 +1794,7 @@ export default function TimeTracking() {
             variant="outline"
             size="icon"
             className="border-white/15 text-white"
-            onClick={() =>
-              setAnchor((d) => (mode === "week" ? subWeeks(d, 1) : subMonths(d, 1)))
-            }
+            onClick={() => shiftViewPeriod(-1)}
             aria-label="Previous"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -1786,9 +1805,7 @@ export default function TimeTracking() {
             variant="outline"
             size="icon"
             className="border-white/15 text-white"
-            onClick={() =>
-              setAnchor((d) => (mode === "week" ? addWeeks(d, 1) : addMonths(d, 1)))
-            }
+            onClick={() => shiftViewPeriod(1)}
             aria-label="Next"
           >
             <ChevronRight className="h-4 w-4" />
@@ -1935,9 +1952,7 @@ export default function TimeTracking() {
             variant="outline"
             size="icon"
             className="h-9 w-9 min-h-9 min-w-9 border-white/15 text-white"
-            onClick={() =>
-              setAnchor((d) => (mode === "week" ? subWeeks(d, 1) : subMonths(d, 1)))
-            }
+            onClick={() => shiftViewPeriod(-1)}
             aria-label="Previous"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -1948,9 +1963,7 @@ export default function TimeTracking() {
             variant="outline"
             size="icon"
             className="h-9 w-9 min-h-9 min-w-9 border-white/15 text-white"
-            onClick={() =>
-              setAnchor((d) => (mode === "week" ? addWeeks(d, 1) : addMonths(d, 1)))
-            }
+            onClick={() => shiftViewPeriod(1)}
             aria-label="Next"
           >
             <ChevronRight className="h-4 w-4" />
@@ -2075,7 +2088,7 @@ export default function TimeTracking() {
       {isTimeSection ? (
         <div className="shrink-0">
           <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap items-center gap-x-4 gap-y-1">
-            {copySourceEntryId ? (
+            {copySourceEntry ? (
               <span className="font-medium text-ordo-yellow">{t("time.copyModeHint")}</span>
             ) : null}
             <span className="tabular-nums text-white/60">
@@ -2217,7 +2230,7 @@ export default function TimeTracking() {
                             key={ymd}
                             type="button"
                             onClick={() => {
-                              if (copySourceEntryId) {
+                              if (copySourceEntry) {
                                 pasteCopyToDay(ymd);
                                 return;
                               }
@@ -2262,7 +2275,7 @@ export default function TimeTracking() {
                       size="icon"
                       className="h-8 w-8 min-h-8 min-w-8 shrink-0 border-white/15 text-white"
                       onClick={() => {
-                        if (copySourceEntryId) {
+                        if (copySourceEntry) {
                           pasteCopyToDay(format(addDays(anchor, -1), "yyyy-MM-dd"));
                         }
                         shiftMobileDay(-1);
@@ -2281,7 +2294,7 @@ export default function TimeTracking() {
                       size="icon"
                       className="h-8 w-8 min-h-8 min-w-8 shrink-0 border-white/15 text-white"
                       onClick={() => {
-                        if (copySourceEntryId) {
+                        if (copySourceEntry) {
                           pasteCopyToDay(format(addDays(anchor, 1), "yyyy-MM-dd"));
                         }
                         shiftMobileDay(1);
@@ -2372,10 +2385,10 @@ export default function TimeTracking() {
                             gridIdx > 0 && "border-l border-white/10",
                             col?.bg,
                             col ? `border-b ${col.border}` : "border-b border-white/10",
-                            copySourceEntryId && canEditVisiblePeriod && "cursor-copy hover:bg-white/[0.04]"
+                            copySourceEntry && canEditVisiblePeriod && "cursor-copy hover:bg-white/[0.04]"
                           )}
                           onClick={() => {
-                            if (copySourceEntryId && canEditVisiblePeriod) pasteCopyToDay(dayYmd);
+                            if (copySourceEntry && canEditVisiblePeriod) pasteCopyToDay(dayYmd);
                           }}
                         >
                           <div className="flex items-start justify-between gap-1">
@@ -2601,10 +2614,10 @@ export default function TimeTracking() {
                       <>
                         <div
                           className="absolute inset-0 z-[1] touch-none"
-                          style={{ cursor: copySourceEntryId ? "copy" : "crosshair" }}
+                          style={{ cursor: copySourceEntry ? "copy" : "crosshair" }}
                           onPointerDown={(ev) => {
                             ev.preventDefault();
-                            if (copySourceEntryId) {
+                            if (copySourceEntry) {
                               pasteCopyToDay(dayYmd);
                               return;
                             }
@@ -2808,7 +2821,7 @@ export default function TimeTracking() {
                               "absolute rounded border px-1 pt-1 pb-2 text-[10px] overflow-hidden shadow-sm select-none",
                               timeEntryBlockSurfaceClass(cat, isJob, layout.stackIndex, layout.stackCount),
                               isLocked ? "opacity-90" : "",
-                              copySourceEntryId === e.id ? "ring-2 ring-ordo-yellow/80" : "",
+                              copySourceEntry?.id === e.id ? "ring-2 ring-ordo-yellow/80" : "",
                               canEditVisiblePeriod && !isLocked ? "cursor-grab active:cursor-grabbing" : ""
                             )}
                             data-entry-block={e.id}
@@ -2871,7 +2884,7 @@ export default function TimeTracking() {
                                   type="button"
                                   className={cn(
                                     "absolute top-5 right-0 z-[3] flex h-5 w-5 items-center justify-center rounded-sm hover:bg-white/15",
-                                    copySourceEntryId === e.id
+                                    copySourceEntry?.id === e.id
                                       ? "bg-ordo-yellow/25 text-ordo-yellow"
                                       : "text-white/70 hover:text-white"
                                   )}
@@ -2880,7 +2893,7 @@ export default function TimeTracking() {
                                   onPointerDown={(ev) => ev.stopPropagation()}
                                   onClick={(ev) => {
                                     ev.stopPropagation();
-                                    setCopySourceEntryId((cur) => (cur === e.id ? null : e.id));
+                                    setCopySourceEntry((cur) => (cur?.id === e.id ? null : e));
                                   }}
                                 >
                                   <Copy className="h-3 w-3" />
