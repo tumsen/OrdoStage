@@ -2684,6 +2684,23 @@ export default function TimeTracking() {
                               Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
                             );
                         const durationLabel = formatDurationShort(durForLabel, isDayOff);
+                        const displayTitle = label || proj || null;
+                        const showProjBelowTimes = Boolean(proj && label);
+                        const blockHeightPx =
+                          (Math.max(4, heightPct) / 100) * effectiveColumnHeightPx;
+                        const noteText = e.note?.trim() ?? "";
+                        const reservedBelowNotePx =
+                          11 + // time row
+                          (showProjBelowTimes ? 11 : 0) +
+                          (e.tagIds.length > 0 ? 14 : 0) +
+                          14; // padding + action buttons
+                        const noteLinePx = 10;
+                        const titleLinePx = displayTitle ? 12 : 0;
+                        const noteSpacePx = blockHeightPx - titleLinePx - reservedBelowNotePx;
+                        const noteMaxLines =
+                          noteText && noteSpacePx >= noteLinePx
+                            ? Math.min(3, Math.max(1, Math.floor(noteSpacePx / noteLinePx)))
+                            : 0;
                         const gapPx = 2;
                         const leftPct = (layout.colIndex / layout.totalCols) * 100;
                         const widthPct = (1 / layout.totalCols) * 100;
@@ -2806,11 +2823,28 @@ export default function TimeTracking() {
                                 ) : null}
                               </>
                             ) : null}
-                            {label ? <div className="font-medium truncate pr-4">{label}</div> : null}
+                            {displayTitle ? (
+                              <div className="font-medium truncate pr-4">{displayTitle}</div>
+                            ) : null}
+                            {noteMaxLines > 0 ? (
+                              <div
+                                className={cn(
+                                  "mt-0.5 pr-4 text-[9px] leading-snug text-white/85 break-words",
+                                  noteMaxLines === 1
+                                    ? "line-clamp-1"
+                                    : noteMaxLines === 2
+                                      ? "line-clamp-2"
+                                      : "line-clamp-3"
+                                )}
+                                title={noteText}
+                              >
+                                {noteText}
+                              </div>
+                            ) : null}
                             <div className="text-[9px] tabular-nums text-white/90 leading-tight pr-4">
                               {startTimeLabel} – {endTimeLabel} · {durationLabel}
                             </div>
-                            {proj ? (
+                            {showProjBelowTimes ? (
                               <div
                                 className="text-[9px] font-medium truncate pr-4"
                                 style={projStripe ? { color: projStripe } : undefined}
@@ -2837,11 +2871,6 @@ export default function TimeTracking() {
                                     </span>
                                   );
                                 })}
-                              </div>
-                            ) : null}
-                            {e.note && !isDayOff ? (
-                              <div className="mt-0.5 pr-4 text-[9px] leading-snug text-white/85 whitespace-pre-wrap break-words">
-                                {e.note}
                               </div>
                             ) : null}
                             {canEditVisiblePeriod && !isDayOff ? (
