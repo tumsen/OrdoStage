@@ -1280,6 +1280,15 @@ export default function TimeTracking() {
     }, 0);
   }, [weekDays, totalsByColumnDay]);
 
+  const monthTotalMinutes = useMemo(() => {
+    const monthStart = startOfMonth(anchor);
+    const monthEnd = endOfMonth(anchor);
+    return eachDayOfInterval({ start: monthStart, end: monthEnd }).reduce((sum, d) => {
+      const k = format(d, "yyyy-MM-dd");
+      return sum + (totalsByDay.get(k) ?? 0);
+    }, 0);
+  }, [anchor, totalsByDay]);
+
   /** Cumulative minutes Mon → this column (same order as `weekDays`). */
   const weekRunningTotalMinutes = useMemo(() => {
     let sum = 0;
@@ -1546,6 +1555,47 @@ export default function TimeTracking() {
     ? (weekRunningTotalMinutes[gridWeekIndex(0)] ?? mobileScheduleDayTotalMinutes)
     : 0;
   const isTimeSection = section === "time";
+  const periodTotalMinutes = mode === "week" ? weekTotalMinutes : monthTotalMinutes;
+  const periodTotalLabel = mode === "week" ? "Week total" : "Month total";
+
+  function ApproveWeekControl({ className }: { className?: string }) {
+    if (!(isTimeSection && mode === "week")) return null;
+    return (
+      <div className={cn("flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 shrink-0", className)}>
+        {approvedTimesheet ? (
+          <>
+            <span className="inline-flex items-center gap-1 text-xs text-emerald-300">
+              <Lock className="h-3 w-3" />
+              Approved
+            </span>
+            {readAll ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-white/55 hover:text-white"
+                onClick={() => reopenTimesheet.mutate(approvedTimesheet.id)}
+                disabled={reopenTimesheet.isPending}
+              >
+                Reopen
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-white/65 hover:text-white"
+            onClick={() => approveTimesheet.mutate()}
+            disabled={!canEdit || approveTimesheet.isPending}
+          >
+            Approve week
+          </Button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -1626,6 +1676,33 @@ export default function TimeTracking() {
             </Select>
           </div>
           ) : null}
+          {/* Week/month toggle before date navigation */}
+          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setMode("week")}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                mode === "week" ? "bg-white/10 text-white" : "text-white/55"
+              )}
+            >
+              {t("time.week")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSection("time");
+                setMode("month");
+              }}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                mode === "month" ? "bg-white/10 text-white" : "text-white/55",
+                section !== "time" && "opacity-60"
+              )}
+            >
+              {t("time.month")}
+            </button>
+          </div>
           {/* Date nav slot */}
           <div className="flex items-center gap-2 shrink-0">
           <Button
@@ -1665,81 +1742,6 @@ export default function TimeTracking() {
           >
             Today
           </Button>
-          {/* Week/month toggle lives next to date navigation (like before). */}
-          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setMode("week")}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-sm",
-                mode === "week" ? "bg-white/10 text-white" : "text-white/55"
-              )}
-            >
-              {t("time.week")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSection("time");
-                setMode("month");
-              }}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-sm",
-                mode === "month" ? "bg-white/10 text-white" : "text-white/55",
-                section !== "time" && "opacity-60"
-              )}
-            >
-              {t("time.month")}
-            </button>
-          </div>
-          </div>
-          {/* Week total slot (reserved space, only visible in week mode + time section) */}
-          <div
-            className={cn(
-              "w-[260px] max-w-full text-xs tabular-nums whitespace-nowrap overflow-hidden text-ellipsis",
-              isTimeSection && mode === "week" ? "text-white/60" : "text-white/0 select-none"
-            )}
-            aria-hidden={!(isTimeSection && mode === "week")}
-          >
-            Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
-            <span className={cn("text-white/35", !(isTimeSection && mode === "week") && "text-white/0")}> · </span>
-            {formatTotalMinutesAsHHMM(weekTotalMinutes)}
-          </div>
-          {/* Approve slot (reserved space) */}
-          <div className={cn("w-[190px]", isTimeSection && mode === "week" ? "" : "invisible pointer-events-none")} aria-hidden={!(isTimeSection && mode === "week")}>
-            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1">
-              {approvedTimesheet ? (
-                <>
-                  <span className="inline-flex items-center gap-1 text-xs text-emerald-300">
-                    <Lock className="h-3 w-3" />
-                    Approved
-                  </span>
-                  {readAll ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs text-white/55 hover:text-white"
-                      onClick={() => reopenTimesheet.mutate(approvedTimesheet.id)}
-                      disabled={reopenTimesheet.isPending || !(isTimeSection && mode === "week")}
-                    >
-                      Reopen
-                    </Button>
-                  ) : null}
-                </>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs text-white/65 hover:text-white"
-                  onClick={() => approveTimesheet.mutate()}
-                  disabled={!canEdit || approveTimesheet.isPending || !(isTimeSection && mode === "week")}
-                >
-                  Approve week
-                </Button>
-              )}
-            </div>
           </div>
           {/* Person selector slot (fixed width) */}
           <div className="w-[220px]">
@@ -1835,9 +1837,36 @@ export default function TimeTracking() {
                 </Button>
               </Link>
             ) : null}
+            <ApproveWeekControl />
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:hidden">
+          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+            <button
+              type="button"
+              onClick={() => setMode("week")}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                mode === "week" ? "bg-white/10 text-white" : "text-white/55"
+              )}
+            >
+              {t("time.week")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSection("time");
+                setMode("month");
+              }}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                mode === "month" ? "bg-white/10 text-white" : "text-white/55",
+                section !== "time" && "opacity-60"
+              )}
+            >
+              {t("time.month")}
+            </button>
+          </div>
           <Button
             type="button"
             variant="outline"
@@ -1875,39 +1904,6 @@ export default function TimeTracking() {
           >
             Today
           </Button>
-          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
-            <button
-              type="button"
-              onClick={() => setMode("week")}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-sm",
-                mode === "week" ? "bg-white/10 text-white" : "text-white/55"
-              )}
-            >
-              {t("time.week")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSection("time");
-                setMode("month");
-              }}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-sm",
-                mode === "month" ? "bg-white/10 text-white" : "text-white/55",
-                section !== "time" && "opacity-60"
-              )}
-            >
-              {t("time.month")}
-            </button>
-          </div>
-          {isTimeSection && mode === "week" ? (
-            <span className="text-xs text-white/60 tabular-nums">
-              Week total {formatOneDecimalHour(weekTotalMinutes / 60, commaDec)}
-              <span className="text-white/35"> · </span>
-              {formatTotalMinutesAsHHMM(weekTotalMinutes)}
-            </span>
-          ) : null}
           </div>
           {isMobile ? (
             <DropdownMenu>
@@ -2013,45 +2009,56 @@ export default function TimeTracking() {
       </div>
       ) : null}
 
-      {leaveManagementEnabled && leaveBalances && isTimeSection ? (
+      {isTimeSection ? (
         <div className="shrink-0">
           <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap items-center gap-x-4 gap-y-1">
-            <span className="text-white/40 font-medium">{t("time.leaveBalancesTitle")}</span>
-            <span>
-              {t("time.leaveVacationRemaining")}:{" "}
-              <span
-                className={cn(
-                  "tabular-nums font-medium",
-                  leaveBalances.vacationRemainingDays < 0 ? "text-red-300" : "text-emerald-300"
-                )}
-              >
-                {leaveBalances.vacationRemainingDays.toFixed(1)}d
-              </span>
+            <span className="tabular-nums text-white/60">
+              {periodTotalLabel}{" "}
+              {formatOneDecimalHour(periodTotalMinutes / 60, commaDec)}
+              <span className="text-white/35"> · </span>
+              {formatTotalMinutesAsHHMM(periodTotalMinutes)}
             </span>
-            <span>
-              {t("time.leaveExtraRemaining")}:{" "}
-              <span className="tabular-nums text-teal-300 font-medium">
-                {leaveBalances.extraVacationRemainingDays.toFixed(1)}d
-              </span>
-            </span>
-            <span>
-              {t("time.leaveCompRemaining")}:{" "}
-              <span className="tabular-nums text-cyan-300 font-medium">
-                {Math.floor(leaveBalances.compTimeRemainingMinutes / 60)}h{" "}
-                {leaveBalances.compTimeRemainingMinutes % 60}m
-              </span>
-            </span>
-            <span className="text-white/35">({leaveBalances.vacationYearKey})</span>
-            {balancePersonId ? (
-              <span className="ml-auto">
-                <LeaveLedgerMenu
-                  personId={balancePersonId}
-                  vacationYearKey={leaveBalances.vacationYearKey}
-                  leave={leaveBalances}
-                  canAdjust={readAll}
-                  variant="compact"
-                />
-              </span>
+            {leaveManagementEnabled && leaveBalances ? (
+              <>
+                <span className="text-white/25 hidden sm:inline">·</span>
+                <span className="text-white/40 font-medium">{t("time.leaveBalancesTitle")}</span>
+                <span>
+                  {t("time.leaveVacationRemaining")}:{" "}
+                  <span
+                    className={cn(
+                      "tabular-nums font-medium",
+                      leaveBalances.vacationRemainingDays < 0 ? "text-red-300" : "text-emerald-300"
+                    )}
+                  >
+                    {leaveBalances.vacationRemainingDays.toFixed(1)}d
+                  </span>
+                </span>
+                <span>
+                  {t("time.leaveExtraRemaining")}:{" "}
+                  <span className="tabular-nums text-teal-300 font-medium">
+                    {leaveBalances.extraVacationRemainingDays.toFixed(1)}d
+                  </span>
+                </span>
+                <span>
+                  {t("time.leaveCompRemaining")}:{" "}
+                  <span className="tabular-nums text-cyan-300 font-medium">
+                    {Math.floor(leaveBalances.compTimeRemainingMinutes / 60)}h{" "}
+                    {leaveBalances.compTimeRemainingMinutes % 60}m
+                  </span>
+                </span>
+                <span className="text-white/35">({leaveBalances.vacationYearKey})</span>
+                {balancePersonId ? (
+                  <span className="ml-auto">
+                    <LeaveLedgerMenu
+                      personId={balancePersonId}
+                      vacationYearKey={leaveBalances.vacationYearKey}
+                      leave={leaveBalances}
+                      canAdjust={readAll}
+                      variant="compact"
+                    />
+                  </span>
+                ) : null}
+              </>
             ) : null}
           </div>
         </div>
