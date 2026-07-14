@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { isDayOffCategory, isLeaveAutoProjectCategory } from "@/lib/timeCategoryI18n";
+import { isDayOffCategory, isLeaveAutoProjectCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
 import {
   clampDayOffDurationMinutes,
   formatWorkDayDuration,
@@ -300,8 +300,12 @@ export function TimeEntryEditSheet(props: {
     );
     return {
       note: note.trim() ? note.trim() : null,
-      timeProjectId: usesLeaveSystemProject ? null : projectId,
-      tagIds: [...selectedTags],
+      timeProjectId: isVacationNoteOnlyCategory(category)
+        ? null
+        : usesLeaveSystemProject
+          ? null
+          : projectId,
+      tagIds: isVacationNoteOnlyCategory(category) ? [] : [...selectedTags],
       category,
       startsAt: newStart.toISOString(),
       endsAt: newEnd.toISOString(),
@@ -370,6 +374,7 @@ export function TimeEntryEditSheet(props: {
   };
 
   const isDayOff = isDayOffCategory(category);
+  const isVacationNoteOnly = isVacationNoteOnlyCategory(category);
   const usesLeaveSystemProject = isLeaveAutoProjectCategory(category);
   const dayOffMaxLabel = formatWorkDayDuration(workDayDurationMinutes);
 
@@ -465,7 +470,10 @@ export function TimeEntryEditSheet(props: {
                   disabled={entry?.isLocked}
                   onClick={() => {
                     setCategory(opt.value);
-                    if (isLeaveAutoProjectCategory(opt.value)) {
+                    if (isVacationNoteOnlyCategory(opt.value)) {
+                      setProjectId(null);
+                      setSelectedTags(new Set());
+                    } else if (isLeaveAutoProjectCategory(opt.value)) {
                       setProjectId(null);
                     }
                     applyWorkDayDuration(opt.value);
@@ -549,7 +557,7 @@ export function TimeEntryEditSheet(props: {
             <p className="text-[11px] text-white/40 -mt-1">{t("time.editTimePreciseHint")}</p>
           ) : null}
 
-          {!usesLeaveSystemProject ? (
+          {!usesLeaveSystemProject && !isVacationNoteOnly ? (
           <div className="grid gap-1.5">
             <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.projectLabel")}</Label>
             <Popover open={projectOpen} onOpenChange={setProjectOpen}>
@@ -633,6 +641,7 @@ export function TimeEntryEditSheet(props: {
             </Popover>
           </div>
           ) : null}
+          {!isVacationNoteOnly ? (
           <div className={cn("grid gap-1.5 min-h-0", isMobile && "overflow-hidden")}>
             <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.tagsLabel")}</Label>
             <div
@@ -678,6 +687,7 @@ export function TimeEntryEditSheet(props: {
               )}
             </div>
           </div>
+          ) : null}
           <div className={cn("grid gap-1.5", isMobile && "min-h-0")}>
             <Label className={cn("text-white/80", isMobile && "text-xs")}>{t("time.noteLabel")}</Label>
             <Textarea

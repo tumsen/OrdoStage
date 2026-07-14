@@ -1,7 +1,6 @@
 import { prisma } from "../prisma";
 
 export const LEAVE_AUTO_PROJECT_CATEGORIES = [
-  "vacation",
   "extra_vacation",
   "sick",
   "comp_time",
@@ -9,11 +8,26 @@ export const LEAVE_AUTO_PROJECT_CATEGORIES = [
 
 export type LeaveAutoProjectCategory = (typeof LEAVE_AUTO_PROJECT_CATEGORIES)[number];
 
+export function isVacationNoteOnlyCategory(cat: string): boolean {
+  return cat === "vacation";
+}
+
+/** Vacation: note only. Other leave types may use system projects. */
+export function normalizeEntryProjectAndTags(
+  category: string,
+  timeProjectId: string | null,
+  tagIds: string[]
+): { timeProjectId: string | null; tagIds: string[] } {
+  if (isVacationNoteOnlyCategory(category)) {
+    return { timeProjectId: null, tagIds: [] };
+  }
+  return { timeProjectId, tagIds };
+}
+
 const LEAVE_PROJECT_DEFS: Record<
   LeaveAutoProjectCategory,
   { systemKey: string; name: string; color: string; sortOrder: number }
 > = {
-  vacation: { systemKey: "leave_vacation", name: "Ferie", color: "#34d399", sortOrder: -40 },
   extra_vacation: {
     systemKey: "leave_extra_vacation",
     name: "Feriefridage",

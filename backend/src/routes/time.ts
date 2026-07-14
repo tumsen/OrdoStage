@@ -20,6 +20,8 @@ import {
   backfillLeaveEntryProjects,
   ensureAllLeaveTimeProjects,
   isLeaveSystemProjectKey,
+  isVacationNoteOnlyCategory,
+  normalizeEntryProjectAndTags,
   resolveEntryTimeProjectId,
 } from "../services/leaveTimeProjects";
 import {
@@ -1837,6 +1839,19 @@ timeRouter.post("/time/bulk-update", zValidator("json", BulkTimeEntryUpdateSchem
   // Update the entries themselves
   const updated = Object.keys(data).length ? await prisma.timeEntry.updateMany({ where, data }) : { count: 0 };
 
+  if (body.action.setCategory === "vacation") {
+    const vacationIds = await prisma.timeEntry.findMany({
+      where,
+      select: { id: true },
+      take: 5000,
+    });
+    if (vacationIds.length > 0) {
+      await prisma.timeEntryTag.deleteMany({
+        where: { timeEntryId: { in: vacationIds.map((r) => r.id) } },
+      });
+    }
+  }
+
   // Tag operations across matches
   if (body.action.addTagId || body.action.removeTagId) {
     const ids = await prisma.timeEntry.findMany({
@@ -3546,18 +3561,23 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
     entryCategory,
     body.timeProjectId ?? null
   );
-  if (resolvedCustomProjectId) {
+  const normalizedCustom = normalizeEntryProjectAndTags(
+    entryCategory,
+    resolvedCustomProjectId,
+    body.tagIds ?? []
+  );
+  if (normalizedCustom.timeProjectId) {
     const p = await prisma.timeProject.findFirst({
-      where: { id: resolvedCustomProjectId, organizationId: user.organizationId },
+      where: { id: normalizedCustom.timeProjectId, organizationId: user.organizationId },
     });
     if (!p) return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
-  } else if (body.timeProjectId) {
+  } else if (body.timeProjectId && !isVacationNoteOnlyCategory(entryCategory)) {
     const p = await prisma.timeProject.findFirst({
       where: { id: body.timeProjectId, organizationId: user.organizationId },
     });
     if (!p) return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
   }
-  const tagIds = body.tagIds ?? [];
+  const tagIds = normalizedCustom.tagIds;
   if (tagIds.length) {
     const count = await prisma.timeTag.count({
       where: { organizationId: user.organizationId, id: { in: tagIds } },
@@ -3604,7 +3624,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       eventShowStaffingId: null,
       internalBookingPersonId: null,
       internalBookingDayKey: null,
-      timeProjectId: resolvedCustomProjectId,
+      timeProjectId: normalizedCustom.timeProjectId,
       note: body.note ?? null,
       isLocked: body.isLocked ?? false,
       ...segmentGroupPatchCustom,
@@ -3630,7 +3650,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           eventShowStaffingId: null,
           internalBookingPersonId: null,
           internalBookingDayKey: null,
-          timeProjectId: resolvedCustomProjectId,
+          timeProjectId: normalizedCustom.timeProjectId,
           note: body.note ?? null,
           isLocked: body.isLocked ?? false,
           ...segmentGroupPatchCustom,
@@ -3926,14 +3946,20 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
   const finalEventId = body.eventId !== undefined ? body.eventId : existing.eventId;
   const requestedProjectId =
     body.timeProjectId !== undefined ? body.timeProjectId : existing.timeProjectId;
-  const finalProjectId = await resolveEntryTimeProjectId(
+  const resolvedProjectId = await resolveEntryTimeProjectId(
     user.organizationId,
     finalCategory,
     requestedProjectId
   );
+  const normalizedPatch = normalizeEntryProjectAndTags(
+    finalCategory,
+    resolvedProjectId,
+    body.tagIds !== undefined ? body.tagIds : existing.tagLinks.map((t) => t.timeTagId)
+  );
+  const finalProjectId = normalizedPatch.timeProjectId;
   const finalNote = body.note !== undefined ? body.note : existing.note;
   const finalIsLocked = body.isLocked !== undefined ? body.isLocked : existing.isLocked;
-  const finalTagIds = body.tagIds !== undefined ? body.tagIds : existing.tagLinks.map((t) => t.timeTagId);
+  const finalTagIds = normalizedPatch.tagIds;
 
   const spans = await computeNonOverlappingSpans({
     organizationId: user.organizationId,

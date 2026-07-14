@@ -21,11 +21,15 @@ export const DAY_OFF_CATEGORIES: TimeCategory[] = [
 
 /** Leave types that always map to a system time project (not user-selectable). */
 export const LEAVE_AUTO_PROJECT_CATEGORIES = [
-  "vacation",
   "extra_vacation",
   "sick",
   "comp_time",
 ] as const satisfies readonly TimeCategory[];
+
+/** Vacation entries are note-only — no project or tags. */
+export function isVacationNoteOnlyCategory(cat: string): boolean {
+  return cat === "vacation";
+}
 
 export function isLeaveAutoProjectCategory(cat: string): cat is TimeCategory {
   return (LEAVE_AUTO_PROJECT_CATEGORIES as readonly string[]).includes(cat);
