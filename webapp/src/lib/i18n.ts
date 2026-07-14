@@ -73,6 +73,9 @@ const en = {
     entryLocked: "Entry locked.",
     entryUnlocked: "Entry unlocked.",
     editEntry: "Edit entry",
+    copyEntry: "Copy entry",
+    copyModeHint: "Click a day to paste the entry. Press any key to cancel.",
+    entryCopied: "Entry copied.",
     lockEntry: "Lock entry",
     unlockEntry: "Unlock entry",
     lockedShort: "Locked",
@@ -485,6 +488,9 @@ const da: DeepPartial<typeof en> = {
     categoryTravelAllowance: "Rejsegodtgørsel",
     dragHint:
       "Træk på tom plads for at oprette en blok (snapper til 5 min). Træk blokke for at flytte; træk top eller bund for at ændre længde. Blyant: projekt, tidspunkter, kategori (fx rejsegodtgørsel), tags, note.",
+    copyEntry: "Kopiér registrering",
+    copyModeHint: "Klik på en dag for at indsætte. Tryk en tast for at annullere.",
+    entryCopied: "Registrering kopieret.",
     editTimePreciseHint:
       "Brug præcis tid (TT:MM), fx 07:24 for 7 t. 24 min. Træk på ugen snupper stadig til 5 minutter.",
     weekToolsExpand: "Kommende jobs & katalog",

@@ -34,6 +34,7 @@ import {
   FileSpreadsheet,
   Upload,
   Trash2,
+  Copy,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -84,7 +85,11 @@ import type {
 } from "@/contracts/backendTypes";
 import type { Language, TimeFormat } from "@/lib/preferences";
 import { calendarDateKeyFromJobDate } from "@/lib/showTiming";
-import { addMinutesToUtcIso, wallClockYmdHhMmToUtcIso } from "@/lib/browserUserTime";
+import {
+  addMinutesToUtcIso,
+  localHhMmFromUtcIso,
+  wallClockYmdHhMmToUtcIso,
+} from "@/lib/browserUserTime";
 import {
   formatWorkDayDuration,
   workDayDurationMinutes,
@@ -135,6 +140,27 @@ function plannedJobKeyFromEntry(e: TimeEntry): string | null {
     return `${IBOOKP_PREFIX}${e.internalBookingPersonId}:${e.internalBookingDayKey}`;
   }
   return null;
+}
+
+function buildCopiedEntryBody(source: TimeEntry, targetDayYmd: string): Record<string, unknown> {
+  const cat = source.category ?? "work";
+  const startsAt = wallClockYmdHhMmToUtcIso(targetDayYmd, localHhMmFromUtcIso(source.startsAt));
+  const srcStart = parseISO(source.startsAt);
+  const srcEnd = parseISO(source.endsAt);
+  const durationMin = Math.max(1, Math.round((srcEnd.getTime() - srcStart.getTime()) / 60000));
+  const endsAt = addMinutesToUtcIso(startsAt, durationMin);
+  if (!endsAt) throw new Error("invalid copy range");
+
+  const noteOnly = isVacationNoteOnlyCategory(cat);
+  return {
+    kind: "custom",
+    category: cat,
+    startsAt,
+    endsAt,
+    note: source.note,
+    timeProjectId: noteOnly ? null : source.timeProjectId,
+    tagIds: noteOnly ? [] : [...source.tagIds],
+  };
 }
 
 /** Fill/border strength: stacked layers behind the top entry are more transparent (venue-booking style). */
@@ -639,6 +665,7 @@ export default function TimeTracking() {
   const canEditVisiblePeriod = canEdit && !isApprovedWeek;
 
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [copySourceEntryId, setCopySourceEntryId] = useState<string | null>(null);
 
   const updateEntry = useMutation({
     mutationFn: ({
@@ -917,6 +944,42 @@ export default function TimeTracking() {
   useEffect(() => {
     if (editingEntryId && !editingEntry) setEditingEntryId(null);
   }, [editingEntryId, editingEntry]);
+
+  const copySourceEntry = useMemo(
+    () => (entries ?? []).find((x) => x.id === copySourceEntryId) ?? null,
+    [entries, copySourceEntryId]
+  );
+
+  useEffect(() => {
+    if (copySourceEntryId && !copySourceEntry) setCopySourceEntryId(null);
+  }, [copySourceEntryId, copySourceEntry]);
+
+  useEffect(() => {
+    if (!copySourceEntryId) return;
+    const onKey = () => setCopySourceEntryId(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [copySourceEntryId]);
+
+  useEffect(() => {
+    if (!canEditVisiblePeriod) setCopySourceEntryId(null);
+  }, [canEditVisiblePeriod]);
+
+  const pasteCopyToDay = useCallback(
+    (targetDayYmd: string) => {
+      if (!copySourceEntry || !canEditVisiblePeriod) return;
+      try {
+        createEntry.mutate(buildCopiedEntryBody(copySourceEntry, targetDayYmd), {
+          onSuccess: () => {
+            timeNotify({ title: t("time.entryCopied") });
+          },
+        });
+      } catch {
+        /* invalid range */
+      }
+    },
+    [copySourceEntry, canEditVisiblePeriod, createEntry, timeNotify, t]
+  );
 
   const attachCreateDragListeners = useCallback(
     (dayYmd: string, startClientX: number, startClientY: number) => {
@@ -2012,6 +2075,9 @@ export default function TimeTracking() {
       {isTimeSection ? (
         <div className="shrink-0">
           <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap items-center gap-x-4 gap-y-1">
+            {copySourceEntryId ? (
+              <span className="font-medium text-ordo-yellow">{t("time.copyModeHint")}</span>
+            ) : null}
             <span className="tabular-nums text-white/60">
               {periodTotalLabel}{" "}
               {formatOneDecimalHour(periodTotalMinutes / 60, commaDec)}
@@ -2150,7 +2216,13 @@ export default function TimeTracking() {
                           <button
                             key={ymd}
                             type="button"
-                            onClick={() => setSelectedDayIndex(i)}
+                            onClick={() => {
+                              if (copySourceEntryId) {
+                                pasteCopyToDay(ymd);
+                                return;
+                              }
+                              setSelectedDayIndex(i);
+                            }}
                             className={cn(
                               "h-2 w-2 rounded-full transition-colors",
                               i === selectedDayIndex
@@ -2189,7 +2261,12 @@ export default function TimeTracking() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 min-h-8 min-w-8 shrink-0 border-white/15 text-white"
-                      onClick={() => shiftMobileDay(-1)}
+                      onClick={() => {
+                        if (copySourceEntryId) {
+                          pasteCopyToDay(format(addDays(anchor, -1), "yyyy-MM-dd"));
+                        }
+                        shiftMobileDay(-1);
+                      }}
                       aria-label="Previous day"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -2203,7 +2280,12 @@ export default function TimeTracking() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 min-h-8 min-w-8 shrink-0 border-white/15 text-white"
-                      onClick={() => shiftMobileDay(1)}
+                      onClick={() => {
+                        if (copySourceEntryId) {
+                          pasteCopyToDay(format(addDays(anchor, 1), "yyyy-MM-dd"));
+                        }
+                        shiftMobileDay(1);
+                      }}
                       aria-label="Next day"
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -2289,8 +2371,12 @@ export default function TimeTracking() {
                             "min-w-0 text-xs text-white/70",
                             gridIdx > 0 && "border-l border-white/10",
                             col?.bg,
-                            col ? `border-b ${col.border}` : "border-b border-white/10"
+                            col ? `border-b ${col.border}` : "border-b border-white/10",
+                            copySourceEntryId && canEditVisiblePeriod && "cursor-copy hover:bg-white/[0.04]"
                           )}
+                          onClick={() => {
+                            if (copySourceEntryId && canEditVisiblePeriod) pasteCopyToDay(dayYmd);
+                          }}
                         >
                           <div className="flex items-start justify-between gap-1">
                             <div className="min-w-0 flex-1 text-left">
@@ -2328,7 +2414,10 @@ export default function TimeTracking() {
                               </div>
                             </div>
                             {canEditVisiblePeriod && !dayOffEntry ? (
-                              <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                              <div
+                                className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+                                onClick={(ev) => ev.stopPropagation()}
+                              >
                                 <button
                                   type="button"
                                   title={`${t("time.addVacationDay")} (${workDayDurationLabel})`}
@@ -2372,7 +2461,10 @@ export default function TimeTracking() {
                             <button
                               type="button"
                               disabled={!canEditVisiblePeriod}
-                              onClick={() => setEditingEntryId(dayOffEntry.id)}
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                setEditingEntryId(dayOffEntry.id);
+                              }}
                               className={cn(
                                 "mt-1 text-[9px] font-medium text-left",
                                 col?.text,
@@ -2508,9 +2600,14 @@ export default function TimeTracking() {
                     {canEditVisiblePeriod ? (
                       <>
                         <div
-                          className="absolute inset-0 z-[1] cursor-crosshair touch-none"
+                          className="absolute inset-0 z-[1] touch-none"
+                          style={{ cursor: copySourceEntryId ? "copy" : "crosshair" }}
                           onPointerDown={(ev) => {
                             ev.preventDefault();
+                            if (copySourceEntryId) {
+                              pasteCopyToDay(dayYmd);
+                              return;
+                            }
                             registerDayColumnRef(
                               (ev.currentTarget as HTMLElement).closest("[data-day-col]"),
                               dayYmd
@@ -2711,6 +2808,7 @@ export default function TimeTracking() {
                               "absolute rounded border px-1 pt-1 pb-2 text-[10px] overflow-hidden shadow-sm select-none",
                               timeEntryBlockSurfaceClass(cat, isJob, layout.stackIndex, layout.stackCount),
                               isLocked ? "opacity-90" : "",
+                              copySourceEntryId === e.id ? "ring-2 ring-ordo-yellow/80" : "",
                               canEditVisiblePeriod && !isLocked ? "cursor-grab active:cursor-grabbing" : ""
                             )}
                             data-entry-block={e.id}
@@ -2771,7 +2869,25 @@ export default function TimeTracking() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="absolute top-5 right-0 z-[4] flex h-5 w-5 items-center justify-center rounded-sm text-white/70 hover:bg-white/15 hover:text-white disabled:opacity-40"
+                                  className={cn(
+                                    "absolute top-5 right-0 z-[3] flex h-5 w-5 items-center justify-center rounded-sm hover:bg-white/15",
+                                    copySourceEntryId === e.id
+                                      ? "bg-ordo-yellow/25 text-ordo-yellow"
+                                      : "text-white/70 hover:text-white"
+                                  )}
+                                  data-handle="copy"
+                                  aria-label={t("time.copyEntry")}
+                                  onPointerDown={(ev) => ev.stopPropagation()}
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setCopySourceEntryId((cur) => (cur === e.id ? null : e.id));
+                                  }}
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="absolute top-10 right-0 z-[4] flex h-5 w-5 items-center justify-center rounded-sm text-white/70 hover:bg-white/15 hover:text-white disabled:opacity-40"
                                   data-handle="lock"
                                   aria-label={isLocked ? t("time.unlockEntry") : t("time.lockEntry")}
                                   disabled={updateEntry.isPending}
