@@ -356,7 +356,7 @@ const en = {
     reportRangeYear: "Year",
     reportRangeCustom: "Custom range",
     reportContractHint:
-      "Click the contract hours cell to set expected weekly hours per person. Overtime = logged work hours − contracted hours over the period.",
+      "Click the contract hours cell to set expected weekly hours per person. Overtime = (work + vacation + feriefridage + holidays) − contracted hours over the period.",
     reportColVacUsed: "Vac. used",
     reportColVacLeft: "Vac. left",
   },

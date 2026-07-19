@@ -63,6 +63,7 @@ import type {
   TimeReportEntry,
 } from "@/contracts/backendTypes";
 import { timeCategoryMessageId } from "@/lib/timeCategoryI18n";
+import { overtimeAgainstContract } from "@/lib/leaveNorms";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -752,7 +753,15 @@ export default function TimeReport() {
         ...p,
         weeklyContractHours: contractHours ?? null,
         contractMinutes,
-        overtimeMinutes: contractMinutes != null ? p.workMinutes - contractMinutes : null,
+        overtimeMinutes: overtimeAgainstContract(
+          {
+            workMinutes: p.workMinutes,
+            vacationMinutes: p.vacationMinutes,
+            extraVacationMinutes: p.extraVacationMinutes,
+            holidayMinutes: p.holidayMinutes,
+          },
+          contractMinutes
+        ),
       };
     });
     return rows.sort((a, b) => {

@@ -21,7 +21,7 @@ import {
   mapPersonLeaveProfile,
   postLeaveTransaction,
 } from "../services/leaveLedger";
-import { resolveVacationYear, resolveLeaveNorms } from "../rules/leave/danishLeave";
+import { resolveVacationYear, resolveLeaveNorms, overtimeAgainstContract } from "../rules/leave/danishLeave";
 
 const leaveRouter = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -471,14 +471,23 @@ leaveRouter.get("/time/payroll-export", async (c) => {
     );
     const personEntries = entries.filter((e) => e.personId === p.id);
     let workMinutes = 0;
+    let vacationMinutes = 0;
+    let extraVacationMinutes = 0;
+    let holidayMinutes = 0;
     for (const e of personEntries) {
-      if ((e.category || "work") === "work") {
-        workMinutes += Math.max(0, (e.endsAt.getTime() - e.startsAt.getTime()) / 60_000);
-      }
+      const cat = e.category || "work";
+      const dur = Math.max(0, (e.endsAt.getTime() - e.startsAt.getTime()) / 60_000);
+      if (cat === "work") workMinutes += dur;
+      else if (cat === "vacation") vacationMinutes += dur;
+      else if (cat === "extra_vacation") extraVacationMinutes += dur;
+      else if (cat === "holiday") holidayMinutes += dur;
     }
     const contractMinutes =
       norms.weeklyContractHours != null ? (rangeDays / 7) * norms.weeklyContractHours * 60 : null;
-    const overtimeMinutes = contractMinutes != null ? workMinutes - contractMinutes : null;
+    const overtimeMinutes = overtimeAgainstContract(
+      { workMinutes, vacationMinutes, extraVacationMinutes, holidayMinutes },
+      contractMinutes
+    );
 
     if (overtimeMinutes != null && overtimeMinutes > 0) {
       const { accrueCompTimeFromOvertime } = await import("../services/leaveLedger");

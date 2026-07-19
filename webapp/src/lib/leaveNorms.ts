@@ -14,6 +14,28 @@ export function workDayDurationMinutes(weeklyHours: number | null | undefined): 
   return Math.round((weekly * 60) / 5);
 }
 
+/**
+ * Danish model: weekly/period norm is fulfilled by work + vacation + feriefridage + holidays.
+ * Overtime = that sum − prorated contract minutes.
+ */
+export function overtimeAgainstContract(
+  parts: {
+    workMinutes: number;
+    vacationMinutes?: number;
+    extraVacationMinutes?: number;
+    holidayMinutes?: number;
+  },
+  contractMinutes: number | null | undefined
+): number | null {
+  if (contractMinutes == null) return null;
+  const fulfilling =
+    parts.workMinutes +
+    (parts.vacationMinutes ?? 0) +
+    (parts.extraVacationMinutes ?? 0) +
+    (parts.holidayMinutes ?? 0);
+  return fulfilling - contractMinutes;
+}
+
 export function formatWorkDayDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;

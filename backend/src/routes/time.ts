@@ -10,7 +10,7 @@ import type { EffectiveRole } from "../effectiveRole";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { getCountryRuleSet, type TravelAllowanceType, type TravelClaimDayLine, type MileageVehicleType } from "../rules/countryRuleSets";
 import { isCountryFeatureEnabled } from "../countryFeatures";
-import { hoursPerWorkDayFromWeekly } from "../rules/leave/danishLeave";
+import { hoursPerWorkDayFromWeekly, overtimeAgainstContract } from "../rules/leave/danishLeave";
 import {
   applyTimeEntryToLeaveLedger,
   getLeaveBalanceSummary,
@@ -1617,7 +1617,15 @@ timeRouter.get("/time/report", async (c) => {
       travelAllowanceMinutes: pa.travelAllowanceMinutes,
       weeklyContractHours: pa.weeklyContractHours,
       contractMinutes,
-      overtimeMinutes: contractMinutes != null ? pa.workMinutes - contractMinutes : null,
+      overtimeMinutes: overtimeAgainstContract(
+        {
+          workMinutes: pa.workMinutes,
+          vacationMinutes: pa.vacationMinutes,
+          extraVacationMinutes: pa.extraVacationMinutes,
+          holidayMinutes: pa.holidayMinutes,
+        },
+        contractMinutes
+      ),
       vacationDaysPerYear: pa.vacationDaysPerYear,
       vacationDaysUsed: pa.vacationDaysPerYear != null || pa.vacationMinutes > 0 ? vacationDaysUsed : null,
       vacationDaysRemaining,
