@@ -421,15 +421,20 @@ export default function TimeReport() {
     [people]
   );
   const projectOptions = useMemo(
-    () =>
-      (projects ?? [])
+    () => [
+      { id: "__none__", label: t("time.noProject") },
+      ...(projects ?? [])
         .filter((p) => !p.isArchived)
         .map((p) => ({ id: p.id, label: p.name })),
-    [projects]
+    ],
+    [projects, t]
   );
   const parentCategoryOptions = useMemo(
-    () => (parentCategories ?? []).map((c) => ({ id: c.id, label: c.name })),
-    [parentCategories]
+    () => [
+      { id: "__none__", label: t("time.parentCategoryNone") },
+      ...(parentCategories ?? []).map((c) => ({ id: c.id, label: c.name })),
+    ],
+    [parentCategories, t]
   );
   const categoryOptions = [
     { id: "work", label: t("time.categoryWork") },

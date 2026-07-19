@@ -60,6 +60,7 @@ import {
   startOfLocalCalendarDayInZone,
   wallClockInstantFromDateIsoAndHHMM,
 } from "../clientWallClock";
+import { DateTime } from "luxon";
 import {
   archiveLegacyEventShowProjects,
   archiveLegacyTourShowProjects,
@@ -742,12 +743,18 @@ function parseRange(c: { req: { query: (k: string) => string | undefined } }) {
   const from = c.req.query("from");
   const to = c.req.query("to");
   if (!from || !to) return { error: "from and to (YYYY-MM-DD) are required" as const };
-  const rangeStart = new Date(`${from}T00:00:00.000Z`);
-  const toPlus = new Date(`${to}T00:00:00.000Z`);
-  if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(toPlus.getTime())) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
     return { error: "invalid date" as const };
   }
-  const rangeEndExclusive = new Date(toPlus.getTime() + 86_400_000);
+  /** Bound calendar days in the browser’s wall-clock zone (imported / logged times use the same zone). */
+  const zone = getClientWallClockZone();
+  const startDt = DateTime.fromISO(`${from}T00:00:00`, { zone });
+  const endDay = DateTime.fromISO(`${to}T00:00:00`, { zone });
+  if (!startDt.isValid || !endDay.isValid) {
+    return { error: "invalid date" as const };
+  }
+  const rangeStart = startDt.toJSDate();
+  const rangeEndExclusive = endDay.plus({ days: 1 }).toJSDate();
   return { rangeStart, rangeEndExclusive };
 }
 
@@ -1381,26 +1388,33 @@ timeRouter.get("/time/report", async (c) => {
 
   const where: Record<string, unknown> = {
     organizationId: user.organizationId,
-    startsAt: { gte: rangeStart },
-    endsAt: { lt: rangeEndExclusive },
+    /** Overlap (same as /time/entries) — not strict containment — so early/late local hours still match. */
+    startsAt: { lt: rangeEndExclusive },
+    endsAt: { gt: rangeStart },
   };
   if (personIdFilter.length) where.personId = { in: personIdFilter };
   if (categoryFilter.length) where.category = { in: categoryFilter };
   if (projectIdFilter.length) {
-    const pf: unknown[] = projectIdFilter.map((id) => ({ timeProjectId: id }));
+    const pf: unknown[] = projectIdFilter
+      .filter((id) => id !== "__none__")
+      .map((id) => ({ timeProjectId: id }));
     if (projectIdFilter.includes("__none__")) pf.push({ timeProjectId: null });
-    where.OR = pf;
+    if (pf.length) where.OR = pf;
   }
   if (parentCategoryIdFilter.length) {
-    const pcFilter: unknown[] = parentCategoryIdFilter.map((id) => ({
-      timeProject: { timeParentCategoryId: id },
-    }));
+    const pcFilter: unknown[] = parentCategoryIdFilter
+      .filter((id) => id !== "__none__")
+      .map((id) => ({
+        timeProject: { timeParentCategoryId: id },
+      }));
     if (parentCategoryIdFilter.includes("__none__")) {
       pcFilter.push({
         OR: [{ timeProjectId: null }, { timeProject: { timeParentCategoryId: null } }],
       });
     }
-    where.AND = [...((where.AND as unknown[]) ?? []), { OR: pcFilter }];
+    if (pcFilter.length) {
+      where.AND = [...((where.AND as unknown[]) ?? []), { OR: pcFilter }];
+    }
   }
   if (tagIdFilter.length) {
     where.tagLinks = { some: { timeTagId: { in: tagIdFilter } } };
@@ -1460,11 +1474,17 @@ timeRouter.get("/time/report", async (c) => {
   const byProject = new Map<string | null, ProjectAgg>();
   const byParentCategory = new Map<string | null, ParentCategoryAgg>();
   const byDay = new Map<string, DayAgg>();
+  const clientZone = getClientWallClockZone();
+  const rangeStartMs = rangeStart.getTime();
+  const rangeEndMs = rangeEndExclusive.getTime();
 
   for (const row of rows) {
-    const durMin = Math.max(0, (row.endsAt.getTime() - row.startsAt.getTime()) / 60_000);
+    const clippedStart = Math.max(row.startsAt.getTime(), rangeStartMs);
+    const clippedEnd = Math.min(row.endsAt.getTime(), rangeEndMs);
+    const durMin = Math.max(0, (clippedEnd - clippedStart) / 60_000);
+    if (durMin <= 0) continue;
     const cat = (row.category || "work") as string;
-    const dateKey = row.startsAt.toISOString().substring(0, 10);
+    const dateKey = DateTime.fromMillis(clippedStart, { zone: clientZone }).toFormat("yyyy-MM-dd");
 
     // byPerson
     if (!byPerson.has(row.personId)) {
@@ -1641,21 +1661,26 @@ timeRouter.get("/time/report", async (c) => {
   const summaryHoliday = byPersonArr.reduce((s, p) => s + p.holidayMinutes, 0);
   const summaryTravelAllowance = byPersonArr.reduce((s, p) => s + p.travelAllowanceMinutes, 0);
 
-  const entries = rows.map((row) => ({
-    id: row.id,
-    personId: row.personId,
-    personName: row.person.name,
-    startsAt: iso(row.startsAt),
-    endsAt: iso(row.endsAt),
-    durationMinutes: Math.round((row.endsAt.getTime() - row.startsAt.getTime()) / 60_000),
-    kind: row.kind,
-    category: (row.category || "work") as TimeCategory,
-    note: row.note,
-    projectId: row.timeProjectId,
-    projectName: row.timeProject?.name ?? null,
-    tagIds: row.tagLinks.map((t) => t.timeTagId),
-    tagNames: row.tagLinks.map((t) => t.timeTag.name),
-  }));
+  const entries = rows.map((row) => {
+    const clippedStart = Math.max(row.startsAt.getTime(), rangeStartMs);
+    const clippedEnd = Math.min(row.endsAt.getTime(), rangeEndMs);
+    const durationMinutes = Math.max(0, Math.round((clippedEnd - clippedStart) / 60_000));
+    return {
+      id: row.id,
+      personId: row.personId,
+      personName: row.person.name,
+      startsAt: iso(row.startsAt),
+      endsAt: iso(row.endsAt),
+      durationMinutes,
+      kind: row.kind,
+      category: (row.category || "work") as TimeCategory,
+      note: row.note,
+      projectId: row.timeProjectId,
+      projectName: row.timeProject?.name ?? null,
+      tagIds: row.tagLinks.map((t) => t.timeTagId),
+      tagNames: row.tagLinks.map((t) => t.timeTag.name),
+    };
+  }).filter((e) => e.durationMinutes > 0);
 
   return c.json({
     data: {
@@ -1675,7 +1700,7 @@ timeRouter.get("/time/report", async (c) => {
         sickMinutes: summarySick,
         holidayMinutes: summaryHoliday,
         travelAllowanceMinutes: summaryTravelAllowance,
-        entryCount: rows.length,
+        entryCount: entries.length,
         rangeDays,
       },
       byPerson: byPersonArr,
