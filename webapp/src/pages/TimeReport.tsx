@@ -3,15 +3,19 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   addMonths,
+  addWeeks,
   format,
+  getISOWeek,
   startOfMonth,
   endOfMonth,
   startOfWeek,
+  endOfWeek,
   startOfYear,
   endOfYear,
   parseISO,
   startOfDay,
   subMonths,
+  subWeeks,
 } from "date-fns";
 import type { Locale } from "date-fns";
 import { da as localeDa, de as localeDe, enGB as localeEnGB } from "date-fns/locale";
@@ -50,6 +54,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type {
   TimeCategory,
@@ -101,7 +106,86 @@ function today(): Date {
   return startOfDay(new Date());
 }
 
-type RangeMode = "all_time" | "month" | "year" | "custom";
+type RangeMode = "all_time" | "week" | "month" | "year" | "custom";
+
+const WEEK_STARTS_ON = 1 as const;
+
+function WeekPickerButton({
+  weekStart,
+  onPick,
+  locale,
+  label,
+  weekLabel,
+}: {
+  weekStart: Date;
+  onPick: (d: Date) => void;
+  locale: Locale;
+  label: string;
+  weekLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [month, setMonth] = useState(() => weekStart);
+  const weekEnd = endOfWeek(weekStart, { weekStartsOn: WEEK_STARTS_ON });
+
+  useEffect(() => {
+    setMonth(weekStart);
+  }, [weekStart]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[16rem] hover:bg-white/[0.06]"
+          aria-label={label}
+          aria-expanded={open}
+        >
+          {weekLabel} · {format(weekStart, "d MMM", { locale })} –{" "}
+          {format(weekEnd, "d MMM yyyy", { locale })}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
+        <Calendar
+          mode="single"
+          selected={weekStart}
+          month={month}
+          onMonthChange={setMonth}
+          showWeekNumber
+          weekStartsOn={WEEK_STARTS_ON}
+          onSelect={(d) => {
+            if (!d) return;
+            onPick(startOfWeek(d, { weekStartsOn: WEEK_STARTS_ON }));
+            setOpen(false);
+          }}
+          classNames={{
+            months: "flex flex-col",
+            month: "space-y-3 p-3",
+            caption: "flex justify-center pt-1 relative items-center",
+            caption_label: "text-sm font-medium text-white",
+            nav: "space-x-1 flex items-center",
+            nav_button:
+              "inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent p-0 text-white/70 hover:bg-white/10 hover:text-white",
+            nav_button_previous: "absolute left-1",
+            nav_button_next: "absolute right-1",
+            table: "w-full border-collapse space-y-1",
+            head_row: "flex",
+            head_cell: "w-9 font-normal text-[0.8rem] text-white/45",
+            row: "flex w-full mt-2",
+            cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+            day: "h-9 w-9 p-0 font-normal text-white/90 hover:bg-white/10 hover:text-white aria-selected:opacity-100",
+            day_selected:
+              "bg-red-900 text-white hover:bg-red-800 hover:text-white focus:bg-red-900 focus:text-white",
+            day_today: "bg-white/10 text-white",
+            day_outside: "text-white/30 opacity-50",
+            day_disabled: "text-white/20 opacity-50",
+            day_hidden: "invisible",
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function MonthPickerButton({
   month,
@@ -506,6 +590,7 @@ function exportCsv(entries: TimeReportEntry[]) {
 
 const RANGE_MODES: { id: RangeMode; labelKey: string }[] = [
   { id: "all_time", labelKey: "time.reportAllTime" },
+  { id: "week", labelKey: "time.reportRangeWeek" },
   { id: "month", labelKey: "time.reportRangeMonth" },
   { id: "year", labelKey: "time.reportRangeYear" },
   { id: "custom", labelKey: "time.reportRangeCustom" },
@@ -519,6 +604,9 @@ export default function TimeReport() {
 
   const now = today();
   const [rangeMode, setRangeMode] = useState<RangeMode>("all_time");
+  const [anchorWeek, setAnchorWeek] = useState(() =>
+    startOfWeek(now, { weekStartsOn: WEEK_STARTS_ON })
+  );
   const [anchorMonth, setAnchorMonth] = useState(() => startOfMonth(now));
   const [anchorYear, setAnchorYear] = useState(() => now.getFullYear());
   const [customFrom, setCustomFrom] = useState(format(startOfMonth(now), "yyyy-MM-dd"));
@@ -537,6 +625,15 @@ export default function TimeReport() {
     if (rangeMode === "all_time") {
       return { from: "", to: "", allTime: true as const };
     }
+    if (rangeMode === "week") {
+      const start = startOfWeek(anchorWeek, { weekStartsOn: WEEK_STARTS_ON });
+      const end = endOfWeek(anchorWeek, { weekStartsOn: WEEK_STARTS_ON });
+      return {
+        from: format(start, "yyyy-MM-dd"),
+        to: format(end, "yyyy-MM-dd"),
+        allTime: false as const,
+      };
+    }
     if (rangeMode === "month") {
       return {
         from: format(startOfMonth(anchorMonth), "yyyy-MM-dd"),
@@ -553,7 +650,7 @@ export default function TimeReport() {
       };
     }
     return { from: customFrom, to: customTo, allTime: false as const };
-  }, [rangeMode, anchorMonth, anchorYear, customFrom, customTo]);
+  }, [rangeMode, anchorWeek, anchorMonth, anchorYear, customFrom, customTo]);
 
   const { data: people } = useQuery({
     queryKey: ["time-people"],
@@ -750,6 +847,42 @@ export default function TimeReport() {
               </button>
             ))}
           </div>
+
+          {rangeMode === "week" ? (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 border-white/15 text-white"
+                onClick={() =>
+                  setAnchorWeek((d) => startOfWeek(subWeeks(d, 1), { weekStartsOn: WEEK_STARTS_ON }))
+                }
+                aria-label="Previous week"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <WeekPickerButton
+                weekStart={anchorWeek}
+                onPick={(d) => setAnchorWeek(startOfWeek(d, { weekStartsOn: WEEK_STARTS_ON }))}
+                locale={dfLocale}
+                label={t("time.reportRangeWeek")}
+                weekLabel={t("time.calendarWeekIso", { week: getISOWeek(anchorWeek) })}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 border-white/15 text-white"
+                onClick={() =>
+                  setAnchorWeek((d) => startOfWeek(addWeeks(d, 1), { weekStartsOn: WEEK_STARTS_ON }))
+                }
+                aria-label="Next week"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : null}
 
           {rangeMode === "month" ? (
             <div className="flex items-center gap-2">
