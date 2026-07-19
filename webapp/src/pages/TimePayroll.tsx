@@ -25,7 +25,6 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -457,7 +456,8 @@ export default function TimePayroll() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4 shrink-0">
+        <div className="flex flex-wrap gap-3 items-end">
         <div className="flex rounded-md border border-white/10 bg-white/[0.03] p-0.5">
           {RANGE_MODES.map((m) => (
             <button
@@ -572,26 +572,21 @@ export default function TimePayroll() {
         ) : null}
 
         {rangeMode === "custom" ? (
-          <>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-white/50">{t("time.payrollFrom")}</Label>
-              <Input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="bg-white/5 border-white/10 text-white w-[160px]"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-white/50">{t("time.payrollTo")}</Label>
-              <Input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="bg-white/5 border-white/10 text-white w-[160px]"
-              />
-            </div>
-          </>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="h-9 w-36 bg-white/5 border-white/15 text-white text-sm px-2"
+            />
+            <span className="text-white/40 text-sm">–</span>
+            <Input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="h-9 w-36 bg-white/5 border-white/15 text-white text-sm px-2"
+            />
+          </div>
         ) : null}
 
         <label className="flex items-center gap-2 text-sm text-white/60 pb-1">
@@ -603,6 +598,7 @@ export default function TimePayroll() {
             {t("time.payrollVacationYear")}: <span className="text-white/70">{data.vacationYearKey}</span>
           </p>
         ) : null}
+        </div>
       </div>
 
       {error ? (
