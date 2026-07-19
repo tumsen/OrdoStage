@@ -740,6 +740,13 @@ async function resolvePersonIdForUser(organizationId: string, email: string | nu
 }
 
 function parseRange(c: { req: { query: (k: string) => string | undefined } }) {
+  if (c.req.query("all") === "1") {
+    return {
+      rangeStart: new Date(0),
+      rangeEndExclusive: new Date("2100-01-01T00:00:00.000Z"),
+      allTime: true as const,
+    };
+  }
   const from = c.req.query("from");
   const to = c.req.query("to");
   if (!from || !to) return { error: "from and to (YYYY-MM-DD) are required" as const };
@@ -755,7 +762,7 @@ function parseRange(c: { req: { query: (k: string) => string | undefined } }) {
   }
   const rangeStart = startDt.toJSDate();
   const rangeEndExclusive = endDay.plus({ days: 1 }).toJSDate();
-  return { rangeStart, rangeEndExclusive };
+  return { rangeStart, rangeEndExclusive, allTime: false as const };
 }
 
 type TimeSpan = { startsAt: Date; endsAt: Date };
@@ -1366,9 +1373,7 @@ timeRouter.get("/time/report", async (c) => {
 
   const r = parseRange(c);
   if ("error" in r) return c.json({ error: { message: r.error, code: "BAD_REQUEST" } }, 400);
-  const { rangeStart, rangeEndExclusive } = r;
-
-  const rangeDays = Math.round((rangeEndExclusive.getTime() - rangeStart.getTime()) / 86_400_000);
+  const { rangeStart, rangeEndExclusive, allTime } = r;
 
   const qPersonIds = c.req.query("personIds");
   const qProjectIds = c.req.query("projectIds");
@@ -1386,23 +1391,23 @@ timeRouter.get("/time/report", async (c) => {
     ? qCategories.split(",").filter((x) => TIME_CATEGORIES.includes(x as never))
     : [];
 
-  const where: Record<string, unknown> = {
-    organizationId: user.organizationId,
-    /** Overlap (same as /time/entries) — not strict containment — so early/late local hours still match. */
-    startsAt: { lt: rangeEndExclusive },
-    endsAt: { gt: rangeStart },
-  };
-  if (personIdFilter.length) where.personId = { in: personIdFilter };
-  if (categoryFilter.length) where.category = { in: categoryFilter };
+  /** Every filter is an AND clause so a single filter alone still returns matching rows. */
+  const andClauses: Record<string, unknown>[] = [{ organizationId: user.organizationId }];
+  if (!allTime) {
+    andClauses.push({ startsAt: { lt: rangeEndExclusive } });
+    andClauses.push({ endsAt: { gt: rangeStart } });
+  }
+  if (personIdFilter.length) andClauses.push({ personId: { in: personIdFilter } });
+  if (categoryFilter.length) andClauses.push({ category: { in: categoryFilter } });
   if (projectIdFilter.length) {
-    const pf: unknown[] = projectIdFilter
+    const pf: Record<string, unknown>[] = projectIdFilter
       .filter((id) => id !== "__none__")
       .map((id) => ({ timeProjectId: id }));
     if (projectIdFilter.includes("__none__")) pf.push({ timeProjectId: null });
-    if (pf.length) where.OR = pf;
+    if (pf.length) andClauses.push({ OR: pf });
   }
   if (parentCategoryIdFilter.length) {
-    const pcFilter: unknown[] = parentCategoryIdFilter
+    const pcFilter: Record<string, unknown>[] = parentCategoryIdFilter
       .filter((id) => id !== "__none__")
       .map((id) => ({
         timeProject: { timeParentCategoryId: id },
@@ -1412,16 +1417,14 @@ timeRouter.get("/time/report", async (c) => {
         OR: [{ timeProjectId: null }, { timeProject: { timeParentCategoryId: null } }],
       });
     }
-    if (pcFilter.length) {
-      where.AND = [...((where.AND as unknown[]) ?? []), { OR: pcFilter }];
-    }
+    if (pcFilter.length) andClauses.push({ OR: pcFilter });
   }
   if (tagIdFilter.length) {
-    where.tagLinks = { some: { timeTagId: { in: tagIdFilter } } };
+    andClauses.push({ tagLinks: { some: { timeTagId: { in: tagIdFilter } } } });
   }
 
   const rows = await prisma.timeEntry.findMany({
-    where,
+    where: { AND: andClauses },
     include: {
       person: { select: { id: true, name: true, weeklyContractHours: true, vacationDaysPerYear: true } },
       timeProject: {
@@ -1430,8 +1433,19 @@ timeRouter.get("/time/report", async (c) => {
       tagLinks: { include: { timeTag: { select: { id: true, name: true } } } },
     },
     orderBy: { startsAt: "asc" },
-    take: 5000,
   });
+
+  let rangeDays = Math.max(
+    1,
+    Math.round((rangeEndExclusive.getTime() - rangeStart.getTime()) / 86_400_000)
+  );
+  if (allTime && rows.length > 0) {
+    const minStart = Math.min(...rows.map((row) => row.startsAt.getTime()));
+    const maxEnd = Math.max(...rows.map((row) => row.endsAt.getTime()));
+    rangeDays = Math.max(1, Math.round((maxEnd - minStart) / 86_400_000) + 1);
+  } else if (allTime) {
+    rangeDays = 0;
+  }
 
   const parentCategoryNameById = new Map(
     (
@@ -1475,8 +1489,8 @@ timeRouter.get("/time/report", async (c) => {
   const byParentCategory = new Map<string | null, ParentCategoryAgg>();
   const byDay = new Map<string, DayAgg>();
   const clientZone = getClientWallClockZone();
-  const rangeStartMs = rangeStart.getTime();
-  const rangeEndMs = rangeEndExclusive.getTime();
+  const rangeStartMs = allTime ? Number.NEGATIVE_INFINITY : rangeStart.getTime();
+  const rangeEndMs = allTime ? Number.POSITIVE_INFINITY : rangeEndExclusive.getTime();
 
   for (const row of rows) {
     const clippedStart = Math.max(row.startsAt.getTime(), rangeStartMs);
@@ -1560,16 +1574,18 @@ timeRouter.get("/time/report", async (c) => {
     else if (cat === "travel_allowance") dp.travelAllowanceMinutes += durMin;
   }
 
-  const leaveEnabled = await isCountryFeatureEnabled(
-    (
-      await prisma.organization.findUnique({
-        where: { id: user.organizationId },
-        select: { countryFeatures: true },
-      })
-    )?.countryFeatures,
-    "DK",
-    "leaveManagement"
-  );
+  const leaveEnabled =
+    !allTime &&
+    (await isCountryFeatureEnabled(
+      (
+        await prisma.organization.findUnique({
+          where: { id: user.organizationId },
+          select: { countryFeatures: true },
+        })
+      )?.countryFeatures,
+      "DK",
+      "leaveManagement"
+    ));
 
   const byPersonArr = await Promise.all(
     [...byPerson.entries()].map(async ([personId, pa]) => {

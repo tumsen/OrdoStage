@@ -98,9 +98,18 @@ function today(): Date {
   return startOfDay(new Date());
 }
 
-type DatePreset = "this_week" | "last_week" | "this_month" | "last_month" | "last_3_months" | "this_year" | "custom";
+type DatePreset =
+  | "all_time"
+  | "this_week"
+  | "last_week"
+  | "this_month"
+  | "last_month"
+  | "last_3_months"
+  | "this_year"
+  | "custom";
 
-function presetRange(preset: DatePreset): { from: Date; to: Date } {
+function presetRange(preset: DatePreset): { from: Date; to: Date } | "all" {
+  if (preset === "all_time") return "all";
   const now = today();
   switch (preset) {
     case "this_week":
@@ -363,7 +372,8 @@ function exportCsv(entries: TimeReportEntry[]) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const PRESETS: { id: DatePreset; label: string }[] = [
+const PRESETS: { id: DatePreset; labelKey?: string; label?: string }[] = [
+  { id: "all_time", labelKey: "time.reportAllTime" },
   { id: "this_week", label: "This week" },
   { id: "last_week", label: "Last week" },
   { id: "this_month", label: "This month" },
@@ -377,7 +387,7 @@ export default function TimeReport() {
   const { canAction } = usePermissions();
   const canReadAll = canAction("time.read_all");
 
-  const [preset, setPreset] = useState<DatePreset>("this_month");
+  const [preset, setPreset] = useState<DatePreset>("all_time");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [selectedPersonIds, setSelectedPersonIds] = useState<string[]>([]);
@@ -390,12 +400,20 @@ export default function TimeReport() {
   const [sortPersonDir, setSortPersonDir] = useState<"asc" | "desc">("asc");
   const [contractOverrides, setContractOverrides] = useState<Map<string, number | null>>(new Map());
 
-  const { from, to } = useMemo(() => {
+  const { from, to, allTime } = useMemo(() => {
+    if (preset === "all_time") {
+      return { from: "", to: "", allTime: true as const };
+    }
     if (preset === "custom" && customFrom && customTo) {
-      return { from: customFrom, to: customTo };
+      return { from: customFrom, to: customTo, allTime: false as const };
     }
     const r = presetRange(preset);
-    return { from: format(r.from, "yyyy-MM-dd"), to: format(r.to, "yyyy-MM-dd") };
+    if (r === "all") return { from: "", to: "", allTime: true as const };
+    return {
+      from: format(r.from, "yyyy-MM-dd"),
+      to: format(r.to, "yyyy-MM-dd"),
+      allTime: false as const,
+    };
   }, [preset, customFrom, customTo]);
 
   const { data: people } = useQuery({
@@ -445,7 +463,13 @@ export default function TimeReport() {
   ];
 
   const qs = useMemo(() => {
-    const params = new URLSearchParams({ from, to });
+    const params = new URLSearchParams();
+    if (allTime) {
+      params.set("all", "1");
+    } else {
+      params.set("from", from);
+      params.set("to", to);
+    }
     if (selectedPersonIds.length) params.set("personIds", selectedPersonIds.join(","));
     if (selectedProjectIds.length) params.set("projectIds", selectedProjectIds.join(","));
     if (selectedParentCategoryIds.length) {
@@ -453,12 +477,20 @@ export default function TimeReport() {
     }
     if (selectedCategories.length) params.set("categories", selectedCategories.join(","));
     return params.toString();
-  }, [from, to, selectedPersonIds, selectedProjectIds, selectedParentCategoryIds, selectedCategories]);
+  }, [
+    allTime,
+    from,
+    to,
+    selectedPersonIds,
+    selectedProjectIds,
+    selectedParentCategoryIds,
+    selectedCategories,
+  ]);
 
-  const { data: report, isFetching } = useQuery({
+  const { data: report, isFetching, isError, error } = useQuery({
     queryKey: ["time-report", qs],
     queryFn: () => api.get<TimeReport>(`/api/time/report?${qs}`),
-    enabled: canReadAll && Boolean(from && to),
+    enabled: canReadAll && (allTime || Boolean(from && to)),
     placeholderData: (prev) => prev,
   });
 
@@ -537,9 +569,9 @@ export default function TimeReport() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0d14] text-white px-4 md:px-8 py-6 max-w-7xl mx-auto">
+    <div className="flex w-full flex-1 flex-col min-h-0 gap-2 p-2 sm:p-3 md:p-4 text-white">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <Link to="/time" className="text-white/40 hover:text-white/70 transition-colors">
             <ArrowLeft className="h-5 w-5" />
@@ -562,7 +594,7 @@ export default function TimeReport() {
       </div>
 
       {/* Date range bar */}
-      <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4 mb-4">
+      <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4 shrink-0">
         <div className="flex flex-wrap gap-2 items-center">
           {PRESETS.map((p) => (
             <button
@@ -575,7 +607,7 @@ export default function TimeReport() {
                   : "text-white/60 hover:text-white hover:bg-white/8"
               )}
             >
-              {p.label}
+              {p.labelKey ? t(p.labelKey as "time.reportAllTime") : p.label}
             </button>
           ))}
           <button
@@ -660,7 +692,7 @@ export default function TimeReport() {
 
       {/* Summary cards */}
       {report && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           <SummaryCard
             label={t("time.reportTotalHours")}
             value={fmtMins(report.summary.totalMinutes)}
@@ -709,7 +741,7 @@ export default function TimeReport() {
 
       {/* Chart */}
       {report && chartData.length > 0 && (
-        <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4 mb-6">
+        <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4">
           <h2 className="text-sm font-medium text-white/70 mb-4">{t("time.reportChartTitle")}</h2>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData} barCategoryGap="25%" barGap={0}>
@@ -770,8 +802,12 @@ export default function TimeReport() {
       )}
 
       {/* Main tabs */}
-      {report ? (
-        <Tabs defaultValue="persons" className="space-y-4">
+      {isError ? (
+        <div className="text-center py-16 text-red-300 text-sm">
+          {(error as Error)?.message || t("time.reportNoData")}
+        </div>
+      ) : report ? (
+        <Tabs defaultValue="persons" className="space-y-4 min-w-0">
           <TabsList className="bg-white/[0.04] border border-white/8 h-9">
             <TabsTrigger value="persons" className="text-sm data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
               {t("time.reportTabPersons")} ({report.byPerson.length})
