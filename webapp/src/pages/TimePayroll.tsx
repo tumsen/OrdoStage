@@ -3,11 +3,18 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   addMonths,
+  addWeeks,
   endOfMonth,
+  endOfWeek,
+  endOfYear,
   format,
+  getISOWeek,
   startOfDay,
   startOfMonth,
+  startOfWeek,
+  startOfYear,
   subMonths,
+  subWeeks,
 } from "date-fns";
 import type { Locale } from "date-fns";
 import { da as localeDa, de as localeDe, enGB as localeEnGB } from "date-fns/locale";
@@ -20,8 +27,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type { PayrollExport } from "@/contracts/backendTypes";
+
+type RangeMode = "week" | "month" | "year" | "custom";
+
+const WEEK_STARTS_ON = 1 as const;
+
+const RANGE_MODES: { id: RangeMode; labelKey: string }[] = [
+  { id: "week", labelKey: "time.payrollRangeWeek" },
+  { id: "month", labelKey: "time.payrollRangeMonth" },
+  { id: "year", labelKey: "time.payrollRangeYear" },
+  { id: "custom", labelKey: "time.payrollRangeCustom" },
+];
 
 function fmtMins(minutes: number): string {
   const h = Math.floor(Math.abs(minutes) / 60);
@@ -97,6 +116,83 @@ function buildCsv(data: PayrollExport, lang: string): string {
   };
 
   return [headers, ...rows].map((row) => row.map(escape).join(",")).join("\n");
+}
+
+function WeekPickerButton({
+  weekStart,
+  onPick,
+  locale,
+  label,
+  weekLabel,
+}: {
+  weekStart: Date;
+  onPick: (d: Date) => void;
+  locale: Locale;
+  label: string;
+  weekLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [month, setMonth] = useState(() => weekStart);
+  const weekEnd = endOfWeek(weekStart, { weekStartsOn: WEEK_STARTS_ON });
+
+  useEffect(() => {
+    setMonth(weekStart);
+  }, [weekStart]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[16rem] hover:bg-white/[0.06]"
+          aria-label={label}
+          aria-expanded={open}
+        >
+          {weekLabel} · {format(weekStart, "d MMM", { locale })} –{" "}
+          {format(weekEnd, "d MMM yyyy", { locale })}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
+        <Calendar
+          mode="single"
+          selected={weekStart}
+          month={month}
+          onMonthChange={setMonth}
+          showWeekNumber
+          weekStartsOn={WEEK_STARTS_ON}
+          onSelect={(d) => {
+            if (!d) return;
+            onPick(startOfWeek(d, { weekStartsOn: WEEK_STARTS_ON }));
+            setOpen(false);
+          }}
+          classNames={{
+            months: "flex flex-col",
+            month: "space-y-3 p-3",
+            caption: "flex justify-center pt-1 relative items-center",
+            caption_label: "text-sm font-medium text-white",
+            nav: "space-x-1 flex items-center",
+            nav_button:
+              "inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent p-0 text-white/70 hover:bg-white/10 hover:text-white",
+            nav_button_previous: "absolute left-1",
+            nav_button_next: "absolute right-1",
+            table: "w-full border-collapse space-y-1",
+            head_row: "flex",
+            head_cell: "w-9 font-normal text-[0.8rem] text-white/45",
+            row: "flex w-full mt-2",
+            cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+            day: "h-9 w-9 p-0 font-normal text-white/90 hover:bg-white/10 hover:text-white aria-selected:opacity-100",
+            day_selected:
+              "bg-red-900 text-white hover:bg-red-800 hover:text-white focus:bg-red-900 focus:text-white",
+            day_today: "bg-white/10 text-white",
+            day_outside: "text-white/30 opacity-50",
+            day_disabled: "text-white/20 opacity-50",
+            day_hidden: "invisible",
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function MonthPickerButton({
@@ -179,6 +275,88 @@ function MonthPickerButton({
   );
 }
 
+function YearPickerButton({
+  year,
+  onPick,
+  label,
+}: {
+  year: number;
+  onPick: (y: number) => void;
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [decadeStart, setDecadeStart] = useState(() => Math.floor(year / 10) * 10);
+
+  useEffect(() => {
+    setDecadeStart(Math.floor(year / 10) * 10);
+  }, [year]);
+
+  const years = Array.from({ length: 12 }, (_, i) => decadeStart - 1 + i);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[8rem] hover:bg-white/[0.06]"
+          aria-label={label}
+          aria-expanded={open}
+        >
+          {year}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
+        <div className="p-3 w-[18rem]">
+          <div className="flex items-center justify-between pb-2">
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setDecadeStart((d) => d - 10)}
+              aria-label="Previous decade"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="text-sm font-medium text-white">
+              {decadeStart} – {decadeStart + 9}
+            </div>
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setDecadeStart((d) => d + 10)}
+              aria-label="Next decade"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {years.map((y) => {
+              const outside = y < decadeStart || y > decadeStart + 9;
+              const isSelected = y === year;
+              return (
+                <button
+                  key={y}
+                  type="button"
+                  className={cn(
+                    "h-9 rounded-md border border-white/10 bg-white/[0.02] text-xs text-white/80 hover:bg-white/10",
+                    outside && "text-white/35",
+                    isSelected && "bg-white/10 text-white border-white/20"
+                  )}
+                  onClick={() => {
+                    onPick(y);
+                    setOpen(false);
+                  }}
+                >
+                  {y}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function TimePayroll() {
   const { t, language } = useI18n();
   const { canAction } = usePermissions();
@@ -186,15 +364,40 @@ export default function TimePayroll() {
 
   const dfLocale = language === "da" ? localeDa : language === "de" ? localeDe : localeEnGB;
   const now = today();
-  const [rangeMode, setRangeMode] = useState<"month" | "custom">("month");
+  const [rangeMode, setRangeMode] = useState<RangeMode>("month");
+  const [anchorWeek, setAnchorWeek] = useState(() =>
+    startOfWeek(now, { weekStartsOn: WEEK_STARTS_ON })
+  );
   const [anchorMonth, setAnchorMonth] = useState(() => startOfMonth(now));
+  const [anchorYear, setAnchorYear] = useState(() => now.getFullYear());
   const [customFrom, setCustomFrom] = useState(format(startOfMonth(now), "yyyy-MM-dd"));
   const [customTo, setCustomTo] = useState(format(endOfMonth(now), "yyyy-MM-dd"));
   const [approvedOnly, setApprovedOnly] = useState(false);
 
-  const from =
-    rangeMode === "month" ? format(startOfMonth(anchorMonth), "yyyy-MM-dd") : customFrom;
-  const to = rangeMode === "month" ? format(endOfMonth(anchorMonth), "yyyy-MM-dd") : customTo;
+  const { from, to } = useMemo(() => {
+    if (rangeMode === "week") {
+      const start = startOfWeek(anchorWeek, { weekStartsOn: WEEK_STARTS_ON });
+      const end = endOfWeek(anchorWeek, { weekStartsOn: WEEK_STARTS_ON });
+      return {
+        from: format(start, "yyyy-MM-dd"),
+        to: format(end, "yyyy-MM-dd"),
+      };
+    }
+    if (rangeMode === "month") {
+      return {
+        from: format(startOfMonth(anchorMonth), "yyyy-MM-dd"),
+        to: format(endOfMonth(anchorMonth), "yyyy-MM-dd"),
+      };
+    }
+    if (rangeMode === "year") {
+      const y = new Date(anchorYear, 0, 1);
+      return {
+        from: format(startOfYear(y), "yyyy-MM-dd"),
+        to: format(endOfYear(y), "yyyy-MM-dd"),
+      };
+    }
+    return { from: customFrom, to: customTo };
+  }, [rangeMode, anchorWeek, anchorMonth, anchorYear, customFrom, customTo]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["time-payroll-export", from, to, approvedOnly],
@@ -256,27 +459,56 @@ export default function TimePayroll() {
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <div className="flex rounded-md border border-white/10 bg-white/[0.03] p-0.5">
-          <button
-            type="button"
-            onClick={() => setRangeMode("month")}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-sm",
-              rangeMode === "month" ? "bg-white/10 text-white" : "text-white/55"
-            )}
-          >
-            {t("time.payrollRangeMonth")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setRangeMode("custom")}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-sm",
-              rangeMode === "custom" ? "bg-white/10 text-white" : "text-white/55"
-            )}
-          >
-            {t("time.payrollRangeCustom")}
-          </button>
+          {RANGE_MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setRangeMode(m.id)}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm",
+                rangeMode === m.id ? "bg-white/10 text-white" : "text-white/55"
+              )}
+            >
+              {t(m.labelKey as "time.payrollRangeMonth")}
+            </button>
+          ))}
         </div>
+
+        {rangeMode === "week" ? (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 border-white/15 text-white"
+              onClick={() =>
+                setAnchorWeek((d) => startOfWeek(subWeeks(d, 1), { weekStartsOn: WEEK_STARTS_ON }))
+              }
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <WeekPickerButton
+              weekStart={anchorWeek}
+              onPick={(d) => setAnchorWeek(startOfWeek(d, { weekStartsOn: WEEK_STARTS_ON }))}
+              locale={dfLocale}
+              label={t("time.payrollRangeWeek")}
+              weekLabel={t("time.calendarWeekIso", { week: getISOWeek(anchorWeek) })}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 border-white/15 text-white"
+              onClick={() =>
+                setAnchorWeek((d) => startOfWeek(addWeeks(d, 1), { weekStartsOn: WEEK_STARTS_ON }))
+              }
+              aria-label="Next week"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : null}
 
         {rangeMode === "month" ? (
           <div className="flex items-center gap-2">
@@ -306,17 +538,40 @@ export default function TimePayroll() {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
+          </div>
+        ) : null}
+
+        {rangeMode === "year" ? (
+          <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
-              className="h-9 text-xs text-white/40 hover:text-white/70 hover:bg-white/5"
-              onClick={() => setAnchorMonth(startOfMonth(today()))}
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 border-white/15 text-white"
+              onClick={() => setAnchorYear((y) => y - 1)}
+              aria-label="Previous year"
             >
-              Today
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <YearPickerButton
+              year={anchorYear}
+              onPick={setAnchorYear}
+              label={t("time.payrollRangeYear")}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 border-white/15 text-white"
+              onClick={() => setAnchorYear((y) => y + 1)}
+              aria-label="Next year"
+            >
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-        ) : (
+        ) : null}
+
+        {rangeMode === "custom" ? (
           <>
             <div className="space-y-1.5">
               <Label className="text-xs text-white/50">{t("time.payrollFrom")}</Label>
@@ -337,7 +592,7 @@ export default function TimePayroll() {
               />
             </div>
           </>
-        )}
+        ) : null}
 
         <label className="flex items-center gap-2 text-sm text-white/60 pb-1">
           <Checkbox checked={approvedOnly} onCheckedChange={(v) => setApprovedOnly(v === true)} />
