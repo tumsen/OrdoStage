@@ -421,7 +421,7 @@ leaveRouter.get("/time/payroll-export", async (c) => {
   const vacationYear = resolveVacationYear(from, policy);
 
   const people = await prisma.person.findMany({
-    where: { organizationId: user.organizationId, isActive: true },
+    where: { organizationId: user.organizationId, isActive: true, showInPayroll: true },
     select: {
       id: true,
       name: true,

@@ -390,6 +390,8 @@ model Person {
   permissionGroupId String?
   permissionGroup   RoleDefinition?        @relation(fields: [permissionGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   isActive         Boolean                 @default(true)
+  /** When false, person is omitted from payroll export (e.g. fixed-salary contracts). */
+  showInPayroll    Boolean                 @default(true)
   /** Cast/crew: in-house vs contractor — required for new people; existing rows default to internal. */
   affiliation      String                  @default("internal")
   /** Expected work hours per week — used in reports to compute overtime. */

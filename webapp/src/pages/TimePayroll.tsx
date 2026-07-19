@@ -1,14 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  format,
-  startOfMonth,
+  addMonths,
   endOfMonth,
-  subMonths,
+  format,
   startOfDay,
+  startOfMonth,
+  subMonths,
 } from "date-fns";
-import { ArrowLeft, Download } from "lucide-react";
+import type { Locale } from "date-fns";
+import { da as localeDa, de as localeDe, enGB as localeEnGB } from "date-fns/locale";
+import { ArrowLeft, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -16,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import type { PayrollExport } from "@/contracts/backendTypes";
 
@@ -95,15 +99,102 @@ function buildCsv(data: PayrollExport, lang: string): string {
   return [headers, ...rows].map((row) => row.map(escape).join(",")).join("\n");
 }
 
+function MonthPickerButton({
+  month,
+  onPick,
+  locale,
+  label,
+}: {
+  month: Date;
+  onPick: (d: Date) => void;
+  locale: Locale;
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(() => month);
+
+  useEffect(() => {
+    setViewYear(month);
+  }, [month]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[12rem] hover:bg-white/[0.06]"
+          aria-label={label}
+          aria-expanded={open}
+        >
+          {format(month, "MMMM yyyy", { locale })}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
+        <div className="p-3 w-[18rem]">
+          <div className="flex items-center justify-between pb-2">
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setViewYear((m) => new Date(m.getFullYear() - 1, m.getMonth(), 1))}
+              aria-label="Previous year"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="text-sm font-medium text-white">{viewYear.getFullYear()}</div>
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setViewYear((m) => new Date(m.getFullYear() + 1, m.getMonth(), 1))}
+              aria-label="Next year"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 12 }).map((_, i) => {
+              const year = viewYear.getFullYear();
+              const d = new Date(year, i, 1);
+              const isSelected = month.getFullYear() === year && month.getMonth() === i;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={cn(
+                    "h-9 rounded-md border border-white/10 bg-white/[0.02] text-xs text-white/80 hover:bg-white/10",
+                    isSelected && "bg-white/10 text-white border-white/20"
+                  )}
+                  onClick={() => {
+                    onPick(d);
+                    setOpen(false);
+                  }}
+                >
+                  {format(d, "MMM", { locale })}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function TimePayroll() {
   const { t, language } = useI18n();
   const { canAction } = usePermissions();
   const readAll = canAction("time.read_all");
 
+  const dfLocale = language === "da" ? localeDa : language === "de" ? localeDe : localeEnGB;
   const now = today();
-  const [from, setFrom] = useState(format(startOfMonth(now), "yyyy-MM-dd"));
-  const [to, setTo] = useState(format(endOfMonth(now), "yyyy-MM-dd"));
+  const [rangeMode, setRangeMode] = useState<"month" | "custom">("month");
+  const [anchorMonth, setAnchorMonth] = useState(() => startOfMonth(now));
+  const [customFrom, setCustomFrom] = useState(format(startOfMonth(now), "yyyy-MM-dd"));
+  const [customTo, setCustomTo] = useState(format(endOfMonth(now), "yyyy-MM-dd"));
   const [approvedOnly, setApprovedOnly] = useState(false);
+
+  const from =
+    rangeMode === "month" ? format(startOfMonth(anchorMonth), "yyyy-MM-dd") : customFrom;
+  const to = rangeMode === "month" ? format(endOfMonth(anchorMonth), "yyyy-MM-dd") : customTo;
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["time-payroll-export", from, to, approvedOnly],
@@ -124,12 +215,6 @@ export default function TimePayroll() {
     a.download = `payroll-${data.from}-${data.to}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const presetMonth = (offset: number) => {
-    const d = subMonths(now, offset);
-    setFrom(format(startOfMonth(d), "yyyy-MM-dd"));
-    setTo(format(endOfMonth(d), "yyyy-MM-dd"));
   };
 
   const rows = useMemo(() => data?.people ?? [], [data]);
@@ -170,32 +255,90 @@ export default function TimePayroll() {
       </div>
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-white/50">From</Label>
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="bg-white/5 border-white/10 text-white w-[160px]"
-          />
+        <div className="flex rounded-md border border-white/10 bg-white/[0.03] p-0.5">
+          <button
+            type="button"
+            onClick={() => setRangeMode("month")}
+            className={cn(
+              "px-3 py-1.5 rounded-md text-sm",
+              rangeMode === "month" ? "bg-white/10 text-white" : "text-white/55"
+            )}
+          >
+            {t("time.payrollRangeMonth")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRangeMode("custom")}
+            className={cn(
+              "px-3 py-1.5 rounded-md text-sm",
+              rangeMode === "custom" ? "bg-white/10 text-white" : "text-white/55"
+            )}
+          >
+            {t("time.payrollRangeCustom")}
+          </button>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-white/50">To</Label>
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="bg-white/5 border-white/10 text-white w-[160px]"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" className="border-white/10 text-white/60" onClick={() => presetMonth(0)}>
-            This month
-          </Button>
-          <Button type="button" variant="outline" size="sm" className="border-white/10 text-white/60" onClick={() => presetMonth(1)}>
-            Last month
-          </Button>
-        </div>
+
+        {rangeMode === "month" ? (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 border-white/15 text-white"
+              onClick={() => setAnchorMonth((d) => startOfMonth(subMonths(d, 1)))}
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <MonthPickerButton
+              month={anchorMonth}
+              onPick={(d) => setAnchorMonth(startOfMonth(d))}
+              locale={dfLocale}
+              label={t("time.payrollRangeMonth")}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 border-white/15 text-white"
+              onClick={() => setAnchorMonth((d) => startOfMonth(addMonths(d, 1)))}
+              aria-label="Next month"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 text-xs text-white/40 hover:text-white/70 hover:bg-white/5"
+              onClick={() => setAnchorMonth(startOfMonth(today()))}
+            >
+              Today
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-white/50">{t("time.payrollFrom")}</Label>
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="bg-white/5 border-white/10 text-white w-[160px]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-white/50">{t("time.payrollTo")}</Label>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="bg-white/5 border-white/10 text-white w-[160px]"
+              />
+            </div>
+          </>
+        )}
+
         <label className="flex items-center gap-2 text-sm text-white/60 pb-1">
           <Checkbox checked={approvedOnly} onCheckedChange={(v) => setApprovedOnly(v === true)} />
           {t("time.payrollApprovedOnly")}

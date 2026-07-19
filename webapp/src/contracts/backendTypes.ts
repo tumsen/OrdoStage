@@ -223,6 +223,8 @@ export const PersonSchema = z.object({
     .nullable()
     .optional(),
   isActive: z.boolean(),
+  /** When false, omitted from payroll export (e.g. fixed-salary contracts). */
+  showInPayroll: z.boolean().optional(),
   /** Work contract — set by admins with time.read_all. */
   weeklyContractHours: z.number().nullable().optional(),
   vacationDaysPerYear: z.number().nullable().optional(),
@@ -346,6 +348,10 @@ export const CreatePersonSchema = z
 
 export const PersonActiveSchema = z.object({
   active: z.boolean(),
+});
+
+export const PersonShowInPayrollSchema = z.object({
+  showInPayroll: z.boolean(),
 });
 
 /** All fields optional; must not use `CreatePersonSchema.partial()` — Zod v4 disallows `.partial()` on refined object schemas. */

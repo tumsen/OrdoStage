@@ -309,6 +309,7 @@ function PersonFormDialog({
   // Work contract state (separate from main form — saved independently)
   const [contractWeeklyHours, setContractWeeklyHours] = useState<string>("");
   const [contractVacationDays, setContractVacationDays] = useState<string>("");
+  const [showInPayroll, setShowInPayroll] = useState(true);
   const [leaveUseOrgDefaults, setLeaveUseOrgDefaults] = useState(true);
   const [leaveExtraVacationDays, setLeaveExtraVacationDays] = useState("");
   const [leaveMonthlyHours, setLeaveMonthlyHours] = useState("");
@@ -506,6 +507,7 @@ function PersonFormDialog({
     const vacation = p?.vacationDaysPerYear != null ? String(p.vacationDaysPerYear) : "";
     setContractWeeklyHours(weekly);
     setContractVacationDays(vacation);
+    setShowInPayroll(p?.showInPayroll !== false);
     return { contractWeeklyHours: weekly, contractVacationDays: vacation };
   }, []);
 
@@ -558,6 +560,31 @@ function PersonFormDialog({
     },
     onError: (e: Error) => {
       toast({ title: "Could not send login email", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const showInPayrollMutation = useMutation({
+    mutationFn: (next: boolean) => {
+      if (!person?.id) throw new Error("No person");
+      return api.patch<Person>(`/api/people/${person.id}/show-in-payroll`, { showInPayroll: next });
+    },
+    onMutate: (next) => {
+      setShowInPayroll(next);
+    },
+    onSuccess: (updated) => {
+      setShowInPayroll(updated.showInPayroll !== false);
+      onPersonUpdated?.(updated);
+      queryClient.setQueryData(["people", updated.id], updated);
+      queryClient.invalidateQueries({ queryKey: ["people"] });
+      queryClient.invalidateQueries({ queryKey: ["time-payroll-export"] });
+    },
+    onError: (e: Error, next) => {
+      setShowInPayroll(!next);
+      toast({
+        title: t("time.showInPayrollSaveError"),
+        description: e.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -1356,6 +1383,20 @@ function PersonFormDialog({
                     ? t("time.leaveProfileHint")
                     : "Used for overtime and vacation tracking in time reports."}
                 </p>
+                <label className="flex items-start gap-2 text-xs text-white/55">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={showInPayroll}
+                    disabled={showInPayrollMutation.isPending}
+                    onCheckedChange={(v) => showInPayrollMutation.mutate(v === true)}
+                  />
+                  <span>
+                    <span className="block text-white/75">{t("time.showInPayroll")}</span>
+                    <span className="block text-[11px] text-white/35 mt-0.5">
+                      {t("time.showInPayrollHint")}
+                    </span>
+                  </span>
+                </label>
                 {leaveManagementEnabled ? (
                   <label className="flex items-center gap-2 text-xs text-white/55">
                     <Checkbox
@@ -1752,6 +1793,20 @@ function PersonFormDialog({
                   : "Used for overtime and vacation tracking in time reports."}
               </p>
             </div>
+            <label className="flex items-start gap-2 text-xs text-white/55">
+              <Checkbox
+                className="mt-0.5"
+                checked={showInPayroll}
+                disabled={showInPayrollMutation.isPending}
+                onCheckedChange={(v) => showInPayrollMutation.mutate(v === true)}
+              />
+              <span>
+                <span className="block text-white/75">{t("time.showInPayroll")}</span>
+                <span className="block text-[11px] text-white/35 mt-0.5">
+                  {t("time.showInPayrollHint")}
+                </span>
+              </span>
+            </label>
             {leaveManagementEnabled ? (
               <label className="flex items-center gap-2 text-xs text-white/55">
                 <Checkbox

@@ -13,6 +13,7 @@ import {
   UpdatePersonPhotoFocusSchema,
   UpdatePersonSchema,
   PersonActiveSchema,
+  PersonShowInPayrollSchema,
   UpdatePersonDocumentSchema,
   UpdatePersonDocumentVisibilitySchema,
   type TeamAssignmentInput,
@@ -187,6 +188,7 @@ function serializePerson(person: {
   photoZoom?: number | null;
   departmentId: string | null;
   isActive?: boolean;
+  showInPayroll?: boolean;
   weeklyContractHours?: number | null;
   vacationDaysPerYear?: number | null;
   teamMemberships?: Array<{
@@ -239,6 +241,7 @@ function serializePerson(person: {
     photoZoom: person.photoZoom ?? 100,
     departmentId: person.departmentId,
     isActive: person.isActive ?? true,
+    showInPayroll: person.showInPayroll ?? true,
     weeklyContractHours: person.weeklyContractHours ?? null,
     vacationDaysPerYear: person.vacationDaysPerYear ?? null,
     teamIds: (person.teamMemberships ?? []).map((membership) => membership.departmentId),
@@ -670,6 +673,50 @@ peopleRouter.patch("/people/:id/active", zValidator("json", PersonActiveSchema),
   });
   return c.json({ data: serializePerson(updated!) });
 });
+
+// PATCH /api/people/:id/show-in-payroll
+peopleRouter.patch(
+  "/people/:id/show-in-payroll",
+  zValidator("json", PersonShowInPayrollSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId)
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+
+    if (!canAction(c, "write.people") && !canAction(c, "time.read_all")) {
+      return c.json({ error: { message: "Insufficient permissions", code: "FORBIDDEN" } }, 403);
+    }
+
+    const { id } = c.req.param();
+    const { showInPayroll } = c.req.valid("json");
+
+    const existing = await prisma.person.findUnique({
+      where: { id, organizationId: user.organizationId },
+    });
+    if (!existing) {
+      return c.json({ error: { message: "Person not found", code: "NOT_FOUND" } }, 404);
+    }
+
+    if (existing.showInPayroll === showInPayroll) {
+      const full = await prisma.person.findUnique({
+        where: { id },
+        include: { teamMemberships: { include: { department: true } } },
+      });
+      return c.json({ data: serializePerson(full!) });
+    }
+
+    await prisma.person.update({
+      where: { id },
+      data: { showInPayroll },
+    });
+
+    const updated = await prisma.person.findUnique({
+      where: { id },
+      include: { teamMemberships: { include: { department: true } } },
+    });
+    return c.json({ data: serializePerson(updated!) });
+  }
+);
 
 // PUT /api/people/:id
 peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c) => {
