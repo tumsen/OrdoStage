@@ -57,6 +57,26 @@ async function leaveEnabled(organizationId: string) {
   return isCountryFeatureEnabled(org?.countryFeatures, "DK", "leaveManagement");
 }
 
+/** All leave/payroll country rules require DK leaveManagement to be enabled. */
+leaveRouter.use("*", async (c, next) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!(await leaveEnabled(user.organizationId))) {
+    return c.json(
+      {
+        error: {
+          message: "Danish leave management is not enabled for this organization.",
+          code: "FEATURE_DISABLED",
+        },
+      },
+      403
+    );
+  }
+  await next();
+});
+
 async function resolvePersonIdForUser(organizationId: string, email: string | null | undefined) {
   if (!email?.trim()) return null;
   let person = await prisma.person.findFirst({
@@ -486,7 +506,8 @@ leaveRouter.get("/time/payroll-export", async (c) => {
       norms.weeklyContractHours != null ? (rangeDays / 7) * norms.weeklyContractHours * 60 : null;
     const overtimeMinutes = overtimeAgainstContract(
       { workMinutes, vacationMinutes, extraVacationMinutes, holidayMinutes },
-      contractMinutes
+      contractMinutes,
+      { includeLeaveInNorm: true }
     );
 
     if (overtimeMinutes != null && overtimeMinutes > 0) {

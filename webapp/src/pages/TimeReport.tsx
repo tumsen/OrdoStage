@@ -64,6 +64,8 @@ import type {
 } from "@/contracts/backendTypes";
 import { timeCategoryMessageId } from "@/lib/timeCategoryI18n";
 import { overtimeAgainstContract } from "@/lib/leaveNorms";
+import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
+import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -653,6 +655,17 @@ export default function TimeReport() {
     return { from: customFrom, to: customTo, allTime: false as const };
   }, [rangeMode, anchorWeek, anchorMonth, anchorYear, customFrom, customTo]);
 
+  const { data: orgFeatures } = useQuery<{ countryFeatures?: OrganizationCountryFeatures }>({
+    queryKey: ["org"],
+    queryFn: () => api.get<{ countryFeatures?: OrganizationCountryFeatures }>("/api/org"),
+    enabled: canReadAll,
+  });
+  const leaveManagementEnabled = isCountryFeatureEnabled(
+    orgFeatures?.countryFeatures,
+    "DK",
+    "leaveManagement"
+  );
+
   const { data: people } = useQuery({
     queryKey: ["time-people"],
     queryFn: () => api.get<TimePerson[]>("/api/time/people"),
@@ -760,7 +773,8 @@ export default function TimeReport() {
             extraVacationMinutes: p.extraVacationMinutes,
             holidayMinutes: p.holidayMinutes,
           },
-          contractMinutes
+          contractMinutes,
+          { includeLeaveInNorm: leaveManagementEnabled }
         ),
       };
     });
@@ -772,7 +786,7 @@ export default function TimeReport() {
         cmp = (a.overtimeMinutes ?? -Infinity) - (b.overtimeMinutes ?? -Infinity);
       return sortPersonDir === "asc" ? cmp : -cmp;
     });
-  }, [report, sortPersonBy, sortPersonDir, contractOverrides]);
+  }, [report, sortPersonBy, sortPersonDir, contractOverrides, leaveManagementEnabled]);
 
   const handleContractSaved = useCallback((personId: string, hours: number | null) => {
     setContractOverrides((prev) => new Map(prev).set(personId, hours));
@@ -1337,7 +1351,7 @@ export default function TimeReport() {
                   </table>
                 </div>
                 <p className="px-4 py-2 text-xs text-white/30 border-t border-white/5">
-                  {t("time.reportContractHint")}
+                  {t(leaveManagementEnabled ? "time.reportContractHintDk" : "time.reportContractHint")}
                 </p>
               </div>
             )}

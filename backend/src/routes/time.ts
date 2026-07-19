@@ -1574,18 +1574,17 @@ timeRouter.get("/time/report", async (c) => {
     else if (cat === "travel_allowance") dp.travelAllowanceMinutes += durMin;
   }
 
-  const leaveEnabled =
-    !allTime &&
-    (await isCountryFeatureEnabled(
-      (
-        await prisma.organization.findUnique({
-          where: { id: user.organizationId },
-          select: { countryFeatures: true },
-        })
-      )?.countryFeatures,
-      "DK",
-      "leaveManagement"
-    ));
+  const leaveManagementEnabled = await isCountryFeatureEnabled(
+    (
+      await prisma.organization.findUnique({
+        where: { id: user.organizationId },
+        select: { countryFeatures: true },
+      })
+    )?.countryFeatures,
+    "DK",
+    "leaveManagement"
+  );
+  const leaveEnabled = !allTime && leaveManagementEnabled;
 
   const byPersonArr = await Promise.all(
     [...byPerson.entries()].map(async ([personId, pa]) => {
@@ -1624,7 +1623,8 @@ timeRouter.get("/time/report", async (c) => {
           extraVacationMinutes: pa.extraVacationMinutes,
           holidayMinutes: pa.holidayMinutes,
         },
-        contractMinutes
+        contractMinutes,
+        { includeLeaveInNorm: leaveManagementEnabled }
       ),
       vacationDaysPerYear: pa.vacationDaysPerYear,
       vacationDaysUsed: pa.vacationDaysPerYear != null || pa.vacationMinutes > 0 ? vacationDaysUsed : null,

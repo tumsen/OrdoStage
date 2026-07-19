@@ -21,7 +21,7 @@ export const COUNTRY_FEATURE_CATALOG = {
       leaveManagement: {
         label: "Leave management (fravær og løn)",
         description:
-          "Danish vacation, feriefridage, comp time, and sick leave with payroll data export.",
+          "Danish vacation, feriefridage, holidays, sick leave, comp time, payroll export, and overtime vs the weekly norm (work + leave).",
       },
     },
   },

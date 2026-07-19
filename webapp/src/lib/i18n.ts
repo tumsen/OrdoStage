@@ -180,6 +180,8 @@ const en = {
     payrollRangeMonth: "Month",
     payrollRangeYear: "Year",
     payrollRangeCustom: "Custom range",
+    payrollFeatureDisabled:
+      "Danish leave management is not enabled for this organisation. Turn it on under Account → Country modules.",
     payrollFrom: "From",
     payrollTo: "To",
     showInPayroll: "Show in payroll data",
@@ -356,7 +358,9 @@ const en = {
     reportRangeYear: "Year",
     reportRangeCustom: "Custom range",
     reportContractHint:
-      "Click the contract hours cell to set expected weekly hours per person. Overtime = (work + vacation + feriefridage + holidays) − contracted hours over the period.",
+      "Click the contract hours cell to set expected weekly hours per person. Overtime = logged work hours − contracted hours over the period.",
+    reportContractHintDk:
+      "Click the contract hours cell to set expected weekly hours per person. With Danish leave enabled: overtime = (work + vacation + feriefridage + holidays) − contracted hours.",
     reportColVacUsed: "Vac. used",
     reportColVacLeft: "Vac. left",
   },
@@ -576,6 +580,8 @@ const da: DeepPartial<typeof en> = {
     payrollRangeCustom: "Valgfri periode",
     payrollFrom: "Fra",
     payrollTo: "Til",
+    payrollFeatureDisabled:
+      "Dansk fravær/løn er ikke aktiveret for denne organisation. Slå det til under Konto → Landemoduler.",
     showInPayroll: "Vis i løn-datagrundlag",
     showInPayrollHint:
       "Slå fra for fastlønnede eller andre, der ikke skal med i løn-eksport.",

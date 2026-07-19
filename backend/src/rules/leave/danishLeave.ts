@@ -14,9 +14,10 @@ export function hoursPerWorkDayFromWeekly(weeklyHours: number | null | undefined
 }
 
 /**
- * Danish full-time model: the weekly/period norm (e.g. 37h) is fulfilled by
- * work plus vacation, extra vacation (feriefridage), and public holidays.
- * Overtime is that sum minus the prorated contract minutes.
+ * Overtime vs prorated contract minutes.
+ * When `includeLeaveInNorm` is true (Danish leave module): work + vacation +
+ * feriefridage + holidays fulfill the weekly/period norm (e.g. 37h).
+ * When false: classic work-only overtime.
  */
 export function overtimeAgainstContract(
   parts: {
@@ -25,15 +26,19 @@ export function overtimeAgainstContract(
     extraVacationMinutes?: number;
     holidayMinutes?: number;
   },
-  contractMinutes: number | null | undefined
+  contractMinutes: number | null | undefined,
+  opts?: { includeLeaveInNorm?: boolean }
 ): number | null {
   if (contractMinutes == null) return null;
-  const fulfilling =
-    parts.workMinutes +
-    (parts.vacationMinutes ?? 0) +
-    (parts.extraVacationMinutes ?? 0) +
-    (parts.holidayMinutes ?? 0);
-  return fulfilling - contractMinutes;
+  if (opts?.includeLeaveInNorm) {
+    const fulfilling =
+      parts.workMinutes +
+      (parts.vacationMinutes ?? 0) +
+      (parts.extraVacationMinutes ?? 0) +
+      (parts.holidayMinutes ?? 0);
+    return fulfilling - contractMinutes;
+  }
+  return parts.workMinutes - contractMinutes;
 }
 
 export function resolveVacationYear(

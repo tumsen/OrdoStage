@@ -28,6 +28,8 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
+import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 import type { PayrollExport } from "@/contracts/backendTypes";
 
 type RangeMode = "week" | "month" | "year" | "custom";
@@ -398,13 +400,24 @@ export default function TimePayroll() {
     return { from: customFrom, to: customTo };
   }, [rangeMode, anchorWeek, anchorMonth, anchorYear, customFrom, customTo]);
 
+  const { data: orgFeatures } = useQuery<{ countryFeatures?: OrganizationCountryFeatures }>({
+    queryKey: ["org"],
+    queryFn: () => api.get<{ countryFeatures?: OrganizationCountryFeatures }>("/api/org"),
+    enabled: readAll,
+  });
+  const leaveManagementEnabled = isCountryFeatureEnabled(
+    orgFeatures?.countryFeatures,
+    "DK",
+    "leaveManagement"
+  );
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["time-payroll-export", from, to, approvedOnly],
     queryFn: () =>
       api.get<PayrollExport>(
         `/api/time/payroll-export?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&approvedOnly=${approvedOnly ? "1" : "0"}`
       ),
-    enabled: readAll && Boolean(from) && Boolean(to),
+    enabled: readAll && leaveManagementEnabled && Boolean(from) && Boolean(to),
   });
 
   const exportCsv = () => {
@@ -425,6 +438,14 @@ export default function TimePayroll() {
     return (
       <div className="p-6 max-w-lg">
         <p className="text-sm text-white/55">{t("time.reportsNoAccess")}</p>
+      </div>
+    );
+  }
+
+  if (orgFeatures && !leaveManagementEnabled) {
+    return (
+      <div className="p-6 max-w-lg">
+        <p className="text-sm text-white/55">{t("time.payrollFeatureDisabled")}</p>
       </div>
     );
   }
