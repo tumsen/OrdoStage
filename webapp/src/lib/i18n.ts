@@ -349,6 +349,9 @@ const en = {
     reportColShare: "Share",
     reportNoData: "No entries found for the selected filters.",
     reportAllTime: "All time",
+    reportRangeMonth: "Month",
+    reportRangeYear: "Year",
+    reportRangeCustom: "Custom range",
     reportContractHint:
       "Click the contract hours cell to set expected weekly hours per person. Overtime = logged work hours − contracted hours over the period.",
     reportColVacUsed: "Vac. used",
@@ -649,6 +652,9 @@ const da: DeepPartial<typeof en> = {
     reportTabParentCategories: "Pr. overkategori",
     reportFilterParentCategories: "Overkategorier",
     reportAllTime: "Al tid",
+    reportRangeMonth: "Måned",
+    reportRangeYear: "År",
+    reportRangeCustom: "Valgfri periode",
   },
   account: {
     title: "Konto",

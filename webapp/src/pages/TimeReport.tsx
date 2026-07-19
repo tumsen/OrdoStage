@@ -1,19 +1,20 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  addMonths,
   format,
-  startOfWeek,
-  endOfWeek,
   startOfMonth,
   endOfMonth,
-  subWeeks,
-  subMonths,
+  startOfWeek,
   startOfYear,
   endOfYear,
   parseISO,
   startOfDay,
+  subMonths,
 } from "date-fns";
+import type { Locale } from "date-fns";
+import { da as localeDa, de as localeDe, enGB as localeEnGB } from "date-fns/locale";
 import {
   BarChart,
   Bar,
@@ -29,6 +30,8 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Pencil,
   Check,
   X,
@@ -98,39 +101,168 @@ function today(): Date {
   return startOfDay(new Date());
 }
 
-type DatePreset =
-  | "all_time"
-  | "this_week"
-  | "last_week"
-  | "this_month"
-  | "last_month"
-  | "last_3_months"
-  | "this_year"
-  | "custom";
+type RangeMode = "all_time" | "month" | "year" | "custom";
 
-function presetRange(preset: DatePreset): { from: Date; to: Date } | "all" {
-  if (preset === "all_time") return "all";
-  const now = today();
-  switch (preset) {
-    case "this_week":
-      return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
-    case "last_week": {
-      const lw = subWeeks(now, 1);
-      return { from: startOfWeek(lw, { weekStartsOn: 1 }), to: endOfWeek(lw, { weekStartsOn: 1 }) };
-    }
-    case "this_month":
-      return { from: startOfMonth(now), to: endOfMonth(now) };
-    case "last_month": {
-      const lm = subMonths(now, 1);
-      return { from: startOfMonth(lm), to: endOfMonth(lm) };
-    }
-    case "last_3_months":
-      return { from: startOfMonth(subMonths(now, 2)), to: endOfMonth(now) };
-    case "this_year":
-      return { from: startOfYear(now), to: endOfYear(now) };
-    default:
-      return { from: startOfMonth(now), to: endOfMonth(now) };
-  }
+function MonthPickerButton({
+  month,
+  onPick,
+  locale,
+  label,
+}: {
+  month: Date;
+  onPick: (d: Date) => void;
+  locale: Locale;
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(() => month);
+
+  useEffect(() => {
+    setViewYear(month);
+  }, [month]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[12rem] hover:bg-white/[0.06]"
+          aria-label={label}
+          aria-expanded={open}
+        >
+          {format(month, "MMMM yyyy", { locale })}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
+        <div className="p-3 w-[18rem]">
+          <div className="flex items-center justify-between pb-2">
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setViewYear((m) => new Date(m.getFullYear() - 1, m.getMonth(), 1))}
+              aria-label="Previous year"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="text-sm font-medium text-white">{viewYear.getFullYear()}</div>
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setViewYear((m) => new Date(m.getFullYear() + 1, m.getMonth(), 1))}
+              aria-label="Next year"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 12 }).map((_, i) => {
+              const year = viewYear.getFullYear();
+              const d = new Date(year, i, 1);
+              const isSelected = month.getFullYear() === year && month.getMonth() === i;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={cn(
+                    "h-9 rounded-md border border-white/10 bg-white/[0.02] text-xs text-white/80 hover:bg-white/10",
+                    isSelected && "bg-white/10 text-white border-white/20"
+                  )}
+                  onClick={() => {
+                    onPick(d);
+                    setOpen(false);
+                  }}
+                >
+                  {format(d, "MMM", { locale })}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function YearPickerButton({
+  year,
+  onPick,
+  label,
+}: {
+  year: number;
+  onPick: (y: number) => void;
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [decadeStart, setDecadeStart] = useState(() => Math.floor(year / 10) * 10);
+
+  useEffect(() => {
+    setDecadeStart(Math.floor(year / 10) * 10);
+  }, [year]);
+
+  const years = Array.from({ length: 12 }, (_, i) => decadeStart - 1 + i);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[8rem] hover:bg-white/[0.06]"
+          aria-label={label}
+          aria-expanded={open}
+        >
+          {year}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
+        <div className="p-3 w-[18rem]">
+          <div className="flex items-center justify-between pb-2">
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setDecadeStart((d) => d - 10)}
+              aria-label="Previous decade"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="text-sm font-medium text-white">
+              {decadeStart} – {decadeStart + 9}
+            </div>
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setDecadeStart((d) => d + 10)}
+              aria-label="Next decade"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {years.map((y) => {
+              const outside = y < decadeStart || y > decadeStart + 9;
+              const isSelected = y === year;
+              return (
+                <button
+                  key={y}
+                  type="button"
+                  className={cn(
+                    "h-9 rounded-md border border-white/10 bg-white/[0.02] text-xs text-white/80 hover:bg-white/10",
+                    outside && "text-white/35",
+                    isSelected && "bg-white/10 text-white border-white/20"
+                  )}
+                  onClick={() => {
+                    onPick(y);
+                    setOpen(false);
+                  }}
+                >
+                  {y}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 type TimePerson = { id: string; name: string; email: string | null; weeklyContractHours: number | null };
@@ -372,24 +504,25 @@ function exportCsv(entries: TimeReportEntry[]) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const PRESETS: { id: DatePreset; labelKey?: string; label?: string }[] = [
+const RANGE_MODES: { id: RangeMode; labelKey: string }[] = [
   { id: "all_time", labelKey: "time.reportAllTime" },
-  { id: "this_week", label: "This week" },
-  { id: "last_week", label: "Last week" },
-  { id: "this_month", label: "This month" },
-  { id: "last_month", label: "Last month" },
-  { id: "last_3_months", label: "Last 3 months" },
-  { id: "this_year", label: "This year" },
+  { id: "month", labelKey: "time.reportRangeMonth" },
+  { id: "year", labelKey: "time.reportRangeYear" },
+  { id: "custom", labelKey: "time.reportRangeCustom" },
 ];
 
 export default function TimeReport() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { canAction } = usePermissions();
   const canReadAll = canAction("time.read_all");
+  const dfLocale = language === "da" ? localeDa : language === "de" ? localeDe : localeEnGB;
 
-  const [preset, setPreset] = useState<DatePreset>("all_time");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
+  const now = today();
+  const [rangeMode, setRangeMode] = useState<RangeMode>("all_time");
+  const [anchorMonth, setAnchorMonth] = useState(() => startOfMonth(now));
+  const [anchorYear, setAnchorYear] = useState(() => now.getFullYear());
+  const [customFrom, setCustomFrom] = useState(format(startOfMonth(now), "yyyy-MM-dd"));
+  const [customTo, setCustomTo] = useState(format(endOfMonth(now), "yyyy-MM-dd"));
   const [selectedPersonIds, setSelectedPersonIds] = useState<string[]>([]);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [selectedParentCategoryIds, setSelectedParentCategoryIds] = useState<string[]>([]);
@@ -401,20 +534,26 @@ export default function TimeReport() {
   const [contractOverrides, setContractOverrides] = useState<Map<string, number | null>>(new Map());
 
   const { from, to, allTime } = useMemo(() => {
-    if (preset === "all_time") {
+    if (rangeMode === "all_time") {
       return { from: "", to: "", allTime: true as const };
     }
-    if (preset === "custom" && customFrom && customTo) {
-      return { from: customFrom, to: customTo, allTime: false as const };
+    if (rangeMode === "month") {
+      return {
+        from: format(startOfMonth(anchorMonth), "yyyy-MM-dd"),
+        to: format(endOfMonth(anchorMonth), "yyyy-MM-dd"),
+        allTime: false as const,
+      };
     }
-    const r = presetRange(preset);
-    if (r === "all") return { from: "", to: "", allTime: true as const };
-    return {
-      from: format(r.from, "yyyy-MM-dd"),
-      to: format(r.to, "yyyy-MM-dd"),
-      allTime: false as const,
-    };
-  }, [preset, customFrom, customTo]);
+    if (rangeMode === "year") {
+      const y = new Date(anchorYear, 0, 1);
+      return {
+        from: format(startOfYear(y), "yyyy-MM-dd"),
+        to: format(endOfYear(y), "yyyy-MM-dd"),
+        allTime: false as const,
+      };
+    }
+    return { from: customFrom, to: customTo, allTime: false as const };
+  }, [rangeMode, anchorMonth, anchorYear, customFrom, customTo]);
 
   const { data: people } = useQuery({
     queryKey: ["time-people"],
@@ -595,49 +734,101 @@ export default function TimeReport() {
 
       {/* Date range bar */}
       <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4 shrink-0">
-        <div className="flex flex-wrap gap-2 items-center">
-          {PRESETS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPreset(p.id)}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-sm transition-colors",
-                preset === p.id
-                  ? "bg-ordo-yellow text-[#0d0d14] font-medium"
-                  : "text-white/60 hover:text-white hover:bg-white/8"
-              )}
-            >
-              {p.labelKey ? t(p.labelKey as "time.reportAllTime") : p.label}
-            </button>
-          ))}
-          <button
-            onClick={() => setPreset("custom")}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-sm transition-colors",
-              preset === "custom"
-                ? "bg-ordo-yellow text-[#0d0d14] font-medium"
-                : "text-white/60 hover:text-white hover:bg-white/8"
-            )}
-          >
-            Custom
-          </button>
-          {preset === "custom" && (
-            <div className="flex items-center gap-2 ml-2">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex rounded-md border border-white/10 bg-white/[0.03] p-0.5">
+            {RANGE_MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setRangeMode(m.id)}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm",
+                  rangeMode === m.id ? "bg-white/10 text-white" : "text-white/55"
+                )}
+              >
+                {t(m.labelKey as "time.reportAllTime")}
+              </button>
+            ))}
+          </div>
+
+          {rangeMode === "month" ? (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 border-white/15 text-white"
+                onClick={() => setAnchorMonth((d) => startOfMonth(subMonths(d, 1)))}
+                aria-label="Previous month"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <MonthPickerButton
+                month={anchorMonth}
+                onPick={(d) => setAnchorMonth(startOfMonth(d))}
+                locale={dfLocale}
+                label={t("time.reportRangeMonth")}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 border-white/15 text-white"
+                onClick={() => setAnchorMonth((d) => startOfMonth(addMonths(d, 1)))}
+                aria-label="Next month"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : null}
+
+          {rangeMode === "year" ? (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 border-white/15 text-white"
+                onClick={() => setAnchorYear((y) => y - 1)}
+                aria-label="Previous year"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <YearPickerButton
+                year={anchorYear}
+                onPick={setAnchorYear}
+                label={t("time.reportRangeYear")}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 border-white/15 text-white"
+                onClick={() => setAnchorYear((y) => y + 1)}
+                aria-label="Next year"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : null}
+
+          {rangeMode === "custom" ? (
+            <div className="flex items-center gap-2">
               <Input
                 type="date"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-8 w-36 bg-white/5 border-white/15 text-white text-sm px-2"
+                className="h-9 w-36 bg-white/5 border-white/15 text-white text-sm px-2"
               />
               <span className="text-white/40 text-sm">–</span>
               <Input
                 type="date"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="h-8 w-36 bg-white/5 border-white/15 text-white text-sm px-2"
+                className="h-9 w-36 bg-white/5 border-white/15 text-white text-sm px-2"
               />
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Filters */}
