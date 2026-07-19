@@ -61,9 +61,15 @@ import type {
   TimeReport,
   TimeReportPerson,
   TimeReportEntry,
+  OrganizationLeavePolicy,
 } from "@/contracts/backendTypes";
 import { timeCategoryMessageId } from "@/lib/timeCategoryI18n";
-import { overtimeAgainstContract } from "@/lib/leaveNorms";
+import {
+  overtimeAgainstContract,
+  resolveVacationYear,
+  vacationYearFromStartYear,
+  DEFAULT_VACATION_YEAR_POLICY,
+} from "@/lib/leaveNorms";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 
@@ -109,7 +115,7 @@ function today(): Date {
   return startOfDay(new Date());
 }
 
-type RangeMode = "all_time" | "week" | "month" | "year" | "custom";
+type RangeMode = "all_time" | "week" | "month" | "year" | "vacation_year" | "custom";
 
 const WEEK_STARTS_ON = 1 as const;
 
@@ -274,10 +280,12 @@ function YearPickerButton({
   year,
   onPick,
   label,
+  displayLabel,
 }: {
   year: number;
   onPick: (y: number) => void;
   label: string;
+  displayLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [decadeStart, setDecadeStart] = useState(() => Math.floor(year / 10) * 10);
@@ -293,11 +301,14 @@ function YearPickerButton({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[8rem] hover:bg-white/[0.06]"
+          className={cn(
+            "inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap hover:bg-white/[0.06]",
+            displayLabel ? "min-w-[18rem]" : "min-w-[8rem]"
+          )}
           aria-label={label}
           aria-expanded={open}
         >
-          {year}
+          {displayLabel ?? year}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
@@ -591,11 +602,12 @@ function exportCsv(entries: TimeReportEntry[]) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const RANGE_MODES: { id: RangeMode; labelKey: string }[] = [
+const RANGE_MODES: { id: RangeMode; labelKey: string; requiresLeave?: boolean }[] = [
   { id: "all_time", labelKey: "time.reportAllTime" },
   { id: "week", labelKey: "time.reportRangeWeek" },
   { id: "month", labelKey: "time.reportRangeMonth" },
   { id: "year", labelKey: "time.reportRangeYear" },
+  { id: "vacation_year", labelKey: "time.reportRangeVacationYear", requiresLeave: true },
   { id: "custom", labelKey: "time.reportRangeCustom" },
 ];
 
@@ -612,6 +624,9 @@ export default function TimeReport() {
   );
   const [anchorMonth, setAnchorMonth] = useState(() => startOfMonth(now));
   const [anchorYear, setAnchorYear] = useState(() => now.getFullYear());
+  const [anchorVacationYearStart, setAnchorVacationYearStart] = useState(
+    () => resolveVacationYear(now, DEFAULT_VACATION_YEAR_POLICY).start.getFullYear()
+  );
   const [customFrom, setCustomFrom] = useState(format(startOfMonth(now), "yyyy-MM-dd"));
   const [customTo, setCustomTo] = useState(format(endOfMonth(now), "yyyy-MM-dd"));
   const [selectedPersonIds, setSelectedPersonIds] = useState<string[]>([]);
@@ -623,6 +638,50 @@ export default function TimeReport() {
   const [sortPersonBy, setSortPersonBy] = useState<"name" | "total" | "overtime">("name");
   const [sortPersonDir, setSortPersonDir] = useState<"asc" | "desc">("asc");
   const [contractOverrides, setContractOverrides] = useState<Map<string, number | null>>(new Map());
+
+  const { data: orgFeatures } = useQuery<{ countryFeatures?: OrganizationCountryFeatures }>({
+    queryKey: ["org"],
+    queryFn: () => api.get<{ countryFeatures?: OrganizationCountryFeatures }>("/api/org"),
+    enabled: canReadAll,
+  });
+  const leaveManagementEnabled = isCountryFeatureEnabled(
+    orgFeatures?.countryFeatures,
+    "DK",
+    "leaveManagement"
+  );
+
+  const { data: leavePolicy } = useQuery({
+    queryKey: ["org-leave-policy"],
+    queryFn: () => api.get<OrganizationLeavePolicy>("/api/org/leave-policy"),
+    enabled: canReadAll && leaveManagementEnabled,
+  });
+
+  const vacationPolicy = useMemo(
+    () =>
+      leavePolicy
+        ? {
+            vacationYearStartMonth: leavePolicy.vacationYearStartMonth,
+            vacationYearStartDay: leavePolicy.vacationYearStartDay,
+          }
+        : DEFAULT_VACATION_YEAR_POLICY,
+    [leavePolicy]
+  );
+
+  const selectedVacationYear = useMemo(
+    () => vacationYearFromStartYear(anchorVacationYearStart, vacationPolicy),
+    [anchorVacationYearStart, vacationPolicy]
+  );
+
+  const visibleRangeModes = useMemo(
+    () => RANGE_MODES.filter((m) => !m.requiresLeave || leaveManagementEnabled),
+    [leaveManagementEnabled]
+  );
+
+  useEffect(() => {
+    if (!leaveManagementEnabled && rangeMode === "vacation_year") {
+      setRangeMode("year");
+    }
+  }, [leaveManagementEnabled, rangeMode]);
 
   const { from, to, allTime } = useMemo(() => {
     if (rangeMode === "all_time") {
@@ -652,19 +711,23 @@ export default function TimeReport() {
         allTime: false as const,
       };
     }
+    if (rangeMode === "vacation_year") {
+      return {
+        from: format(selectedVacationYear.start, "yyyy-MM-dd"),
+        to: format(selectedVacationYear.end, "yyyy-MM-dd"),
+        allTime: false as const,
+      };
+    }
     return { from: customFrom, to: customTo, allTime: false as const };
-  }, [rangeMode, anchorWeek, anchorMonth, anchorYear, customFrom, customTo]);
-
-  const { data: orgFeatures } = useQuery<{ countryFeatures?: OrganizationCountryFeatures }>({
-    queryKey: ["org"],
-    queryFn: () => api.get<{ countryFeatures?: OrganizationCountryFeatures }>("/api/org"),
-    enabled: canReadAll,
-  });
-  const leaveManagementEnabled = isCountryFeatureEnabled(
-    orgFeatures?.countryFeatures,
-    "DK",
-    "leaveManagement"
-  );
+  }, [
+    rangeMode,
+    anchorWeek,
+    anchorMonth,
+    anchorYear,
+    selectedVacationYear,
+    customFrom,
+    customTo,
+  ]);
 
   const { data: people } = useQuery({
     queryKey: ["time-people"],
@@ -856,7 +919,7 @@ export default function TimeReport() {
       <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4 shrink-0">
         <div className="flex flex-wrap gap-3 items-end">
           <div className="flex rounded-md border border-white/10 bg-white/[0.03] p-0.5">
-            {RANGE_MODES.map((m) => (
+            {visibleRangeModes.map((m) => (
               <button
                 key={m.id}
                 type="button"
@@ -962,6 +1025,37 @@ export default function TimeReport() {
                 className="h-9 w-9 border-white/15 text-white"
                 onClick={() => setAnchorYear((y) => y + 1)}
                 aria-label="Next year"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : null}
+
+          {rangeMode === "vacation_year" ? (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 border-white/15 text-white"
+                onClick={() => setAnchorVacationYearStart((y) => y - 1)}
+                aria-label="Previous vacation year"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <YearPickerButton
+                year={anchorVacationYearStart}
+                onPick={setAnchorVacationYearStart}
+                label={t("time.reportRangeVacationYear")}
+                displayLabel={`${selectedVacationYear.key} · ${format(selectedVacationYear.start, "d MMM", { locale: dfLocale })} – ${format(selectedVacationYear.end, "d MMM yyyy", { locale: dfLocale })}`}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 border-white/15 text-white"
+                onClick={() => setAnchorVacationYearStart((y) => y + 1)}
+                aria-label="Next vacation year"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

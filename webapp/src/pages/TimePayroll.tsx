@@ -30,9 +30,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
-import type { PayrollExport } from "@/contracts/backendTypes";
+import {
+  resolveVacationYear,
+  vacationYearFromStartYear,
+  DEFAULT_VACATION_YEAR_POLICY,
+} from "@/lib/leaveNorms";
+import type { OrganizationLeavePolicy, PayrollExport } from "@/contracts/backendTypes";
 
-type RangeMode = "week" | "month" | "year" | "custom";
+type RangeMode = "week" | "month" | "year" | "vacation_year" | "custom";
 
 const WEEK_STARTS_ON = 1 as const;
 
@@ -40,6 +45,7 @@ const RANGE_MODES: { id: RangeMode; labelKey: string }[] = [
   { id: "week", labelKey: "time.payrollRangeWeek" },
   { id: "month", labelKey: "time.payrollRangeMonth" },
   { id: "year", labelKey: "time.payrollRangeYear" },
+  { id: "vacation_year", labelKey: "time.payrollRangeVacationYear" },
   { id: "custom", labelKey: "time.payrollRangeCustom" },
 ];
 
@@ -280,10 +286,12 @@ function YearPickerButton({
   year,
   onPick,
   label,
+  displayLabel,
 }: {
   year: number;
   onPick: (y: number) => void;
   label: string;
+  displayLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [decadeStart, setDecadeStart] = useState(() => Math.floor(year / 10) * 10);
@@ -299,11 +307,14 @@ function YearPickerButton({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap min-w-[8rem] hover:bg-white/[0.06]"
+          className={cn(
+            "inline-flex h-9 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-3 text-xs text-white/85 whitespace-nowrap hover:bg-white/[0.06]",
+            displayLabel ? "min-w-[18rem]" : "min-w-[8rem]"
+          )}
           aria-label={label}
           aria-expanded={open}
         >
-          {year}
+          {displayLabel ?? year}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
@@ -371,9 +382,45 @@ export default function TimePayroll() {
   );
   const [anchorMonth, setAnchorMonth] = useState(() => startOfMonth(now));
   const [anchorYear, setAnchorYear] = useState(() => now.getFullYear());
+  const [anchorVacationYearStart, setAnchorVacationYearStart] = useState(
+    () => resolveVacationYear(now, DEFAULT_VACATION_YEAR_POLICY).start.getFullYear()
+  );
   const [customFrom, setCustomFrom] = useState(format(startOfMonth(now), "yyyy-MM-dd"));
   const [customTo, setCustomTo] = useState(format(endOfMonth(now), "yyyy-MM-dd"));
   const [approvedOnly, setApprovedOnly] = useState(false);
+
+  const { data: orgFeatures } = useQuery<{ countryFeatures?: OrganizationCountryFeatures }>({
+    queryKey: ["org"],
+    queryFn: () => api.get<{ countryFeatures?: OrganizationCountryFeatures }>("/api/org"),
+    enabled: readAll,
+  });
+  const leaveManagementEnabled = isCountryFeatureEnabled(
+    orgFeatures?.countryFeatures,
+    "DK",
+    "leaveManagement"
+  );
+
+  const { data: leavePolicy } = useQuery({
+    queryKey: ["org-leave-policy"],
+    queryFn: () => api.get<OrganizationLeavePolicy>("/api/org/leave-policy"),
+    enabled: readAll && leaveManagementEnabled,
+  });
+
+  const vacationPolicy = useMemo(
+    () =>
+      leavePolicy
+        ? {
+            vacationYearStartMonth: leavePolicy.vacationYearStartMonth,
+            vacationYearStartDay: leavePolicy.vacationYearStartDay,
+          }
+        : DEFAULT_VACATION_YEAR_POLICY,
+    [leavePolicy]
+  );
+
+  const selectedVacationYear = useMemo(
+    () => vacationYearFromStartYear(anchorVacationYearStart, vacationPolicy),
+    [anchorVacationYearStart, vacationPolicy]
+  );
 
   const { from, to } = useMemo(() => {
     if (rangeMode === "week") {
@@ -397,19 +444,22 @@ export default function TimePayroll() {
         to: format(endOfYear(y), "yyyy-MM-dd"),
       };
     }
+    if (rangeMode === "vacation_year") {
+      return {
+        from: format(selectedVacationYear.start, "yyyy-MM-dd"),
+        to: format(selectedVacationYear.end, "yyyy-MM-dd"),
+      };
+    }
     return { from: customFrom, to: customTo };
-  }, [rangeMode, anchorWeek, anchorMonth, anchorYear, customFrom, customTo]);
-
-  const { data: orgFeatures } = useQuery<{ countryFeatures?: OrganizationCountryFeatures }>({
-    queryKey: ["org"],
-    queryFn: () => api.get<{ countryFeatures?: OrganizationCountryFeatures }>("/api/org"),
-    enabled: readAll,
-  });
-  const leaveManagementEnabled = isCountryFeatureEnabled(
-    orgFeatures?.countryFeatures,
-    "DK",
-    "leaveManagement"
-  );
+  }, [
+    rangeMode,
+    anchorWeek,
+    anchorMonth,
+    anchorYear,
+    selectedVacationYear,
+    customFrom,
+    customTo,
+  ]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["time-payroll-export", from, to, approvedOnly],
@@ -586,6 +636,37 @@ export default function TimePayroll() {
               className="h-9 w-9 border-white/15 text-white"
               onClick={() => setAnchorYear((y) => y + 1)}
               aria-label="Next year"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : null}
+
+        {rangeMode === "vacation_year" ? (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 border-white/15 text-white"
+              onClick={() => setAnchorVacationYearStart((y) => y - 1)}
+              aria-label="Previous vacation year"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <YearPickerButton
+              year={anchorVacationYearStart}
+              onPick={setAnchorVacationYearStart}
+              label={t("time.payrollRangeVacationYear")}
+              displayLabel={`${selectedVacationYear.key} · ${format(selectedVacationYear.start, "d MMM", { locale: dfLocale })} – ${format(selectedVacationYear.end, "d MMM yyyy", { locale: dfLocale })}`}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 border-white/15 text-white"
+              onClick={() => setAnchorVacationYearStart((y) => y + 1)}
+              aria-label="Next vacation year"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

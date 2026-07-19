@@ -1,6 +1,52 @@
 /** Danish default full-time week (37h → 7.4h / 7h 24m per vacation or sick day). */
 export const DEFAULT_WEEKLY_CONTRACT_HOURS = 37;
 
+/** Org leave policy default (Account → leave policy): ferieår starts 1 Sep. */
+export const DEFAULT_VACATION_YEAR_START_MONTH = 9;
+export const DEFAULT_VACATION_YEAR_START_DAY = 1;
+
+export type VacationYearPolicy = {
+  vacationYearStartMonth: number;
+  vacationYearStartDay: number;
+};
+
+export type VacationYear = {
+  key: string;
+  start: Date;
+  end: Date;
+};
+
+export const DEFAULT_VACATION_YEAR_POLICY: VacationYearPolicy = {
+  vacationYearStartMonth: DEFAULT_VACATION_YEAR_START_MONTH,
+  vacationYearStartDay: DEFAULT_VACATION_YEAR_START_DAY,
+};
+
+/** Same rules as backend `resolveVacationYear` (org leave policy start month/day). */
+export function resolveVacationYear(date: Date, policy: VacationYearPolicy): VacationYear {
+  const month = policy.vacationYearStartMonth;
+  const day = policy.vacationYearStartDay;
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const inCurrentYear = m > month || (m === month && d >= day);
+  const startYear = inCurrentYear ? y : y - 1;
+  const endYear = startYear + 1;
+  const start = new Date(startYear, month - 1, day);
+  const end = new Date(endYear, month - 1, day);
+  end.setMilliseconds(end.getMilliseconds() - 1);
+  return { key: `${startYear}-${endYear}`, start, end };
+}
+
+export function vacationYearFromStartYear(
+  startYear: number,
+  policy: VacationYearPolicy
+): VacationYear {
+  return resolveVacationYear(
+    new Date(startYear, policy.vacationYearStartMonth - 1, policy.vacationYearStartDay),
+    policy
+  );
+}
+
 /** Hours per vacation/sick day = weekly contract ÷ 5 (e.g. 37 → 7.4, 30 → 6). */
 export function hoursPerWorkDayFromWeekly(weeklyHours: number | null | undefined): number {
   if (weeklyHours != null && weeklyHours > 0) return weeklyHours / 5;

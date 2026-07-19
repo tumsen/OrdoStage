@@ -179,6 +179,7 @@ const en = {
     payrollRangeWeek: "Week",
     payrollRangeMonth: "Month",
     payrollRangeYear: "Year",
+    payrollRangeVacationYear: "Vacation year",
     payrollRangeCustom: "Custom range",
     payrollFeatureDisabled:
       "Danish leave management is not enabled for this organisation. Turn it on under Account → Country modules.",
@@ -356,6 +357,7 @@ const en = {
     reportRangeWeek: "Week",
     reportRangeMonth: "Month",
     reportRangeYear: "Year",
+    reportRangeVacationYear: "Vacation year",
     reportRangeCustom: "Custom range",
     reportContractHint:
       "Click the contract hours cell to set expected weekly hours per person. Overtime = logged work hours − contracted hours over the period.",
@@ -577,6 +579,7 @@ const da: DeepPartial<typeof en> = {
     payrollRangeWeek: "Uge",
     payrollRangeMonth: "Måned",
     payrollRangeYear: "År",
+    payrollRangeVacationYear: "Ferieår",
     payrollRangeCustom: "Valgfri periode",
     payrollFrom: "Fra",
     payrollTo: "Til",
@@ -666,6 +669,7 @@ const da: DeepPartial<typeof en> = {
     reportRangeWeek: "Uge",
     reportRangeMonth: "Måned",
     reportRangeYear: "År",
+    reportRangeVacationYear: "Ferieår",
     reportRangeCustom: "Valgfri periode",
   },
   account: {
