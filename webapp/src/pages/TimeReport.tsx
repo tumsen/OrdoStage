@@ -829,7 +829,7 @@ export default function TimeReport() {
   const dfLocale = language === "da" ? localeDa : language === "de" ? localeDe : localeEnGB;
 
   const now = today();
-  const [rangeMode, setRangeMode] = useState<RangeMode>("all_time");
+  const [rangeMode, setRangeMode] = useState<RangeMode>("month");
   const [anchorWeek, setAnchorWeek] = useState(() =>
     startOfWeek(now, { weekStartsOn: WEEK_STARTS_ON })
   );
