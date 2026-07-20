@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt, Mail, Wrench, Crown, UserMinus } from "lucide-react";
+import { ArrowLeft, Users, CalendarDays, MapPin, UserRound, Receipt, Mail, Wrench, Crown, UserMinus, HardDrive } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -85,6 +85,21 @@ async function downloadInvoiceStatement(invoiceId: string): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+interface OrgStorageUsage {
+  totalBytes: number;
+  companyLogoBytes: number;
+  personPhotoBytes: number;
+  personDocumentBytes: number;
+  venueDocumentBytes: number;
+  eventDocumentBytes: number;
+  eventTeamDocumentBytes: number;
+  tourTechRiderBytes: number;
+  tourShowTechRiderBytes: number;
+  productionTechRiderBytes: number;
+  productionDocumentBytes: number;
+  productionPhaseDocumentBytes: number;
+}
+
 interface OrgDetail {
   id: string;
   name: string;
@@ -111,10 +126,22 @@ interface OrgDetail {
   billingCurrencyCode: string;
   estimatedMonthlyCents: number;
   estimatedCurrencyCode: string;
+  storage?: OrgStorageUsage;
   createdAt: string;
   users: OrgUser[];
   invoices: Invoice[];
   _count: { events: number; venues: number; people: number };
+}
+
+function formatStorageBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+  if (bytes < 1024 * 1024 * 1024) {
+    const mb = bytes / (1024 * 1024);
+    return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
+  }
+  const gb = bytes / (1024 * 1024 * 1024);
+  return `${gb.toFixed(gb < 10 ? 2 : 1)} GB`;
 }
 
 function formatDate(dateStr: string): string {
@@ -150,9 +177,19 @@ function BillingStatusBadge({ status }: { status: string }) {
   );
 }
 
-function StatItem({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number }) {
+function StatItem({
+  icon: Icon,
+  label,
+  value,
+  title,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  title?: string;
+}) {
   return (
-    <div className="flex flex-col items-center gap-1 px-4 py-3">
+    <div className="flex flex-col items-center gap-1 px-4 py-3" title={title}>
       <Icon size={16} className="text-white/30" />
       <div className="text-lg font-bold text-white">{value}</div>
       <div className="text-xs text-white/40">{label}</div>
@@ -1064,6 +1101,29 @@ export default function OrgDetail() {
         <StatItem icon={CalendarDays} label="Events" value={org._count.events} />
         <StatItem icon={MapPin} label="Venues" value={org._count.venues} />
         <StatItem icon={UserRound} label="People" value={org._count.people} />
+        <StatItem
+          icon={HardDrive}
+          label="Storage"
+          value={formatStorageBytes(org.storage?.totalBytes ?? 0)}
+          title={
+            org.storage
+              ? [
+                  `Logo ${formatStorageBytes(org.storage.companyLogoBytes)}`,
+                  `People photos ${formatStorageBytes(org.storage.personPhotoBytes)}`,
+                  `Person docs ${formatStorageBytes(org.storage.personDocumentBytes)}`,
+                  `Venue docs ${formatStorageBytes(org.storage.venueDocumentBytes)}`,
+                  `Event docs ${formatStorageBytes(org.storage.eventDocumentBytes)}`,
+                  `Team docs ${formatStorageBytes(org.storage.eventTeamDocumentBytes)}`,
+                  `Tour riders ${formatStorageBytes(org.storage.tourTechRiderBytes + org.storage.tourShowTechRiderBytes)}`,
+                  `Production ${formatStorageBytes(
+                    org.storage.productionTechRiderBytes +
+                      org.storage.productionDocumentBytes +
+                      org.storage.productionPhaseDocumentBytes
+                  )}`,
+                ].join(" · ")
+              : undefined
+          }
+        />
         <div className="flex flex-col items-center gap-1 px-4 py-3">
           <Receipt size={16} className="text-white/30" />
           <div

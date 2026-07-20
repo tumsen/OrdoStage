@@ -41,6 +41,7 @@ import {
   statementRefForInvoice,
 } from "../billingStatementPdf";
 import { contentDispositionHeader } from "../lib/contentDisposition";
+import { getOrgStorageUsage } from "../orgStorageUsage";
 
 const app = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -612,27 +613,34 @@ app.post("/admin/orgs", async (c) => {
 });
 
 app.get("/admin/orgs/:id", async (c) => {
-  const [org, currencyPrices, globalSeatJson] = await Promise.all([prisma.organization.findUnique({
-    where: { id: c.req.param("id") },
-    include: {
-      memberships: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              createdAt: true,
-              isActive: true,
+  const orgId = c.req.param("id");
+  const [org, currencyPrices, globalSeatJson, storage] = await Promise.all([
+    prisma.organization.findUnique({
+      where: { id: orgId },
+      omit: { companyLogoData: true },
+      include: {
+        memberships: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                createdAt: true,
+                isActive: true,
+              },
             },
           },
+          orderBy: { user: { name: "asc" } },
         },
-        orderBy: { user: { name: "asc" } },
+        invoices: { orderBy: { issuedAt: "desc" }, take: 20, include: { lines: true } },
+        _count: { select: { events: true, venues: true, people: true } },
       },
-      invoices: { orderBy: { issuedAt: "desc" }, take: 20, include: { lines: true } },
-      _count: { select: { events: true, venues: true, people: true } },
-    },
-  }), getCurrencyPriceMap(prisma), getGlobalDefaultSeatCalculatorJson(prisma)]);
+    }),
+    getCurrencyPriceMap(prisma),
+    getGlobalDefaultSeatCalculatorJson(prisma),
+    getOrgStorageUsage(prisma, orgId),
+  ]);
   if (!org)
     return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
 
@@ -665,7 +673,9 @@ app.get("/admin/orgs/:id", async (c) => {
   return c.json({
     data: {
       ...rest,
+      hasCompanyLogo: storage.companyLogoBytes > 0,
       users,
+      storage,
       estimatedMonthlyCents,
       estimatedCurrencyCode: BILLING_CURRENCY_CODE,
       /** Same persisted JSON used for invoices when the org has no custom curve. */
