@@ -341,6 +341,7 @@ const en = {
     reportTotalHours: "Total hours",
     reportPersonCount: "People",
     reportChartTitle: "Hours by day",
+    reportChartTitleWeek: "Hours by week",
     reportTabPersons: "By person",
     reportTabProjects: "By project",
     reportTabParentCategories: "By parent category",

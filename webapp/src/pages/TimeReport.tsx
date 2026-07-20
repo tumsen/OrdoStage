@@ -532,49 +532,88 @@ function ContractHoursCell({
 
 function groupChartData(
   byDay: TimeReport["byDay"],
-  rangeDays: number
+  rangeDays: number,
+  weekLabel: (week: number) => string
 ): {
-  key: string;
-  work: number;
-  vacation: number;
-  sick: number;
-  holiday: number;
-  travelAllowance: number;
-}[] {
+  points: {
+    key: string;
+    label: string;
+    work: number;
+    vacation: number;
+    sick: number;
+    holiday: number;
+    travelAllowance: number;
+  }[];
+  groupedBy: "day" | "week";
+} {
   if (rangeDays <= 31) {
-    return byDay.map((d) => ({
-      key: format(parseISO(d.date), "d MMM"),
-      work: +(d.workMinutes / 60).toFixed(2),
-      vacation: +(d.vacationMinutes / 60).toFixed(2),
-      sick: +(d.sickMinutes / 60).toFixed(2),
-      holiday: +(d.holidayMinutes / 60).toFixed(2),
-      travelAllowance: +(d.travelAllowanceMinutes / 60).toFixed(2),
-    }));
+    return {
+      groupedBy: "day",
+      points: byDay.map((d) => {
+        const date = parseISO(d.date);
+        const key = format(date, "d MMM");
+        return {
+          key,
+          label: key,
+          work: +(d.workMinutes / 60).toFixed(2),
+          vacation: +(d.vacationMinutes / 60).toFixed(2),
+          sick: +(d.sickMinutes / 60).toFixed(2),
+          holiday: +(d.holidayMinutes / 60).toFixed(2),
+          travelAllowance: +(d.travelAllowanceMinutes / 60).toFixed(2),
+        };
+      }),
+    };
   }
-  // group by week
+
   const weeks = new Map<
     string,
-    { work: number; vacation: number; sick: number; holiday: number; travelAllowance: number }
+    {
+      weekStart: Date;
+      work: number;
+      vacation: number;
+      sick: number;
+      holiday: number;
+      travelAllowance: number;
+    }
   >();
   for (const d of byDay) {
-    const wk = format(startOfWeek(parseISO(d.date), { weekStartsOn: 1 }), "d MMM");
-    if (!weeks.has(wk))
-      weeks.set(wk, { work: 0, vacation: 0, sick: 0, holiday: 0, travelAllowance: 0 });
-    const w = weeks.get(wk)!;
+    const day = parseISO(d.date);
+    const weekStart = startOfWeek(day, { weekStartsOn: 1 });
+    const mapKey = format(weekStart, "yyyy-MM-dd");
+    if (!weeks.has(mapKey)) {
+      weeks.set(mapKey, {
+        weekStart,
+        work: 0,
+        vacation: 0,
+        sick: 0,
+        holiday: 0,
+        travelAllowance: 0,
+      });
+    }
+    const w = weeks.get(mapKey)!;
     w.work += d.workMinutes;
     w.vacation += d.vacationMinutes;
     w.sick += d.sickMinutes;
     w.holiday += d.holidayMinutes;
     w.travelAllowance += d.travelAllowanceMinutes;
   }
-  return [...weeks.entries()].map(([key, w]) => ({
-    key,
-    work: +(w.work / 60).toFixed(2),
-    vacation: +(w.vacation / 60).toFixed(2),
-    sick: +(w.sick / 60).toFixed(2),
-    holiday: +(w.holiday / 60).toFixed(2),
-    travelAllowance: +(w.travelAllowance / 60).toFixed(2),
-  }));
+
+  return {
+    groupedBy: "week",
+    points: [...weeks.values()].map((w) => {
+      const weekEnd = endOfWeek(w.weekStart, { weekStartsOn: 1 });
+      const isoWeek = getISOWeek(w.weekStart);
+      return {
+        key: weekLabel(isoWeek),
+        label: `${weekLabel(isoWeek)} · ${format(w.weekStart, "d MMM")} – ${format(weekEnd, "d MMM yyyy")}`,
+        work: +(w.work / 60).toFixed(2),
+        vacation: +(w.vacation / 60).toFixed(2),
+        sick: +(w.sick / 60).toFixed(2),
+        holiday: +(w.holiday / 60).toFixed(2),
+        travelAllowance: +(w.travelAllowance / 60).toFixed(2),
+      };
+    }),
+  };
 }
 
 // ─── CSV export ───────────────────────────────────────────────────────────────
@@ -807,10 +846,16 @@ export default function TimeReport() {
     placeholderData: (prev) => prev,
   });
 
-  const chartData = useMemo(
-    () => report ? groupChartData(report.byDay, report.summary.rangeDays) : [],
-    [report]
+  const chart = useMemo(
+    () =>
+      report
+        ? groupChartData(report.byDay, report.summary.rangeDays, (week) =>
+            t("time.calendarWeekIso", { week })
+          )
+        : { points: [], groupedBy: "day" as const },
+    [report, t]
   );
+  const chartData = chart.points;
 
   const hasVacation = (report?.summary.vacationMinutes ?? 0) > 0;
   const hasSick = (report?.summary.sickMinutes ?? 0) > 0;
@@ -1183,7 +1228,9 @@ export default function TimeReport() {
       {/* Chart */}
       {report && chartData.length > 0 && (
         <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4">
-          <h2 className="text-sm font-medium text-white/70 mb-4">{t("time.reportChartTitle")}</h2>
+          <h2 className="text-sm font-medium text-white/70 mb-4">
+            {t(chart.groupedBy === "week" ? "time.reportChartTitleWeek" : "time.reportChartTitle")}
+          </h2>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData} barCategoryGap="25%" barGap={0}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
@@ -1207,6 +1254,10 @@ export default function TimeReport() {
                   borderRadius: "8px",
                   color: "#fff",
                   fontSize: 12,
+                }}
+                labelFormatter={(_label, payload) => {
+                  const point = payload?.[0]?.payload as { label?: string } | undefined;
+                  return point?.label ?? _label;
                 }}
                 formatter={(value: number, name: string) => {
                   const map: Record<string, string> = {
