@@ -771,10 +771,21 @@ function groupChartData(
   };
 }
 
-function defaultChartGroupMode(rangeMode: RangeMode, rangeDays: number): ChartGroupMode {
-  if (rangeMode === "week" || rangeMode === "month") return "day";
-  if (rangeMode === "year" || rangeMode === "vacation_year") return "week";
-  return rangeDays <= 31 ? "day" : "week";
+const CHART_GROUP_OPTIONS: { id: ChartGroupMode; labelKey: string }[] = [
+  { id: "day", labelKey: "time.reportChartByDay" },
+  { id: "week", labelKey: "time.reportChartByWeek" },
+  { id: "month", labelKey: "time.reportChartByMonth" },
+  { id: "year", labelKey: "time.reportChartByYear" },
+];
+
+function chartGroupOptionsForRange(rangeMode: RangeMode): ChartGroupMode[] {
+  if (rangeMode === "week" || rangeMode === "month") return ["day", "week"];
+  // year, vacation year, all time, custom
+  return ["day", "week", "month"];
+}
+
+function defaultChartGroupMode(rangeMode: RangeMode): ChartGroupMode {
+  return chartGroupOptionsForRange(rangeMode)[0] ?? "day";
 }
 
 // ─── CSV export ───────────────────────────────────────────────────────────────
@@ -839,10 +850,13 @@ export default function TimeReport() {
   const [sortPersonDir, setSortPersonDir] = useState<"asc" | "desc">("asc");
   const [contractOverrides, setContractOverrides] = useState<Map<string, number | null>>(new Map());
   const [chartGroupMode, setChartGroupMode] = useState<ChartGroupMode>("day");
+  const allowedChartGroups = useMemo(() => chartGroupOptionsForRange(rangeMode), [rangeMode]);
 
   useEffect(() => {
-    setChartGroupMode(defaultChartGroupMode(rangeMode, 365));
-  }, [rangeMode]);
+    if (!allowedChartGroups.includes(chartGroupMode)) {
+      setChartGroupMode(defaultChartGroupMode(rangeMode));
+    }
+  }, [rangeMode, allowedChartGroups, chartGroupMode]);
 
   const { data: orgFeatures } = useQuery<{ countryFeatures?: OrganizationCountryFeatures }>({
     queryKey: ["org"],
@@ -1398,14 +1412,7 @@ export default function TimeReport() {
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <span className="text-xs text-white/45">{t("time.reportChartShowBy")}</span>
             <div className="flex rounded-md border border-white/10 bg-white/[0.03] p-0.5">
-              {(
-                [
-                  { id: "day" as const, labelKey: "time.reportChartByDay" },
-                  { id: "week" as const, labelKey: "time.reportChartByWeek" },
-                  { id: "month" as const, labelKey: "time.reportChartByMonth" },
-                  { id: "year" as const, labelKey: "time.reportChartByYear" },
-                ] as const
-              ).map((m) => (
+              {CHART_GROUP_OPTIONS.filter((m) => allowedChartGroups.includes(m.id)).map((m) => (
                 <button
                   key={m.id}
                   type="button"
@@ -1415,7 +1422,7 @@ export default function TimeReport() {
                     chartGroupMode === m.id ? "bg-white/10 text-white" : "text-white/55"
                   )}
                 >
-                  {t(m.labelKey)}
+                  {t(m.labelKey as "time.reportChartByDay")}
                 </button>
               ))}
             </div>
