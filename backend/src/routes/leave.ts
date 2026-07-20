@@ -512,14 +512,23 @@ leaveRouter.get("/time/payroll-export", async (c) => {
 
     if (overtimeMinutes != null && overtimeMinutes > 0) {
       const { accrueCompTimeFromOvertime } = await import("../services/leaveLedger");
-      await accrueCompTimeFromOvertime({
-        organizationId: user.organizationId,
-        personId: p.id,
-        periodStart: from,
-        periodEnd: to,
-        overtimeMinutes: Math.round(overtimeMinutes),
-        createdByUserId: user.id,
-      });
+      const { hasTimesheetCompSettlementInRange } = await import("../services/timesheetCompSettlement");
+      const alreadySettled = await hasTimesheetCompSettlementInRange(
+        user.organizationId,
+        p.id,
+        from,
+        to
+      );
+      if (!alreadySettled) {
+        await accrueCompTimeFromOvertime({
+          organizationId: user.organizationId,
+          personId: p.id,
+          periodStart: from,
+          periodEnd: to,
+          overtimeMinutes: Math.round(overtimeMinutes),
+          createdByUserId: user.id,
+        });
+      }
     }
 
     const leave = await getLeaveBalanceSummary(user.organizationId, p.id, to);

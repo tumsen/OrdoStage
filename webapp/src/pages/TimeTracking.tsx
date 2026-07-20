@@ -813,9 +813,28 @@ export default function TimeTracking() {
         periodStart: approvalPeriodStart.toISOString(),
         periodEnd: approvalPeriodEnd.toISOString(),
       }),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["time-approvals"] });
-      timeNotify({ title: "Timesheet approved" });
+      queryClient.invalidateQueries({ queryKey: ["time-leave-balances"] });
+      const settlement = data.compSettlement;
+      if (leaveManagementEnabled && settlement && settlement.totalDeltaMinutes !== 0) {
+        const sign = settlement.totalDeltaMinutes >= 0 ? "+" : "";
+        const h = Math.floor(Math.abs(settlement.totalDeltaMinutes) / 60);
+        const m = Math.round(Math.abs(settlement.totalDeltaMinutes) % 60);
+        const delta = m === 0 ? `${sign}${h}h` : `${sign}${h}h ${m}m`;
+        timeNotify({
+          title: t("time.timesheetApprovedCompAdjusted", { delta }),
+        });
+      } else if (
+        leaveManagementEnabled &&
+        settlement &&
+        settlement.dailyNormMinutes > 0 &&
+        settlement.totalDeltaMinutes === 0
+      ) {
+        timeNotify({ title: t("time.timesheetApprovedNoCompChange") });
+      } else {
+        timeNotify({ title: "Timesheet approved" });
+      }
     },
     onError: () => toast({ title: "Could not approve timesheet", variant: "destructive" }),
   });
@@ -824,6 +843,7 @@ export default function TimeTracking() {
     mutationFn: (id: string) => api.post<TimesheetApproval>(`/api/time/approvals/${id}/reopen`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-approvals"] });
+      queryClient.invalidateQueries({ queryKey: ["time-leave-balances"] });
       timeNotify({ title: "Timesheet reopened" });
     },
     onError: () => toast({ title: "Could not reopen timesheet", variant: "destructive" }),
@@ -1666,16 +1686,26 @@ export default function TimeTracking() {
             ) : null}
           </>
         ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs text-white/65 hover:text-white"
-            onClick={() => approveTimesheet.mutate()}
-            disabled={!canEdit || approveTimesheet.isPending}
-          >
-            Approve week
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-white/65 hover:text-white"
+              onClick={() => approveTimesheet.mutate()}
+              disabled={!canEdit || approveTimesheet.isPending}
+            >
+              Approve week
+            </Button>
+            {leaveManagementEnabled ? (
+              <span
+                className="hidden lg:inline text-[10px] text-white/35 max-w-[220px] leading-tight"
+                title={t("time.timesheetApproveHint")}
+              >
+                {t("time.timesheetApproveHint")}
+              </span>
+            ) : null}
+          </>
         )}
       </div>
     );

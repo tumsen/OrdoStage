@@ -12,6 +12,7 @@ export type LeaveBalanceType = (typeof LEAVE_BALANCE_TYPES)[number];
 export const LEAVE_TRANSACTION_SOURCES = [
   "time_entry",
   "overtime_accrual",
+  "timesheet_settlement",
   "manual_adjustment",
   "opening_balance",
   "reversal",

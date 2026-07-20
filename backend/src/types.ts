@@ -1741,6 +1741,20 @@ export const MileageDistanceResultSchema = z.object({
   durationMinutes: z.number().nullable().optional(),
 });
 
+export const TimesheetCompSettlementDaySchema = z.object({
+  date: z.string(),
+  fulfillingMinutes: z.number(),
+  dailyNormMinutes: z.number(),
+  deltaMinutes: z.number(),
+});
+
+export const TimesheetCompSettlementSchema = z.object({
+  applied: z.boolean(),
+  dailyNormMinutes: z.number(),
+  totalDeltaMinutes: z.number(),
+  days: z.array(TimesheetCompSettlementDaySchema),
+});
+
 export const TimesheetApprovalSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
@@ -1755,6 +1769,7 @@ export const TimesheetApprovalSchema = z.object({
   note: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  compSettlement: TimesheetCompSettlementSchema.optional(),
 });
 
 export const ApproveTimesheetSchema = z.object({

@@ -18,6 +18,10 @@ import {
   sumCompTimeEarnedMinutesInRange,
 } from "../services/leaveLedger";
 import {
+  reverseCompTimeForTimesheetReopen,
+  settleCompTimeForTimesheetApproval,
+} from "../services/timesheetCompSettlement";
+import {
   backfillLeaveEntryProjects,
   ensureAllLeaveTimeProjects,
   isLeaveSystemProjectKey,
@@ -1265,21 +1269,34 @@ function serializeMileageClaim(row: {
   };
 }
 
-function serializeTimesheetApproval(row: {
-  id: string;
-  organizationId: string;
-  personId: string;
-  periodStart: Date;
-  periodEnd: Date;
-  status: string;
-  approvedAt: Date | null;
-  approvedByUserId: string | null;
-  reopenedAt: Date | null;
-  reopenedByUserId: string | null;
-  note: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function serializeTimesheetApproval(
+  row: {
+    id: string;
+    organizationId: string;
+    personId: string;
+    periodStart: Date;
+    periodEnd: Date;
+    status: string;
+    approvedAt: Date | null;
+    approvedByUserId: string | null;
+    reopenedAt: Date | null;
+    reopenedByUserId: string | null;
+    note: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  compSettlement?: {
+    applied: boolean;
+    dailyNormMinutes: number;
+    totalDeltaMinutes: number;
+    days: Array<{
+      date: string;
+      fulfillingMinutes: number;
+      dailyNormMinutes: number;
+      deltaMinutes: number;
+    }>;
+  }
+) {
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -1294,6 +1311,7 @@ function serializeTimesheetApproval(row: {
     note: row.note,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
+    ...(compSettlement ? { compSettlement } : {}),
   };
 }
 
@@ -4823,7 +4841,7 @@ timeRouter.get("/time/approvals", async (c) => {
     },
     orderBy: { periodStart: "asc" },
   });
-  return c.json({ data: rows.map(serializeTimesheetApproval) });
+  return c.json({ data: rows.map((row) => serializeTimesheetApproval(row)) });
 });
 
 timeRouter.post("/time/approvals", zValidator("json", ApproveTimesheetSchema), async (c) => {
@@ -4872,7 +4890,22 @@ timeRouter.post("/time/approvals", zValidator("json", ApproveTimesheetSchema), a
       note: body.note ?? null,
     },
   });
-  return c.json({ data: serializeTimesheetApproval(row) });
+
+  const compSettlement = await settleCompTimeForTimesheetApproval({
+    organizationId: user.organizationId,
+    personId: target.personId,
+    periodStart,
+    periodEnd,
+    timesheetApprovalId: row.id,
+    createdByUserId: user.id,
+  });
+
+  return c.json({
+    data: serializeTimesheetApproval(
+      row,
+      compSettlement.dailyNormMinutes > 0 ? compSettlement : undefined
+    ),
+  });
 });
 
 timeRouter.post("/time/approvals/:id/reopen", async (c) => {
@@ -4888,6 +4921,15 @@ timeRouter.post("/time/approvals/:id/reopen", async (c) => {
     where: { id, organizationId: user.organizationId },
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  if (existing.status === "approved") {
+    await reverseCompTimeForTimesheetReopen({
+      organizationId: user.organizationId,
+      timesheetApprovalId: existing.id,
+      createdByUserId: user.id,
+    });
+  }
+
   const row = await prisma.timesheetApproval.update({
     where: { id },
     data: {

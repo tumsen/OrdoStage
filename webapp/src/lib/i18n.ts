@@ -278,8 +278,13 @@ const en = {
     leaveSource_time_entry: "Time entry",
     leaveSource_manual_adjustment: "Manual adjustment",
     leaveSource_overtime_accrual: "Overtime accrual",
+    leaveSource_timesheet_settlement: "Week approval (daily norm)",
     leaveSource_opening_balance: "Opening balance",
     leaveSource_reversal: "Reversal",
+    timesheetApproveHint:
+      "Approving settles each weekday (Mon–Fri) against the daily norm (weekly contract ÷ 5, e.g. 7h 24m at 37h/week). Work + vacation + feriefridage + holidays count toward the norm; the difference updates afspadsering (+ or −).",
+    timesheetApprovedCompAdjusted: "Week approved. Afspadsering adjusted by {{delta}}.",
+    timesheetApprovedNoCompChange: "Week approved. Daily norm matched — no afspadsering change.",
     reportsTitle: "Time reports",
     reportsSubtitle: "Analyse hours, projects, overtime, and leave across your team.",
     reportsNoAccess: "You need the 'View everyone's time' permission to access reports.",
@@ -634,6 +639,12 @@ const da: DeepPartial<typeof en> = {
     leaveSource_manual_adjustment: "Manuel justering",
     leaveSource_time_entry: "Tidsregistrering",
     leaveSource_overtime_accrual: "Overarbejde",
+    leaveSource_timesheet_settlement: "Ugegodkendelse (dagsnorm)",
+    leaveSource_reversal: "Tilbageførsel",
+    timesheetApproveHint:
+      "Godkendelse afregner hver hverdag (man–fre) mod dagsnormen (ugentlig kontrakt ÷ 5, fx 7t 24m ved 37t/uge). Arbejde + ferie + feriefridage + helligdage tæller med; differencen opdaterer afspadsering (+ eller −).",
+    timesheetApprovedCompAdjusted: "Uge godkendt. Afspadsering justeret med {{delta}}.",
+    timesheetApprovedNoCompChange: "Uge godkendt. Dagsnorm opfyldt — ingen ændring i afspadsering.",
     parentCategoryPageTitle: "Projekter",
     parentCategoryPageHint:
       "Administrer overkategorier og projekter. Events og turneer får automatisk et tidsprojekt i den overkategori du vælger ved oprettelse.",
