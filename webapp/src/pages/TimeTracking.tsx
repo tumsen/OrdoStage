@@ -40,6 +40,16 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -411,6 +421,7 @@ export default function TimeTracking() {
   );
   const [section, setSection] = useState<"time" | "travel" | "mileage">("time");
   const [anchor, setAnchor] = useState(() => new Date());
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!travelAllowanceEnabled && section === "travel") {
@@ -1670,6 +1681,11 @@ export default function TimeTracking() {
   const periodTotalMinutes = mode === "week" ? weekTotalMinutes : monthTotalMinutes;
   const periodTotalLabel = mode === "week" ? t("time.weekTotal") : t("time.monthTotal");
 
+  function requestApproveWeek() {
+    if (!canEdit || approveTimesheet.isPending) return;
+    setApproveConfirmOpen(true);
+  }
+
   function ApproveWeekControl({ className }: { className?: string }) {
     if (!(isTimeSection && mode === "week")) return null;
     return (
@@ -1694,26 +1710,16 @@ export default function TimeTracking() {
             ) : null}
           </>
         ) : (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs text-white/65 hover:text-white"
-              onClick={() => approveTimesheet.mutate()}
-              disabled={!canEdit || approveTimesheet.isPending}
-            >
-              {t("time.approveWeek")}
-            </Button>
-            {leaveManagementEnabled ? (
-              <span
-                className="hidden lg:inline text-[10px] text-white/35 max-w-[220px] leading-tight"
-                title={t("time.timesheetApproveHint")}
-              >
-                {t("time.timesheetApproveHint")}
-              </span>
-            ) : null}
-          </>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-white/65 hover:text-white"
+            onClick={requestApproveWeek}
+            disabled={!canEdit || approveTimesheet.isPending}
+          >
+            {t("time.approveWeek")}
+          </Button>
         )}
       </div>
     );
@@ -2067,7 +2073,7 @@ export default function TimeTracking() {
                     ) : (
                       <DropdownMenuItem
                         className="focus:bg-white/10"
-                        onClick={() => approveTimesheet.mutate()}
+                        onClick={requestApproveWeek}
                         disabled={!canEdit || approveTimesheet.isPending}
                       >
                         {t("time.approveWeek")}
@@ -3282,6 +3288,34 @@ export default function TimeTracking() {
         leaveManagementEnabled={leaveManagementEnabled}
         workDayDurationMinutes={workDayMinutes}
       />
+      <AlertDialog open={approveConfirmOpen} onOpenChange={setApproveConfirmOpen}>
+        <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("time.timesheetApproveConfirmTitle")}</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/55 space-y-3 text-left">
+              {leaveManagementEnabled ? (
+                <span className="block">{t("time.timesheetApproveHint")}</span>
+              ) : null}
+              <span className="block">{t("time.timesheetApproveConfirmBody")}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+              {t("time.timesheetApproveCancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-emerald-700 hover:bg-emerald-600 text-white"
+              disabled={approveTimesheet.isPending}
+              onClick={() => {
+                setApproveConfirmOpen(false);
+                approveTimesheet.mutate();
+              }}
+            >
+              {t("time.timesheetApproveConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

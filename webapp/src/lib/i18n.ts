@@ -283,6 +283,10 @@ const en = {
     leaveSource_reversal: "Reversal",
     timesheetApproveHint:
       "Approving settles each weekday (Mon–Fri) against the daily norm (weekly contract ÷ 5, e.g. 7h 24m at 37h/week). Work + vacation + feriefridage + holidays count toward the norm; the difference updates afspadsering (+ or −).",
+    timesheetApproveConfirmTitle: "Approve this week?",
+    timesheetApproveConfirmBody: "The week will be locked and can only be reopened by someone with permission to view everyone’s time.",
+    timesheetApproveConfirm: "Approve week",
+    timesheetApproveCancel: "Cancel",
     timesheetApprovedCompAdjusted: "Week approved. Afspadsering adjusted by {{delta}}.",
     timesheetApprovedNoCompChange: "Week approved. Daily norm matched — no afspadsering change.",
     timesheetApproved: "Week approved.",
@@ -653,6 +657,10 @@ const da: DeepPartial<typeof en> = {
     leaveSource_reversal: "Tilbageførsel",
     timesheetApproveHint:
       "Godkendelse afregner hver hverdag (man–fre) mod dagsnormen (ugentlig kontrakt ÷ 5, fx 7t 24m ved 37t/uge). Arbejde + ferie + feriefridage + helligdage tæller med; differencen opdaterer afspadsering (+ eller −).",
+    timesheetApproveConfirmTitle: "Godkend denne uge?",
+    timesheetApproveConfirmBody: "Ugen låses og kan kun genåbnes af nogen med adgang til at se alles timer.",
+    timesheetApproveConfirm: "Godkend uge",
+    timesheetApproveCancel: "Annuller",
     timesheetApprovedCompAdjusted: "Uge godkendt. Afspadsering justeret med {{delta}}.",
     timesheetApprovedNoCompChange: "Uge godkendt. Dagsnorm opfyldt — ingen ændring i afspadsering.",
     timesheetApproved: "Uge godkendt.",
