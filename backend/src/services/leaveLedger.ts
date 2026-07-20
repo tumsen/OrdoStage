@@ -396,3 +396,40 @@ export async function getLeaveBalanceSummary(
   const earned = accrueVacationEarnedDays(norms, vacationYear, asOf);
   return summarizeLeaveBalances(vacationYear.key, norms, earned, map);
 }
+
+/**
+ * Comp-time (afspadsering) minutes earned in a half-open UTC range, from leave ledger posts
+ * (overtime accrual, opening balance, manual adjustment). Does not accrue overtime as a side effect.
+ */
+export async function sumCompTimeEarnedMinutesInRange(
+  organizationId: string,
+  personIds: string[],
+  rangeStart: Date,
+  rangeEndExclusive: Date,
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (personIds.length === 0) return map;
+
+  const rows = await prisma.leaveTransaction.findMany({
+    where: {
+      organizationId,
+      personId: { in: personIds },
+      balanceType: "comp_time_earned",
+      OR: [
+        {
+          periodStart: { gte: rangeStart, lt: rangeEndExclusive },
+        },
+        {
+          periodStart: null,
+          createdAt: { gte: rangeStart, lt: rangeEndExclusive },
+        },
+      ],
+    },
+    select: { personId: true, amount: true },
+  });
+
+  for (const row of rows) {
+    map.set(row.personId, (map.get(row.personId) ?? 0) + row.amount);
+  }
+  return map;
+}

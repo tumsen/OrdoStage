@@ -366,12 +366,16 @@ const en = {
     reportRangeYear: "Year",
     reportRangeVacationYear: "Vacation year",
     reportRangeCustom: "Custom range",
+    reportColVacUsed: "Vac. used",
+    reportColVacLeft: "Vac. left",
+    reportColCompPeriod: "Comp Δ",
+    reportColCompBalance: "Comp balance",
+    reportCompPeriodHint: "Earned − used in period",
+    reportCompBalanceHint: "Afspadsering rest at period end",
     reportContractHint:
       "Click the contract hours cell to set expected weekly hours per person. Overtime = logged work hours − contracted hours over the period.",
     reportContractHintDk:
-      "Click the contract hours cell to set expected weekly hours per person. With Danish leave enabled: overtime = (work + vacation + feriefridage + holidays) − contracted hours.",
-    reportColVacUsed: "Vac. used",
-    reportColVacLeft: "Vac. left",
+      "Click the contract hours cell to set expected weekly hours per person. With Danish leave enabled: overtime = (work + vacation + feriefridage + holidays) − contracted hours. Comp Δ = afspadsering earned − used in the period; Comp balance is remaining at period end.",
   },
   account: {
     title: "Account",
@@ -678,6 +682,13 @@ const da: DeepPartial<typeof en> = {
     reportRangeYear: "År",
     reportRangeVacationYear: "Ferieår",
     reportRangeCustom: "Valgfri periode",
+    reportColCompPeriod: "Afsp. Δ",
+    reportColCompBalance: "Afsp. saldo",
+    reportCompPeriodHint: "Optjent − brugt i perioden",
+    reportCompBalanceHint: "Afspadsering rest ved periodens slut",
+    reportColVacUsed: "Fer. brugt",
+    reportColVacLeft: "Fer. rest",
+    reportColOvertime: "Overarbejde",
   },
   account: {
     title: "Konto",

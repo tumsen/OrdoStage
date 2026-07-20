@@ -15,6 +15,7 @@ import {
   applyTimeEntryToLeaveLedger,
   getLeaveBalanceSummary,
   removeTimeEntryFromLeaveLedger,
+  sumCompTimeEarnedMinutesInRange,
 } from "../services/leaveLedger";
 import {
   backfillLeaveEntryProjects,
@@ -1586,6 +1587,16 @@ timeRouter.get("/time/report", async (c) => {
   );
   const leaveEnabled = !allTime && leaveManagementEnabled;
 
+  const personIdsForLeave = [...byPerson.keys()];
+  const compEarnedByPerson = leaveEnabled
+    ? await sumCompTimeEarnedMinutesInRange(
+        user.organizationId!,
+        personIdsForLeave,
+        rangeStart,
+        rangeEndExclusive
+      )
+    : new Map<string, number>();
+
   const byPersonArr = await Promise.all(
     [...byPerson.entries()].map(async ([personId, pa]) => {
     const total =
@@ -1603,6 +1614,17 @@ timeRouter.get("/time/report", async (c) => {
     const vacationDaysUsed = Math.round((pa.vacationMinutes / 60 / hoursPerDay) * 10) / 10;
     const vacationDaysRemaining =
       pa.vacationDaysPerYear != null ? Math.round((pa.vacationDaysPerYear - vacationDaysUsed) * 10) / 10 : null;
+    const leave = leaveEnabled
+      ? await getLeaveBalanceSummary(
+          user.organizationId!,
+          personId,
+          new Date(rangeEndExclusive.getTime() - 1)
+        )
+      : undefined;
+    const earnedInPeriod = leaveEnabled ? Math.round(compEarnedByPerson.get(personId) ?? 0) : null;
+    const usedInPeriod = leaveEnabled ? Math.round(pa.compTimeMinutes) : null;
+    const periodDelta =
+      earnedInPeriod != null && usedInPeriod != null ? earnedInPeriod - usedInPeriod : null;
     return {
       personId,
       personName: pa.personName,
@@ -1629,13 +1651,10 @@ timeRouter.get("/time/report", async (c) => {
       vacationDaysPerYear: pa.vacationDaysPerYear,
       vacationDaysUsed: pa.vacationDaysPerYear != null || pa.vacationMinutes > 0 ? vacationDaysUsed : null,
       vacationDaysRemaining,
-      leave: leaveEnabled
-        ? await getLeaveBalanceSummary(
-            user.organizationId!,
-            personId,
-            new Date(rangeEndExclusive.getTime() - 1)
-          )
-        : undefined,
+      compTimeBalanceMinutes: leave ? Math.round(leave.compTimeRemainingMinutes) : null,
+      compTimePeriodDeltaMinutes: periodDelta,
+      compTimeEarnedMinutes: earnedInPeriod,
+      leave,
     };
   })
   );

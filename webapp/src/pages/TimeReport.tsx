@@ -86,6 +86,12 @@ function fmtMins(minutes: number): string {
   return `${sign}${h}h ${m}m`;
 }
 
+function fmtSignedMins(minutes: number): string {
+  const rounded = Math.round(minutes);
+  if (rounded > 0) return `+${fmtMins(rounded)}`;
+  return fmtMins(rounded);
+}
+
 function fmtDate(iso: string): string {
   try {
     return format(parseISO(iso), "d MMM HH:mm");
@@ -846,7 +852,9 @@ export default function TimeReport() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [entryPage, setEntryPage] = useState(0);
   const ENTRIES_PER_PAGE = 50;
-  const [sortPersonBy, setSortPersonBy] = useState<"name" | "total" | "overtime">("name");
+  const [sortPersonBy, setSortPersonBy] = useState<
+    "name" | "total" | "overtime" | "compDelta" | "compBalance"
+  >("name");
   const [sortPersonDir, setSortPersonDir] = useState<"asc" | "desc">("asc");
   const [contractOverrides, setContractOverrides] = useState<Map<string, number | null>>(new Map());
   const [chartGroupMode, setChartGroupMode] = useState<ChartGroupMode>("day");
@@ -1042,6 +1050,18 @@ export default function TimeReport() {
   const hasSick = (report?.summary.sickMinutes ?? 0) > 0;
   const hasHoliday = (report?.summary.holidayMinutes ?? 0) > 0;
   const hasTravelAllowance = (report?.summary.travelAllowanceMinutes ?? 0) > 0;
+  const showCompBalance = leaveManagementEnabled && !allTime;
+
+  const compPeriodTotals = useMemo(() => {
+    if (!report || !showCompBalance) return null;
+    let delta = 0;
+    let balance = 0;
+    for (const p of report.byPerson) {
+      delta += p.compTimePeriodDeltaMinutes ?? 0;
+      balance += p.compTimeBalanceMinutes ?? 0;
+    }
+    return { delta: Math.round(delta), balance: Math.round(balance) };
+  }, [report, showCompBalance]);
 
   const sortedPersons = useMemo((): TimeReportPerson[] => {
     if (!report) return [];
@@ -1073,6 +1093,13 @@ export default function TimeReport() {
       else if (sortPersonBy === "total") cmp = a.totalMinutes - b.totalMinutes;
       else if (sortPersonBy === "overtime")
         cmp = (a.overtimeMinutes ?? -Infinity) - (b.overtimeMinutes ?? -Infinity);
+      else if (sortPersonBy === "compDelta")
+        cmp =
+          (a.compTimePeriodDeltaMinutes ?? -Infinity) -
+          (b.compTimePeriodDeltaMinutes ?? -Infinity);
+      else if (sortPersonBy === "compBalance")
+        cmp =
+          (a.compTimeBalanceMinutes ?? -Infinity) - (b.compTimeBalanceMinutes ?? -Infinity);
       return sortPersonDir === "asc" ? cmp : -cmp;
     });
   }, [report, sortPersonBy, sortPersonDir, contractOverrides, leaveManagementEnabled]);
@@ -1081,7 +1108,7 @@ export default function TimeReport() {
     setContractOverrides((prev) => new Map(prev).set(personId, hours));
   }, []);
 
-  function togglePersonSort(col: "name" | "total" | "overtime") {
+  function togglePersonSort(col: "name" | "total" | "overtime" | "compDelta" | "compBalance") {
     if (sortPersonBy === col) setSortPersonDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortPersonBy(col);
@@ -1398,6 +1425,28 @@ export default function TimeReport() {
               color="text-amber-300"
             />
           )}
+          {showCompBalance && compPeriodTotals && (
+            <>
+              <SummaryCard
+                label={t("time.reportColCompPeriod")}
+                value={fmtSignedMins(compPeriodTotals.delta)}
+                color={
+                  compPeriodTotals.delta > 0
+                    ? "text-cyan-300"
+                    : compPeriodTotals.delta < 0
+                      ? "text-orange-300"
+                      : "text-white/50"
+                }
+                sub={t("time.reportCompPeriodHint")}
+              />
+              <SummaryCard
+                label={t("time.reportColCompBalance")}
+                value={fmtMins(compPeriodTotals.balance)}
+                color="text-cyan-300"
+                sub={t("time.reportCompBalanceHint")}
+              />
+            </>
+          )}
           <SummaryCard
             label={t("time.reportPersonCount")}
             value={String(report.byPerson.length)}
@@ -1571,6 +1620,22 @@ export default function TimeReport() {
                         >
                           {t("time.reportColOvertime")} <SortIcon col="overtime" />
                         </th>
+                        {showCompBalance && (
+                          <>
+                            <th
+                              className="text-right px-4 py-3 font-medium text-cyan-400/70 text-xs whitespace-nowrap cursor-pointer hover:text-cyan-300/90 select-none"
+                              onClick={() => togglePersonSort("compDelta")}
+                            >
+                              {t("time.reportColCompPeriod")} <SortIcon col="compDelta" />
+                            </th>
+                            <th
+                              className="text-right px-4 py-3 font-medium text-cyan-400/70 text-xs whitespace-nowrap cursor-pointer hover:text-cyan-300/90 select-none"
+                              onClick={() => togglePersonSort("compBalance")}
+                            >
+                              {t("time.reportColCompBalance")} <SortIcon col="compBalance" />
+                            </th>
+                          </>
+                        )}
                         <th className="text-right px-4 py-3 font-medium text-emerald-400/60 text-xs whitespace-nowrap">
                           {t("time.reportColVacUsed")}
                         </th>
@@ -1641,6 +1706,49 @@ export default function TimeReport() {
                               <span className="text-white/20">—</span>
                             )}
                           </td>
+                          {showCompBalance && (
+                            <>
+                              <td className="px-4 py-3 text-right tabular-nums">
+                                {p.compTimePeriodDeltaMinutes != null ? (
+                                  <span
+                                    className={cn(
+                                      "font-medium",
+                                      p.compTimePeriodDeltaMinutes > 0
+                                        ? "text-cyan-300"
+                                        : p.compTimePeriodDeltaMinutes < 0
+                                          ? "text-orange-300"
+                                          : "text-white/40"
+                                    )}
+                                    title={
+                                      p.compTimeEarnedMinutes != null
+                                        ? `${t("time.payrollColCompEarned")}: ${fmtMins(p.compTimeEarnedMinutes)} · ${t("time.categoryCompTime")}: ${fmtMins(p.compTimeMinutes)}`
+                                        : undefined
+                                    }
+                                  >
+                                    {fmtSignedMins(p.compTimePeriodDeltaMinutes)}
+                                  </span>
+                                ) : (
+                                  <span className="text-white/20">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right tabular-nums">
+                                {p.compTimeBalanceMinutes != null ? (
+                                  <span
+                                    className={cn(
+                                      "font-medium",
+                                      p.compTimeBalanceMinutes < 0
+                                        ? "text-red-300"
+                                        : "text-cyan-300/90"
+                                    )}
+                                  >
+                                    {fmtMins(p.compTimeBalanceMinutes)}
+                                  </span>
+                                ) : (
+                                  <span className="text-white/20">—</span>
+                                )}
+                              </td>
+                            </>
+                          )}
                           <td className="px-4 py-3 text-right tabular-nums text-emerald-300/70">
                             {p.vacationDaysUsed != null ? (
                               `${p.vacationDaysUsed}d`
@@ -1691,6 +1799,16 @@ export default function TimeReport() {
                         </td>
                         <td />
                         <td />
+                        {showCompBalance && (
+                          <>
+                            <td className="px-4 py-3 text-right tabular-nums font-semibold text-cyan-300">
+                              {compPeriodTotals ? fmtSignedMins(compPeriodTotals.delta) : "—"}
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums font-semibold text-cyan-300/80">
+                              {compPeriodTotals ? fmtMins(compPeriodTotals.balance) : "—"}
+                            </td>
+                          </>
+                        )}
                         <td />
                         <td />
                       </tr>

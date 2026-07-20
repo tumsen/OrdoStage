@@ -1786,6 +1786,12 @@ export const TimeReportPersonSchema = z.object({
   vacationDaysPerYear: z.number().nullable(),
   vacationDaysUsed: z.number().nullable(),
   vacationDaysRemaining: z.number().nullable(),
+  /** Afspadsering saldo as of range end (minutes). Null when leave management is off / all-time. */
+  compTimeBalanceMinutes: z.number().nullable().optional(),
+  /** Period change: earned − used (minutes). Positive = banked, negative = used. */
+  compTimePeriodDeltaMinutes: z.number().nullable().optional(),
+  /** Comp time earned in the report period (ledger). */
+  compTimeEarnedMinutes: z.number().nullable().optional(),
   leave: LeaveBalanceSummarySchema.optional(),
 });
 
