@@ -8,6 +8,7 @@ import {
   format,
   getISOWeek,
   getISOWeekYear,
+  getYear,
   startOfMonth,
   endOfMonth,
   startOfWeek,
@@ -532,50 +533,53 @@ function ContractHoursCell({
 
 // ─── Chart grouping ───────────────────────────────────────────────────────────
 
+type ChartGroupMode = "day" | "week" | "year";
+
+type ChartPoint = {
+  key: string;
+  tick?: string;
+  label: string;
+  work: number;
+  vacation: number;
+  sick: number;
+  holiday: number;
+  travelAllowance: number;
+};
+
+function emptyBuckets() {
+  return { work: 0, vacation: 0, sick: 0, holiday: 0, travelAllowance: 0 };
+}
+
+function toHours(minutes: number) {
+  return +(minutes / 60).toFixed(2);
+}
+
+/** How often to show an X-axis label so ticks don't overlap. */
+function xAxisLabelInterval(pointCount: number): number {
+  if (pointCount <= 14) return 0;
+  if (pointCount <= 31) return 1;
+  if (pointCount <= 52) return 3;
+  return Math.max(1, Math.ceil(pointCount / 12) - 1);
+}
+
 function groupChartData(
   byDay: TimeReport["byDay"],
   weekLabel: (week: number) => string,
   opts: {
-    groupedBy: "day" | "week";
+    groupedBy: ChartGroupMode;
     range?: { from: string; to: string } | null;
   }
-): {
-  points: {
-    key: string;
-    tick?: string;
-    label: string;
-    work: number;
-    vacation: number;
-    sick: number;
-    holiday: number;
-    travelAllowance: number;
-  }[];
-  groupedBy: "day" | "week";
-} {
+): { points: ChartPoint[]; groupedBy: ChartGroupMode } {
   if (opts.groupedBy === "day") {
     const days = new Map<
       string,
-      {
-        date: Date;
-        work: number;
-        vacation: number;
-        sick: number;
-        holiday: number;
-        travelAllowance: number;
-      }
+      { date: Date } & ReturnType<typeof emptyBuckets>
     >();
 
     const ensureDay = (date: Date) => {
       const mapKey = format(date, "yyyy-MM-dd");
       if (!days.has(mapKey)) {
-        days.set(mapKey, {
-          date: startOfDay(date),
-          work: 0,
-          vacation: 0,
-          sick: 0,
-          holiday: 0,
-          travelAllowance: 0,
-        });
+        days.set(mapKey, { date: startOfDay(date), ...emptyBuckets() });
       }
       return days.get(mapKey)!;
     };
@@ -590,8 +594,7 @@ function groupChartData(
     }
 
     for (const d of byDay) {
-      const date = parseISO(d.date);
-      const row = ensureDay(date);
+      const row = ensureDay(parseISO(d.date));
       row.work += d.workMinutes;
       row.vacation += d.vacationMinutes;
       row.sick += d.sickMinutes;
@@ -599,55 +602,84 @@ function groupChartData(
       row.travelAllowance += d.travelAllowanceMinutes;
     }
 
-    const ordered = [...days.values()].sort((a, b) => a.date.getTime() - b.date.getTime());
     return {
       groupedBy: "day",
-      points: ordered.map((d) => {
-        const key = format(d.date, "yyyy-MM-dd");
-        const tick = format(d.date, "d");
-        const label = format(d.date, "EEE d MMM yyyy");
-        return {
-          key,
-          tick,
-          label,
-          work: +(d.work / 60).toFixed(2),
-          vacation: +(d.vacation / 60).toFixed(2),
-          sick: +(d.sick / 60).toFixed(2),
-          holiday: +(d.holiday / 60).toFixed(2),
-          travelAllowance: +(d.travelAllowance / 60).toFixed(2),
-        };
-      }),
+      points: [...days.values()]
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+        .map((d) => ({
+          key: format(d.date, "yyyy-MM-dd"),
+          tick: format(d.date, "d"),
+          label: format(d.date, "EEE d MMM yyyy"),
+          work: toHours(d.work),
+          vacation: toHours(d.vacation),
+          sick: toHours(d.sick),
+          holiday: toHours(d.holiday),
+          travelAllowance: toHours(d.travelAllowance),
+        })),
+    };
+  }
+
+  if (opts.groupedBy === "year") {
+    const years = new Map<number, ReturnType<typeof emptyBuckets>>();
+
+    const ensureYear = (year: number) => {
+      if (!years.has(year)) years.set(year, emptyBuckets());
+      return years.get(year)!;
+    };
+
+    if (opts.range?.from && opts.range?.to) {
+      let y = getYear(parseISO(opts.range.from));
+      const last = getYear(parseISO(opts.range.to));
+      while (y <= last) {
+        ensureYear(y);
+        y += 1;
+      }
+    }
+
+    for (const d of byDay) {
+      const row = ensureYear(getYear(parseISO(d.date)));
+      row.work += d.workMinutes;
+      row.vacation += d.vacationMinutes;
+      row.sick += d.sickMinutes;
+      row.holiday += d.holidayMinutes;
+      row.travelAllowance += d.travelAllowanceMinutes;
+    }
+
+    // If no explicit range, still include years from data.
+    if (!opts.range && byDay.length === 0) {
+      return { groupedBy: "year", points: [] };
+    }
+
+    return {
+      groupedBy: "year",
+      points: [...years.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([year, row]) => ({
+          key: String(year),
+          tick: String(year),
+          label: String(year),
+          work: toHours(row.work),
+          vacation: toHours(row.vacation),
+          sick: toHours(row.sick),
+          holiday: toHours(row.holiday),
+          travelAllowance: toHours(row.travelAllowance),
+        })),
     };
   }
 
   const weeks = new Map<
     string,
-    {
-      weekStart: Date;
-      work: number;
-      vacation: number;
-      sick: number;
-      holiday: number;
-      travelAllowance: number;
-    }
+    { weekStart: Date } & ReturnType<typeof emptyBuckets>
   >();
 
   const ensureWeek = (weekStart: Date) => {
     const mapKey = format(weekStart, "yyyy-MM-dd");
     if (!weeks.has(mapKey)) {
-      weeks.set(mapKey, {
-        weekStart,
-        work: 0,
-        vacation: 0,
-        sick: 0,
-        holiday: 0,
-        travelAllowance: 0,
-      });
+      weeks.set(mapKey, { weekStart, ...emptyBuckets() });
     }
     return weeks.get(mapKey)!;
   };
 
-  // Fill every week in the selected period (e.g. full calendar/vacation year).
   if (opts.range?.from && opts.range?.to) {
     let cursor = startOfWeek(parseISO(opts.range.from), { weekStartsOn: 1 });
     const last = startOfWeek(parseISO(opts.range.to), { weekStartsOn: 1 });
@@ -658,8 +690,7 @@ function groupChartData(
   }
 
   for (const d of byDay) {
-    const day = parseISO(d.date);
-    const weekStart = startOfWeek(day, { weekStartsOn: 1 });
+    const weekStart = startOfWeek(parseISO(d.date), { weekStartsOn: 1 });
     const w = ensureWeek(weekStart);
     w.work += d.workMinutes;
     w.vacation += d.vacationMinutes;
@@ -668,29 +699,32 @@ function groupChartData(
     w.travelAllowance += d.travelAllowanceMinutes;
   }
 
-  const ordered = [...weeks.values()].sort(
-    (a, b) => a.weekStart.getTime() - b.weekStart.getTime()
-  );
-
   return {
     groupedBy: "week",
-    points: ordered.map((w) => {
-      const weekEnd = endOfWeek(w.weekStart, { weekStartsOn: 1 });
-      const isoWeek = getISOWeek(w.weekStart);
-      const isoYear = getISOWeekYear(w.weekStart);
-      return {
-        // Unique across year boundaries (e.g. W1 of next ISO year inside Dec).
-        key: `${isoYear}-W${String(isoWeek).padStart(2, "0")}`,
-        tick: weekLabel(isoWeek),
-        label: `${weekLabel(isoWeek)} · ${format(w.weekStart, "d MMM")} – ${format(weekEnd, "d MMM yyyy")}`,
-        work: +(w.work / 60).toFixed(2),
-        vacation: +(w.vacation / 60).toFixed(2),
-        sick: +(w.sick / 60).toFixed(2),
-        holiday: +(w.holiday / 60).toFixed(2),
-        travelAllowance: +(w.travelAllowance / 60).toFixed(2),
-      };
-    }),
+    points: [...weeks.values()]
+      .sort((a, b) => a.weekStart.getTime() - b.weekStart.getTime())
+      .map((w) => {
+        const weekEnd = endOfWeek(w.weekStart, { weekStartsOn: 1 });
+        const isoWeek = getISOWeek(w.weekStart);
+        const isoYear = getISOWeekYear(w.weekStart);
+        return {
+          key: `${isoYear}-W${String(isoWeek).padStart(2, "0")}`,
+          tick: weekLabel(isoWeek),
+          label: `${weekLabel(isoWeek)} · ${format(w.weekStart, "d MMM")} – ${format(weekEnd, "d MMM yyyy")}`,
+          work: toHours(w.work),
+          vacation: toHours(w.vacation),
+          sick: toHours(w.sick),
+          holiday: toHours(w.holiday),
+          travelAllowance: toHours(w.travelAllowance),
+        };
+      }),
   };
+}
+
+function defaultChartGroupMode(rangeMode: RangeMode, rangeDays: number): ChartGroupMode {
+  if (rangeMode === "week" || rangeMode === "month") return "day";
+  if (rangeMode === "year" || rangeMode === "vacation_year") return "week";
+  return rangeDays <= 31 ? "day" : "week";
 }
 
 // ─── CSV export ───────────────────────────────────────────────────────────────
@@ -754,6 +788,11 @@ export default function TimeReport() {
   const [sortPersonBy, setSortPersonBy] = useState<"name" | "total" | "overtime">("name");
   const [sortPersonDir, setSortPersonDir] = useState<"asc" | "desc">("asc");
   const [contractOverrides, setContractOverrides] = useState<Map<string, number | null>>(new Map());
+  const [chartGroupMode, setChartGroupMode] = useState<ChartGroupMode>("day");
+
+  useEffect(() => {
+    setChartGroupMode(defaultChartGroupMode(rangeMode, 365));
+  }, [rangeMode]);
 
   const { data: orgFeatures } = useQuery<{ countryFeatures?: OrganizationCountryFeatures }>({
     queryKey: ["org"],
@@ -924,23 +963,16 @@ export default function TimeReport() {
   });
 
   const chart = useMemo(() => {
-    if (!report) return { points: [], groupedBy: "day" as const };
+    if (!report) return { points: [], groupedBy: chartGroupMode };
     const range = !allTime && from && to ? { from, to } : null;
-    const groupedBy: "day" | "week" =
-      rangeMode === "week" || rangeMode === "month"
-        ? "day"
-        : rangeMode === "year" || rangeMode === "vacation_year"
-          ? "week"
-          : report.summary.rangeDays <= 31
-            ? "day"
-            : "week";
     return groupChartData(
       report.byDay,
       (week) => t("time.calendarWeekIso", { week }),
-      { groupedBy, range }
+      { groupedBy: chartGroupMode, range }
     );
-  }, [report, t, allTime, from, to, rangeMode]);
+  }, [report, t, allTime, from, to, chartGroupMode]);
   const chartData = chart.points;
+  const chartTickInterval = xAxisLabelInterval(chartData.length);
 
   const hasVacation = (report?.summary.vacationMinutes ?? 0) > 0;
   const hasSick = (report?.summary.sickMinutes ?? 0) > 0;
@@ -1313,9 +1345,38 @@ export default function TimeReport() {
       {/* Chart */}
       {report && chartData.length > 0 && (
         <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4">
-          <h2 className="text-sm font-medium text-white/70 mb-4">
-            {t(chart.groupedBy === "week" ? "time.reportChartTitleWeek" : "time.reportChartTitle")}
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="text-sm font-medium text-white/70">
+              {t(
+                chart.groupedBy === "year"
+                  ? "time.reportChartTitleYear"
+                  : chart.groupedBy === "week"
+                    ? "time.reportChartTitleWeek"
+                    : "time.reportChartTitle"
+              )}
+            </h2>
+            <div className="flex rounded-md border border-white/10 bg-white/[0.03] p-0.5">
+              {(
+                [
+                  { id: "day" as const, labelKey: "time.reportChartByDay" },
+                  { id: "week" as const, labelKey: "time.reportChartByWeek" },
+                  { id: "year" as const, labelKey: "time.reportChartByYear" },
+                ] as const
+              ).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setChartGroupMode(m.id)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-xs",
+                    chartGroupMode === m.id ? "bg-white/10 text-white" : "text-white/55"
+                  )}
+                >
+                  {t(m.labelKey)}
+                </button>
+              ))}
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData} barCategoryGap="25%" barGap={0}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
@@ -1324,7 +1385,8 @@ export default function TimeReport() {
                 tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                interval={chart.groupedBy === "week" ? 3 : 0}
+                interval={chartTickInterval}
+                minTickGap={28}
                 tickFormatter={(value) => {
                   const point = chartData.find((p) => p.key === value);
                   return point?.tick ?? value;
