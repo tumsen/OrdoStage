@@ -197,12 +197,7 @@ function timeEntryBlockSurfaceClass(
       ? "border-cyan-400/30 bg-cyan-500/12 text-cyan-50/85"
       : "border-cyan-400/60 bg-cyan-500/30 text-cyan-50";
   }
-  if (cat === "comp_settlement_earned") {
-    return behind
-      ? "border-teal-300/35 bg-teal-400/15 text-teal-50/90 border-dashed"
-      : "border-teal-300/70 bg-teal-400/25 text-teal-50 border-dashed";
-  }
-  if (cat === "comp_settlement_used") {
+  if (isCompSettlementCategory(cat)) {
     return behind
       ? "border-amber-400/35 bg-amber-500/12 text-amber-50/90 border-dashed"
       : "border-amber-400/60 bg-amber-500/22 text-amber-50 border-dashed";
@@ -844,10 +839,10 @@ export default function TimeTracking() {
       ) {
         timeNotify({ title: t("time.timesheetApprovedNoCompChange") });
       } else {
-        timeNotify({ title: "Timesheet approved" });
+        timeNotify({ title: t("time.timesheetApproved") });
       }
     },
-    onError: () => toast({ title: "Could not approve timesheet", variant: "destructive" }),
+    onError: () => toast({ title: t("time.timesheetApproveError"), variant: "destructive" }),
   });
 
   const reopenTimesheet = useMutation({
@@ -856,9 +851,9 @@ export default function TimeTracking() {
       queryClient.invalidateQueries({ queryKey: ["time-approvals"] });
       queryClient.invalidateQueries({ queryKey: ["time-leave-balances"] });
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
-      timeNotify({ title: "Timesheet reopened" });
+      timeNotify({ title: t("time.timesheetReopened") });
     },
-    onError: () => toast({ title: "Could not reopen timesheet", variant: "destructive" }),
+    onError: () => toast({ title: t("time.timesheetReopenError"), variant: "destructive" }),
   });
 
   /** Live drag preview: absolute range (same shape as booking grid drag updates). */
@@ -1673,7 +1668,7 @@ export default function TimeTracking() {
     : 0;
   const isTimeSection = section === "time";
   const periodTotalMinutes = mode === "week" ? weekTotalMinutes : monthTotalMinutes;
-  const periodTotalLabel = mode === "week" ? "Week total" : "Month total";
+  const periodTotalLabel = mode === "week" ? t("time.weekTotal") : t("time.monthTotal");
 
   function ApproveWeekControl({ className }: { className?: string }) {
     if (!(isTimeSection && mode === "week")) return null;
@@ -1683,7 +1678,7 @@ export default function TimeTracking() {
           <>
             <span className="inline-flex items-center gap-1 text-xs text-emerald-300">
               <Lock className="h-3 w-3" />
-              Approved
+              {t("time.timesheetStatusApproved")}
             </span>
             {readAll ? (
               <Button
@@ -1694,7 +1689,7 @@ export default function TimeTracking() {
                 onClick={() => reopenTimesheet.mutate(approvedTimesheet.id)}
                 disabled={reopenTimesheet.isPending}
               >
-                Reopen
+                {t("time.reopenWeek")}
               </Button>
             ) : null}
           </>
@@ -1708,7 +1703,7 @@ export default function TimeTracking() {
               onClick={() => approveTimesheet.mutate()}
               disabled={!canEdit || approveTimesheet.isPending}
             >
-              Approve week
+              {t("time.approveWeek")}
             </Button>
             {leaveManagementEnabled ? (
               <span
@@ -2067,7 +2062,7 @@ export default function TimeTracking() {
                         onClick={() => readAll && reopenTimesheet.mutate(approvedTimesheet.id)}
                         disabled={!readAll || reopenTimesheet.isPending}
                       >
-                        Reopen approved week
+                        {t("time.reopenApprovedWeek")}
                       </DropdownMenuItem>
                     ) : (
                       <DropdownMenuItem
@@ -2075,7 +2070,7 @@ export default function TimeTracking() {
                         onClick={() => approveTimesheet.mutate()}
                         disabled={!canEdit || approveTimesheet.isPending}
                       >
-                        Approve week
+                        {t("time.approveWeek")}
                       </DropdownMenuItem>
                     )}
                   </>
@@ -2805,7 +2800,9 @@ export default function TimeTracking() {
                                 ?.title
                             : undefined;
                         const label =
-                          isDayOff || cat === "travel_allowance"
+                          isCompSettlementCategory(cat) ||
+                          isDayOff ||
+                          cat === "travel_allowance"
                             ? t(timeCategoryMessageId(cat) as never)
                             : isJob && (jobKey || e.tourShowId)
                               ? (jobKey
@@ -2841,7 +2838,8 @@ export default function TimeTracking() {
                         const showProjBelowTimes = Boolean(proj && label);
                         const blockHeightPx =
                           (Math.max(4, heightPct) / 100) * effectiveColumnHeightPx;
-                        const noteText = e.note?.trim() ?? "";
+                        const noteText =
+                          isCompSettlementCategory(cat) ? "" : (e.note?.trim() ?? "");
                         const reservedBelowNotePx =
                           11 + // time row
                           (showProjBelowTimes ? 11 : 0) +

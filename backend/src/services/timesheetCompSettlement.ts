@@ -106,21 +106,49 @@ async function resolveUserIdForPerson(
   return fallbackUserId ?? null;
 }
 
+function latestEntryEndOnLocalDay(
+  entries: Array<{ startsAt: Date; endsAt: Date; category: string }>,
+  dateKey: string,
+  zone: string,
+): DateTime | null {
+  const dayStart = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone });
+  const dayEnd = dayStart.plus({ days: 1 });
+  let latest: DateTime | null = null;
+  for (const row of entries) {
+    const cat = row.category || "work";
+    if (cat === "comp_settlement_earned" || cat === "comp_settlement_used") continue;
+    const start = DateTime.fromJSDate(row.startsAt, { zone });
+    const end = DateTime.fromJSDate(row.endsAt, { zone });
+    if (end <= dayStart || start >= dayEnd) continue;
+    if (!latest || end > latest) latest = end;
+  }
+  return latest;
+}
+
+/** Place after the last same-day entry; never overlap; clip at local midnight if needed. */
 function settlementCalendarEntryWindow(
   dateKey: string,
-  fulfillingMinutes: number,
   deltaMinutes: number,
   zone: string,
+  entries: Array<{ startsAt: Date; endsAt: Date; category: string }>,
 ): { startsAt: Date; endsAt: Date; category: "comp_settlement_earned" | "comp_settlement_used" } {
   const duration = Math.abs(deltaMinutes);
-  const dayStart = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone }).set({
-    hour: 8,
-    minute: 0,
-    second: 0,
-    millisecond: 0,
-  });
-  const start = dayStart.plus({ minutes: Math.max(0, fulfillingMinutes) });
-  const end = start.plus({ minutes: duration });
+  const dayStart = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone });
+  const dayEnd = dayStart.plus({ days: 1 });
+  const lastEnd = latestEntryEndOnLocalDay(entries, dateKey, zone);
+
+  let start = lastEnd && lastEnd > dayStart ? lastEnd : dayStart;
+  let end = start.plus({ minutes: duration });
+  if (end > dayEnd) {
+    const shiftedStart = dayEnd.minus({ minutes: duration });
+    if (shiftedStart >= start) {
+      start = shiftedStart;
+      end = dayEnd;
+    } else {
+      end = dayEnd;
+    }
+  }
+
   return {
     startsAt: start.toJSDate(),
     endsAt: end.toJSDate(),
@@ -134,15 +162,15 @@ async function createSettlementCalendarEntry(input: {
   userId: string;
   timesheetApprovalId: string;
   dateKey: string;
-  fulfillingMinutes: number;
   deltaMinutes: number;
   zone: string;
+  entries: Array<{ startsAt: Date; endsAt: Date; category: string }>;
 }) {
   const { startsAt, endsAt, category } = settlementCalendarEntryWindow(
     input.dateKey,
-    input.fulfillingMinutes,
     input.deltaMinutes,
-    input.zone
+    input.zone,
+    input.entries,
   );
   await prisma.timeEntry.create({
     data: {
@@ -280,9 +308,9 @@ export async function settleCompTimeForTimesheetApproval(input: {
       userId,
       timesheetApprovalId: input.timesheetApprovalId,
       dateKey,
-      fulfillingMinutes,
       deltaMinutes,
       zone,
+      entries,
     });
 
     days.push({

@@ -11,8 +11,8 @@ const TIME_CATEGORY_MSG: Record<TimeCategory, string> = {
   vacation: "categoryVacation",
   extra_vacation: "categoryExtraVacation",
   comp_time: "categoryCompTime",
-  comp_settlement_earned: "categoryCompSettlementEarned",
-  comp_settlement_used: "categoryCompSettlementUsed",
+  comp_settlement_earned: "categoryCompTime",
+  comp_settlement_used: "categoryCompTime",
   sick: "categorySick",
   holiday: "categoryHoliday",
   travel_allowance: "categoryTravelAllowance",
@@ -43,7 +43,7 @@ export function isLeaveAutoProjectCategory(cat: string): cat is TimeCategory {
 }
 
 export function isDayOffCategory(cat: string): cat is TimeCategory {
-  return (DAY_OFF_CATEGORIES as string[]).includes(cat) || isCompSettlementCategory(cat);
+  return (DAY_OFF_CATEGORIES as string[]).includes(cat);
 }
 
 export function timeCategoryMessageId(cat: TimeCategory): `time.${string}` {
