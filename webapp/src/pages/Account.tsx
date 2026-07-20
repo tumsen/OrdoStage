@@ -265,23 +265,23 @@ export default function Account() {
         if (!resp.ok) {
           const payload = await resp.json().catch(() => null);
           const message =
-            payload?.error?.message || payload?.message || "Company info saved, but logo upload failed.";
+            payload?.error?.message || payload?.message || t("account.companyInfoLogoPartialFail");
           throw new Error(message);
         }
       }
     },
     onSuccess: () => {
       setCompanyLogoFile(null);
-      setCompanyLogoStatus(companyLogoFile ? "Company information and logo saved." : "Company information saved.");
+      setCompanyLogoStatus(companyLogoFile ? t("account.companyInfoAndLogoSaved") : t("account.companyInfoSaved"));
       queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
-      setProfileMessage(companyLogoFile ? "Company information and logo saved." : "Company information saved.");
-      toast({ title: companyLogoFile ? "Company information and logo saved" : "Company information saved" });
+      setProfileMessage(companyLogoFile ? t("account.companyInfoAndLogoSaved") : t("account.companyInfoSaved"));
+      toast({ title: companyLogoFile ? t("account.companyInfoAndLogoSaved") : t("account.companyInfoSaved") });
     },
     onError: (e: Error) => {
-      const msg = e.message || "Could not save company information.";
+      const msg = e.message || t("account.companyInfoSaveError");
       setCompanyLogoStatus(msg);
       setProfileMessage(msg);
-      toast({ title: "Could not save company information", description: msg, variant: "destructive" });
+      toast({ title: t("account.companyInfoSaveError"), description: msg, variant: "destructive" });
     },
   });
 
@@ -294,12 +294,12 @@ export default function Account() {
       setProductionPlannerEnabled(Boolean(data.productionPlannerEnabled));
       queryClient.invalidateQueries({ queryKey: ["org"] });
       queryClient.invalidateQueries({ queryKey: ["org", "features"] });
-      toast({ title: "Organization feature updated" });
+      toast({ title: t("account.orgFeatureUpdated") });
     },
     onError: (e: unknown) => {
       setProductionPlannerEnabled(Boolean(orgFeatureData?.productionPlannerEnabled));
-      const msg = isApiError(e) ? e.message : "Could not update organization feature.";
-      toast({ title: "Feature update failed", description: msg, variant: "destructive" });
+      const msg = isApiError(e) ? e.message : t("account.orgFeatureUpdateError");
+      toast({ title: t("account.featureUpdateFailed"), description: msg, variant: "destructive" });
     },
   });
 
@@ -325,7 +325,7 @@ export default function Account() {
       );
       queryClient.invalidateQueries({ queryKey: ["org"] });
       queryClient.invalidateQueries({ queryKey: ["org", "features"] });
-      toast({ title: "Country feature updated" });
+      toast({ title: t("account.countryFeatureUpdated") });
     },
     onError: (e: unknown) => {
       setDkTravelAllowanceEnabled(
@@ -337,8 +337,8 @@ export default function Account() {
       setDkLeaveManagementEnabled(
         isCountryFeatureEnabled(orgFeatureData?.countryFeatures, "DK", "leaveManagement")
       );
-      const msg = isApiError(e) ? e.message : "Could not update country feature.";
-      toast({ title: "Feature update failed", description: msg, variant: "destructive" });
+      const msg = isApiError(e) ? e.message : t("account.countryFeatureUpdateError");
+      toast({ title: t("account.featureUpdateFailed"), description: msg, variant: "destructive" });
     },
   });
 
@@ -381,17 +381,17 @@ export default function Account() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["org-leave-policy"] });
-      toast({ title: "Leave policy saved" });
+      toast({ title: t("account.leavePolicySaved") });
     },
     onError: (e: unknown) => {
-      const msg = isApiError(e) ? e.message : "Could not save leave policy.";
-      toast({ title: "Save failed", description: msg, variant: "destructive" });
+      const msg = isApiError(e) ? e.message : t("account.leavePolicySaveError");
+      toast({ title: t("account.saveFailed"), description: msg, variant: "destructive" });
     },
   });
 
   const uploadCompanyLogoMutation = useMutation({
     mutationFn: async () => {
-      if (!companyLogoFile) throw new Error("Please choose a logo file first.");
+      if (!companyLogoFile) throw new Error(t("account.chooseLogoFirst"));
       const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
       const formData = new FormData();
       formData.append("file", companyLogoFile);
@@ -402,22 +402,22 @@ export default function Account() {
       });
       if (!resp.ok) {
         const payload = await resp.json().catch(() => null);
-        const message = payload?.error?.message || payload?.message || "Could not upload company logo.";
+        const message = payload?.error?.message || payload?.message || t("account.companyLogoUploadError");
         throw new Error(message);
       }
     },
     onSuccess: () => {
       setCompanyLogoFile(null);
-      setCompanyLogoStatus("Company logo updated.");
+      setCompanyLogoStatus(t("account.companyLogoUpdated"));
       queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
-      setProfileMessage("Company logo updated.");
-      toast({ title: "Company logo updated" });
+      setProfileMessage(t("account.companyLogoUpdated"));
+      toast({ title: t("account.companyLogoUpdated") });
     },
     onError: (e: Error) => {
-      const msg = e.message || "Could not upload company logo.";
+      const msg = e.message || t("account.companyLogoUploadError");
       setCompanyLogoStatus(msg);
       setProfileMessage(msg);
-      toast({ title: "Could not upload company logo", description: msg, variant: "destructive" });
+      toast({ title: t("account.companyLogoUploadError"), description: msg, variant: "destructive" });
     },
   });
 
@@ -425,15 +425,15 @@ export default function Account() {
     mutationFn: () => api.delete("/api/org/company-logo"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["org-invoice-info"] });
-      setCompanyLogoStatus("Company logo removed.");
-      setProfileMessage("Company logo removed.");
-      toast({ title: "Company logo removed" });
+      setCompanyLogoStatus(t("account.companyLogoRemoved"));
+      setProfileMessage(t("account.companyLogoRemoved"));
+      toast({ title: t("account.companyLogoRemoved") });
     },
     onError: (e: Error) => {
-      const msg = e.message || "Could not remove company logo.";
+      const msg = e.message || t("account.companyLogoRemoveError");
       setCompanyLogoStatus(msg);
       setProfileMessage(msg);
-      toast({ title: "Could not remove company logo", description: msg, variant: "destructive" });
+      toast({ title: t("account.companyLogoRemoveError"), description: msg, variant: "destructive" });
     },
   });
 
@@ -496,12 +496,12 @@ export default function Account() {
         return null;
       });
       queryClient.invalidateQueries({ queryKey: ["people", "me"] });
-      setProfileMessage("Profile image updated.");
+      setProfileMessage(t("account.profileImageUpdated"));
     },
     onError: (e: Error) => {
-      const msg = e.message || "Could not upload profile image.";
+      const msg = e.message || t("account.profileImageUploadError");
       setProfileMessage(msg);
-      toast({ title: "Could not upload profile image", description: msg, variant: "destructive" });
+      toast({ title: t("account.profileImageUploadError"), description: msg, variant: "destructive" });
     },
   });
 
@@ -529,9 +529,9 @@ export default function Account() {
         setPhotoPreviewUrl(null);
       }
       queryClient.invalidateQueries({ queryKey: ["people", "me"] });
-      setProfileMessage("Image deleted.");
+      setProfileMessage(t("account.imageDeleted"));
     },
-    onError: () => setProfileMessage("Could not delete image."),
+    onError: () => setProfileMessage(t("account.imageDeleteError")),
   });
 
   const deleteDocMutation = useMutation({
@@ -555,7 +555,7 @@ export default function Account() {
       queryClient.invalidateQueries({ queryKey: ["people"] });
     },
     onError: (e: Error) => {
-      const msg = e instanceof ApiError ? e.message : "Could not update document";
+      const msg = e instanceof ApiError ? e.message : t("account.documentUpdateError");
       toast({ title: msg, variant: "destructive" });
     },
   });
@@ -565,11 +565,11 @@ export default function Account() {
       api.patch<DocumentPermissionState>(`/api/people/documents/${id}/permissions`, body),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["people", "documents", id, "permissions"] });
-      toast({ title: "Document permissions updated" });
+      toast({ title: t("account.documentPermissionsUpdated") });
       setPermissionsDoc(null);
     },
     onError: (e: Error) => {
-      const msg = e instanceof ApiError ? e.message : "Could not update document permissions";
+      const msg = e instanceof ApiError ? e.message : t("account.documentPermissionsError");
       toast({ title: msg, variant: "destructive" });
     },
   });
@@ -741,14 +741,14 @@ export default function Account() {
           onBlurCapture={companyAutoSave.onBlurCapture}
         >
           <div>
-            <p className="text-sm font-medium text-white">Company information & branding</p>
+            <p className="text-sm font-medium text-white">{t("account.companyInfoTitle")}</p>
             <p className="text-xs text-white/50 mt-1">
-              Used on generated reports and documents (invoice PDFs and venue tech rider files).
+              {t("account.companyInfoHint")}
             </p>
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-xs uppercase tracking-wide">Company name</Label>
+              <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.companyName")}</Label>
               <Input
                 value={companyDraft.invoiceName}
                 onChange={(e) => setCompanyDraft((s) => ({ ...s, invoiceName: e.target.value }))}
@@ -756,7 +756,7 @@ export default function Account() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-xs uppercase tracking-wide">VAT number</Label>
+              <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.companyVat")}</Label>
               <Input
                 value={companyDraft.invoiceVat}
                 onChange={(e) => setCompanyDraft((s) => ({ ...s, invoiceVat: e.target.value }))}
@@ -764,11 +764,11 @@ export default function Account() {
               />
             </div>
             <div className="sm:col-span-2 space-y-1.5">
-              <Label className="text-white/70 text-xs uppercase tracking-wide">Company address</Label>
+              <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.companyAddress")}</Label>
               <AddressFields value={companyAddress} onChange={setCompanyAddress} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-xs uppercase tracking-wide">Email</Label>
+              <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.companyEmail")}</Label>
               <Input
                 value={companyDraft.invoiceEmail}
                 onChange={(e) => setCompanyDraft((s) => ({ ...s, invoiceEmail: e.target.value }))}
@@ -776,7 +776,7 @@ export default function Account() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-xs uppercase tracking-wide">Phone</Label>
+              <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.companyPhone")}</Label>
               <Input
                 value={companyDraft.invoicePhone}
                 onChange={(e) => setCompanyDraft((s) => ({ ...s, invoicePhone: e.target.value }))}
@@ -784,7 +784,7 @@ export default function Account() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-xs uppercase tracking-wide">Contact person</Label>
+              <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.companyContactPerson")}</Label>
               <Input
                 value={companyDraft.invoiceContact}
                 onChange={(e) => setCompanyDraft((s) => ({ ...s, invoiceContact: e.target.value }))}
@@ -793,11 +793,11 @@ export default function Account() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-white/70 text-xs uppercase tracking-wide">Company logo</Label>
+            <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.companyLogo")}</Label>
             {companyInfo?.hasCompanyLogo ? (
               <RemoteImageHoverPreview
                 src={`${import.meta.env.VITE_BACKEND_URL || ""}/api/org/company-logo?ts=${companyInfo.companyLogoUpdatedAt ?? ""}`}
-                alt="Company logo"
+                alt={t("account.companyLogo")}
                 triggerClassName="h-20 max-w-[240px] rounded border border-white/10 bg-white p-2 shadow-none"
                 triggerImgClassName="h-full w-full max-h-[4.5rem] object-contain"
               />
@@ -820,7 +820,7 @@ export default function Account() {
                   disabled={!companyLogoFile || uploadCompanyLogoMutation.isPending}
                   onClick={() => uploadCompanyLogoMutation.mutate()}
                 >
-                  {uploadCompanyLogoMutation.isPending ? "Uploading..." : "Upload logo"}
+                  {uploadCompanyLogoMutation.isPending ? t("account.uploading") : t("account.uploadLogo")}
                 </Button>
                 {companyInfo?.hasCompanyLogo ? (
                   <Button
@@ -830,16 +830,16 @@ export default function Account() {
                     disabled={removeCompanyLogoMutation.isPending}
                     onClick={() => removeCompanyLogoMutation.mutate()}
                   >
-                    {removeCompanyLogoMutation.isPending ? "Removing..." : "Remove logo"}
+                    {removeCompanyLogoMutation.isPending ? t("account.removing") : t("account.removeLogo")}
                   </Button>
                 ) : null}
               </div>
               {companyLogoPreviewUrl ? (
                 <div className="rounded border border-white/10 bg-white/5 p-2">
-                  <p className="mb-1 text-[10px] uppercase tracking-wide text-white/40">New logo preview</p>
+                  <p className="mb-1 text-[10px] uppercase tracking-wide text-white/40">{t("account.newLogoPreview")}</p>
                   <RemoteImageHoverPreview
                     src={companyLogoPreviewUrl}
-                    alt="New company logo preview"
+                    alt={t("account.newLogoPreview")}
                     triggerClassName="h-20 max-w-[200px] rounded border-0 bg-transparent p-0 shadow-none"
                     triggerImgClassName="h-full w-full object-contain"
                   />
@@ -867,14 +867,14 @@ export default function Account() {
       {canManageOrgFeatures ? (
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
           <div>
-            <p className="text-sm font-medium text-white">Organization features</p>
+            <p className="text-sm font-medium text-white">{t("account.orgFeaturesTitle")}</p>
             <p className="text-xs text-white/50 mt-1">
               Enable optional modules per organization. Country-specific rules can be toggled separately.
             </p>
           </div>
           <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
             <div>
-              <p className="text-sm text-white">Production planner</p>
+              <p className="text-sm text-white">{t("account.productionPlanner")}</p>
               <p className="text-xs text-white/45">Disabled by default while Events and Tours continue.</p>
             </div>
             <Switch
@@ -887,7 +887,7 @@ export default function Account() {
             />
           </div>
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-white/35">Country modules</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-white/35">{t("account.countryModulesTitle")}</p>
             <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
               <div>
                 <p className="text-sm text-white">
@@ -1002,6 +1002,7 @@ export default function Account() {
                 }
                 className="bg-white/5 border-white/10 text-white h-8"
               />
+              <p className="text-[10px] text-white/40">{t("time.leavePolicyDefaultExtraVacationHint")}</p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-white/55 text-xs">{t("time.leavePolicyDefaultWeeklyHours")}</Label>
@@ -1033,7 +1034,7 @@ export default function Account() {
             disabled={saveLeavePolicyMutation.isPending}
             onClick={() => saveLeavePolicyMutation.mutate()}
           >
-            Save leave policy
+            {t("account.saveLeavePolicy")}
           </Button>
         </div>
       ) : null}
@@ -1041,24 +1042,24 @@ export default function Account() {
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium text-white">My profile</p>
+            <p className="text-sm font-medium text-white">{t("account.myProfile")}</p>
             {mePerson ? (
               <AutoSaveStatus status={profileAutoSave.status} error={profileAutoSave.error} />
             ) : null}
           </div>
           <p className="text-xs text-white/50 mt-1">
-            Edit your person profile, image, and personal documents here.
+            {t("account.myProfileHint")}
           </p>
         </div>
         {!mePerson ? (
           <p className="text-xs text-white/40">
-            No linked person profile found for your email in this organization yet.
+            {t("account.noLinkedPerson")}
           </p>
         ) : (
           <>
             <div className="grid sm:grid-cols-2 gap-3" onBlurCapture={onProfileBlurCapture}>
               <div className="space-y-2">
-                <Label className="text-white/70 text-xs uppercase tracking-wide">Name</Label>
+                <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.name")}</Label>
                 <Input
                   value={profileDraft.name}
                   onChange={(e) => setProfileDraft((s) => ({ ...s, name: e.target.value }))}
@@ -1066,7 +1067,7 @@ export default function Account() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-white/70 text-xs uppercase tracking-wide">Phone</Label>
+                <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.phone")}</Label>
                 <Input
                   value={profileDraft.phone}
                   onChange={(e) => setProfileDraft((s) => ({ ...s, phone: e.target.value }))}
@@ -1074,7 +1075,7 @@ export default function Account() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-white/70 text-xs uppercase tracking-wide">Emergency contact name</Label>
+                <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.emergencyContactName")}</Label>
                 <Input
                   value={profileDraft.emergencyContactName}
                   onChange={(e) => setProfileDraft((s) => ({ ...s, emergencyContactName: e.target.value }))}
@@ -1082,7 +1083,7 @@ export default function Account() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-white/70 text-xs uppercase tracking-wide">Emergency contact phone</Label>
+                <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.emergencyContactPhone")}</Label>
                 <Input
                   value={profileDraft.emergencyContactPhone}
                   onChange={(e) => setProfileDraft((s) => ({ ...s, emergencyContactPhone: e.target.value }))}
@@ -1117,7 +1118,7 @@ export default function Account() {
                   className="bg-white/5 border-white/10 text-white file:text-white"
                 />
                 {uploadPhotoMutation.isPending ? (
-                  <p className="text-xs text-white/45">Uploading profile image…</p>
+                  <p className="text-xs text-white/45">{t("account.uploadingProfileImage")}</p>
                 ) : null}
                 {mePerson.hasPhoto ? (
                   <Button
@@ -1131,26 +1132,26 @@ export default function Account() {
                       removePhotoMutation.mutate();
                     }}
                   >
-                    {removePhotoMutation.isPending ? "Deleting..." : "Delete image"}
+                    {removePhotoMutation.isPending ? t("account.deleting") : t("account.deleteImage")}
                   </Button>
                 ) : null}
               </div>
 
               <div className="space-y-2 w-full min-w-0">
-                <Label className="text-white/70 text-xs uppercase tracking-wide">Documents</Label>
+                <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.documents")}</Label>
                 <div className="overflow-x-auto">
                   <div className="flex flex-wrap items-end gap-2 min-w-0">
                     <div className="space-y-1">
-                      <Label className="text-[10px] text-white/45 uppercase tracking-wide">Name</Label>
+                      <Label className="text-[10px] text-white/45 uppercase tracking-wide">{t("account.name")}</Label>
                       <Input
-                        placeholder="Document name"
+                        placeholder={t("account.documentNamePlaceholder")}
                         value={docName}
                         onChange={(e) => setDocName(e.target.value)}
                         className="w-[220px] bg-white/5 border-white/10 text-white"
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[10px] text-white/45 uppercase tracking-wide">Type</Label>
+                      <Label className="text-[10px] text-white/45 uppercase tracking-wide">{t("account.type")}</Label>
                       <Select value={docType} onValueChange={(v) => setDocType(v as PersonDocumentTypeKey)}>
                         <SelectTrigger className="w-[200px] h-9 bg-white/5 border-white/10 text-white text-sm">
                           <SelectValue />
@@ -1174,7 +1175,7 @@ export default function Account() {
                         }}
                         className="rounded border-white/30 accent-violet-600"
                       />
-                      <span>Does not expire</span>
+                      <span>{t("account.doesNotExpire")}</span>
                     </label>
                     <DateInputWithWeekday
                       value={docExpires}
@@ -1242,7 +1243,7 @@ export default function Account() {
       <Dialog open={Boolean(permissionsDoc)} onOpenChange={(o) => { if (!o) setPermissionsDoc(null); }}>
         <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Document permissions</DialogTitle>
+            <DialogTitle>{t("account.documentPermissions")}</DialogTitle>
           </DialogHeader>
           <p className="text-xs text-white/45">Default is no one in addition to the document owner. Use teams and people below.</p>
           <DocumentPermissionsForm
@@ -1271,7 +1272,7 @@ export default function Account() {
                 });
               }}
             >
-              {updateDocPermissionsMutation.isPending ? "Saving..." : "Save permissions"}
+              {updateDocPermissionsMutation.isPending ? t("account.saving") : t("account.savePermissions")}
             </Button>
           </DialogFooter>
         </DialogContent>

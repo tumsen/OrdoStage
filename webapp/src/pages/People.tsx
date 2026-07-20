@@ -185,11 +185,11 @@ function toFriendlyPeopleSaveError(message: string): string {
   return m;
 }
 
-const PEOPLE_SORT_OPTIONS: { mode: PeopleSortMode; label: string }[] = [
-  { mode: "alphabetical", label: "Alphabetically" },
-  { mode: "teams", label: "Teams" },
-  { mode: "internal", label: "Internal" },
-  { mode: "external", label: "External" },
+const PEOPLE_SORT_OPTIONS: { mode: PeopleSortMode; labelKey: "people.sortAlphabetical" | "people.sortTeams" | "people.sortInternal" | "people.sortExternal" }[] = [
+  { mode: "alphabetical", labelKey: "people.sortAlphabetical" },
+  { mode: "teams", labelKey: "people.sortTeams" },
+  { mode: "internal", labelKey: "people.sortInternal" },
+  { mode: "external", labelKey: "people.sortExternal" },
 ];
 
 async function uploadPersonPhoto(personId: string, file: File): Promise<void> {
@@ -652,7 +652,7 @@ function PersonFormDialog({
       setUploadError(null);
       if (person) {
         onPersonUpdated?.(result as Person);
-        if (!asPage) toast({ title: "Changes saved" });
+        if (!asPage) toast({ title: t("people.changesSaved") });
       } else {
         onOpenChange?.(false);
         form.reset();
@@ -839,7 +839,7 @@ function PersonFormDialog({
         !old ? old : old.map((p) => (p.id === person.id ? { ...p, ...result } : p))
       );
       onPersonUpdated?.(result);
-      if (!silent) toast({ title: "Changes saved" });
+      if (!silent) toast({ title: t("people.changesSaved") });
     }
   }
 
@@ -959,7 +959,7 @@ function PersonFormDialog({
       <p className="text-[11px] text-white/35">
         {person?.id
           ? "Uploads automatically when you choose a file."
-          : "You can pick an image now; it uploads right after you click Add Person."}
+          : t("people.photoAfterAdd")}
       </p>
       {profileImageSrc ? (
         <div className="space-y-2">
@@ -1021,7 +1021,7 @@ function PersonFormDialog({
             onClick={() => form.handleSubmit(handleSubmit)()}
             className="bg-red-900 hover:bg-red-800 text-white border-red-700/50"
           >
-            {mutation.isPending ? "Adding…" : "Add Person"}
+            {mutation.isPending ? t("people.adding") : t("people.addPerson")}
           </Button>
         ) : (
           <AutoSaveIndicator status={autoSave.status} error={autoSave.error} />
@@ -1377,7 +1377,7 @@ function PersonFormDialog({
                 onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
               >
                 <p className={sectionTitle}>
-                  {leaveManagementEnabled ? t("time.leaveProfileTitle") : "Work contract"}
+                  {leaveManagementEnabled ? t("time.leaveProfileTitle") : t("people.workContract")}
                 </p>
                 <p className="text-[11px] text-white/30">
                   {leaveManagementEnabled
@@ -1453,6 +1453,7 @@ function PersonFormDialog({
                         placeholder="e.g. 5"
                         className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                       />
+                      <p className="text-[10px] text-white/40">{t("time.leaveProfileExtraVacationHint")}</p>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-white/55 text-xs">{t("time.leaveProfileMonthlyHours")}</Label>
@@ -1572,7 +1573,7 @@ function PersonFormDialog({
                 {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) ? (
                   <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
                     {[
-                      { label: "Hours/day", value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
+                      { label: t("people.hoursPerDay"), value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
                       { label: "Monthly", value: `${((parseFloat(contractWeeklyHours) * 52) / 12).toFixed(0)} h` },
                       { label: "Yearly", value: `${(parseFloat(contractWeeklyHours) * 52).toFixed(0)} h` },
                     ].map((item) => (
@@ -1782,7 +1783,7 @@ function PersonFormDialog({
               </div>
               {!person ? (
                 <p className="text-[11px] text-white/35">
-                  For new people, the selected document is uploaded after you click Add Person.
+                  {t("people.documentAfterAdd")}
                 </p>
               ) : null}
               {personDocuments && personDocuments.length > 0 ? (
@@ -1825,7 +1826,7 @@ function PersonFormDialog({
           >
             <div>
               <p className={sectionTitle}>
-                {leaveManagementEnabled ? t("time.leaveProfileTitle") : "Work contract"}
+                {leaveManagementEnabled ? t("time.leaveProfileTitle") : t("people.workContract")}
               </p>
               <p className="text-[11px] text-white/30 mt-0.5">
                 {leaveManagementEnabled
@@ -1901,6 +1902,7 @@ function PersonFormDialog({
                     onBlur={() => contractAutoSave.schedule()}
                     className="bg-white/5 border-white/10 text-white h-8 text-sm"
                   />
+                  <p className="text-[10px] text-white/40">{t("time.leaveProfileExtraVacationHint")}</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-white/55 text-xs">{t("time.leaveProfileSickStatus")}</Label>
@@ -1926,7 +1928,7 @@ function PersonFormDialog({
             {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) && (
               <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
                 {[
-                  { label: "Hours/day", value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
+                  { label: t("people.hoursPerDay"), value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
                   { label: "Monthly", value: `${((parseFloat(contractWeeklyHours) * 52) / 12).toFixed(0)} h` },
                   { label: "Yearly", value: `${(parseFloat(contractWeeklyHours) * 52).toFixed(0)} h` },
                 ].map((item) => (
@@ -1955,7 +1957,7 @@ function PersonFormDialog({
     <Dialog open={Boolean(open)} onOpenChange={onOpenChange}>
       <DialogContent className="bg-[#16161f] border-white/10 text-white w-[95vw] max-w-[1200px] max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{person ? "Edit Person" : "Add Person"}</DialogTitle>
+          <DialogTitle>{person ? t("people.editPerson") : t("people.addPerson")}</DialogTitle>
         </DialogHeader>
         {formBody}
         <DialogFooter>{formFooter}</DialogFooter>
@@ -1969,6 +1971,7 @@ export { PersonFormDialog };
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function People() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -2006,9 +2009,9 @@ export default function People() {
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm text-white/40">Cast, crew and contacts.</p>
+          <p className="text-sm text-white/40">{t("people.pageSubtitle")}</p>
           <p className="text-xs text-white/25 mt-1">
-            Add people first; send login invitations when you are ready from each person&apos;s profile.
+            {t("people.pageHint")}
           </p>
         </div>
         <Button
@@ -2016,13 +2019,13 @@ export default function People() {
           onClick={() => setAddOpen(true)}
           className="bg-red-900 hover:bg-red-800 text-white border border-red-700/50 gap-2"
         >
-          <Plus size={14} /> Add Person
+          <Plus size={14} /> {t("people.addPerson")}
         </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-        <span className="text-[10px] uppercase tracking-wide text-white/35">Sort</span>
-        {PEOPLE_SORT_OPTIONS.map(({ mode, label }) => (
+        <span className="text-[10px] uppercase tracking-wide text-white/35">{t("people.sort")}</span>
+        {PEOPLE_SORT_OPTIONS.map(({ mode, labelKey }) => (
           <label
             key={mode}
             className="flex items-center gap-2 cursor-pointer text-white/55 hover:text-white/85 select-none"
@@ -2033,7 +2036,7 @@ export default function People() {
                 if (v === true) setSortMode(mode);
               }}
             />
-            {label}
+            {t(labelKey)}
           </label>
         ))}
       </div>
