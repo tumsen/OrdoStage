@@ -1,3 +1,4 @@
+import { DateTime } from "luxon";
 import type {
   LeaveBalanceSummary,
   OrganizationLeavePolicyData,
@@ -128,19 +129,79 @@ export function resolveLeaveNorms(
   };
 }
 
-/** Pro-rate annual vacation allowance over months in the vacation year (≈2.08 days/month for 25 days). */
+/** Statutory rates for 25-day / 5-week entitlement (Ferieloven § 5 / BM samtidighedsferie). */
+export const FERIELOVEN_DAYS_PER_MONTH = 2.08;
+export const FERIELOVEN_DAYS_PER_CALENDAR_DAY = 0.07;
+
+function vacationMonthlyRate(vacationDaysPerYear: number): number {
+  if (vacationDaysPerYear === 25) return FERIELOVEN_DAYS_PER_MONTH;
+  return Math.round((vacationDaysPerYear / 12) * 100) / 100;
+}
+
+function vacationDailyRate(vacationDaysPerYear: number): number {
+  if (vacationDaysPerYear === 25) return FERIELOVEN_DAYS_PER_CALENDAR_DAY;
+  const monthly = vacationMonthlyRate(vacationDaysPerYear);
+  return Math.round((monthly / 30) * 100) / 100;
+}
+
+/**
+ * Accrue paid vacation per Ferieloven § 5 (samtidighedsferie):
+ * 2.08 days for each full month of employment in the ferieår (1 Sep–31 Aug),
+ * or 0.07 day per calendar day in a partial month (max one month’s rate).
+ * @see https://danskelove.dk/ferieloven/5
+ * @see BM faktaark “Ny ferielov – hvad betyder det for mig?”
+ */
 export function accrueVacationEarnedDays(
   norms: ResolvedLeaveNorms,
   vacationYear: VacationYear,
   asOf: Date = new Date()
 ): number {
-  const totalMs = vacationYear.end.getTime() - vacationYear.start.getTime();
-  const elapsedMs = Math.min(
-    Math.max(asOf.getTime() - vacationYear.start.getTime(), 0),
-    totalMs
+  return accrueVacationEarnedDaysBetween(
+    norms.vacationDaysPerYear,
+    vacationYear.start,
+    vacationYear.end,
+    asOf
   );
-  const fraction = totalMs > 0 ? elapsedMs / totalMs : 0;
-  return Math.round(norms.vacationDaysPerYear * fraction * 100) / 100;
+}
+
+/** Accrual for employment overlapping [rangeStart, asOf], clipped to the vacation year. */
+export function accrueVacationEarnedDaysBetween(
+  vacationDaysPerYear: number,
+  rangeStart: Date,
+  rangeEndInclusive: Date,
+  asOf: Date = new Date()
+): number {
+  const monthly = vacationMonthlyRate(vacationDaysPerYear);
+  const daily = vacationDailyRate(vacationDaysPerYear);
+
+  const start = DateTime.fromJSDate(rangeStart).startOf("day");
+  const yearEnd = DateTime.fromJSDate(rangeEndInclusive).startOf("day");
+  let end = DateTime.fromJSDate(asOf).startOf("day");
+  if (end < start) return 0;
+  if (end > yearEnd) end = yearEnd;
+
+  let earned = 0;
+  let cursor = start.startOf("month");
+  // Walk each calendar month that intersects [start, end]
+  while (cursor <= end) {
+    const monthStart = cursor.startOf("day");
+    const monthEnd = cursor.endOf("month").startOf("day");
+    const segStart = start > monthStart ? start : monthStart;
+    const segEnd = end < monthEnd ? end : monthEnd;
+    if (segEnd >= segStart) {
+      const daysEmployed = Math.floor(segEnd.diff(segStart, "days").days) + 1;
+      const daysInMonth = cursor.daysInMonth ?? 30;
+      if (daysEmployed >= daysInMonth) {
+        earned += monthly;
+      } else {
+        earned += Math.min(monthly, Math.round(daysEmployed * daily * 100) / 100);
+      }
+    }
+    cursor = cursor.plus({ months: 1 }).startOf("month");
+  }
+
+  const capped = Math.min(vacationDaysPerYear, Math.round(earned * 100) / 100);
+  return capped;
 }
 
 export function minutesToVacationDays(minutes: number, hoursPerDay: number): number {
@@ -169,7 +230,8 @@ export function summarizeLeaveBalances(
   const compEarned = balances.comp_time_earned ?? 0;
   const compUsed = balances.comp_time_used ?? 0;
   const sickDays = balances.sick_days ?? 0;
-  const earned = balances.vacation_earned ?? earnedDays;
+  // Optjent = Ferieloven monthly accrual (passed in). Ledger vacation_earned is kept in sync.
+  const earned = earnedDays;
 
   return {
     vacationYearKey,

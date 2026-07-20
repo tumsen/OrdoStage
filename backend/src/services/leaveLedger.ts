@@ -347,8 +347,10 @@ export async function applyOpeningBalances(input: {
   };
 
   if (input.vacationRemainingDays !== undefined) {
-    const delta = input.vacationRemainingDays - current.vacationRemainingDays;
-    await postDelta("vacation_earned", delta);
+    // Keep accrued vacation_earned as Ferieloven optjening; hit remaining via used.
+    const targetUsed = earned - input.vacationRemainingDays;
+    const delta = targetUsed - current.vacationUsedDays;
+    await postDelta("vacation_used", delta);
   }
 
   if (input.extraVacationRemainingDays !== undefined) {

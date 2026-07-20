@@ -21,7 +21,7 @@ import {
   mapPersonLeaveProfile,
   postLeaveTransaction,
 } from "../services/leaveLedger";
-import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays } from "../rules/leave/danishLeave";
+import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays, accrueVacationEarnedDaysBetween } from "../rules/leave/danishLeave";
 import { TIMESHEET_COMP_SETTLEMENT_SOURCE } from "../services/timesheetCompSettlement";
 import { DateTime } from "luxon";
 import { getClientWallClockZone } from "../clientWallClock";
@@ -583,9 +583,15 @@ leaveRouter.get("/time/payroll-export", async (c) => {
       }
     }
 
-    // Remaining / earned / comp balances are vacation-year totals as of period end.
-    // Used columns are for the selected from–to range (e.g. this month for payroll).
+    // Used + earned-in-period from the selected from–to range (e.g. month for payroll).
+    // Remaining / comp are ferieår saldo as of period end (samtidighedsferie).
     const leave = await getLeaveBalanceSummary(user.organizationId, p.id, toInclusive);
+    const vacationEarnedInPeriod = accrueVacationEarnedDaysBetween(
+      norms.vacationDaysPerYear,
+      from,
+      toInclusive,
+      toInclusive
+    );
 
     exportPeople.push({
       personId: p.id,
@@ -595,7 +601,7 @@ leaveRouter.get("/time/payroll-export", async (c) => {
       annualContractHours: norms.annualContractHours,
       workMinutes: Math.round(workMinutes),
       overtimeMinutes: overtimeMinutes != null ? Math.round(overtimeMinutes) : null,
-      vacationEarnedDays: leave.vacationEarnedDays,
+      vacationEarnedDays: vacationEarnedInPeriod,
       vacationUsedDays: vacationUsedInPeriod,
       vacationRemainingDays: leave.vacationRemainingDays,
       extraVacationUsedDays: extraVacationUsedInPeriod,
