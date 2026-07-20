@@ -18,6 +18,9 @@ export function hoursPerWorkDayFromWeekly(weeklyHours: number | null | undefined
  * When `includeLeaveInNorm` is true (Danish leave module): work + vacation +
  * feriefridage + holidays fulfill the weekly/period norm (e.g. 37h).
  * When false: classic work-only overtime.
+ *
+ * Returns signed minutes (positive = over norm, negative = under). Callers that
+ * mean “overtime pay” should clamp with Math.max(0, …).
  */
 export function overtimeAgainstContract(
   parts: {
@@ -39,6 +42,17 @@ export function overtimeAgainstContract(
     return fulfilling - contractMinutes;
   }
   return parts.workMinutes - contractMinutes;
+}
+
+/** Positive overtime only (hours above the period norm). Under-time is 0. */
+export function positiveOvertimeMinutes(
+  parts: Parameters<typeof overtimeAgainstContract>[0],
+  contractMinutes: number | null | undefined,
+  opts?: { includeLeaveInNorm?: boolean }
+): number | null {
+  const delta = overtimeAgainstContract(parts, contractMinutes, opts);
+  if (delta == null) return null;
+  return Math.max(0, delta);
 }
 
 export function resolveVacationYear(

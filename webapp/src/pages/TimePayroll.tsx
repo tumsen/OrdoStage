@@ -50,10 +50,11 @@ const RANGE_MODES: { id: RangeMode; labelKey: string }[] = [
 ];
 
 function fmtMins(minutes: number): string {
+  const sign = minutes < 0 ? "−" : "";
   const h = Math.floor(Math.abs(minutes) / 60);
   const m = Math.round(Math.abs(minutes) % 60);
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
+  if (m === 0) return `${sign}${h}h`;
+  return `${sign}${h}h ${m}m`;
 }
 
 function fmtDays(days: number): string {

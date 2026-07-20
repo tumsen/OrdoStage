@@ -21,7 +21,7 @@ import {
   mapPersonLeaveProfile,
   postLeaveTransaction,
 } from "../services/leaveLedger";
-import { resolveVacationYear, resolveLeaveNorms, overtimeAgainstContract } from "../rules/leave/danishLeave";
+import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes } from "../rules/leave/danishLeave";
 import { TIMESHEET_COMP_SETTLEMENT_SOURCE } from "../services/timesheetCompSettlement";
 import { DateTime } from "luxon";
 import { getClientWallClockZone } from "../clientWallClock";
@@ -494,7 +494,11 @@ leaveRouter.get("/time/payroll-export", async (c) => {
     },
   });
 
-  const rangeDays = Math.max(1, (to.getTime() - from.getTime()) / 86_400_000);
+  // Inclusive calendar days (from/to are date strings at local midnight).
+  const rangeDays = Math.max(
+    1,
+    Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1
+  );
 
   const approvals = approvedOnly
     ? await prisma.timesheetApproval.findMany({
@@ -533,7 +537,7 @@ leaveRouter.get("/time/payroll-export", async (c) => {
     }
     const contractMinutes =
       norms.weeklyContractHours != null ? (rangeDays / 7) * norms.weeklyContractHours * 60 : null;
-    const overtimeMinutes = overtimeAgainstContract(
+    const overtimeMinutes = positiveOvertimeMinutes(
       { workMinutes, vacationMinutes, extraVacationMinutes, holidayMinutes },
       contractMinutes,
       { includeLeaveInNorm: true }
