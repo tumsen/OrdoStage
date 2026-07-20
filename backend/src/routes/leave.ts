@@ -21,7 +21,7 @@ import {
   mapPersonLeaveProfile,
   postLeaveTransaction,
 } from "../services/leaveLedger";
-import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes } from "../rules/leave/danishLeave";
+import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays } from "../rules/leave/danishLeave";
 import { TIMESHEET_COMP_SETTLEMENT_SOURCE } from "../services/timesheetCompSettlement";
 import { DateTime } from "luxon";
 import { getClientWallClockZone } from "../clientWallClock";
@@ -459,9 +459,17 @@ leaveRouter.get("/time/payroll-export", async (c) => {
   if (!fromStr || !toStr) {
     return c.json({ error: { message: "from and to required", code: "BAD_REQUEST" } }, 400);
   }
-  const from = new Date(fromStr);
-  const to = new Date(toStr);
-  if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime())) {
+  const zone = getClientWallClockZone();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromStr) || !/^\d{4}-\d{2}-\d{2}$/.test(toStr)) {
+    return c.json({ error: { message: "from and to must be yyyy-MM-dd", code: "BAD_REQUEST" } }, 400);
+  }
+  const from = DateTime.fromFormat(fromStr, "yyyy-MM-dd", { zone }).startOf("day").toJSDate();
+  const toInclusive = DateTime.fromFormat(toStr, "yyyy-MM-dd", { zone }).endOf("day").toJSDate();
+  const toExclusive = DateTime.fromFormat(toStr, "yyyy-MM-dd", { zone })
+    .plus({ days: 1 })
+    .startOf("day")
+    .toJSDate();
+  if (!Number.isFinite(from.getTime()) || !Number.isFinite(toInclusive.getTime())) {
     return c.json({ error: { message: "Invalid date range", code: "BAD_REQUEST" } }, 400);
   }
 
@@ -484,7 +492,7 @@ leaveRouter.get("/time/payroll-export", async (c) => {
   const entries = await prisma.timeEntry.findMany({
     where: {
       organizationId: user.organizationId,
-      startsAt: { gte: from, lte: to },
+      startsAt: { gte: from, lt: toExclusive },
     },
     select: {
       personId: true,
@@ -494,10 +502,15 @@ leaveRouter.get("/time/payroll-export", async (c) => {
     },
   });
 
-  // Inclusive calendar days (from/to are date strings at local midnight).
+  // Inclusive calendar days in the selected from–to range.
   const rangeDays = Math.max(
     1,
-    Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1
+    Math.round(
+      DateTime.fromFormat(toStr, "yyyy-MM-dd", { zone }).diff(
+        DateTime.fromFormat(fromStr, "yyyy-MM-dd", { zone }),
+        "days"
+      ).days
+    ) + 1
   );
 
   const approvals = approvedOnly
@@ -505,8 +518,8 @@ leaveRouter.get("/time/payroll-export", async (c) => {
         where: {
           organizationId: user.organizationId,
           status: "approved",
-          periodStart: { lte: to },
-          periodEnd: { gte: from },
+          periodStart: { lt: toExclusive },
+          periodEnd: { gt: from },
         },
         select: { personId: true },
       })
@@ -527,6 +540,7 @@ leaveRouter.get("/time/payroll-export", async (c) => {
     let vacationMinutes = 0;
     let extraVacationMinutes = 0;
     let holidayMinutes = 0;
+    let sickMinutes = 0;
     for (const e of personEntries) {
       const cat = e.category || "work";
       const dur = Math.max(0, (e.endsAt.getTime() - e.startsAt.getTime()) / 60_000);
@@ -534,7 +548,12 @@ leaveRouter.get("/time/payroll-export", async (c) => {
       else if (cat === "vacation") vacationMinutes += dur;
       else if (cat === "extra_vacation") extraVacationMinutes += dur;
       else if (cat === "holiday") holidayMinutes += dur;
+      else if (cat === "sick") sickMinutes += dur;
     }
+    const hoursPerDay = hoursPerWorkDayFromWeekly(norms.weeklyContractHours);
+    const vacationUsedInPeriod = minutesToVacationDays(vacationMinutes, hoursPerDay);
+    const extraVacationUsedInPeriod = minutesToVacationDays(extraVacationMinutes, hoursPerDay);
+    const sickDaysInPeriod = minutesToVacationDays(sickMinutes, hoursPerDay);
     const contractMinutes =
       norms.weeklyContractHours != null ? (rangeDays / 7) * norms.weeklyContractHours * 60 : null;
     const overtimeMinutes = positiveOvertimeMinutes(
@@ -550,21 +569,23 @@ leaveRouter.get("/time/payroll-export", async (c) => {
         user.organizationId,
         p.id,
         from,
-        to
+        toExclusive
       );
       if (!alreadySettled) {
         await accrueCompTimeFromOvertime({
           organizationId: user.organizationId,
           personId: p.id,
           periodStart: from,
-          periodEnd: to,
+          periodEnd: toExclusive,
           overtimeMinutes: Math.round(overtimeMinutes),
           createdByUserId: user.id,
         });
       }
     }
 
-    const leave = await getLeaveBalanceSummary(user.organizationId, p.id, to);
+    // Remaining / earned / comp balances are vacation-year totals as of period end.
+    // Used columns are for the selected from–to range (e.g. this month for payroll).
+    const leave = await getLeaveBalanceSummary(user.organizationId, p.id, toInclusive);
 
     exportPeople.push({
       personId: p.id,
@@ -575,14 +596,14 @@ leaveRouter.get("/time/payroll-export", async (c) => {
       workMinutes: Math.round(workMinutes),
       overtimeMinutes: overtimeMinutes != null ? Math.round(overtimeMinutes) : null,
       vacationEarnedDays: leave.vacationEarnedDays,
-      vacationUsedDays: leave.vacationUsedDays,
+      vacationUsedDays: vacationUsedInPeriod,
       vacationRemainingDays: leave.vacationRemainingDays,
-      extraVacationUsedDays: leave.extraVacationUsedDays,
+      extraVacationUsedDays: extraVacationUsedInPeriod,
       extraVacationRemainingDays: leave.extraVacationRemainingDays,
       compTimeEarnedMinutes: leave.compTimeEarnedMinutes,
       compTimeUsedMinutes: leave.compTimeUsedMinutes,
       compTimeRemainingMinutes: leave.compTimeRemainingMinutes,
-      sickDays: leave.sickDays,
+      sickDays: sickDaysInPeriod,
       timesheetApproved: approvedIds.has(p.id),
       leave,
     });
