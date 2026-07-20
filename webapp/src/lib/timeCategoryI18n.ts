@@ -1,11 +1,18 @@
 import type { TimeCategory } from "@/contracts/backendTypes";
 
+/** Week-approval settlement blocks (ledger already updated; display-only). */
+export function isCompSettlementCategory(cat: string): cat is TimeCategory {
+  return cat === "comp_settlement_earned" || cat === "comp_settlement_used";
+}
+
 /** Keys under `time.*` for `useI18n` (avoids wrong keys for `travel_allowance`). */
 const TIME_CATEGORY_MSG: Record<TimeCategory, string> = {
   work: "categoryWork",
   vacation: "categoryVacation",
   extra_vacation: "categoryExtraVacation",
   comp_time: "categoryCompTime",
+  comp_settlement_earned: "categoryCompSettlementEarned",
+  comp_settlement_used: "categoryCompSettlementUsed",
   sick: "categorySick",
   holiday: "categoryHoliday",
   travel_allowance: "categoryTravelAllowance",
@@ -36,7 +43,7 @@ export function isLeaveAutoProjectCategory(cat: string): cat is TimeCategory {
 }
 
 export function isDayOffCategory(cat: string): cat is TimeCategory {
-  return (DAY_OFF_CATEGORIES as string[]).includes(cat);
+  return (DAY_OFF_CATEGORIES as string[]).includes(cat) || isCompSettlementCategory(cat);
 }
 
 export function timeCategoryMessageId(cat: TimeCategory): `time.${string}` {

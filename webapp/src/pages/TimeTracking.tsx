@@ -60,7 +60,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useI18n } from "@/lib/i18n";
 import { toast, useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { timeCategoryMessageId, isDayOffCategory, isLeaveAutoProjectCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
+import { timeCategoryMessageId, isCompSettlementCategory, isDayOffCategory, isLeaveAutoProjectCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
@@ -196,6 +196,16 @@ function timeEntryBlockSurfaceClass(
     return behind
       ? "border-cyan-400/30 bg-cyan-500/12 text-cyan-50/85"
       : "border-cyan-400/60 bg-cyan-500/30 text-cyan-50";
+  }
+  if (cat === "comp_settlement_earned") {
+    return behind
+      ? "border-teal-300/35 bg-teal-400/15 text-teal-50/90 border-dashed"
+      : "border-teal-300/70 bg-teal-400/25 text-teal-50 border-dashed";
+  }
+  if (cat === "comp_settlement_used") {
+    return behind
+      ? "border-amber-400/35 bg-amber-500/12 text-amber-50/90 border-dashed"
+      : "border-amber-400/60 bg-amber-500/22 text-amber-50 border-dashed";
   }
   if (cat === "travel_allowance") {
     return behind
@@ -816,6 +826,7 @@ export default function TimeTracking() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["time-approvals"] });
       queryClient.invalidateQueries({ queryKey: ["time-leave-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       const settlement = data.compSettlement;
       if (leaveManagementEnabled && settlement && settlement.totalDeltaMinutes !== 0) {
         const sign = settlement.totalDeltaMinutes >= 0 ? "+" : "";
@@ -844,6 +855,7 @@ export default function TimeTracking() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["time-approvals"] });
       queryClient.invalidateQueries({ queryKey: ["time-leave-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       timeNotify({ title: "Timesheet reopened" });
     },
     onError: () => toast({ title: "Could not reopen timesheet", variant: "destructive" }),
@@ -1368,6 +1380,7 @@ export default function TimeTracking() {
   const totalsByColumnDay = useMemo(() => {
     const acc = new Map<string, number>();
     for (const e of entries ?? []) {
+      if (isCompSettlementCategory(e.category ?? "")) continue;
       const start = parseISO(e.startsAt);
       const end = parseISO(e.endsAt);
       const mins = Math.max(0, (end.getTime() - start.getTime()) / 60_000);

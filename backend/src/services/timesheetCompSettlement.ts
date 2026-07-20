@@ -16,6 +16,7 @@ import {
 
 export const TIMESHEET_COMP_SETTLEMENT_SOURCE = "timesheet_settlement";
 const APPROVAL_NOTE_PREFIX = "timesheetApprovalId:";
+export const SETTLEMENT_ENTRY_NOTE_PREFIX = "timesheetSettlementEntry:";
 
 type DayParts = {
   workMinutes: number;
@@ -60,6 +61,7 @@ function aggregateNormFulfillingByLocalDay(
     const durMin = Math.max(0, (clippedEnd - clippedStart) / 60_000);
     if (durMin <= 0) continue;
     const cat = row.category || "work";
+    if (cat === "comp_settlement_earned" || cat === "comp_settlement_used") continue;
     const dateKey = DateTime.fromMillis(clippedStart, { zone }).toFormat("yyyy-MM-dd");
     if (!map.has(dateKey)) map.set(dateKey, emptyDayParts());
     addCategoryMinutes(map.get(dateKey)!, cat, durMin);
@@ -79,6 +81,82 @@ function weekdayDateKeysInPeriod(periodStart: Date, periodEnd: Date, zone: strin
     cursor = cursor.plus({ days: 1 });
   }
   return keys;
+}
+
+async function resolveUserIdForPerson(
+  organizationId: string,
+  personId: string,
+  fallbackUserId?: string | null,
+): Promise<string | null> {
+  const person = await prisma.person.findFirst({
+    where: { id: personId, organizationId },
+    select: { email: true },
+  });
+  const email = person?.email?.trim();
+  if (email) {
+    const membership = await prisma.organizationMembership.findFirst({
+      where: {
+        organizationId,
+        user: { email: { equals: email, mode: "insensitive" } },
+      },
+      select: { userId: true },
+    });
+    if (membership) return membership.userId;
+  }
+  return fallbackUserId ?? null;
+}
+
+function settlementCalendarEntryWindow(
+  dateKey: string,
+  fulfillingMinutes: number,
+  deltaMinutes: number,
+  zone: string,
+): { startsAt: Date; endsAt: Date; category: "comp_settlement_earned" | "comp_settlement_used" } {
+  const duration = Math.abs(deltaMinutes);
+  const dayStart = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone }).set({
+    hour: 8,
+    minute: 0,
+    second: 0,
+    millisecond: 0,
+  });
+  const start = dayStart.plus({ minutes: Math.max(0, fulfillingMinutes) });
+  const end = start.plus({ minutes: duration });
+  return {
+    startsAt: start.toJSDate(),
+    endsAt: end.toJSDate(),
+    category: deltaMinutes > 0 ? "comp_settlement_earned" : "comp_settlement_used",
+  };
+}
+
+async function createSettlementCalendarEntry(input: {
+  organizationId: string;
+  personId: string;
+  userId: string;
+  timesheetApprovalId: string;
+  dateKey: string;
+  fulfillingMinutes: number;
+  deltaMinutes: number;
+  zone: string;
+}) {
+  const { startsAt, endsAt, category } = settlementCalendarEntryWindow(
+    input.dateKey,
+    input.fulfillingMinutes,
+    input.deltaMinutes,
+    input.zone
+  );
+  await prisma.timeEntry.create({
+    data: {
+      organizationId: input.organizationId,
+      userId: input.userId,
+      personId: input.personId,
+      startsAt,
+      endsAt,
+      kind: "custom",
+      category,
+      isLocked: true,
+      note: `${SETTLEMENT_ENTRY_NOTE_PREFIX}${input.timesheetApprovalId}:${input.dateKey}`,
+    },
+  });
 }
 
 export type TimesheetCompSettlementDay = {
@@ -163,6 +241,13 @@ export async function settleCompTimeForTimesheetApproval(input: {
   );
   const weekdayKeys = weekdayDateKeysInPeriod(input.periodStart, input.periodEnd, zone);
 
+  const userId = await resolveUserIdForPerson(
+    input.organizationId,
+    input.personId,
+    input.createdByUserId
+  );
+  if (!userId) return empty;
+
   const days: TimesheetCompSettlementDay[] = [];
   let totalDeltaMinutes = 0;
 
@@ -187,6 +272,17 @@ export async function settleCompTimeForTimesheetApproval(input: {
       effectiveDate: dateKey,
       note: `${APPROVAL_NOTE_PREFIX}${input.timesheetApprovalId} date:${dateKey} fulfilling:${fulfillingMinutes} norm:${dailyNormMinutes}`,
       createdByUserId: input.createdByUserId,
+    });
+
+    await createSettlementCalendarEntry({
+      organizationId: input.organizationId,
+      personId: input.personId,
+      userId,
+      timesheetApprovalId: input.timesheetApprovalId,
+      dateKey,
+      fulfillingMinutes,
+      deltaMinutes,
+      zone,
     });
 
     days.push({
@@ -219,7 +315,15 @@ export async function reverseCompTimeForTimesheetReopen(input: {
       note: { startsWith: `${APPROVAL_NOTE_PREFIX}${input.timesheetApprovalId}` },
     },
   });
-  if (txns.length === 0) return 0;
+  if (txns.length === 0) {
+    await prisma.timeEntry.deleteMany({
+      where: {
+        organizationId: input.organizationId,
+        note: { startsWith: `${SETTLEMENT_ENTRY_NOTE_PREFIX}${input.timesheetApprovalId}:` },
+      },
+    });
+    return 0;
+  }
 
   for (const txn of txns) {
     await postLeaveTransaction({
@@ -236,6 +340,13 @@ export async function reverseCompTimeForTimesheetReopen(input: {
     });
     await prisma.leaveTransaction.delete({ where: { id: txn.id } });
   }
+
+  await prisma.timeEntry.deleteMany({
+    where: {
+      organizationId: input.organizationId,
+      note: { startsWith: `${SETTLEMENT_ENTRY_NOTE_PREFIX}${input.timesheetApprovalId}:` },
+    },
+  });
 
   return txns.length;
 }

@@ -1213,6 +1213,8 @@ export const TIME_CATEGORIES = [
   "vacation",
   "extra_vacation",
   "comp_time",
+  "comp_settlement_earned",
+  "comp_settlement_used",
   "sick",
   "holiday",
   "travel_allowance",
