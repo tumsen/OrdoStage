@@ -31,6 +31,7 @@ import { api } from "@/lib/api";
 import { usePermissions } from "@/hooks/usePermissions";
 import { OrdoStageLogo } from "@/components/OrdoStageLogo";
 import { OrgWorkspaceMenu } from "@/components/OrgWorkspaceMenu";
+import { UserUiLanguageSelect } from "@/components/UserUiLanguageSelect";
 import { WorkAnnouncementBar } from "@/components/WorkAnnouncementBar";
 import { useI18n } from "@/lib/i18n";
 import type { Person } from "../../../backend/src/types";
@@ -277,6 +278,13 @@ export function SidebarContent({ onNav }: { onNav?: () => void }) {
               </p>
               <p className="min-w-0 truncate text-[9px] text-white/45">{userEmail}</p>
             </div>
+          </div>
+        ) : null}
+        {session?.user ? (
+          <div className="px-3 pb-1">
+            <UserUiLanguageSelect
+              triggerClassName="h-9 text-sm"
+            />
           </div>
         ) : null}
         <button

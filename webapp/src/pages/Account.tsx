@@ -18,7 +18,9 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { signOut } from "@/lib/auth-client";
 import { usePreferences } from "@/hooks/usePreferences";
+import { useUserPreferencesMutation } from "@/hooks/useUserPreferencesMutation";
 import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
+import { UserUiLanguageSelect } from "@/components/UserUiLanguageSelect";
 import { useI18n } from "@/lib/i18n";
 import type { Person, PersonDocument, OrganizationLeavePolicy } from "../../../backend/src/types";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
@@ -228,18 +230,17 @@ export default function Account() {
     enabled: canManageBranding,
   });
 
-  const updatePrefsMutation = useMutation({
-    mutationFn: (body: Partial<{ language: Language; timeFormat: TimeFormat; distanceUnit: DistanceUnit }>) =>
-      api.patch<{ ok: boolean }>("/api/preferences", body),
-    onSuccess: () => {
-      setPrefsError("");
-      queryClient.invalidateQueries({ queryKey: ["preferences"] });
-    },
-    onError: (e: unknown) => {
-      if (isApiError(e)) setPrefsError(e.message);
-      else setPrefsError(t("account.savePrefError"));
-    },
-  });
+  const updatePrefsMutation = useUserPreferencesMutation();
+
+  const patchPrefs = (body: Partial<{ language: Language; timeFormat: TimeFormat; distanceUnit: DistanceUnit }>) => {
+    updatePrefsMutation.mutate(body, {
+      onSuccess: () => setPrefsError(""),
+      onError: (e: unknown) => {
+        if (isApiError(e)) setPrefsError(e.message);
+        else setPrefsError(t("account.savePrefError"));
+      },
+    });
+  };
 
   const saveCompanyMutation = useMutation({
     mutationFn: async () => {
@@ -697,29 +698,13 @@ export default function Account() {
           </p>
         </div>
         <div className="grid sm:grid-cols-3 gap-3">
-          <div className="space-y-2">
-            <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.language")}</Label>
-            <Select
-              value={effective?.language ?? "en"}
-              disabled={isLoading || updatePrefsMutation.isPending}
-              onValueChange={(value) => updatePrefsMutation.mutate({ language: value as Language })}
-            >
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                <SelectItem value="en">{t("common.english")}</SelectItem>
-                <SelectItem value="da">{t("common.danish")}</SelectItem>
-                <SelectItem value="de">{t("common.german")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <UserUiLanguageSelect />
           <div className="space-y-2">
             <Label className="text-white/70 text-xs uppercase tracking-wide">{t("account.timeFormat")}</Label>
             <Select
               value={effective?.timeFormat ?? "24h"}
               disabled={isLoading || updatePrefsMutation.isPending}
-              onValueChange={(value) => updatePrefsMutation.mutate({ timeFormat: value as TimeFormat })}
+              onValueChange={(value) => patchPrefs({ timeFormat: value as TimeFormat })}
             >
               <SelectTrigger className="bg-white/5 border-white/10 text-white">
                 <SelectValue />
@@ -735,7 +720,7 @@ export default function Account() {
             <Select
               value={effective?.distanceUnit ?? "km"}
               disabled={isLoading || updatePrefsMutation.isPending}
-              onValueChange={(value) => updatePrefsMutation.mutate({ distanceUnit: value as DistanceUnit })}
+              onValueChange={(value) => patchPrefs({ distanceUnit: value as DistanceUnit })}
             >
               <SelectTrigger className="bg-white/5 border-white/10 text-white">
                 <SelectValue />

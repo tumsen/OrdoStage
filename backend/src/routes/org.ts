@@ -287,13 +287,18 @@ app.patch("/preferences", async (c) => {
     return c.json({ error: { message: "No changes", code: "BAD_REQUEST" } }, 400);
   }
 
+  const data: {
+    preferredLanguage?: string;
+    preferredTimeFormat?: string;
+    preferredDistanceUnit?: string;
+  } = {};
+  if (body.language !== undefined) data.preferredLanguage = body.language;
+  if (body.timeFormat !== undefined) data.preferredTimeFormat = body.timeFormat;
+  if (body.distanceUnit !== undefined) data.preferredDistanceUnit = body.distanceUnit;
+
   await prisma.user.update({
     where: { id: sessionUser.id },
-    data: {
-      preferredLanguage: body.language,
-      preferredTimeFormat: body.timeFormat,
-      preferredDistanceUnit: body.distanceUnit,
-    },
+    data,
   });
 
   return c.json({ data: { ok: true } });

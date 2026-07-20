@@ -759,7 +759,10 @@ const da: DeepPartial<typeof en> = {
     title: "Konto",
     subtitle: "Personlige indstillinger, sikkerhed og kontosletning.",
     preferencesTitle: "Personlige visningsindstillinger",
+    preferencesHint:
+      "Dine valg gælder kun for dig og gemmes på din bruger. De tilsidesætter organisationens standard, indtil du ændrer dem igen.",
     language: "Sprog",
+    savePrefError: "Kunne ikke gemme indstilling.",
     timeFormat: "Tidsformat",
     distance: "Afstand",
   },

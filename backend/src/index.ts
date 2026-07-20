@@ -244,6 +244,7 @@ app.use("/api/*", async (c, next) => {
     (path.match(/^\/api\/people\/[^/]+\/resend-app-access-email$/) && method === "POST") ||
     (path === "/api/org" && method === "DELETE") ||
     (path === "/api/me/account" && method === "DELETE") ||
+    (path === "/api/preferences" && method === "PATCH") ||
     (path.match(/^\/api\/people\/documents\/.+/) && ["PATCH", "DELETE"].includes(method)) ||
     (path.match(/^\/api\/people\/[^/]+\/documents$/) && method === "POST");
   if (exemptBillingBlock) {
