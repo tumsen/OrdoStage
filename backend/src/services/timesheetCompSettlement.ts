@@ -83,110 +83,6 @@ function weekdayDateKeysInPeriod(periodStart: Date, periodEnd: Date, zone: strin
   return keys;
 }
 
-async function resolveUserIdForPerson(
-  organizationId: string,
-  personId: string,
-  fallbackUserId?: string | null,
-): Promise<string | null> {
-  const person = await prisma.person.findFirst({
-    where: { id: personId, organizationId },
-    select: { email: true },
-  });
-  const email = person?.email?.trim();
-  if (email) {
-    const membership = await prisma.organizationMembership.findFirst({
-      where: {
-        organizationId,
-        user: { email: { equals: email, mode: "insensitive" } },
-      },
-      select: { userId: true },
-    });
-    if (membership) return membership.userId;
-  }
-  return fallbackUserId ?? null;
-}
-
-function latestEntryEndOnLocalDay(
-  entries: Array<{ startsAt: Date; endsAt: Date; category: string }>,
-  dateKey: string,
-  zone: string,
-): DateTime | null {
-  const dayStart = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone });
-  const dayEnd = dayStart.plus({ days: 1 });
-  let latest: DateTime | null = null;
-  for (const row of entries) {
-    const cat = row.category || "work";
-    if (cat === "comp_settlement_earned" || cat === "comp_settlement_used") continue;
-    const start = DateTime.fromJSDate(row.startsAt, { zone });
-    const end = DateTime.fromJSDate(row.endsAt, { zone });
-    if (end <= dayStart || start >= dayEnd) continue;
-    if (!latest || end > latest) latest = end;
-  }
-  return latest;
-}
-
-/** Place after the last same-day entry; never overlap; clip at local midnight if needed. */
-function settlementCalendarEntryWindow(
-  dateKey: string,
-  deltaMinutes: number,
-  zone: string,
-  entries: Array<{ startsAt: Date; endsAt: Date; category: string }>,
-): { startsAt: Date; endsAt: Date; category: "comp_settlement_earned" | "comp_settlement_used" } {
-  const duration = Math.abs(deltaMinutes);
-  const dayStart = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone });
-  const dayEnd = dayStart.plus({ days: 1 });
-  const lastEnd = latestEntryEndOnLocalDay(entries, dateKey, zone);
-
-  let start = lastEnd && lastEnd > dayStart ? lastEnd : dayStart;
-  let end = start.plus({ minutes: duration });
-  if (end > dayEnd) {
-    const shiftedStart = dayEnd.minus({ minutes: duration });
-    if (shiftedStart >= start) {
-      start = shiftedStart;
-      end = dayEnd;
-    } else {
-      end = dayEnd;
-    }
-  }
-
-  return {
-    startsAt: start.toJSDate(),
-    endsAt: end.toJSDate(),
-    category: deltaMinutes > 0 ? "comp_settlement_earned" : "comp_settlement_used",
-  };
-}
-
-async function createSettlementCalendarEntry(input: {
-  organizationId: string;
-  personId: string;
-  userId: string;
-  timesheetApprovalId: string;
-  dateKey: string;
-  deltaMinutes: number;
-  zone: string;
-  entries: Array<{ startsAt: Date; endsAt: Date; category: string }>;
-}) {
-  const { startsAt, endsAt, category } = settlementCalendarEntryWindow(
-    input.dateKey,
-    input.deltaMinutes,
-    input.zone,
-    input.entries,
-  );
-  await prisma.timeEntry.create({
-    data: {
-      organizationId: input.organizationId,
-      userId: input.userId,
-      personId: input.personId,
-      startsAt,
-      endsAt,
-      kind: "custom",
-      category,
-      isLocked: true,
-      note: `${SETTLEMENT_ENTRY_NOTE_PREFIX}${input.timesheetApprovalId}:${input.dateKey}`,
-    },
-  });
-}
-
 export type TimesheetCompSettlementDay = {
   date: string;
   fulfillingMinutes: number;
@@ -229,6 +125,20 @@ export async function settleCompTimeForTimesheetApproval(input: {
   const policyRow = await ensureOrgLeavePolicy(input.organizationId);
   if (!policyRow.compTimeFromOvertimeEnabled) return empty;
 
+  // Legacy: settlement used to create calendar blocks — remove any leftovers for this week.
+  await prisma.timeEntry.deleteMany({
+    where: {
+      organizationId: input.organizationId,
+      personId: input.personId,
+      startsAt: { lt: input.periodEnd },
+      endsAt: { gt: input.periodStart },
+      OR: [
+        { note: { startsWith: SETTLEMENT_ENTRY_NOTE_PREFIX } },
+        { category: { in: ["comp_settlement_earned", "comp_settlement_used"] } },
+      ],
+    },
+  });
+
   const existing = await prisma.leaveTransaction.findFirst({
     where: {
       organizationId: input.organizationId,
@@ -269,12 +179,6 @@ export async function settleCompTimeForTimesheetApproval(input: {
   );
   const weekdayKeys = weekdayDateKeysInPeriod(input.periodStart, input.periodEnd, zone);
 
-  const userId = await resolveUserIdForPerson(
-    input.organizationId,
-    input.personId,
-    input.createdByUserId
-  );
-  if (!userId) return empty;
 
   const days: TimesheetCompSettlementDay[] = [];
   let totalDeltaMinutes = 0;
@@ -302,16 +206,6 @@ export async function settleCompTimeForTimesheetApproval(input: {
       createdByUserId: input.createdByUserId,
     });
 
-    await createSettlementCalendarEntry({
-      organizationId: input.organizationId,
-      personId: input.personId,
-      userId,
-      timesheetApprovalId: input.timesheetApprovalId,
-      dateKey,
-      deltaMinutes,
-      zone,
-      entries,
-    });
 
     days.push({
       date: dateKey,

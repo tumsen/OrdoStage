@@ -2694,6 +2694,7 @@ timeRouter.get("/time/entries", async (c) => {
       personId: target.personId,
       startsAt: { lt: rangeEndExclusive },
       endsAt: { gt: rangeStart },
+      category: { notIn: ["comp_settlement_earned", "comp_settlement_used"] },
     },
     include: { tagLinks: { select: { timeTagId: true } } },
     orderBy: { startsAt: "asc" },

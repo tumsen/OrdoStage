@@ -13,6 +13,7 @@ import { AutoSaveStatus as AutoSaveIndicator } from "@/components/AutoSaveStatus
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
+import { cn } from "@/lib/utils";
 import { BillingSummary, type OrgBillingPayload } from "@/components/BillingSummary";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import {
@@ -1500,15 +1501,54 @@ function PersonFormDialog({
                     <p className="text-white/35 uppercase tracking-wide text-[10px]">{t("time.leaveBalancesTitle")}</p>
                     <p>
                       {t("time.leaveVacationRemaining")}:{" "}
-                      <span className="text-emerald-300 tabular-nums">
-                        {leaveProfileData.leave.vacationRemainingDays.toFixed(1)}d
+                      <span
+                        className={cn(
+                          "tabular-nums font-medium",
+                          leaveProfileData.leave.vacationRemainingDays > 0
+                            ? "text-emerald-300"
+                            : leaveProfileData.leave.vacationRemainingDays < 0
+                              ? "text-red-300"
+                              : "text-white/55"
+                        )}
+                      >
+                        {leaveProfileData.leave.vacationRemainingDays > 0 ? "+" : leaveProfileData.leave.vacationRemainingDays < 0 ? "−" : ""}
+                        {Math.abs(leaveProfileData.leave.vacationRemainingDays).toFixed(1)}d
+                      </span>
+                    </p>
+                    <p>
+                      {t("time.leaveExtraRemaining")}:{" "}
+                      <span
+                        className={cn(
+                          "tabular-nums font-medium",
+                          leaveProfileData.leave.extraVacationRemainingDays > 0
+                            ? "text-emerald-300"
+                            : leaveProfileData.leave.extraVacationRemainingDays < 0
+                              ? "text-red-300"
+                              : "text-white/55"
+                        )}
+                      >
+                        {leaveProfileData.leave.extraVacationRemainingDays > 0 ? "+" : leaveProfileData.leave.extraVacationRemainingDays < 0 ? "−" : ""}
+                        {Math.abs(leaveProfileData.leave.extraVacationRemainingDays).toFixed(1)}d
                       </span>
                     </p>
                     <p>
                       {t("time.leaveCompRemaining")}:{" "}
-                      <span className="text-cyan-300 tabular-nums">
-                        {Math.floor(leaveProfileData.leave.compTimeRemainingMinutes / 60)}h{" "}
-                        {leaveProfileData.leave.compTimeRemainingMinutes % 60}m
+                      <span
+                        className={cn(
+                          "tabular-nums font-medium",
+                          leaveProfileData.leave.compTimeRemainingMinutes > 0
+                            ? "text-emerald-300"
+                            : leaveProfileData.leave.compTimeRemainingMinutes < 0
+                              ? "text-red-300"
+                              : "text-white/55"
+                        )}
+                      >
+                        {(() => {
+                          const mins = Math.round(leaveProfileData.leave.compTimeRemainingMinutes);
+                          const sign = mins > 0 ? "+" : mins < 0 ? "−" : "";
+                          const abs = Math.abs(mins);
+                          return `${sign}${Math.floor(abs / 60)}h ${abs % 60}m`;
+                        })()}
                       </span>
                     </p>
                   </div>

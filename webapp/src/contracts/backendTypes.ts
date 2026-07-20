@@ -1385,6 +1385,8 @@ export const LeaveBalanceSummarySchema = z.object({
   compTimeUsedMinutes: z.number(),
   compTimeRemainingMinutes: z.number(),
   sickDays: z.number(),
+  /** Net afspadsering from week approvals in the requested from/to range (minutes). */
+  compTimePeriodDeltaMinutes: z.number().optional(),
 });
 
 export const CreateLeaveAdjustmentSchema = z.object({

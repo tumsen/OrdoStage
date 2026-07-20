@@ -22,6 +22,9 @@ import {
   postLeaveTransaction,
 } from "../services/leaveLedger";
 import { resolveVacationYear, resolveLeaveNorms, overtimeAgainstContract } from "../rules/leave/danishLeave";
+import { TIMESHEET_COMP_SETTLEMENT_SOURCE } from "../services/timesheetCompSettlement";
+import { DateTime } from "luxon";
+import { getClientWallClockZone } from "../clientWallClock";
 
 const leaveRouter = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -266,6 +269,32 @@ leaveRouter.get("/time/leave-balances/:personId", async (c) => {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
   const leave = await getLeaveBalanceSummary(user.organizationId, personId);
+  const from = c.req.query("from");
+  const to = c.req.query("to");
+  if (from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    const zone = getClientWallClockZone();
+    const rangeStart = DateTime.fromFormat(from, "yyyy-MM-dd", { zone }).startOf("day").toJSDate();
+    const rangeEndExclusive = DateTime.fromFormat(to, "yyyy-MM-dd", { zone })
+      .plus({ days: 1 })
+      .startOf("day")
+      .toJSDate();
+    const agg = await prisma.leaveTransaction.aggregate({
+      where: {
+        organizationId: user.organizationId,
+        personId,
+        source: TIMESHEET_COMP_SETTLEMENT_SOURCE,
+        periodStart: { lt: rangeEndExclusive },
+        periodEnd: { gt: rangeStart },
+      },
+      _sum: { amount: true },
+    });
+    return c.json({
+      data: {
+        ...leave,
+        compTimePeriodDeltaMinutes: Math.round(agg._sum.amount ?? 0),
+      },
+    });
+  }
   return c.json({ data: leave });
 });
 

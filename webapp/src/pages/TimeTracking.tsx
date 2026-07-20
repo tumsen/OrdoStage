@@ -354,6 +354,26 @@ function formatDurationShort(totalMin: number, exact = false): string {
   return mm > 0 ? `${h}h ${mm}m` : `${h}h`;
 }
 
+function signedBalanceClass(value: number): string {
+  if (value > 0) return "text-emerald-300";
+  if (value < 0) return "text-red-300";
+  return "text-white/55";
+}
+
+function formatSignedDays(days: number): string {
+  const sign = days > 0 ? "+" : days < 0 ? "−" : "";
+  return `${sign}${Math.abs(days).toFixed(1)}d`;
+}
+
+function formatSignedMinutes(minutes: number): string {
+  const rounded = Math.round(minutes);
+  const sign = rounded > 0 ? "+" : rounded < 0 ? "−" : "";
+  const abs = Math.abs(rounded);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  return `${sign}${h}h ${m}m`;
+}
+
 function dayOffHeaderLabel(
   startsAt: string,
   endsAt: string,
@@ -610,8 +630,11 @@ export default function TimeTracking() {
   const balancePersonId = readAll && selectedPersonId ? selectedPersonId : mePerson?.id ?? null;
 
   const { data: leaveBalances } = useQuery({
-    queryKey: ["time-leave-balances", balancePersonId],
-    queryFn: () => api.get<LeaveBalanceSummary>(`/api/time/leave-balances/${balancePersonId}`),
+    queryKey: ["time-leave-balances", balancePersonId, rangeFrom, rangeTo],
+    queryFn: () =>
+      api.get<LeaveBalanceSummary>(
+        `/api/time/leave-balances/${balancePersonId}?from=${encodeURIComponent(rangeFrom)}&to=${encodeURIComponent(rangeTo)}`
+      ),
     enabled: leaveManagementEnabled && Boolean(balancePersonId),
     staleTime: 30_000,
   });
@@ -2150,23 +2173,43 @@ export default function TimeTracking() {
                   <span
                     className={cn(
                       "tabular-nums font-medium",
-                      leaveBalances.vacationRemainingDays < 0 ? "text-red-300" : "text-emerald-300"
+                      signedBalanceClass(leaveBalances.vacationRemainingDays)
                     )}
                   >
-                    {leaveBalances.vacationRemainingDays.toFixed(1)}d
+                    {formatSignedDays(leaveBalances.vacationRemainingDays)}
                   </span>
                 </span>
                 <span>
                   {t("time.leaveExtraRemaining")}:{" "}
-                  <span className="tabular-nums text-teal-300 font-medium">
-                    {leaveBalances.extraVacationRemainingDays.toFixed(1)}d
+                  <span
+                    className={cn(
+                      "tabular-nums font-medium",
+                      signedBalanceClass(leaveBalances.extraVacationRemainingDays)
+                    )}
+                  >
+                    {formatSignedDays(leaveBalances.extraVacationRemainingDays)}
                   </span>
                 </span>
                 <span>
                   {t("time.leaveCompRemaining")}:{" "}
-                  <span className="tabular-nums text-cyan-300 font-medium">
-                    {Math.floor(leaveBalances.compTimeRemainingMinutes / 60)}h{" "}
-                    {leaveBalances.compTimeRemainingMinutes % 60}m
+                  <span
+                    className={cn(
+                      "tabular-nums font-medium",
+                      signedBalanceClass(leaveBalances.compTimeRemainingMinutes)
+                    )}
+                  >
+                    {formatSignedMinutes(leaveBalances.compTimeRemainingMinutes)}
+                  </span>
+                </span>
+                <span>
+                  {t("time.leaveCompPeriodDelta")}:{" "}
+                  <span
+                    className={cn(
+                      "tabular-nums font-medium",
+                      signedBalanceClass(leaveBalances.compTimePeriodDeltaMinutes ?? 0)
+                    )}
+                  >
+                    {formatSignedMinutes(leaveBalances.compTimePeriodDeltaMinutes ?? 0)}
                   </span>
                 </span>
                 <span className="text-white/35">({leaveBalances.vacationYearKey})</span>
