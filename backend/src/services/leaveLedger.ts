@@ -1,3 +1,4 @@
+import { getClientWallClockZone } from "../clientWallClock";
 import { prisma } from "../prisma";
 import {
   accrueVacationEarnedDays,
@@ -156,7 +157,12 @@ export async function syncVacationEarnedForPerson(
   if (!person) return;
   const norms = resolveLeaveNorms(policy, mapPersonLeaveProfile(profileRow), person);
   const vacationYear = resolveVacationYear(asOf, policy);
-  const earned = accrueVacationEarnedDays(norms, vacationYear, asOf);
+  const earned = accrueVacationEarnedDays(
+    norms,
+    vacationYear,
+    asOf,
+    getClientWallClockZone()
+  );
   const existing = await prisma.leaveBalance.findUnique({
     where: {
       personId_vacationYearKey_balanceType: {
@@ -327,7 +333,8 @@ export async function applyOpeningBalances(input: {
   const earned = accrueVacationEarnedDays(
     norms,
     resolveVacationYear(asOf, policy),
-    asOf
+    asOf,
+    getClientWallClockZone()
   );
   const current = summarizeLeaveBalances(vacationYearKey, norms, earned, map);
 
@@ -395,7 +402,12 @@ export async function getLeaveBalanceSummary(
   const map: Record<string, number> = {};
   for (const r of rows) map[r.balanceType] = r.amount;
 
-  const earned = accrueVacationEarnedDays(norms, vacationYear, asOf);
+  const earned = accrueVacationEarnedDays(
+    norms,
+    vacationYear,
+    asOf,
+    getClientWallClockZone()
+  );
   return summarizeLeaveBalances(vacationYear.key, norms, earned, map);
 }
 

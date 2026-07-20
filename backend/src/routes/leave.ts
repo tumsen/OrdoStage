@@ -21,7 +21,7 @@ import {
   mapPersonLeaveProfile,
   postLeaveTransaction,
 } from "../services/leaveLedger";
-import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays, accrueVacationEarnedDaysBetween } from "../rules/leave/danishLeave";
+import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays, accrueVacationEarnedForDateRange } from "../rules/leave/danishLeave";
 import { TIMESHEET_COMP_SETTLEMENT_SOURCE } from "../services/timesheetCompSettlement";
 import { DateTime } from "luxon";
 import { getClientWallClockZone } from "../clientWallClock";
@@ -586,11 +586,11 @@ leaveRouter.get("/time/payroll-export", async (c) => {
     // Used + earned-in-period from the selected from–to range (e.g. month for payroll).
     // Remaining / comp are ferieår saldo as of period end (samtidighedsferie).
     const leave = await getLeaveBalanceSummary(user.organizationId, p.id, toInclusive);
-    const vacationEarnedInPeriod = accrueVacationEarnedDaysBetween(
+    const vacationEarnedInPeriod = accrueVacationEarnedForDateRange(
       norms.vacationDaysPerYear,
-      from,
-      toInclusive,
-      toInclusive
+      fromStr,
+      toStr,
+      zone
     );
 
     exportPeople.push({

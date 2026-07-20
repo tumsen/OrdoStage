@@ -134,12 +134,13 @@ export const FERIELOVEN_DAYS_PER_MONTH = 2.08;
 export const FERIELOVEN_DAYS_PER_CALENDAR_DAY = 0.07;
 
 function vacationMonthlyRate(vacationDaysPerYear: number): number {
-  if (vacationDaysPerYear === 25) return FERIELOVEN_DAYS_PER_MONTH;
+  // Ferieloven § 5: 2.08 for the statutory 25 days (5 weeks). Tolerate float from DB.
+  if (Math.abs(vacationDaysPerYear - 25) < 0.01) return FERIELOVEN_DAYS_PER_MONTH;
   return Math.round((vacationDaysPerYear / 12) * 100) / 100;
 }
 
 function vacationDailyRate(vacationDaysPerYear: number): number {
-  if (vacationDaysPerYear === 25) return FERIELOVEN_DAYS_PER_CALENDAR_DAY;
+  if (Math.abs(vacationDaysPerYear - 25) < 0.01) return FERIELOVEN_DAYS_PER_CALENDAR_DAY;
   const monthly = vacationMonthlyRate(vacationDaysPerYear);
   return Math.round((monthly / 30) * 100) / 100;
 }
@@ -154,35 +155,50 @@ function vacationDailyRate(vacationDaysPerYear: number): number {
 export function accrueVacationEarnedDays(
   norms: ResolvedLeaveNorms,
   vacationYear: VacationYear,
-  asOf: Date = new Date()
+  asOf: Date = new Date(),
+  zone = "UTC"
 ): number {
   return accrueVacationEarnedDaysBetween(
     norms.vacationDaysPerYear,
     vacationYear.start,
     vacationYear.end,
-    asOf
+    asOf,
+    zone
   );
 }
 
-/** Accrual for employment overlapping [rangeStart, asOf], clipped to the vacation year. */
+/**
+ * Accrual for employment overlapping [rangeStart, asOf], clipped to rangeEndInclusive.
+ * Pass an IANA `zone` so month boundaries match the client calendar (not the server’s).
+ */
 export function accrueVacationEarnedDaysBetween(
   vacationDaysPerYear: number,
   rangeStart: Date,
   rangeEndInclusive: Date,
-  asOf: Date = new Date()
+  asOf: Date = new Date(),
+  zone = "UTC"
 ): number {
   const monthly = vacationMonthlyRate(vacationDaysPerYear);
   const daily = vacationDailyRate(vacationDaysPerYear);
 
-  const start = DateTime.fromJSDate(rangeStart).startOf("day");
-  const yearEnd = DateTime.fromJSDate(rangeEndInclusive).startOf("day");
-  let end = DateTime.fromJSDate(asOf).startOf("day");
+  const start = DateTime.fromJSDate(rangeStart, { zone }).startOf("day");
+  const periodEnd = DateTime.fromJSDate(rangeEndInclusive, { zone }).startOf("day");
+  let end = DateTime.fromJSDate(asOf, { zone }).startOf("day");
   if (end < start) return 0;
-  if (end > yearEnd) end = yearEnd;
+  if (end > periodEnd) end = periodEnd;
+
+  // Exact calendar months in range → N × monthly (avoids timezone day-shift artifacts).
+  if (
+    start.day === 1 &&
+    end.day === (end.daysInMonth ?? 0) &&
+    start.hasSame(end, "month") &&
+    start.hasSame(end, "year")
+  ) {
+    return monthly;
+  }
 
   let earned = 0;
   let cursor = start.startOf("month");
-  // Walk each calendar month that intersects [start, end]
   while (cursor <= end) {
     const monthStart = cursor.startOf("day");
     const monthEnd = cursor.endOf("month").startOf("day");
@@ -200,8 +216,26 @@ export function accrueVacationEarnedDaysBetween(
     cursor = cursor.plus({ months: 1 }).startOf("month");
   }
 
-  const capped = Math.min(vacationDaysPerYear, Math.round(earned * 100) / 100);
-  return capped;
+  return Math.min(vacationDaysPerYear, Math.round(earned * 100) / 100);
+}
+
+/** Whole months (and partial ends) between two yyyy-MM-dd dates in a zone — for payroll periods. */
+export function accrueVacationEarnedForDateRange(
+  vacationDaysPerYear: number,
+  fromYmd: string,
+  toYmd: string,
+  zone = "UTC"
+): number {
+  const start = DateTime.fromFormat(fromYmd, "yyyy-MM-dd", { zone }).startOf("day");
+  const end = DateTime.fromFormat(toYmd, "yyyy-MM-dd", { zone }).startOf("day");
+  if (!start.isValid || !end.isValid || end < start) return 0;
+  return accrueVacationEarnedDaysBetween(
+    vacationDaysPerYear,
+    start.toJSDate(),
+    end.toJSDate(),
+    end.toJSDate(),
+    zone
+  );
 }
 
 export function minutesToVacationDays(minutes: number, hoursPerDay: number): number {
