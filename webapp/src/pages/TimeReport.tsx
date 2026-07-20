@@ -533,7 +533,7 @@ function ContractHoursCell({
 
 // ─── Chart grouping ───────────────────────────────────────────────────────────
 
-type ChartGroupMode = "day" | "week" | "year";
+type ChartGroupMode = "day" | "week" | "month" | "year";
 
 type ChartPoint = {
   key: string;
@@ -615,6 +615,56 @@ function groupChartData(
           sick: toHours(d.sick),
           holiday: toHours(d.holiday),
           travelAllowance: toHours(d.travelAllowance),
+        })),
+    };
+  }
+
+  if (opts.groupedBy === "month") {
+    const months = new Map<
+      string,
+      { monthStart: Date } & ReturnType<typeof emptyBuckets>
+    >();
+
+    const ensureMonth = (date: Date) => {
+      const monthStart = startOfMonth(date);
+      const mapKey = format(monthStart, "yyyy-MM");
+      if (!months.has(mapKey)) {
+        months.set(mapKey, { monthStart, ...emptyBuckets() });
+      }
+      return months.get(mapKey)!;
+    };
+
+    if (opts.range?.from && opts.range?.to) {
+      let cursor = startOfMonth(parseISO(opts.range.from));
+      const last = startOfMonth(parseISO(opts.range.to));
+      while (cursor.getTime() <= last.getTime()) {
+        ensureMonth(cursor);
+        cursor = addMonths(cursor, 1);
+      }
+    }
+
+    for (const d of byDay) {
+      const row = ensureMonth(parseISO(d.date));
+      row.work += d.workMinutes;
+      row.vacation += d.vacationMinutes;
+      row.sick += d.sickMinutes;
+      row.holiday += d.holidayMinutes;
+      row.travelAllowance += d.travelAllowanceMinutes;
+    }
+
+    return {
+      groupedBy: "month",
+      points: [...months.values()]
+        .sort((a, b) => a.monthStart.getTime() - b.monthStart.getTime())
+        .map((m) => ({
+          key: format(m.monthStart, "yyyy-MM"),
+          tick: format(m.monthStart, "MMM"),
+          label: format(m.monthStart, "MMMM yyyy"),
+          work: toHours(m.work),
+          vacation: toHours(m.vacation),
+          sick: toHours(m.sick),
+          holiday: toHours(m.holiday),
+          travelAllowance: toHours(m.travelAllowance),
         })),
     };
   }
@@ -1345,21 +1395,14 @@ export default function TimeReport() {
       {/* Chart */}
       {report && chartData.length > 0 && (
         <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <h2 className="text-sm font-medium text-white/70">
-              {t(
-                chart.groupedBy === "year"
-                  ? "time.reportChartTitleYear"
-                  : chart.groupedBy === "week"
-                    ? "time.reportChartTitleWeek"
-                    : "time.reportChartTitle"
-              )}
-            </h2>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <span className="text-xs text-white/45">{t("time.reportChartShowBy")}</span>
             <div className="flex rounded-md border border-white/10 bg-white/[0.03] p-0.5">
               {(
                 [
                   { id: "day" as const, labelKey: "time.reportChartByDay" },
                   { id: "week" as const, labelKey: "time.reportChartByWeek" },
+                  { id: "month" as const, labelKey: "time.reportChartByMonth" },
                   { id: "year" as const, labelKey: "time.reportChartByYear" },
                 ] as const
               ).map((m) => (
