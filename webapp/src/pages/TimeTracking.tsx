@@ -105,6 +105,7 @@ import {
   formatWorkDayDuration,
   workDayDurationMinutes,
 } from "@/lib/leaveNorms";
+import { formatCompTimeHhhMm } from "@/lib/compTimeInput";
 import {
   MINUTES_PER_DAY,
   TIME_SNAP_MINUTES,
@@ -367,11 +368,10 @@ function formatSignedDays(days: number): string {
 
 function formatSignedMinutes(minutes: number): string {
   const rounded = Math.round(minutes);
-  const sign = rounded > 0 ? "+" : rounded < 0 ? "−" : "";
-  const abs = Math.abs(rounded);
-  const h = Math.floor(abs / 60);
-  const m = abs % 60;
-  return `${sign}${h}h ${m}m`;
+  const body = formatCompTimeHhhMm(Math.abs(rounded));
+  if (rounded > 0) return `+${body}`;
+  if (rounded < 0) return `−${body}`;
+  return body;
 }
 
 function dayOffHeaderLabel(
@@ -2190,7 +2190,7 @@ export default function TimeTracking() {
                     {formatSignedDays(leaveBalances.extraVacationRemainingDays)}
                   </span>
                 </span>
-                <span>
+                <span className="whitespace-nowrap">
                   {t("time.leaveCompRemaining")}:{" "}
                   <span
                     className={cn(
@@ -2201,7 +2201,7 @@ export default function TimeTracking() {
                     {formatSignedMinutes(leaveBalances.compTimeRemainingMinutes)}
                   </span>
                 </span>
-                <span>
+                <span className="whitespace-nowrap">
                   {t("time.leaveCompPeriodDelta")}:{" "}
                   <span
                     className={cn(

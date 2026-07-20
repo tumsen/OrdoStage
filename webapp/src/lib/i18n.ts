@@ -610,6 +610,7 @@ const da: DeepPartial<typeof en> = {
     payrollColVacUsed: "Fer. brugt (periode)",
     payrollColExtraUsed: "Feriefridage brugt (periode)",
     payrollColSick: "Sygdom (periode)",
+    payrollColCompLeft: "Afsp. rest",
     payrollRangeWeek: "Uge",
     payrollRangeMonth: "Måned",
     payrollRangeYear: "År",

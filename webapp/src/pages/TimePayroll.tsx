@@ -36,6 +36,7 @@ import {
   DEFAULT_VACATION_YEAR_POLICY,
 } from "@/lib/leaveNorms";
 import type { OrganizationLeavePolicy, PayrollExport } from "@/contracts/backendTypes";
+import { formatCompTimeHhhMm } from "@/lib/compTimeInput";
 
 type RangeMode = "week" | "month" | "year" | "vacation_year" | "custom";
 
@@ -55,6 +56,11 @@ function fmtMins(minutes: number): string {
   const m = Math.round(Math.abs(minutes) % 60);
   if (m === 0) return `${sign}${h}h`;
   return `${sign}${h}h ${m}m`;
+}
+
+/** Comp balances as HHHH:MM on one line (e.g. 1234:30). */
+function fmtCompHhhMm(minutes: number): string {
+  return formatCompTimeHhhMm(minutes);
 }
 
 function fmtDays(days: number): string {
@@ -113,7 +119,7 @@ function buildCsv(data: PayrollExport, lang: string): string {
     fmtDays(p.extraVacationRemainingDays),
     fmtMins(p.compTimeEarnedMinutes),
     fmtMins(p.compTimeUsedMinutes),
-    fmtMins(p.compTimeRemainingMinutes),
+    fmtCompHhhMm(p.compTimeRemainingMinutes),
     fmtDays(p.sickDays),
     p.timesheetApproved ? (da ? "Ja" : "Yes") : da ? "Nej" : "No",
   ]);
@@ -712,7 +718,7 @@ export default function TimePayroll() {
         <p className="text-sm text-white/40">{t("time.payrollNoData")}</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-sm text-left min-w-[1200px]">
+          <table className="w-full text-sm text-left min-w-[1280px]">
             <thead>
               <tr className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wide text-white/40">
                 <th className="px-3 py-2.5 font-medium">{t("time.reportColPerson")}</th>
@@ -724,7 +730,9 @@ export default function TimePayroll() {
                 <th className="px-3 py-2.5 font-medium">{t("time.payrollColVacLeft")}</th>
                 <th className="px-3 py-2.5 font-medium">{t("time.payrollColExtraUsed")}</th>
                 <th className="px-3 py-2.5 font-medium">{t("time.payrollColExtraLeft")}</th>
-                <th className="px-3 py-2.5 font-medium">{t("time.payrollColCompLeft")}</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap min-w-[6.5rem]">
+                  {t("time.payrollColCompLeft")}
+                </th>
                 <th className="px-3 py-2.5 font-medium">{t("time.payrollColSick")}</th>
                 <th className="px-3 py-2.5 font-medium">{t("time.payrollColApproved")}</th>
               </tr>
@@ -752,7 +760,9 @@ export default function TimePayroll() {
                   </td>
                   <td className="px-3 py-2 tabular-nums text-white/70">{fmtDays(p.extraVacationUsedDays)}</td>
                   <td className="px-3 py-2 tabular-nums text-teal-300/80">{fmtDays(p.extraVacationRemainingDays)}</td>
-                  <td className="px-3 py-2 tabular-nums text-cyan-300/80">{fmtMins(p.compTimeRemainingMinutes)}</td>
+                  <td className="px-3 py-2 tabular-nums text-cyan-300/80 whitespace-nowrap min-w-[6.5rem]">
+                    {fmtCompHhhMm(p.compTimeRemainingMinutes)}
+                  </td>
                   <td className="px-3 py-2 tabular-nums text-orange-300/80">{fmtDays(p.sickDays)}</td>
                   <td className="px-3 py-2 text-white/50">{p.timesheetApproved ? "✓" : "—"}</td>
                 </tr>

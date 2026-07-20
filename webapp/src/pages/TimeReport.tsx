@@ -75,6 +75,7 @@ import {
 } from "@/lib/leaveNorms";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
+import { formatCompTimeHhhMm } from "@/lib/compTimeInput";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,10 @@ function fmtMins(minutes: number): string {
   const sign = minutes < 0 ? "-" : "";
   if (m === 0) return `${sign}${h}h`;
   return `${sign}${h}h ${m}m`;
+}
+
+function fmtCompHhhMm(minutes: number): string {
+  return formatCompTimeHhhMm(minutes);
 }
 
 function fmtSignedMins(minutes: number): string {
@@ -1441,7 +1446,7 @@ export default function TimeReport() {
               />
               <SummaryCard
                 label={t("time.reportColCompBalance")}
-                value={fmtMins(compPeriodTotals.balance)}
+                value={fmtCompHhhMm(compPeriodTotals.balance)}
                 color="text-cyan-300"
                 sub={t("time.reportCompBalanceHint")}
               />
@@ -1731,7 +1736,7 @@ export default function TimeReport() {
                                   <span className="text-white/20">—</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 text-right tabular-nums">
+                              <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap min-w-[6.5rem]">
                                 {p.compTimeBalanceMinutes != null ? (
                                   <span
                                     className={cn(
@@ -1741,7 +1746,7 @@ export default function TimeReport() {
                                         : "text-cyan-300/90"
                                     )}
                                   >
-                                    {fmtMins(p.compTimeBalanceMinutes)}
+                                    {fmtCompHhhMm(p.compTimeBalanceMinutes)}
                                   </span>
                                 ) : (
                                   <span className="text-white/20">—</span>
@@ -1804,8 +1809,8 @@ export default function TimeReport() {
                             <td className="px-4 py-3 text-right tabular-nums font-semibold text-cyan-300">
                               {compPeriodTotals ? fmtSignedMins(compPeriodTotals.delta) : "—"}
                             </td>
-                            <td className="px-4 py-3 text-right tabular-nums font-semibold text-cyan-300/80">
-                              {compPeriodTotals ? fmtMins(compPeriodTotals.balance) : "—"}
+                            <td className="px-4 py-3 text-right tabular-nums font-semibold text-cyan-300/80 whitespace-nowrap min-w-[6.5rem]">
+                              {compPeriodTotals ? fmtCompHhhMm(compPeriodTotals.balance) : "—"}
                             </td>
                           </>
                         )}
