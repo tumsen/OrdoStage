@@ -6,6 +6,7 @@ import {
   addWeeks,
   format,
   getISOWeek,
+  getISOWeekYear,
   startOfMonth,
   endOfMonth,
   startOfWeek,
@@ -533,10 +534,12 @@ function ContractHoursCell({
 function groupChartData(
   byDay: TimeReport["byDay"],
   rangeDays: number,
-  weekLabel: (week: number) => string
+  weekLabel: (week: number) => string,
+  range?: { from: string; to: string } | null
 ): {
   points: {
     key: string;
+    tick?: string;
     label: string;
     work: number;
     vacation: number;
@@ -576,9 +579,8 @@ function groupChartData(
       travelAllowance: number;
     }
   >();
-  for (const d of byDay) {
-    const day = parseISO(d.date);
-    const weekStart = startOfWeek(day, { weekStartsOn: 1 });
+
+  const ensureWeek = (weekStart: Date) => {
     const mapKey = format(weekStart, "yyyy-MM-dd");
     if (!weeks.has(mapKey)) {
       weeks.set(mapKey, {
@@ -590,7 +592,23 @@ function groupChartData(
         travelAllowance: 0,
       });
     }
-    const w = weeks.get(mapKey)!;
+    return weeks.get(mapKey)!;
+  };
+
+  // Fill every week in the selected period (e.g. full calendar/vacation year).
+  if (range?.from && range?.to) {
+    let cursor = startOfWeek(parseISO(range.from), { weekStartsOn: 1 });
+    const last = startOfWeek(parseISO(range.to), { weekStartsOn: 1 });
+    while (cursor.getTime() <= last.getTime()) {
+      ensureWeek(cursor);
+      cursor = addWeeks(cursor, 1);
+    }
+  }
+
+  for (const d of byDay) {
+    const day = parseISO(d.date);
+    const weekStart = startOfWeek(day, { weekStartsOn: 1 });
+    const w = ensureWeek(weekStart);
     w.work += d.workMinutes;
     w.vacation += d.vacationMinutes;
     w.sick += d.sickMinutes;
@@ -598,13 +616,20 @@ function groupChartData(
     w.travelAllowance += d.travelAllowanceMinutes;
   }
 
+  const ordered = [...weeks.values()].sort(
+    (a, b) => a.weekStart.getTime() - b.weekStart.getTime()
+  );
+
   return {
     groupedBy: "week",
-    points: [...weeks.values()].map((w) => {
+    points: ordered.map((w) => {
       const weekEnd = endOfWeek(w.weekStart, { weekStartsOn: 1 });
       const isoWeek = getISOWeek(w.weekStart);
+      const isoYear = getISOWeekYear(w.weekStart);
       return {
-        key: weekLabel(isoWeek),
+        // Unique across year boundaries (e.g. W1 of next ISO year inside Dec).
+        key: `${isoYear}-W${String(isoWeek).padStart(2, "0")}`,
+        tick: weekLabel(isoWeek),
         label: `${weekLabel(isoWeek)} · ${format(w.weekStart, "d MMM")} – ${format(weekEnd, "d MMM yyyy")}`,
         work: +(w.work / 60).toFixed(2),
         vacation: +(w.vacation / 60).toFixed(2),
@@ -849,11 +874,14 @@ export default function TimeReport() {
   const chart = useMemo(
     () =>
       report
-        ? groupChartData(report.byDay, report.summary.rangeDays, (week) =>
-            t("time.calendarWeekIso", { week })
+        ? groupChartData(
+            report.byDay,
+            report.summary.rangeDays,
+            (week) => t("time.calendarWeekIso", { week }),
+            !allTime && from && to ? { from, to } : null
           )
         : { points: [], groupedBy: "day" as const },
-    [report, t]
+    [report, t, allTime, from, to]
   );
   const chartData = chart.points;
 
@@ -1239,6 +1267,11 @@ export default function TimeReport() {
                 tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
+                interval={chart.groupedBy === "week" ? 3 : "preserveStartEnd"}
+                tickFormatter={(value) => {
+                  const point = chartData.find((p) => p.key === value);
+                  return point?.tick ?? value;
+                }}
               />
               <YAxis
                 unit="h"
