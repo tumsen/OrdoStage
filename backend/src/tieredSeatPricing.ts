@@ -38,3 +38,16 @@ export function tieredMonthlyTotalCents(users: number, model: TieredSeatModel): 
   const major = calcMonthlyTotal(users, model.base, model.start, model.floor, model.floorAt);
   return Math.max(0, Math.round(major * 100));
 }
+
+/** Per-seat monthly cents (seat 1 = base, seat 2+ = marginals), summing to `tieredMonthlyTotalCents`. */
+export function tieredMonthlyPerSeatCents(users: number, model: TieredSeatModel): number[] {
+  if (users <= 0) return [];
+  const rates: number[] = [];
+  let prev = 0;
+  for (let n = 1; n <= users; n++) {
+    const total = tieredMonthlyTotalCents(n, model);
+    rates.push(total - prev);
+    prev = total;
+  }
+  return rates;
+}

@@ -34,7 +34,7 @@ const DEFAULT_SITE_CONTENT: Array<{ key: string; value: string }> = [
   {
     key: "pricing_intro",
     value: [
-      "Two plans: Flex (monthly postpaid for billable activity) and Yearly (committed seats, 12 months upfront).",
+      "Two plans: Flex (monthly postpaid for billable activity; mid-month joins prorated) and Yearly (committed seats, 12 months upfront).",
       "Flex: pay for real usage each month—or nothing when the team is quiet. No annual lock-in.",
       "Yearly: deepest volume discount when your roster is stable; checkout in the app via Paddle.",
       "Yearly overage above commitment is billed monthly at Flex marginal rates; seat increases are prorated top-ups.",

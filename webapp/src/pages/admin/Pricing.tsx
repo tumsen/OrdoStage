@@ -249,7 +249,8 @@ function AdminBillingPricingEditor({ initialData, queryClient }: BillingEditorPr
           <div>
             <CardTitle className="text-white">Flex &amp; Fixed pricing</CardTitle>
             <p className="mt-1 text-xs text-white/50">
-              Flex is monthly postpaid only. Yearly uses annual volume discount on the committed-seat curve. Press{" "}
+              Flex is monthly postpaid only (previous month, mid-month joins prorated by UTC days). Yearly uses annual
+              volume discount on the committed-seat curve. Press{" "}
               <span className="text-white/80">Save pricing</span> to persist.
             </p>
           </div>

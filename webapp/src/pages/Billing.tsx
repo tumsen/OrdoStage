@@ -124,12 +124,13 @@ export default function Billing({ embedded = false }: { embedded?: boolean } = {
           <p className="text-gray-400 mt-2 text-sm leading-relaxed max-w-3xl">
             You only pay for seats that actually get used in a calendar month. If nobody on your team had billable
             activity (show jobs, staffing, event edits, or logged work time), that month costs nothing for those idle
-            seats. When people do contribute, each billable member counts as one seat for that month—no charge for
-            months where they stay inactive.
+            seats. When people do contribute, each billable member counts as one seat—charged from their membership
+            join date for the rest of that month (UTC days), then a full month while they remain billable.
           </p>
           <p className="text-gray-400 mt-2 text-sm leading-relaxed max-w-3xl">
-            Invoices cover the <strong className="text-white/80 font-medium">previous</strong> calendar month and are
-            due within {org?.paymentDueDays ?? 7} days of issue.
+            Invoices are <strong className="text-white/80 font-medium">postpaid</strong> for the{" "}
+            <strong className="text-white/80 font-medium">previous</strong> calendar month and are due within{" "}
+            {org?.paymentDueDays ?? 7} days of issue.
             {trialDays > 0 ? (
               <>
                 {" "}

@@ -52,6 +52,10 @@ interface Invoice {
   id: string;
   issuedAt: string;
   dueAt: string;
+  periodStart?: string;
+  periodEnd?: string;
+  invoiceKind?: string;
+  currency?: string;
   status: string;
   subtotalCents: number;
   discountPercent: number;
@@ -59,6 +63,26 @@ interface Invoice {
   totalCents: number;
   paddleInvoiceUrl?: string | null;
   lines: InvoiceLine[];
+}
+
+async function downloadInvoiceStatement(invoiceId: string): Promise<void> {
+  const res = await api.raw(`/api/admin/billing/invoices/${invoiceId}/statement.pdf`);
+  if (!res.ok) {
+    const json = await res.json().catch(() => null);
+    throw new Error(json?.error?.message || `Failed to download statement (${res.status})`);
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get("Content-Disposition") || "";
+  const match = /filename\*?=(?:UTF-8'')?["']?([^"';]+)/i.exec(cd);
+  const filename = match?.[1] ? decodeURIComponent(match[1]) : `ordostage-statement-${invoiceId}.pdf`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 interface OrgDetail {
@@ -210,6 +234,18 @@ function BillingTab({ org }: { org: OrgDetail }) {
     },
   });
 
+  const statementMutation = useMutation({
+    mutationFn: (invoiceId: string) => downloadInvoiceStatement(invoiceId),
+    onSuccess: () => toast({ title: "Statement downloaded" }),
+    onError: (err) => {
+      toast({
+        title: "Could not download statement",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const paddleSyncMutation = useMutation({
     mutationFn: (invoiceId: string) =>
       api.post<{ paddleInvoiceUrl: string | null }>(`/api/admin/billing/invoices/${invoiceId}/paddle-sync`, {}),
@@ -336,6 +372,10 @@ function BillingTab({ org }: { org: OrgDetail }) {
       <Card className="bg-gray-900 border border-white/10">
         <CardHeader>
           <CardTitle className="text-white text-base">Latest invoices</CardTitle>
+          <p className="text-xs text-white/40 font-normal">
+            Download the usage statement PDF to attach to your external tax invoice. Mark paid when
+            payment is received. Flex seats are prorated from membership join date. Paddle is optional.
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
             {org.invoices.length === 0 ? (
@@ -343,30 +383,31 @@ function BillingTab({ org }: { org: OrgDetail }) {
             ) : (
               org.invoices.slice(0, 5).map((inv) => (
                 <div key={inv.id} className="rounded border border-white/10 p-3 space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <BillingStatusBadge status={inv.status} />
-                    <p className="text-xs text-white/50">Due {formatDate(inv.dueAt)}</p>
+                    <p className="text-xs text-white/50">
+                      {inv.periodStart
+                        ? `Period ${formatDate(inv.periodStart)}`
+                        : `Issued ${formatDate(inv.issuedAt)}`}
+                      {" · "}Due {formatDate(inv.dueAt)}
+                    </p>
                   </div>
-                  <p className="text-sm text-white">Total €{(inv.totalCents / 100).toFixed(2)}</p>
+                  <p className="text-sm text-white">
+                    {(inv.currency ?? "EUR")} {(inv.totalCents / 100).toFixed(2)}
+                    {inv.invoiceKind ? (
+                      <span className="text-white/40 text-xs ml-2">{inv.invoiceKind}</span>
+                    ) : null}
+                  </p>
                   <p className="text-xs text-white/50">Lines: {inv.lines.length}</p>
-                  {inv.status !== "paid" ? (
-                    <div className="flex flex-wrap gap-2">
-                      {inv.paddleInvoiceUrl ? (
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={inv.paddleInvoiceUrl} target="_blank" rel="noreferrer">
-                            Open Paddle checkout
-                          </a>
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => paddleSyncMutation.mutate(inv.id)}
-                          disabled={paddleSyncMutation.isPending}
-                        >
-                          {paddleSyncMutation.isPending ? "Syncing…" : "Create Paddle checkout"}
-                        </Button>
-                      )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => statementMutation.mutate(inv.id)}
+                      disabled={statementMutation.isPending}
+                    >
+                      {statementMutation.isPending ? "Downloading…" : "Download statement"}
+                    </Button>
+                    {inv.status !== "paid" ? (
                       <Button
                         size="sm"
                         variant="outline"
@@ -375,8 +416,24 @@ function BillingTab({ org }: { org: OrgDetail }) {
                       >
                         Mark as paid
                       </Button>
-                    </div>
-                  ) : null}
+                    ) : null}
+                    {inv.paddleInvoiceUrl ? (
+                      <Button size="sm" variant="ghost" asChild>
+                        <a href={inv.paddleInvoiceUrl} target="_blank" rel="noreferrer">
+                          Paddle checkout
+                        </a>
+                      </Button>
+                    ) : inv.status !== "paid" ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => paddleSyncMutation.mutate(inv.id)}
+                        disabled={paddleSyncMutation.isPending}
+                      >
+                        {paddleSyncMutation.isPending ? "Syncing…" : "Paddle (optional)"}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               ))
             )}
@@ -882,6 +939,19 @@ function UsersTab({ orgId, users }: { orgId: string; users: OrgUser[] }) {
 }
 
 function HistoryTab({ invoices }: { invoices: Invoice[] }) {
+  const { toast } = useToast();
+  const statementMutation = useMutation({
+    mutationFn: (invoiceId: string) => downloadInvoiceStatement(invoiceId),
+    onSuccess: () => toast({ title: "Statement downloaded" }),
+    onError: (err) => {
+      toast({
+        title: "Could not download statement",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="rounded-lg border border-white/10 overflow-hidden">
       <Table>
@@ -891,12 +961,15 @@ function HistoryTab({ invoices }: { invoices: Invoice[] }) {
             <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Status</TableHead>
             <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Due</TableHead>
             <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider">Total</TableHead>
+            <TableHead className="text-white/40 font-medium text-xs uppercase tracking-wider text-right">
+              Statement
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {invoices.length === 0 ? (
             <TableRow className="border-white/5">
-              <TableCell colSpan={4} className="text-center text-white/30 py-10">
+              <TableCell colSpan={5} className="text-center text-white/30 py-10">
                 No invoice history yet
               </TableCell>
             </TableRow>
@@ -908,7 +981,19 @@ function HistoryTab({ invoices }: { invoices: Invoice[] }) {
                   <BillingStatusBadge status={inv.status} />
                 </TableCell>
                 <TableCell className="text-white/40 text-sm">{formatDate(inv.dueAt)}</TableCell>
-                <TableCell className="text-white/40 text-sm">€{(inv.totalCents / 100).toFixed(2)}</TableCell>
+                <TableCell className="text-white/40 text-sm">
+                  {(inv.currency ?? "EUR")} {(inv.totalCents / 100).toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => statementMutation.mutate(inv.id)}
+                    disabled={statementMutation.isPending}
+                  >
+                    PDF
+                  </Button>
+                </TableCell>
               </TableRow>
             ))
           )}

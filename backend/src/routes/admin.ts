@@ -23,6 +23,7 @@ import {
   markInvoicePaid,
   recordDailyUsageSnapshot,
   SUPPORTED_BILLING_CURRENCIES,
+  utcDayCountHalfOpen,
 } from "../postpaidBilling";
 import {
   FixedPlanPricingConfigSchema,
@@ -34,6 +35,12 @@ import { syncBillingInvoiceWithPaddle } from "../billingPaddle";
 import { AdminOrgEmailMembersBodySchema } from "../types";
 import { sendHtmlEmail } from "../resendMail";
 import { parseSeatCalculatorJson, SEAT_CALCULATOR_JSON_MAX_CHARS } from "../seatCalculatorJson";
+import {
+  buildBuyerAddressLines,
+  generateBillingStatementPdf,
+  statementRefForInvoice,
+} from "../billingStatementPdf";
+import { contentDispositionHeader } from "../lib/contentDisposition";
 
 const app = new Hono<{
   Variables: { user: typeof auth.$Infer.Session.user | null };
@@ -346,6 +353,78 @@ app.post("/admin/billing/invoices/:id/mark-paid", async (c) => {
   const paddleInvoiceId = z.object({ paddleInvoiceId: z.string().optional() }).parse(body).paddleInvoiceId;
   await markInvoicePaid(prisma, c.req.param("id"), paddleInvoiceId);
   return c.json({ data: { ok: true } });
+});
+
+/** Usage billing statement PDF — attach to your external tax invoice (manual invoicing). */
+app.get("/admin/billing/invoices/:id/statement.pdf", async (c) => {
+  const invoiceId = c.req.param("id");
+  const invoice = await prisma.billingInvoice.findUnique({
+    where: { id: invoiceId },
+    include: {
+      lines: { orderBy: { createdAt: "asc" } },
+      organization: true,
+    },
+  });
+  if (!invoice) {
+    return c.json({ error: { message: "Invoice not found", code: "NOT_FOUND" } }, 404);
+  }
+
+  const org = invoice.organization;
+  const ref = statementRefForInvoice(invoice);
+  const pdf = await generateBillingStatementPdf({
+    statementRef: ref,
+    invoiceId: invoice.id,
+    invoiceKind: invoice.invoiceKind,
+    status: invoice.status,
+    issuedAt: invoice.issuedAt,
+    dueAt: invoice.dueAt,
+    periodStart: invoice.periodStart,
+    periodEnd: invoice.periodEnd,
+    currency: invoice.currency,
+    billingPlan: org.billingPlan,
+    committedSeats: org.committedSeats,
+    sellerName: "Schwifty (OrdoStage)",
+    sellerAddress: "Strandgade 1, 5700 Svendborg, Denmark",
+    sellerVat: "DK28625383",
+    sellerEmail: "mail@ordostage.com",
+    buyerName: org.invoiceName?.trim() || org.name,
+    buyerAddressLines: buildBuyerAddressLines(org),
+    buyerVat: org.invoiceVat,
+    buyerEmail: org.invoiceEmail,
+    buyerContact: org.invoiceContact,
+    buyerPhone: org.invoicePhone,
+    lines: invoice.lines.map((line) => {
+      const name = line.userName?.trim() || "Seat / usage";
+      const email = line.userEmail?.trim();
+      const periodDays = utcDayCountHalfOpen(invoice.periodStart, invoice.periodEnd);
+      const dayNote =
+        periodDays > 0 && line.daysConsumed >= periodDays
+          ? `Full month (${line.daysConsumed} days)`
+          : `Prorated ${line.daysConsumed} of ${periodDays} days`;
+      return {
+        description: email ? `${name} <${email}>` : name,
+        detail: line.userId ? `${dayNote} · user ${line.userId}` : dayNote,
+        quantity: line.daysConsumed,
+        unitCents: line.rateCents,
+        amountCents: line.subtotalCents,
+      };
+    }),
+    subtotalCents: invoice.subtotalCents,
+    discountPercent: invoice.discountPercent,
+    discountCents: invoice.discountCents,
+    totalCents: invoice.totalCents,
+  });
+
+  const filename = `ordostage-statement-${ref}.pdf`;
+  return new Response(pdf, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": contentDispositionHeader("attachment", filename),
+      "Cache-Control": "private, no-store",
+      "Content-Length": String(pdf.byteLength),
+    },
+  });
 });
 
 app.post("/admin/billing/invoices/:id/paddle-sync", async (c) => {
