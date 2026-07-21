@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { ArrowLeft, FolderKanban, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, FolderKanban, Plus, Trash2 } from "lucide-react";
+import { format, parseISO } from "date-fns";
 
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -19,64 +20,22 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { displayHex } from "@/lib/timeCatalogColors";
+import { timeCategoryMessageId } from "@/lib/timeCategoryI18n";
 import type {
+  TimeCategory,
   TimeParentCategory,
   TimeParentCategoryCatalog,
   TimeProject,
+  TimeProjectEntriesResponse,
 } from "@/contracts/backendTypes";
 
-type CatalogEvent = TimeParentCategoryCatalog["events"][number];
-type CatalogTour = TimeParentCategoryCatalog["tours"][number];
+type CatalogProject = TimeParentCategoryCatalog["projects"][number];
 
-function MemberRow({
-  label,
-  sublabel,
-  onRemove,
-  removing,
-}: {
-  label: string;
-  sublabel?: string;
-  onRemove: () => void;
-  removing?: boolean;
-}) {
-  return (
-    <li className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-white/90">{label}</p>
-        {sublabel ? <p className="truncate text-[10px] text-white/40">{sublabel}</p> : null}
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 shrink-0 text-white/35 hover:text-red-400"
-        disabled={removing}
-        onClick={onRemove}
-        aria-label="Remove"
-      >
-        <X size={14} />
-      </Button>
-    </li>
-  );
-}
-
-function LinkedResourceRow({
-  label,
-  sublabel,
-  href,
-}: {
-  label: string;
-  sublabel?: string;
-  href: string;
-}) {
-  return (
-    <li className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2">
-      <Link to={href} className="block min-w-0 hover:text-white">
-        <p className="truncate text-sm text-white/90">{label}</p>
-        {sublabel ? <p className="truncate text-[10px] text-white/40">{sublabel}</p> : null}
-      </Link>
-    </li>
-  );
+function formatMinutes(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  if (m === 0) return `${h}t`;
+  return `${h}t ${m}m`;
 }
 
 export default function TimeParentCategoryCatalog() {
@@ -85,14 +44,13 @@ export default function TimeParentCategoryCatalog() {
   const { canAction } = usePermissions();
   const canManage = canAction("time.manage_catalog");
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
-  const [pickEventId, setPickEventId] = useState("");
-  const [pickTourId, setPickTourId] = useState("");
-  const [pickProjectId, setPickProjectId] = useState("");
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [reassignToProjectId, setReassignToProjectId] = useState("");
+  const [moveToProjectId, setMoveToProjectId] = useState("");
 
   const { data: catalog, isLoading } = useQuery({
     queryKey: ["time-parent-category-catalog"],
@@ -100,116 +58,110 @@ export default function TimeParentCategoryCatalog() {
     enabled: canManage,
   });
 
-  const categories = catalog?.categories ?? [];
-  const selected =
-    categories.find((c) => c.id === selectedId) ??
-    (categories[0] ?? null);
-
-  const activeId = selected?.id ?? null;
-  const [categoryNameDraft, setCategoryNameDraft] = useState("");
+  const categories = useMemo(() => catalog?.categories ?? [], [catalog?.categories]);
+  const allProjects = useMemo(() => catalog?.projects ?? [], [catalog?.projects]);
+  const selectedCategory =
+    categories.find((c) => c.id === selectedCategoryId) ?? categories[0] ?? null;
+  const activeCategoryId = selectedCategory?.id ?? null;
 
   useEffect(() => {
-    setCategoryNameDraft(selected?.name ?? "");
-  }, [selected?.id, selected?.name]);
+    if (!selectedCategoryId && categories[0]) setSelectedCategoryId(categories[0].id);
+  }, [categories, selectedCategoryId]);
 
-  const members = useMemo(() => {
-    if (!catalog || !activeId) {
-      return { events: [] as CatalogEvent[], tours: [] as CatalogTour[], projects: [] as TimeProject[] };
-    }
-    return {
-      events: catalog.events.filter((e) => e.timeParentCategoryId === activeId),
-      tours: catalog.tours.filter((tour) => tour.timeParentCategoryId === activeId),
-      projects: catalog.standaloneProjects.filter((p) => p.timeParentCategoryId === activeId),
-    };
-  }, [catalog, activeId]);
+  const projectsInCategory = useMemo(() => {
+    if (!activeCategoryId) return [] as CatalogProject[];
+    return allProjects.filter((p) => p.timeParentCategoryId === activeCategoryId);
+  }, [allProjects, activeCategoryId]);
 
-  const unassignedEvents = useMemo(
-    () => (catalog?.events ?? []).filter((e) => !e.timeParentCategoryId),
-    [catalog]
-  );
-  const unassignedTours = useMemo(
-    () => (catalog?.tours ?? []).filter((tour) => !tour.timeParentCategoryId),
-    [catalog]
-  );
   const unassignedProjects = useMemo(
-    () =>
-      (catalog?.standaloneProjects ?? []).filter(
-        (p) => !p.timeParentCategoryId && !(p.systemKey?.startsWith("leave_") ?? false)
-      ),
-    [catalog]
+    () => allProjects.filter((p) => !p.timeParentCategoryId),
+    [allProjects]
   );
+
+  const selectedProject =
+    allProjects.find((p) => p.id === selectedProjectId) ?? null;
+
+  const { data: projectEntries, isLoading: entriesLoading } = useQuery({
+    queryKey: ["time-project-entries", selectedProjectId],
+    queryFn: () =>
+      api.get<TimeProjectEntriesResponse>(
+        `/api/time/projects/${selectedProjectId}/entries?limit=400`
+      ),
+    enabled: canManage && Boolean(selectedProjectId),
+  });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["time-parent-category-catalog"] });
     queryClient.invalidateQueries({ queryKey: ["time-projects"] });
+    queryClient.invalidateQueries({ queryKey: ["time-project-entries"] });
+    queryClient.invalidateQueries({ queryKey: ["time-entries"] });
   };
 
   const addCategory = useMutation({
     mutationFn: (name: string) => api.post<TimeParentCategory>("/api/time/parent-categories", { name }),
     onSuccess: (row) => {
       invalidate();
-      setSelectedId(row.id);
+      setSelectedCategoryId(row.id);
       setNewCategoryName("");
       toast({ title: t("time.parentCategoryAdded") });
     },
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
   });
 
-  const patchCategory = useMutation({
-    mutationFn: (vars: { id: string; name?: string; color?: string | null }) =>
-      api.patch(`/api/time/parent-categories/${vars.id}`, {
-        ...(vars.name !== undefined ? { name: vars.name } : {}),
-        ...(vars.color !== undefined ? { color: vars.color } : {}),
-      }),
-    onSuccess: invalidate,
-    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
-  });
-
-  const deleteCategory = useMutation({
-    mutationFn: (id: string) => api.delete(`/api/time/parent-categories/${id}`),
-    onSuccess: () => {
-      invalidate();
-      setSelectedId(null);
-      toast({ title: t("time.catalogRemoved") });
-    },
-    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
-  });
-
-  const linkItem = useMutation({
-    mutationFn: (body: {
-      type: "event" | "tour" | "project";
-      id: string;
-      timeParentCategoryId: string | null;
-    }) => api.patch("/api/time/parent-category-link", body),
-    onSuccess: () => {
-      invalidate();
-      setPickEventId("");
-      setPickTourId("");
-      setPickProjectId("");
-    },
-    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
-  });
-
   const addProject = useMutation({
     mutationFn: (vars: { name: string; timeParentCategoryId: string }) =>
-      api.post("/api/time/projects", vars),
-    onSuccess: () => {
+      api.post<TimeProject>("/api/time/projects", vars),
+    onSuccess: (row) => {
       invalidate();
       setNewProjectName("");
+      setSelectedProjectId(row.id);
       toast({ title: t("time.catalogProjectAdded") });
     },
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
   });
 
-  const reassignTargets = useMemo(() => {
-    const all = catalog?.standaloneProjects ?? [];
-    return all.filter(
-      (p) =>
-        p.id !== deleteProjectId &&
-        !p.isArchived &&
-        !(p.systemKey?.startsWith("leave_") ?? false)
-    );
-  }, [catalog, deleteProjectId]);
+  const linkProject = useMutation({
+    mutationFn: (vars: { id: string; timeParentCategoryId: string }) =>
+      api.patch("/api/time/parent-category-link", {
+        type: "project",
+        id: vars.id,
+        timeParentCategoryId: vars.timeParentCategoryId,
+      }),
+    onSuccess: () => {
+      invalidate();
+      toast({ title: t("time.parentCategoryLinkProjectDone") });
+    },
+    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
+  });
+
+  const moveTargets = useMemo(() => {
+    const excludeId = selectedProjectId ?? deleteProjectId;
+    return allProjects.filter((p) => p.id !== excludeId && !p.isArchived);
+  }, [allProjects, selectedProjectId, deleteProjectId]);
+
+  const moveAllEntries = useMutation({
+    mutationFn: (vars: { fromId: string; toProjectId: string }) =>
+      api.post<{
+        ok: boolean;
+        reassignedEntries: number;
+        reassignedTravelClaims: number;
+        reassignedMileageClaims: number;
+      }>(`/api/time/projects/${vars.fromId}/reassign-entries`, {
+        toProjectId: vars.toProjectId,
+      }),
+    onSuccess: (data) => {
+      invalidate();
+      setMoveToProjectId("");
+      toast({
+        title: t("time.catalogEntriesMoved"),
+        description: t("time.catalogProjectReassigned", {
+          count:
+            data.reassignedEntries + data.reassignedTravelClaims + data.reassignedMileageClaims,
+        }),
+      });
+    },
+    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
+  });
 
   const deleteProject = useMutation({
     mutationFn: (vars: { id: string; reassignToProjectId: string }) =>
@@ -223,12 +175,14 @@ export default function TimeParentCategoryCatalog() {
       }),
     onSuccess: (data) => {
       invalidate();
+      if (selectedProjectId === deleteProjectId) setSelectedProjectId(null);
       setDeleteProjectId(null);
       setReassignToProjectId("");
       toast({
         title: t("time.catalogProjectDeleted"),
         description: t("time.catalogProjectReassigned", {
-          count: data.reassignedEntries + data.reassignedTravelClaims + data.reassignedMileageClaims,
+          count:
+            data.reassignedEntries + data.reassignedTravelClaims + data.reassignedMileageClaims,
         }),
       });
     },
@@ -239,26 +193,62 @@ export default function TimeParentCategoryCatalog() {
     return <Navigate to="/time" replace />;
   }
 
+  const renderProjectRow = (p: CatalogProject) => {
+    const isSelected = selectedProjectId === p.id;
+    const kindLabel = p.eventId
+      ? t("time.parentCategoryAutoEvent")
+      : p.tourId
+        ? t("time.parentCategoryLinkedTour")
+        : p.systemKey === "unassigned_hours"
+          ? t("time.catalogUnassignedHoursProject")
+          : t("time.parentCategoryStandaloneProject");
+    return (
+      <li key={p.id}>
+        <button
+          type="button"
+          onClick={() => setSelectedProjectId(p.id)}
+          className={cn(
+            "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
+            isSelected
+              ? "border-indigo-400/40 bg-indigo-500/15 text-white"
+              : "border-white/10 bg-white/[0.03] text-white/85 hover:bg-white/[0.06]"
+          )}
+        >
+          <span
+            className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white/15"
+            style={{ backgroundColor: displayHex(p.color, p.id) }}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">{p.name}</span>
+            <span className="mt-0.5 block text-[10px] text-white/45">
+              {kindLabel} · {p.entryCount} {t("time.catalogEntryCount")} ·{" "}
+              {formatMinutes(p.totalMinutes)}
+            </span>
+          </span>
+        </button>
+      </li>
+    );
+  };
+
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link
-            to="/time"
-            className="mb-2 inline-flex items-center gap-1.5 text-xs text-white/45 hover:text-white/70"
-          >
-            <ArrowLeft size={14} />
-            {t("time.backToTime")}
-          </Link>
-          <h1 className="text-xl font-semibold text-white">{t("time.parentCategoryPageTitle")}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-white/50">{t("time.parentCategoryPageHint")}</p>
-        </div>
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6">
+      <div>
+        <Link
+          to="/time"
+          className="mb-2 inline-flex items-center gap-1.5 text-xs text-white/45 hover:text-white/70"
+        >
+          <ArrowLeft size={14} />
+          {t("time.backToTime")}
+        </Link>
+        <h1 className="text-xl font-semibold text-white">{t("time.parentCategoryPageTitle")}</h1>
+        <p className="mt-1 max-w-3xl text-sm text-white/50">{t("time.parentCategoryPageHint")}</p>
       </div>
 
       {isLoading ? (
         <p className="text-sm text-white/45">{t("time.parentCategoryLoading")}</p>
       ) : (
-        <div className="grid min-h-[28rem] gap-4 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
+        <div className="grid min-h-[32rem] gap-4 lg:grid-cols-[minmax(0,15rem)_minmax(0,18rem)_minmax(0,1fr)]">
+          {/* Categories */}
           <aside className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <Label className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
               {t("time.parentCategoriesHeading")}
@@ -281,17 +271,19 @@ export default function TimeParentCategoryCatalog() {
               </Button>
             </div>
             <ul className="mt-3 space-y-1">
-              {categories.length === 0 ? (
-                <li className="text-sm text-white/40">{t("time.parentCategoryEmpty")}</li>
-              ) : (
-                categories.map((cat) => (
+              {categories.map((cat) => {
+                const count = allProjects.filter((p) => p.timeParentCategoryId === cat.id).length;
+                return (
                   <li key={cat.id}>
                     <button
                       type="button"
-                      onClick={() => setSelectedId(cat.id)}
+                      onClick={() => {
+                        setSelectedCategoryId(cat.id);
+                        setSelectedProjectId(null);
+                      }}
                       className={cn(
                         "flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left text-sm transition-colors",
-                        (activeId === cat.id)
+                        activeCategoryId === cat.id
                           ? "border-white/25 bg-white/[0.08] text-white"
                           : "border-transparent text-white/70 hover:bg-white/[0.04]"
                       )}
@@ -300,425 +292,274 @@ export default function TimeParentCategoryCatalog() {
                         className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white/15"
                         style={{ backgroundColor: displayHex(cat.color, cat.id) }}
                       />
-                      <span className="truncate">{cat.name}</span>
-                      {cat.systemKey ? (
-                        <span className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-white/35 ring-1 ring-white/10">
-                          {t("time.parentCategorySystemBadge")}
-                        </span>
-                      ) : null}
+                      <span className="min-w-0 flex-1 truncate">{cat.name}</span>
+                      <span className="shrink-0 tabular-nums text-[10px] text-white/40">{count}</span>
                     </button>
                   </li>
-                ))
-              )}
+                );
+              })}
+              {unassignedProjects.length > 0 ? (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategoryId("__unassigned__");
+                      setSelectedProjectId(null);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left text-sm transition-colors",
+                      selectedCategoryId === "__unassigned__"
+                        ? "border-amber-400/35 bg-amber-500/10 text-amber-50"
+                        : "border-transparent text-amber-100/70 hover:bg-amber-500/[0.06]"
+                    )}
+                  >
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400/70" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {t("time.parentCategoryUnassignedHeading")}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-[10px] text-white/40">
+                      {unassignedProjects.length}
+                    </span>
+                  </button>
+                </li>
+              ) : null}
             </ul>
           </aside>
 
-          <main className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            {!selected ? (
-              <div className="flex h-full min-h-[20rem] flex-col items-center justify-center gap-2 text-center">
+          {/* Projects in category */}
+          <section className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+            {selectedCategoryId === "__unassigned__" ? (
+              <>
+                <h2 className="text-sm font-medium text-white">
+                  {t("time.parentCategoryUnassignedHeading")}
+                </h2>
+                <p className="mt-1 text-xs text-white/45">{t("time.parentCategoryUnassignedHint")}</p>
+                <ul className="mt-3 space-y-1.5">
+                  {unassignedProjects.map(renderProjectRow)}
+                </ul>
+                {activeCategoryId && activeCategoryId !== "__unassigned__" ? null : (
+                  <div className="mt-4 space-y-2 border-t border-white/10 pt-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
+                      {t("time.parentCategoryLinkProject")}
+                    </p>
+                    {unassignedProjects.length > 0 && categories.length > 0 ? (
+                      <p className="text-[11px] text-white/40">
+                        {t("time.catalogAssignFromUnassignedHint")}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </>
+            ) : selectedCategory ? (
+              <>
+                <h2 className="text-sm font-medium text-white">{selectedCategory.name}</h2>
+                <p className="mt-1 text-xs text-white/45">{t("time.parentCategoryProjectsHint")}</p>
+                <div className="mt-3 flex gap-2">
+                  <Input
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    placeholder={t("time.projectPlaceholder")}
+                    className="h-9 border-white/10 bg-white/5 text-white"
+                  />
+                  <Button
+                    type="button"
+                    className="shrink-0 bg-indigo-700 hover:bg-indigo-600"
+                    disabled={!newProjectName.trim() || addProject.isPending}
+                    onClick={() => {
+                      if (!activeCategoryId) return;
+                      addProject.mutate({
+                        name: newProjectName.trim(),
+                        timeParentCategoryId: activeCategoryId,
+                      });
+                    }}
+                  >
+                    {t("time.add")}
+                  </Button>
+                </div>
+                {unassignedProjects.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Select
+                      value=""
+                      onValueChange={(projectId) => {
+                        if (!projectId || !activeCategoryId) return;
+                        linkProject.mutate({
+                          id: projectId,
+                          timeParentCategoryId: activeCategoryId,
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-9 w-full border-white/10 bg-white/5 text-white">
+                        <SelectValue placeholder={t("time.parentCategorySelectUnassignedProject")} />
+                      </SelectTrigger>
+                      <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                        {unassignedProjects.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+                <ul className="mt-3 space-y-1.5">
+                  {projectsInCategory.length === 0 ? (
+                    <li className="text-sm text-white/35">{t("time.parentCategoryNoProjects")}</li>
+                  ) : (
+                    projectsInCategory.map(renderProjectRow)
+                  )}
+                </ul>
+              </>
+            ) : (
+              <div className="flex h-full min-h-[16rem] flex-col items-center justify-center gap-2 text-center">
                 <FolderKanban className="h-10 w-10 text-white/20" />
                 <p className="text-sm text-white/45">{t("time.parentCategorySelectPrompt")}</p>
               </div>
+            )}
+          </section>
+
+          {/* Project detail / entries */}
+          <section className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+            {!selectedProject ? (
+              <div className="flex h-full min-h-[16rem] flex-col items-center justify-center gap-2 text-center">
+                <p className="text-sm text-white/45">{t("time.catalogSelectProjectPrompt")}</p>
+              </div>
             ) : (
-              <div className="space-y-6">
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
-                  <div className="flex min-w-0 flex-1 items-start gap-3">
-                    <input
-                      type="color"
-                      aria-label={t("time.catalogColorLabel")}
-                      className="mt-1 h-10 w-12 shrink-0 cursor-pointer rounded border border-white/15 bg-transparent p-0"
-                      value={displayHex(selected.color, selected.id)}
-                      onChange={(e) =>
-                        patchCategory.mutate({ id: selected.id, color: e.target.value })
-                      }
-                    />
-                    <Input
-                      value={categoryNameDraft}
-                      onChange={(e) => setCategoryNameDraft(e.target.value)}
-                      onBlur={() => {
-                        const trimmed = categoryNameDraft.trim();
-                        if (!trimmed || trimmed === selected.name) return;
-                        patchCategory.mutate({ id: selected.id, name: trimmed });
-                      }}
-                      className="h-10 max-w-md border-white/10 bg-white/5 text-lg font-medium text-white"
-                    />
+              <div className="flex h-full flex-col gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-base font-semibold text-white">
+                      {selectedProject.name}
+                    </h2>
+                    <p className="mt-1 text-xs text-white/45">
+                      {projectEntries
+                        ? `${projectEntries.totalCount} ${t("time.catalogEntryCount")} · ${formatMinutes(projectEntries.totalMinutes)}`
+                        : `${selectedProject.entryCount} ${t("time.catalogEntryCount")}`}
+                    </p>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 text-white/45 hover:text-white/80"
-                      title={t("time.catalogColorReset")}
-                      disabled={selected.color == null}
-                      onClick={() => patchCategory.mutate({ id: selected.id, color: null })}
-                    >
-                      <RotateCcw size={14} />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 text-red-400/70 hover:text-red-400"
-                      disabled={Boolean(selected.systemKey)}
-                      title={
-                        selected.systemKey
-                          ? t("time.parentCategoryCannotDeleteSystem")
-                          : undefined
-                      }
+                      variant="outline"
+                      size="sm"
+                      className="border-white/15 text-white"
                       onClick={() => {
-                        if (selected.systemKey) return;
-                        if (!confirm(t("time.parentCategoryDeleteConfirm"))) return;
-                        deleteCategory.mutate(selected.id);
+                        setDeleteProjectId(selectedProject.id);
+                        setReassignToProjectId("");
                       }}
+                      disabled={Boolean(selectedProject.systemKey?.startsWith("leave_"))}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={14} className="mr-1.5" />
+                      {t("time.catalogDeleteProjectTitle")}
                     </Button>
                   </div>
                 </div>
 
-                <section className="space-y-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-white/45">
-                    {t("time.parentCategoryProjectsHeading")}
-                  </h2>
-                  <p className="text-xs text-white/40">{t("time.parentCategoryProjectsHint")}</p>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newProjectName}
-                      onChange={(e) => setNewProjectName(e.target.value)}
-                      placeholder={t("time.projectPlaceholder")}
-                      className="h-9 border-white/10 bg-white/5 text-white"
-                    />
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-white/70">
+                    <ArrowRightLeft size={14} />
+                    {t("time.catalogMoveAllEntries")}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Select value={moveToProjectId} onValueChange={setMoveToProjectId}>
+                      <SelectTrigger className="h-9 min-w-[12rem] flex-1 border-white/10 bg-white/5 text-white">
+                        <SelectValue placeholder={t("time.catalogReassignPlaceholder")} />
+                      </SelectTrigger>
+                      <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                        {moveTargets.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Button
                       type="button"
-                      className="shrink-0 bg-indigo-700 hover:bg-indigo-600"
-                      disabled={!newProjectName.trim() || addProject.isPending}
+                      className="bg-indigo-700 hover:bg-indigo-600"
+                      disabled={
+                        !moveToProjectId || moveAllEntries.isPending || moveTargets.length === 0
+                      }
                       onClick={() => {
-                        if (!activeId) return;
-                        addProject.mutate({
-                          name: newProjectName.trim(),
-                          timeParentCategoryId: activeId,
+                        if (!selectedProjectId || !moveToProjectId) return;
+                        moveAllEntries.mutate({
+                          fromId: selectedProjectId,
+                          toProjectId: moveToProjectId,
                         });
                       }}
                     >
-                      {t("time.add")}
+                      {t("time.catalogMoveAllConfirm")}
                     </Button>
                   </div>
-                  {unassignedProjects.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Select value={pickProjectId} onValueChange={setPickProjectId}>
-                        <SelectTrigger className="h-9 w-full max-w-sm border-white/10 bg-white/5 text-white">
-                          <SelectValue placeholder={t("time.parentCategorySelectUnassignedProject")} />
-                        </SelectTrigger>
-                        <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                          {unassignedProjects.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="border-white/15 text-white hover:bg-white/5"
-                        disabled={!pickProjectId || linkItem.isPending}
-                        onClick={() => {
-                          if (!activeId || !pickProjectId) return;
-                          linkItem.mutate({
-                            type: "project",
-                            id: pickProjectId,
-                            timeParentCategoryId: activeId,
-                          });
-                        }}
-                      >
-                        {t("time.parentCategoryLinkProject")}
-                      </Button>
-                    </div>
-                  ) : null}
-                  <ul className="space-y-1.5">
-                    {members.projects.map((p) => (
-                      <MemberRow
-                        key={p.id}
-                        label={p.name}
-                        sublabel={t("time.parentCategoryStandaloneProject")}
-                        onRemove={() => {
-                          setDeleteProjectId(p.id);
-                          setReassignToProjectId("");
-                        }}
-                        removing={deleteProject.isPending}
-                      />
-                    ))}
-                    {members.projects.length === 0 ? (
-                      <li className="text-sm text-white/35">{t("time.parentCategoryNoProjects")}</li>
-                    ) : null}
-                  </ul>
-                </section>
+                </div>
 
-                <section className="space-y-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-white/45">
-                    {t("time.parentCategoryEventsHeading")}
-                  </h2>
-                  <p className="text-xs text-white/40">{t("time.parentCategoryEventsHint")}</p>
-                  {unassignedEvents.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Select value={pickEventId} onValueChange={setPickEventId}>
-                        <SelectTrigger className="h-9 w-full max-w-sm border-white/10 bg-white/5 text-white">
-                          <SelectValue placeholder={t("time.selectEventPlaceholder")} />
-                        </SelectTrigger>
-                        <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                          {unassignedEvents.map((e) => (
-                            <SelectItem key={e.id} value={e.id}>
-                              {e.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="border-white/15 text-white hover:bg-white/5"
-                        disabled={!pickEventId || linkItem.isPending}
-                        onClick={() => {
-                          if (!activeId || !pickEventId) return;
-                          linkItem.mutate({
-                            type: "event",
-                            id: pickEventId,
-                            timeParentCategoryId: activeId,
-                          });
-                        }}
-                      >
-                        {t("time.parentCategoryLinkEvent")}
-                      </Button>
-                    </div>
-                  ) : null}
-                  <ul className="space-y-1.5">
-                    {members.events.map((e) => (
-                      <LinkedResourceRow
-                        key={e.id}
-                        label={e.title}
-                        sublabel={t("time.parentCategoryAutoEvent")}
-                        href={`/events/${e.id}`}
-                      />
-                    ))}
-                    {members.events.length === 0 ? (
-                      <li className="text-sm text-white/35">{t("time.parentCategoryNoEvents")}</li>
-                    ) : null}
-                  </ul>
-                </section>
-
-                <section className="space-y-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-white/45">
-                    {t("time.parentCategoryToursHeading")}
-                  </h2>
-                  <p className="text-xs text-white/40">{t("time.parentCategoryToursHint")}</p>
-                  {unassignedTours.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Select value={pickTourId} onValueChange={setPickTourId}>
-                        <SelectTrigger className="h-9 w-full max-w-sm border-white/10 bg-white/5 text-white">
-                          <SelectValue placeholder={t("time.parentCategorySelectTour")} />
-                        </SelectTrigger>
-                        <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                          {unassignedTours.map((tour) => (
-                            <SelectItem key={tour.id} value={tour.id}>
-                              {tour.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="border-white/15 text-white hover:bg-white/5"
-                        disabled={!pickTourId || linkItem.isPending}
-                        onClick={() => {
-                          if (!activeId || !pickTourId) return;
-                          linkItem.mutate({
-                            type: "tour",
-                            id: pickTourId,
-                            timeParentCategoryId: activeId,
-                          });
-                        }}
-                      >
-                        {t("time.parentCategoryLinkTour")}
-                      </Button>
-                    </div>
-                  ) : null}
-                  <ul className="space-y-1.5">
-                    {members.tours.map((tour) => (
-                      <LinkedResourceRow
-                        key={tour.id}
-                        label={tour.name}
-                        sublabel={t("time.parentCategoryLinkedTour")}
-                        href={`/tours/${tour.id}`}
-                      />
-                    ))}
-                    {members.tours.length === 0 ? (
-                      <li className="text-sm text-white/35">{t("time.parentCategoryNoTours")}</li>
-                    ) : null}
-                  </ul>
-                </section>
+                <div className="min-h-0 flex-1 overflow-auto">
+                  {entriesLoading ? (
+                    <p className="text-sm text-white/45">{t("time.parentCategoryLoading")}</p>
+                  ) : !projectEntries || projectEntries.entries.length === 0 ? (
+                    <p className="text-sm text-white/35">{t("time.catalogNoEntries")}</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {projectEntries.entries.map((e) => (
+                        <li
+                          key={e.id}
+                          className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2"
+                        >
+                          <div className="flex flex-wrap items-baseline justify-between gap-2">
+                            <p className="text-sm text-white/90">{e.personName}</p>
+                            <p className="tabular-nums text-[11px] text-white/50">
+                              {formatMinutes(e.durationMinutes)}
+                              {e.isLocked ? ` · ${t("time.lockedShort")}` : ""}
+                            </p>
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-white/50">
+                            {format(parseISO(e.startsAt), "d MMM yyyy HH:mm")} –{" "}
+                            {format(parseISO(e.endsAt), "HH:mm")} ·{" "}
+                            {t(timeCategoryMessageId(e.category as TimeCategory) as never)}
+                          </p>
+                          {e.note ? (
+                            <p className="mt-0.5 truncate text-[11px] text-white/40">{e.note}</p>
+                          ) : null}
+                        </li>
+                      ))}
+                      {projectEntries.totalCount > projectEntries.entries.length ? (
+                        <li className="px-1 py-2 text-[11px] text-white/40">
+                          {t("time.catalogEntriesTruncated", {
+                            shown: projectEntries.entries.length,
+                            total: projectEntries.totalCount,
+                          })}
+                        </li>
+                      ) : null}
+                    </ul>
+                  )}
+                </div>
               </div>
             )}
-          </main>
+          </section>
         </div>
       )}
 
-      {!isLoading &&
-      (unassignedEvents.length > 0 || unassignedTours.length > 0 || unassignedProjects.length > 0) ? (
-        <section className="rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-5 space-y-4">
-          <div>
-            <h2 className="text-sm font-medium text-amber-100/90">{t("time.parentCategoryUnassignedHeading")}</h2>
-            <p className="mt-1 text-xs text-white/45">{t("time.parentCategoryUnassignedHint")}</p>
-          </div>
-          {unassignedProjects.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
-                {t("time.parentCategoryUnassignedProjects")} ({unassignedProjects.length})
-              </p>
-              <ul className="space-y-1.5">
-                {unassignedProjects.map((p) => (
-                  <li
-                    key={p.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-sm text-white/90">{p.name}</span>
-                    <div className="flex items-center gap-1.5">
-                      <Select
-                        value=""
-                        onValueChange={(categoryId) => {
-                          if (!categoryId) return;
-                          linkItem.mutate({
-                            type: "project",
-                            id: p.id,
-                            timeParentCategoryId: categoryId,
-                          });
-                        }}
-                      >
-                        <SelectTrigger className="h-8 w-44 border-white/10 bg-white/5 text-xs text-white">
-                          <SelectValue placeholder={t("time.parentCategorySelectPlaceholder")} />
-                        </SelectTrigger>
-                        <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                          {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id}>
-                              {cat.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0 text-white/35 hover:text-red-400"
-                        onClick={() => {
-                          setDeleteProjectId(p.id);
-                          setReassignToProjectId("");
-                        }}
-                        aria-label={t("time.catalogDeleteConfirm")}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          {unassignedEvents.length > 0 ? (
-            <ul className="space-y-1.5">
-              {unassignedEvents.map((e) => (
-                <li
-                  key={e.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2"
-                >
-                  <Link to={`/events/${e.id}`} className="min-w-0 flex-1 truncate text-sm text-white/90 hover:text-white">
-                    {e.title}
-                  </Link>
-                  <Select
-                    value=""
-                    onValueChange={(categoryId) => {
-                      if (!categoryId) return;
-                      linkItem.mutate({
-                        type: "event",
-                        id: e.id,
-                        timeParentCategoryId: categoryId,
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="h-8 w-44 border-white/10 bg-white/5 text-xs text-white">
-                      <SelectValue placeholder={t("time.parentCategorySelectPlaceholder")} />
-                    </SelectTrigger>
-                    <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {unassignedTours.length > 0 ? (
-            <ul className="space-y-1.5">
-              {unassignedTours.map((tour) => (
-                <li
-                  key={tour.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2"
-                >
-                  <Link to={`/tours/${tour.id}`} className="min-w-0 flex-1 truncate text-sm text-white/90 hover:text-white">
-                    {tour.name}
-                  </Link>
-                  <Select
-                    value=""
-                    onValueChange={(categoryId) => {
-                      if (!categoryId) return;
-                      linkItem.mutate({
-                        type: "tour",
-                        id: tour.id,
-                        timeParentCategoryId: categoryId,
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="h-8 w-44 border-white/10 bg-white/5 text-xs text-white">
-                      <SelectValue placeholder={t("time.parentCategorySelectPlaceholder")} />
-                    </SelectTrigger>
-                    <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-      ) : null}
-
       {deleteProjectId ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-white/15 bg-[#16161f] p-5 shadow-xl space-y-4">
+          <div className="w-full max-w-md space-y-4 rounded-xl border border-white/15 bg-[#16161f] p-5 shadow-xl">
             <div>
-              <h2 className="text-base font-semibold text-white">{t("time.catalogDeleteProjectTitle")}</h2>
+              <h2 className="text-base font-semibold text-white">
+                {t("time.catalogDeleteProjectTitle")}
+              </h2>
               <p className="mt-1 text-sm text-white/55">{t("time.catalogDeleteProjectHint")}</p>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-xs">{t("time.catalogReassignToProject")}</Label>
+              <Label className="text-xs text-white/70">{t("time.catalogReassignToProject")}</Label>
               <Select value={reassignToProjectId} onValueChange={setReassignToProjectId}>
                 <SelectTrigger className="h-9 border-white/10 bg-white/5 text-white">
                   <SelectValue placeholder={t("time.catalogReassignPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                  {reassignTargets.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
+                  {allProjects
+                    .filter((p) => p.id !== deleteProjectId)
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -737,7 +578,7 @@ export default function TimeParentCategoryCatalog() {
               <Button
                 type="button"
                 className="bg-red-700 hover:bg-red-600"
-                disabled={!reassignToProjectId || deleteProject.isPending || reassignTargets.length === 0}
+                disabled={!reassignToProjectId || deleteProject.isPending}
                 onClick={() => {
                   if (!deleteProjectId || !reassignToProjectId) return;
                   deleteProject.mutate({

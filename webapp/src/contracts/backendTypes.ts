@@ -1201,11 +1201,19 @@ export const TimeParentCategoryCatalogTourSchema = z.object({
   timeParentCategoryId: z.string().nullable(),
 });
 
+export const TimeParentCategoryCatalogProjectSchema = TimeProjectSchema.extend({
+  entryCount: z.number().int().nonnegative(),
+  totalMinutes: z.number().nonnegative(),
+});
+
 export const TimeParentCategoryCatalogSchema = z.object({
   categories: z.array(TimeParentCategorySchema),
   events: z.array(TimeParentCategoryCatalogEventSchema),
   tours: z.array(TimeParentCategoryCatalogTourSchema),
+  /** Manual projects only (no event/tour link) — used when creating under a category. */
   standaloneProjects: z.array(TimeProjectSchema),
+  /** All non-leave projects with usage stats for the category tree. */
+  projects: z.array(TimeParentCategoryCatalogProjectSchema),
 });
 
 export const TIME_CATEGORIES = [
@@ -1220,6 +1228,30 @@ export const TIME_CATEGORIES = [
   "travel_allowance",
 ] as const;
 export type TimeCategory = (typeof TIME_CATEGORIES)[number];
+
+export const TimeProjectEntryRowSchema = z.object({
+  id: z.string(),
+  personId: z.string(),
+  personName: z.string(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+  category: z.enum(TIME_CATEGORIES),
+  note: z.string().nullable(),
+  isLocked: z.boolean(),
+  durationMinutes: z.number(),
+});
+
+export const TimeProjectEntriesResponseSchema = z.object({
+  projectId: z.string(),
+  projectName: z.string(),
+  totalCount: z.number().int(),
+  totalMinutes: z.number(),
+  entries: z.array(TimeProjectEntryRowSchema),
+});
+
+export const ReassignTimeProjectEntriesSchema = z.object({
+  toProjectId: z.string().min(1),
+});
 
 export const TimeEntrySchema = z.object({
   id: z.string(),
@@ -1912,6 +1944,8 @@ export type TimeTag = z.infer<typeof TimeTagSchema>;
 export type TimeProject = z.infer<typeof TimeProjectSchema>;
 export type TimeParentCategory = z.infer<typeof TimeParentCategorySchema>;
 export type TimeParentCategoryCatalog = z.infer<typeof TimeParentCategoryCatalogSchema>;
+export type TimeProjectEntriesResponse = z.infer<typeof TimeProjectEntriesResponseSchema>;
+export type TimeProjectEntryRow = z.infer<typeof TimeProjectEntryRowSchema>;
 export type TimeEntry = z.infer<typeof TimeEntrySchema>;
 export type TimeTrackingJob = z.infer<typeof TimeTrackingJobSchema>;
 export type TimeTravelClaim = z.infer<typeof TimeTravelClaimSchema>;

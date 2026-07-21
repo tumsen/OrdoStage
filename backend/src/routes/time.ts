@@ -53,6 +53,7 @@ import {
   CreateTimeProjectSchema,
   PatchTimeProjectSchema,
   DeleteTimeProjectSchema,
+  ReassignTimeProjectEntriesSchema,
   CreateTimeParentCategorySchema,
   PatchTimeParentCategorySchema,
   LinkTimeParentCategoryItemSchema,
@@ -2035,7 +2036,7 @@ timeRouter.get("/time/parent-category-catalog", async (c) => {
   await ensureDefaultParentCategories(user.organizationId);
   await syncEventShowTimeProjects(user.organizationId);
   await backfillMissingTimeProjects(user.organizationId);
-  const [categories, events, tours, standaloneProjects] = await Promise.all([
+  const [categories, events, tours, standaloneProjects, allProjects] = await Promise.all([
     prisma.timeParentCategory.findMany({
       where: { organizationId: user.organizationId },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -2059,13 +2060,52 @@ timeRouter.get("/time/parent-category-catalog", async (c) => {
       },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
+    prisma.timeProject.findMany({
+      where: {
+        organizationId: user.organizationId,
+        isArchived: false,
+        OR: [{ systemKey: null }, { systemKey: { not: { startsWith: "leave_" } } }],
+      },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
   ]);
+
+  const projectIds = allProjects.map((p) => p.id);
+  const entryRows =
+    projectIds.length === 0
+      ? []
+      : await prisma.timeEntry.findMany({
+          where: {
+            organizationId: user.organizationId,
+            timeProjectId: { in: projectIds },
+            category: { notIn: ["comp_settlement_earned", "comp_settlement_used"] },
+          },
+          select: { timeProjectId: true, startsAt: true, endsAt: true },
+        });
+  const stats = new Map<string, { entryCount: number; totalMinutes: number }>();
+  for (const row of entryRows) {
+    if (!row.timeProjectId) continue;
+    const mins = Math.max(0, (row.endsAt.getTime() - row.startsAt.getTime()) / 60_000);
+    const cur = stats.get(row.timeProjectId) ?? { entryCount: 0, totalMinutes: 0 };
+    cur.entryCount += 1;
+    cur.totalMinutes += mins;
+    stats.set(row.timeProjectId, cur);
+  }
+
   return c.json({
     data: {
       categories: categories.map(serializeParentCategory),
       events,
       tours,
       standaloneProjects: standaloneProjects.map(serializeProject),
+      projects: allProjects.map((p) => {
+        const s = stats.get(p.id) ?? { entryCount: 0, totalMinutes: 0 };
+        return {
+          ...serializeProject(p),
+          entryCount: s.entryCount,
+          totalMinutes: Math.round(s.totalMinutes),
+        };
+      }),
     },
   });
 });
@@ -2541,6 +2581,142 @@ timeRouter.get("/time/projects/:id/usage", async (c) => {
   const count = await countProjectUsages(user.organizationId, id);
   return c.json({ data: { count } });
 });
+
+timeRouter.get("/time/projects/:id/entries", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "time.manage_catalog")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const project = await prisma.timeProject.findFirst({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true, name: true },
+  });
+  if (!project) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+
+  const limitRaw = Number.parseInt(c.req.query("limit") ?? "300", 10);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 1000) : 300;
+
+  const totalCount = await prisma.timeEntry.count({
+    where: {
+      organizationId: user.organizationId,
+      timeProjectId: id,
+      category: { notIn: ["comp_settlement_earned", "comp_settlement_used"] },
+    },
+  });
+
+  const rows = await prisma.timeEntry.findMany({
+    where: {
+      organizationId: user.organizationId,
+      timeProjectId: id,
+      category: { notIn: ["comp_settlement_earned", "comp_settlement_used"] },
+    },
+    select: {
+      id: true,
+      personId: true,
+      startsAt: true,
+      endsAt: true,
+      category: true,
+      note: true,
+      isLocked: true,
+      person: { select: { name: true } },
+    },
+    orderBy: { startsAt: "desc" },
+    take: limit,
+  });
+
+  let totalMinutes = 0;
+  const entries = rows.map((row) => {
+    const durationMinutes = Math.max(
+      0,
+      Math.round((row.endsAt.getTime() - row.startsAt.getTime()) / 60_000)
+    );
+    totalMinutes += durationMinutes;
+    return {
+      id: row.id,
+      personId: row.personId,
+      personName: row.person.name,
+      startsAt: iso(row.startsAt),
+      endsAt: iso(row.endsAt),
+      category: row.category as TimeCategory,
+      note: row.note,
+      isLocked: row.isLocked,
+      durationMinutes,
+    };
+  });
+
+  // If truncated, still report full total minutes via aggregate query
+  if (totalCount > rows.length) {
+    const allForSum = await prisma.timeEntry.findMany({
+      where: {
+        organizationId: user.organizationId,
+        timeProjectId: id,
+        category: { notIn: ["comp_settlement_earned", "comp_settlement_used"] },
+      },
+      select: { startsAt: true, endsAt: true },
+    });
+    totalMinutes = allForSum.reduce(
+      (s, r) => s + Math.max(0, (r.endsAt.getTime() - r.startsAt.getTime()) / 60_000),
+      0
+    );
+  }
+
+  return c.json({
+    data: {
+      projectId: project.id,
+      projectName: project.name,
+      totalCount,
+      totalMinutes: Math.round(totalMinutes),
+      entries,
+    },
+  });
+});
+
+timeRouter.post(
+  "/time/projects/:id/reassign-entries",
+  zValidator("json", ReassignTimeProjectEntriesSchema),
+  async (c) => {
+    const user = c.get("user");
+    if (!user?.organizationId) {
+      return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+    }
+    if (!canAction(c, "time.manage_catalog")) {
+      return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+    }
+    const id = c.req.param("id");
+    const body = c.req.valid("json");
+    if (body.toProjectId === id) {
+      return c.json(
+        { error: { message: "Choose a different target project.", code: "BAD_REQUEST" } },
+        400
+      );
+    }
+    try {
+      const moved = await reassignProjectReferences({
+        organizationId: user.organizationId,
+        fromProjectId: id,
+        toProjectId: body.toProjectId,
+      });
+      return c.json({
+        data: {
+          ok: true,
+          reassignedEntries: moved.entries,
+          reassignedTravelClaims: moved.travelClaims,
+          reassignedMileageClaims: moved.mileageClaims,
+        },
+      });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      if (code === "TARGET_NOT_FOUND" || code === "SOURCE_NOT_FOUND") {
+        return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
+      }
+      throw err;
+    }
+  }
+);
 
 timeRouter.get("/time/jobs", async (c) => {
   const user = c.get("user");
