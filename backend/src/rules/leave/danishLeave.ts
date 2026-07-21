@@ -76,6 +76,14 @@ export function resolveVacationYear(
   return { key, start, end };
 }
 
+/** Next ferieår after `year` (e.g. 2025-2026 → 2026-2027). */
+export function resolveNextVacationYear(
+  year: VacationYear,
+  policy: Pick<OrganizationLeavePolicyData, "vacationYearStartMonth" | "vacationYearStartDay">
+): VacationYear {
+  return resolveVacationYear(new Date(year.end.getTime() + 1), policy);
+}
+
 export function resolveLeaveNorms(
   policy: OrganizationLeavePolicyData,
   profile: PersonLeaveProfileData | null,

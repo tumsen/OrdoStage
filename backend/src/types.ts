@@ -1373,6 +1373,14 @@ export const PatchPersonLeaveProfileSchema = z.object({
   sickLeaveNote: z.string().nullable().optional(),
 });
 
+export const LeaveBalanceNextYearSchema = z.object({
+  vacationYearKey: z.string(),
+  vacationEarnedDays: z.number(),
+  vacationUsedDays: z.number(),
+  vacationRemainingDays: z.number(),
+  extraVacationRemainingDays: z.number(),
+});
+
 export const LeaveBalanceSummarySchema = z.object({
   vacationYearKey: z.string(),
   vacationEarnedDays: z.number(),
@@ -1387,6 +1395,8 @@ export const LeaveBalanceSummarySchema = z.object({
   sickDays: z.number(),
   /** Net afspadsering change in the requested from/to range (earned − used). */
   compTimePeriodDeltaMinutes: z.number().optional(),
+  /** Next ferieår vacation overview (earned/used/remaining as of today). */
+  nextVacationYear: LeaveBalanceNextYearSchema.optional(),
 });
 
 export const CreateLeaveAdjustmentSchema = z.object({

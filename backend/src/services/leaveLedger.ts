@@ -5,6 +5,7 @@ import {
   categoryToLeaveBalanceType,
   minutesToVacationDays,
   resolveLeaveNorms,
+  resolveNextVacationYear,
   resolveVacationYear,
   summarizeLeaveBalances,
 } from "../rules/leave/danishLeave";
@@ -13,6 +14,7 @@ import type {
   LeaveBalanceType,
   OrganizationLeavePolicyData,
   PersonLeaveProfileData,
+  VacationYear,
 } from "../rules/leave/types";
 
 export const DEFAULT_LEAVE_POLICY: OrganizationLeavePolicyData = {
@@ -145,7 +147,8 @@ export async function postLeaveTransaction(input: {
 export async function syncVacationEarnedForPerson(
   organizationId: string,
   personId: string,
-  asOf: Date = new Date()
+  asOf: Date = new Date(),
+  forcedVacationYear?: VacationYear
 ) {
   const policyRow = await ensureOrgLeavePolicy(organizationId);
   const policy = mapOrgLeavePolicy(policyRow);
@@ -156,7 +159,7 @@ export async function syncVacationEarnedForPerson(
   });
   if (!person) return;
   const norms = resolveLeaveNorms(policy, mapPersonLeaveProfile(profileRow), person);
-  const vacationYear = resolveVacationYear(asOf, policy);
+  const vacationYear = forcedVacationYear ?? resolveVacationYear(asOf, policy);
   const earned = accrueVacationEarnedDays(
     norms,
     vacationYear,
@@ -385,7 +388,8 @@ export async function applyOpeningBalances(input: {
 export async function getLeaveBalanceSummary(
   organizationId: string,
   personId: string,
-  asOf: Date = new Date()
+  asOf: Date = new Date(),
+  forcedVacationYear?: VacationYear
 ): Promise<LeaveBalanceSummary> {
   const policyRow = await ensureOrgLeavePolicy(organizationId);
   const policy = mapOrgLeavePolicy(policyRow);
@@ -395,8 +399,8 @@ export async function getLeaveBalanceSummary(
     select: { weeklyContractHours: true, vacationDaysPerYear: true },
   });
   const norms = resolveLeaveNorms(policy, mapPersonLeaveProfile(profileRow), person ?? undefined);
-  const vacationYear = resolveVacationYear(asOf, policy);
-  await syncVacationEarnedForPerson(organizationId, personId, asOf);
+  const vacationYear = forcedVacationYear ?? resolveVacationYear(asOf, policy);
+  await syncVacationEarnedForPerson(organizationId, personId, asOf, vacationYear);
 
   const rows = await prisma.leaveBalance.findMany({
     where: { personId, vacationYearKey: vacationYear.key },
@@ -411,6 +415,24 @@ export async function getLeaveBalanceSummary(
     getClientWallClockZone()
   );
   return summarizeLeaveBalances(vacationYear.key, norms, earned, map);
+}
+
+/** Current ferieår + next ferieår vacation overview (as of today). */
+export async function getLeaveBalanceOverview(
+  organizationId: string,
+  personId: string,
+  asOf: Date = new Date()
+): Promise<{
+  current: LeaveBalanceSummary;
+  next: LeaveBalanceSummary;
+}> {
+  const policyRow = await ensureOrgLeavePolicy(organizationId);
+  const policy = mapOrgLeavePolicy(policyRow);
+  const currentYear = resolveVacationYear(asOf, policy);
+  const nextYear = resolveNextVacationYear(currentYear, policy);
+  const current = await getLeaveBalanceSummary(organizationId, personId, asOf, currentYear);
+  const next = await getLeaveBalanceSummary(organizationId, personId, asOf, nextYear);
+  return { current, next };
 }
 
 /**

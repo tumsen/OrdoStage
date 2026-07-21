@@ -2176,19 +2176,21 @@ export default function TimeTracking() {
               <>
                 <span className="text-white/25 hidden sm:inline">·</span>
                 <span className="text-white/40 font-medium">{t("time.leaveBalancesTitle")}</span>
-                <span>
-                  {t("time.leaveVacationRemaining")}:{" "}
+                <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                  <span className="text-white/45">
+                    {t("time.leaveVacationYearCurrent", { year: leaveBalances.vacationYearKey })}:
+                  </span>
                   <span
                     className={cn(
                       "tabular-nums font-medium",
                       signedBalanceClass(leaveBalances.vacationRemainingDays)
                     )}
+                    title={`${t("time.leaveVacationEarned")}: ${leaveBalances.vacationEarnedDays} · ${t("time.leaveVacationUsed")}: ${leaveBalances.vacationUsedDays}`}
                   >
                     {formatSignedDays(leaveBalances.vacationRemainingDays)}
                   </span>
-                </span>
-                <span>
-                  {t("time.leaveExtraRemaining")}:{" "}
+                  <span className="text-white/25">·</span>
+                  <span className="text-white/45">{t("time.leaveExtraRemaining")}:</span>
                   <span
                     className={cn(
                       "tabular-nums font-medium",
@@ -2198,6 +2200,37 @@ export default function TimeTracking() {
                     {formatSignedDays(leaveBalances.extraVacationRemainingDays)}
                   </span>
                 </span>
+                {leaveBalances.nextVacationYear ? (
+                  <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                    <span className="text-white/45">
+                      {t("time.leaveVacationYearNext", {
+                        year: leaveBalances.nextVacationYear.vacationYearKey,
+                      })}
+                      :
+                    </span>
+                    <span
+                      className={cn(
+                        "tabular-nums font-medium",
+                        signedBalanceClass(leaveBalances.nextVacationYear.vacationRemainingDays)
+                      )}
+                      title={`${t("time.leaveVacationEarned")}: ${leaveBalances.nextVacationYear.vacationEarnedDays} · ${t("time.leaveVacationUsed")}: ${leaveBalances.nextVacationYear.vacationUsedDays}`}
+                    >
+                      {formatSignedDays(leaveBalances.nextVacationYear.vacationRemainingDays)}
+                    </span>
+                    <span className="text-white/25">·</span>
+                    <span className="text-white/45">{t("time.leaveExtraRemaining")}:</span>
+                    <span
+                      className={cn(
+                        "tabular-nums font-medium",
+                        signedBalanceClass(
+                          leaveBalances.nextVacationYear.extraVacationRemainingDays
+                        )
+                      )}
+                    >
+                      {formatSignedDays(leaveBalances.nextVacationYear.extraVacationRemainingDays)}
+                    </span>
+                  </span>
+                ) : null}
                 <span className="whitespace-nowrap">
                   {t("time.leaveCompRemaining")}:{" "}
                   <span
@@ -2220,7 +2253,6 @@ export default function TimeTracking() {
                     {formatSignedMinutes(leaveBalances.compTimePeriodDeltaMinutes ?? 0)}
                   </span>
                 </span>
-                <span className="text-white/35">({leaveBalances.vacationYearKey})</span>
                 {balancePersonId ? (
                   <span className="ml-auto">
                     <LeaveLedgerMenu
@@ -2361,7 +2393,12 @@ export default function TimeTracking() {
               {mobileScheduleDay ? (
                 <div
                   ref={mobileDayHeaderRef}
-                  className="shrink-0 border-b border-white/10 bg-white/[0.07] px-1 py-1.5"
+                  className={cn(
+                    "shrink-0 border-b border-white/10 px-1 py-1.5",
+                    isLocalCalendarToday(mobileScheduleDay)
+                      ? CALENDAR_TODAY_HEADER_CLASS
+                      : "bg-white/[0.07]"
+                  )}
                 >
                   <div className="flex items-center gap-0.5">
                     <Button
@@ -2479,9 +2516,11 @@ export default function TimeTracking() {
                             WEEK_GRID_HEADER_CLASS,
                             "min-w-0 text-xs text-white/70",
                             gridIdx > 0 && "border-l border-white/10",
-                            col?.bg,
-                            col ? `border-b ${col.border}` : "border-b border-white/10",
-                            isToday && !col && CALENDAR_TODAY_HEADER_CLASS,
+                            !isToday && col?.bg,
+                            !isToday && col
+                              ? `border-b ${col.border}`
+                              : "border-b border-white/10",
+                            isToday && CALENDAR_TODAY_HEADER_CLASS,
                             copySourceEntry && canEditVisiblePeriod && "cursor-copy hover:bg-white/[0.04]"
                           )}
                           onClick={() => {
@@ -2687,7 +2726,7 @@ export default function TimeTracking() {
                   <div
                     className={cn(
                       "relative box-border",
-                      isToday && !col && CALENDAR_TODAY_COLUMN_CLASS
+                      isToday && CALENDAR_TODAY_COLUMN_CLASS
                     )}
                     style={{ height: effectiveColumnFrameHeightPx }}
                   >
@@ -2699,8 +2738,8 @@ export default function TimeTracking() {
                     className={cn(
                       "absolute inset-x-0 touch-none select-none",
                       gridIdx > 0 && "border-l border-white/10",
-                      col?.bg,
-                      isToday && !col && CALENDAR_TODAY_COLUMN_CLASS
+                      !isToday && col?.bg,
+                      isToday && CALENDAR_TODAY_COLUMN_CLASS
                     )}
                     style={{
                       top: effectiveTopPad,

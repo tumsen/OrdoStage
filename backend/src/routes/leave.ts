@@ -17,6 +17,7 @@ import {
   ensureOrgLeavePolicy,
   ensurePersonLeaveProfile,
   getLeaveBalanceSummary,
+  getLeaveBalanceOverview,
   mapOrgLeavePolicy,
   mapPersonLeaveProfile,
   postLeaveTransaction,
@@ -268,7 +269,8 @@ leaveRouter.get("/time/leave-balances/:personId", async (c) => {
   if (!allowed) {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
-  const leave = await getLeaveBalanceSummary(user.organizationId, personId);
+  const overview = await getLeaveBalanceOverview(user.organizationId, personId);
+  const leave = overview.current;
   const from = c.req.query("from");
   const to = c.req.query("to");
   if (from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
@@ -287,11 +289,29 @@ leaveRouter.get("/time/leave-balances/:personId", async (c) => {
     return c.json({
       data: {
         ...leave,
+        nextVacationYear: {
+          vacationYearKey: overview.next.vacationYearKey,
+          vacationEarnedDays: overview.next.vacationEarnedDays,
+          vacationUsedDays: overview.next.vacationUsedDays,
+          vacationRemainingDays: overview.next.vacationRemainingDays,
+          extraVacationRemainingDays: overview.next.extraVacationRemainingDays,
+        },
         compTimePeriodDeltaMinutes,
       },
     });
   }
-  return c.json({ data: leave });
+  return c.json({
+    data: {
+      ...leave,
+      nextVacationYear: {
+        vacationYearKey: overview.next.vacationYearKey,
+        vacationEarnedDays: overview.next.vacationEarnedDays,
+        vacationUsedDays: overview.next.vacationUsedDays,
+        vacationRemainingDays: overview.next.vacationRemainingDays,
+        extraVacationRemainingDays: overview.next.extraVacationRemainingDays,
+      },
+    },
+  });
 });
 
 leaveRouter.post(
