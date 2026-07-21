@@ -130,6 +130,7 @@ export default function TimeParentCategoryCatalog() {
   const [expandedEntryProjectIds, setExpandedEntryProjectIds] = useState<Set<string>>(
     () => new Set()
   );
+  const [showDetailEntries, setShowDetailEntries] = useState(true);
 
   const toggleProjectEntries = (projectId: string) => {
     setExpandedEntryProjectIds((prev) => {
@@ -139,6 +140,10 @@ export default function TimeParentCategoryCatalog() {
       return next;
     });
   };
+
+  useEffect(() => {
+    setShowDetailEntries(true);
+  }, [selectedProjectId]);
 
   const { data: catalog, isLoading } = useQuery({
     queryKey: ["time-parent-category-catalog"],
@@ -453,7 +458,6 @@ export default function TimeParentCategoryCatalog() {
 
   const renderProjectRow = (p: CatalogProject) => {
     const isSelected = selectedProjectId === p.id;
-    const entriesExpanded = expandedEntryProjectIds.has(p.id);
     const kindLabel = p.eventId
       ? t("time.parentCategoryAutoEvent")
       : p.tourId
@@ -464,55 +468,29 @@ export default function TimeParentCategoryCatalog() {
             ? t("time.catalogLeaveProjectKind")
             : t("time.parentCategoryStandaloneProject");
     return (
-      <li key={p.id} className="space-y-0">
-        <div
+      <li key={p.id}>
+        <button
+          type="button"
+          onClick={() => setSelectedProjectId(p.id)}
           className={cn(
-            "rounded-md border transition-colors",
+            "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
             isSelected
               ? "border-indigo-400/40 bg-indigo-500/15 text-white"
-              : "border-white/10 bg-white/[0.03] text-white/85"
+              : "border-white/10 bg-white/[0.03] text-white/85 hover:bg-white/[0.06]"
           )}
         >
-          <div className="flex items-start gap-1 px-1.5 py-1.5">
-            <button
-              type="button"
-              onClick={() => setSelectedProjectId(p.id)}
-              className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-1 py-0.5 text-left hover:bg-white/[0.04]"
-            >
-              <span
-                className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white/15"
-                style={{ backgroundColor: displayHex(p.color, p.id) }}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{p.name}</span>
-                <span className="mt-0.5 block text-[10px] text-white/45">
-                  {kindLabel} · {p.entryCount} {t("time.catalogEntryCount")} ·{" "}
-                  {formatMinutes(p.totalMinutes)}
-                </span>
-              </span>
-            </button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 shrink-0 gap-0.5 px-1.5 text-[10px] text-white/50 hover:bg-white/10 hover:text-white"
-              onClick={() => toggleProjectEntries(p.id)}
-              title={
-                entriesExpanded ? t("time.catalogHideEntries") : t("time.catalogShowEntries")
-              }
-            >
-              {entriesExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              <span className="hidden xl:inline">
-                {entriesExpanded ? t("time.catalogHideEntries") : t("time.catalogShowEntries")}
-              </span>
-            </Button>
-          </div>
-          {entriesExpanded ? (
-            <div className="px-2.5 pb-2">
-              <ProjectEntriesExpand projectId={p.id} enabled={entriesExpanded} />
-            </div>
-          ) : null}
-        </div>
+          <span
+            className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white/15"
+            style={{ backgroundColor: displayHex(p.color, p.id) }}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">{p.name}</span>
+            <span className="mt-0.5 block text-[10px] text-white/45">
+              {kindLabel} · {p.entryCount} {t("time.catalogEntryCount")} ·{" "}
+              {formatMinutes(p.totalMinutes)}
+            </span>
+          </span>
+        </button>
       </li>
     );
   };
@@ -791,6 +769,22 @@ export default function TimeParentCategoryCatalog() {
                       variant="outline"
                       size="sm"
                       className="border-white/15 text-white"
+                      onClick={() => setShowDetailEntries((v) => !v)}
+                    >
+                      {showDetailEntries ? (
+                        <ChevronDown size={14} className="mr-1.5" />
+                      ) : (
+                        <ChevronRight size={14} className="mr-1.5" />
+                      )}
+                      {showDetailEntries
+                        ? t("time.catalogHideEntries")
+                        : t("time.catalogShowEntries")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-white/15 text-white"
                       onClick={() => {
                         setDeleteProjectId(selectedProject.id);
                         setReassignToProjectId("");
@@ -907,46 +901,48 @@ export default function TimeParentCategoryCatalog() {
                   </div>
                 ) : null}
 
-                <div className="min-h-0 flex-1 overflow-auto">
-                  {entriesLoading ? (
-                    <p className="text-sm text-white/45">{t("time.parentCategoryLoading")}</p>
-                  ) : !projectEntries || projectEntries.entries.length === 0 ? (
-                    <p className="text-sm text-white/35">{t("time.catalogNoEntries")}</p>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {projectEntries.entries.map((e) => (
-                        <li
-                          key={e.id}
-                          className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2"
-                        >
-                          <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <p className="text-sm text-white/90">{e.personName}</p>
-                            <p className="tabular-nums text-[11px] text-white/50">
-                              {formatMinutes(e.durationMinutes)}
-                              {e.isLocked ? ` · ${t("time.lockedShort")}` : ""}
+                {showDetailEntries ? (
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    {entriesLoading ? (
+                      <p className="text-sm text-white/45">{t("time.parentCategoryLoading")}</p>
+                    ) : !projectEntries || projectEntries.entries.length === 0 ? (
+                      <p className="text-sm text-white/35">{t("time.catalogNoEntries")}</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {projectEntries.entries.map((e) => (
+                          <li
+                            key={e.id}
+                            className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2"
+                          >
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                              <p className="text-sm text-white/90">{e.personName}</p>
+                              <p className="tabular-nums text-[11px] text-white/50">
+                                {formatMinutes(e.durationMinutes)}
+                                {e.isLocked ? ` · ${t("time.lockedShort")}` : ""}
+                              </p>
+                            </div>
+                            <p className="mt-0.5 text-[11px] text-white/50">
+                              {format(parseISO(e.startsAt), "d MMM yyyy HH:mm")} –{" "}
+                              {format(parseISO(e.endsAt), "HH:mm")} ·{" "}
+                              {t(timeCategoryMessageId(e.category as TimeCategory) as never)}
                             </p>
-                          </div>
-                          <p className="mt-0.5 text-[11px] text-white/50">
-                            {format(parseISO(e.startsAt), "d MMM yyyy HH:mm")} –{" "}
-                            {format(parseISO(e.endsAt), "HH:mm")} ·{" "}
-                            {t(timeCategoryMessageId(e.category as TimeCategory) as never)}
-                          </p>
-                          {e.note ? (
-                            <p className="mt-0.5 truncate text-[11px] text-white/40">{e.note}</p>
-                          ) : null}
-                        </li>
-                      ))}
-                      {projectEntries.totalCount > projectEntries.entries.length ? (
-                        <li className="px-1 py-2 text-[11px] text-white/40">
-                          {t("time.catalogEntriesTruncated", {
-                            shown: projectEntries.entries.length,
-                            total: projectEntries.totalCount,
-                          })}
-                        </li>
-                      ) : null}
-                    </ul>
-                  )}
-                </div>
+                            {e.note ? (
+                              <p className="mt-0.5 truncate text-[11px] text-white/40">{e.note}</p>
+                            ) : null}
+                          </li>
+                        ))}
+                        {projectEntries.totalCount > projectEntries.entries.length ? (
+                          <li className="px-1 py-2 text-[11px] text-white/40">
+                            {t("time.catalogEntriesTruncated", {
+                              shown: projectEntries.entries.length,
+                              total: projectEntries.totalCount,
+                            })}
+                          </li>
+                        ) : null}
+                      </ul>
+                    )}
+                  </div>
+                ) : null}
               </div>
             )}
           </section>
