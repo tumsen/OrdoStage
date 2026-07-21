@@ -2501,6 +2501,22 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
       ...(body.color !== undefined ? { color: body.color } : {}),
     },
   });
+  // Keep linked event/tour title in sync so auto-project sync does not overwrite the rename.
+  if (body.name !== undefined) {
+    const trimmed = body.name.trim();
+    if (existing.eventId) {
+      await prisma.event.update({
+        where: { id: existing.eventId },
+        data: { title: trimmed },
+      });
+    }
+    if (existing.tourId) {
+      await prisma.tour.update({
+        where: { id: existing.tourId },
+        data: { name: trimmed },
+      });
+    }
+  }
   return c.json({ data: serializeProject(row) });
 });
 

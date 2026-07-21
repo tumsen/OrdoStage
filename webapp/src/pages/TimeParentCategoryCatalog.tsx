@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { ArrowLeft, ArrowRightLeft, FolderKanban, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 import { api } from "@/lib/api";
@@ -52,6 +52,10 @@ export default function TimeParentCategoryCatalog() {
   const [reassignToProjectId, setReassignToProjectId] = useState("");
   const [moveToProjectId, setMoveToProjectId] = useState("");
   const [moveToCategoryId, setMoveToCategoryId] = useState("");
+  const [renameTarget, setRenameTarget] = useState<
+    null | { kind: "category" | "project"; id: string; name: string }
+  >(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const { data: catalog, isLoading } = useQuery({
     queryKey: ["time-parent-category-catalog"],
@@ -135,6 +139,47 @@ export default function TimeParentCategoryCatalog() {
     },
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
   });
+
+  const renameCategory = useMutation({
+    mutationFn: (vars: { id: string; name: string }) =>
+      api.patch<TimeParentCategory>(`/api/time/parent-categories/${vars.id}`, {
+        name: vars.name,
+      }),
+    onSuccess: () => {
+      invalidate();
+      setRenameTarget(null);
+      setRenameValue("");
+      toast({ title: t("time.catalogCategoryRenamed") });
+    },
+    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
+  });
+
+  const renameProject = useMutation({
+    mutationFn: (vars: { id: string; name: string }) =>
+      api.patch<TimeProject>(`/api/time/projects/${vars.id}`, { name: vars.name }),
+    onSuccess: () => {
+      invalidate();
+      setRenameTarget(null);
+      setRenameValue("");
+      toast({ title: t("time.catalogProjectRenamed") });
+    },
+    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
+  });
+
+  const openRename = (kind: "category" | "project", id: string, name: string) => {
+    setRenameTarget({ kind, id, name });
+    setRenameValue(name);
+  };
+
+  const submitRename = () => {
+    const next = renameValue.trim();
+    if (!renameTarget || !next || next === renameTarget.name) return;
+    if (renameTarget.kind === "category") {
+      renameCategory.mutate({ id: renameTarget.id, name: next });
+      return;
+    }
+    renameProject.mutate({ id: renameTarget.id, name: next });
+  };
 
   const linkProject = useMutation({
     mutationFn: (vars: {
@@ -314,8 +359,9 @@ export default function TimeParentCategoryCatalog() {
             <ul className="mt-3 space-y-1">
               {categories.map((cat) => {
                 const count = allProjects.filter((p) => p.timeParentCategoryId === cat.id).length;
+                const isActive = activeCategoryId === cat.id && selectedCategoryId !== "__unassigned__";
                 return (
-                  <li key={cat.id}>
+                  <li key={cat.id} className="group flex items-center gap-0.5">
                     <button
                       type="button"
                       onClick={() => {
@@ -323,8 +369,8 @@ export default function TimeParentCategoryCatalog() {
                         setSelectedProjectId(null);
                       }}
                       className={cn(
-                        "flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left text-sm transition-colors",
-                        activeCategoryId === cat.id
+                        "flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-2 text-left text-sm transition-colors",
+                        isActive
                           ? "border-white/25 bg-white/[0.08] text-white"
                           : "border-transparent text-white/70 hover:bg-white/[0.04]"
                       )}
@@ -336,6 +382,16 @@ export default function TimeParentCategoryCatalog() {
                       <span className="min-w-0 flex-1 truncate">{cat.name}</span>
                       <span className="shrink-0 tabular-nums text-[10px] text-white/40">{count}</span>
                     </button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-white/40 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100 focus-visible:opacity-100"
+                      title={t("time.catalogRenameCategory")}
+                      onClick={() => openRename("category", cat.id, cat.name)}
+                    >
+                      <Pencil size={14} />
+                    </Button>
                   </li>
                 );
               })}
@@ -393,8 +449,24 @@ export default function TimeParentCategoryCatalog() {
               </>
             ) : selectedCategory ? (
               <>
-                <h2 className="text-sm font-medium text-white">{selectedCategory.name}</h2>
-                <p className="mt-1 text-xs text-white/45">{t("time.parentCategoryProjectsHint")}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-medium text-white">{selectedCategory.name}</h2>
+                    <p className="mt-1 text-xs text-white/45">{t("time.parentCategoryProjectsHint")}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-white/45 hover:bg-white/10 hover:text-white"
+                    title={t("time.catalogRenameCategory")}
+                    onClick={() =>
+                      openRename("category", selectedCategory.id, selectedCategory.name)
+                    }
+                  >
+                    <Pencil size={14} />
+                  </Button>
+                </div>
                 <div className="mt-3 flex gap-2">
                   <Input
                     value={newProjectName}
@@ -469,9 +541,25 @@ export default function TimeParentCategoryCatalog() {
               <div className="flex h-full flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="truncate text-base font-semibold text-white">
-                      {selectedProject.name}
-                    </h2>
+                    <div className="flex items-center gap-1.5">
+                      <h2 className="truncate text-base font-semibold text-white">
+                        {selectedProject.name}
+                      </h2>
+                      {!selectedProject.systemKey?.startsWith("leave_") ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-white/45 hover:bg-white/10 hover:text-white"
+                          title={t("time.catalogRenameProject")}
+                          onClick={() =>
+                            openRename("project", selectedProject.id, selectedProject.name)
+                          }
+                        >
+                          <Pencil size={14} />
+                        </Button>
+                      ) : null}
+                    </div>
                     <p className="mt-1 text-xs text-white/45">
                       {projectEntries
                         ? `${projectEntries.totalCount} ${t("time.catalogEntryCount")} · ${formatMinutes(projectEntries.totalMinutes)}`
@@ -640,6 +728,61 @@ export default function TimeParentCategoryCatalog() {
           </section>
         </div>
       )}
+
+      {renameTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md space-y-4 rounded-xl border border-white/15 bg-[#16161f] p-5 shadow-xl">
+            <div>
+              <h2 className="text-base font-semibold text-white">
+                {renameTarget.kind === "category"
+                  ? t("time.catalogRenameCategory")
+                  : t("time.catalogRenameProject")}
+              </h2>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-white/70">{t("time.catalogRenameNameLabel")}</Label>
+              <Input
+                autoFocus
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitRename();
+                  }
+                }}
+                className="h-9 border-white/10 bg-white/5 text-white"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-white/15 text-white"
+                onClick={() => {
+                  setRenameTarget(null);
+                  setRenameValue("");
+                }}
+              >
+                {t("time.cancelDelete")}
+              </Button>
+              <Button
+                type="button"
+                className="bg-indigo-700 hover:bg-indigo-600"
+                disabled={
+                  !renameValue.trim() ||
+                  renameValue.trim() === renameTarget.name ||
+                  renameCategory.isPending ||
+                  renameProject.isPending
+                }
+                onClick={submitRename}
+              >
+                {t("time.catalogRenameSave")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {deleteProjectId ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
