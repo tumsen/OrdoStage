@@ -130,7 +130,7 @@ export default function TimeParentCategoryCatalog() {
   const [expandedEntryProjectIds, setExpandedEntryProjectIds] = useState<Set<string>>(
     () => new Set()
   );
-  const [showDetailEntries, setShowDetailEntries] = useState(true);
+  const [showDetailEntries, setShowDetailEntries] = useState(false);
 
   const toggleProjectEntries = (projectId: string) => {
     setExpandedEntryProjectIds((prev) => {
@@ -142,7 +142,7 @@ export default function TimeParentCategoryCatalog() {
   };
 
   useEffect(() => {
-    setShowDetailEntries(true);
+    setShowDetailEntries(false);
   }, [selectedProjectId]);
 
   const { data: catalog, isLoading } = useQuery({
@@ -763,37 +763,34 @@ export default function TimeParentCategoryCatalog() {
                         : `${selectedProject.entryCount} ${t("time.catalogEntryCount")}`}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-1">
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="border-white/15 text-white"
+                      className="h-8 gap-1 px-2 text-xs text-white/55 hover:bg-white/10 hover:text-white"
                       onClick={() => setShowDetailEntries((v) => !v)}
                     >
-                      {showDetailEntries ? (
-                        <ChevronDown size={14} className="mr-1.5" />
-                      ) : (
-                        <ChevronRight size={14} className="mr-1.5" />
-                      )}
+                      {showDetailEntries ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       {showDetailEntries
                         ? t("time.catalogHideEntries")
                         : t("time.catalogShowEntries")}
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-white/15 text-white"
-                      onClick={() => {
-                        setDeleteProjectId(selectedProject.id);
-                        setReassignToProjectId("");
-                      }}
-                      disabled={Boolean(selectedProject.systemKey?.startsWith("leave_"))}
-                    >
-                      <Trash2 size={14} className="mr-1.5" />
-                      {t("time.catalogDeleteProjectTitle")}
-                    </Button>
+                    {!selectedProject.systemKey?.startsWith("leave_") ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-white/45 hover:bg-white/10 hover:text-white"
+                        title={t("time.catalogDeleteProjectTitle")}
+                        onClick={() => {
+                          setDeleteProjectId(selectedProject.id);
+                          setReassignToProjectId("");
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -1108,7 +1105,7 @@ export default function TimeParentCategoryCatalog() {
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-white/45 hover:bg-red-500/15 hover:text-red-200"
+                                  className="h-8 w-8 text-white/45 hover:bg-white/10 hover:text-white"
                                   title={t("time.catalogDeleteProjectTitle")}
                                   onClick={() => {
                                     setDeleteProjectId(p.id);
