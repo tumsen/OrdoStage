@@ -147,6 +147,8 @@ const en = {
     catalogAllProjectsHint:
       "Sorted by parent category. Change category or move all hours to another project.",
     catalogQuickMoveHoursPlaceholder: "Move hours to…",
+    catalogShowEntries: "Show entries",
+    catalogHideEntries: "Hide entries",
     catalogEntryCount: "entries",
     catalogSelectProjectPrompt: "Select a project to see its time registrations.",
     catalogMoveAllEntries: "Move all registrations to another project",
@@ -976,6 +978,8 @@ const da: DeepPartial<typeof en> = {
     catalogAllProjectsHint:
       "Sorteret efter overkategori. Skift overkategori eller flyt alle timer til et andet projekt.",
     catalogQuickMoveHoursPlaceholder: "Flyt timer til…",
+    catalogShowEntries: "Vis registreringer",
+    catalogHideEntries: "Skjul registreringer",
     catalogEntryCount: "registreringer",
     catalogSelectProjectPrompt: "Vælg et projekt for at se dets tidsregistreringer.",
     catalogMoveAllEntries: "Flyt alle registreringer til et andet projekt",

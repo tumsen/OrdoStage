@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { ArrowLeft, ArrowRightLeft, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, ChevronDown, ChevronRight, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 import { api } from "@/lib/api";
@@ -44,6 +44,71 @@ function isLeaveProject(p: CatalogProject | null | undefined): boolean {
   return Boolean(p?.systemKey?.startsWith("leave_"));
 }
 
+function ProjectEntriesExpand({
+  projectId,
+  enabled,
+}: {
+  projectId: string;
+  enabled: boolean;
+}) {
+  const { t } = useI18n();
+  const { data, isLoading } = useQuery({
+    queryKey: ["time-project-entries", projectId],
+    queryFn: () =>
+      api.get<TimeProjectEntriesResponse>(
+        `/api/time/projects/${projectId}/entries?limit=400`
+      ),
+    enabled,
+  });
+
+  if (!enabled) return null;
+
+  if (isLoading) {
+    return (
+      <p className="px-1 py-2 text-[11px] text-white/45">{t("time.parentCategoryLoading")}</p>
+    );
+  }
+
+  if (!data || data.entries.length === 0) {
+    return <p className="px-1 py-2 text-[11px] text-white/35">{t("time.catalogNoEntries")}</p>;
+  }
+
+  return (
+    <ul className="mt-1 max-h-64 space-y-1 overflow-auto border-t border-white/10 pt-2">
+      {data.entries.map((e) => (
+        <li
+          key={e.id}
+          className="rounded-md border border-white/10 bg-black/20 px-2.5 py-1.5"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs text-white/90">{e.personName}</p>
+            <p className="tabular-nums text-[10px] text-white/50">
+              {formatMinutes(e.durationMinutes)}
+              {e.isLocked ? ` · ${t("time.lockedShort")}` : ""}
+            </p>
+          </div>
+          <p className="mt-0.5 text-[10px] text-white/50">
+            {format(parseISO(e.startsAt), "d MMM yyyy HH:mm")} –{" "}
+            {format(parseISO(e.endsAt), "HH:mm")} ·{" "}
+            {t(timeCategoryMessageId(e.category as TimeCategory) as never)}
+          </p>
+          {e.note ? (
+            <p className="mt-0.5 truncate text-[10px] text-white/40">{e.note}</p>
+          ) : null}
+        </li>
+      ))}
+      {data.totalCount > data.entries.length ? (
+        <li className="px-1 py-1 text-[10px] text-white/40">
+          {t("time.catalogEntriesTruncated", {
+            shown: data.entries.length,
+            total: data.totalCount,
+          })}
+        </li>
+      ) : null}
+    </ul>
+  );
+}
+
 export default function TimeParentCategoryCatalog() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
@@ -62,6 +127,18 @@ export default function TimeParentCategoryCatalog() {
     null | { kind: "category" | "project"; id: string; name: string }
   >(null);
   const [renameValue, setRenameValue] = useState("");
+  const [expandedEntryProjectIds, setExpandedEntryProjectIds] = useState<Set<string>>(
+    () => new Set()
+  );
+
+  const toggleProjectEntries = (projectId: string) => {
+    setExpandedEntryProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
 
   const { data: catalog, isLoading } = useQuery({
     queryKey: ["time-parent-category-catalog"],
@@ -376,6 +453,7 @@ export default function TimeParentCategoryCatalog() {
 
   const renderProjectRow = (p: CatalogProject) => {
     const isSelected = selectedProjectId === p.id;
+    const entriesExpanded = expandedEntryProjectIds.has(p.id);
     const kindLabel = p.eventId
       ? t("time.parentCategoryAutoEvent")
       : p.tourId
@@ -386,29 +464,55 @@ export default function TimeParentCategoryCatalog() {
             ? t("time.catalogLeaveProjectKind")
             : t("time.parentCategoryStandaloneProject");
     return (
-      <li key={p.id}>
-        <button
-          type="button"
-          onClick={() => setSelectedProjectId(p.id)}
+      <li key={p.id} className="space-y-0">
+        <div
           className={cn(
-            "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
+            "rounded-md border transition-colors",
             isSelected
               ? "border-indigo-400/40 bg-indigo-500/15 text-white"
-              : "border-white/10 bg-white/[0.03] text-white/85 hover:bg-white/[0.06]"
+              : "border-white/10 bg-white/[0.03] text-white/85"
           )}
         >
-          <span
-            className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white/15"
-            style={{ backgroundColor: displayHex(p.color, p.id) }}
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">{p.name}</span>
-            <span className="mt-0.5 block text-[10px] text-white/45">
-              {kindLabel} · {p.entryCount} {t("time.catalogEntryCount")} ·{" "}
-              {formatMinutes(p.totalMinutes)}
-            </span>
-          </span>
-        </button>
+          <div className="flex items-start gap-1 px-1.5 py-1.5">
+            <button
+              type="button"
+              onClick={() => setSelectedProjectId(p.id)}
+              className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-1 py-0.5 text-left hover:bg-white/[0.04]"
+            >
+              <span
+                className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white/15"
+                style={{ backgroundColor: displayHex(p.color, p.id) }}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{p.name}</span>
+                <span className="mt-0.5 block text-[10px] text-white/45">
+                  {kindLabel} · {p.entryCount} {t("time.catalogEntryCount")} ·{" "}
+                  {formatMinutes(p.totalMinutes)}
+                </span>
+              </span>
+            </button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 shrink-0 gap-0.5 px-1.5 text-[10px] text-white/50 hover:bg-white/10 hover:text-white"
+              onClick={() => toggleProjectEntries(p.id)}
+              title={
+                entriesExpanded ? t("time.catalogHideEntries") : t("time.catalogShowEntries")
+              }
+            >
+              {entriesExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <span className="hidden xl:inline">
+                {entriesExpanded ? t("time.catalogHideEntries") : t("time.catalogShowEntries")}
+              </span>
+            </Button>
+          </div>
+          {entriesExpanded ? (
+            <div className="px-2.5 pb-2">
+              <ProjectEntriesExpand projectId={p.id} enabled={entriesExpanded} />
+            </div>
+          ) : null}
+        </div>
       </li>
     );
   };
@@ -899,111 +1003,129 @@ export default function TimeParentCategoryCatalog() {
                   {group.projects.map((p) => {
                     const leave = isLeaveProject(p);
                     const categoryValue = p.timeParentCategoryId ?? "__none__";
+                    const entriesExpanded = expandedEntryProjectIds.has(p.id);
                     return (
                       <li
                         key={p.id}
                         className={cn(
-                          "grid gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(9rem,12rem)_minmax(9rem,12rem)_auto] sm:items-center",
+                          "rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2",
                           selectedProjectId === p.id && "border-indigo-400/35 bg-indigo-500/10"
                         )}
                       >
-                        <button
-                          type="button"
-                          className="min-w-0 text-left"
-                          onClick={() => {
-                            setSelectedProjectId(p.id);
-                            setSelectedCategoryId(p.timeParentCategoryId ?? "__unassigned__");
-                          }}
-                        >
-                          <span className="block truncate text-sm font-medium text-white">
-                            {p.name}
-                          </span>
-                          <span className="mt-0.5 block text-[10px] text-white/45">
-                            {p.entryCount} {t("time.catalogEntryCount")} ·{" "}
-                            {formatMinutes(p.totalMinutes)}
-                            {leave ? ` · ${t("time.catalogLeaveProjectKind")}` : ""}
-                          </span>
-                        </button>
-                        <Select
-                          value={categoryValue}
-                          disabled={leave || linkProject.isPending}
-                          onValueChange={(next) => assignProjectCategory(p, next)}
-                        >
-                          <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
-                            <SelectValue placeholder={t("time.catalogMoveProjectCategoryPlaceholder")} />
-                          </SelectTrigger>
-                          <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                            {workCategories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                            <SelectItem value="__none__">
-                              {t("time.parentCategoryUnassignedHeading")}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Select
-                          key={`move-hours-${p.id}-${p.entryCount}`}
-                          value=""
-                          disabled={p.entryCount === 0 || moveAllEntries.isPending}
-                          onValueChange={(toProjectId) => {
-                            if (!toProjectId) return;
-                            moveAllEntries.mutate({ fromId: p.id, toProjectId });
-                          }}
-                        >
-                          <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
-                            <SelectValue
-                              placeholder={
-                                p.entryCount === 0
-                                  ? t("time.catalogNoEntries")
-                                  : t("time.catalogQuickMoveHoursPlaceholder")
-                              }
-                            />
-                          </SelectTrigger>
-                          <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                            {allProjects
-                              .filter((target) => target.id !== p.id && !target.isArchived)
-                              .map((target) => (
-                                <SelectItem key={target.id} value={target.id}>
-                                  {isLeaveProject(target)
-                                    ? `${target.name} (${t("time.catalogLeaveProjectKind")})`
-                                    : target.name}
+                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(9rem,12rem)_minmax(9rem,12rem)_auto] sm:items-center">
+                          <button
+                            type="button"
+                            className="min-w-0 text-left"
+                            onClick={() => {
+                              setSelectedProjectId(p.id);
+                              setSelectedCategoryId(p.timeParentCategoryId ?? "__unassigned__");
+                            }}
+                          >
+                            <span className="block truncate text-sm font-medium text-white">
+                              {p.name}
+                            </span>
+                            <span className="mt-0.5 block text-[10px] text-white/45">
+                              {p.entryCount} {t("time.catalogEntryCount")} ·{" "}
+                              {formatMinutes(p.totalMinutes)}
+                              {leave ? ` · ${t("time.catalogLeaveProjectKind")}` : ""}
+                            </span>
+                          </button>
+                          <Select
+                            value={categoryValue}
+                            disabled={leave || linkProject.isPending}
+                            onValueChange={(next) => assignProjectCategory(p, next)}
+                          >
+                            <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
+                              <SelectValue placeholder={t("time.catalogMoveProjectCategoryPlaceholder")} />
+                            </SelectTrigger>
+                            <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                              {workCategories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.name}
                                 </SelectItem>
                               ))}
-                          </SelectContent>
-                        </Select>
-                        <div className="flex shrink-0 items-center justify-end gap-0.5">
-                          {!leave ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-white/45 hover:bg-white/10 hover:text-white"
-                                title={t("time.catalogRenameProject")}
-                                onClick={() => openRename("project", p.id, p.name)}
-                              >
-                                <Pencil size={14} />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-white/45 hover:bg-red-500/15 hover:text-red-200"
-                                title={t("time.catalogDeleteProjectTitle")}
-                                onClick={() => {
-                                  setDeleteProjectId(p.id);
-                                  setReassignToProjectId("");
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                            </>
-                          ) : (
-                            <span className="h-8 w-16" aria-hidden />
-                          )}
+                              <SelectItem value="__none__">
+                                {t("time.parentCategoryUnassignedHeading")}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            key={`move-hours-${p.id}-${p.entryCount}`}
+                            value=""
+                            disabled={p.entryCount === 0 || moveAllEntries.isPending}
+                            onValueChange={(toProjectId) => {
+                              if (!toProjectId) return;
+                              moveAllEntries.mutate({ fromId: p.id, toProjectId });
+                            }}
+                          >
+                            <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
+                              <SelectValue
+                                placeholder={
+                                  p.entryCount === 0
+                                    ? t("time.catalogNoEntries")
+                                    : t("time.catalogQuickMoveHoursPlaceholder")
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                              {allProjects
+                                .filter((target) => target.id !== p.id && !target.isArchived)
+                                .map((target) => (
+                                  <SelectItem key={target.id} value={target.id}>
+                                    {isLeaveProject(target)
+                                      ? `${target.name} (${t("time.catalogLeaveProjectKind")})`
+                                      : target.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 gap-1 px-2 text-xs text-white/55 hover:bg-white/10 hover:text-white"
+                              onClick={() => toggleProjectEntries(p.id)}
+                            >
+                              {entriesExpanded ? (
+                                <ChevronDown size={14} />
+                              ) : (
+                                <ChevronRight size={14} />
+                              )}
+                              {entriesExpanded
+                                ? t("time.catalogHideEntries")
+                                : t("time.catalogShowEntries")}
+                            </Button>
+                            {!leave ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-white/45 hover:bg-white/10 hover:text-white"
+                                  title={t("time.catalogRenameProject")}
+                                  onClick={() => openRename("project", p.id, p.name)}
+                                >
+                                  <Pencil size={14} />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-white/45 hover:bg-red-500/15 hover:text-red-200"
+                                  title={t("time.catalogDeleteProjectTitle")}
+                                  onClick={() => {
+                                    setDeleteProjectId(p.id);
+                                    setReassignToProjectId("");
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
                         </div>
+                        <ProjectEntriesExpand projectId={p.id} enabled={entriesExpanded} />
                       </li>
                     );
                   })}
