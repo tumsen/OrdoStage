@@ -1,4 +1,8 @@
 import { prisma } from "../prisma";
+import {
+  isLeaveParentCategoryKey,
+  LEAVE_PARENT_CATEGORY_SYSTEM_KEY,
+} from "./leaveTimeProjects";
 
 export const PRESET_PARENT_CATEGORY_KEYS = [
   "guest_play",
@@ -24,6 +28,11 @@ export function isPresetParentCategoryKey(key: string | null | undefined): boole
     typeof key === "string" &&
     (PRESET_PARENT_CATEGORY_KEYS as readonly string[]).includes(key)
   );
+}
+
+/** Preset work categories + Fravær — cannot be deleted. */
+export function isProtectedParentCategoryKey(key: string | null | undefined): boolean {
+  return isPresetParentCategoryKey(key) || isLeaveParentCategoryKey(key);
 }
 
 export async function ensureDefaultParentCategories(organizationId: string) {
@@ -66,8 +75,12 @@ export async function resolveOrgParentCategoryId(
   if (id === null || id === "") return { ok: true, value: null };
   const row = await prisma.timeParentCategory.findFirst({
     where: { id, organizationId },
-    select: { id: true },
+    select: { id: true, systemKey: true },
   });
   if (!row) return { ok: false };
+  // Do not allow linking work items into the Fravær system category via generic id.
+  if (row.systemKey === LEAVE_PARENT_CATEGORY_SYSTEM_KEY) {
+    return { ok: false };
+  }
   return { ok: true, value: id };
 }

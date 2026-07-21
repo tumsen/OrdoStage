@@ -1210,9 +1210,9 @@ export const TimeParentCategoryCatalogSchema = z.object({
   categories: z.array(TimeParentCategorySchema),
   events: z.array(TimeParentCategoryCatalogEventSchema),
   tours: z.array(TimeParentCategoryCatalogTourSchema),
-  /** Manual projects only (no event/tour link) — used when creating under a category. */
+  /** Manual projects only (no event/tour/leave link) — used when creating under a category. */
   standaloneProjects: z.array(TimeProjectSchema),
-  /** All non-leave projects with usage stats for the category tree. */
+  /** All active projects (including leave system projects) with usage stats. */
   projects: z.array(TimeParentCategoryCatalogProjectSchema),
 });
 

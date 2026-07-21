@@ -31,11 +31,17 @@ import type {
 
 type CatalogProject = TimeParentCategoryCatalog["projects"][number];
 
+const LEAVE_PARENT_SYSTEM_KEY = "absence";
+
 function formatMinutes(mins: number): string {
   const h = Math.floor(mins / 60);
   const m = Math.round(mins % 60);
   if (m === 0) return `${h}t`;
   return `${h}t ${m}m`;
+}
+
+function isLeaveProject(p: CatalogProject | null | undefined): boolean {
+  return Boolean(p?.systemKey?.startsWith("leave_"));
 }
 
 export default function TimeParentCategoryCatalog() {
@@ -202,8 +208,8 @@ export default function TimeParentCategoryCatalog() {
 
   const canMoveSelectedProject =
     Boolean(selectedProject) &&
-    !selectedProject?.systemKey?.startsWith("leave_") &&
-    categories.length > 0;
+    !isLeaveProject(selectedProject) &&
+    categories.some((c) => c.systemKey !== LEAVE_PARENT_SYSTEM_KEY);
 
   const selectedProjectCategoryChanged = Boolean(
     selectedProject &&
@@ -211,10 +217,22 @@ export default function TimeParentCategoryCatalog() {
       (selectedProject.timeParentCategoryId ?? "__none__") !== moveToCategoryId
   );
 
+  const workCategories = useMemo(
+    () => categories.filter((c) => c.systemKey !== LEAVE_PARENT_SYSTEM_KEY),
+    [categories]
+  );
+
   const moveTargets = useMemo(() => {
     const excludeId = selectedProjectId ?? deleteProjectId;
     return allProjects.filter((p) => p.id !== excludeId && !p.isArchived);
   }, [allProjects, selectedProjectId, deleteProjectId]);
+
+  const moveTargetIsLeave = Boolean(
+    moveToProjectId &&
+      allProjects.find((p) => p.id === moveToProjectId && isLeaveProject(p))
+  );
+
+  const selectedIsLeaveCategory = selectedCategory?.systemKey === LEAVE_PARENT_SYSTEM_KEY;
 
   const moveAllEntries = useMutation({
     mutationFn: (vars: { fromId: string; toProjectId: string }) =>
@@ -287,7 +305,9 @@ export default function TimeParentCategoryCatalog() {
         ? t("time.parentCategoryLinkedTour")
         : p.systemKey === "unassigned_hours"
           ? t("time.catalogUnassignedHoursProject")
-          : t("time.parentCategoryStandaloneProject");
+          : isLeaveProject(p)
+            ? t("time.catalogLeaveProjectKind")
+            : t("time.parentCategoryStandaloneProject");
     return (
       <li key={p.id}>
         <button
@@ -359,7 +379,9 @@ export default function TimeParentCategoryCatalog() {
             <ul className="mt-3 space-y-1">
               {categories.map((cat) => {
                 const count = allProjects.filter((p) => p.timeParentCategoryId === cat.id).length;
-                const isActive = activeCategoryId === cat.id && selectedCategoryId !== "__unassigned__";
+                const isLeaveParent = cat.systemKey === LEAVE_PARENT_SYSTEM_KEY;
+                const isActive =
+                  activeCategoryId === cat.id && selectedCategoryId !== "__unassigned__";
                 return (
                   <li key={cat.id} className="group flex items-center gap-0.5">
                     <button
@@ -371,8 +393,12 @@ export default function TimeParentCategoryCatalog() {
                       className={cn(
                         "flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-2 text-left text-sm transition-colors",
                         isActive
-                          ? "border-white/25 bg-white/[0.08] text-white"
-                          : "border-transparent text-white/70 hover:bg-white/[0.04]"
+                          ? isLeaveParent
+                            ? "border-rose-400/40 bg-rose-500/15 text-rose-50"
+                            : "border-white/25 bg-white/[0.08] text-white"
+                          : isLeaveParent
+                            ? "border-transparent text-rose-100/75 hover:bg-rose-500/[0.08]"
+                            : "border-transparent text-white/70 hover:bg-white/[0.04]"
                       )}
                     >
                       <span
@@ -382,16 +408,20 @@ export default function TimeParentCategoryCatalog() {
                       <span className="min-w-0 flex-1 truncate">{cat.name}</span>
                       <span className="shrink-0 tabular-nums text-[10px] text-white/40">{count}</span>
                     </button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-white/40 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100 focus-visible:opacity-100"
-                      title={t("time.catalogRenameCategory")}
-                      onClick={() => openRename("category", cat.id, cat.name)}
-                    >
-                      <Pencil size={14} />
-                    </Button>
+                    {!isLeaveParent ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-white/40 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100 focus-visible:opacity-100"
+                        title={t("time.catalogRenameCategory")}
+                        onClick={() => openRename("category", cat.id, cat.name)}
+                      >
+                        <Pencil size={14} />
+                      </Button>
+                    ) : (
+                      <span className="h-8 w-8 shrink-0" aria-hidden />
+                    )}
                   </li>
                 );
               })}
@@ -452,21 +482,28 @@ export default function TimeParentCategoryCatalog() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="text-sm font-medium text-white">{selectedCategory.name}</h2>
-                    <p className="mt-1 text-xs text-white/45">{t("time.parentCategoryProjectsHint")}</p>
+                    <p className="mt-1 text-xs text-white/45">
+                      {selectedIsLeaveCategory
+                        ? t("time.catalogLeaveCategoryHint")
+                        : t("time.parentCategoryProjectsHint")}
+                    </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-white/45 hover:bg-white/10 hover:text-white"
-                    title={t("time.catalogRenameCategory")}
-                    onClick={() =>
-                      openRename("category", selectedCategory.id, selectedCategory.name)
-                    }
-                  >
-                    <Pencil size={14} />
-                  </Button>
+                  {!selectedIsLeaveCategory ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-white/45 hover:bg-white/10 hover:text-white"
+                      title={t("time.catalogRenameCategory")}
+                      onClick={() =>
+                        openRename("category", selectedCategory.id, selectedCategory.name)
+                      }
+                    >
+                      <Pencil size={14} />
+                    </Button>
+                  ) : null}
                 </div>
+                {!selectedIsLeaveCategory ? (
                 <div className="mt-3 flex gap-2">
                   <Input
                     value={newProjectName}
@@ -489,7 +526,8 @@ export default function TimeParentCategoryCatalog() {
                     {t("time.add")}
                   </Button>
                 </div>
-                {unassignedProjects.length > 0 ? (
+                ) : null}
+                {!selectedIsLeaveCategory && unassignedProjects.length > 0 ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Select
                       value=""
@@ -595,7 +633,7 @@ export default function TimeParentCategoryCatalog() {
                           <SelectValue placeholder={t("time.catalogMoveProjectCategoryPlaceholder")} />
                         </SelectTrigger>
                         <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                          {categories.map((cat) => (
+                          {workCategories.map((cat) => (
                             <SelectItem key={cat.id} value={cat.id}>
                               {cat.name}
                             </SelectItem>
@@ -650,6 +688,7 @@ export default function TimeParentCategoryCatalog() {
                       <ArrowRightLeft size={14} />
                       {t("time.catalogMoveAllEntries")}
                     </div>
+                    <p className="text-[11px] text-white/45">{t("time.catalogMoveAllEntriesHint")}</p>
                     <div className="flex flex-wrap gap-2">
                       <Select value={moveToProjectId} onValueChange={setMoveToProjectId}>
                         <SelectTrigger className="h-9 min-w-[12rem] flex-1 border-white/10 bg-white/5 text-white">
@@ -658,7 +697,9 @@ export default function TimeParentCategoryCatalog() {
                         <SelectContent className="border-white/10 bg-[#16161f] text-white">
                           {moveTargets.map((p) => (
                             <SelectItem key={p.id} value={p.id}>
-                              {p.name}
+                              {isLeaveProject(p)
+                                ? `${p.name} (${t("time.catalogLeaveProjectKind")})`
+                                : p.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -677,7 +718,9 @@ export default function TimeParentCategoryCatalog() {
                           });
                         }}
                       >
-                        {t("time.catalogMoveAllConfirm")}
+                        {moveTargetIsLeave
+                          ? t("time.catalogMoveAllToLeaveConfirm")
+                          : t("time.catalogMoveAllConfirm")}
                       </Button>
                     </div>
                   </div>

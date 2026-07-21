@@ -24,6 +24,7 @@ import {
 import {
   backfillLeaveEntryProjects,
   ensureAllLeaveTimeProjects,
+  isLeaveParentCategoryKey,
   isLeaveSystemProjectKey,
   isVacationNoteOnlyCategory,
   normalizeEntryProjectAndTags,
@@ -39,7 +40,7 @@ import {
 } from "../services/timeProjectAssignment";
 import {
   ensureDefaultParentCategories,
-  isPresetParentCategoryKey,
+  isProtectedParentCategoryKey,
   resolveOrgParentCategoryId,
 } from "../services/parentCategoryPresets";
 import {
@@ -2034,7 +2035,9 @@ timeRouter.get("/time/parent-category-catalog", async (c) => {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
   await ensureDefaultParentCategories(user.organizationId);
+  await ensureAllLeaveTimeProjects(user.organizationId);
   await syncEventShowTimeProjects(user.organizationId);
+  await backfillLeaveEntryProjects(user.organizationId);
   await backfillMissingTimeProjects(user.organizationId);
   const [categories, events, tours, standaloneProjects, allProjects] = await Promise.all([
     prisma.timeParentCategory.findMany({
@@ -2057,6 +2060,7 @@ timeRouter.get("/time/parent-category-catalog", async (c) => {
         isArchived: false,
         eventId: null,
         tourId: null,
+        OR: [{ systemKey: null }, { systemKey: { not: { startsWith: "leave_" } } }],
       },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
@@ -2064,7 +2068,6 @@ timeRouter.get("/time/parent-category-catalog", async (c) => {
       where: {
         organizationId: user.organizationId,
         isArchived: false,
-        OR: [{ systemKey: null }, { systemKey: { not: { startsWith: "leave_" } } }],
       },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
@@ -2160,6 +2163,12 @@ timeRouter.patch("/time/parent-categories/:id", zValidator("json", PatchTimePare
     where: { id, organizationId: user.organizationId },
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  if (isLeaveParentCategoryKey(existing.systemKey)) {
+    return c.json(
+      { error: { message: "Fravær-overkategorien kan ikke omdøbes.", code: "FORBIDDEN" } },
+      403
+    );
+  }
   const row = await prisma.timeParentCategory.update({
     where: { id },
     data: {
@@ -2184,7 +2193,7 @@ timeRouter.delete("/time/parent-categories/:id", async (c) => {
     where: { id, organizationId: user.organizationId },
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
-  if (isPresetParentCategoryKey(existing.systemKey)) {
+  if (isProtectedParentCategoryKey(existing.systemKey)) {
     return c.json(
       { error: { message: "Systemkategorier kan ikke slettes", code: "FORBIDDEN" } },
       403
@@ -2273,6 +2282,17 @@ timeRouter.patch("/time/parent-category-link", zValidator("json", LinkTimeParent
   });
   if (!project) {
     return c.json({ error: { message: "Standalone project not found", code: "NOT_FOUND" } }, 404);
+  }
+  if (isLeaveSystemProjectKey(project.systemKey)) {
+    return c.json(
+      {
+        error: {
+          message: "Fraværsprojekter kan ikke flyttes til en anden overkategori.",
+          code: "FORBIDDEN",
+        },
+      },
+      403
+    );
   }
   await prisma.timeProject.update({
     where: { id: project.id },
@@ -2578,10 +2598,14 @@ timeRouter.delete("/time/projects/:id", zValidator("json", DeleteTimeProjectSche
   }
 
   try {
+    const organizationId = user.organizationId;
     const moved = await reassignProjectReferences({
-      organizationId: user.organizationId,
+      organizationId,
       fromProjectId: id,
       toProjectId: body.reassignToProjectId,
+      onEntryMoved: async (entry) => {
+        await maybeSyncLeaveLedger(organizationId, entry, user.id ?? null);
+      },
     });
     await prisma.timeProject.delete({ where: { id } });
     return c.json({
@@ -2736,10 +2760,14 @@ timeRouter.post(
       );
     }
     try {
+      const organizationId = user.organizationId;
       const moved = await reassignProjectReferences({
-        organizationId: user.organizationId,
+        organizationId,
         fromProjectId: id,
         toProjectId: body.toProjectId,
+        onEntryMoved: async (entry) => {
+          await maybeSyncLeaveLedger(organizationId, entry, user.id ?? null);
+        },
       });
       return c.json({
         data: {
@@ -2747,6 +2775,7 @@ timeRouter.post(
           reassignedEntries: moved.entries,
           reassignedTravelClaims: moved.travelClaims,
           reassignedMileageClaims: moved.mileageClaims,
+          categoryUpdates: moved.categoryUpdates,
         },
       });
     } catch (err) {

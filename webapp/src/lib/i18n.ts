@@ -137,6 +137,12 @@ const en = {
     catalogRenameSave: "Save name",
     catalogCategoryRenamed: "Parent category renamed.",
     catalogProjectRenamed: "Project renamed.",
+    catalogLeaveProjectKind: "Absence",
+    catalogLeaveCategoryHint:
+      "System projects for vacation, sick leave, holidays, and compensatory time. Move registrations here to change their leave category.",
+    catalogMoveAllEntriesHint:
+      "Choose a work project or an absence project. Moving to absence also updates the registration category and leave balances.",
+    catalogMoveAllToLeaveConfirm: "Move to absence",
     catalogEntryCount: "entries",
     catalogSelectProjectPrompt: "Select a project to see its time registrations.",
     catalogMoveAllEntries: "Move all registrations to another project",
@@ -956,6 +962,12 @@ const da: DeepPartial<typeof en> = {
     catalogRenameSave: "Gem navn",
     catalogCategoryRenamed: "Overkategori omdøbt.",
     catalogProjectRenamed: "Projekt omdøbt.",
+    catalogLeaveProjectKind: "Fravær",
+    catalogLeaveCategoryHint:
+      "Systemprojekter for ferie, sygdom, helligdage og afspadsering. Flyt registreringer hertil for at skifte fraværskategori.",
+    catalogMoveAllEntriesHint:
+      "Vælg et arbejdsprojekt eller et fraværsprojekt. Flytning til fravær opdaterer også kategorien og feriesaldoen.",
+    catalogMoveAllToLeaveConfirm: "Flyt til fravær",
     catalogEntryCount: "registreringer",
     catalogSelectProjectPrompt: "Vælg et projekt for at se dets tidsregistreringer.",
     catalogMoveAllEntries: "Flyt alle registreringer til et andet projekt",
