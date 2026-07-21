@@ -131,9 +131,13 @@ import {
   CALENDAR_PX_PER_HOUR,
   CALENDAR_STICKY_HEADER_CHROME,
   CALENDAR_TIME_GRID_TOP_PAD_PX,
+  CALENDAR_TODAY_COLUMN_CLASS,
+  CALENDAR_TODAY_HEADER_CLASS,
+  CALENDAR_TODAY_LABEL_CLASS,
   findColumnIndexAtX,
   WEEK_GRID_MIN_DRAG_PX,
 } from "@/lib/weekGridColumns";
+import { isLocalCalendarToday } from "@/lib/dateUtils";
 
 const WEEK_STARTS_ON = 1 as const;
 const PX_PER_HOUR = CALENDAR_PX_PER_HOUR;
@@ -2448,6 +2452,7 @@ export default function TimeTracking() {
                         },
                       };
                       const col = dayOffCategory ? dayOffColors[dayOffCategory] : null;
+                      const isToday = isLocalCalendarToday(day);
 
                       const addDayOff = (category: "vacation" | "sick" | "extra_vacation" | "comp_time") => {
                         if (!canEditVisiblePeriod) return;
@@ -2472,6 +2477,7 @@ export default function TimeTracking() {
                             gridIdx > 0 && "border-l border-white/10",
                             col?.bg,
                             col ? `border-b ${col.border}` : "border-b border-white/10",
+                            isToday && !col && CALENDAR_TODAY_HEADER_CLASS,
                             copySourceEntry && canEditVisiblePeriod && "cursor-copy hover:bg-white/[0.04]"
                           )}
                           onClick={() => {
@@ -2483,16 +2489,24 @@ export default function TimeTracking() {
                               <div
                                 className={cn(
                                   "text-[11px] font-semibold leading-tight",
-                                  col ? col.text : "text-white"
+                                  col ? col.text : isToday ? "text-indigo-200" : "text-white"
                                 )}
                               >
                                 {format(day, "EEEE", { locale: dfLocale })}
                               </div>
-                              <div className="mt-1 text-[10px] text-white/60 leading-snug">
+                              <div
+                                className={cn(
+                                  "mt-1 text-[10px] leading-snug",
+                                  isToday && !col ? "text-indigo-300/80" : "text-white/60"
+                                )}
+                              >
                                 {format(day, "d MMMM yyyy", { locale: dfLocale })}
                               </div>
-                              <div className="mt-0.5 text-[10px] text-white/45 leading-snug tabular-nums">
-                                {t("time.calendarWeekIso", { week: getISOWeek(day) })}
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-white/45 leading-snug tabular-nums">
+                                <span>{t("time.calendarWeekIso", { week: getISOWeek(day) })}</span>
+                                {isToday ? (
+                                  <span className={CALENDAR_TODAY_LABEL_CLASS}>{t("common.today")}</span>
+                                ) : null}
                               </div>
                               <div className="mt-0.5 space-y-0.5 text-[10px] leading-snug tabular-nums">
                                 <div className="text-white/40">
@@ -2659,6 +2673,7 @@ export default function TimeTracking() {
                 holiday: { bg: "bg-purple-500/8", text: "text-purple-300", border: "border-purple-500/25" },
               };
               const col = dayOffCategory ? dayOffColors[dayOffCategory] : null;
+              const isToday = isLocalCalendarToday(day);
 
               return (
                 <div
@@ -2666,7 +2681,10 @@ export default function TimeTracking() {
                   className="group relative min-h-0 min-w-0"
                 >
                   <div
-                    className="relative box-border"
+                    className={cn(
+                      "relative box-border",
+                      isToday && !col && CALENDAR_TODAY_COLUMN_CLASS
+                    )}
                     style={{ height: effectiveColumnFrameHeightPx }}
                   >
                   <div
@@ -2677,7 +2695,8 @@ export default function TimeTracking() {
                     className={cn(
                       "absolute inset-x-0 touch-none select-none",
                       gridIdx > 0 && "border-l border-white/10",
-                      col?.bg
+                      col?.bg,
+                      isToday && !col && CALENDAR_TODAY_COLUMN_CLASS
                     )}
                     style={{
                       top: effectiveTopPad,

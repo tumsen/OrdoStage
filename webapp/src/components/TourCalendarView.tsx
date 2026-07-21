@@ -1,6 +1,13 @@
 import { cn } from "@/lib/utils";
 import { tourShowPrimaryTime } from "@/lib/tourScheduleDisplay";
 import type { TourDetail, TourShow } from "../../../backend/src/types";
+import { isLocalCalendarToday, localDateToIso } from "@/lib/dateUtils";
+import {
+  CALENDAR_TODAY_COLUMN_CLASS,
+  CALENDAR_TODAY_DAY_NUMBER_CLASS,
+  CALENDAR_TODAY_LABEL_CLASS,
+} from "@/lib/weekGridColumns";
+import { useI18n } from "@/lib/i18n";
 
 // ISO week number (Mon = first day of week)
 function getISOWeek(date: Date): number {
@@ -17,11 +24,7 @@ function addDays(d: Date, n: number): Date {
 }
 
 function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return dateKey(a) === dateKey(b);
+  return localDateToIso(d);
 }
 
 // Start of ISO week (Monday) for a given date
@@ -36,6 +39,8 @@ function getISOWeekStart(d: Date): Date {
 const DOW_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export function TourCalendarView({ tour }: { tour: TourDetail }) {
+  const { t } = useI18n();
+
   if (tour.shows.length === 0) {
     return (
       <div className="py-8 text-center text-white/25 text-xs">No shows scheduled.</div>
@@ -45,7 +50,7 @@ export function TourCalendarView({ tour }: { tour: TourDetail }) {
   // Map date key → shows
   const showsByDate = new Map<string, TourShow[]>();
   for (const show of tour.shows) {
-    const k = new Date(show.date).toISOString().slice(0, 10);
+    const k = show.date.slice(0, 10);
     if (!showsByDate.has(k)) showsByDate.set(k, []);
     showsByDate.get(k)!.push(show);
   }
@@ -66,9 +71,6 @@ export function TourCalendarView({ tour }: { tour: TourDetail }) {
     cur = addDays(cur, 1);
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   let lastWeekNum = -1;
 
   return (
@@ -79,7 +81,7 @@ export function TourCalendarView({ tour }: { tour: TourDetail }) {
           const dayShows = showsByDate.get(k) ?? [];
           const dowIndex = (day.getDay() + 6) % 7; // 0=Mon … 6=Sun
           const isWeekend = dowIndex >= 5; // Sat or Sun
-          const isToday = isSameDay(day, today);
+          const isToday = isLocalCalendarToday(day);
           const isMonday = dowIndex === 0;
           const weekNum = getISOWeek(day);
           const showWeekNum = isMonday && weekNum !== lastWeekNum;
@@ -101,16 +103,18 @@ export function TourCalendarView({ tour }: { tour: TourDetail }) {
               <div
                 className={cn(
                   "flex items-center gap-1.5 rounded px-1 py-[3px]",
-                  isToday ? "bg-white/10" : isWeekend ? "bg-white/[0.025]" : ""
+                  isToday ? CALENDAR_TODAY_COLUMN_CLASS : isWeekend ? "bg-white/[0.025]" : ""
                 )}
               >
                 {/* Spacer to align with week-number width */}
                 <span
                   className={cn(
                     "text-[10px] w-7 text-right flex-shrink-0",
-                    isToday ? "font-bold text-white" :
-                    isWeekend ? "text-white/40" :
-                    "text-white/20"
+                    isToday
+                      ? CALENDAR_TODAY_DAY_NUMBER_CLASS
+                      : isWeekend
+                        ? "text-white/40"
+                        : "text-white/20"
                   )}
                 >
                   {day.getDate()}
@@ -119,13 +123,19 @@ export function TourCalendarView({ tour }: { tour: TourDetail }) {
                 <span
                   className={cn(
                     "text-[9px] w-6 flex-shrink-0",
-                    isToday ? "font-bold text-white" :
-                    isWeekend ? "text-white/35" :
-                    "text-white/20"
+                    isToday
+                      ? CALENDAR_TODAY_DAY_NUMBER_CLASS
+                      : isWeekend
+                        ? "text-white/35"
+                        : "text-white/20"
                   )}
                 >
                   {DOW_SHORT[dowIndex]}
                 </span>
+
+                {isToday ? (
+                  <span className={cn(CALENDAR_TODAY_LABEL_CLASS, "shrink-0")}>{t("common.today")}</span>
+                ) : null}
 
                 {/* Month label on 1st of each month */}
                 {day.getDate() === 1 ? (
@@ -141,17 +151,19 @@ export function TourCalendarView({ tour }: { tour: TourDetail }) {
                       show.type === "travel"
                         ? [show.fromLocation, show.toLocation].filter(Boolean).join("→") || "Travel"
                         : show.type === "day_off"
-                        ? "Day off"
-                        : show.venueName || show.venueCity || "Show";
+                          ? "Day off"
+                          : show.venueName || show.venueCity || "Show";
                     const time = tourShowPrimaryTime(show);
                     return (
                       <div
                         key={show.id}
                         className={cn(
                           "flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] leading-tight flex-shrink-0 max-w-[110px]",
-                          show.type === "travel" ? "bg-blue-900/50 text-blue-300" :
-                          show.type === "day_off" ? "bg-zinc-800/55 text-zinc-300" :
-                          "bg-emerald-900/50 text-emerald-300"
+                          show.type === "travel"
+                            ? "bg-blue-900/50 text-blue-300"
+                            : show.type === "day_off"
+                              ? "bg-zinc-800/55 text-zinc-300"
+                              : "bg-emerald-900/50 text-emerald-300"
                         )}
                         title={`${time ? time + " " : ""}${label}`}
                       >

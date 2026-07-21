@@ -21,13 +21,19 @@ import {
   CALENDAR_PX_PER_HOUR,
   CALENDAR_STICKY_HEADER_CHROME,
   CALENDAR_TIME_GRID_TOP_PAD_PX,
+  CALENDAR_TODAY_COLUMN_CLASS,
+  CALENDAR_TODAY_DAY_NUMBER_CLASS,
+  CALENDAR_TODAY_HEADER_CLASS,
+  CALENDAR_TODAY_LABEL_CLASS,
   findColumnIndexAtX,
   WEEK_GRID_MIN_DRAG_PX,
 } from "@/lib/weekGridColumns";
+import { isLocalCalendarToday } from "@/lib/dateUtils";
 import { bottomBoundaryLabel, formatHourLabel } from "@/lib/timeGrid";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { CalendarItemHoverCard } from "@/components/schedule/CalendarItemHoverCard";
+import { useI18n } from "@/lib/i18n";
 
 const SNAP_MINUTES = 15;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -246,6 +252,7 @@ export function OutlookTimeGrid({
   rejectCreateDragWhenOverlapping = false,
 }: OutlookTimeGridProps) {
   const { effective } = usePreferences();
+  const { t } = useI18n();
   const timeFormat = effective?.timeFormat === "12h" ? "12h" : "24h";
   const hour12 = timeFormat === "12h";
   const locale = effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
@@ -556,42 +563,76 @@ export function OutlookTimeGrid({
               )}
               aria-hidden
             />
-            {days.map((d, dayIdx) => (
+            {days.map((d, dayIdx) => {
+              const isToday = isLocalCalendarToday(d);
+              return (
               <div
                 key={d.toISOString()}
                 className={cn(
                   dayIdx > 0 && "border-l border-white/10",
                   compactDayHeaders
                     ? "min-h-[3.75rem] shrink-0 border-b border-white/10 box-border flex flex-col items-stretch justify-center px-0.5 py-1 text-[10px] text-white/75"
-                    : `${WEEK_GRID_HEADER_CLASS} text-xs text-white/70`
+                    : `${WEEK_GRID_HEADER_CLASS} text-xs text-white/70`,
+                  isToday && CALENDAR_TODAY_HEADER_CLASS
                 )}
               >
                 {compactDayHeaders ? (
                   <div className="flex flex-col items-center justify-center text-center min-w-0">
-                    <div className="text-[9px] font-semibold uppercase tracking-wide text-white/70 leading-none">
+                    <div
+                      className={cn(
+                        "text-[9px] font-semibold uppercase tracking-wide leading-none",
+                        isToday ? "text-indigo-300" : "text-white/70"
+                      )}
+                    >
                       {d.toLocaleDateString(locale, { weekday: "short" })}
                     </div>
-                    <div className="text-[12px] font-bold text-white tabular-nums leading-none mt-1">
+                    <div
+                      className={cn(
+                        "text-[12px] font-bold tabular-nums leading-none mt-1",
+                        isToday ? CALENDAR_TODAY_DAY_NUMBER_CLASS : "text-white"
+                      )}
+                    >
                       {d.getDate()}
                     </div>
+                    {isToday ? (
+                      <div className={cn(CALENDAR_TODAY_LABEL_CLASS, "mt-0.5 leading-none")}>
+                        {t("common.today")}
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="flex items-start justify-between gap-1">
                     <div className="min-w-0 flex-1 text-left">
-                      <div className="text-[11px] text-white font-semibold leading-tight">
+                      <div
+                        className={cn(
+                          "text-[11px] font-semibold leading-tight",
+                          isToday ? "text-indigo-200" : "text-white"
+                        )}
+                      >
                         {d.toLocaleDateString(locale, { weekday: "long" })}
                       </div>
-                      <div className="mt-1 text-[10px] text-white/60 leading-snug">
+                      <div
+                        className={cn(
+                          "mt-1 text-[10px] leading-snug",
+                          isToday ? "text-indigo-300/80" : "text-white/60"
+                        )}
+                      >
                         {d.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" })}
                       </div>
-                      <div className="text-[10px] text-white/45 leading-snug mt-0.5 tabular-nums">
-                        W{getIsoWeek(d)}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <div className="text-[10px] text-white/45 leading-snug tabular-nums">
+                          W{getIsoWeek(d)}
+                        </div>
+                        {isToday ? (
+                          <span className={CALENDAR_TODAY_LABEL_CLASS}>{t("common.today")}</span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* ── All-day strip ──────────────────────────────────────────────── */}
@@ -602,12 +643,14 @@ export function OutlookTimeGrid({
               </div>
               {days.map((day, dayIdx) => {
                 const allDay = itemsForDay(items, day).filter((i) => !getItemTimeRange(i).hasExplicitTime);
+                const isToday = isLocalCalendarToday(day);
                 return (
                   <div
                     key={day.toISOString()}
                     className={cn(
                       "bg-white/[0.01] p-0.5 min-h-[28px] flex flex-col gap-0.5",
                       dayIdx > 0 && "border-l border-white/10",
+                      isToday && CALENDAR_TODAY_COLUMN_CLASS,
                     )}
                   >
                     {allDay.map((item) => {
@@ -703,6 +746,7 @@ export function OutlookTimeGrid({
 
           {/* Day columns */}
           {days.map((day, dayIndex) => {
+            const isToday = isLocalCalendarToday(day);
             const dayItems = itemsForDay(items, day);
             const timedRaw = dayItems
               .map((item) => ({ item, ...getItemTimeRange(item) }))
@@ -869,7 +913,7 @@ export function OutlookTimeGrid({
             return (
               <div
                 key={day.toISOString()}
-                className="relative box-border"
+                className={cn("relative box-border", isToday && CALENDAR_TODAY_COLUMN_CLASS)}
                 style={{ height: columnFrameHeight }}
               >
                 <div

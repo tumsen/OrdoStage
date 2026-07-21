@@ -16,6 +16,13 @@ export const CALENDAR_TIME_GRID_TOP_PAD_PX = 24;
 export const CALENDAR_STICKY_HEADER_CHROME =
   "sticky top-0 z-30 bg-white/[0.07] backdrop-blur-md backdrop-saturate-150";
 
+/** Shared “today” chrome for week/day grids and month cells. */
+export const CALENDAR_TODAY_HEADER_CLASS = "bg-indigo-500/15 border-b-indigo-400/45";
+export const CALENDAR_TODAY_COLUMN_CLASS = "bg-indigo-950/20";
+export const CALENDAR_TODAY_DAY_NUMBER_CLASS = "text-indigo-300 font-bold";
+export const CALENDAR_TODAY_CELL_CLASS = "border-indigo-500/50 bg-indigo-950/20";
+export const CALENDAR_TODAY_LABEL_CLASS = "text-[10px] text-indigo-400 font-medium";
+
 /**
  * Padded shell around the week/day grid — same panel as `Schedule.tsx` uses around
  * `OutlookTimeGrid` / other calendar views (single design with Time).

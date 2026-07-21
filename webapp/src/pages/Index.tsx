@@ -6,13 +6,19 @@ import type { EventDetail, Venue } from "@/lib/types";
 import type { TourDetail, TourListItem } from "../../../backend/src/types";
 import { tourShowPrimaryTime } from "@/lib/tourScheduleDisplay";
 import { StatusBadge } from "@/components/StatusBadge";
-import { formatDate, eventStartsOnOrAfterToday } from "@/lib/dateUtils";
+import { formatDate, eventStartsOnOrAfterToday, todayIsoDate } from "@/lib/dateUtils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { CALENDAR_STICKY_HEADER_CHROME } from "@/lib/weekGridColumns";
+import {
+  CALENDAR_STICKY_HEADER_CHROME,
+  CALENDAR_TODAY_CELL_CLASS,
+  CALENDAR_TODAY_DAY_NUMBER_CLASS,
+  CALENDAR_TODAY_LABEL_CLASS,
+} from "@/lib/weekGridColumns";
 import { useMemo, useState } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useI18n } from "@/lib/i18n";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -34,6 +40,7 @@ function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType
 type CalEntry = { label: string; color: "event" | "show" | "travel" | "day_off"; href: string };
 
 function MonthCalendar({ events, tourDetails }: { events: EventDetail[]; tourDetails: TourDetail[] }) {
+  const { t } = useI18n();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth()); // 0-indexed
@@ -93,7 +100,7 @@ function MonthCalendar({ events, tourDetails }: { events: EventDetail[]; tourDet
   const totalCells = startOffset + lastDay.getDate();
   const rows = Math.ceil(totalCells / 7);
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayIsoDate();
 
   function prevMonth() {
     if (month === 0) { setMonth(11); setYear((y) => y - 1); }
@@ -150,12 +157,24 @@ function MonthCalendar({ events, tourDetails }: { events: EventDetail[]; tourDet
                 className={cn(
                   "min-h-[60px] rounded-lg p-1.5 flex flex-col gap-0.5 border",
                   entries.length > 0 ? "border-white/10 bg-white/[0.03]" : "border-white/[0.03]",
-                  isToday ? "ring-1 ring-inset ring-white/25" : ""
+                  isToday ? CALENDAR_TODAY_CELL_CLASS : ""
                 )}
               >
-                <span className={cn("text-[11px] leading-none mb-0.5 font-medium", isToday ? "text-white" : entries.length ? "text-white/55" : "text-white/20")}>
-                  {dayNum}
-                </span>
+                <div className="flex items-center justify-between gap-1 mb-0.5">
+                  <span
+                    className={cn(
+                      "text-[11px] leading-none font-medium",
+                      isToday
+                        ? CALENDAR_TODAY_DAY_NUMBER_CLASS
+                        : entries.length
+                          ? "text-white/55"
+                          : "text-white/20"
+                    )}
+                  >
+                    {dayNum}
+                  </span>
+                  {isToday ? <span className={CALENDAR_TODAY_LABEL_CLASS}>{t("common.today")}</span> : null}
+                </div>
                 {entries.slice(0, 3).map((entry, i) => (
                   <Link key={i} to={entry.href} className={cn("rounded px-1 py-0.5 text-[9px] leading-tight truncate hover:opacity-80", entryColorClass[entry.color])}>
                     {entry.label}

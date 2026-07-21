@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/hooks/usePreferences";
+import { useI18n } from "@/lib/i18n";
 import { CalendarItemHoverCard } from "@/components/schedule/CalendarItemHoverCard";
 import type { CalendarItem } from "./scheduleUtils";
 import type { InternalBookingDetail } from "../../../../backend/src/types";
@@ -12,6 +13,11 @@ import {
   backingVenueBookingForEvent,
   orphanBackingVenueBookings,
 } from "./scheduleUtils";
+import {
+  CALENDAR_TODAY_CELL_CLASS,
+  CALENDAR_TODAY_DAY_NUMBER_CLASS,
+  CALENDAR_TODAY_LABEL_CLASS,
+} from "@/lib/weekGridColumns";
 
 const PILL_LIMIT = 3;
 
@@ -24,6 +30,7 @@ interface CalendarCellProps {
 }
 
 export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }: CalendarCellProps) {
+  const { t } = useI18n();
   const { effective } = usePreferences();
   const locale =
     effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
@@ -59,7 +66,7 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
       className={cn(
         "min-h-[100px] p-1.5 border rounded-lg flex flex-col gap-1 transition-colors",
         isToday
-          ? "border-indigo-500/50 bg-indigo-950/20"
+          ? CALENDAR_TODAY_CELL_CLASS
           : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04]",
         (foregroundItems.length > 0 || orphanBacking.length > 0) && "ring-1 ring-white/5"
       )}
@@ -69,15 +76,13 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
         <span
           className={cn(
             "text-xs font-medium leading-none",
-            isToday
-              ? "text-indigo-300 font-bold"
-              : "text-white/50"
+            isToday ? CALENDAR_TODAY_DAY_NUMBER_CLASS : "text-white/50"
           )}
         >
           {date.getDate()}
         </span>
         {isToday ? (
-          <span className="text-[10px] text-indigo-400 font-medium">Today</span>
+          <span className={CALENDAR_TODAY_LABEL_CLASS}>{t("common.today")}</span>
         ) : null}
       </div>
 

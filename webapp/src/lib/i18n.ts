@@ -521,6 +521,7 @@ const en = {
     kilometers: "Kilometers (km)",
     miles: "Miles (mi)",
     skipToContent: "Skip to main content",
+    today: "Today",
   },
   admin: {
     uiLanguage: "Admin panel language",
@@ -1098,6 +1099,7 @@ const da: DeepPartial<typeof en> = {
     kilometers: "Kilometer (km)",
     miles: "Miles (mi)",
     skipToContent: "Spring til indhold",
+    today: "I dag",
   },
   admin: {
     uiLanguage: "Sprog i admin-panelet",
@@ -1213,6 +1215,7 @@ const de: DeepPartial<typeof en> = {
     kilometers: "Kilometer (km)",
     miles: "Meilen (mi)",
     skipToContent: "Zum Inhalt springen",
+    today: "Heute",
   },
   admin: {
     uiLanguage: "Admin-Sprache",

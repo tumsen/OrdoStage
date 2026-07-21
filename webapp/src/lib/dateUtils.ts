@@ -111,6 +111,11 @@ export function todayIsoDate(): string {
   return localDateToIso(now);
 }
 
+/** True when `date` falls on the user's local calendar today. */
+export function isLocalCalendarToday(date: Date): boolean {
+  return localDateToIso(date) === todayIsoDate();
+}
+
 /** Parse `YYYY-MM-DD` (or ISO prefix) as local calendar midnight. */
 export function isoDateToLocalDate(value: string | null | undefined): Date | undefined {
   const ymd = isoDatePrefix(value);
