@@ -143,6 +143,10 @@ const en = {
     catalogMoveAllEntriesHint:
       "Choose a work project or an absence project. Moving to absence also updates the registration category and leave balances.",
     catalogMoveAllToLeaveConfirm: "Move to absence",
+    catalogAllProjectsHeading: "All projects",
+    catalogAllProjectsHint:
+      "Sorted by parent category. Change category or move all hours to another project.",
+    catalogQuickMoveHoursPlaceholder: "Move hours to…",
     catalogEntryCount: "entries",
     catalogSelectProjectPrompt: "Select a project to see its time registrations.",
     catalogMoveAllEntries: "Move all registrations to another project",
@@ -968,6 +972,10 @@ const da: DeepPartial<typeof en> = {
     catalogMoveAllEntriesHint:
       "Vælg et arbejdsprojekt eller et fraværsprojekt. Flytning til fravær opdaterer også kategorien og feriesaldoen.",
     catalogMoveAllToLeaveConfirm: "Flyt til fravær",
+    catalogAllProjectsHeading: "Alle projekter",
+    catalogAllProjectsHint:
+      "Sorteret efter overkategori. Skift overkategori eller flyt alle timer til et andet projekt.",
+    catalogQuickMoveHoursPlaceholder: "Flyt timer til…",
     catalogEntryCount: "registreringer",
     catalogSelectProjectPrompt: "Vælg et projekt for at se dets tidsregistreringer.",
     catalogMoveAllEntries: "Flyt alle registreringer til et andet projekt",

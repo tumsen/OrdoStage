@@ -192,6 +192,7 @@ export default function TimeParentCategoryCatalog() {
       type: "event" | "tour" | "project";
       id: string;
       timeParentCategoryId: string | null;
+      stayOnList?: boolean;
     }) =>
       api.patch("/api/time/parent-category-link", {
         type: vars.type,
@@ -200,7 +201,9 @@ export default function TimeParentCategoryCatalog() {
       }),
     onSuccess: (_data, vars) => {
       invalidate();
-      setSelectedCategoryId(vars.timeParentCategoryId ?? "__unassigned__");
+      if (!vars.stayOnList) {
+        setSelectedCategoryId(vars.timeParentCategoryId ?? "__unassigned__");
+      }
       toast({ title: t("time.catalogProjectMovedToCategory") });
     },
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
@@ -222,6 +225,48 @@ export default function TimeParentCategoryCatalog() {
     [categories]
   );
 
+  const projectsGroupedByCategory = useMemo(() => {
+    const groups: {
+      key: string;
+      name: string;
+      color: string | null;
+      isLeave: boolean;
+      isUnassigned: boolean;
+      projects: CatalogProject[];
+    }[] = [];
+
+    for (const cat of categories) {
+      const projects = allProjects
+        .filter((p) => p.timeParentCategoryId === cat.id)
+        .sort((a, b) => a.name.localeCompare(b.name, "da"));
+      if (projects.length === 0) continue;
+      groups.push({
+        key: cat.id,
+        name: cat.name,
+        color: cat.color,
+        isLeave: cat.systemKey === LEAVE_PARENT_SYSTEM_KEY,
+        isUnassigned: false,
+        projects,
+      });
+    }
+
+    const unassigned = allProjects
+      .filter((p) => !p.timeParentCategoryId)
+      .sort((a, b) => a.name.localeCompare(b.name, "da"));
+    if (unassigned.length > 0) {
+      groups.push({
+        key: "__unassigned__",
+        name: t("time.parentCategoryUnassignedHeading"),
+        color: null,
+        isLeave: false,
+        isUnassigned: true,
+        projects: unassigned,
+      });
+    }
+
+    return groups;
+  }, [allProjects, categories, t]);
+
   const moveTargets = useMemo(() => {
     const excludeId = selectedProjectId ?? deleteProjectId;
     return allProjects.filter((p) => p.id !== excludeId && !p.isArchived);
@@ -233,6 +278,38 @@ export default function TimeParentCategoryCatalog() {
   );
 
   const selectedIsLeaveCategory = selectedCategory?.systemKey === LEAVE_PARENT_SYSTEM_KEY;
+
+  const assignProjectCategory = (project: CatalogProject, nextCategoryId: string) => {
+    const timeParentCategoryId = nextCategoryId === "__none__" ? null : nextCategoryId;
+    const current = project.timeParentCategoryId ?? "__none__";
+    const next = timeParentCategoryId ?? "__none__";
+    if (current === next) return;
+
+    if (project.eventId) {
+      linkProject.mutate({
+        type: "event",
+        id: project.eventId,
+        timeParentCategoryId,
+        stayOnList: true,
+      });
+      return;
+    }
+    if (project.tourId) {
+      linkProject.mutate({
+        type: "tour",
+        id: project.tourId,
+        timeParentCategoryId,
+        stayOnList: true,
+      });
+      return;
+    }
+    linkProject.mutate({
+      type: "project",
+      id: project.id,
+      timeParentCategoryId,
+      stayOnList: true,
+    });
+  };
 
   const moveAllEntries = useMutation({
     mutationFn: (vars: { fromId: string; toProjectId: string }) =>
@@ -771,6 +848,140 @@ export default function TimeParentCategoryCatalog() {
           </section>
         </div>
       )}
+
+      {!isLoading && projectsGroupedByCategory.length > 0 ? (
+        <section className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="mb-3">
+            <h2 className="text-sm font-semibold text-white">{t("time.catalogAllProjectsHeading")}</h2>
+            <p className="mt-1 text-xs text-white/45">{t("time.catalogAllProjectsHint")}</p>
+          </div>
+          <div className="space-y-5">
+            {projectsGroupedByCategory.map((group) => (
+              <div key={group.key}>
+                <div
+                  className={cn(
+                    "mb-2 flex items-center gap-2 border-b pb-1.5",
+                    group.isLeave
+                      ? "border-rose-400/25"
+                      : group.isUnassigned
+                        ? "border-amber-400/25"
+                        : "border-white/10"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white/15",
+                      group.isUnassigned && "bg-amber-400/70"
+                    )}
+                    style={
+                      group.isUnassigned
+                        ? undefined
+                        : { backgroundColor: displayHex(group.color, group.key) }
+                    }
+                  />
+                  <h3
+                    className={cn(
+                      "text-xs font-semibold uppercase tracking-wide",
+                      group.isLeave
+                        ? "text-rose-200/80"
+                        : group.isUnassigned
+                          ? "text-amber-100/80"
+                          : "text-white/55"
+                    )}
+                  >
+                    {group.name}
+                  </h3>
+                  <span className="tabular-nums text-[10px] text-white/35">
+                    {group.projects.length}
+                  </span>
+                </div>
+                <ul className="space-y-1.5">
+                  {group.projects.map((p) => {
+                    const leave = isLeaveProject(p);
+                    const categoryValue = p.timeParentCategoryId ?? "__none__";
+                    return (
+                      <li
+                        key={p.id}
+                        className={cn(
+                          "grid gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_minmax(10rem,14rem)] sm:items-center",
+                          selectedProjectId === p.id && "border-indigo-400/35 bg-indigo-500/10"
+                        )}
+                      >
+                        <button
+                          type="button"
+                          className="min-w-0 text-left"
+                          onClick={() => {
+                            setSelectedProjectId(p.id);
+                            setSelectedCategoryId(p.timeParentCategoryId ?? "__unassigned__");
+                          }}
+                        >
+                          <span className="block truncate text-sm font-medium text-white">
+                            {p.name}
+                          </span>
+                          <span className="mt-0.5 block text-[10px] text-white/45">
+                            {p.entryCount} {t("time.catalogEntryCount")} ·{" "}
+                            {formatMinutes(p.totalMinutes)}
+                            {leave ? ` · ${t("time.catalogLeaveProjectKind")}` : ""}
+                          </span>
+                        </button>
+                        <Select
+                          value={categoryValue}
+                          disabled={leave || linkProject.isPending}
+                          onValueChange={(next) => assignProjectCategory(p, next)}
+                        >
+                          <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
+                            <SelectValue placeholder={t("time.catalogMoveProjectCategoryPlaceholder")} />
+                          </SelectTrigger>
+                          <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                            {workCategories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="__none__">
+                              {t("time.parentCategoryUnassignedHeading")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          key={`move-hours-${p.id}-${p.entryCount}`}
+                          value=""
+                          disabled={p.entryCount === 0 || moveAllEntries.isPending}
+                          onValueChange={(toProjectId) => {
+                            if (!toProjectId) return;
+                            moveAllEntries.mutate({ fromId: p.id, toProjectId });
+                          }}
+                        >
+                          <SelectTrigger className="h-8 border-white/10 bg-white/5 text-xs text-white">
+                            <SelectValue
+                              placeholder={
+                                p.entryCount === 0
+                                  ? t("time.catalogNoEntries")
+                                  : t("time.catalogQuickMoveHoursPlaceholder")
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                            {allProjects
+                              .filter((target) => target.id !== p.id && !target.isArchived)
+                              .map((target) => (
+                                <SelectItem key={target.id} value={target.id}>
+                                  {isLeaveProject(target)
+                                    ? `${target.name} (${t("time.catalogLeaveProjectKind")})`
+                                    : target.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {renameTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
