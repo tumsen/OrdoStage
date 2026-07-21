@@ -2536,6 +2536,31 @@ timeRouter.delete("/time/projects/:id", zValidator("json", DeleteTimeProjectSche
     );
   }
 
+  const usageCount = await countProjectUsages(user.organizationId, id);
+
+  if (!body.reassignToProjectId) {
+    if (usageCount > 0) {
+      return c.json(
+        {
+          error: {
+            message: "Project still has registrations. Choose a project to move them to.",
+            code: "BAD_REQUEST",
+          },
+        },
+        400
+      );
+    }
+    await prisma.timeProject.delete({ where: { id } });
+    return c.json({
+      data: {
+        ok: true,
+        reassignedEntries: 0,
+        reassignedTravelClaims: 0,
+        reassignedMileageClaims: 0,
+      },
+    });
+  }
+
   try {
     const moved = await reassignProjectReferences({
       organizationId: user.organizationId,

@@ -90,6 +90,13 @@ export default function TimeParentCategoryCatalog() {
     enabled: canManage && Boolean(selectedProjectId),
   });
 
+  const { data: deleteUsage } = useQuery({
+    queryKey: ["time-project-usage", deleteProjectId],
+    queryFn: () =>
+      api.get<{ count: number }>(`/api/time/projects/${deleteProjectId}/usage`),
+    enabled: canManage && Boolean(deleteProjectId),
+  });
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["time-parent-category-catalog"] });
     queryClient.invalidateQueries({ queryKey: ["time-projects"] });
@@ -164,26 +171,29 @@ export default function TimeParentCategoryCatalog() {
   });
 
   const deleteProject = useMutation({
-    mutationFn: (vars: { id: string; reassignToProjectId: string }) =>
+    mutationFn: (vars: { id: string; reassignToProjectId?: string }) =>
       api.deleteWithBody<{
         ok: boolean;
         reassignedEntries: number;
         reassignedTravelClaims: number;
         reassignedMileageClaims: number;
       }>(`/api/time/projects/${vars.id}`, {
-        reassignToProjectId: vars.reassignToProjectId,
+        ...(vars.reassignToProjectId
+          ? { reassignToProjectId: vars.reassignToProjectId }
+          : {}),
       }),
     onSuccess: (data) => {
       invalidate();
       if (selectedProjectId === deleteProjectId) setSelectedProjectId(null);
       setDeleteProjectId(null);
       setReassignToProjectId("");
+      const moved =
+        data.reassignedEntries + data.reassignedTravelClaims + data.reassignedMileageClaims;
       toast({
         title: t("time.catalogProjectDeleted"),
-        description: t("time.catalogProjectReassigned", {
-          count:
-            data.reassignedEntries + data.reassignedTravelClaims + data.reassignedMileageClaims,
-        }),
+        ...(moved > 0
+          ? { description: t("time.catalogProjectReassigned", { count: moved }) }
+          : {}),
       });
     },
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
@@ -192,6 +202,12 @@ export default function TimeParentCategoryCatalog() {
   if (!canManage) {
     return <Navigate to="/time" replace />;
   }
+
+  const deleteTarget = allProjects.find((p) => p.id === deleteProjectId) ?? null;
+  const deleteTargetHasEntries =
+    (deleteUsage?.count ?? deleteTarget?.entryCount ?? 0) > 0;
+  const selectedHasEntries =
+    (projectEntries?.totalCount ?? selectedProject?.entryCount ?? 0) > 0;
 
   const renderProjectRow = (p: CatalogProject) => {
     const isSelected = selectedProjectId === p.id;
@@ -454,42 +470,44 @@ export default function TimeParentCategoryCatalog() {
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-medium text-white/70">
-                    <ArrowRightLeft size={14} />
-                    {t("time.catalogMoveAllEntries")}
+                {selectedHasEntries ? (
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-medium text-white/70">
+                      <ArrowRightLeft size={14} />
+                      {t("time.catalogMoveAllEntries")}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Select value={moveToProjectId} onValueChange={setMoveToProjectId}>
+                        <SelectTrigger className="h-9 min-w-[12rem] flex-1 border-white/10 bg-white/5 text-white">
+                          <SelectValue placeholder={t("time.catalogReassignPlaceholder")} />
+                        </SelectTrigger>
+                        <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                          {moveTargets.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        className="bg-indigo-700 hover:bg-indigo-600"
+                        disabled={
+                          !moveToProjectId || moveAllEntries.isPending || moveTargets.length === 0
+                        }
+                        onClick={() => {
+                          if (!selectedProjectId || !moveToProjectId) return;
+                          moveAllEntries.mutate({
+                            fromId: selectedProjectId,
+                            toProjectId: moveToProjectId,
+                          });
+                        }}
+                      >
+                        {t("time.catalogMoveAllConfirm")}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Select value={moveToProjectId} onValueChange={setMoveToProjectId}>
-                      <SelectTrigger className="h-9 min-w-[12rem] flex-1 border-white/10 bg-white/5 text-white">
-                        <SelectValue placeholder={t("time.catalogReassignPlaceholder")} />
-                      </SelectTrigger>
-                      <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                        {moveTargets.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      className="bg-indigo-700 hover:bg-indigo-600"
-                      disabled={
-                        !moveToProjectId || moveAllEntries.isPending || moveTargets.length === 0
-                      }
-                      onClick={() => {
-                        if (!selectedProjectId || !moveToProjectId) return;
-                        moveAllEntries.mutate({
-                          fromId: selectedProjectId,
-                          toProjectId: moveToProjectId,
-                        });
-                      }}
-                    >
-                      {t("time.catalogMoveAllConfirm")}
-                    </Button>
-                  </div>
-                </div>
+                ) : null}
 
                 <div className="min-h-0 flex-1 overflow-auto">
                   {entriesLoading ? (
@@ -544,25 +562,36 @@ export default function TimeParentCategoryCatalog() {
               <h2 className="text-base font-semibold text-white">
                 {t("time.catalogDeleteProjectTitle")}
               </h2>
-              <p className="mt-1 text-sm text-white/55">{t("time.catalogDeleteProjectHint")}</p>
+              <p className="mt-1 text-sm text-white/55">
+                {deleteTargetHasEntries
+                  ? t("time.catalogDeleteProjectHint")
+                  : t("time.catalogDeleteEmptyProjectHint")}
+              </p>
+              {deleteTarget ? (
+                <p className="mt-2 truncate text-sm font-medium text-white/80">
+                  {deleteTarget.name}
+                </p>
+              ) : null}
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-white/70">{t("time.catalogReassignToProject")}</Label>
-              <Select value={reassignToProjectId} onValueChange={setReassignToProjectId}>
-                <SelectTrigger className="h-9 border-white/10 bg-white/5 text-white">
-                  <SelectValue placeholder={t("time.catalogReassignPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                  {allProjects
-                    .filter((p) => p.id !== deleteProjectId)
-                    .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {deleteTargetHasEntries ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-white/70">{t("time.catalogReassignToProject")}</Label>
+                <Select value={reassignToProjectId} onValueChange={setReassignToProjectId}>
+                  <SelectTrigger className="h-9 border-white/10 bg-white/5 text-white">
+                    <SelectValue placeholder={t("time.catalogReassignPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                    {allProjects
+                      .filter((p) => p.id !== deleteProjectId)
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
@@ -578,16 +607,26 @@ export default function TimeParentCategoryCatalog() {
               <Button
                 type="button"
                 className="bg-red-700 hover:bg-red-600"
-                disabled={!reassignToProjectId || deleteProject.isPending}
+                disabled={
+                  deleteProject.isPending ||
+                  (deleteTargetHasEntries && !reassignToProjectId)
+                }
                 onClick={() => {
-                  if (!deleteProjectId || !reassignToProjectId) return;
-                  deleteProject.mutate({
-                    id: deleteProjectId,
-                    reassignToProjectId,
-                  });
+                  if (!deleteProjectId) return;
+                  if (deleteTargetHasEntries) {
+                    if (!reassignToProjectId) return;
+                    deleteProject.mutate({
+                      id: deleteProjectId,
+                      reassignToProjectId,
+                    });
+                    return;
+                  }
+                  deleteProject.mutate({ id: deleteProjectId });
                 }}
               >
-                {t("time.catalogDeleteAndReassign")}
+                {deleteTargetHasEntries
+                  ? t("time.catalogDeleteAndReassign")
+                  : t("time.catalogDeleteConfirmAction")}
               </Button>
             </div>
           </div>

@@ -124,6 +124,9 @@ const en = {
     catalogReassignToProject: "Move registrations to",
     catalogReassignPlaceholder: "Choose project…",
     catalogDeleteAndReassign: "Delete and move",
+    catalogDeleteEmptyProjectHint:
+      "This project has no registrations. Delete it permanently?",
+    catalogDeleteConfirmAction: "Delete project",
     catalogEntryCount: "entries",
     catalogSelectProjectPrompt: "Select a project to see its time registrations.",
     catalogMoveAllEntries: "Move all registrations to another project",
@@ -930,6 +933,9 @@ const da: DeepPartial<typeof en> = {
     catalogReassignToProject: "Flyt registreringer til",
     catalogReassignPlaceholder: "Vælg projekt…",
     catalogDeleteAndReassign: "Slet og flyt",
+    catalogDeleteEmptyProjectHint:
+      "Dette projekt har ingen registreringer. Vil du slette det permanent?",
+    catalogDeleteConfirmAction: "Slet projekt",
     catalogEntryCount: "registreringer",
     catalogSelectProjectPrompt: "Vælg et projekt for at se dets tidsregistreringer.",
     catalogMoveAllEntries: "Flyt alle registreringer til et andet projekt",

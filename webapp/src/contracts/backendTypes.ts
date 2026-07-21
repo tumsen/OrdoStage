@@ -1337,7 +1337,8 @@ export const PatchTimeProjectSchema = z.object({
 
 /** Delete a project after moving its time entries / claims to another project. */
 export const DeleteTimeProjectSchema = z.object({
-  reassignToProjectId: z.string().min(1),
+  /** Required when the project still has time, travel, or mileage references. */
+  reassignToProjectId: z.string().min(1).optional(),
 });
 
 export const CreateTimeParentCategorySchema = z.object({
