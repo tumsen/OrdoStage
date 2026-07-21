@@ -2243,14 +2243,9 @@ export default function TimeTracking() {
                   </span>
                 </span>
                 <span className="whitespace-nowrap">
-                  {t("time.leaveCompPeriodDelta")}:{" "}
-                  <span
-                    className={cn(
-                      "tabular-nums font-medium",
-                      signedBalanceClass(leaveBalances.compTimePeriodDeltaMinutes ?? 0)
-                    )}
-                  >
-                    {formatSignedMinutes(leaveBalances.compTimePeriodDeltaMinutes ?? 0)}
+                  {t("time.leaveCompPeriodUsed")}:{" "}
+                  <span className="tabular-nums font-medium text-white/80">
+                    {formatTotalMinutesAsHHMM(leaveBalances.compTimePeriodUsedMinutes ?? 0)}
                   </span>
                 </span>
                 {balancePersonId ? (

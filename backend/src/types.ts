@@ -1393,8 +1393,11 @@ export const LeaveBalanceSummarySchema = z.object({
   compTimeUsedMinutes: z.number(),
   compTimeRemainingMinutes: z.number(),
   sickDays: z.number(),
-  /** Net afspadsering change in the requested from/to range (earned − used). */
-  compTimePeriodDeltaMinutes: z.number().optional(),
+  /**
+   * Afspadsering taken (time entries category=comp_time) in the requested from/to
+   * range — week or month matching the time tracking view.
+   */
+  compTimePeriodUsedMinutes: z.number().optional(),
   /** Next ferieår vacation overview (earned/used/remaining as of today). */
   nextVacationYear: LeaveBalanceNextYearSchema.optional(),
 });

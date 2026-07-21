@@ -21,7 +21,7 @@ import {
   mapOrgLeavePolicy,
   mapPersonLeaveProfile,
   postLeaveTransaction,
-  computeCompTimePeriodDeltaMinutes,
+  sumCompTimeUsedMinutesInRange,
 } from "../services/leaveLedger";
 import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays, accrueVacationEarnedForDateRange } from "../rules/leave/danishLeave";
 import { DateTime } from "luxon";
@@ -271,6 +271,13 @@ leaveRouter.get("/time/leave-balances/:personId", async (c) => {
   }
   const overview = await getLeaveBalanceOverview(user.organizationId, personId);
   const leave = overview.current;
+  const nextVacationYear = {
+    vacationYearKey: overview.next.vacationYearKey,
+    vacationEarnedDays: overview.next.vacationEarnedDays,
+    vacationUsedDays: overview.next.vacationUsedDays,
+    vacationRemainingDays: overview.next.vacationRemainingDays,
+    extraVacationRemainingDays: overview.next.extraVacationRemainingDays,
+  };
   const from = c.req.query("from");
   const to = c.req.query("to");
   if (from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
@@ -280,36 +287,24 @@ leaveRouter.get("/time/leave-balances/:personId", async (c) => {
       .plus({ days: 1 })
       .startOf("day")
       .toJSDate();
-    const compTimePeriodDeltaMinutes = await computeCompTimePeriodDeltaMinutes(
+    const usedByPerson = await sumCompTimeUsedMinutesInRange(
       user.organizationId,
-      personId,
+      [personId],
       rangeStart,
       rangeEndExclusive
     );
     return c.json({
       data: {
         ...leave,
-        nextVacationYear: {
-          vacationYearKey: overview.next.vacationYearKey,
-          vacationEarnedDays: overview.next.vacationEarnedDays,
-          vacationUsedDays: overview.next.vacationUsedDays,
-          vacationRemainingDays: overview.next.vacationRemainingDays,
-          extraVacationRemainingDays: overview.next.extraVacationRemainingDays,
-        },
-        compTimePeriodDeltaMinutes,
+        nextVacationYear,
+        compTimePeriodUsedMinutes: Math.round(usedByPerson.get(personId) ?? 0),
       },
     });
   }
   return c.json({
     data: {
       ...leave,
-      nextVacationYear: {
-        vacationYearKey: overview.next.vacationYearKey,
-        vacationEarnedDays: overview.next.vacationEarnedDays,
-        vacationUsedDays: overview.next.vacationUsedDays,
-        vacationRemainingDays: overview.next.vacationRemainingDays,
-        extraVacationRemainingDays: overview.next.extraVacationRemainingDays,
-      },
+      nextVacationYear,
     },
   });
 });
