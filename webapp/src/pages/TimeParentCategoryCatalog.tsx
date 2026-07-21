@@ -51,6 +51,7 @@ export default function TimeParentCategoryCatalog() {
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [reassignToProjectId, setReassignToProjectId] = useState("");
   const [moveToProjectId, setMoveToProjectId] = useState("");
+  const [moveToCategoryId, setMoveToCategoryId] = useState("");
 
   const { data: catalog, isLoading } = useQuery({
     queryKey: ["time-parent-category-catalog"],
@@ -80,6 +81,14 @@ export default function TimeParentCategoryCatalog() {
 
   const selectedProject =
     allProjects.find((p) => p.id === selectedProjectId) ?? null;
+
+  useEffect(() => {
+    if (!selectedProject) {
+      setMoveToCategoryId("");
+      return;
+    }
+    setMoveToCategoryId(selectedProject.timeParentCategoryId ?? "__none__");
+  }, [selectedProject]);
 
   const { data: projectEntries, isLoading: entriesLoading } = useQuery({
     queryKey: ["time-project-entries", selectedProjectId],
@@ -128,18 +137,34 @@ export default function TimeParentCategoryCatalog() {
   });
 
   const linkProject = useMutation({
-    mutationFn: (vars: { id: string; timeParentCategoryId: string }) =>
+    mutationFn: (vars: {
+      type: "event" | "tour" | "project";
+      id: string;
+      timeParentCategoryId: string | null;
+    }) =>
       api.patch("/api/time/parent-category-link", {
-        type: "project",
+        type: vars.type,
         id: vars.id,
         timeParentCategoryId: vars.timeParentCategoryId,
       }),
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       invalidate();
-      toast({ title: t("time.parentCategoryLinkProjectDone") });
+      setSelectedCategoryId(vars.timeParentCategoryId ?? "__unassigned__");
+      toast({ title: t("time.catalogProjectMovedToCategory") });
     },
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
   });
+
+  const canMoveSelectedProject =
+    Boolean(selectedProject) &&
+    !selectedProject?.systemKey?.startsWith("leave_") &&
+    categories.length > 0;
+
+  const selectedProjectCategoryChanged = Boolean(
+    selectedProject &&
+      moveToCategoryId &&
+      (selectedProject.timeParentCategoryId ?? "__none__") !== moveToCategoryId
+  );
 
   const moveTargets = useMemo(() => {
     const excludeId = selectedProjectId ?? deleteProjectId;
@@ -399,6 +424,7 @@ export default function TimeParentCategoryCatalog() {
                       onValueChange={(projectId) => {
                         if (!projectId || !activeCategoryId) return;
                         linkProject.mutate({
+                          type: "project",
                           id: projectId,
                           timeParentCategoryId: activeCategoryId,
                         });
@@ -469,6 +495,66 @@ export default function TimeParentCategoryCatalog() {
                     </Button>
                   </div>
                 </div>
+
+                {canMoveSelectedProject ? (
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 space-y-2">
+                    <div className="text-xs font-medium text-white/70">
+                      {t("time.catalogMoveProjectToCategory")}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Select value={moveToCategoryId} onValueChange={setMoveToCategoryId}>
+                        <SelectTrigger className="h-9 min-w-[12rem] flex-1 border-white/10 bg-white/5 text-white">
+                          <SelectValue placeholder={t("time.catalogMoveProjectCategoryPlaceholder")} />
+                        </SelectTrigger>
+                        <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="__none__">
+                            {t("time.parentCategoryUnassignedHeading")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        className="bg-indigo-700 hover:bg-indigo-600"
+                        disabled={
+                          !selectedProjectCategoryChanged || linkProject.isPending
+                        }
+                        onClick={() => {
+                          if (!selectedProject || !moveToCategoryId) return;
+                          const timeParentCategoryId =
+                            moveToCategoryId === "__none__" ? null : moveToCategoryId;
+                          if (selectedProject.eventId) {
+                            linkProject.mutate({
+                              type: "event",
+                              id: selectedProject.eventId,
+                              timeParentCategoryId,
+                            });
+                            return;
+                          }
+                          if (selectedProject.tourId) {
+                            linkProject.mutate({
+                              type: "tour",
+                              id: selectedProject.tourId,
+                              timeParentCategoryId,
+                            });
+                            return;
+                          }
+                          linkProject.mutate({
+                            type: "project",
+                            id: selectedProject.id,
+                            timeParentCategoryId,
+                          });
+                        }}
+                      >
+                        {t("time.catalogMoveProjectConfirm")}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {selectedHasEntries ? (
                   <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 space-y-2">

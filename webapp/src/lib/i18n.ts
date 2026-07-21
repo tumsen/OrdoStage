@@ -127,6 +127,10 @@ const en = {
     catalogDeleteEmptyProjectHint:
       "This project has no registrations. Delete it permanently?",
     catalogDeleteConfirmAction: "Delete project",
+    catalogMoveProjectToCategory: "Move project to another parent category",
+    catalogMoveProjectCategoryPlaceholder: "Choose parent category…",
+    catalogMoveProjectConfirm: "Move project",
+    catalogProjectMovedToCategory: "Project moved to parent category.",
     catalogEntryCount: "entries",
     catalogSelectProjectPrompt: "Select a project to see its time registrations.",
     catalogMoveAllEntries: "Move all registrations to another project",
@@ -936,6 +940,10 @@ const da: DeepPartial<typeof en> = {
     catalogDeleteEmptyProjectHint:
       "Dette projekt har ingen registreringer. Vil du slette det permanent?",
     catalogDeleteConfirmAction: "Slet projekt",
+    catalogMoveProjectToCategory: "Flyt projekt til en anden overkategori",
+    catalogMoveProjectCategoryPlaceholder: "Vælg overkategori…",
+    catalogMoveProjectConfirm: "Flyt projekt",
+    catalogProjectMovedToCategory: "Projekt flyttet til overkategori.",
     catalogEntryCount: "registreringer",
     catalogSelectProjectPrompt: "Vælg et projekt for at se dets tidsregistreringer.",
     catalogMoveAllEntries: "Flyt alle registreringer til et andet projekt",
