@@ -71,6 +71,7 @@ import { useI18n } from "@/lib/i18n";
 import { toast, useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { timeCategoryMessageId, isCompSettlementCategory, isDayOffCategory, isLeaveAutoProjectCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
+import { isTimesheetSettlementFillEntry, timeEntryUserVisibleNote } from "@/lib/timeEntryNotes";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
@@ -171,9 +172,15 @@ function timeEntryMonthCalendarTitle(
     isJob && e.tourShowId
       ? jobs?.find((j) => j.source === "tour" && j.tourShowId === e.tourShowId)?.title
       : undefined;
-  const categoryLabel = translate(timeCategoryMessageId(cat));
+  const isSettlementFill = isTimesheetSettlementFillEntry(e);
+  const categoryLabel = translate(
+    timeCategoryMessageId((isSettlementFill ? "comp_time" : cat) as TimeCategory)
+  );
   const label =
-    isCompSettlementCategory(cat) || isDayOffCategory(cat) || cat === "travel_allowance"
+    isCompSettlementCategory(cat) ||
+    isDayOffCategory(cat) ||
+    isSettlementFill ||
+    cat === "travel_allowance"
       ? categoryLabel
       : isJob && (jobKey || e.tourShowId)
         ? (jobKey ? jobs?.find((j) => j.id === jobKey)?.title : undefined) ??
@@ -183,14 +190,18 @@ function timeEntryMonthCalendarTitle(
   const projEntity =
     !isLeaveAutoProjectCategory(cat) &&
     !isVacationNoteOnlyCategory(cat) &&
+    !isSettlementFill &&
     e.timeProjectId
       ? projectById.get(e.timeProjectId)
       : undefined;
-  const proj = projEntity?.name?.trim() || null;
+  const proj =
+    projEntity && !projEntity.systemKey?.startsWith("leave_")
+      ? projEntity.name?.trim() || null
+      : null;
   let title: string;
   if (label && proj) title = `${label} · ${proj}`;
   else title = label || proj || categoryLabel;
-  const note = isVacationNoteOnlyCategory(cat) ? e.note?.trim() : "";
+  const note = isVacationNoteOnlyCategory(cat) ? timeEntryUserVisibleNote(e.note) : "";
   if (note) {
     const short = note.length > 32 ? `${note.slice(0, 31)}…` : note;
     title = `${title} · ${short}`;
@@ -2954,11 +2965,17 @@ export default function TimeTracking() {
                             ? (jobs ?? []).find((j) => j.source === "tour" && j.tourShowId === e.tourShowId)
                                 ?.title
                             : undefined;
+                        const isSettlementFill = isTimesheetSettlementFillEntry(e);
                         const label =
                           isCompSettlementCategory(cat) ||
                           isDayOff ||
+                          isSettlementFill ||
                           cat === "travel_allowance"
-                            ? t(timeCategoryMessageId(cat) as never)
+                            ? t(
+                                timeCategoryMessageId(
+                                  (isSettlementFill ? "comp_time" : cat) as TimeCategory
+                                ) as never
+                              )
                             : isJob && (jobKey || e.tourShowId)
                               ? (jobKey
                                   ? (jobs ?? []).find((j) => j.id === jobKey)?.title ??
@@ -2970,13 +2987,17 @@ export default function TimeTracking() {
                         const projEntity =
                           !isLeaveAutoProjectCategory(cat) &&
                           !isVacationNoteOnlyCategory(cat) &&
+                          !isSettlementFill &&
                           e.timeProjectId
                             ? projectById.get(e.timeProjectId)
                             : undefined;
                         const projStripe = projEntity
                           ? displayHex(projEntity.color, projEntity.id)
                           : null;
-                        const proj = projEntity?.name ?? null;
+                        const proj =
+                          projEntity && !projEntity.systemKey?.startsWith("leave_")
+                            ? (projEntity.name ?? null)
+                            : null;
                         const timeTf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
                         const startDisp = snapLocalClockToGrid(spanStart);
                         const endDisp = snapLocalClockToGrid(spanEnd);
@@ -2993,8 +3014,9 @@ export default function TimeTracking() {
                         const showProjBelowTimes = Boolean(proj && label);
                         const blockHeightPx =
                           (Math.max(4, heightPct) / 100) * effectiveColumnHeightPx;
-                        const noteText =
-                          isCompSettlementCategory(cat) ? "" : (e.note?.trim() ?? "");
+                        const noteText = isCompSettlementCategory(cat)
+                          ? ""
+                          : timeEntryUserVisibleNote(e.note);
                         const reservedBelowNotePx =
                           11 + // time row
                           (showProjBelowTimes ? 11 : 0) +

@@ -32,6 +32,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { isDayOffCategory, isLeaveAutoProjectCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
+import { isTimesheetSettlementFillEntry, timeEntryUserVisibleNote } from "@/lib/timeEntryNotes";
 import {
   clampDayOffDurationMinutes,
   formatWorkDayDuration,
@@ -216,7 +217,7 @@ export function TimeEntryEditSheet(props: {
 
   useEffect(() => {
     if (!entry || !open) return;
-    setNote(entry.note ?? "");
+    setNote(timeEntryUserVisibleNote(entry.note));
     setProjectId(entry.timeProjectId);
     setSelectedTags(new Set(entry.tagIds));
     const entryCategory = (entry.category as TimeCategory) ?? "work";
@@ -298,8 +299,13 @@ export function TimeEntryEditSheet(props: {
       dayOffDurationMin,
       workDayDurationMinutes
     );
+    const trimmedNote = note.trim();
+    let noteOut: string | null = trimmedNote || null;
+    if (!trimmedNote && isTimesheetSettlementFillEntry(entry) && entry.note?.trim()) {
+      noteOut = entry.note.trim();
+    }
     return {
-      note: note.trim() ? note.trim() : null,
+      note: noteOut,
       timeProjectId: isVacationNoteOnlyCategory(category)
         ? null
         : usesLeaveSystemProject
