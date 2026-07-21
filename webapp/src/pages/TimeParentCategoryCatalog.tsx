@@ -903,7 +903,7 @@ export default function TimeParentCategoryCatalog() {
                       <li
                         key={p.id}
                         className={cn(
-                          "grid gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_minmax(10rem,14rem)] sm:items-center",
+                          "grid gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(9rem,12rem)_minmax(9rem,12rem)_auto] sm:items-center",
                           selectedProjectId === p.id && "border-indigo-400/35 bg-indigo-500/10"
                         )}
                       >
@@ -973,6 +973,37 @@ export default function TimeParentCategoryCatalog() {
                               ))}
                           </SelectContent>
                         </Select>
+                        <div className="flex shrink-0 items-center justify-end gap-0.5">
+                          {!leave ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-white/45 hover:bg-white/10 hover:text-white"
+                                title={t("time.catalogRenameProject")}
+                                onClick={() => openRename("project", p.id, p.name)}
+                              >
+                                <Pencil size={14} />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-white/45 hover:bg-red-500/15 hover:text-red-200"
+                                title={t("time.catalogDeleteProjectTitle")}
+                                onClick={() => {
+                                  setDeleteProjectId(p.id);
+                                  setReassignToProjectId("");
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </>
+                          ) : (
+                            <span className="h-8 w-16" aria-hidden />
+                          )}
+                        </div>
                       </li>
                     );
                   })}
