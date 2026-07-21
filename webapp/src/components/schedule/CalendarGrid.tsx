@@ -10,6 +10,8 @@ interface CalendarGridProps {
   items: CalendarItem[];
   onItemClick: (item: CalendarItem) => void;
   onDateClick?: (date: Date) => void;
+  /** Max pills per day cell (default 3). */
+  pillLimit?: number;
   /**
    * When many month grids share one vertical scroller (e.g. year view), turn off so only one sticky row is not fighting others.
    */
@@ -23,6 +25,7 @@ export function CalendarGrid({
   onItemClick,
   onDateClick,
   stickyDowHeader = true,
+  pillLimit,
 }: CalendarGridProps) {
   const cells = getMonthDays(year, month);
   const todayStr = toDateStr(new Date());
@@ -56,6 +59,7 @@ export function CalendarGrid({
             isToday={date !== null && toDateStr(date) === todayStr}
             onItemClick={onItemClick}
             onDateClick={onDateClick}
+            pillLimit={pillLimit}
           />
         ))}
       </div>

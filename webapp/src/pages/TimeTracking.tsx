@@ -158,6 +158,46 @@ function plannedJobKeyFromEntry(e: TimeEntry): string | null {
   return null;
 }
 
+function timeEntryMonthCalendarTitle(
+  e: TimeEntry,
+  jobs: TimeTrackingJob[] | undefined,
+  projectById: Map<string, TimeProject>,
+  translate: (key: `time.${string}`) => string
+): string {
+  const cat = (e.category ?? "work") as TimeCategory;
+  const isJob = e.kind === "job";
+  const jobKey = plannedJobKeyFromEntry(e);
+  const tourJobTitle =
+    isJob && e.tourShowId
+      ? jobs?.find((j) => j.source === "tour" && j.tourShowId === e.tourShowId)?.title
+      : undefined;
+  const categoryLabel = translate(timeCategoryMessageId(cat));
+  const label =
+    isCompSettlementCategory(cat) || isDayOffCategory(cat) || cat === "travel_allowance"
+      ? categoryLabel
+      : isJob && (jobKey || e.tourShowId)
+        ? (jobKey ? jobs?.find((j) => j.id === jobKey)?.title : undefined) ??
+          tourJobTitle ??
+          translate("time.job")
+        : "";
+  const projEntity =
+    !isLeaveAutoProjectCategory(cat) &&
+    !isVacationNoteOnlyCategory(cat) &&
+    e.timeProjectId
+      ? projectById.get(e.timeProjectId)
+      : undefined;
+  const proj = projEntity?.name?.trim() || null;
+  let title: string;
+  if (label && proj) title = `${label} · ${proj}`;
+  else title = label || proj || categoryLabel;
+  const note = isVacationNoteOnlyCategory(cat) ? e.note?.trim() : "";
+  if (note) {
+    const short = note.length > 32 ? `${note.slice(0, 31)}…` : note;
+    title = `${title} · ${short}`;
+  }
+  return title;
+}
+
 function buildCopiedEntryBody(source: TimeEntry, targetDayYmd: string): Record<string, unknown> {
   const cat = source.category ?? "work";
   const startsAt = wallClockYmdHhMmToUtcIso(targetDayYmd, localHhMmFromUtcIso(source.startsAt));
@@ -1402,17 +1442,22 @@ export default function TimeTracking() {
 
   const monthCalendarItems = useMemo<CalendarItem[]>(() => {
     if (mode !== "month") return [];
-    return Array.from(totalsByDay.entries())
-      .filter(([, mins]) => mins > 0)
-      .map(([day, mins]) => ({
-        id: `time-total:${day}`,
-        title: `${Math.round((mins / 60) * 10) / 10}h`,
-        kind: "summary",
-        startDate: day,
-        endDate: null,
-        raw: {} as CalendarItem["raw"],
-      }));
-  }, [mode, totalsByDay]);
+    return (entries ?? [])
+      .map((e) => {
+        const cat = e.category ?? "work";
+        return {
+          id: e.id,
+          title: timeEntryMonthCalendarTitle(e, jobs, projectById, (key) => t(key as never)),
+          kind: "time" as const,
+          timeCategory: cat,
+          timeIsJob: e.kind === "job",
+          startDate: e.startsAt,
+          endDate: e.endsAt,
+          raw: {} as CalendarItem["raw"],
+        };
+      })
+      .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  }, [mode, entries, jobs, projectById, t]);
 
   const totalsByColumnDay = useMemo(() => {
     const acc = new Map<string, number>();
@@ -2293,8 +2338,12 @@ export default function TimeTracking() {
               year={anchor.getFullYear()}
               month={anchor.getMonth()}
               items={monthCalendarItems}
+              pillLimit={6}
               onItemClick={(item) => {
-                const day = dateFromISODate(item.startDate);
+                const dayKey = item.startDate.includes("T")
+                  ? format(parseISO(item.startDate), "yyyy-MM-dd")
+                  : item.startDate.slice(0, 10);
+                const day = dateFromISODate(dayKey);
                 if (!day) return;
                 setAnchor(day);
                 setMode("week");

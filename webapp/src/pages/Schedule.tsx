@@ -196,7 +196,7 @@ function VenueOccupationView({
 
   for (const item of items) {
     if (!item.startDate) continue;
-    if (item.kind === "summary") continue;
+    if (item.kind === "summary" || item.kind === "time") continue;
     const venue = resolveItemVenue(item);
     if (!venue) continue;
     if (venueFilterId !== "all" && venue.id !== venueFilterId) continue;

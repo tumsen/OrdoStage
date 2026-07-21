@@ -39,12 +39,16 @@ export function isMirroredSystemInternalBookingTitle(title: string): boolean {
 export interface CalendarItem {
   id: string;
   title: string;
-  kind: "event" | "booking" | "job" | "summary" | "tour";
+  kind: "event" | "booking" | "job" | "summary" | "tour" | "time";
   type?: BookingType;
   status?: string;
   startDate: string;
   endDate: string | null;
   raw: EventDetail | InternalBookingDetail | TourDetail;
+  /** Time tracking month view — `TimeEntry.category` for pill coloring. */
+  timeCategory?: string;
+  /** Time tracking month view — job rows use job styling when category is work-like. */
+  timeIsJob?: boolean;
   /** Venue label for job rows and tour day rows (when known). */
   venueLabel?: string;
   /** When true, render greyed/faded and ignore interactions (used for conflict awareness). */
@@ -360,7 +364,7 @@ export function getMonthCalendarDays(anchor: Date): Date[] {
  * Tour rows are excluded (no stable venue id in the model).
  */
 export function calendarItemVenueIdForFilter(item: CalendarItem): string | null {
-  if (item.kind === "summary") return null;
+  if (item.kind === "summary" || item.kind === "time") return null;
   if (item.id.startsWith("tour:")) return null;
   if (item.kind === "booking") {
     const booking = item.raw as InternalBookingDetail;
@@ -425,7 +429,24 @@ export const ITEM_COLORS: Record<string, string> = {
   other: "bg-blue-600/80 text-blue-100 border border-blue-500/40",
 };
 
+function timeCategoryPillClass(cat: string, isJob?: boolean): string {
+  if (cat === "vacation") return "bg-emerald-500/35 text-emerald-50 border border-emerald-400/50";
+  if (cat === "sick") return "bg-orange-500/35 text-orange-50 border border-orange-400/50";
+  if (cat === "holiday") return "bg-purple-500/35 text-purple-50 border border-purple-400/50";
+  if (cat === "extra_vacation") return "bg-teal-500/35 text-teal-50 border border-teal-400/50";
+  if (cat === "comp_time") return "bg-cyan-500/35 text-cyan-50 border border-cyan-400/50";
+  if (cat === "comp_settlement_earned" || cat === "comp_settlement_used") {
+    return "bg-amber-500/25 text-amber-50 border border-dashed border-amber-400/55";
+  }
+  if (cat === "travel_allowance") return "bg-amber-500/30 text-amber-50 border border-amber-400/50";
+  if (isJob) return "bg-emerald-500/30 text-emerald-50 border border-emerald-400/45";
+  return "bg-sky-500/30 text-sky-50 border border-sky-400/45";
+}
+
 export function itemColor(item: CalendarItem): string {
+  if (item.kind === "time") {
+    return timeCategoryPillClass(item.timeCategory ?? "work", item.timeIsJob);
+  }
   if (item.kind === "job") return ITEM_COLORS.job;
   if (item.kind === "tour") return ITEM_COLORS.tour;
   if (item.kind === "event") return ITEM_COLORS.event;
@@ -452,6 +473,7 @@ export function scheduleVisibilityFilterKey(item: CalendarItem): ScheduleVisibil
   if (item.kind === "tour") return "tour";
   if (item.kind === "event" || item.kind === "job") return "event";
   if (item.kind === "summary") return "other";
+  if (item.kind === "time") return "other";
   if (item.kind === "booking") {
     const raw = item.raw as InternalBookingDetail;
     const t = (raw.type ?? item.type ?? "other").trim().toLowerCase();

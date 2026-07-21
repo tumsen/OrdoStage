@@ -27,9 +27,17 @@ interface CalendarCellProps {
   isToday: boolean;
   onItemClick: (item: CalendarItem) => void;
   onDateClick?: (date: Date) => void;
+  pillLimit?: number;
 }
 
-export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }: CalendarCellProps) {
+export function CalendarCell({
+  date,
+  items,
+  isToday,
+  onItemClick,
+  onDateClick,
+  pillLimit = PILL_LIMIT,
+}: CalendarCellProps) {
   const { t } = useI18n();
   const { effective } = usePreferences();
   const locale =
@@ -47,8 +55,8 @@ export function CalendarCell({ date, items, isToday, onItemClick, onDateClick }:
   const foregroundItems = dayItems.filter((item) => item.renderBehind !== true);
   const orphanBacking = orphanBackingVenueBookings(foregroundItems, backingItems);
   const combinedForPills = [...foregroundItems, ...orphanBacking];
-  const visible = combinedForPills.slice(0, PILL_LIMIT);
-  const overflow = combinedForPills.length - PILL_LIMIT;
+  const visible = combinedForPills.slice(0, pillLimit);
+  const overflow = combinedForPills.length - pillLimit;
   const orphanIds = new Set(orphanBacking.map((b) => b.id));
 
   return (
