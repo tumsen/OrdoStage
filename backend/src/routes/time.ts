@@ -28,7 +28,15 @@ import {
   isVacationNoteOnlyCategory,
   normalizeEntryProjectAndTags,
   resolveEntryTimeProjectId,
+  resolveLeaveTimeProjectId,
 } from "../services/leaveTimeProjects";
+import {
+  backfillMissingTimeProjects,
+  categoryRequiresTimeProject,
+  countProjectUsages,
+  ensureUnassignedHoursProject,
+  reassignProjectReferences,
+} from "../services/timeProjectAssignment";
 import {
   ensureDefaultParentCategories,
   isPresetParentCategoryKey,
@@ -44,6 +52,7 @@ import {
   PatchTimeTagSchema,
   CreateTimeProjectSchema,
   PatchTimeProjectSchema,
+  DeleteTimeProjectSchema,
   CreateTimeParentCategorySchema,
   PatchTimeParentCategorySchema,
   LinkTimeParentCategoryItemSchema,
@@ -1914,11 +1923,17 @@ timeRouter.post("/time/bulk-update", zValidator("json", BulkTimeEntryUpdateSchem
   }
   if (body.action.setCategory) {
     data.category = body.action.setCategory;
-    if (
+    if (isVacationNoteOnlyCategory(body.action.setCategory)) {
+      data.timeProjectId = null;
+    } else if (
       body.action.setCategory !== "work" &&
       body.action.setCategory !== "travel_allowance"
     ) {
-      data.timeProjectId = null;
+      const leaveProjectId = await resolveLeaveTimeProjectId(
+        user.organizationId,
+        body.action.setCategory
+      );
+      if (leaveProjectId) data.timeProjectId = leaveProjectId;
     }
   }
 
@@ -2019,6 +2034,7 @@ timeRouter.get("/time/parent-category-catalog", async (c) => {
   }
   await ensureDefaultParentCategories(user.organizationId);
   await syncEventShowTimeProjects(user.organizationId);
+  await backfillMissingTimeProjects(user.organizationId);
   const [categories, events, tours, standaloneProjects] = await Promise.all([
     prisma.timeParentCategory.findMany({
       where: { organizationId: user.organizationId },
@@ -2236,6 +2252,7 @@ timeRouter.get("/time/projects", async (c) => {
   await syncEventShowTimeProjects(user.organizationId);
   await ensureAllLeaveTimeProjects(user.organizationId);
   await backfillLeaveEntryProjects(user.organizationId);
+  await backfillMissingTimeProjects(user.organizationId);
   const archived = c.req.query("archived") === "1";
   const rows = await prisma.timeProject.findMany({
     where: {
@@ -2447,7 +2464,7 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
   return c.json({ data: serializeProject(row) });
 });
 
-timeRouter.delete("/time/projects/:id", async (c) => {
+timeRouter.delete("/time/projects/:id", zValidator("json", DeleteTimeProjectSchema), async (c) => {
   const user = c.get("user");
   if (!user?.organizationId) {
     return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
@@ -2456,6 +2473,7 @@ timeRouter.delete("/time/projects/:id", async (c) => {
     return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
   }
   const id = c.req.param("id");
+  const body = c.req.valid("json");
   const existing = await prisma.timeProject.findFirst({
     where: { id, organizationId: user.organizationId },
   });
@@ -2471,8 +2489,57 @@ timeRouter.delete("/time/projects/:id", async (c) => {
       403
     );
   }
-  await prisma.timeProject.delete({ where: { id } });
-  return c.json({ ok: true });
+  if (body.reassignToProjectId === id) {
+    return c.json(
+      { error: { message: "Choose a different project for the existing registrations.", code: "BAD_REQUEST" } },
+      400
+    );
+  }
+
+  try {
+    const moved = await reassignProjectReferences({
+      organizationId: user.organizationId,
+      fromProjectId: id,
+      toProjectId: body.reassignToProjectId,
+    });
+    await prisma.timeProject.delete({ where: { id } });
+    return c.json({
+      data: {
+        ok: true,
+        reassignedEntries: moved.entries,
+        reassignedTravelClaims: moved.travelClaims,
+        reassignedMileageClaims: moved.mileageClaims,
+      },
+    });
+  } catch (err) {
+    const code = err instanceof Error ? err.message : "";
+    if (code === "TARGET_NOT_FOUND") {
+      return c.json({ error: { message: "Target project not found", code: "NOT_FOUND" } }, 404);
+    }
+    if (code === "SOURCE_NOT_FOUND") {
+      return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+    }
+    throw err;
+  }
+});
+
+/** Optional: usage count before delete UI. */
+timeRouter.get("/time/projects/:id/usage", async (c) => {
+  const user = c.get("user");
+  if (!user?.organizationId) {
+    return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+  }
+  if (!canAction(c, "time.manage_catalog")) {
+    return c.json({ error: { message: "Forbidden", code: "FORBIDDEN" } }, 403);
+  }
+  const id = c.req.param("id");
+  const existing = await prisma.timeProject.findFirst({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true },
+  });
+  if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+  const count = await countProjectUsages(user.organizationId, id);
+  return c.json({ data: { count } });
 });
 
 timeRouter.get("/time/jobs", async (c) => {
@@ -3653,9 +3720,13 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
     resolvedCustomProjectId,
     body.tagIds ?? []
   );
-  if (normalizedCustom.timeProjectId) {
+  let customProjectId = normalizedCustom.timeProjectId;
+  if (!customProjectId && categoryRequiresTimeProject(entryCategory)) {
+    customProjectId = await ensureUnassignedHoursProject(user.organizationId);
+  }
+  if (customProjectId) {
     const p = await prisma.timeProject.findFirst({
-      where: { id: normalizedCustom.timeProjectId, organizationId: user.organizationId },
+      where: { id: customProjectId, organizationId: user.organizationId },
     });
     if (!p) return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
   } else if (body.timeProjectId && !isVacationNoteOnlyCategory(entryCategory)) {
@@ -3711,7 +3782,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       eventShowStaffingId: null,
       internalBookingPersonId: null,
       internalBookingDayKey: null,
-      timeProjectId: normalizedCustom.timeProjectId,
+      timeProjectId: customProjectId,
       note: body.note ?? null,
       isLocked: body.isLocked ?? false,
       ...segmentGroupPatchCustom,
@@ -3737,7 +3808,7 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
           eventShowStaffingId: null,
           internalBookingPersonId: null,
           internalBookingDayKey: null,
-          timeProjectId: normalizedCustom.timeProjectId,
+          timeProjectId: customProjectId,
           note: body.note ?? null,
           isLocked: body.isLocked ?? false,
           ...segmentGroupPatchCustom,
@@ -4043,7 +4114,17 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
     resolvedProjectId,
     body.tagIds !== undefined ? body.tagIds : existing.tagLinks.map((t) => t.timeTagId)
   );
-  const finalProjectId = normalizedPatch.timeProjectId;
+  const finalProjectId =
+    normalizedPatch.timeProjectId ??
+    (categoryRequiresTimeProject(finalCategory)
+      ? await ensureUnassignedHoursProject(user.organizationId)
+      : null);
+  if (finalProjectId) {
+    const p = await prisma.timeProject.findFirst({
+      where: { id: finalProjectId, organizationId: user.organizationId },
+    });
+    if (!p) return c.json({ error: { message: "Project not found", code: "NOT_FOUND" } }, 404);
+  }
   const finalNote = body.note !== undefined ? body.note : existing.note;
   const finalIsLocked = body.isLocked !== undefined ? body.isLocked : existing.isLocked;
   const finalTagIds = normalizedPatch.tagIds;

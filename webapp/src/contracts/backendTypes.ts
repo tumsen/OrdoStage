@@ -1303,6 +1303,11 @@ export const PatchTimeProjectSchema = z.object({
   color: z.union([TimeCatalogHexColorSchema, z.null()]).optional(),
 });
 
+/** Delete a project after moving its time entries / claims to another project. */
+export const DeleteTimeProjectSchema = z.object({
+  reassignToProjectId: z.string().min(1),
+});
+
 export const CreateTimeParentCategorySchema = z.object({
   name: z.string().min(1),
   sortOrder: z.number().int().optional(),

@@ -205,8 +205,8 @@ export function TimeEntryEditSheet(props: {
   );
 
   const selectedProjectLabel = useMemo(() => {
-    if (!projectId) return t("time.noProject");
-    return activeProjects.find((p) => p.id === projectId)?.name ?? t("time.noProject");
+    if (!projectId) return t("time.projectRequiredPlaceholder");
+    return activeProjects.find((p) => p.id === projectId)?.name ?? t("time.projectRequiredPlaceholder");
   }, [projectId, activeProjects, t]);
 
   const selectedProjectColor = useMemo(() => {
@@ -602,18 +602,6 @@ export function TimeEntryEditSheet(props: {
                   />
                   <CommandList>
                     <CommandEmpty className="text-white/50 py-4 text-sm">{t("time.noProjectMatches")}</CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        value="__none__ none"
-                        onSelect={() => {
-                          setProjectId(null);
-                          setProjectOpen(false);
-                        }}
-                        className="text-white aria-selected:bg-white/10"
-                      >
-                        {t("time.noProject")}
-                      </CommandItem>
-                    </CommandGroup>
                     {projectsByParentCategory.map((group) => (
                       <CommandGroup key={group.key} heading={group.label}>
                         {group.projects.map((p) => {

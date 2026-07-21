@@ -91,6 +91,8 @@ export default function TimeParentCategoryCatalog() {
   const [pickEventId, setPickEventId] = useState("");
   const [pickTourId, setPickTourId] = useState("");
   const [pickProjectId, setPickProjectId] = useState("");
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const [reassignToProjectId, setReassignToProjectId] = useState("");
 
   const { data: catalog, isLoading } = useQuery({
     queryKey: ["time-parent-category-catalog"],
@@ -129,11 +131,10 @@ export default function TimeParentCategoryCatalog() {
     () => (catalog?.tours ?? []).filter((tour) => !tour.timeParentCategoryId),
     [catalog]
   );
-  /** Imported / manual projects not yet placed in a parent category (excludes leave system projects). */
   const unassignedProjects = useMemo(
     () =>
       (catalog?.standaloneProjects ?? []).filter(
-        (p) => !p.timeParentCategoryId && !p.systemKey
+        (p) => !p.timeParentCategoryId && !(p.systemKey?.startsWith("leave_") ?? false)
       ),
     [catalog]
   );
@@ -200,9 +201,37 @@ export default function TimeParentCategoryCatalog() {
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
   });
 
+  const reassignTargets = useMemo(() => {
+    const all = catalog?.standaloneProjects ?? [];
+    return all.filter(
+      (p) =>
+        p.id !== deleteProjectId &&
+        !p.isArchived &&
+        !(p.systemKey?.startsWith("leave_") ?? false)
+    );
+  }, [catalog, deleteProjectId]);
+
   const deleteProject = useMutation({
-    mutationFn: (id: string) => api.delete(`/api/time/projects/${id}`),
-    onSuccess: invalidate,
+    mutationFn: (vars: { id: string; reassignToProjectId: string }) =>
+      api.deleteWithBody<{
+        ok: boolean;
+        reassignedEntries: number;
+        reassignedTravelClaims: number;
+        reassignedMileageClaims: number;
+      }>(`/api/time/projects/${vars.id}`, {
+        reassignToProjectId: vars.reassignToProjectId,
+      }),
+    onSuccess: (data) => {
+      invalidate();
+      setDeleteProjectId(null);
+      setReassignToProjectId("");
+      toast({
+        title: t("time.catalogProjectDeleted"),
+        description: t("time.catalogProjectReassigned", {
+          count: data.reassignedEntries + data.reassignedTravelClaims + data.reassignedMileageClaims,
+        }),
+      });
+    },
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
   });
 
@@ -414,8 +443,8 @@ export default function TimeParentCategoryCatalog() {
                         label={p.name}
                         sublabel={t("time.parentCategoryStandaloneProject")}
                         onRemove={() => {
-                          if (!confirm(t("time.catalogDeleteConfirm"))) return;
-                          deleteProject.mutate(p.id);
+                          setDeleteProjectId(p.id);
+                          setReassignToProjectId("");
                         }}
                         removing={deleteProject.isPending}
                       />
@@ -554,28 +583,43 @@ export default function TimeParentCategoryCatalog() {
                     className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2"
                   >
                     <span className="min-w-0 flex-1 truncate text-sm text-white/90">{p.name}</span>
-                    <Select
-                      value=""
-                      onValueChange={(categoryId) => {
-                        if (!categoryId) return;
-                        linkItem.mutate({
-                          type: "project",
-                          id: p.id,
-                          timeParentCategoryId: categoryId,
-                        });
-                      }}
-                    >
-                      <SelectTrigger className="h-8 w-44 border-white/10 bg-white/5 text-xs text-white">
-                        <SelectValue placeholder={t("time.parentCategorySelectPlaceholder")} />
-                      </SelectTrigger>
-                      <SelectContent className="border-white/10 bg-[#16161f] text-white">
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-1.5">
+                      <Select
+                        value=""
+                        onValueChange={(categoryId) => {
+                          if (!categoryId) return;
+                          linkItem.mutate({
+                            type: "project",
+                            id: p.id,
+                            timeParentCategoryId: categoryId,
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-44 border-white/10 bg-white/5 text-xs text-white">
+                          <SelectValue placeholder={t("time.parentCategorySelectPlaceholder")} />
+                        </SelectTrigger>
+                        <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-white/35 hover:text-red-400"
+                        onClick={() => {
+                          setDeleteProjectId(p.id);
+                          setReassignToProjectId("");
+                        }}
+                        aria-label={t("time.catalogDeleteConfirm")}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -654,6 +698,59 @@ export default function TimeParentCategoryCatalog() {
             </ul>
           ) : null}
         </section>
+      ) : null}
+
+      {deleteProjectId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-white/15 bg-[#16161f] p-5 shadow-xl space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-white">{t("time.catalogDeleteProjectTitle")}</h2>
+              <p className="mt-1 text-sm text-white/55">{t("time.catalogDeleteProjectHint")}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-xs">{t("time.catalogReassignToProject")}</Label>
+              <Select value={reassignToProjectId} onValueChange={setReassignToProjectId}>
+                <SelectTrigger className="h-9 border-white/10 bg-white/5 text-white">
+                  <SelectValue placeholder={t("time.catalogReassignPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                  {reassignTargets.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-white/15 text-white"
+                onClick={() => {
+                  setDeleteProjectId(null);
+                  setReassignToProjectId("");
+                }}
+              >
+                {t("time.cancelDelete")}
+              </Button>
+              <Button
+                type="button"
+                className="bg-red-700 hover:bg-red-600"
+                disabled={!reassignToProjectId || deleteProject.isPending || reassignTargets.length === 0}
+                onClick={() => {
+                  if (!deleteProjectId || !reassignToProjectId) return;
+                  deleteProject.mutate({
+                    id: deleteProjectId,
+                    reassignToProjectId,
+                  });
+                }}
+              >
+                {t("time.catalogDeleteAndReassign")}
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );
