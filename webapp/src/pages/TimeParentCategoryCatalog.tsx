@@ -90,6 +90,7 @@ export default function TimeParentCategoryCatalog() {
   const [newProjectName, setNewProjectName] = useState("");
   const [pickEventId, setPickEventId] = useState("");
   const [pickTourId, setPickTourId] = useState("");
+  const [pickProjectId, setPickProjectId] = useState("");
 
   const { data: catalog, isLoading } = useQuery({
     queryKey: ["time-parent-category-catalog"],
@@ -126,6 +127,14 @@ export default function TimeParentCategoryCatalog() {
   );
   const unassignedTours = useMemo(
     () => (catalog?.tours ?? []).filter((tour) => !tour.timeParentCategoryId),
+    [catalog]
+  );
+  /** Imported / manual projects not yet placed in a parent category (excludes leave system projects). */
+  const unassignedProjects = useMemo(
+    () =>
+      (catalog?.standaloneProjects ?? []).filter(
+        (p) => !p.timeParentCategoryId && !p.systemKey
+      ),
     [catalog]
   );
 
@@ -175,6 +184,7 @@ export default function TimeParentCategoryCatalog() {
       invalidate();
       setPickEventId("");
       setPickTourId("");
+      setPickProjectId("");
     },
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
   });
@@ -365,6 +375,38 @@ export default function TimeParentCategoryCatalog() {
                       {t("time.add")}
                     </Button>
                   </div>
+                  {unassignedProjects.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Select value={pickProjectId} onValueChange={setPickProjectId}>
+                        <SelectTrigger className="h-9 w-full max-w-sm border-white/10 bg-white/5 text-white">
+                          <SelectValue placeholder={t("time.parentCategorySelectUnassignedProject")} />
+                        </SelectTrigger>
+                        <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                          {unassignedProjects.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-white/15 text-white hover:bg-white/5"
+                        disabled={!pickProjectId || linkItem.isPending}
+                        onClick={() => {
+                          if (!activeId || !pickProjectId) return;
+                          linkItem.mutate({
+                            type: "project",
+                            id: pickProjectId,
+                            timeParentCategoryId: activeId,
+                          });
+                        }}
+                      >
+                        {t("time.parentCategoryLinkProject")}
+                      </Button>
+                    </div>
+                  ) : null}
                   <ul className="space-y-1.5">
                     {members.projects.map((p) => (
                       <MemberRow
@@ -493,12 +535,52 @@ export default function TimeParentCategoryCatalog() {
         </div>
       )}
 
-      {!isLoading && (unassignedEvents.length > 0 || unassignedTours.length > 0) ? (
+      {!isLoading &&
+      (unassignedEvents.length > 0 || unassignedTours.length > 0 || unassignedProjects.length > 0) ? (
         <section className="rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-5 space-y-4">
           <div>
             <h2 className="text-sm font-medium text-amber-100/90">{t("time.parentCategoryUnassignedHeading")}</h2>
             <p className="mt-1 text-xs text-white/45">{t("time.parentCategoryUnassignedHint")}</p>
           </div>
+          {unassignedProjects.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
+                {t("time.parentCategoryUnassignedProjects")} ({unassignedProjects.length})
+              </p>
+              <ul className="space-y-1.5">
+                {unassignedProjects.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-sm text-white/90">{p.name}</span>
+                    <Select
+                      value=""
+                      onValueChange={(categoryId) => {
+                        if (!categoryId) return;
+                        linkItem.mutate({
+                          type: "project",
+                          id: p.id,
+                          timeParentCategoryId: categoryId,
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-44 border-white/10 bg-white/5 text-xs text-white">
+                        <SelectValue placeholder={t("time.parentCategorySelectPlaceholder")} />
+                      </SelectTrigger>
+                      <SelectContent className="border-white/10 bg-[#16161f] text-white">
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {unassignedEvents.length > 0 ? (
             <ul className="space-y-1.5">
               {unassignedEvents.map((e) => (
