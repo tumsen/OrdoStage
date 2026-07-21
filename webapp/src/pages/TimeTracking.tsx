@@ -861,6 +861,8 @@ export default function TimeTracking() {
       queryClient.invalidateQueries({ queryKey: ["time-leave-balances"] });
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       const settlement = data.compSettlement;
+      const fillMinutes =
+        settlement?.days?.reduce((s, d) => s + (d.fillMinutes ?? 0), 0) ?? 0;
       if (leaveManagementEnabled && settlement && settlement.totalDeltaMinutes !== 0) {
         const sign = settlement.totalDeltaMinutes >= 0 ? "+" : "";
         const h = Math.floor(Math.abs(settlement.totalDeltaMinutes) / 60);
@@ -869,6 +871,8 @@ export default function TimeTracking() {
         timeNotify({
           title: t("time.timesheetApprovedCompAdjusted", { delta }),
         });
+      } else if (leaveManagementEnabled && settlement && fillMinutes > 0) {
+        timeNotify({ title: t("time.timesheetApprovedCompFilled") });
       } else if (
         leaveManagementEnabled &&
         settlement &&

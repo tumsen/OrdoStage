@@ -1385,7 +1385,7 @@ export const LeaveBalanceSummarySchema = z.object({
   compTimeUsedMinutes: z.number(),
   compTimeRemainingMinutes: z.number(),
   sickDays: z.number(),
-  /** Net afspadsering from week approvals in the requested from/to range (minutes). */
+  /** Net afspadsering change in the requested from/to range (earned − used). */
   compTimePeriodDeltaMinutes: z.number().optional(),
 });
 
@@ -1750,6 +1750,7 @@ export const TimesheetCompSettlementDaySchema = z.object({
   fulfillingMinutes: z.number(),
   dailyNormMinutes: z.number(),
   deltaMinutes: z.number(),
+  fillMinutes: z.number().optional(),
 });
 
 export const TimesheetCompSettlementSchema = z.object({

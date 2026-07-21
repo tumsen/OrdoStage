@@ -283,7 +283,7 @@ const en = {
     leaveSource_opening_balance: "Opening balance",
     leaveSource_reversal: "Reversal",
     timesheetApproveHint:
-      "Approving settles each weekday (Mon–Fri) against the daily norm (weekly contract ÷ 5, e.g. 7h 24m at 37h/week). Work + vacation + feriefridage + holidays count toward the norm; the difference updates afspadsering (+ or −).",
+      "Approving settles each weekday (Mon–Fri) against the daily norm (weekly contract ÷ 5, e.g. 7h 24m at 37h/week). Work + vacation + feriefridage + holidays count toward the norm. Days under the norm get afspadsering blocks automatically (until the week reaches contract hours); overtime days credit afspadsering.",
     timesheetApproveConfirmTitle: "Approve this week?",
     timesheetApproveConfirmBody: "The week will be locked and can only be reopened by someone with permission to view everyone’s time.",
     timesheetApproveConfirm: "Approve week",
@@ -291,6 +291,7 @@ const en = {
     timesheetApprovedCompAdjusted: "Week approved. Afspadsering adjusted by {{delta}}.",
     timesheetApprovedNoCompChange: "Week approved. Daily norm matched — no afspadsering change.",
     timesheetApproved: "Week approved.",
+    timesheetApprovedCompFilled: "Week approved. Afspadsering blocks added for under-norm days.",
     timesheetApproveError: "Could not approve timesheet.",
     timesheetReopened: "Timesheet reopened.",
     timesheetReopenError: "Could not reopen timesheet.",
@@ -753,7 +754,7 @@ const da: DeepPartial<typeof en> = {
     leaveSource_timesheet_settlement: "Ugegodkendelse (dagsnorm)",
     leaveSource_reversal: "Tilbageførsel",
     timesheetApproveHint:
-      "Godkendelse afregner hver hverdag (man–fre) mod dagsnormen (ugentlig kontrakt ÷ 5, fx 7t 24m ved 37t/uge). Arbejde + ferie + feriefridage + helligdage tæller med; differencen opdaterer afspadsering (+ eller −).",
+      "Godkendelse afregner hver hverdag (man–fre) mod dagsnormen (ugentlig kontrakt ÷ 5, fx 7t 24m ved 37t/uge). Arbejde + ferie + feriefridage + helligdage tæller med. Dage under normen får automatisk afspadseringsblokke (indtil ugen når kontrakt-timer); overarbejde krediters som afspadsering.",
     timesheetApproveConfirmTitle: "Godkend denne uge?",
     timesheetApproveConfirmBody: "Ugen låses og kan kun genåbnes af nogen med adgang til at se alles timer.",
     timesheetApproveConfirm: "Godkend uge",
@@ -761,6 +762,7 @@ const da: DeepPartial<typeof en> = {
     timesheetApprovedCompAdjusted: "Uge godkendt. Afspadsering justeret med {{delta}}.",
     timesheetApprovedNoCompChange: "Uge godkendt. Dagsnorm opfyldt — ingen ændring i afspadsering.",
     timesheetApproved: "Uge godkendt.",
+    timesheetApprovedCompFilled: "Uge godkendt. Afspadseringsblokke tilføjet på dage under normen.",
     timesheetApproveError: "Kunne ikke godkende ugen.",
     timesheetReopened: "Ugen er genåbnet.",
     timesheetReopenError: "Kunne ikke genåbne ugen.",

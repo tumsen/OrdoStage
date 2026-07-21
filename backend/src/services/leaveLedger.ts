@@ -236,6 +236,8 @@ export async function applyTimeEntryToLeaveLedger(
     amount,
     source: "time_entry",
     timeEntryId: entry.id,
+    periodStart: entry.startsAt,
+    periodEnd: entry.endsAt,
     createdByUserId: options?.createdByUserId ?? null,
   });
 }
@@ -446,4 +448,59 @@ export async function sumCompTimeEarnedMinutesInRange(
     map.set(row.personId, (map.get(row.personId) ?? 0) + row.amount);
   }
   return map;
+}
+
+/** Afspadsering used in range from time entries (`category=comp_time`). */
+export async function sumCompTimeUsedMinutesInRange(
+  organizationId: string,
+  personIds: string[],
+  rangeStart: Date,
+  rangeEndExclusive: Date
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (personIds.length === 0) return map;
+
+  const entries = await prisma.timeEntry.findMany({
+    where: {
+      organizationId,
+      personId: { in: personIds },
+      category: "comp_time",
+      startsAt: { lt: rangeEndExclusive },
+      endsAt: { gt: rangeStart },
+    },
+    select: { personId: true, startsAt: true, endsAt: true },
+  });
+
+  const startMs = rangeStart.getTime();
+  const endMs = rangeEndExclusive.getTime();
+  for (const e of entries) {
+    const clippedStart = Math.max(e.startsAt.getTime(), startMs);
+    const clippedEnd = Math.min(e.endsAt.getTime(), endMs);
+    const dur = Math.max(0, (clippedEnd - clippedStart) / 60_000);
+    if (dur <= 0) continue;
+    map.set(e.personId, (map.get(e.personId) ?? 0) + dur);
+  }
+  return map;
+}
+
+/** Net afspadsering change in range: earned − used (manual + auto-fill). */
+export async function computeCompTimePeriodDeltaMinutes(
+  organizationId: string,
+  personId: string,
+  rangeStart: Date,
+  rangeEndExclusive: Date
+): Promise<number> {
+  const earned = await sumCompTimeEarnedMinutesInRange(
+    organizationId,
+    [personId],
+    rangeStart,
+    rangeEndExclusive
+  );
+  const used = await sumCompTimeUsedMinutesInRange(
+    organizationId,
+    [personId],
+    rangeStart,
+    rangeEndExclusive
+  );
+  return Math.round((earned.get(personId) ?? 0) - (used.get(personId) ?? 0));
 }

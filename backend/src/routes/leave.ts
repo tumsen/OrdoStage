@@ -20,9 +20,9 @@ import {
   mapOrgLeavePolicy,
   mapPersonLeaveProfile,
   postLeaveTransaction,
+  computeCompTimePeriodDeltaMinutes,
 } from "../services/leaveLedger";
 import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays, accrueVacationEarnedForDateRange } from "../rules/leave/danishLeave";
-import { TIMESHEET_COMP_SETTLEMENT_SOURCE } from "../services/timesheetCompSettlement";
 import { DateTime } from "luxon";
 import { getClientWallClockZone } from "../clientWallClock";
 
@@ -278,20 +278,16 @@ leaveRouter.get("/time/leave-balances/:personId", async (c) => {
       .plus({ days: 1 })
       .startOf("day")
       .toJSDate();
-    const agg = await prisma.leaveTransaction.aggregate({
-      where: {
-        organizationId: user.organizationId,
-        personId,
-        source: TIMESHEET_COMP_SETTLEMENT_SOURCE,
-        periodStart: { lt: rangeEndExclusive },
-        periodEnd: { gt: rangeStart },
-      },
-      _sum: { amount: true },
-    });
+    const compTimePeriodDeltaMinutes = await computeCompTimePeriodDeltaMinutes(
+      user.organizationId,
+      personId,
+      rangeStart,
+      rangeEndExclusive
+    );
     return c.json({
       data: {
         ...leave,
-        compTimePeriodDeltaMinutes: Math.round(agg._sum.amount ?? 0),
+        compTimePeriodDeltaMinutes,
       },
     });
   }

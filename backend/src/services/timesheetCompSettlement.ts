@@ -8,11 +8,14 @@ import {
   resolveVacationYear,
 } from "../rules/leave/danishLeave";
 import {
+  applyTimeEntryToLeaveLedger,
   ensureOrgLeavePolicy,
   mapOrgLeavePolicy,
   mapPersonLeaveProfile,
   postLeaveTransaction,
+  removeTimeEntryFromLeaveLedger,
 } from "./leaveLedger";
+import { ensureLeaveTimeProject } from "./leaveTimeProjects";
 
 export const TIMESHEET_COMP_SETTLEMENT_SOURCE = "timesheet_settlement";
 const APPROVAL_NOTE_PREFIX = "timesheetApprovalId:";
@@ -23,10 +26,17 @@ type DayParts = {
   vacationMinutes: number;
   extraVacationMinutes: number;
   holidayMinutes: number;
+  compTimeMinutes: number;
 };
 
 function emptyDayParts(): DayParts {
-  return { workMinutes: 0, vacationMinutes: 0, extraVacationMinutes: 0, holidayMinutes: 0 };
+  return {
+    workMinutes: 0,
+    vacationMinutes: 0,
+    extraVacationMinutes: 0,
+    holidayMinutes: 0,
+    compTimeMinutes: 0,
+  };
 }
 
 /** Minutes that count toward the daily norm (not afspadsering, sick, or travel). */
@@ -44,9 +54,10 @@ function addCategoryMinutes(parts: DayParts, category: string, minutes: number) 
   else if (category === "vacation") parts.vacationMinutes += minutes;
   else if (category === "extra_vacation") parts.extraVacationMinutes += minutes;
   else if (category === "holiday") parts.holidayMinutes += minutes;
+  else if (category === "comp_time") parts.compTimeMinutes += minutes;
 }
 
-function aggregateNormFulfillingByLocalDay(
+function aggregateByLocalDay(
   entries: Array<{ startsAt: Date; endsAt: Date; category: string }>,
   periodStart: Date,
   periodEnd: Date,
@@ -83,11 +94,92 @@ function weekdayDateKeysInPeriod(periodStart: Date, periodEnd: Date, zone: strin
   return keys;
 }
 
+async function resolveUserIdForPerson(
+  organizationId: string,
+  personId: string,
+  fallbackUserId?: string | null
+): Promise<string | null> {
+  const person = await prisma.person.findFirst({
+    where: { id: personId, organizationId },
+    select: { email: true },
+  });
+  const email = person?.email?.trim();
+  if (email) {
+    const membership = await prisma.organizationMembership.findFirst({
+      where: {
+        organizationId,
+        user: { email: { equals: email, mode: "insensitive" } },
+      },
+      select: { userId: true },
+    });
+    if (membership) return membership.userId;
+  }
+  return fallbackUserId ?? null;
+}
+
+async function deleteSettlementFillEntries(input: {
+  organizationId: string;
+  personId?: string;
+  timesheetApprovalId?: string;
+  periodStart?: Date;
+  periodEnd?: Date;
+}) {
+  const whereNote = input.timesheetApprovalId
+    ? { startsWith: `${SETTLEMENT_ENTRY_NOTE_PREFIX}${input.timesheetApprovalId}` as const }
+    : { startsWith: SETTLEMENT_ENTRY_NOTE_PREFIX };
+
+  const rows = await prisma.timeEntry.findMany({
+    where: {
+      organizationId: input.organizationId,
+      ...(input.personId ? { personId: input.personId } : {}),
+      ...(input.periodStart && input.periodEnd
+        ? { startsAt: { lt: input.periodEnd }, endsAt: { gt: input.periodStart } }
+        : {}),
+      OR: [
+        { note: whereNote },
+        { category: { in: ["comp_settlement_earned", "comp_settlement_used"] } },
+      ],
+    },
+    select: { id: true },
+  });
+  for (const row of rows) {
+    await removeTimeEntryFromLeaveLedger(row.id);
+  }
+  if (rows.length > 0) {
+    await prisma.timeEntry.deleteMany({
+      where: { id: { in: rows.map((r) => r.id) } },
+    });
+  }
+}
+
+function fillWindowAfterDayLoad(
+  dateKey: string,
+  durationMinutes: number,
+  zone: string,
+  dayEntries: Array<{ endsAt: Date }>
+): { startsAt: Date; endsAt: Date } {
+  let start = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone }).set({
+    hour: 8,
+    minute: 0,
+    second: 0,
+    millisecond: 0,
+  });
+  for (const e of dayEntries) {
+    const end = DateTime.fromJSDate(e.endsAt, { zone });
+    if (end > start) start = end;
+  }
+  const ends = start.plus({ minutes: durationMinutes });
+  return { startsAt: start.toJSDate(), endsAt: ends.toJSDate() };
+}
+
 export type TimesheetCompSettlementDay = {
   date: string;
   fulfillingMinutes: number;
   dailyNormMinutes: number;
+  /** Net ledger effect for the day: +overtime earned, −afspadsering fill created. */
   deltaMinutes: number;
+  /** Afspadsering minutes auto-created as time entries on under-norm days. */
+  fillMinutes: number;
 };
 
 export type TimesheetCompSettlementResult = {
@@ -125,20 +217,6 @@ export async function settleCompTimeForTimesheetApproval(input: {
   const policyRow = await ensureOrgLeavePolicy(input.organizationId);
   if (!policyRow.compTimeFromOvertimeEnabled) return empty;
 
-  // Legacy: settlement used to create calendar blocks — remove any leftovers for this week.
-  await prisma.timeEntry.deleteMany({
-    where: {
-      organizationId: input.organizationId,
-      personId: input.personId,
-      startsAt: { lt: input.periodEnd },
-      endsAt: { gt: input.periodStart },
-      OR: [
-        { note: { startsWith: SETTLEMENT_ENTRY_NOTE_PREFIX } },
-        { category: { in: ["comp_settlement_earned", "comp_settlement_used"] } },
-      ],
-    },
-  });
-
   const existing = await prisma.leaveTransaction.findFirst({
     where: {
       organizationId: input.organizationId,
@@ -150,6 +228,14 @@ export async function settleCompTimeForTimesheetApproval(input: {
   if (existing) {
     return empty;
   }
+
+  // Remove legacy settlement blocks / previous auto-fill for this week before settling.
+  await deleteSettlementFillEntries({
+    organizationId: input.organizationId,
+    personId: input.personId,
+    periodStart: input.periodStart,
+    periodEnd: input.periodEnd,
+  });
 
   const person = await prisma.person.findFirst({
     where: { id: input.personId, organizationId: input.organizationId },
@@ -171,14 +257,17 @@ export async function settleCompTimeForTimesheetApproval(input: {
     select: { startsAt: true, endsAt: true, category: true },
   });
 
-  const byDay = aggregateNormFulfillingByLocalDay(
-    entries,
-    input.periodStart,
-    input.periodEnd,
-    zone
-  );
+  const byDay = aggregateByLocalDay(entries, input.periodStart, input.periodEnd, zone);
   const weekdayKeys = weekdayDateKeysInPeriod(input.periodStart, input.periodEnd, zone);
 
+  const userId = await resolveUserIdForPerson(
+    input.organizationId,
+    input.personId,
+    input.createdByUserId
+  );
+  if (!userId) return empty;
+
+  const compProjectId = await ensureLeaveTimeProject(input.organizationId, "comp_time");
 
   const days: TimesheetCompSettlementDay[] = [];
   let totalDeltaMinutes = 0;
@@ -186,38 +275,68 @@ export async function settleCompTimeForTimesheetApproval(input: {
   for (const dateKey of weekdayKeys) {
     const parts = byDay.get(dateKey) ?? emptyDayParts();
     const fulfillingMinutes = Math.round(normFulfillingMinutes(parts));
-    const deltaMinutes = fulfillingMinutes - dailyNormMinutes;
-    if (deltaMinutes === 0) continue;
+    const existingComp = Math.round(parts.compTimeMinutes);
+    const overtimeMinutes = Math.max(0, fulfillingMinutes - dailyNormMinutes);
+    const fillMinutes = Math.max(0, dailyNormMinutes - fulfillingMinutes - existingComp);
+    if (overtimeMinutes === 0 && fillMinutes === 0) continue;
 
     const dayInstant = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone }).startOf("day");
     const vacationYear = resolveVacationYear(dayInstant.toJSDate(), policy);
+    let dayDelta = 0;
 
-    await postLeaveTransaction({
-      organizationId: input.organizationId,
-      personId: input.personId,
-      vacationYearKey: vacationYear.key,
-      balanceType: "comp_time_earned",
-      amount: deltaMinutes,
-      source: TIMESHEET_COMP_SETTLEMENT_SOURCE,
-      periodStart: dayInstant.toJSDate(),
-      periodEnd: dayInstant.plus({ days: 1 }).toJSDate(),
-      effectiveDate: dateKey,
-      note: `${APPROVAL_NOTE_PREFIX}${input.timesheetApprovalId} date:${dateKey} fulfilling:${fulfillingMinutes} norm:${dailyNormMinutes}`,
-      createdByUserId: input.createdByUserId,
-    });
+    if (overtimeMinutes > 0) {
+      await postLeaveTransaction({
+        organizationId: input.organizationId,
+        personId: input.personId,
+        vacationYearKey: vacationYear.key,
+        balanceType: "comp_time_earned",
+        amount: overtimeMinutes,
+        source: TIMESHEET_COMP_SETTLEMENT_SOURCE,
+        periodStart: dayInstant.toJSDate(),
+        periodEnd: dayInstant.plus({ days: 1 }).toJSDate(),
+        effectiveDate: dateKey,
+        note: `${APPROVAL_NOTE_PREFIX}${input.timesheetApprovalId} date:${dateKey} fulfilling:${fulfillingMinutes} norm:${dailyNormMinutes}`,
+        createdByUserId: input.createdByUserId,
+      });
+      dayDelta += overtimeMinutes;
+    }
 
+    if (fillMinutes > 0) {
+      const dayEntries = entries.filter((e) => {
+        const key = DateTime.fromJSDate(e.startsAt, { zone }).toFormat("yyyy-MM-dd");
+        return key === dateKey;
+      });
+      const { startsAt, endsAt } = fillWindowAfterDayLoad(dateKey, fillMinutes, zone, dayEntries);
+      const created = await prisma.timeEntry.create({
+        data: {
+          organizationId: input.organizationId,
+          userId,
+          personId: input.personId,
+          startsAt,
+          endsAt,
+          kind: "custom",
+          category: "comp_time",
+          timeProjectId: compProjectId,
+          isLocked: true,
+          note: `${SETTLEMENT_ENTRY_NOTE_PREFIX}${input.timesheetApprovalId}:${dateKey}`,
+        },
+      });
+      await applyTimeEntryToLeaveLedger(created, { createdByUserId: input.createdByUserId });
+      dayDelta -= fillMinutes;
+    }
 
     days.push({
       date: dateKey,
       fulfillingMinutes,
       dailyNormMinutes,
-      deltaMinutes,
+      deltaMinutes: dayDelta,
+      fillMinutes,
     });
-    totalDeltaMinutes += deltaMinutes;
+    totalDeltaMinutes += dayDelta;
   }
 
   return {
-    applied: totalDeltaMinutes !== 0,
+    applied: totalDeltaMinutes !== 0 || days.length > 0,
     dailyNormMinutes,
     totalDeltaMinutes,
     days,
@@ -237,15 +356,6 @@ export async function reverseCompTimeForTimesheetReopen(input: {
       note: { startsWith: `${APPROVAL_NOTE_PREFIX}${input.timesheetApprovalId}` },
     },
   });
-  if (txns.length === 0) {
-    await prisma.timeEntry.deleteMany({
-      where: {
-        organizationId: input.organizationId,
-        note: { startsWith: `${SETTLEMENT_ENTRY_NOTE_PREFIX}${input.timesheetApprovalId}:` },
-      },
-    });
-    return 0;
-  }
 
   for (const txn of txns) {
     await postLeaveTransaction({
@@ -263,11 +373,9 @@ export async function reverseCompTimeForTimesheetReopen(input: {
     await prisma.leaveTransaction.delete({ where: { id: txn.id } });
   }
 
-  await prisma.timeEntry.deleteMany({
-    where: {
-      organizationId: input.organizationId,
-      note: { startsWith: `${SETTLEMENT_ENTRY_NOTE_PREFIX}${input.timesheetApprovalId}:` },
-    },
+  await deleteSettlementFillEntries({
+    organizationId: input.organizationId,
+    timesheetApprovalId: input.timesheetApprovalId,
   });
 
   return txns.length;
