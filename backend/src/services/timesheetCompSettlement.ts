@@ -49,6 +49,37 @@ export function normFulfillingMinutes(parts: DayParts): number {
   );
 }
 
+/**
+ * Afspadsering auto-fill per weekday, capped so fulfilling + existing comp + new fill
+ * does not exceed the person's weekly contract (e.g. 37h), even when other days are over daily norm.
+ */
+export function distributeWeeklyCompFillMinutes(input: {
+  weekdayStats: Array<{
+    fulfillingMinutes: number;
+    existingCompMinutes: number;
+  }>;
+  dailyNormMinutes: number;
+  weeklyNormMinutes: number;
+}): number[] {
+  const { weekdayStats, dailyNormMinutes, weeklyNormMinutes } = input;
+  let weekFulfilling = 0;
+  let weekComp = 0;
+  const rawCaps: number[] = [];
+  for (const d of weekdayStats) {
+    weekFulfilling += d.fulfillingMinutes;
+    weekComp += d.existingCompMinutes;
+    rawCaps.push(
+      Math.max(0, dailyNormMinutes - d.fulfillingMinutes - d.existingCompMinutes)
+    );
+  }
+  let fillBudget = Math.max(0, weeklyNormMinutes - weekFulfilling - weekComp);
+  return rawCaps.map((cap) => {
+    const fill = Math.min(cap, fillBudget);
+    fillBudget -= fill;
+    return fill;
+  });
+}
+
 function addCategoryMinutes(parts: DayParts, category: string, minutes: number) {
   if (category === "work") parts.workMinutes += minutes;
   else if (category === "vacation") parts.vacationMinutes += minutes;
@@ -185,6 +216,7 @@ export type TimesheetCompSettlementDay = {
 export type TimesheetCompSettlementResult = {
   applied: boolean;
   dailyNormMinutes: number;
+  weeklyNormMinutes: number;
   totalDeltaMinutes: number;
   days: TimesheetCompSettlementDay[];
 };
@@ -202,6 +234,7 @@ export async function settleCompTimeForTimesheetApproval(input: {
   const empty: TimesheetCompSettlementResult = {
     applied: false,
     dailyNormMinutes: 0,
+    weeklyNormMinutes: 0,
     totalDeltaMinutes: 0,
     days: [],
   };
@@ -246,6 +279,7 @@ export async function settleCompTimeForTimesheetApproval(input: {
   const policy = mapOrgLeavePolicy(policyRow);
   const norms = resolveLeaveNorms(policy, mapPersonLeaveProfile(person.leaveProfile), person);
   const dailyNormMinutes = Math.round(hoursPerWorkDayFromWeekly(norms.weeklyContractHours) * 60);
+  const weeklyNormMinutes = Math.round(norms.weeklyContractHours * 60);
 
   const entries = await prisma.timeEntry.findMany({
     where: {
@@ -269,15 +303,31 @@ export async function settleCompTimeForTimesheetApproval(input: {
 
   const compProjectId = await ensureLeaveTimeProject(input.organizationId, "comp_time");
 
+  const weekdayStats = weekdayKeys.map((dateKey) => {
+    const parts = byDay.get(dateKey) ?? emptyDayParts();
+    return {
+      dateKey,
+      fulfillingMinutes: Math.round(normFulfillingMinutes(parts)),
+      existingCompMinutes: Math.round(parts.compTimeMinutes),
+    };
+  });
+
+  const fillByDayIndex = distributeWeeklyCompFillMinutes({
+    weekdayStats: weekdayStats.map((d) => ({
+      fulfillingMinutes: d.fulfillingMinutes,
+      existingCompMinutes: d.existingCompMinutes,
+    })),
+    dailyNormMinutes,
+    weeklyNormMinutes,
+  });
+
   const days: TimesheetCompSettlementDay[] = [];
   let totalDeltaMinutes = 0;
 
-  for (const dateKey of weekdayKeys) {
-    const parts = byDay.get(dateKey) ?? emptyDayParts();
-    const fulfillingMinutes = Math.round(normFulfillingMinutes(parts));
-    const existingComp = Math.round(parts.compTimeMinutes);
+  for (let i = 0; i < weekdayStats.length; i++) {
+    const { dateKey, fulfillingMinutes, existingCompMinutes } = weekdayStats[i]!;
+    const fillMinutes = fillByDayIndex[i] ?? 0;
     const overtimeMinutes = Math.max(0, fulfillingMinutes - dailyNormMinutes);
-    const fillMinutes = Math.max(0, dailyNormMinutes - fulfillingMinutes - existingComp);
     if (overtimeMinutes === 0 && fillMinutes === 0) continue;
 
     const dayInstant = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone }).startOf("day");
@@ -338,6 +388,7 @@ export async function settleCompTimeForTimesheetApproval(input: {
   return {
     applied: totalDeltaMinutes !== 0 || days.length > 0,
     dailyNormMinutes,
+    weeklyNormMinutes,
     totalDeltaMinutes,
     days,
   };
