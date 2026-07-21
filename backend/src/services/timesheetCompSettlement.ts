@@ -80,6 +80,42 @@ export function distributeWeeklyCompFillMinutes(input: {
   });
 }
 
+/** Cap desired per-day fill so total blocks never exceed available comp-time balance. */
+export function capFillMinutesByAvailableBalance(
+  desiredFillMinutesPerDay: number[],
+  availableMinutes: number
+): number[] {
+  let budget = Math.max(0, availableMinutes);
+  return desiredFillMinutesPerDay.map((want) => {
+    const take = Math.min(Math.max(0, want), budget);
+    budget -= take;
+    return take;
+  });
+}
+
+async function getCompTimeRemainingMinutes(
+  organizationId: string,
+  personId: string,
+  vacationYearKey: string
+): Promise<number> {
+  const rows = await prisma.leaveBalance.findMany({
+    where: {
+      organizationId,
+      personId,
+      vacationYearKey,
+      balanceType: { in: ["comp_time_earned", "comp_time_used"] },
+    },
+    select: { balanceType: true, amount: true },
+  });
+  let earned = 0;
+  let used = 0;
+  for (const r of rows) {
+    if (r.balanceType === "comp_time_earned") earned = r.amount;
+    if (r.balanceType === "comp_time_used") used = r.amount;
+  }
+  return Math.round(earned - used);
+}
+
 function addCategoryMinutes(parts: DayParts, category: string, minutes: number) {
   if (category === "work") parts.workMinutes += minutes;
   else if (category === "vacation") parts.vacationMinutes += minutes;
@@ -218,6 +254,8 @@ export type TimesheetCompSettlementResult = {
   dailyNormMinutes: number;
   weeklyNormMinutes: number;
   totalDeltaMinutes: number;
+  /** Minustid: under-norm minutes booked on ledger without afspadsering time entries. */
+  deficitLedgerMinutes: number;
   days: TimesheetCompSettlementDay[];
 };
 
@@ -236,6 +274,7 @@ export async function settleCompTimeForTimesheetApproval(input: {
     dailyNormMinutes: 0,
     weeklyNormMinutes: 0,
     totalDeltaMinutes: 0,
+    deficitLedgerMinutes: 0,
     days: [],
   };
 
@@ -321,35 +360,51 @@ export async function settleCompTimeForTimesheetApproval(input: {
     weeklyNormMinutes,
   });
 
+  const vacationYearForWeek = resolveVacationYear(input.periodStart, policy);
+
+  // Credit overtime first so same-week earnings count toward available afspadsering.
+  for (let i = 0; i < weekdayStats.length; i++) {
+    const { dateKey, fulfillingMinutes } = weekdayStats[i]!;
+    const overtimeMinutes = Math.max(0, fulfillingMinutes - dailyNormMinutes);
+    if (overtimeMinutes <= 0) continue;
+    const dayInstant = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone }).startOf("day");
+    const vacationYear = resolveVacationYear(dayInstant.toJSDate(), policy);
+    await postLeaveTransaction({
+      organizationId: input.organizationId,
+      personId: input.personId,
+      vacationYearKey: vacationYear.key,
+      balanceType: "comp_time_earned",
+      amount: overtimeMinutes,
+      source: TIMESHEET_COMP_SETTLEMENT_SOURCE,
+      periodStart: dayInstant.toJSDate(),
+      periodEnd: dayInstant.plus({ days: 1 }).toJSDate(),
+      effectiveDate: dateKey,
+      note: `${APPROVAL_NOTE_PREFIX}${input.timesheetApprovalId} date:${dateKey} fulfilling:${fulfillingMinutes} norm:${dailyNormMinutes}`,
+      createdByUserId: input.createdByUserId,
+    });
+  }
+
+  const compRemaining = await getCompTimeRemainingMinutes(
+    input.organizationId,
+    input.personId,
+    vacationYearForWeek.key
+  );
+  const blockFillByDayIndex = capFillMinutesByAvailableBalance(fillByDayIndex, compRemaining);
+  const totalDesiredFill = fillByDayIndex.reduce((s, m) => s + m, 0);
+  const totalBlockFill = blockFillByDayIndex.reduce((s, m) => s + m, 0);
+  const deficitLedgerMinutes = Math.max(0, totalDesiredFill - totalBlockFill);
+
   const days: TimesheetCompSettlementDay[] = [];
   let totalDeltaMinutes = 0;
 
   for (let i = 0; i < weekdayStats.length; i++) {
-    const { dateKey, fulfillingMinutes, existingCompMinutes } = weekdayStats[i]!;
-    const fillMinutes = fillByDayIndex[i] ?? 0;
+    const { dateKey, fulfillingMinutes } = weekdayStats[i]!;
+    const desiredFill = fillByDayIndex[i] ?? 0;
+    const fillMinutes = blockFillByDayIndex[i] ?? 0;
     const overtimeMinutes = Math.max(0, fulfillingMinutes - dailyNormMinutes);
-    if (overtimeMinutes === 0 && fillMinutes === 0) continue;
+    if (overtimeMinutes === 0 && fillMinutes === 0 && desiredFill === 0) continue;
 
-    const dayInstant = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone }).startOf("day");
-    const vacationYear = resolveVacationYear(dayInstant.toJSDate(), policy);
-    let dayDelta = 0;
-
-    if (overtimeMinutes > 0) {
-      await postLeaveTransaction({
-        organizationId: input.organizationId,
-        personId: input.personId,
-        vacationYearKey: vacationYear.key,
-        balanceType: "comp_time_earned",
-        amount: overtimeMinutes,
-        source: TIMESHEET_COMP_SETTLEMENT_SOURCE,
-        periodStart: dayInstant.toJSDate(),
-        periodEnd: dayInstant.plus({ days: 1 }).toJSDate(),
-        effectiveDate: dateKey,
-        note: `${APPROVAL_NOTE_PREFIX}${input.timesheetApprovalId} date:${dateKey} fulfilling:${fulfillingMinutes} norm:${dailyNormMinutes}`,
-        createdByUserId: input.createdByUserId,
-      });
-      dayDelta += overtimeMinutes;
-    }
+    let dayDelta = overtimeMinutes > 0 ? overtimeMinutes : 0;
 
     if (fillMinutes > 0) {
       const dayEntries = entries.filter((e) => {
@@ -385,11 +440,28 @@ export async function settleCompTimeForTimesheetApproval(input: {
     totalDeltaMinutes += dayDelta;
   }
 
+  if (deficitLedgerMinutes > 0) {
+    await postLeaveTransaction({
+      organizationId: input.organizationId,
+      personId: input.personId,
+      vacationYearKey: vacationYearForWeek.key,
+      balanceType: "comp_time_used",
+      amount: deficitLedgerMinutes,
+      source: TIMESHEET_COMP_SETTLEMENT_SOURCE,
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+      note: `${APPROVAL_NOTE_PREFIX}${input.timesheetApprovalId} undernorm_deficit:${deficitLedgerMinutes}`,
+      createdByUserId: input.createdByUserId,
+    });
+    totalDeltaMinutes -= deficitLedgerMinutes;
+  }
+
   return {
-    applied: totalDeltaMinutes !== 0 || days.length > 0,
+    applied: totalDeltaMinutes !== 0 || days.length > 0 || deficitLedgerMinutes > 0,
     dailyNormMinutes,
     weeklyNormMinutes,
     totalDeltaMinutes,
+    deficitLedgerMinutes,
     days,
   };
 }
@@ -413,7 +485,7 @@ export async function reverseCompTimeForTimesheetReopen(input: {
       organizationId: txn.organizationId,
       personId: txn.personId,
       vacationYearKey: txn.vacationYearKey,
-      balanceType: txn.balanceType as "comp_time_earned",
+      balanceType: txn.balanceType as "comp_time_earned" | "comp_time_used",
       amount: -txn.amount,
       source: "reversal",
       periodStart: txn.periodStart,

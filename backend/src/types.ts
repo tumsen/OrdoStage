@@ -1770,6 +1770,7 @@ export const TimesheetCompSettlementSchema = z.object({
   applied: z.boolean(),
   dailyNormMinutes: z.number(),
   totalDeltaMinutes: z.number(),
+  deficitLedgerMinutes: z.number().optional(),
   days: z.array(TimesheetCompSettlementDaySchema),
 });
 
