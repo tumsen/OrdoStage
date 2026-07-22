@@ -374,12 +374,6 @@ function PersonFormDialog({
     return value;
   }
 
-  function periodValueFromWeekly(weekly: number, period: "weekly" | "monthly" | "annual"): number {
-    if (period === "monthly") return (weekly * 52) / 12;
-    if (period === "annual") return weekly * 52;
-    return weekly;
-  }
-
   function formatHours2(n: number): string {
     return (Math.round(n * 100) / 100).toFixed(2);
   }
@@ -2205,11 +2199,7 @@ function PersonFormDialog({
                 <Select
                   value={contractHoursPeriod}
                   onValueChange={(v) => {
-                    const next = v as "weekly" | "monthly" | "annual";
-                    if (weeklyHoursValid != null) {
-                      setContractHoursInput(formatHours2(periodValueFromWeekly(weeklyHoursValid, next)));
-                    }
-                    setContractHoursPeriod(next);
+                    setContractHoursPeriod(v as "weekly" | "monthly" | "annual");
                     contractAutoSave.schedule();
                   }}
                 >
