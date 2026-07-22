@@ -13,6 +13,10 @@ import { AutoSaveStatus as AutoSaveIndicator } from "@/components/AutoSaveStatus
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
+import {
+  formatDurationHoursBoth,
+  parseDurationHours,
+} from "@/lib/durationHours";
 import { cn } from "@/lib/utils";
 import { BillingSummary, type OrgBillingPayload } from "@/components/BillingSummary";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
@@ -374,12 +378,7 @@ function PersonFormDialog({
     return value;
   }
 
-  function formatHours2(n: number): string {
-    return (Math.round(n * 100) / 100).toFixed(2);
-  }
-
-  const hoursInputParsed =
-    contractHoursInput.trim() === "" ? null : parseFloat(contractHoursInput);
+  const hoursInputParsed = parseDurationHours(contractHoursInput);
   const weeklyHoursValid =
     hoursInputParsed != null && !Number.isNaN(hoursInputParsed)
       ? weeklyFromPeriodValue(hoursInputParsed, contractHoursPeriod)
@@ -986,8 +985,10 @@ function PersonFormDialog({
     save: async () => {
       const personId = person?.id;
       if (!personId) return;
-      const raw = contractHoursInput.trim() === "" ? null : parseFloat(contractHoursInput);
-      if (raw !== null && Number.isNaN(raw)) throw new Error("Hours must be a number");
+      const raw = parseDurationHours(contractHoursInput);
+      if (raw !== null && Number.isNaN(raw)) {
+        throw new Error("Hours must be hhhh:mm or a decimal number");
+      }
       const wh =
         raw === null ? null : Math.round(weeklyFromPeriodValue(raw, contractHoursPeriod) * 100) / 100;
       const vd = contractVacationDays.trim() === "" ? null : parseFloat(contractVacationDays);
@@ -1642,15 +1643,21 @@ function PersonFormDialog({
                   <div className="space-y-1 min-w-0">
                     <Label className="text-white/55 text-xs">{t("time.leaveHoursInputLabel")}</Label>
                     <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={contractHoursInput}
                       onChange={(e) => setContractHoursInput(e.target.value)}
                       onBlur={() => contractAutoSave.schedule()}
-                      placeholder={contractHoursPeriod === "weekly" ? "37" : contractHoursPeriod === "monthly" ? "160.33" : "1924"}
+                      placeholder={
+                        contractHoursPeriod === "weekly"
+                          ? "37:00"
+                          : contractHoursPeriod === "monthly"
+                            ? "160:20"
+                            : "1924:00"
+                      }
                       className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                     />
+                    <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
                   </div>
                   <div className="space-y-1 min-w-0">
                     <Label className="text-white/55 text-xs">{t("time.leaveHoursPeriodLabel")}</Label>
@@ -1676,20 +1683,20 @@ function PersonFormDialog({
                   {[
                     {
                       label: t("people.hoursPerDay"),
-                      value: derivedDailyHours != null ? `${formatHours2(derivedDailyHours)} h` : "—",
+                      value: derivedDailyHours != null ? formatDurationHoursBoth(derivedDailyHours) : "—",
                     },
                     {
                       label: t("time.leaveProfileMonthlyHours"),
-                      value: derivedMonthlyHours != null ? `${formatHours2(derivedMonthlyHours)} h` : "—",
+                      value: derivedMonthlyHours != null ? formatDurationHoursBoth(derivedMonthlyHours) : "—",
                     },
                     {
                       label: t("time.leaveProfileAnnualHours"),
-                      value: derivedAnnualHours != null ? `${formatHours2(derivedAnnualHours)} h` : "—",
+                      value: derivedAnnualHours != null ? formatDurationHoursBoth(derivedAnnualHours) : "—",
                     },
                   ].map((item) => (
                     <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
                       <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
-                      <p className="font-semibold text-white/70 mt-0.5 tabular-nums">{item.value}</p>
+                      <p className="font-semibold text-white/70 mt-0.5 tabular-nums text-[11px] leading-snug">{item.value}</p>
                     </div>
                   ))}
                 </div>
@@ -1851,15 +1858,21 @@ function PersonFormDialog({
                   <div className="space-y-1 min-w-0">
                     <Label className="text-white/55 text-xs">{t("time.leaveHoursInputLabel")}</Label>
                     <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={contractHoursInput}
                       onChange={(e) => setContractHoursInput(e.target.value)}
                       onBlur={() => contractAutoSave.schedule()}
-                      placeholder={contractHoursPeriod === "weekly" ? "37" : contractHoursPeriod === "monthly" ? "160.33" : "1924"}
+                      placeholder={
+                        contractHoursPeriod === "weekly"
+                          ? "37:00"
+                          : contractHoursPeriod === "monthly"
+                            ? "160:20"
+                            : "1924:00"
+                      }
                       className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                     />
+                    <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
                   </div>
                   <div className="space-y-1 min-w-0">
                     <Label className="text-white/55 text-xs">{t("time.leaveHoursPeriodLabel")}</Label>
@@ -1885,15 +1898,15 @@ function PersonFormDialog({
                   {[
                     {
                       label: t("people.hoursPerDay"),
-                      value: derivedDailyHours != null ? `${formatHours2(derivedDailyHours)} h` : "—",
+                      value: derivedDailyHours != null ? formatDurationHoursBoth(derivedDailyHours) : "—",
                     },
                     {
                       label: t("time.leaveProfileMonthlyHours"),
-                      value: derivedMonthlyHours != null ? `${formatHours2(derivedMonthlyHours)} h` : "—",
+                      value: derivedMonthlyHours != null ? formatDurationHoursBoth(derivedMonthlyHours) : "—",
                     },
                     {
                       label: t("time.leaveProfileAnnualHours"),
-                      value: derivedAnnualHours != null ? `${formatHours2(derivedAnnualHours)} h` : "—",
+                      value: derivedAnnualHours != null ? formatDurationHoursBoth(derivedAnnualHours) : "—",
                     },
                   ].map((item) => (
                     <div
@@ -1901,7 +1914,9 @@ function PersonFormDialog({
                       className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center"
                     >
                       <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
-                      <p className="font-semibold text-white/70 mt-0.5 tabular-nums">{item.value}</p>
+                      <p className="font-semibold text-white/70 mt-0.5 tabular-nums text-[11px] leading-snug">
+                        {item.value}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -2184,15 +2199,21 @@ function PersonFormDialog({
               <div className="space-y-1 min-w-0">
                 <Label className="text-white/55 text-xs">{t("time.leaveHoursInputLabel")}</Label>
                 <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={contractHoursInput}
                   onChange={(e) => setContractHoursInput(e.target.value)}
                   onBlur={() => contractAutoSave.schedule()}
-                  placeholder={contractHoursPeriod === "weekly" ? "37" : contractHoursPeriod === "monthly" ? "160.33" : "1924"}
+                  placeholder={
+                    contractHoursPeriod === "weekly"
+                      ? "37:00"
+                      : contractHoursPeriod === "monthly"
+                        ? "160:20"
+                        : "1924:00"
+                  }
                   className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                 />
+                <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
               </div>
               <div className="space-y-1 min-w-0">
                 <Label className="text-white/55 text-xs">{t("time.leaveHoursPeriodLabel")}</Label>
@@ -2218,20 +2239,22 @@ function PersonFormDialog({
               {[
                 {
                   label: t("people.hoursPerDay"),
-                  value: derivedDailyHours != null ? `${formatHours2(derivedDailyHours)} h` : "—",
+                  value: derivedDailyHours != null ? formatDurationHoursBoth(derivedDailyHours) : "—",
                 },
                 {
                   label: t("time.leaveProfileMonthlyHours"),
-                  value: derivedMonthlyHours != null ? `${formatHours2(derivedMonthlyHours)} h` : "—",
+                  value: derivedMonthlyHours != null ? formatDurationHoursBoth(derivedMonthlyHours) : "—",
                 },
                 {
                   label: t("time.leaveProfileAnnualHours"),
-                  value: derivedAnnualHours != null ? `${formatHours2(derivedAnnualHours)} h` : "—",
+                  value: derivedAnnualHours != null ? formatDurationHoursBoth(derivedAnnualHours) : "—",
                 },
               ].map((item) => (
                 <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
                   <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
-                  <p className="font-semibold text-white/70 mt-0.5 tabular-nums">{item.value}</p>
+                  <p className="font-semibold text-white/70 mt-0.5 tabular-nums text-[11px] leading-snug">
+                    {item.value}
+                  </p>
                 </div>
               ))}
             </div>
