@@ -1,14 +1,17 @@
 /**
- * Contract / duration hours: accept `hhhh:mm` or decimal (`hhhh.decimal` / comma).
- * Stored and calculated as decimal hours.
+ * Contract / duration hours: accept `hhhhh:mm` or decimal (`hhhhh,dd` / `hhhhh.dd`).
+ * Stored and calculated as decimal hours. Max: 5 hour digits + separator + 2 fraction/minute digits.
  */
+
+const MAX_HOUR_DIGITS = 5;
+const MAX_FRACTION_DIGITS = 2;
 
 /** Parse "37:30", "37.5", "37,5", or "37" → decimal hours. Empty → null. Invalid → NaN. */
 export function parseDurationHours(raw: string): number | null {
   const s = raw.trim();
   if (s === "") return null;
 
-  const colon = /^(\d+):([0-5]?\d)$/.exec(s);
+  const colon = new RegExp(`^(\\d{1,${MAX_HOUR_DIGITS}}):([0-5]?\\d)$`).exec(s);
   if (colon) {
     const hours = Number.parseInt(colon[1], 10);
     const minutes = Number.parseInt(colon[2], 10);
@@ -17,10 +20,15 @@ export function parseDurationHours(raw: string): number | null {
   }
 
   const normalized = s.replace(",", ".");
-  if (!/^\d+(\.\d+)?$/.test(normalized)) return Number.NaN;
+  if (!new RegExp(`^\\d{1,${MAX_HOUR_DIGITS}}(\\.\\d{1,${MAX_FRACTION_DIGITS}})?$`).test(normalized)) {
+    return Number.NaN;
+  }
   const n = Number.parseFloat(normalized);
   return Number.isFinite(n) ? n : Number.NaN;
 }
+
+/** Max typed length for `HHHHH,DD` / `HHHHH:MM`. */
+export const DURATION_HOURS_INPUT_MAX_LENGTH = MAX_HOUR_DIGITS + 1 + MAX_FRACTION_DIGITS;
 
 /** Decimal hours → `h:mm` (minutes 00–59, rounded). */
 export function formatDurationHoursHHMM(hours: number): string {

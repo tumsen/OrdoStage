@@ -14,6 +14,7 @@ import { toast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import {
+  DURATION_HOURS_INPUT_MAX_LENGTH,
   formatDurationHoursBoth,
   formatDurationHoursForInput,
   parseDurationHours,
@@ -1650,12 +1651,14 @@ function PersonFormDialog({
                   </span>
                 </label>
                 <div className="space-y-1">
-                  <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
-                    <div className="space-y-1 min-w-0">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="space-y-1">
                       <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursInputLabel")}</Label>
                       <Input
                         type="text"
                         inputMode="decimal"
+                        maxLength={DURATION_HOURS_INPUT_MAX_LENGTH}
+                        size={DURATION_HOURS_INPUT_MAX_LENGTH}
                         value={contractHoursInput}
                         onChange={(e) => setContractHoursInput(e.target.value)}
                         onBlur={() => contractAutoSave.schedule()}
@@ -1666,10 +1669,10 @@ function PersonFormDialog({
                               ? "160:20"
                               : "1924:00"
                         }
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                        className="h-8 w-[calc(8ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
                       />
                     </div>
-                    <div className="space-y-1 min-w-0">
+                    <div className="space-y-1">
                       <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursPeriodLabel")}</Label>
                       <Select
                         value={contractHoursPeriod}
@@ -1678,7 +1681,7 @@ function PersonFormDialog({
                           contractAutoSave.schedule();
                         }}
                       >
-                        <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                        <SelectTrigger className="h-8 w-auto min-w-[7.5rem] bg-white/5 border-white/10 text-white text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-[#16161f] border-white/10 text-white">
@@ -1867,12 +1870,14 @@ function PersonFormDialog({
                   </span>
                 </label>
                 <div className="space-y-1">
-                  <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
-                    <div className="space-y-1 min-w-0">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="space-y-1">
                       <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursInputLabel")}</Label>
                       <Input
                         type="text"
                         inputMode="decimal"
+                        maxLength={DURATION_HOURS_INPUT_MAX_LENGTH}
+                        size={DURATION_HOURS_INPUT_MAX_LENGTH}
                         value={contractHoursInput}
                         onChange={(e) => setContractHoursInput(e.target.value)}
                         onBlur={() => contractAutoSave.schedule()}
@@ -1883,10 +1888,10 @@ function PersonFormDialog({
                               ? "160:20"
                               : "1924:00"
                         }
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                        className="h-8 w-[calc(8ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
                       />
                     </div>
-                    <div className="space-y-1 min-w-0">
+                    <div className="space-y-1">
                       <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursPeriodLabel")}</Label>
                       <Select
                         value={contractHoursPeriod}
@@ -1895,7 +1900,7 @@ function PersonFormDialog({
                           contractAutoSave.schedule();
                         }}
                       >
-                        <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                        <SelectTrigger className="h-8 w-auto min-w-[7.5rem] bg-white/5 border-white/10 text-white text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-[#16161f] border-white/10 text-white">
@@ -2210,12 +2215,14 @@ function PersonFormDialog({
               </span>
             </label>
             <div className="space-y-1">
-              <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
-                <div className="space-y-1 min-w-0">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1">
                   <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursInputLabel")}</Label>
                   <Input
                     type="text"
                     inputMode="decimal"
+                    maxLength={DURATION_HOURS_INPUT_MAX_LENGTH}
+                    size={DURATION_HOURS_INPUT_MAX_LENGTH}
                     value={contractHoursInput}
                     onChange={(e) => setContractHoursInput(e.target.value)}
                     onBlur={() => contractAutoSave.schedule()}
@@ -2226,10 +2233,10 @@ function PersonFormDialog({
                           ? "160:20"
                           : "1924:00"
                     }
-                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                    className="h-8 w-[calc(8ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
                   />
                 </div>
-                <div className="space-y-1 min-w-0">
+                <div className="space-y-1">
                   <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursPeriodLabel")}</Label>
                   <Select
                     value={contractHoursPeriod}
@@ -2238,7 +2245,7 @@ function PersonFormDialog({
                       contractAutoSave.schedule();
                     }}
                   >
-                    <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                    <SelectTrigger className="h-8 w-auto min-w-[7.5rem] bg-white/5 border-white/10 text-white text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-[#16161f] border-white/10 text-white">
