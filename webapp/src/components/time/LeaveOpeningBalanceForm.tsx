@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
@@ -8,21 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { CompTimeHhhMmField } from "@/components/time/CompTimeHhhMmField";
+import { todayIsoDate } from "@/lib/dateUtils";
 import type { LeaveBalanceSummary } from "@/contracts/backendTypes";
 
-function todayIsoDate(): string {
-  return format(new Date(), "yyyy-MM-dd");
-}
-
-/** Fixed cell widths so ferie / feriefridage / overarbejde match exactly. */
+/** Fixed cell width so ferie / feriefridage / overarbejde match exactly. */
 const VALUE_CELL = "w-[7.5rem] shrink-0";
-/** YYYY-MM-DD (10ch) + padding + native calendar control — no wider. */
-const DATE_CELL = "w-[calc(10ch+1.75rem)] shrink-0";
 const VALUE_INPUT =
   "h-8 w-full min-w-0 bg-white/5 border-white/10 text-white text-xs tabular-nums font-mono px-2";
-const DATE_INPUT =
-  "h-8 w-full min-w-0 bg-white/5 border-white/10 text-white text-xs tabular-nums px-1.5 [color-scheme:dark]";
+const DATE_INPUT_CLASS =
+  "h-8 rounded border border-white/10 bg-white/5 px-1.5 py-0 text-white text-[11px]";
+const DATE_WEEKDAY_CLASS = "text-sm text-white/45";
 
 export function LeaveOpeningBalanceForm(props: {
   personId: string;
@@ -135,7 +131,7 @@ export function LeaveOpeningBalanceForm(props: {
       <div className="space-y-2.5">
         <div className="space-y-1">
           <Label className="text-[10px] text-white/45">{t("time.leaveVacationRemaining")}</Label>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className={VALUE_CELL}>
               <Input
                 type="text"
@@ -146,21 +142,18 @@ export function LeaveOpeningBalanceForm(props: {
                 aria-label={t("time.leaveVacationRemaining")}
               />
             </div>
-            <div className={DATE_CELL}>
-              <Input
-                type="date"
-                value={vacationDate}
-                onChange={(e) => setVacationDate(e.target.value)}
-                className={DATE_INPUT}
-                aria-label={`${t("time.leaveVacationRemaining")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
-              />
-            </div>
+            <DateInputWithWeekday
+              value={vacationDate}
+              onChange={setVacationDate}
+              className={DATE_INPUT_CLASS}
+              weekdayClassName={DATE_WEEKDAY_CLASS}
+            />
           </div>
         </div>
 
         <div className="space-y-1">
           <Label className="text-[10px] text-white/45">{t("time.leaveExtraRemaining")}</Label>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className={VALUE_CELL}>
               <Input
                 type="text"
@@ -171,21 +164,18 @@ export function LeaveOpeningBalanceForm(props: {
                 aria-label={t("time.leaveExtraRemaining")}
               />
             </div>
-            <div className={DATE_CELL}>
-              <Input
-                type="date"
-                value={extraVacationDate}
-                onChange={(e) => setExtraVacationDate(e.target.value)}
-                className={DATE_INPUT}
-                aria-label={`${t("time.leaveExtraRemaining")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
-              />
-            </div>
+            <DateInputWithWeekday
+              value={extraVacationDate}
+              onChange={setExtraVacationDate}
+              className={DATE_INPUT_CLASS}
+              weekdayClassName={DATE_WEEKDAY_CLASS}
+            />
           </div>
         </div>
 
         <div className="space-y-1">
           <Label className="text-[10px] text-white/45">{t("time.leaveOpeningBalanceCompTime")}</Label>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className={VALUE_CELL}>
               <CompTimeHhhMmField
                 valueMinutes={compTimeMinutes}
@@ -197,15 +187,12 @@ export function LeaveOpeningBalanceForm(props: {
                 aria-label={t("time.leaveOpeningBalanceCompTime")}
               />
             </div>
-            <div className={DATE_CELL}>
-              <Input
-                type="date"
-                value={compTimeDate}
-                onChange={(e) => setCompTimeDate(e.target.value)}
-                className={DATE_INPUT}
-                aria-label={`${t("time.leaveOpeningBalanceCompTime")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
-              />
-            </div>
+            <DateInputWithWeekday
+              value={compTimeDate}
+              onChange={setCompTimeDate}
+              className={DATE_INPUT_CLASS}
+              weekdayClassName={DATE_WEEKDAY_CLASS}
+            />
           </div>
         </div>
       </div>
