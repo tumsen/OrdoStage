@@ -65,6 +65,56 @@ function isPdfMime(m: string, fn: string) {
   return m.includes("pdf") || fn.toLowerCase().endsWith(".pdf");
 }
 
+/** Fetch PDF once (when enabled) as a blob URL so preview works with cookie auth. */
+function useAuthenticatedPdfObjectUrl(downloadUrl: string, enabled: boolean) {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !downloadUrl) return;
+    let cancelled = false;
+    let created: string | null = null;
+    setLoading(true);
+    setFailed(false);
+    setObjectUrl(null);
+
+    void (async () => {
+      try {
+        const blob = await fetchDocumentBlob(downloadUrl);
+        if (cancelled) return;
+        const pdfBlob =
+          blob.type.includes("pdf") || blob.type === "application/octet-stream" || !blob.type
+            ? new Blob([blob], { type: "application/pdf" })
+            : blob;
+        created = URL.createObjectURL(pdfBlob);
+        setObjectUrl(created);
+      } catch {
+        if (!cancelled) setFailed(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [downloadUrl, enabled]);
+
+  return { objectUrl, loading, failed };
+}
+
+function PdfIframePreview({ src, title }: { src: string; title: string }) {
+  return (
+    <iframe
+      title={title}
+      src={src}
+      className="h-[min(70vh,22rem)] w-[min(92vw,28rem)] max-w-full rounded-md border-0 bg-white"
+    />
+  );
+}
+
 function Placeholder({ mimeType, filename }: { mimeType: string; filename: string }) {
   if (isPdfMime(mimeType, filename)) {
     return <FileText className="h-5 w-5 text-red-300/75" aria-hidden />;
@@ -135,19 +185,29 @@ export function DocumentListThumbnail({
   const [loadFailed, setLoadFailed] = useState(false);
   const [previewImgErr, setPreviewImgErr] = useState(false);
   const [previewVideoErr, setPreviewVideoErr] = useState(false);
+  const [hoverOpen, setHoverOpen] = useState(false);
+  const [pdfRequested, setPdfRequested] = useState(false);
 
   const tryImage = !loadFailed && (preferImage || isImageMime(mimeType));
   const tryVideo =
     !loadFailed && !tryImage && (isVideoMime(mimeType) || (isVideoFilename(filename) && Boolean(downloadUrl)));
+  const tryPdf = !tryImage && !tryVideo && isPdfMime(mimeType, filename);
 
   useEffect(() => {
     setLoadFailed(false);
+    setPdfRequested(false);
   }, [downloadUrl, mimeType, filename, preferImage]);
 
   useEffect(() => {
     setPreviewImgErr(false);
     setPreviewVideoErr(false);
   }, [downloadUrl, mimeType, filename, preferImage]);
+
+  useEffect(() => {
+    if (hoverOpen && tryPdf) setPdfRequested(true);
+  }, [hoverOpen, tryPdf]);
+
+  const pdfPreview = useAuthenticatedPdfObjectUrl(downloadUrl, pdfRequested && tryPdf);
 
   const primaryLabel = (name?.trim() || filename).trim() || "Document";
 
@@ -222,6 +282,21 @@ export function DocumentListThumbnail({
           preload="metadata"
           onError={() => setPreviewVideoErr(true)}
         />
+      ) : tryPdf ? (
+        pdfPreview.loading || (!pdfPreview.objectUrl && !pdfPreview.failed) ? (
+          <div className="flex min-h-[9rem] items-center justify-center px-6 py-8 text-xs text-white/50">
+            Loading preview…
+          </div>
+        ) : pdfPreview.objectUrl ? (
+          <PdfIframePreview src={pdfPreview.objectUrl} title={`Preview ${primaryLabel}`} />
+        ) : (
+          <LargePreviewFallback
+            mimeType={mimeType}
+            filename={filename}
+            primaryLabel={primaryLabel}
+            previewUnavailable
+          />
+        )
       ) : (
         <LargePreviewFallback
           mimeType={mimeType}
@@ -238,7 +313,7 @@ export function DocumentListThumbnail({
   }
 
   return (
-    <HoverCard openDelay={100} closeDelay={280}>
+    <HoverCard open={hoverOpen} onOpenChange={setHoverOpen} openDelay={100} closeDelay={280}>
       <HoverCardTrigger asChild>
         <button
           type="button"
@@ -253,7 +328,12 @@ export function DocumentListThumbnail({
           {triggerInner}
         </button>
       </HoverCardTrigger>
-      <HoverCardContent side="top" align="center" sideOffset={8} className={hoverCardContentClass}>
+      <HoverCardContent
+        side="top"
+        align="center"
+        sideOffset={8}
+        className={cn(hoverCardContentClass, tryPdf && "max-w-[min(92vw,32rem)]")}
+      >
         {previewBlock}
         <div className="mt-2 space-y-1">
           <p className="line-clamp-2 text-[11px] font-medium text-white/90">{primaryLabel}</p>
@@ -279,21 +359,28 @@ type LocalFileThumbnailProps = {
   className?: string;
 };
 
-/** Preview for a `File` before upload (object URL for image/video; icon fallback otherwise) with hover enlargement. */
+/** Preview for a `File` before upload (object URL for image/video/pdf; icon fallback otherwise) with hover enlargement. */
 export function LocalFileThumbnail({ file, sizeClassName = "h-11 w-11", className }: LocalFileThumbnailProps) {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
+  const isPdf = isPdfMime(file.type, file.name);
+
   useEffect(() => {
-    if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
-      const u = URL.createObjectURL(file);
+    if (file.type.startsWith("image/") || file.type.startsWith("video/") || isPdf) {
+      const u = URL.createObjectURL(
+        isPdf && !file.type.includes("pdf")
+          ? new Blob([file], { type: "application/pdf" })
+          : file
+      );
       setObjectUrl(u);
       return () => URL.revokeObjectURL(u);
     }
     setObjectUrl(null);
-  }, [file]);
+  }, [file, isPdf]);
 
   const isImg = Boolean(objectUrl && file.type.startsWith("image/"));
   const isVid = Boolean(objectUrl && file.type.startsWith("video/"));
+  const showPdf = Boolean(objectUrl && isPdf);
 
   const triggerInner = (
     <>
@@ -324,6 +411,8 @@ export function LocalFileThumbnail({ file, sizeClassName = "h-11 w-11", classNam
           playsInline
           preload="metadata"
         />
+      ) : showPdf ? (
+        <PdfIframePreview src={objectUrl!} title={`Preview ${file.name}`} />
       ) : (
         <LargePreviewFallback mimeType={file.type} filename={file.name} primaryLabel={file.name} />
       )}
@@ -346,7 +435,12 @@ export function LocalFileThumbnail({ file, sizeClassName = "h-11 w-11", classNam
           {triggerInner}
         </button>
       </HoverCardTrigger>
-      <HoverCardContent side="top" align="center" sideOffset={8} className={hoverCardContentClass}>
+      <HoverCardContent
+        side="top"
+        align="center"
+        sideOffset={8}
+        className={cn(hoverCardContentClass, showPdf && "max-w-[min(92vw,32rem)]")}
+      >
         {previewBlock}
         <div className="mt-2 space-y-1">
           <p className="line-clamp-2 text-[11px] font-medium text-white/90">{file.name}</p>
