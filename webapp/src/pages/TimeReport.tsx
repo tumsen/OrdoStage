@@ -75,27 +75,15 @@ import {
 } from "@/lib/leaveNorms";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
-import { formatCompTimeHhhMm } from "@/lib/compTimeInput";
+import {
+  formatDurationHoursBoth,
+  formatMinutesAsDurationBoth,
+  formatSignedMinutesAsDurationBoth,
+} from "@/lib/durationHours";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
+import { DurationHoursInput } from "@/components/time/DurationHoursInput";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function fmtMins(minutes: number): string {
-  const h = Math.floor(Math.abs(minutes) / 60);
-  const m = Math.round(Math.abs(minutes) % 60);
-  const sign = minutes < 0 ? "-" : "";
-  if (m === 0) return `${sign}${h}h`;
-  return `${sign}${h}h ${m}m`;
-}
-
-function fmtCompHhhMm(minutes: number): string {
-  return formatCompTimeHhhMm(minutes);
-}
-
-function fmtSignedMins(minutes: number): string {
-  const rounded = Math.round(minutes);
-  if (rounded > 0) return `+${fmtMins(rounded)}`;
-  return fmtMins(rounded);
-}
 
 function fmtDate(iso: string): string {
   try {
@@ -474,9 +462,11 @@ function ContractHoursCell({
   onSaved: (personId: string, hours: number | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
+  const [draftHours, setDraftHours] = useState<number | null>(value);
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { language } = useI18n();
+  const commaDec = commaDecimalForLanguage(language);
 
   const save = useMutation({
     mutationFn: (hours: number | null) =>
@@ -492,31 +482,15 @@ function ContractHoursCell({
   if (editing) {
     return (
       <div className="flex items-center gap-1">
-        <Input
-          autoFocus
-          type="number"
-          min="0"
-          max="168"
-          step="0.5"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              const n = draft.trim() === "" ? null : parseFloat(draft);
-              if (n !== null && isNaN(n)) return;
-              save.mutate(n);
-            }
-            if (e.key === "Escape") setEditing(false);
-          }}
-          className="h-7 w-20 bg-white/5 border-white/15 text-white text-xs px-2"
-          placeholder="37.5"
+        <DurationHoursInput
+          valueHours={draftHours}
+          onChangeHours={setDraftHours}
+          allowEmpty
+          inputClassName="h-7"
+          placeholder="37:00"
         />
         <button
-          onClick={() => {
-            const n = draft.trim() === "" ? null : parseFloat(draft);
-            if (n !== null && isNaN(n)) return;
-            save.mutate(n);
-          }}
+          onClick={() => save.mutate(draftHours)}
           className="text-emerald-400 hover:text-emerald-300"
         >
           <Check className="h-3.5 w-3.5" />
@@ -531,13 +505,15 @@ function ContractHoursCell({
   return (
     <button
       onClick={() => {
-        setDraft(value !== null ? String(value) : "");
+        setDraftHours(value);
         setEditing(true);
       }}
       className="flex items-center gap-1 text-white/60 hover:text-white/90 group"
     >
-      <span className="tabular-nums">{value !== null ? `${value}h/wk` : "—"}</span>
-      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+      <span className="tabular-nums text-left">
+        {value !== null ? `${formatDurationHoursBoth(value, commaDec)}/wk` : "—"}
+      </span>
+      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
     </button>
   );
 }
@@ -838,6 +814,10 @@ export default function TimeReport() {
   const { canAction } = usePermissions();
   const canReadAll = canAction("time.read_all");
   const dfLocale = language === "da" ? localeDa : language === "de" ? localeDe : localeEnGB;
+  const commaDec = commaDecimalForLanguage(language);
+  const fmtMins = (minutes: number) => formatMinutesAsDurationBoth(minutes, commaDec);
+  const fmtCompHhhMm = (minutes: number) => formatMinutesAsDurationBoth(minutes, commaDec);
+  const fmtSignedMins = (minutes: number) => formatSignedMinutesAsDurationBoth(minutes, commaDec);
 
   const now = today();
   const [rangeMode, setRangeMode] = useState<RangeMode>("month");

@@ -20,11 +20,10 @@ import {
 } from "@/lib/staffingPageContext";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
+import { formatMinutesAsDurationBoth } from "@/lib/durationHours";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
 import type { Person } from "@/lib/types";
-
-function hours(minutes: number): string {
-  return `${Math.round((minutes / 60) * 10) / 10}h`;
-}
 
 export function StaffingJobCard({
   req,
@@ -37,6 +36,9 @@ export function StaffingJobCard({
   roster: Person[];
   defaultOpen?: boolean;
 }) {
+  const { language } = useI18n();
+  const hours = (minutes: number) =>
+    formatMinutesAsDurationBoth(minutes, commaDecimalForLanguage(language));
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(defaultOpen);
   const slots = slotPersonIdsFromRequirement(req);

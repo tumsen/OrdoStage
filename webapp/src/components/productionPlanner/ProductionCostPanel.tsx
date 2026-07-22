@@ -4,6 +4,9 @@ import { Plus, Pencil, Trash2, Clock } from "lucide-react";
 import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { formatMoneyFromCents, parseMoneyToCents } from "@/lib/formatMoney";
+import { formatMinutesAsDurationBoth } from "@/lib/durationHours";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
+import { useI18n } from "@/lib/i18n";
 import {
   COST_CATEGORY_COLORS,
   COST_CATEGORY_LABELS,
@@ -100,6 +103,8 @@ export function ProductionCostPanel({
   plannerQueryKey: unknown[];
 }) {
   const queryClient = useQueryClient();
+  const { language } = useI18n();
+  const commaDec = commaDecimalForLanguage(language);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProductionCostLine | null>(null);
   const [form, setForm] = useState<CostFormState>(emptyForm);
@@ -192,7 +197,7 @@ export function ProductionCostPanel({
 
   const s = row.costSummary;
   const varianceTone = s.varianceCents > 0 ? "warn" : s.varianceCents < 0 ? "good" : "default";
-  const laborHours = (s.loggedLaborMinutes / 60).toFixed(1);
+  const laborHours = formatMinutesAsDurationBoth(s.loggedLaborMinutes, commaDec);
 
   return (
     <div className="rounded-xl border border-white/10 bg-[#12121a]/80 flex flex-col min-h-0 overflow-hidden">
@@ -236,7 +241,7 @@ export function ProductionCostPanel({
           />
           <SummaryCard
             label="Logged labor"
-            value={`${laborHours} h`}
+            value={laborHours}
             sub="From time entries linked to this production"
           />
         </div>

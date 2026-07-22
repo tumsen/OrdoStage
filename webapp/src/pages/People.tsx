@@ -17,6 +17,7 @@ import {
   DURATION_HOURS_INPUT_MAX_LENGTH,
   formatDurationHoursBoth,
   formatDurationHoursForInput,
+  formatSignedMinutesAsDurationBoth,
   parseDurationHours,
 } from "@/lib/durationHours";
 import { cn } from "@/lib/utils";
@@ -2024,9 +2025,7 @@ function PersonFormDialog({
                       >
                         {(() => {
                           const mins = Math.round(leaveProfileData.leave.compTimeRemainingMinutes);
-                          const sign = mins > 0 ? "+" : mins < 0 ? "−" : "";
-                          const abs = Math.abs(mins);
-                          return `${sign}${Math.floor(abs / 60)}h ${abs % 60}m`;
+                          return formatSignedMinutesAsDurationBoth(mins, commaDecimal);
                         })()}
                       </span>
                     </p>

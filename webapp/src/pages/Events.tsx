@@ -19,6 +19,8 @@ import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useI18n } from "@/lib/i18n";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
 import {
   Select,
   SelectContent,
@@ -58,6 +60,8 @@ function EventListRow({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { language } = useI18n();
+  const commaDec = commaDecimalForLanguage(language);
   const eventWorkTotals = computeEventWorkTotals(event.shows ?? []);
   const jobCount = (event.shows ?? []).reduce((n, s) => n + (s.jobs?.length ?? 0), 0);
 
@@ -90,7 +94,7 @@ function EventListRow({
                     className="text-[10px] tabular-nums text-white/40 shrink-0"
                     title="Planned job hours (all shows on this event)"
                   >
-                    {formatPlannedHoursShort(eventWorkTotals.jobHours)} h
+                    {formatPlannedHoursShort(eventWorkTotals.jobHours, commaDec)}
                   </span>
                 ) : null}
                 {jobCount > 0 && !open ? (

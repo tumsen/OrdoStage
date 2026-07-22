@@ -1,3 +1,5 @@
+import { parseDurationHours } from "@/lib/durationHours";
+
 /** Max comp time balance: 999 hours 59 minutes. */
 export const COMP_TIME_MAX_MINUTES = 999 * 60 + 59;
 
@@ -15,34 +17,21 @@ export function formatCompTimeHhhMm(totalMinutes: number): string {
 }
 
 /**
- * Parse "400", "400:00", "400:30", or "-12:15" as hours:minutes (plain number = hours).
- * Returns null when invalid.
+ * Parse HHHHH:MM or HHHHH,DD / HHHHH.DD (optional leading `-`) as total minutes.
+ * Empty → 0. Invalid → null.
  */
 export function parseCompTimeHhhMm(input: string): number | null {
   const trimmed = input.trim();
   if (!trimmed) return 0;
 
-  const negative = trimmed.startsWith("-");
-  const body = negative ? trimmed.slice(1).trim() : trimmed;
-  if (!body) return null;
+  const hours = parseDurationHours(trimmed, { allowNegative: true });
+  if (hours === null) return 0;
+  if (Number.isNaN(hours)) return null;
 
-  if (body.includes(":")) {
-    const [rawH = "", rawM = ""] = body.split(":");
-    const h = parseInt(rawH.replace(/\D/g, ""), 10);
-    const m = parseInt((rawM.replace(/\D/g, "") || "0").slice(0, 2), 10);
-    if (Number.isNaN(h) || Number.isNaN(m) || m > 59 || h > 999) return null;
-    const total = h * 60 + m;
-    if (total > COMP_TIME_MAX_MINUTES) return null;
-    return negative ? -total : total;
-  }
-
-  const digits = body.replace(/\D/g, "");
-  if (!digits) return null;
-  const h = parseInt(digits, 10);
-  if (Number.isNaN(h) || h > 999) return null;
-  const total = h * 60;
+  const total = Math.round(Math.abs(hours) * 60);
   if (total > COMP_TIME_MAX_MINUTES) return null;
-  return negative ? -total : total;
+  if (Math.floor(total / 60) > 999) return null;
+  return hours < 0 ? -total : total;
 }
 
 /** Normalize free-form input to canonical HHH:MM on blur. */

@@ -26,7 +26,8 @@ import { ScrollText } from "lucide-react";
 import type { LeaveBalanceSummary, LeaveTransaction } from "@/contracts/backendTypes";
 import { LeaveOpeningBalanceForm } from "@/components/time/LeaveOpeningBalanceForm";
 import { CompTimeHhhMmField } from "@/components/time/CompTimeHhhMmField";
-import { formatCompTimeHhhMm } from "@/lib/compTimeInput";
+import { formatMinutesAsDurationBoth } from "@/lib/durationHours";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
 
 const ADJUSTMENT_BALANCE_TYPES = [
   "vacation_earned",
@@ -43,10 +44,10 @@ function isCompTimeType(t: string) {
   return t === "comp_time_earned" || t === "comp_time_used";
 }
 
-function formatAmount(amount: number, balanceType: string): string {
+function formatAmount(amount: number, balanceType: string, commaDecimal: boolean): string {
   if (isCompTimeType(balanceType)) {
     const sign = amount < 0 ? "-" : amount > 0 ? "+" : "";
-    return `${sign}${formatCompTimeHhhMm(Math.abs(Math.round(amount)))}`;
+    return `${sign}${formatMinutesAsDurationBoth(Math.abs(Math.round(amount)), commaDecimal)}`;
   }
   const sign = amount < 0 ? "" : amount > 0 ? "+" : "";
   return `${sign}${amount.toFixed(2).replace(/\.?0+$/, "")}d`;
@@ -73,7 +74,8 @@ export function LeaveLedgerPanel(props: {
     showTitle = true,
     showOpeningBalance = true,
   } = props;
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const commaDec = commaDecimalForLanguage(language);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -266,7 +268,7 @@ export function LeaveLedgerPanel(props: {
                     ) : null}
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums font-medium text-white/80">
-                    {formatAmount(tx.amount, tx.balanceType)}
+                    {formatAmount(tx.amount, tx.balanceType, commaDec)}
                   </td>
                   <td className="px-2 py-1.5 text-white/50 max-w-[120px] truncate">
                     {tx.createdByName ?? tx.createdByEmail ?? "—"}

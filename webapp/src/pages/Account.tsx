@@ -22,6 +22,13 @@ import { useUserPreferencesMutation } from "@/hooks/useUserPreferencesMutation";
 import type { DistanceUnit, Language, TimeFormat } from "@/lib/preferences";
 import { UserUiLanguageSelect } from "@/components/UserUiLanguageSelect";
 import { useI18n } from "@/lib/i18n";
+import {
+  DURATION_HOURS_INPUT_CLASS,
+  DURATION_HOURS_INPUT_MAX_LENGTH,
+  formatDurationHoursForInput,
+  parseDurationHours,
+} from "@/lib/durationHours";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
 import type { Person, PersonDocument, OrganizationLeavePolicy } from "../../../backend/src/types";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import { AddressFields, EMPTY_ADDRESS, type Address } from "@/components/AddressFields";
@@ -92,7 +99,8 @@ export default function Account() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { effective, isLoading } = usePreferences();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const commaDec = commaDecimalForLanguage(language);
   const { canAction, isOwner } = usePermissions();
   const canManageBranding = canAction("billing.manage");
   const canDeleteOrganization = canAction("org.delete");
@@ -364,21 +372,29 @@ export default function Account() {
       vacationYearStartDay: String(leavePolicy.vacationYearStartDay),
       defaultVacationDaysPerYear: String(leavePolicy.defaultVacationDaysPerYear),
       defaultExtraVacationDays: String(leavePolicy.defaultExtraVacationDays),
-      defaultWeeklyContractHours: String(leavePolicy.defaultWeeklyContractHours),
+      defaultWeeklyContractHours: formatDurationHoursForInput(
+        leavePolicy.defaultWeeklyContractHours,
+        commaDec
+      ),
       compTimeFromOvertimeEnabled: leavePolicy.compTimeFromOvertimeEnabled,
     });
-  }, [leavePolicy]);
+  }, [leavePolicy, commaDec]);
 
   const saveLeavePolicyMutation = useMutation({
-    mutationFn: () =>
-      api.patch<OrganizationLeavePolicy>("/api/org/leave-policy", {
+    mutationFn: () => {
+      const weeklyHours = parseDurationHours(leavePolicyDraft.defaultWeeklyContractHours);
+      if (weeklyHours === null || Number.isNaN(weeklyHours)) {
+        throw new Error("Invalid weekly contract hours");
+      }
+      return api.patch<OrganizationLeavePolicy>("/api/org/leave-policy", {
         vacationYearStartMonth: parseInt(leavePolicyDraft.vacationYearStartMonth, 10),
         vacationYearStartDay: parseInt(leavePolicyDraft.vacationYearStartDay, 10),
         defaultVacationDaysPerYear: parseFloat(leavePolicyDraft.defaultVacationDaysPerYear),
         defaultExtraVacationDays: parseFloat(leavePolicyDraft.defaultExtraVacationDays),
-        defaultWeeklyContractHours: parseFloat(leavePolicyDraft.defaultWeeklyContractHours),
+        defaultWeeklyContractHours: weeklyHours,
         compTimeFromOvertimeEnabled: leavePolicyDraft.compTimeFromOvertimeEnabled,
-      }),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["org-leave-policy"] });
       toast({ title: t("account.leavePolicySaved") });
@@ -1007,15 +1023,17 @@ export default function Account() {
             <div className="space-y-1.5">
               <Label className="text-white/55 text-xs">{t("time.leavePolicyDefaultWeeklyHours")}</Label>
               <Input
-                type="number"
-                min={0}
-                step={0.5}
+                type="text"
+                inputMode="decimal"
+                maxLength={DURATION_HOURS_INPUT_MAX_LENGTH}
                 value={leavePolicyDraft.defaultWeeklyContractHours}
                 onChange={(e) =>
                   setLeavePolicyDraft((s) => ({ ...s, defaultWeeklyContractHours: e.target.value }))
                 }
-                className="bg-white/5 border-white/10 text-white h-8"
+                placeholder="37:00"
+                className={DURATION_HOURS_INPUT_CLASS}
               />
+              <p className="text-[10px] text-white/40">{t("time.leaveHoursInputHint")}</p>
             </div>
             <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 sm:col-span-2 lg:col-span-1">
               <Label className="text-white/55 text-xs">{t("time.leavePolicyCompFromOvertime")}</Label>

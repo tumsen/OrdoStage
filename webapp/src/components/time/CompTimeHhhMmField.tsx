@@ -55,7 +55,7 @@ export function CompTimeHhhMmField(props: {
       <input
         id={id}
         type="text"
-        inputMode="numeric"
+        inputMode="decimal"
         autoComplete="off"
         disabled={disabled}
         aria-label={ariaLabel ?? "Hours and minutes"}
@@ -82,13 +82,13 @@ export function CompTimeHhhMmField(props: {
           }
         }}
         className={cn(
-          "h-8 w-full min-w-[5.5rem] max-w-[7rem] rounded-md border border-white/10 bg-white/5 px-2",
+          "h-8 w-[calc(8ch+1rem)] min-w-0 max-w-none shrink-0 rounded-md border border-white/10 bg-white/5 px-2",
           "font-mono text-xs tabular-nums text-white placeholder:text-white/25",
           "focus:outline-none focus:ring-1 focus:ring-emerald-500/40",
           inputClassName
         )}
       />
-      <p className="text-[10px] text-white/30">{t("time.leaveOpeningBalanceCompTimeHint")}</p>
+      <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
     </div>
   );
 }

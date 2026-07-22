@@ -2,6 +2,8 @@ import { Fragment } from "react";
 import { computeShowStaffingStats, formatJobAssigneesLabel, sortEventShowJobs } from "@/lib/eventShowStaffing";
 import { ShowTeamStaffingSummary } from "@/components/event/ShowTeamStaffingSummary";
 import type { EventShow, EventShowJob, EventTeam } from "@/lib/types";
+import { formatDurationHoursBoth } from "@/lib/durationHours";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -14,8 +16,8 @@ export function effectiveShowStatus(show: EventShow): "draft" | "confirmed" | "c
   return "draft";
 }
 
-export function formatPlannedHoursShort(jobHours: number): string {
-  return jobHours >= 10 ? jobHours.toFixed(1) : jobHours.toFixed(2);
+export function formatPlannedHoursShort(jobHours: number, commaDecimal = false): string {
+  return formatDurationHoursBoth(jobHours, commaDecimal);
 }
 
 function overviewGridColumns(hour12: boolean): string {
@@ -149,6 +151,7 @@ export function EventShowsOverviewGrid({
   const { effective } = usePreferences();
   const prefsLocale = localeForLanguage(effective?.language ?? "en");
   const hour12 = effective?.timeFormat === "12h";
+  const commaDec = commaDecimalForLanguage(effective?.language ?? "en");
 
   const sorted = [...shows].sort((a, b) => {
     const da = a.showDate.slice(0, 10);
@@ -177,7 +180,7 @@ export function EventShowsOverviewGrid({
           const ticketBits = formatEventListTicketBits(show, prefsLocale, hour12);
           const when = formatEventListWhenParts(show, prefsLocale, hour12);
           const showStatus = effectiveShowStatus(show);
-          const hoursLabel = formatPlannedHoursShort(stats.jobHours);
+          const hoursLabel = formatPlannedHoursShort(stats.jobHours, commaDec);
           const rowTone = showOff
             ? "text-white/30 line-through decoration-white/20"
             : "text-white/50";
@@ -223,7 +226,7 @@ export function EventShowsOverviewGrid({
                   )}
                   title="Total planned hours for this show"
                 >
-                  {hoursLabel} h
+                  {hoursLabel}
                 </span>
                 <div
                   className={cn(

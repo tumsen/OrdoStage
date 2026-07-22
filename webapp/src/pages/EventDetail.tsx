@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { api, isApiError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
 import { invalidateWorkAnnouncementBar } from "@/lib/invalidateWorkAnnouncementBar";
 import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
 import { AutoSaveStatus } from "@/components/AutoSaveStatus";
@@ -1566,6 +1567,8 @@ function bookingSlotFromEventShows(event: EventDetail) {
 }
 
 function EventStaffingOverviewBanner({ event }: { event: EventDetail }) {
+  const { language } = useI18n();
+  const commaDec = commaDecimalForLanguage(language);
   const teams = event.teams ?? [];
   const shows = event.shows ?? [];
   const eventWorkTotals = computeEventWorkTotals(shows);
@@ -1583,7 +1586,7 @@ function EventStaffingOverviewBanner({ event }: { event: EventDetail }) {
             className="text-[10px] tabular-nums text-white/40 shrink-0"
             title="Planned job hours (all shows on this event)"
           >
-            {formatPlannedHoursShort(eventWorkTotals.jobHours)} h
+            {formatPlannedHoursShort(eventWorkTotals.jobHours, commaDec)}
           </span>
         ) : null}
       </div>

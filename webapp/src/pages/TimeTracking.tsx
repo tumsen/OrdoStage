@@ -106,7 +106,7 @@ import {
   formatWorkDayDuration,
   workDayDurationMinutes,
 } from "@/lib/leaveNorms";
-import { formatCompTimeHhhMm } from "@/lib/compTimeInput";
+import { formatMinutesAsDurationBoth, formatSignedMinutesAsDurationBoth } from "@/lib/durationHours";
 import {
   MINUTES_PER_DAY,
   TIME_SNAP_MINUTES,
@@ -116,8 +116,6 @@ import {
   commaDecimalForLanguage,
   dateFromColumnAndWindowMinutes,
   formatHourLabel,
-  formatOneDecimalHour,
-  formatTotalMinutesAsHHMM,
   minutesFromWindowStart,
   layoutTimeEntryBlocks,
   rangeMetricsInColumn,
@@ -421,12 +419,8 @@ function formatSignedDays(days: number): string {
   return `${sign}${Math.abs(days).toFixed(1)}d`;
 }
 
-function formatSignedMinutes(minutes: number): string {
-  const rounded = Math.round(minutes);
-  const body = formatCompTimeHhhMm(Math.abs(rounded));
-  if (rounded > 0) return `+${body}`;
-  if (rounded < 0) return `−${body}`;
-  return body;
+function formatSignedMinutes(minutes: number, commaDecimal = false): string {
+  return formatSignedMinutesAsDurationBoth(minutes, commaDecimal);
 }
 
 function dayOffHeaderLabel(
@@ -2223,10 +2217,7 @@ export default function TimeTracking() {
               <span className="font-medium text-ordo-yellow">{t("time.copyModeHint")}</span>
             ) : null}
             <span className="tabular-nums text-white/60">
-              {periodTotalLabel}{" "}
-              {formatOneDecimalHour(periodTotalMinutes / 60, commaDec)}
-              <span className="text-white/35"> · </span>
-              {formatTotalMinutesAsHHMM(periodTotalMinutes)}
+              {periodTotalLabel} {formatMinutesAsDurationBoth(periodTotalMinutes, commaDec)}
             </span>
             {leaveManagementEnabled && leaveBalances ? (
               <>
@@ -2295,13 +2286,13 @@ export default function TimeTracking() {
                       signedBalanceClass(leaveBalances.compTimeRemainingMinutes)
                     )}
                   >
-                    {formatSignedMinutes(leaveBalances.compTimeRemainingMinutes)}
+                    {formatSignedMinutes(leaveBalances.compTimeRemainingMinutes, commaDec)}
                   </span>
                 </span>
                 <span className="whitespace-nowrap">
                   {t("time.leaveCompPeriodUsed")}:{" "}
                   <span className="tabular-nums font-medium text-white/80">
-                    {formatTotalMinutesAsHHMM(leaveBalances.compTimePeriodUsedMinutes ?? 0)}
+                    {formatMinutesAsDurationBoth(leaveBalances.compTimePeriodUsedMinutes ?? 0, commaDec)}
                   </span>
                 </span>
                 {balancePersonId ? (
@@ -2493,12 +2484,10 @@ export default function TimeTracking() {
                   </div>
                   <p className="mt-0.5 text-center text-[10px] leading-tight tabular-nums text-white/55">
                     <span className="text-white/40">{t("time.weekColumnDayHours")}</span>{" "}
-                    {formatOneDecimalHour(mobileScheduleDayTotalMinutes / 60, commaDec)}{" "}
-                    {formatTotalMinutesAsHHMM(mobileScheduleDayTotalMinutes)}
+                    {formatMinutesAsDurationBoth(mobileScheduleDayTotalMinutes, commaDec)}
                     <span className="mx-1.5 text-white/20">·</span>
                     <span className="text-white/40">{t("time.weekColumnRunningHours")}</span>{" "}
-                    {formatOneDecimalHour(mobileScheduleRunningMinutes / 60, commaDec)}{" "}
-                    {formatTotalMinutesAsHHMM(mobileScheduleRunningMinutes)}
+                    {formatMinutesAsDurationBoth(mobileScheduleRunningMinutes, commaDec)}
                   </p>
                 </div>
               ) : null}
@@ -2610,17 +2599,13 @@ export default function TimeTracking() {
                                 <div className="text-white/40">
                                   <span className="text-white/35">{t("time.weekColumnDayHours")}</span>{" "}
                                   <span className="text-white/55">
-                                    {formatOneDecimalHour(dayTotalMinutes / 60, commaDec)}
-                                    <span className="text-white/25"> · </span>
-                                    {formatTotalMinutesAsHHMM(dayTotalMinutes)}
+                                    {formatMinutesAsDurationBoth(dayTotalMinutes, commaDec)}
                                   </span>
                                 </div>
                                 <div className="text-white/40">
                                   <span className="text-white/35">{t("time.weekColumnRunningHours")}</span>{" "}
                                   <span className="text-white/70">
-                                    {formatOneDecimalHour(runningMinutes / 60, commaDec)}
-                                    <span className="text-white/25"> · </span>
-                                    {formatTotalMinutesAsHHMM(runningMinutes)}
+                                    {formatMinutesAsDurationBoth(runningMinutes, commaDec)}
                                   </span>
                                 </div>
                               </div>

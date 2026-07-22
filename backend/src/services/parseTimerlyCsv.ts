@@ -72,8 +72,16 @@ function parseDanishDate(raw: string): string | null {
 }
 
 function parseDecimalHours(raw: string): number {
-  const s = raw.trim().replace(",", ".");
-  const n = Number.parseFloat(s);
+  const s = raw.trim();
+  if (!s) return 0;
+  const colon = /^(\d{1,5}):([0-5]?\d)$/.exec(s);
+  if (colon) {
+    const hours = Number.parseInt(colon[1]!, 10);
+    const minutes = Number.parseInt(colon[2]!, 10);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes >= 60) return 0;
+    return hours + minutes / 60;
+  }
+  const n = Number.parseFloat(s.replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 }
 

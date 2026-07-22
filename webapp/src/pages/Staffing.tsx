@@ -12,6 +12,9 @@ import { api } from "@/lib/api";
 import { isStaffingRequirementFilled } from "@/lib/eventShowStaffing";
 import type { StaffingRequirementRow } from "@/lib/staffingPageContext";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
+import { formatMinutesAsDurationBoth } from "@/lib/durationHours";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
 import type { Person } from "@/lib/types";
 
 type StaffingPerson = {
@@ -46,11 +49,10 @@ function dateFromIsoDate(value: string): Date | null {
   return Number.isFinite(d.getTime()) ? d : null;
 }
 
-function hours(minutes: number): string {
-  return `${Math.round((minutes / 60) * 10) / 10}h`;
-}
-
 export default function Staffing() {
+  const { language } = useI18n();
+  const hours = (minutes: number) =>
+    formatMinutesAsDurationBoth(minutes, commaDecimalForLanguage(language));
   const [anchor, setAnchor] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);

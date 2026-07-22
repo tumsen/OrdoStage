@@ -36,7 +36,8 @@ import {
   DEFAULT_VACATION_YEAR_POLICY,
 } from "@/lib/leaveNorms";
 import type { OrganizationLeavePolicy, PayrollExport } from "@/contracts/backendTypes";
-import { formatCompTimeHhhMm } from "@/lib/compTimeInput";
+import { formatDurationHoursBoth, formatMinutesAsDurationBoth } from "@/lib/durationHours";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
 
 type RangeMode = "week" | "month" | "year" | "vacation_year" | "custom";
 
@@ -50,17 +51,13 @@ const RANGE_MODES: { id: RangeMode; labelKey: string }[] = [
   { id: "custom", labelKey: "time.payrollRangeCustom" },
 ];
 
-function fmtMins(minutes: number): string {
-  const sign = minutes < 0 ? "−" : "";
-  const h = Math.floor(Math.abs(minutes) / 60);
-  const m = Math.round(Math.abs(minutes) % 60);
-  if (m === 0) return `${sign}${h}h`;
-  return `${sign}${h}h ${m}m`;
+function fmtMins(minutes: number, commaDecimal = false): string {
+  return formatMinutesAsDurationBoth(minutes, commaDecimal);
 }
 
-/** Comp balances as HHHH:MM on one line (e.g. 1234:30). */
-function fmtCompHhhMm(minutes: number): string {
-  return formatCompTimeHhhMm(minutes);
+/** Comp balances as dual duration formats. */
+function fmtCompHhhMm(minutes: number, commaDecimal = false): string {
+  return formatMinutesAsDurationBoth(minutes, commaDecimal);
 }
 
 function fmtDays(days: number): string {
@@ -73,6 +70,7 @@ function today(): Date {
 
 function buildCsv(data: PayrollExport, lang: string): string {
   const da = lang === "da";
+  const commaDec = commaDecimalForLanguage(lang === "da" || lang === "de" ? lang : "en");
   const headers = da
     ? [
         "Navn",
@@ -109,17 +107,17 @@ function buildCsv(data: PayrollExport, lang: string): string {
 
   const rows = data.people.map((p) => [
     p.personName,
-    p.weeklyContractHours != null ? String(p.weeklyContractHours) : "",
-    fmtMins(p.workMinutes),
-    p.overtimeMinutes != null ? fmtMins(p.overtimeMinutes) : "",
+    p.weeklyContractHours != null ? formatDurationHoursBoth(p.weeklyContractHours, commaDec) : "",
+    fmtMins(p.workMinutes, commaDec),
+    p.overtimeMinutes != null ? fmtMins(p.overtimeMinutes, commaDec) : "",
     fmtDays(p.vacationEarnedDays),
     fmtDays(p.vacationUsedDays),
     fmtDays(p.vacationRemainingDays),
     fmtDays(p.extraVacationUsedDays),
     fmtDays(p.extraVacationRemainingDays),
-    fmtMins(p.compTimeEarnedMinutes),
-    fmtMins(p.compTimeUsedMinutes),
-    fmtCompHhhMm(p.compTimeRemainingMinutes),
+    fmtMins(p.compTimeEarnedMinutes, commaDec),
+    fmtMins(p.compTimeUsedMinutes, commaDec),
+    fmtCompHhhMm(p.compTimeRemainingMinutes, commaDec),
     fmtDays(p.sickDays),
     p.timesheetApproved ? (da ? "Ja" : "Yes") : da ? "Nej" : "No",
   ]);
@@ -382,6 +380,8 @@ export default function TimePayroll() {
   const readAll = canAction("time.read_all");
 
   const dfLocale = language === "da" ? localeDa : language === "de" ? localeDe : localeEnGB;
+  const commaDec = commaDecimalForLanguage(language);
+  const fmtM = (minutes: number) => formatMinutesAsDurationBoth(minutes, commaDec);
   const now = today();
   const [rangeMode, setRangeMode] = useState<RangeMode>("month");
   const [anchorWeek, setAnchorWeek] = useState(() =>
@@ -742,11 +742,13 @@ export default function TimePayroll() {
                 <tr key={p.personId} className="border-b border-white/5 hover:bg-white/[0.02]">
                   <td className="px-3 py-2 text-white">{p.personName}</td>
                   <td className="px-3 py-2 tabular-nums text-white/70">
-                    {p.weeklyContractHours != null ? `${p.weeklyContractHours}h` : "—"}
+                    {p.weeklyContractHours != null
+                      ? formatDurationHoursBoth(p.weeklyContractHours, commaDec)
+                      : "—"}
                   </td>
-                  <td className="px-3 py-2 tabular-nums text-white/70">{fmtMins(p.workMinutes)}</td>
+                  <td className="px-3 py-2 tabular-nums text-white/70">{fmtM(p.workMinutes)}</td>
                   <td className="px-3 py-2 tabular-nums text-white/70">
-                    {p.overtimeMinutes != null ? fmtMins(p.overtimeMinutes) : "—"}
+                    {p.overtimeMinutes != null ? fmtM(p.overtimeMinutes) : "—"}
                   </td>
                   <td className="px-3 py-2 tabular-nums text-emerald-300/80">{fmtDays(p.vacationEarnedDays)}</td>
                   <td className="px-3 py-2 tabular-nums text-white/70">{fmtDays(p.vacationUsedDays)}</td>
@@ -761,7 +763,7 @@ export default function TimePayroll() {
                   <td className="px-3 py-2 tabular-nums text-white/70">{fmtDays(p.extraVacationUsedDays)}</td>
                   <td className="px-3 py-2 tabular-nums text-teal-300/80">{fmtDays(p.extraVacationRemainingDays)}</td>
                   <td className="px-3 py-2 tabular-nums text-cyan-300/80 whitespace-nowrap min-w-[6.5rem]">
-                    {fmtCompHhhMm(p.compTimeRemainingMinutes)}
+                    {fmtM(p.compTimeRemainingMinutes)}
                   </td>
                   <td className="px-3 py-2 tabular-nums text-orange-300/80">{fmtDays(p.sickDays)}</td>
                   <td className="px-3 py-2 text-white/50">{p.timesheetApproved ? "✓" : "—"}</td>
