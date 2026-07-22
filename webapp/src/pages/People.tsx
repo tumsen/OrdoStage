@@ -15,9 +15,11 @@ import { api } from "@/lib/api";
 import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import {
   formatDurationHoursBoth,
+  formatDurationHoursForInput,
   parseDurationHours,
 } from "@/lib/durationHours";
 import { cn } from "@/lib/utils";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
 import { BillingSummary, type OrgBillingPayload } from "@/components/BillingSummary";
 import { DateInputWithWeekday } from "@/components/DateInputWithWeekday";
 import {
@@ -357,7 +359,8 @@ function PersonFormDialog({
   const queryClient = useQueryClient();
   const { canWrite: canWriteOrg, canAction } = usePermissions();
   const canManageContracts = canAction("time.read_all");
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const commaDecimal = commaDecimalForLanguage(language);
   const { data: session } = useSession();
 
   // Work contract state (separate from main form — saved independently)
@@ -590,19 +593,25 @@ function PersonFormDialog({
   }, [permissionState, permissionsDoc?.id, permissionOptions?.teams]);
 
   // Sync contract fields from loaded person (after contractAutoSave is defined below)
-  const syncContractFromPerson = useCallback((p: Person | undefined) => {
-    const weekly = p?.weeklyContractHours != null ? String(p.weeklyContractHours) : "";
-    const vacation = p?.vacationDaysPerYear != null ? String(p.vacationDaysPerYear) : "";
-    setContractHoursInput(weekly);
-    setContractHoursPeriod("weekly");
-    setContractVacationDays(vacation);
-    setShowInPayroll(p?.showInPayroll !== false);
-    return {
-      contractHoursInput: weekly,
-      contractHoursPeriod: "weekly" as const,
-      contractVacationDays: vacation,
-    };
-  }, []);
+  const syncContractFromPerson = useCallback(
+    (p: Person | undefined) => {
+      const weekly =
+        p?.weeklyContractHours != null
+          ? formatDurationHoursForInput(p.weeklyContractHours, commaDecimal)
+          : "";
+      const vacation = p?.vacationDaysPerYear != null ? String(p.vacationDaysPerYear) : "";
+      setContractHoursInput(weekly);
+      setContractHoursPeriod("weekly");
+      setContractVacationDays(vacation);
+      setShowInPayroll(p?.showInPayroll !== false);
+      return {
+        contractHoursInput: weekly,
+        contractHoursPeriod: "weekly" as const,
+        contractVacationDays: vacation,
+      };
+    },
+    [commaDecimal]
+  );
 
   useEffect(() => {
     const profile = leaveProfileData?.profile;
@@ -612,12 +621,12 @@ function PersonFormDialog({
       profile.extraVacationDaysPerYear != null ? String(profile.extraVacationDaysPerYear) : ""
     );
     if (profile.weeklyContractHours != null) {
-      setContractHoursInput(String(profile.weeklyContractHours));
+      setContractHoursInput(formatDurationHoursForInput(profile.weeklyContractHours, commaDecimal));
       setContractHoursPeriod("weekly");
     }
     setLeaveSickStatus(profile.sickLeaveStatus);
     setLeaveSickNote(profile.sickLeaveNote ?? "");
-  }, [leaveProfileData?.profile]);
+  }, [leaveProfileData?.profile, commaDecimal]);
 
   const watchedAssignments = form.watch("teamAssignments");
   const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
@@ -1683,15 +1692,15 @@ function PersonFormDialog({
                   {[
                     {
                       label: t("people.hoursPerDay"),
-                      value: derivedDailyHours != null ? formatDurationHoursBoth(derivedDailyHours) : "—",
+                      value: derivedDailyHours != null ? formatDurationHoursBoth(derivedDailyHours, commaDecimal) : "—",
                     },
                     {
                       label: t("time.leaveProfileMonthlyHours"),
-                      value: derivedMonthlyHours != null ? formatDurationHoursBoth(derivedMonthlyHours) : "—",
+                      value: derivedMonthlyHours != null ? formatDurationHoursBoth(derivedMonthlyHours, commaDecimal) : "—",
                     },
                     {
                       label: t("time.leaveProfileAnnualHours"),
-                      value: derivedAnnualHours != null ? formatDurationHoursBoth(derivedAnnualHours) : "—",
+                      value: derivedAnnualHours != null ? formatDurationHoursBoth(derivedAnnualHours, commaDecimal) : "—",
                     },
                   ].map((item) => (
                     <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
@@ -1898,15 +1907,15 @@ function PersonFormDialog({
                   {[
                     {
                       label: t("people.hoursPerDay"),
-                      value: derivedDailyHours != null ? formatDurationHoursBoth(derivedDailyHours) : "—",
+                      value: derivedDailyHours != null ? formatDurationHoursBoth(derivedDailyHours, commaDecimal) : "—",
                     },
                     {
                       label: t("time.leaveProfileMonthlyHours"),
-                      value: derivedMonthlyHours != null ? formatDurationHoursBoth(derivedMonthlyHours) : "—",
+                      value: derivedMonthlyHours != null ? formatDurationHoursBoth(derivedMonthlyHours, commaDecimal) : "—",
                     },
                     {
                       label: t("time.leaveProfileAnnualHours"),
-                      value: derivedAnnualHours != null ? formatDurationHoursBoth(derivedAnnualHours) : "—",
+                      value: derivedAnnualHours != null ? formatDurationHoursBoth(derivedAnnualHours, commaDecimal) : "—",
                     },
                   ].map((item) => (
                     <div
@@ -2239,15 +2248,15 @@ function PersonFormDialog({
               {[
                 {
                   label: t("people.hoursPerDay"),
-                  value: derivedDailyHours != null ? formatDurationHoursBoth(derivedDailyHours) : "—",
+                  value: derivedDailyHours != null ? formatDurationHoursBoth(derivedDailyHours, commaDecimal) : "—",
                 },
                 {
                   label: t("time.leaveProfileMonthlyHours"),
-                  value: derivedMonthlyHours != null ? formatDurationHoursBoth(derivedMonthlyHours) : "—",
+                  value: derivedMonthlyHours != null ? formatDurationHoursBoth(derivedMonthlyHours, commaDecimal) : "—",
                 },
                 {
                   label: t("time.leaveProfileAnnualHours"),
-                  value: derivedAnnualHours != null ? formatDurationHoursBoth(derivedAnnualHours) : "—",
+                  value: derivedAnnualHours != null ? formatDurationHoursBoth(derivedAnnualHours, commaDecimal) : "—",
                 },
               ].map((item) => (
                 <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">

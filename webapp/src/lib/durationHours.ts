@@ -30,12 +30,23 @@ export function formatDurationHoursHHMM(hours: number): string {
   return `${h}:${String(m).padStart(2, "0")}`;
 }
 
-/** Decimal hours → two-fraction-digit string (dot). */
-export function formatDurationHoursDecimal(hours: number): string {
-  return (Math.round(hours * 100) / 100).toFixed(2);
+/** Decimal hours → two-fraction-digit string (`.` or `,` per locale). */
+export function formatDurationHoursDecimal(hours: number, commaDecimal = false): string {
+  const s = (Math.round(hours * 100) / 100).toFixed(2);
+  return commaDecimal ? s.replace(".", ",") : s;
 }
 
-/** Both formats for display boxes, e.g. `37:30 · 37.50`. */
-export function formatDurationHoursBoth(hours: number): string {
-  return `${formatDurationHoursHHMM(hours)} · ${formatDurationHoursDecimal(hours)}`;
+/**
+ * Compact value for the hours input field (no trailing zeros).
+ * Uses `,` when `commaDecimal` is true (da/de).
+ */
+export function formatDurationHoursForInput(hours: number, commaDecimal = false): string {
+  const rounded = Math.round(hours * 100) / 100;
+  const s = String(rounded);
+  return commaDecimal ? s.replace(".", ",") : s;
+}
+
+/** Both formats for display boxes, e.g. `37:30 · 37.50` or `37:30 · 37,50`. */
+export function formatDurationHoursBoth(hours: number, commaDecimal = false): string {
+  return `${formatDurationHoursHHMM(hours)} · ${formatDurationHoursDecimal(hours, commaDecimal)}`;
 }

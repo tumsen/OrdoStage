@@ -1070,7 +1070,7 @@ const da: DeepPartial<typeof en> = {
     leaveProfileExtraVacation: "Feriefridage",
     leaveProfileExtraVacationHint: "5 dage = 37 timer ved fuldtid (37 t/uge).",
     leaveHoursInputLabel: "Timer",
-    leaveHoursInputHint: "hhhh:mm eller decimaltal (fx 37:30 / 37.5)",
+    leaveHoursInputHint: "hhhh:mm eller decimaltal (fx 37:30 / 37,5)",
     leaveHoursPeriodLabel: "Periode",
     leaveHoursPeriodWeekly: "Ugentligt",
     leaveHoursPeriodMonthly: "Månedligt",
