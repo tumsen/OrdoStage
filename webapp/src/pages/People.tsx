@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns";
 import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, ShieldAlert, User } from "lucide-react";
+import { Plus, ShieldAlert, Trash2, User } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
 import { useAutoSave, type AutoSaveStatus, autoSaveBlurCapture } from "@/hooks/useAutoSave";
@@ -88,6 +88,13 @@ interface Team {
 
 const SOFTWARE_OWNER_EMAIL = "tumsen@gmail.com";
 
+const EmergencyContactFormSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  phone: z.string().optional(),
+  relationNote: z.string().optional(),
+});
+
 const PersonFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   affiliation: z.enum(["internal", "external"], {
@@ -103,8 +110,14 @@ const PersonFormSchema = z.object({
   addressCity:    z.string().optional(),
   addressState:   z.string().optional(),
   addressCountry: z.string().optional(),
-  emergencyContactName: z.string().optional(),
-  emergencyContactPhone: z.string().optional(),
+  workplaceName: z.string().optional(),
+  workAddressStreet:  z.string().optional(),
+  workAddressNumber:  z.string().optional(),
+  workAddressZip:     z.string().optional(),
+  workAddressCity:    z.string().optional(),
+  workAddressState:   z.string().optional(),
+  workAddressCountry: z.string().optional(),
+  emergencyContacts: z.array(EmergencyContactFormSchema),
   notes: z.string().optional(),
   /** Required: every person belongs to exactly one permission group. */
   permissionGroupId: z.string().min(1, "Select a permission group"),
@@ -117,6 +130,39 @@ const PersonFormSchema = z.object({
 });
 
 type PersonFormValues = z.infer<typeof PersonFormSchema>;
+
+function newEmergencyContactId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `ec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function emptyEmergencyContact() {
+  return { id: newEmergencyContactId(), name: "", phone: "", relationNote: "" };
+}
+
+function emergencyContactsFromPerson(person: Person | null | undefined) {
+  const rows = person?.emergencyContacts;
+  if (Array.isArray(rows) && rows.length > 0) {
+    return rows.map((row) => ({
+      id: row.id || newEmergencyContactId(),
+      name: row.name ?? "",
+      phone: row.phone ?? "",
+      relationNote: row.relationNote ?? "",
+    }));
+  }
+  if (person?.emergencyContactName || person?.emergencyContactPhone) {
+    return [
+      {
+        id: newEmergencyContactId(),
+        name: person.emergencyContactName ?? "",
+        phone: person.emergencyContactPhone ?? "",
+        relationNote: "",
+      },
+    ];
+  }
+  return [emptyEmergencyContact()];
+}
 
 type PeopleSortMode = "alphabetical" | "teams" | "internal" | "external";
 
@@ -360,8 +406,14 @@ function PersonFormDialog({
           addressCity:    person.addressCity    ?? "",
           addressState:   person.addressState   ?? "",
           addressCountry: person.addressCountry ?? "",
-          emergencyContactName: person.emergencyContactName ?? "",
-          emergencyContactPhone: person.emergencyContactPhone ?? "",
+          workplaceName: person.workplaceName ?? "",
+          workAddressStreet:  person.workAddressStreet  ?? "",
+          workAddressNumber:  person.workAddressNumber  ?? "",
+          workAddressZip:     person.workAddressZip     ?? "",
+          workAddressCity:    person.workAddressCity    ?? "",
+          workAddressState:   person.workAddressState   ?? "",
+          workAddressCountry: person.workAddressCountry ?? "",
+          emergencyContacts: emergencyContactsFromPerson(person),
           notes: person.notes ?? "",
           teamAssignments:
             person.teamMemberships?.map((membership) => ({
@@ -382,8 +434,14 @@ function PersonFormDialog({
           addressCity:    "",
           addressState:   "",
           addressCountry: "",
-          emergencyContactName: "",
-          emergencyContactPhone: "",
+          workplaceName: "",
+          workAddressStreet:  "",
+          workAddressNumber:  "",
+          workAddressZip:     "",
+          workAddressCity:    "",
+          workAddressState:   "",
+          workAddressCountry: "",
+          emergencyContacts: [emptyEmergencyContact()],
           notes: "",
           teamAssignments: [],
         },
@@ -591,6 +649,14 @@ function PersonFormDialog({
 
   const mutation = useMutation({
     mutationFn: (values: PersonFormValues) => {
+      const emergencyContacts = (values.emergencyContacts ?? [])
+        .map((row) => ({
+          id: row.id || newEmergencyContactId(),
+          name: (row.name ?? "").trim(),
+          phone: (row.phone ?? "").trim(),
+          relationNote: (row.relationNote ?? "").trim(),
+        }))
+        .filter((row) => row.name || row.phone || row.relationNote);
       const payload = {
         name: values.name,
         affiliation: values.affiliation,
@@ -603,8 +669,14 @@ function PersonFormDialog({
         addressCity:    values.addressCity    || undefined,
         addressState:   values.addressState   || undefined,
         addressCountry: values.addressCountry || undefined,
-        emergencyContactName: values.emergencyContactName || undefined,
-        emergencyContactPhone: values.emergencyContactPhone || undefined,
+        workplaceName: values.workplaceName || undefined,
+        workAddressStreet:  values.workAddressStreet  || undefined,
+        workAddressNumber:  values.workAddressNumber  || undefined,
+        workAddressZip:     values.workAddressZip     || undefined,
+        workAddressCity:    values.workAddressCity    || undefined,
+        workAddressState:   values.workAddressState   || undefined,
+        workAddressCountry: values.workAddressCountry || undefined,
+        emergencyContacts,
         notes: values.notes || undefined,
         ...(values.permissionGroupId?.trim()
           ? { permissionGroupId: values.permissionGroupId.trim() }
@@ -1039,28 +1111,169 @@ function PersonFormDialog({
     </div>
   );
 
+  const watchedEmergencyContacts = form.watch("emergencyContacts") ?? [];
+
   const formBody = (
         <div
           className={asPage ? "w-full space-y-6 pb-4" : "space-y-4 py-1"}
           onBlurCapture={autoSave.onBlurCapture}
         >
           <div className={asPage ? "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start" : "contents"}>
-            <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "contents"}>
-              {asPage ? <p className={sectionTitle}>Profile & access</p> : null}
-          {/* Name + affiliation + Role */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "space-y-4"}>
+              <p className={sectionTitle}>{t("people.privateSection")}</p>
+
+          <div className="space-y-1.5">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateName")} *</Label>
+            <Input
+              {...form.register("name")}
+              placeholder="Full name"
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
+            />
+            {form.formState.errors.name ? (
+              <p className="text-red-400 text-xs">{form.formState.errors.name.message}</p>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Name *</Label>
+              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privatePhone")}</Label>
               <Input
-                {...form.register("name")}
-                placeholder="Full name"
+                {...form.register("phone")}
+                placeholder="+45 00 00 00 00"
                 className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
               />
-              {form.formState.errors.name ? (
-                <p className="text-red-400 text-xs">{form.formState.errors.name.message}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateEmail")}</Label>
+              <Input
+                {...form.register("email")}
+                type="email"
+                placeholder="email@example.com"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
+              />
+              {form.formState.errors.email ? (
+                <p className="text-red-400 text-xs">{form.formState.errors.email.message}</p>
               ) : null}
             </div>
+          </div>
 
+          <div className="space-y-1.5">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateAddress")}</Label>
+            <AddressFields
+              value={{
+                street:  form.watch("addressStreet")  ?? "",
+                number:  form.watch("addressNumber")  ?? "",
+                zip:     form.watch("addressZip")     ?? "",
+                city:    form.watch("addressCity")    ?? "",
+                state:   form.watch("addressState")   ?? "",
+                country: form.watch("addressCountry") ?? "",
+              }}
+              onChange={(addr: Address) => {
+                form.setValue("addressStreet",  addr.street, { shouldDirty: true });
+                form.setValue("addressNumber",  addr.number, { shouldDirty: true });
+                form.setValue("addressZip",     addr.zip, { shouldDirty: true });
+                form.setValue("addressCity",    addr.city, { shouldDirty: true });
+                form.setValue("addressState",   addr.state, { shouldDirty: true });
+                form.setValue("addressCountry", addr.country, { shouldDirty: true });
+                if (person?.id) autoSave.schedule();
+              }}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-white/50 text-xs uppercase tracking-wide flex items-center gap-1.5">
+              <ShieldAlert size={11} className="text-amber-400/60" /> {t("people.emergencyContacts")}
+            </Label>
+            <div className="space-y-2">
+              {watchedEmergencyContacts.map((contact, index) => (
+                <div
+                  key={contact.id}
+                  className="rounded-md border border-white/10 bg-white/[0.02] p-2 space-y-2"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+                    <Input
+                      value={contact.name ?? ""}
+                      onChange={(e) => {
+                        const next = [...watchedEmergencyContacts];
+                        next[index] = { ...next[index]!, name: e.target.value };
+                        form.setValue("emergencyContacts", next, { shouldDirty: true });
+                      }}
+                      placeholder={t("people.emergencyName")}
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8"
+                    />
+                    <Input
+                      value={contact.phone ?? ""}
+                      onChange={(e) => {
+                        const next = [...watchedEmergencyContacts];
+                        next[index] = { ...next[index]!, phone: e.target.value };
+                        form.setValue("emergencyContacts", next, { shouldDirty: true });
+                      }}
+                      placeholder={t("people.emergencyPhone")}
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-white/35 hover:text-red-300"
+                      disabled={watchedEmergencyContacts.length <= 1}
+                      title={t("people.removeEmergencyContact")}
+                      onClick={() => {
+                        if (watchedEmergencyContacts.length <= 1) return;
+                        form.setValue(
+                          "emergencyContacts",
+                          watchedEmergencyContacts.filter((_, i) => i !== index),
+                          { shouldDirty: true }
+                        );
+                        if (person?.id) autoSave.schedule();
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </Button>
+                  </div>
+                  <Input
+                    value={contact.relationNote ?? ""}
+                    onChange={(e) => {
+                      const next = [...watchedEmergencyContacts];
+                      next[index] = { ...next[index]!, relationNote: e.target.value };
+                      form.setValue("emergencyContacts", next, { shouldDirty: true });
+                    }}
+                    placeholder={t("people.emergencyRelationNote")}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8"
+                  />
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 border-white/15 text-white/85"
+              onClick={() => {
+                form.setValue(
+                  "emergencyContacts",
+                  [...watchedEmergencyContacts, emptyEmergencyContact()],
+                  { shouldDirty: true }
+                );
+              }}
+            >
+              <Plus size={13} className="mr-1" /> {t("people.addEmergencyContact")}
+            </Button>
+          </div>
+
+            {asPage ? (
+              <div className="space-y-3 pt-2 border-t border-white/8">
+                <p className={sectionTitle}>Profile image</p>
+                {profileImageFields}
+              </div>
+            ) : null}
+            </div>
+
+            <div className={asPage ? "flex flex-col gap-5 min-w-0" : "contents"}>
+              <div className={asPage ? `${cardClass} space-y-4` : "space-y-4"}>
+                <p className={sectionTitle}>{t("people.workSection")}</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-white/50 text-xs uppercase tracking-wide">Internal / external *</Label>
               <Controller
@@ -1074,7 +1287,7 @@ function PersonFormDialog({
                       if (person?.id) autoSave.schedule();
                     }}
                   >
-                    <SelectTrigger className="bg-white/5 border-white/10 text-white mt-1">
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
                       <SelectValue placeholder="Select…" />
                     </SelectTrigger>
                     <SelectContent className="bg-[#16161f] border-white/10 text-white">
@@ -1088,45 +1301,50 @@ function PersonFormDialog({
                 <p className="text-red-400 text-xs">{form.formState.errors.affiliation.message}</p>
               ) : null}
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Default role</Label>
-              <p className="text-[10px] text-white/30 leading-snug">
-                Job title in the directory. You can set a different <strong className="text-white/40">role per team</strong> on the
-                Teams page. App access is not controlled here; use the permission group below (when the person has an email).
-              </p>
+            <div className="space-y-1.5">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workplace")}</Label>
               <Input
-                {...form.register("role")}
-                placeholder="e.g. Tour Manager, Actor, Sound Engineer…"
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 mt-1"
+                {...form.register("workplaceName")}
+                placeholder={t("people.workplacePlaceholder")}
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
               />
             </div>
           </div>
 
-          {/* Email + Phone */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Email</Label>
-              <Input
-                {...form.register("email")}
-                type="email"
-                placeholder="email@example.com"
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
-              />
-              {form.formState.errors.email ? (
-                <p className="text-red-400 text-xs">{form.formState.errors.email.message}</p>
-              ) : null}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Phone</Label>
-              <Input
-                {...form.register("phone")}
-                placeholder="+47 000 00 000"
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">Default role</Label>
+            <p className="text-[10px] text-white/30 leading-snug">
+              Job title in the directory. You can set a different <strong className="text-white/40">role per team</strong> on the
+              Teams page. App access is not controlled here; use the permission group below (when the person has an email).
+            </p>
+            <Input
+              {...form.register("role")}
+              placeholder="e.g. Tour Manager, Actor, Sound Engineer…"
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 mt-1"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workAddress")}</Label>
+            <AddressFields
+              value={{
+                street:  form.watch("workAddressStreet")  ?? "",
+                number:  form.watch("workAddressNumber")  ?? "",
+                zip:     form.watch("workAddressZip")     ?? "",
+                city:    form.watch("workAddressCity")    ?? "",
+                state:   form.watch("workAddressState")   ?? "",
+                country: form.watch("workAddressCountry") ?? "",
+              }}
+              onChange={(addr: Address) => {
+                form.setValue("workAddressStreet",  addr.street, { shouldDirty: true });
+                form.setValue("workAddressNumber",  addr.number, { shouldDirty: true });
+                form.setValue("workAddressZip",     addr.zip, { shouldDirty: true });
+                form.setValue("workAddressCity",    addr.city, { shouldDirty: true });
+                form.setValue("workAddressState",   addr.state, { shouldDirty: true });
+                form.setValue("workAddressCountry", addr.country, { shouldDirty: true });
+                if (person?.id) autoSave.schedule();
+              }}
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -1206,70 +1424,6 @@ function PersonFormDialog({
               </Button>
             </div>
           ) : null}
-
-            {asPage ? (
-              <div className={`${cardClass} space-y-3`}>
-                <p className={sectionTitle}>Profile image</p>
-                {profileImageFields}
-              </div>
-            ) : null}
-            </div>
-
-            <div className={asPage ? "flex flex-col gap-5 min-w-0" : "contents"}>
-              <div className={asPage ? `${cardClass} space-y-3` : "contents"}>
-                {asPage ? <p className={sectionTitle}>Address</p> : null}
-          {/* Address */}
-          <div className={asPage ? "contents" : "space-y-1.5"}>
-            {asPage ? null : (
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Address</Label>
-            )}
-            <AddressFields
-              value={{
-                street:  form.watch("addressStreet")  ?? "",
-                number:  form.watch("addressNumber")  ?? "",
-                zip:     form.watch("addressZip")     ?? "",
-                city:    form.watch("addressCity")    ?? "",
-                state:   form.watch("addressState")   ?? "",
-                country: form.watch("addressCountry") ?? "",
-              }}
-              onChange={(addr: Address) => {
-                form.setValue("addressStreet",  addr.street);
-                form.setValue("addressNumber",  addr.number);
-                form.setValue("addressZip",     addr.zip);
-                form.setValue("addressCity",    addr.city);
-                form.setValue("addressState",   addr.state);
-                form.setValue("addressCountry", addr.country);
-              }}
-            />
-          </div>
-              </div>
-
-              <div className={asPage ? `${cardClass} space-y-3` : "contents"}>
-                {asPage ? (
-                  <p className={`${sectionTitle} flex items-center gap-1.5`}>
-                    <ShieldAlert size={11} className="text-amber-400/60" /> Emergency contact
-                  </p>
-                ) : null}
-          {/* Emergency contact */}
-          <div className={asPage ? "contents" : "space-y-1.5"}>
-            {asPage ? null : (
-              <Label className="text-white/50 text-xs uppercase tracking-wide flex items-center gap-1.5">
-                <ShieldAlert size={11} className="text-amber-400/60" /> Emergency Contact
-              </Label>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                {...form.register("emergencyContactName")}
-                placeholder="Contact name"
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
-              />
-              <Input
-                {...form.register("emergencyContactPhone")}
-                placeholder="Contact phone"
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
-              />
-            </div>
-          </div>
               </div>
 
               <div className={asPage ? `${cardClass} space-y-3 flex-1 flex flex-col min-h-[10rem]` : "contents"}>
@@ -1709,15 +1863,15 @@ function PersonFormDialog({
               <p className="text-[11px] text-white/35">
                 Add passport, driver license, certificates, contracts, or other files.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              <div className="flex flex-col gap-2 px-2 py-2 text-xs border border-white/10 rounded-md bg-white/[0.02] w-full min-w-0 sm:flex-row sm:items-center sm:gap-2">
                   <Input
                     placeholder="Document name"
                     value={docName}
                     onChange={(e) => setDocName(e.target.value)}
-                    className="w-full bg-white/5 border-white/10 text-white placeholder:text-white/25"
+                    className="h-7 w-full min-w-[8rem] max-w-[14rem] bg-white/5 border-white/10 text-white placeholder:text-white/25"
                   />
                   <Select value={docType} onValueChange={(v) => setDocType(v as PersonDocumentTypeKey)}>
-                    <SelectTrigger className="w-full bg-white/5 border-white/10 text-white">
+                    <SelectTrigger className="h-7 w-full min-w-[9rem] max-w-[12rem] bg-white/5 border-white/10 text-white text-[11px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-64">
@@ -1728,7 +1882,7 @@ function PersonFormDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  <label className="flex items-center gap-2 sm:col-span-2 lg:col-span-1 text-[11px] text-white/55 cursor-pointer ">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-white/55 whitespace-nowrap">
                     <Checkbox
                       checked={docDoesNotExpire}
                       onCheckedChange={(v) => {
@@ -1743,41 +1897,27 @@ function PersonFormDialog({
                     value={docExpires}
                     disabled={docDoesNotExpire}
                     onChange={setDocExpires}
-                    className="h-9 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-white text-xs disabled:opacity-40"
+                    className="h-7 rounded border border-white/10 bg-white/5 px-1.5 py-0 text-white text-[11px] disabled:opacity-40"
                     weekdayClassName="text-sm text-white/45"
                   />
-                  <div
-                    className="w-full sm:col-span-2 rounded-md border border-dashed border-white/20 bg-white/[0.02] p-1.5"
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const f = e.dataTransfer.files?.[0] ?? null;
+                  <Input
+                    type="file"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
                       setDocFile(f);
                       if (f && !docName.trim()) setDocName(f.name.replace(/\.[^.]+$/, ""));
                     }}
-                  >
-                    <Input
-                      type="file"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0] ?? null;
-                        setDocFile(f);
-                        if (f && !docName.trim()) setDocName(f.name.replace(/\.[^.]+$/, ""));
-                      }}
-                      className="w-full bg-white/5 border-white/10 text-white file:text-white"
-                    />
-                    <p className="mt-1 text-[10px] text-white/35 text-center">Drag & drop</p>
-                  </div>
+                    className="h-7 w-full min-w-[10rem] max-w-[16rem] bg-white/5 border-white/10 text-white file:text-white file:text-[10px] file:mr-2"
+                  />
                   {person ? (
                     <Button
                       type="button"
                       size="sm"
-                      className="w-full sm:col-span-2 lg:col-span-4 bg-indigo-700 hover:bg-indigo-600 text-white"
+                      className="h-7 shrink-0 bg-indigo-700 hover:bg-indigo-600 text-white"
                       disabled={uploadDocMutation.isPending || !docFile}
                       onClick={() => uploadDocMutation.mutate()}
                     >
-                      {uploadDocMutation.isPending ? "Uploading…" : "Upload document"}
+                      {uploadDocMutation.isPending ? "Uploading…" : "Upload"}
                     </Button>
                   ) : null}
               </div>

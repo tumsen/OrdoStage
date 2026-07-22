@@ -302,11 +302,74 @@ export function PersonCard({
               </a>
             </div>
           ) : null}
+          {person.workplaceName ||
+          person.workAddressStreet ||
+          person.workAddressCity ||
+          person.workAddressCountry ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/30">
+              <span className="flex items-center gap-1">
+                <MapPin size={10} className="text-sky-400/50" />
+                {[
+                  person.workplaceName,
+                  formatAddress({
+                    street: person.workAddressStreet,
+                    number: person.workAddressNumber,
+                    zip: person.workAddressZip,
+                    city: person.workAddressCity,
+                    state: person.workAddressState,
+                    country: person.workAddressCountry,
+                  }),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+              {person.workAddressStreet || person.workAddressCity || person.workAddressCountry ? (
+                <a
+                  href={googleMapsUrl({
+                    street: person.workAddressStreet,
+                    number: person.workAddressNumber,
+                    zip: person.workAddressZip,
+                    city: person.workAddressCity,
+                    state: person.workAddressState,
+                    country: person.workAddressCountry,
+                  })}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-300 hover:text-blue-200"
+                >
+                  Google Maps
+                </a>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-        {person.emergencyContactName || person.emergencyContactPhone ? (
-          <div className="mt-1 text-xs text-white/25 flex items-center gap-1.5">
-            <ShieldAlert size={10} className="text-amber-400/40" />
-            Emergency: {[person.emergencyContactName, person.emergencyContactPhone].filter(Boolean).join(" · ")}
+        {(person.emergencyContacts && person.emergencyContacts.length > 0) ||
+        person.emergencyContactName ||
+        person.emergencyContactPhone ? (
+          <div className="mt-1 space-y-0.5">
+            {(person.emergencyContacts && person.emergencyContacts.length > 0
+              ? person.emergencyContacts
+              : [
+                  {
+                    id: "legacy",
+                    name: person.emergencyContactName ?? "",
+                    phone: person.emergencyContactPhone ?? "",
+                    relationNote: "",
+                  },
+                ]
+            ).map((contact) => (
+              <div
+                key={contact.id}
+                className="text-xs text-white/25 flex items-center gap-1.5 flex-wrap"
+              >
+                <ShieldAlert size={10} className="text-amber-400/40 shrink-0" />
+                <span>
+                  {[contact.name, contact.phone, contact.relationNote]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </div>
+            ))}
           </div>
         ) : null}
         {person.notes ? (

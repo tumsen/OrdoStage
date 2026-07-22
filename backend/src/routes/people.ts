@@ -178,8 +178,16 @@ function serializePerson(person: {
   addressCity:    string | null;
   addressState:   string | null;
   addressCountry: string | null;
+  workplaceName?: string | null;
+  workAddressStreet?: string | null;
+  workAddressNumber?: string | null;
+  workAddressZip?: string | null;
+  workAddressCity?: string | null;
+  workAddressState?: string | null;
+  workAddressCountry?: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
+  emergencyContacts?: unknown;
   notes?: string | null;
   photoData?: Uint8Array | null;
   photoUpdatedAt?: Date | null;
@@ -210,6 +218,12 @@ function serializePerson(person: {
 }) {
   const aff =
     person.affiliation === "external" ? "external" : "internal";
+  const emergencyContacts = normalizeEmergencyContacts(
+    person.emergencyContacts,
+    person.emergencyContactName,
+    person.emergencyContactPhone
+  );
+  const first = emergencyContacts[0];
   return {
     id: person.id,
     name: person.name,
@@ -231,8 +245,16 @@ function serializePerson(person: {
     addressCity:    person.addressCity    ?? null,
     addressState:   person.addressState   ?? null,
     addressCountry: person.addressCountry ?? null,
-    emergencyContactName: person.emergencyContactName ?? null,
-    emergencyContactPhone: person.emergencyContactPhone ?? null,
+    workplaceName: person.workplaceName ?? null,
+    workAddressStreet: person.workAddressStreet ?? null,
+    workAddressNumber: person.workAddressNumber ?? null,
+    workAddressZip: person.workAddressZip ?? null,
+    workAddressCity: person.workAddressCity ?? null,
+    workAddressState: person.workAddressState ?? null,
+    workAddressCountry: person.workAddressCountry ?? null,
+    emergencyContactName: first?.name || person.emergencyContactName || null,
+    emergencyContactPhone: first?.phone || person.emergencyContactPhone || null,
+    emergencyContacts,
     notes: person.notes ?? null,
     hasPhoto: Boolean(person.photoData),
     photoUpdatedAt: person.photoUpdatedAt ? person.photoUpdatedAt.toISOString() : null,
@@ -260,6 +282,68 @@ function serializePerson(person: {
       : null,
     createdAt: person.createdAt.toISOString(),
     updatedAt: person.updatedAt.toISOString(),
+  };
+}
+
+type EmergencyContactRow = {
+  id: string;
+  name: string;
+  phone: string;
+  relationNote: string;
+};
+
+function normalizeEmergencyContacts(
+  raw: unknown,
+  legacyName: string | null | undefined,
+  legacyPhone: string | null | undefined
+): EmergencyContactRow[] {
+  if (Array.isArray(raw)) {
+    const rows = raw
+      .map((row, index) => {
+        if (!row || typeof row !== "object") return null;
+        const r = row as Record<string, unknown>;
+        const name = typeof r.name === "string" ? r.name.trim() : "";
+        const phone = typeof r.phone === "string" ? r.phone.trim() : "";
+        const relationNote =
+          typeof r.relationNote === "string" ? r.relationNote.trim() : "";
+        const id =
+          typeof r.id === "string" && r.id.trim()
+            ? r.id.trim()
+            : `legacy-${index}`;
+        if (!name && !phone && !relationNote) return null;
+        return { id, name, phone, relationNote };
+      })
+      .filter((r): r is EmergencyContactRow => Boolean(r));
+    if (rows.length > 0) return rows;
+  }
+  const name = legacyName?.trim() || "";
+  const phone = legacyPhone?.trim() || "";
+  if (!name && !phone) return [];
+  return [{ id: "legacy-0", name, phone, relationNote: "" }];
+}
+
+function emergencyFieldsFromInput(input: {
+  emergencyContacts?: EmergencyContactRow[] | undefined;
+  emergencyContactName?: string | null | undefined;
+  emergencyContactPhone?: string | null | undefined;
+}): {
+  emergencyContacts: EmergencyContactRow[];
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+} {
+  const contacts =
+    input.emergencyContacts !== undefined
+      ? normalizeEmergencyContacts(input.emergencyContacts, null, null)
+      : normalizeEmergencyContacts(
+          undefined,
+          input.emergencyContactName,
+          input.emergencyContactPhone
+        );
+  const first = contacts[0];
+  return {
+    emergencyContacts: contacts,
+    emergencyContactName: first?.name || null,
+    emergencyContactPhone: first?.phone || null,
   };
 }
 
@@ -575,6 +659,12 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
     }
   }
 
+  const emergency = emergencyFieldsFromInput({
+    emergencyContacts: body.emergencyContacts,
+    emergencyContactName: body.emergencyContactName,
+    emergencyContactPhone: body.emergencyContactPhone,
+  });
+
   const person = await prisma.person.create({
     data: {
       name: body.name,
@@ -588,8 +678,16 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       addressCity:    body.addressCity    ?? null,
       addressState:   body.addressState   ?? null,
       addressCountry: body.addressCountry ?? null,
-      emergencyContactName: body.emergencyContactName ?? null,
-      emergencyContactPhone: body.emergencyContactPhone ?? null,
+      workplaceName: body.workplaceName ?? null,
+      workAddressStreet: body.workAddressStreet ?? null,
+      workAddressNumber: body.workAddressNumber ?? null,
+      workAddressZip: body.workAddressZip ?? null,
+      workAddressCity: body.workAddressCity ?? null,
+      workAddressState: body.workAddressState ?? null,
+      workAddressCountry: body.workAddressCountry ?? null,
+      emergencyContactName: emergency.emergencyContactName,
+      emergencyContactPhone: emergency.emergencyContactPhone,
+      emergencyContacts: emergency.emergencyContacts,
       ...(body.notes !== undefined && { notes: body.notes ?? null }),
       permissionGroupId: body.permissionGroupId,
       departmentId: teamIds[0] ?? null,
@@ -812,6 +910,48 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
     nextAssignments = resolved.map((r) => ({ teamId: r.teamId, role: r.role ?? undefined }));
   }
 
+  const emergencyPatch =
+    body.emergencyContacts !== undefined
+      ? emergencyFieldsFromInput({
+          emergencyContacts: body.emergencyContacts,
+        })
+      : body.emergencyContactName !== undefined || body.emergencyContactPhone !== undefined
+        ? (() => {
+            const existingContacts = normalizeEmergencyContacts(
+              existing.emergencyContacts,
+              existing.emergencyContactName,
+              existing.emergencyContactPhone
+            );
+            const name =
+              body.emergencyContactName !== undefined
+                ? body.emergencyContactName?.trim() || ""
+                : existingContacts[0]?.name || "";
+            const phone =
+              body.emergencyContactPhone !== undefined
+                ? body.emergencyContactPhone?.trim() || ""
+                : existingContacts[0]?.phone || "";
+            const next =
+              existingContacts.length > 0
+                ? [
+                    {
+                      ...existingContacts[0]!,
+                      name,
+                      phone,
+                    },
+                    ...existingContacts.slice(1),
+                  ]
+                : name || phone
+                  ? [{ id: "legacy-0", name, phone, relationNote: "" }]
+                  : [];
+            const first = next[0];
+            return {
+              emergencyContacts: next,
+              emergencyContactName: first?.name || null,
+              emergencyContactPhone: first?.phone || null,
+            };
+          })()
+        : null;
+
   const person = await prisma.person.update({
     where: { id },
     data: {
@@ -826,8 +966,22 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       ...(body.addressCity    !== undefined && { addressCity:    body.addressCity }),
       ...(body.addressState   !== undefined && { addressState:   body.addressState }),
       ...(body.addressCountry !== undefined && { addressCountry: body.addressCountry }),
-      ...(body.emergencyContactName !== undefined && { emergencyContactName: body.emergencyContactName }),
-      ...(body.emergencyContactPhone !== undefined && { emergencyContactPhone: body.emergencyContactPhone }),
+      ...(body.workplaceName !== undefined && { workplaceName: body.workplaceName }),
+      ...(body.workAddressStreet !== undefined && { workAddressStreet: body.workAddressStreet }),
+      ...(body.workAddressNumber !== undefined && { workAddressNumber: body.workAddressNumber }),
+      ...(body.workAddressZip !== undefined && { workAddressZip: body.workAddressZip }),
+      ...(body.workAddressCity !== undefined && { workAddressCity: body.workAddressCity }),
+      ...(body.workAddressState !== undefined && { workAddressState: body.workAddressState }),
+      ...(body.workAddressCountry !== undefined && {
+        workAddressCountry: body.workAddressCountry,
+      }),
+      ...(emergencyPatch
+        ? {
+            emergencyContactName: emergencyPatch.emergencyContactName,
+            emergencyContactPhone: emergencyPatch.emergencyContactPhone,
+            emergencyContacts: emergencyPatch.emergencyContacts,
+          }
+        : {}),
       ...(body.notes !== undefined && { notes: body.notes }),
       ...(body.permissionGroupId !== undefined && { permissionGroupId: body.permissionGroupId }),
       ...(body.teamAssignments !== undefined && { departmentId: nextAssignments[0]?.teamId ?? null }),

@@ -358,8 +358,18 @@ model Person {
   addressCity           String?
   addressState          String?
   addressCountry        String?
+  /** Workplace / employer label (work section). */
+  workplaceName         String?
+  workAddressStreet     String?
+  workAddressNumber     String?
+  workAddressZip        String?
+  workAddressCity       String?
+  workAddressState      String?
+  workAddressCountry    String?
   emergencyContactName  String?
   emergencyContactPhone String?
+  /** Extra emergency contacts: [{ id, name, phone, relationNote }]. First also mirrored in name/phone. */
+  emergencyContacts     Json?
   notes            String?
   photoData         Bytes?
   photoFilename     String?

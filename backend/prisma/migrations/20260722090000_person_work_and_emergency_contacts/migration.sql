@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "Person" ADD COLUMN IF NOT EXISTS "workplaceName" TEXT;
+ALTER TABLE "Person" ADD COLUMN IF NOT EXISTS "workAddressStreet" TEXT;
+ALTER TABLE "Person" ADD COLUMN IF NOT EXISTS "workAddressNumber" TEXT;
+ALTER TABLE "Person" ADD COLUMN IF NOT EXISTS "workAddressZip" TEXT;
+ALTER TABLE "Person" ADD COLUMN IF NOT EXISTS "workAddressCity" TEXT;
+ALTER TABLE "Person" ADD COLUMN IF NOT EXISTS "workAddressState" TEXT;
+ALTER TABLE "Person" ADD COLUMN IF NOT EXISTS "workAddressCountry" TEXT;
+ALTER TABLE "Person" ADD COLUMN IF NOT EXISTS "emergencyContacts" JSONB;

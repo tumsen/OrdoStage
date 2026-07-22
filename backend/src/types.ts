@@ -188,6 +188,13 @@ export const PersonTeamMembershipSchema = z.object({
 
 export const PersonAffiliationSchema = z.enum(["internal", "external"]);
 
+export const PersonEmergencyContactSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  phone: z.string(),
+  relationNote: z.string().optional().default(""),
+});
+
 export const PersonSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -201,8 +208,16 @@ export const PersonSchema = z.object({
   addressCity:    z.string().nullable(),
   addressState:   z.string().nullable(),
   addressCountry: z.string().nullable(),
+  workplaceName: z.string().nullable().optional(),
+  workAddressStreet:  z.string().nullable().optional(),
+  workAddressNumber:  z.string().nullable().optional(),
+  workAddressZip:     z.string().nullable().optional(),
+  workAddressCity:    z.string().nullable().optional(),
+  workAddressState:   z.string().nullable().optional(),
+  workAddressCountry: z.string().nullable().optional(),
   emergencyContactName: z.string().nullable(),
   emergencyContactPhone: z.string().nullable(),
+  emergencyContacts: z.array(PersonEmergencyContactSchema).optional(),
   notes: z.string().nullable().optional(),
   hasPhoto: z.boolean().optional(),
   photoUpdatedAt: z.string().nullable().optional(),
@@ -312,8 +327,16 @@ export const CreatePersonSchema = z
     addressCity: z.string().optional(),
     addressState: z.string().optional(),
     addressCountry: z.string().optional(),
+    workplaceName: z.string().optional(),
+    workAddressStreet: z.string().optional(),
+    workAddressNumber: z.string().optional(),
+    workAddressZip: z.string().optional(),
+    workAddressCity: z.string().optional(),
+    workAddressState: z.string().optional(),
+    workAddressCountry: z.string().optional(),
     emergencyContactName: z.string().optional(),
     emergencyContactPhone: z.string().optional(),
+    emergencyContacts: z.array(PersonEmergencyContactSchema).optional(),
     notes: z.string().optional(),
     /** Required for every person (exactly one permission group). */
     permissionGroupId: z.string().min(1),
@@ -369,8 +392,16 @@ export const UpdatePersonSchema = z
     addressCity: z.string().optional(),
     addressState: z.string().optional(),
     addressCountry: z.string().optional(),
+    workplaceName: z.string().optional(),
+    workAddressStreet: z.string().optional(),
+    workAddressNumber: z.string().optional(),
+    workAddressZip: z.string().optional(),
+    workAddressCity: z.string().optional(),
+    workAddressState: z.string().optional(),
+    workAddressCountry: z.string().optional(),
     emergencyContactName: z.string().optional(),
     emergencyContactPhone: z.string().optional(),
+    emergencyContacts: z.array(PersonEmergencyContactSchema).optional(),
     notes: z.string().optional(),
     permissionGroupId: z.string().min(1).nullable().optional(),
     teamAssignments: z

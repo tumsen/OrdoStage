@@ -183,11 +183,63 @@ export function PersonAssignmentCard({
             </DetailRow>
           ) : null}
           <DetailRow label="Teams" value={teamsLabel} />
-          {person.emergencyContactName?.trim() || person.emergencyContactPhone?.trim() ? (
+          {person.workplaceName?.trim() ? (
+            <DetailRow label="Workplace" value={person.workplaceName.trim()} />
+          ) : null}
+          {person.workAddressStreet || person.workAddressCity || person.workAddressCountry ? (
+            <DetailRow label="Work address">
+              <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>
+                  {formatAddress({
+                    street: person.workAddressStreet,
+                    number: person.workAddressNumber,
+                    zip: person.workAddressZip,
+                    city: person.workAddressCity,
+                    state: person.workAddressState,
+                    country: person.workAddressCountry,
+                  })}
+                </span>
+                <a
+                  href={googleMapsUrl({
+                    street: person.workAddressStreet,
+                    number: person.workAddressNumber,
+                    zip: person.workAddressZip,
+                    city: person.workAddressCity,
+                    state: person.workAddressState,
+                    country: person.workAddressCountry,
+                  })}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-300 hover:text-blue-200"
+                >
+                  Google Maps
+                </a>
+              </span>
+            </DetailRow>
+          ) : null}
+          {(person.emergencyContacts && person.emergencyContacts.length > 0) ||
+          person.emergencyContactName?.trim() ||
+          person.emergencyContactPhone?.trim() ? (
             <DetailRow label="Emergency">
-              {[person.emergencyContactName?.trim(), person.emergencyContactPhone?.trim()]
-                .filter(Boolean)
-                .join(" · ")}
+              <div className="space-y-0.5">
+                {(person.emergencyContacts && person.emergencyContacts.length > 0
+                  ? person.emergencyContacts
+                  : [
+                      {
+                        id: "legacy",
+                        name: person.emergencyContactName ?? "",
+                        phone: person.emergencyContactPhone ?? "",
+                        relationNote: "",
+                      },
+                    ]
+                ).map((contact) => (
+                  <div key={contact.id}>
+                    {[contact.name, contact.phone, contact.relationNote]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                ))}
+              </div>
             </DetailRow>
           ) : null}
           <DetailRow label="Notes" value={person.notes?.trim() || null} />
