@@ -43,6 +43,7 @@ import {
   ensureUnassignedHoursProject,
   reassignProjectReferences,
 } from "../services/timeProjectAssignment";
+import { ensureFullDayTimeSpansBackfilled } from "../services/backfillFullDayTimeSpans";
 import {
   ensureDefaultParentCategories,
   isProtectedParentCategoryKey,
@@ -2093,6 +2094,7 @@ timeRouter.get("/time/parent-category-catalog", async (c) => {
   await backfillLeaveEntryProjects(user.organizationId);
   const leaveCategoryFixed = await backfillLeaveEntryCategories(user.organizationId);
   await backfillMissingTimeProjects(user.organizationId);
+  await ensureFullDayTimeSpansBackfilled(user.organizationId);
   if (leaveCategoryFixed.length > 0) {
     const toSync = await prisma.timeEntry.findMany({
       where: { id: { in: leaveCategoryFixed } },
@@ -2397,6 +2399,7 @@ timeRouter.get("/time/projects", async (c) => {
   await backfillLeaveEntryProjects(user.organizationId);
   const leaveCategoryFixed = await backfillLeaveEntryCategories(user.organizationId);
   await backfillMissingTimeProjects(user.organizationId);
+  await ensureFullDayTimeSpansBackfilled(user.organizationId);
   if (leaveCategoryFixed.length > 0) {
     const toSync = await prisma.timeEntry.findMany({
       where: { id: { in: leaveCategoryFixed } },
@@ -3146,6 +3149,8 @@ timeRouter.get("/time/entries", async (c) => {
   if ("error" in target) {
     return c.json({ error: { message: target.error, code: "BAD_REQUEST" } }, target.status);
   }
+
+  await ensureFullDayTimeSpansBackfilled(user.organizationId);
 
   const rows = await prisma.timeEntry.findMany({
     where: {
