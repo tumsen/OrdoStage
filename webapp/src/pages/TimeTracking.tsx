@@ -200,10 +200,7 @@ function timeEntryMonthCalendarTitle(
   let title: string;
   if (label && proj) title = `${label} · ${proj}`;
   else title = label || proj || categoryLabel;
-  const note =
-    isVacationNoteOnlyCategory(cat) || cat === "holiday"
-      ? timeEntryUserVisibleNote(e.note)
-      : "";
+  const note = timeEntryUserVisibleNote(e.note);
   if (note) {
     const short = note.length > 32 ? `${note.slice(0, 31)}…` : note;
     title = `${title} · ${short}`;
