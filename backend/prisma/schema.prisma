@@ -1009,6 +1009,11 @@ model TimeProject {
   name           String
   /** Optional UI colour (#RRGGBB). When null, clients use a stable fallback by id. */
   color          String?
+  /**
+   * Optional calendar fill pattern for this project (solid, hatch_diag, …).
+   * Null/empty = solid fill using `color`.
+   */
+  fillPattern    String?
   eventId        String?
   event          Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   eventShowId    String?

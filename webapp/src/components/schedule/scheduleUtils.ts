@@ -7,6 +7,8 @@ import {
 } from "@/lib/tourScheduleDisplay";
 import { addMinutesToUtcIso, wallClockYmdHhMmToUtcIso } from "@/lib/browserUserTime";
 import { durationMinutesBetween, normalizeTimeHHMM } from "@/lib/showTiming";
+import { timeProjectSurfaceStyle } from "@/lib/timeCatalogColors";
+import type { CSSProperties } from "react";
 
 export type BookingType = "rehearsal" | "maintenance" | "private" | "venue_booking" | "other";
 
@@ -49,6 +51,10 @@ export interface CalendarItem {
   timeCategory?: string;
   /** Time tracking month view — job rows use job styling when category is work-like. */
   timeIsJob?: boolean;
+  /** Time tracking — project accent (#RRGGBB) when set. */
+  accentColor?: string | null;
+  /** Time tracking — project hatch/fill pattern. */
+  fillPattern?: string | null;
   /** Venue label for job rows and tour day rows (when known). */
   venueLabel?: string;
   /** When true, render greyed/faded and ignore interactions (used for conflict awareness). */
@@ -443,8 +449,19 @@ function timeCategoryPillClass(cat: string, isJob?: boolean): string {
   return "bg-sky-500/30 text-sky-50 border border-sky-400/45";
 }
 
+/** Inline project colour/fill for Tid month pills (when `accentColor` is set). */
+export function itemSurfaceStyle(item: CalendarItem): CSSProperties | undefined {
+  if (item.kind !== "time" || !item.accentColor || !/^#[0-9A-Fa-f]{6}$/.test(item.accentColor)) {
+    return undefined;
+  }
+  return timeProjectSurfaceStyle(item.accentColor, item.fillPattern);
+}
+
 export function itemColor(item: CalendarItem): string {
   if (item.kind === "time") {
+    if (item.accentColor && /^#[0-9A-Fa-f]{6}$/.test(item.accentColor)) {
+      return "border text-white";
+    }
     return timeCategoryPillClass(item.timeCategory ?? "work", item.timeIsJob);
   }
   if (item.kind === "job") return ITEM_COLORS.job;

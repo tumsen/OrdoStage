@@ -959,6 +959,7 @@ function serializeProject(row: {
   organizationId: string;
   name: string;
   color: string | null;
+  fillPattern: string | null;
   eventId: string | null;
   eventShowId: string | null;
   tourId: string | null;
@@ -972,6 +973,7 @@ function serializeProject(row: {
 }) {
   return {
     ...row,
+    fillPattern: row.fillPattern ?? null,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
   };
@@ -2527,6 +2529,7 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
       timeParentCategoryId: isStandalone ? (parentResolved.value ?? null) : null,
       sortOrder: body.sortOrder ?? 0,
       color: body.color ?? null,
+      fillPattern: body.fillPattern ?? null,
     },
   });
   return c.json({ data: serializeProject(row) });
@@ -2547,15 +2550,35 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
   });
   if (!existing) return c.json({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
   if (isLeaveSystemProjectKey(existing.systemKey)) {
-    return c.json(
-      {
-        error: {
-          message: "System leave projects cannot be edited.",
-          code: "FORBIDDEN",
+    const onlyVisual =
+      body.name === undefined &&
+      body.eventId === undefined &&
+      body.eventShowId === undefined &&
+      body.tourId === undefined &&
+      body.tourShowId === undefined &&
+      body.timeParentCategoryId === undefined &&
+      body.isArchived === undefined &&
+      body.sortOrder === undefined &&
+      (body.color !== undefined || body.fillPattern !== undefined);
+    if (!onlyVisual) {
+      return c.json(
+        {
+          error: {
+            message: "System leave projects can only change colour and fill pattern.",
+            code: "FORBIDDEN",
+          },
         },
+        403
+      );
+    }
+    const row = await prisma.timeProject.update({
+      where: { id },
+      data: {
+        ...(body.color !== undefined ? { color: body.color } : {}),
+        ...(body.fillPattern !== undefined ? { fillPattern: body.fillPattern } : {}),
       },
-      403
-    );
+    });
+    return c.json({ data: serializeProject(row) });
   }
   if (body.eventShowId !== undefined && body.eventShowId !== null) {
     const show = await prisma.eventShow.findFirst({
@@ -2641,6 +2664,7 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
       ...(body.isArchived !== undefined ? { isArchived: body.isArchived } : {}),
       ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
       ...(body.color !== undefined ? { color: body.color } : {}),
+      ...(body.fillPattern !== undefined ? { fillPattern: body.fillPattern } : {}),
     },
   });
   // Keep linked event/tour title in sync so auto-project sync does not overwrite the rename.

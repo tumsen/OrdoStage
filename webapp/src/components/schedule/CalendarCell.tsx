@@ -6,6 +6,7 @@ import type { CalendarItem } from "./scheduleUtils";
 import type { InternalBookingDetail } from "../../../../backend/src/types";
 import {
   itemColor,
+  itemSurfaceStyle,
   itemsForDay,
   hasTimedStart,
   calendarItemVenueName,
@@ -114,6 +115,7 @@ export function CalendarCell({
                 itemColor(item),
                 backing && "ring-2 ring-rose-300/70 shadow-[0_0_0_2px_rgba(244,63,94,0.22)]"
               )}
+              style={itemSurfaceStyle(item)}
             >
               {backing ? (
                 <span className="absolute inset-0 bg-rose-500/20 pointer-events-none" aria-hidden="true" />

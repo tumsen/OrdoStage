@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { ArrowLeft, ArrowRightLeft, ChevronDown, ChevronRight, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, ChevronDown, ChevronRight, FolderKanban, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 import { api } from "@/lib/api";
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { displayHex } from "@/lib/timeCatalogColors";
+import { displayHex, fillPatternPreviewStyle, TIME_PROJECT_FILL_PATTERN_OPTIONS } from "@/lib/timeCatalogColors";
 import { timeCategoryMessageId } from "@/lib/timeCategoryI18n";
 import type {
   TimeCategory,
@@ -27,6 +27,7 @@ import type {
   TimeParentCategoryCatalog,
   TimeProject,
   TimeProjectEntriesResponse,
+  TimeProjectFillPattern,
 } from "@/contracts/backendTypes";
 
 type CatalogProject = TimeParentCategoryCatalog["projects"][number];
@@ -225,6 +226,20 @@ export default function TimeParentCategoryCatalog() {
       setSelectedProjectId(row.id);
       toast({ title: t("time.catalogProjectAdded") });
     },
+    onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
+  });
+
+  const patchProjectVisual = useMutation({
+    mutationFn: (vars: {
+      id: string;
+      color?: string | null;
+      fillPattern?: TimeProjectFillPattern | null;
+    }) =>
+      api.patch<TimeProject>(`/api/time/projects/${vars.id}`, {
+        ...(vars.color !== undefined ? { color: vars.color } : {}),
+        ...(vars.fillPattern !== undefined ? { fillPattern: vars.fillPattern } : {}),
+      }),
+    onSuccess: () => invalidate(),
     onError: () => toast({ title: t("time.catalogSaveError"), variant: "destructive" }),
   });
 
@@ -480,8 +495,11 @@ export default function TimeParentCategoryCatalog() {
           )}
         >
           <span
-            className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white/15"
-            style={{ backgroundColor: displayHex(p.color, p.id) }}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border border-white/20"
+            style={fillPatternPreviewStyle(
+              displayHex(p.color, p.id),
+              (p.fillPattern ?? "solid") as TimeProjectFillPattern
+            )}
           />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium">{p.name}</span>
@@ -791,6 +809,83 @@ export default function TimeParentCategoryCatalog() {
                         <Trash2 size={14} />
                       </Button>
                     ) : null}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 space-y-3">
+                  <div className="text-xs font-medium text-white/70">
+                    {t("time.catalogProjectAppearance")}
+                  </div>
+                  <p className="text-[11px] text-white/45">{t("time.catalogProjectAppearanceHint")}</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-[11px] text-white/55">{t("time.catalogColorLabel")}</Label>
+                      <input
+                        type="color"
+                        aria-label={t("time.catalogColorLabel")}
+                        title={t("time.catalogColorLabel")}
+                        className="h-8 w-10 shrink-0 cursor-pointer rounded border border-white/15 bg-transparent p-0"
+                        value={displayHex(selectedProject.color, selectedProject.id)}
+                        disabled={patchProjectVisual.isPending}
+                        onChange={(e) =>
+                          patchProjectVisual.mutate({
+                            id: selectedProject.id,
+                            color: e.target.value,
+                          })
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-white/45 hover:text-white/80"
+                        title={t("time.catalogColorReset")}
+                        disabled={
+                          patchProjectVisual.isPending || selectedProject.color == null
+                        }
+                        onClick={() =>
+                          patchProjectVisual.mutate({
+                            id: selectedProject.id,
+                            color: null,
+                          })
+                        }
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] text-white/55">{t("time.catalogFillPattern")}</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {TIME_PROJECT_FILL_PATTERN_OPTIONS.map((opt) => {
+                        const active =
+                          (selectedProject.fillPattern ?? "solid") === opt.id;
+                        const hex = displayHex(selectedProject.color, selectedProject.id);
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            title={t(opt.labelKey)}
+                            disabled={patchProjectVisual.isPending}
+                            onClick={() =>
+                              patchProjectVisual.mutate({
+                                id: selectedProject.id,
+                                fillPattern: opt.id === "solid" ? null : opt.id,
+                              })
+                            }
+                            className={cn(
+                              "h-9 w-9 rounded-md border transition-opacity hover:opacity-90",
+                              active
+                                ? "ring-2 ring-indigo-400/70 border-white/30"
+                                : "border-white/15 opacity-80"
+                            )}
+                            style={fillPatternPreviewStyle(hex, opt.id)}
+                            aria-label={t(opt.labelKey)}
+                            aria-pressed={active}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 

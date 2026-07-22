@@ -1191,6 +1191,19 @@ export const TimeCatalogHexColorSchema = z
   .string()
   .regex(/^#[0-9A-Fa-f]{6}$/, "Expected #RRGGBB");
 
+/** Calendar fill patterns for time projects (visual only). */
+export const TIME_PROJECT_FILL_PATTERNS = [
+  "solid",
+  "hatch_diag",
+  "hatch_diag_rev",
+  "hatch_horiz",
+  "hatch_vert",
+  "crosshatch",
+  "dots",
+] as const;
+export type TimeProjectFillPattern = (typeof TIME_PROJECT_FILL_PATTERNS)[number];
+export const TimeProjectFillPatternSchema = z.enum(TIME_PROJECT_FILL_PATTERNS);
+
 export const TimeTagSchema = z.object({
   id: z.string(),
   organizationId: z.string(),
@@ -1206,6 +1219,7 @@ export const TimeProjectSchema = z.object({
   organizationId: z.string(),
   name: z.string(),
   color: z.union([TimeCatalogHexColorSchema, z.null()]),
+  fillPattern: z.union([TimeProjectFillPatternSchema, z.null()]),
   eventId: z.string().nullable(),
   eventShowId: z.string().nullable(),
   tourId: z.string().nullable(),
@@ -1361,6 +1375,7 @@ export const CreateTimeProjectSchema = z.object({
   timeParentCategoryId: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
   color: z.union([TimeCatalogHexColorSchema, z.null()]).optional(),
+  fillPattern: z.union([TimeProjectFillPatternSchema, z.null()]).optional(),
 });
 
 export const PatchTimeProjectSchema = z.object({
@@ -1373,6 +1388,7 @@ export const PatchTimeProjectSchema = z.object({
   isArchived: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   color: z.union([TimeCatalogHexColorSchema, z.null()]).optional(),
+  fillPattern: z.union([TimeProjectFillPatternSchema, z.null()]).optional(),
 });
 
 /** Delete a project after moving its time entries / claims to another project. */

@@ -70,9 +70,17 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useI18n } from "@/lib/i18n";
 import { toast, useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { timeCategoryMessageId, isCompSettlementCategory, isDayOffCategory, isLeaveAutoProjectCategory, isLeaveDayDisplayCategory, isNonAccountingTimeCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
+import { displayHex, hexToRgba, timeProjectSurfaceStyle } from "@/lib/timeCatalogColors";
+import {
+  timeCategoryMessageId,
+  isCompSettlementCategory,
+  isDayOffCategory,
+  isLeaveAutoProjectCategory,
+  isLeaveDayDisplayCategory,
+  isNonAccountingTimeCategory,
+  isVacationNoteOnlyCategory,
+} from "@/lib/timeCategoryI18n";
 import { isTimesheetSettlementFillEntry, timeEntryUserVisibleNote } from "@/lib/timeEntryNotes";
-import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
 import { TimeCatalogSettings } from "@/components/time/TimeCatalogSettings";
 import { TravelClaimsPanel } from "@/components/time/TravelClaimsPanel";
@@ -1445,12 +1453,15 @@ export default function TimeTracking() {
     return (entries ?? [])
       .map((e) => {
         const cat = e.category ?? "work";
+        const project = e.timeProjectId ? projectById.get(e.timeProjectId) : undefined;
         return {
           id: e.id,
           title: timeEntryMonthCalendarTitle(e, jobs, projectById, (key) => t(key as never)),
           kind: "time" as const,
           timeCategory: cat,
           timeIsJob: e.kind === "job",
+          accentColor: e.timeProjectId ? displayHex(project?.color, e.timeProjectId) : null,
+          fillPattern: project?.fillPattern ?? null,
           startDate: e.startsAt,
           endDate: e.endsAt,
           raw: {} as CalendarItem["raw"],
@@ -2968,9 +2979,21 @@ export default function TimeTracking() {
                           e.timeProjectId
                             ? projectById.get(e.timeProjectId)
                             : undefined;
-                        const projStripe = projEntity
-                          ? displayHex(projEntity.color, projEntity.id)
-                          : null;
+                        const surfaceProject =
+                          !isSettlementFill && e.timeProjectId
+                            ? projectById.get(e.timeProjectId)
+                            : undefined;
+                        const projectSurface = surfaceProject
+                          ? timeProjectSurfaceStyle(
+                              displayHex(surfaceProject.color, surfaceProject.id),
+                              surfaceProject.fillPattern,
+                              {
+                                behind:
+                                  layout.stackCount > 1 &&
+                                  layout.stackIndex < layout.stackCount - 1,
+                              }
+                            )
+                          : undefined;
                         const proj =
                           projEntity && !projEntity.systemKey?.startsWith("leave_")
                             ? (projEntity.name ?? null)
@@ -3016,7 +3039,14 @@ export default function TimeTracking() {
                             key={`${e.id}-${dayYmd}-${layout.colIndex}-${layout.stackIndex}`}
                             className={cn(
                               "absolute rounded border px-1 pt-1 pb-2 text-[10px] overflow-hidden shadow-sm select-none",
-                              timeEntryBlockSurfaceClass(cat, isJob, layout.stackIndex, layout.stackCount),
+                              projectSurface
+                                ? "border"
+                                : timeEntryBlockSurfaceClass(
+                                    cat,
+                                    isJob,
+                                    layout.stackIndex,
+                                    layout.stackCount
+                                  ),
                               isLocked ? "opacity-90" : "",
                               copySourceEntry?.id === e.id ? "ring-2 ring-ordo-yellow/80" : "",
                               canEditVisiblePeriod && !isLocked ? "cursor-grab active:cursor-grabbing" : ""
@@ -3028,9 +3058,7 @@ export default function TimeTracking() {
                               left: `calc(${leftPct}% + ${gapPx}px)`,
                               width: `calc(${widthPct}% - ${gapPx * 2}px)`,
                               zIndex: 2 + layout.stackIndex,
-                              ...(projStripe
-                                ? { boxShadow: `inset 4px 0 0 0 ${projStripe}` }
-                                : {}),
+                              ...projectSurface,
                             }}
                             onPointerDown={(ev) => {
                               if (!canEditVisiblePeriod) return;
@@ -3173,7 +3201,16 @@ export default function TimeTracking() {
                             {showProjBelowTimes ? (
                               <div
                                 className="text-[9px] font-medium truncate pr-4"
-                                style={projStripe ? { color: projStripe } : undefined}
+                                style={
+                                  surfaceProject
+                                    ? {
+                                        color: displayHex(
+                                          surfaceProject.color,
+                                          surfaceProject.id
+                                        ),
+                                      }
+                                    : undefined
+                                }
                               >
                                 {proj}
                               </div>
