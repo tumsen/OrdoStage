@@ -354,14 +354,8 @@ function dateFnsLocale(language: Language): Locale {
   return localeEnGB;
 }
 
-function dateFromISODate(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const d = new Date(`${value}T00:00:00`);
-  return Number.isFinite(d.getTime()) ? d : null;
-}
-
 const DISPLAY_START_STORAGE_KEY = "timeGrid.displayStartHour";
-const TIME_TRACKING_VIEW_MODES = ["week", "month", "day"] as const;
+const TIME_TRACKING_VIEW_MODES = ["week", "month"] as const;
 
 function readDisplayStartHour(): number {
   if (typeof window === "undefined") return 0;
@@ -494,8 +488,6 @@ export default function TimeTracking() {
     TIME_TRACKING_VIEW_MODES,
     "week",
   );
-  /** Where to return when leaving day view opened from month/week. */
-  const [dayReturnMode, setDayReturnMode] = useState<"week" | "month">("month");
   const [section, setSection] = useState<"time" | "travel" | "mileage">("time");
   const [anchor, setAnchor] = useState(() => new Date());
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
@@ -544,8 +536,7 @@ export default function TimeTracking() {
   }, [weekStartKey, weekDayYmds]);
 
   const mobileDaySchedule = isMobile && section === "time" && mode === "week";
-  const desktopDaySchedule = mode === "day" && section === "time";
-  const singleDayGrid = mobileDaySchedule || desktopDaySchedule;
+  const singleDayGrid = mobileDaySchedule;
   const mobileTimeGridTopPad = 4;
 
   const [mobilePxPerHour, setMobilePxPerHour] = useState(10);
@@ -602,7 +593,7 @@ export default function TimeTracking() {
   }, []);
 
   const gridDays = useMemo(() => {
-    if (desktopDaySchedule || mobileDaySchedule) {
+    if (mobileDaySchedule) {
       return [new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate())];
     }
     if (isMobile && mode === "week") {
@@ -610,15 +601,7 @@ export default function TimeTracking() {
       return day ? [day] : weekDays.length > 0 ? [weekDays[0]!] : [];
     }
     return weekDays;
-  }, [
-    desktopDaySchedule,
-    mobileDaySchedule,
-    anchor,
-    isMobile,
-    mode,
-    weekDays,
-    selectedDayIndex,
-  ]);
+  }, [mobileDaySchedule, anchor, isMobile, mode, weekDays, selectedDayIndex]);
 
   const weekGridTemplateColumns = useMemo(
     () => `56px repeat(${gridDays.length}, minmax(0, 1fr))`,
@@ -665,14 +648,8 @@ export default function TimeTracking() {
     [singleDayGrid]
   );
 
-  const rangeFrom = format(
-    mode === "day" ? anchor : mode === "week" ? weekStart : startOfMonth(anchor),
-    "yyyy-MM-dd"
-  );
-  const rangeTo = format(
-    mode === "day" ? anchor : mode === "week" ? weekEnd : endOfMonth(anchor),
-    "yyyy-MM-dd"
-  );
+  const rangeFrom = format(mode === "week" ? weekStart : startOfMonth(anchor), "yyyy-MM-dd");
+  const rangeTo = format(mode === "week" ? weekEnd : endOfMonth(anchor), "yyyy-MM-dd");
   const approvalPeriodStart = useMemo(() => {
     const d = new Date(weekStart);
     d.setHours(0, 0, 0, 0);
@@ -743,20 +720,9 @@ export default function TimeTracking() {
   });
 
   const { data: approvals } = useQuery({
-    queryKey: [
-      "time-approvals",
-      mode === "day" ? format(weekStart, "yyyy-MM-dd") : rangeFrom,
-      mode === "day" ? format(weekEnd, "yyyy-MM-dd") : rangeTo,
-      readAll,
-      selectedPersonId,
-    ],
-    queryFn: () => {
-      const from = mode === "day" ? format(weekStart, "yyyy-MM-dd") : rangeFrom;
-      const to = mode === "day" ? format(weekEnd, "yyyy-MM-dd") : rangeTo;
-      return api.get<TimesheetApproval[]>(
-        `/api/time/approvals?from=${from}&to=${to}${personQs}`
-      );
-    },
+    queryKey: ["time-approvals", rangeFrom, rangeTo, readAll, selectedPersonId],
+    queryFn: () =>
+      api.get<TimesheetApproval[]>(`/api/time/approvals?from=${rangeFrom}&to=${rangeTo}${personQs}`),
     enabled: canUsePage && Boolean(mePerson?.id),
   });
 
@@ -785,27 +751,12 @@ export default function TimeTracking() {
       ) ?? null,
     [approvals, approvalPeriodStart, approvalPeriodEnd]
   );
-  const isApprovedWeek = (mode === "week" || mode === "day") && Boolean(approvedTimesheet);
+  const isApprovedWeek = mode === "week" && Boolean(approvedTimesheet);
   const canEditVisiblePeriod = canEdit && !isApprovedWeek;
 
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   /** Snapshot kept while navigating weeks/months so copy mode survives outside the loaded range. */
   const [copySourceEntry, setCopySourceEntry] = useState<TimeEntry | null>(null);
-
-  const openDayView = useCallback(
-    (day: Date, entryId?: string | null) => {
-      setDayReturnMode(mode === "week" ? "week" : "month");
-      setAnchor(new Date(day.getFullYear(), day.getMonth(), day.getDate()));
-      setSection("time");
-      setMode("day");
-      if (entryId) setEditingEntryId(entryId);
-    },
-    [mode, setMode]
-  );
-
-  const leaveDayView = useCallback(() => {
-    setMode(dayReturnMode);
-  }, [dayReturnMode, setMode]);
 
   const updateEntry = useMutation({
     mutationFn: ({
@@ -1108,12 +1059,8 @@ export default function TimeTracking() {
   );
 
   useEffect(() => {
-    // Wait until the range query has settled so switching month → day does not
-    // clear the entry id while the day-scoped fetch is still in flight.
-    if (editingEntryId && entries !== undefined && !editingEntry) {
-      setEditingEntryId(null);
-    }
-  }, [editingEntryId, editingEntry, entries]);
+    if (editingEntryId && !editingEntry) setEditingEntryId(null);
+  }, [editingEntryId, editingEntry]);
 
   useEffect(() => {
     if (!copySourceEntry) return;
@@ -1154,17 +1101,10 @@ export default function TimeTracking() {
       if (copySourceEntry && canEditVisiblePeriod) {
         const sourceDate = localDateFromEntryStart(copySourceEntry.startsAt);
         const targetDate =
-          mode === "day"
-            ? addDays(sourceDate, delta)
-            : mode === "week"
-              ? addWeeks(sourceDate, delta)
-              : addMonths(sourceDate, delta);
+          mode === "week" ? addWeeks(sourceDate, delta) : addMonths(sourceDate, delta);
         pasteCopyToDay(format(targetDate, "yyyy-MM-dd"), copySourceEntry);
       }
       setAnchor((d) => {
-        if (mode === "day") {
-          return addDays(new Date(d.getFullYear(), d.getMonth(), d.getDate()), delta);
-        }
         if (mode === "week") {
           return delta === -1 ? subWeeks(d, 1) : addWeeks(d, 1);
         }
@@ -1564,13 +1504,11 @@ export default function TimeTracking() {
   const periodWeek = getISOWeek(anchor);
 
   const periodLabel =
-    mode === "day"
-      ? format(anchor, "EEEE d MMM yyyy", { locale: dfLocale })
-      : mode === "week"
-        ? `W${periodWeek} · ${format(weekStart, "d MMM", { locale: dfLocale })} – ${format(weekEnd, "d MMM yyyy", {
-            locale: dfLocale,
-          })}`
-        : format(anchor, "MMMM yyyy", { locale: dfLocale });
+    mode === "week"
+      ? `W${periodWeek} · ${format(weekStart, "d MMM", { locale: dfLocale })} – ${format(weekEnd, "d MMM yyyy", {
+          locale: dfLocale,
+        })}`
+      : format(anchor, "MMMM yyyy", { locale: dfLocale });
 
   function PeriodPickerButton({ heightClassName, anchorDate }: { heightClassName: string; anchorDate: Date }) {
     const [open, setOpen] = useState(false);
@@ -1581,7 +1519,7 @@ export default function TimeTracking() {
     }, [anchorDate]);
 
     const onPick = (d: Date) => {
-      if (mode === "week" || mode === "day") {
+      if (mode === "week") {
         setAnchor(d);
       } else {
         setAnchor(new Date(d.getFullYear(), d.getMonth(), 1));
@@ -1606,7 +1544,7 @@ export default function TimeTracking() {
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 border-white/10 bg-[#16161f] text-white shadow-xl" align="start">
-          {mode === "week" || mode === "day" ? (
+          {mode === "week" ? (
             <Calendar
               mode="single"
               selected={anchorDate}
@@ -1971,29 +1909,9 @@ export default function TimeTracking() {
             >
               {t("time.month")}
             </button>
-            {mode === "day" ? (
-              <button
-                type="button"
-                className="px-3 py-1.5 rounded-md text-sm bg-white/10 text-white"
-              >
-                {t("time.dayView")}
-              </button>
-            ) : null}
           </div>
           {/* Date nav slot */}
           <div className="flex items-center gap-2 shrink-0">
-          {mode === "day" ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 border-white/15 text-white/80 gap-1.5 px-2"
-              onClick={leaveDayView}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              {dayReturnMode === "week" ? t("time.backToWeek") : t("time.backToMonth")}
-            </Button>
-          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -2151,27 +2069,7 @@ export default function TimeTracking() {
             >
               {t("time.month")}
             </button>
-            {mode === "day" ? (
-              <button
-                type="button"
-                className="px-3 py-1.5 rounded-md text-sm bg-white/10 text-white"
-              >
-                {t("time.dayView")}
-              </button>
-            ) : null}
           </div>
-          {mode === "day" ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 border-white/15 text-white/80 gap-1 px-2"
-              onClick={leaveDayView}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              {dayReturnMode === "week" ? t("time.backToWeek") : t("time.backToMonth")}
-            </Button>
-          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -2442,15 +2340,11 @@ export default function TimeTracking() {
               items={monthCalendarItems}
               pillLimit={6}
               onItemClick={(item) => {
-                const dayKey = item.startDate.includes("T")
-                  ? format(parseISO(item.startDate), "yyyy-MM-dd")
-                  : item.startDate.slice(0, 10);
-                const day = dateFromISODate(dayKey);
-                if (!day) return;
-                openDayView(day, item.id);
+                setEditingEntryId(item.id);
               }}
               onDateClick={(day) => {
-                openDayView(day);
+                setAnchor(day);
+                setMode("week");
               }}
             />
           </div>
