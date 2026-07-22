@@ -70,7 +70,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useI18n } from "@/lib/i18n";
 import { toast, useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { timeCategoryMessageId, isCompSettlementCategory, isDayOffCategory, isLeaveAutoProjectCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
+import { timeCategoryMessageId, isCompSettlementCategory, isDayOffCategory, isLeaveAutoProjectCategory, isLeaveDayDisplayCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
 import { isTimesheetSettlementFillEntry, timeEntryUserVisibleNote } from "@/lib/timeEntryNotes";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
@@ -105,6 +105,7 @@ import {
 import {
   formatWorkDayDuration,
   workDayDurationMinutes,
+  formatLeaveDaysFromMinutes,
 } from "@/lib/leaveNorms";
 import { formatMinutesAsDurationBoth, formatSignedMinutesAsDurationBoth } from "@/lib/durationHours";
 import {
@@ -426,7 +427,10 @@ function formatSignedMinutes(minutes: number, commaDecimal = false): string {
 function dayOffHeaderLabel(
   startsAt: string,
   endsAt: string,
-  timeFormat: TimeFormat
+  timeFormat: TimeFormat,
+  category: string,
+  weeklyHours?: number | null,
+  commaDecimal = false
 ): { range: string; duration: string } {
   const s = parseISO(startsAt);
   const e = parseISO(endsAt);
@@ -434,7 +438,9 @@ function dayOffHeaderLabel(
   const durMin = Math.round((e.getTime() - s.getTime()) / 60000);
   return {
     range: `${format(s, tf)} – ${format(e, tf)}`,
-    duration: formatDurationShort(durMin, true),
+    duration: isLeaveDayDisplayCategory(category)
+      ? formatLeaveDaysFromMinutes(durMin, weeklyHours, commaDecimal)
+      : formatDurationShort(durMin, true),
   };
 }
 
@@ -2673,7 +2679,10 @@ export default function TimeTracking() {
                                 const parts = dayOffHeaderLabel(
                                   dayOffEntry.startsAt,
                                   dayOffEntry.endsAt,
-                                  timeFormat
+                                  timeFormat,
+                                  dayOffEntry.category ?? "vacation",
+                                  activePersonWeeklyHours,
+                                  commaDec
                                 );
                                 return (
                                   <>
@@ -2994,7 +3003,9 @@ export default function TimeTracking() {
                               TIME_SNAP_MINUTES,
                               Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
                             );
-                        const durationLabel = formatDurationShort(durForLabel, isDayOff);
+                        const durationLabel = isLeaveDayDisplayCategory(cat)
+                          ? formatLeaveDaysFromMinutes(durForLabel, activePersonWeeklyHours, commaDec)
+                          : formatDurationShort(durForLabel, isDayOff);
                         const displayTitle = label || proj || null;
                         const showProjBelowTimes = Boolean(proj && label);
                         const blockHeightPx =

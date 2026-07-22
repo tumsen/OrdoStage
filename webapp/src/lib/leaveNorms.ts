@@ -124,3 +124,29 @@ export function durationHmToMinutes(hm: string): number {
   if (!m) return 0;
   return Number(m[1]) * 60 + Number(m[2]);
 }
+
+/** Convert leave minutes to days using weekly contract ÷ 5. */
+export function minutesToLeaveDays(
+  minutes: number,
+  weeklyHours?: number | null
+): number {
+  const dayMin = workDayDurationMinutes(weeklyHours);
+  if (dayMin <= 0 || !Number.isFinite(minutes)) return 0;
+  return Math.round((minutes / dayMin) * 100) / 100;
+}
+
+/** Display leave duration as days, e.g. `1d`, `0,5d`, `1.5d`. */
+export function formatLeaveDaysFromMinutes(
+  minutes: number,
+  weeklyHours?: number | null,
+  commaDecimal = false
+): string {
+  const days = minutesToLeaveDays(minutes, weeklyHours);
+  const abs = Math.abs(days);
+  const body = abs
+    .toFixed(2)
+    .replace(/\.?0+$/, "")
+    .replace(".", commaDecimal ? "," : ".");
+  const sign = days < 0 ? "−" : "";
+  return `${sign}${body || "0"}d`;
+}

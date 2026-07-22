@@ -66,12 +66,13 @@ import type {
   TimeReportEntry,
   OrganizationLeavePolicy,
 } from "@/contracts/backendTypes";
-import { timeCategoryMessageId } from "@/lib/timeCategoryI18n";
+import { timeCategoryMessageId, isLeaveDayDisplayCategory } from "@/lib/timeCategoryI18n";
 import {
   overtimeAgainstContract,
   resolveVacationYear,
   vacationYearFromStartYear,
   DEFAULT_VACATION_YEAR_POLICY,
+  formatLeaveDaysFromMinutes,
 } from "@/lib/leaveNorms";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
@@ -816,6 +817,8 @@ export default function TimeReport() {
   const dfLocale = language === "da" ? localeDa : language === "de" ? localeDe : localeEnGB;
   const commaDec = commaDecimalForLanguage(language);
   const fmtMins = (minutes: number) => formatMinutesAsDurationBoth(minutes, commaDec);
+  const fmtLeaveMins = (minutes: number, weeklyHours?: number | null) =>
+    formatLeaveDaysFromMinutes(minutes, weeklyHours, commaDec);
   const fmtCompHhhMm = (minutes: number) => formatMinutesAsDurationBoth(minutes, commaDec);
   const fmtSignedMins = (minutes: number) => formatSignedMinutesAsDurationBoth(minutes, commaDec);
 
@@ -1385,21 +1388,21 @@ export default function TimeReport() {
           {hasVacation && (
             <SummaryCard
               label={t("time.categoryVacation")}
-              value={fmtMins(report.summary.vacationMinutes)}
+              value={fmtLeaveMins(report.summary.vacationMinutes)}
               color="text-emerald-300"
             />
           )}
           {hasSick && (
             <SummaryCard
               label={t("time.categorySick")}
-              value={fmtMins(report.summary.sickMinutes)}
+              value={fmtLeaveMins(report.summary.sickMinutes)}
               color="text-orange-300"
             />
           )}
           {hasHoliday && (
             <SummaryCard
               label={t("time.categoryHoliday")}
-              value={fmtMins(report.summary.holidayMinutes)}
+              value={fmtLeaveMins(report.summary.holidayMinutes)}
               color="text-purple-300"
             />
           )}
@@ -1644,17 +1647,23 @@ export default function TimeReport() {
                           </td>
                           {hasVacation && (
                             <td className="px-4 py-3 text-right tabular-nums text-emerald-300/80">
-                              {p.vacationMinutes > 0 ? fmtMins(p.vacationMinutes) : "—"}
+                              {p.vacationMinutes > 0
+                                ? fmtLeaveMins(p.vacationMinutes, p.weeklyContractHours)
+                                : "—"}
                             </td>
                           )}
                           {hasSick && (
                             <td className="px-4 py-3 text-right tabular-nums text-orange-300/80">
-                              {p.sickMinutes > 0 ? fmtMins(p.sickMinutes) : "—"}
+                              {p.sickMinutes > 0
+                                ? fmtLeaveMins(p.sickMinutes, p.weeklyContractHours)
+                                : "—"}
                             </td>
                           )}
                           {hasHoliday && (
                             <td className="px-4 py-3 text-right tabular-nums text-purple-300/80">
-                              {p.holidayMinutes > 0 ? fmtMins(p.holidayMinutes) : "—"}
+                              {p.holidayMinutes > 0
+                                ? fmtLeaveMins(p.holidayMinutes, p.weeklyContractHours)
+                                : "—"}
                             </td>
                           )}
                           {hasTravelAllowance && (
@@ -1766,17 +1775,17 @@ export default function TimeReport() {
                         </td>
                         {hasVacation && (
                           <td className="px-4 py-3 text-right tabular-nums font-semibold text-emerald-300">
-                            {fmtMins(report.summary.vacationMinutes)}
+                            {fmtLeaveMins(report.summary.vacationMinutes)}
                           </td>
                         )}
                         {hasSick && (
                           <td className="px-4 py-3 text-right tabular-nums font-semibold text-orange-300">
-                            {fmtMins(report.summary.sickMinutes)}
+                            {fmtLeaveMins(report.summary.sickMinutes)}
                           </td>
                         )}
                         {hasHoliday && (
                           <td className="px-4 py-3 text-right tabular-nums font-semibold text-purple-300">
-                            {fmtMins(report.summary.holidayMinutes)}
+                            {fmtLeaveMins(report.summary.holidayMinutes)}
                           </td>
                         )}
                         <td className="px-4 py-3 text-right tabular-nums font-bold text-white">
@@ -1960,7 +1969,13 @@ export default function TimeReport() {
                               {e.projectName ?? <span className="text-white/25 italic">—</span>}
                             </td>
                             <td className="px-4 py-2.5 text-right tabular-nums font-medium text-white">
-                              {fmtMins(e.durationMinutes)}
+                              {isLeaveDayDisplayCategory(e.category)
+                                ? fmtLeaveMins(
+                                    e.durationMinutes,
+                                    report.byPerson.find((p) => p.personId === e.personId)
+                                      ?.weeklyContractHours
+                                  )
+                                : fmtMins(e.durationMinutes)}
                             </td>
                             <td className="px-4 py-2.5">
                               <span

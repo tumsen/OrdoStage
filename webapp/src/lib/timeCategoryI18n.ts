@@ -48,6 +48,18 @@ export function isDayOffCategory(cat: string): cat is TimeCategory {
   return (DAY_OFF_CATEGORIES as string[]).includes(cat);
 }
 
+/** Leave types shown as days in Tid totals (work/comp stay as hours). */
+export const LEAVE_DAY_DISPLAY_CATEGORIES = [
+  "vacation",
+  "extra_vacation",
+  "sick",
+  "holiday",
+] as const satisfies readonly TimeCategory[];
+
+export function isLeaveDayDisplayCategory(cat: string): boolean {
+  return (LEAVE_DAY_DISPLAY_CATEGORIES as readonly string[]).includes(cat);
+}
+
 export function timeCategoryMessageId(cat: TimeCategory): `time.${string}` {
   return `time.${TIME_CATEGORY_MSG[cat]}`;
 }
