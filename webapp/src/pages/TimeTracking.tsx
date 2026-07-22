@@ -446,16 +446,6 @@ function dayOffHeaderLabel(
   };
 }
 
-/** Snap local wall-clock to grid for on-block labels. */
-function snapLocalClockToGrid(d: Date): Date {
-  const x = new Date(d.getTime());
-  let mins = x.getHours() * 60 + x.getMinutes();
-  mins = Math.round(mins / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
-  mins = Math.min(mins, MINUTES_PER_DAY);
-  x.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
-  return x;
-}
-
 export default function TimeTracking() {
   const { t, language } = useI18n();
   const dfLocale = useMemo(() => dateFnsLocale(language), [language]);
@@ -2999,19 +2989,14 @@ export default function TimeTracking() {
                             ? (projEntity.name ?? null)
                             : null;
                         const timeTf = timeFormat === "24h" ? "HH:mm" : "h:mm a";
-                        const startDisp = snapLocalClockToGrid(spanStart);
-                        const endDisp = snapLocalClockToGrid(spanEnd);
-                        const startTimeLabel = format(startDisp, timeTf);
-                        const endTimeLabel = format(endDisp, timeTf);
-                        const durForLabel = isDayOff
-                          ? Math.round(durMin)
-                          : Math.max(
-                              TIME_SNAP_MINUTES,
-                              Math.round(durMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
-                            );
+                        // Show stored wall-clock times exactly (edit sheet is minute-precise;
+                        // only drag/create on the grid snaps to 5 minutes).
+                        const startTimeLabel = format(spanStart, timeTf);
+                        const endTimeLabel = format(spanEnd, timeTf);
+                        const durForLabel = Math.max(1, Math.round(durMin));
                         const durationLabel = isLeaveDayDisplayCategory(cat)
                           ? formatLeaveDaysFromMinutes(durForLabel, activePersonWeeklyHours, commaDec)
-                          : formatDurationShort(durForLabel, isDayOff);
+                          : formatDurationShort(durForLabel, true);
                         const displayTitle = label || proj || null;
                         const showProjBelowTimes = Boolean(proj && label);
                         const blockHeightPx =
