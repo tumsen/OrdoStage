@@ -1760,7 +1760,7 @@ function PersonFormDialog({
 
           {person && canManageContracts && leaveManagementEnabled ? (
             <div
-              className="grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start w-full"
+              className="grid grid-cols-2 gap-5 items-start w-full min-w-0"
               onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
             >
               <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4 min-w-0"}>
@@ -1804,7 +1804,7 @@ function PersonFormDialog({
                     className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label className="text-white/55 text-xs">{t("time.leaveProfileMonthlyHours")}</Label>
                     <Input
@@ -1842,6 +1842,10 @@ function PersonFormDialog({
                     ))}
                   </div>
                 ) : null}
+              </div>
+
+              <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4 min-w-0"}>
+                <p className={sectionTitle}>{t("time.leaveBalanceSectionTitle")}</p>
                 <div className="space-y-1.5">
                   <Label className="text-white/55 text-xs">Vacation days / year</Label>
                   <Input
@@ -1887,10 +1891,6 @@ function PersonFormDialog({
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4 min-w-0"}>
-                <p className={sectionTitle}>{t("time.leaveBalanceSectionTitle")}</p>
                 {leaveProfileData?.leave ? (
                   <div className="rounded border border-white/8 bg-white/[0.02] px-3 py-2 text-xs text-white/50 space-y-1">
                     <p className="text-white/35 uppercase tracking-wide text-[10px]">{t("time.leaveBalancesTitle")}</p>
