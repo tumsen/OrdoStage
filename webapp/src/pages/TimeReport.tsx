@@ -529,13 +529,14 @@ type ChartPoint = {
   label: string;
   work: number;
   vacation: number;
+  extraVacation: number;
   sick: number;
   holiday: number;
   travelAllowance: number;
 };
 
 function emptyBuckets() {
-  return { work: 0, vacation: 0, sick: 0, holiday: 0, travelAllowance: 0 };
+  return { work: 0, vacation: 0, extraVacation: 0, sick: 0, holiday: 0, travelAllowance: 0 };
 }
 
 function toHours(minutes: number) {
@@ -585,6 +586,7 @@ function groupChartData(
       const row = ensureDay(parseISO(d.date));
       row.work += d.workMinutes;
       row.vacation += d.vacationMinutes;
+      row.extraVacation += d.extraVacationMinutes;
       row.sick += d.sickMinutes;
       row.holiday += d.holidayMinutes;
       row.travelAllowance += d.travelAllowanceMinutes;
@@ -600,6 +602,7 @@ function groupChartData(
           label: format(d.date, "EEE d MMM yyyy"),
           work: toHours(d.work),
           vacation: toHours(d.vacation),
+          extraVacation: toHours(d.extraVacation),
           sick: toHours(d.sick),
           holiday: toHours(d.holiday),
           travelAllowance: toHours(d.travelAllowance),
@@ -635,6 +638,7 @@ function groupChartData(
       const row = ensureMonth(parseISO(d.date));
       row.work += d.workMinutes;
       row.vacation += d.vacationMinutes;
+      row.extraVacation += d.extraVacationMinutes;
       row.sick += d.sickMinutes;
       row.holiday += d.holidayMinutes;
       row.travelAllowance += d.travelAllowanceMinutes;
@@ -650,6 +654,7 @@ function groupChartData(
           label: format(m.monthStart, "MMMM yyyy"),
           work: toHours(m.work),
           vacation: toHours(m.vacation),
+          extraVacation: toHours(m.extraVacation),
           sick: toHours(m.sick),
           holiday: toHours(m.holiday),
           travelAllowance: toHours(m.travelAllowance),
@@ -678,6 +683,7 @@ function groupChartData(
       const row = ensureYear(getYear(parseISO(d.date)));
       row.work += d.workMinutes;
       row.vacation += d.vacationMinutes;
+      row.extraVacation += d.extraVacationMinutes;
       row.sick += d.sickMinutes;
       row.holiday += d.holidayMinutes;
       row.travelAllowance += d.travelAllowanceMinutes;
@@ -698,6 +704,7 @@ function groupChartData(
           label: String(year),
           work: toHours(row.work),
           vacation: toHours(row.vacation),
+          extraVacation: toHours(row.extraVacation),
           sick: toHours(row.sick),
           holiday: toHours(row.holiday),
           travelAllowance: toHours(row.travelAllowance),
@@ -732,6 +739,7 @@ function groupChartData(
     const w = ensureWeek(weekStart);
     w.work += d.workMinutes;
     w.vacation += d.vacationMinutes;
+    w.extraVacation += d.extraVacationMinutes;
     w.sick += d.sickMinutes;
     w.holiday += d.holidayMinutes;
     w.travelAllowance += d.travelAllowanceMinutes;
@@ -751,6 +759,7 @@ function groupChartData(
           label: `${weekLabel(isoWeek)} · ${format(w.weekStart, "d MMM")} – ${format(weekEnd, "d MMM yyyy")}`,
           work: toHours(w.work),
           vacation: toHours(w.vacation),
+          extraVacation: toHours(w.extraVacation),
           sick: toHours(w.sick),
           holiday: toHours(w.holiday),
           travelAllowance: toHours(w.travelAllowance),
@@ -985,6 +994,7 @@ export default function TimeReport() {
   const categoryOptions = [
     { id: "work", label: t("time.categoryWork") },
     { id: "vacation", label: t("time.categoryVacation") },
+    { id: "extra_vacation", label: t("time.categoryExtraVacation") },
     { id: "sick", label: t("time.categorySick") },
     { id: "holiday", label: t("time.categoryHoliday") },
     { id: "travel_allowance", label: t("time.categoryTravelAllowance") },
@@ -1035,6 +1045,7 @@ export default function TimeReport() {
   const chartTickInterval = xAxisLabelInterval(chartData.length);
 
   const hasVacation = (report?.summary.vacationMinutes ?? 0) > 0;
+  const hasExtraVacation = (report?.summary.extraVacationMinutes ?? 0) > 0;
   const hasSick = (report?.summary.sickMinutes ?? 0) > 0;
   const hasHoliday = (report?.summary.holidayMinutes ?? 0) > 0;
   const hasTravelAllowance = (report?.summary.travelAllowanceMinutes ?? 0) > 0;
@@ -1392,6 +1403,13 @@ export default function TimeReport() {
               color="text-emerald-300"
             />
           )}
+          {hasExtraVacation && (
+            <SummaryCard
+              label={t("time.categoryExtraVacation")}
+              value={fmtLeaveMins(report.summary.extraVacationMinutes)}
+              color="text-teal-300"
+            />
+          )}
           {hasSick && (
             <SummaryCard
               label={t("time.categorySick")}
@@ -1502,6 +1520,7 @@ export default function TimeReport() {
                   const map: Record<string, string> = {
                     work: t("time.categoryWork"),
                     vacation: t("time.categoryVacation"),
+                    extraVacation: t("time.categoryExtraVacation"),
                     sick: t("time.categorySick"),
                     holiday: t("time.categoryHoliday"),
                     travelAllowance: t("time.categoryTravelAllowance"),
@@ -1515,6 +1534,7 @@ export default function TimeReport() {
                   const map: Record<string, string> = {
                     work: t("time.categoryWork"),
                     vacation: t("time.categoryVacation"),
+                    extraVacation: t("time.categoryExtraVacation"),
                     sick: t("time.categorySick"),
                     holiday: t("time.categoryHoliday"),
                     travelAllowance: t("time.categoryTravelAllowance"),
@@ -1524,6 +1544,7 @@ export default function TimeReport() {
               />
               <Bar dataKey="work" stackId="a" fill={CATEGORY_COLORS.work} radius={[0, 0, 0, 0]} />
               <Bar dataKey="vacation" stackId="a" fill={CATEGORY_COLORS.vacation} />
+              <Bar dataKey="extraVacation" stackId="a" fill={CATEGORY_COLORS.extra_vacation} />
               <Bar dataKey="sick" stackId="a" fill={CATEGORY_COLORS.sick} />
               <Bar dataKey="travelAllowance" stackId="a" fill={CATEGORY_COLORS.travelAllowance} />
               <Bar dataKey="holiday" stackId="a" fill={CATEGORY_COLORS.holiday} radius={[3, 3, 0, 0]} />
@@ -1576,6 +1597,11 @@ export default function TimeReport() {
                         {hasVacation && (
                           <th className="text-right px-4 py-3 font-medium text-emerald-400/70">
                             {t("time.categoryVacation")}
+                          </th>
+                        )}
+                        {hasExtraVacation && (
+                          <th className="text-right px-4 py-3 font-medium text-teal-400/70">
+                            {t("time.categoryExtraVacation")}
                           </th>
                         )}
                         {hasSick && (
@@ -1649,6 +1675,13 @@ export default function TimeReport() {
                             <td className="px-4 py-3 text-right tabular-nums text-emerald-300/80">
                               {p.vacationMinutes > 0
                                 ? fmtLeaveMins(p.vacationMinutes, p.weeklyContractHours)
+                                : "—"}
+                            </td>
+                          )}
+                          {hasExtraVacation && (
+                            <td className="px-4 py-3 text-right tabular-nums text-teal-300/80">
+                              {p.extraVacationMinutes > 0
+                                ? fmtLeaveMins(p.extraVacationMinutes, p.weeklyContractHours)
                                 : "—"}
                             </td>
                           )}
@@ -1776,6 +1809,11 @@ export default function TimeReport() {
                         {hasVacation && (
                           <td className="px-4 py-3 text-right tabular-nums font-semibold text-emerald-300">
                             {fmtLeaveMins(report.summary.vacationMinutes)}
+                          </td>
+                        )}
+                        {hasExtraVacation && (
+                          <td className="px-4 py-3 text-right tabular-nums font-semibold text-teal-300">
+                            {fmtLeaveMins(report.summary.extraVacationMinutes)}
                           </td>
                         )}
                         {hasSick && (
