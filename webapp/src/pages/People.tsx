@@ -1663,11 +1663,7 @@ function PersonFormDialog({
                     <Select
                       value={contractHoursPeriod}
                       onValueChange={(v) => {
-                        const next = v as "weekly" | "monthly" | "annual";
-                        if (weeklyHoursValid != null) {
-                          setContractHoursInput(formatHours2(periodValueFromWeekly(weeklyHoursValid, next)));
-                        }
-                        setContractHoursPeriod(next);
+                        setContractHoursPeriod(v as "weekly" | "monthly" | "annual");
                         contractAutoSave.schedule();
                       }}
                     >
@@ -1876,11 +1872,7 @@ function PersonFormDialog({
                     <Select
                       value={contractHoursPeriod}
                       onValueChange={(v) => {
-                        const next = v as "weekly" | "monthly" | "annual";
-                        if (weeklyHoursValid != null) {
-                          setContractHoursInput(formatHours2(periodValueFromWeekly(weeklyHoursValid, next)));
-                        }
-                        setContractHoursPeriod(next);
+                        setContractHoursPeriod(v as "weekly" | "monthly" | "annual");
                         contractAutoSave.schedule();
                       }}
                     >
