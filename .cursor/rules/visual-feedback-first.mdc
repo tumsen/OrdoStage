@@ -1,0 +1,19 @@
+---
+description: User directs by eyes — prioritize visible UI; always ship to main for visual QA.
+alwaysApply: true
+---
+
+# Visual feedback first
+
+The user steers the product by **looking at the UI** and giving visual directions. They are not interested in git/branch ceremony.
+
+## Do
+
+- Prefer changes that are **visible on screen** (layout, spacing, sections, columns, copy placement).
+- When they say **side by side**, they mean **two columns next to each other** (not stacked over/under), typically half-width each unless they say otherwise.
+- After UI work: **commit + push to `main`** so deploy matches what they can see (see push-completed-work rule).
+
+## Do not
+
+- Leave finished visual work only on a feature branch.
+- Ask them to check a branch/PR to “see” layout changes unless they explicitly want a PR workflow.
