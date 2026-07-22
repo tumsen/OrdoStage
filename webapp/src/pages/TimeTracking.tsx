@@ -10,6 +10,7 @@ import {
   endOfMonth,
   endOfWeek,
   format,
+  getDay,
   getISOWeek,
   parseISO,
   startOfMonth,
@@ -1426,16 +1427,59 @@ export default function TimeTracking() {
     return m;
   }, [entries]);
 
-  const totalsByDay = useMemo(() => {
+  const totalsByColumnDay = useMemo(() => {
     const acc = new Map<string, number>();
     for (const e of entries ?? []) {
       if (isNonAccountingTimeCategory(e.category ?? "")) continue;
-      const k = format(parseISO(e.startsAt), "yyyy-MM-dd");
-      const mins =
-        (parseISO(e.endsAt).getTime() - parseISO(e.startsAt).getTime()) / 60_000;
-      acc.set(k, (acc.get(k) ?? 0) + mins);
+      const start = parseISO(e.startsAt);
+      const end = parseISO(e.endsAt);
+      const mins = Math.max(0, (end.getTime() - start.getTime()) / 60_000);
+      const dayKey = columnDayYmdForInstant(start, displayStartHour);
+      acc.set(dayKey, (acc.get(dayKey) ?? 0) + mins);
     }
     return acc;
+  }, [entries, displayStartHour]);
+
+  /** Minutes that count toward the period norm (work + vacation + feriefridag + holiday). */
+  const periodFulfillingMinutes = useMemo(() => {
+    let sum = 0;
+    for (const e of entries ?? []) {
+      const cat = e.category ?? "work";
+      if (
+        cat !== "work" &&
+        cat !== "vacation" &&
+        cat !== "extra_vacation" &&
+        cat !== "holiday"
+      ) {
+        continue;
+      }
+      const mins =
+        (parseISO(e.endsAt).getTime() - parseISO(e.startsAt).getTime()) / 60_000;
+      if (mins > 0) sum += mins;
+    }
+    return Math.round(sum);
+  }, [entries]);
+
+  const periodVacationMinutes = useMemo(() => {
+    let sum = 0;
+    for (const e of entries ?? []) {
+      if ((e.category ?? "") !== "vacation") continue;
+      const mins =
+        (parseISO(e.endsAt).getTime() - parseISO(e.startsAt).getTime()) / 60_000;
+      if (mins > 0) sum += mins;
+    }
+    return Math.round(sum);
+  }, [entries]);
+
+  const periodExtraVacationMinutes = useMemo(() => {
+    let sum = 0;
+    for (const e of entries ?? []) {
+      if ((e.category ?? "") !== "extra_vacation") continue;
+      const mins =
+        (parseISO(e.endsAt).getTime() - parseISO(e.startsAt).getTime()) / 60_000;
+      if (mins > 0) sum += mins;
+    }
+    return Math.round(sum);
   }, [entries]);
 
   const monthCalendarItems = useMemo<CalendarItem[]>(() => {
@@ -1459,35 +1503,6 @@ export default function TimeTracking() {
       })
       .sort((a, b) => a.startDate.localeCompare(b.startDate));
   }, [mode, entries, jobs, projectById, t]);
-
-  const totalsByColumnDay = useMemo(() => {
-    const acc = new Map<string, number>();
-    for (const e of entries ?? []) {
-      if (isNonAccountingTimeCategory(e.category ?? "")) continue;
-      const start = parseISO(e.startsAt);
-      const end = parseISO(e.endsAt);
-      const mins = Math.max(0, (end.getTime() - start.getTime()) / 60_000);
-      const dayKey = columnDayYmdForInstant(start, displayStartHour);
-      acc.set(dayKey, (acc.get(dayKey) ?? 0) + mins);
-    }
-    return acc;
-  }, [entries, displayStartHour]);
-
-  const weekTotalMinutes = useMemo(() => {
-    return weekDays.reduce((sum, d) => {
-      const k = format(d, "yyyy-MM-dd");
-      return sum + (totalsByColumnDay.get(k) ?? 0);
-    }, 0);
-  }, [weekDays, totalsByColumnDay]);
-
-  const monthTotalMinutes = useMemo(() => {
-    const monthStart = startOfMonth(anchor);
-    const monthEnd = endOfMonth(anchor);
-    return eachDayOfInterval({ start: monthStart, end: monthEnd }).reduce((sum, d) => {
-      const k = format(d, "yyyy-MM-dd");
-      return sum + (totalsByDay.get(k) ?? 0);
-    }, 0);
-  }, [anchor, totalsByDay]);
 
   /** Cumulative minutes Mon → this column (same order as `weekDays`). */
   const weekRunningTotalMinutes = useMemo(() => {
@@ -1637,6 +1652,25 @@ export default function TimeTracking() {
     return peopleForFilter?.find((p) => p.id === targetId)?.weeklyContractHours ?? null;
   }, [readAll, selectedPersonId, mePerson, peopleForFilter]);
 
+  const periodNormMinutes = useMemo(() => {
+    const weekly =
+      activePersonWeeklyHours != null && activePersonWeeklyHours > 0
+        ? activePersonWeeklyHours
+        : 37;
+    const daily = workDayDurationMinutes(weekly);
+    if (mode === "week") return Math.round(weekly * 60);
+    const monthStart = startOfMonth(anchor);
+    const monthEnd = endOfMonth(anchor);
+    let weekdays = 0;
+    for (const d of eachDayOfInterval({ start: monthStart, end: monthEnd })) {
+      const dow = getDay(d); // 0 = Sun … 6 = Sat
+      if (dow >= 1 && dow <= 5) weekdays += 1;
+    }
+    return weekdays * daily;
+  }, [mode, anchor, activePersonWeeklyHours]);
+
+  const periodDeviationMinutes = periodFulfillingMinutes - periodNormMinutes;
+
   const workDayMinutes = workDayDurationMinutes(activePersonWeeklyHours);
   const workDayDurationLabel = formatWorkDayDuration(workDayMinutes);
 
@@ -1755,8 +1789,16 @@ export default function TimeTracking() {
     ? (weekRunningTotalMinutes[gridWeekIndex(0)] ?? mobileScheduleDayTotalMinutes)
     : 0;
   const isTimeSection = section === "time";
-  const periodTotalMinutes = mode === "week" ? weekTotalMinutes : monthTotalMinutes;
-  const periodTotalLabel = mode === "week" ? t("time.weekTotal") : t("time.monthTotal");
+  const periodVacationUsedLabel = formatLeaveDaysFromMinutes(
+    periodVacationMinutes,
+    activePersonWeeklyHours,
+    commaDec
+  );
+  const periodExtraVacationUsedLabel = formatLeaveDaysFromMinutes(
+    periodExtraVacationMinutes,
+    activePersonWeeklyHours,
+    commaDec
+  );
 
   function requestApproveWeek() {
     if (!canEdit || approveTimesheet.isPending) return;
@@ -2208,87 +2250,77 @@ export default function TimeTracking() {
 
       {isTimeSection ? (
         <div className="shrink-0">
-          <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap items-center gap-x-3 gap-y-1">
             {copySourceEntry ? (
               <span className="font-medium text-ordo-yellow">{t("time.copyModeHint")}</span>
             ) : null}
-            <span className="tabular-nums text-white/60">
-              {periodTotalLabel} {formatMinutesAsDurationBoth(periodTotalMinutes, commaDec)}
+            <span className="whitespace-nowrap tabular-nums">
+              <span className="text-white/40">{t("time.periodNorm")}:</span>{" "}
+              <span className="font-medium text-white/80">
+                {formatMinutesAsDurationBoth(periodNormMinutes, commaDec)}
+              </span>
+            </span>
+            <span className="whitespace-nowrap tabular-nums">
+              <span className="text-white/40">{t("time.periodRegistered")}:</span>{" "}
+              <span className="font-medium text-white/80">
+                {formatMinutesAsDurationBoth(periodFulfillingMinutes, commaDec)}
+              </span>
+            </span>
+            <span className="whitespace-nowrap tabular-nums">
+              <span className="text-white/40">{t("time.periodDeviation")}:</span>{" "}
+              <span
+                className={cn(
+                  "font-medium",
+                  signedBalanceClass(periodDeviationMinutes)
+                )}
+              >
+                {formatSignedMinutesAsDurationBoth(periodDeviationMinutes, commaDec)}
+              </span>
             </span>
             {leaveManagementEnabled && leaveBalances ? (
               <>
                 <span className="text-white/25 hidden sm:inline">·</span>
-                <span className="text-white/40 font-medium">{t("time.leaveBalancesTitle")}</span>
-                <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                  <span className="text-white/45">
-                    {t("time.leaveVacationYearCurrent", { year: leaveBalances.vacationYearKey })}:
-                  </span>
+                <span className="whitespace-nowrap tabular-nums">
+                  <span className="text-white/40">{t("time.leaveWorkAccount")}:</span>{" "}
                   <span
                     className={cn(
-                      "tabular-nums font-medium",
-                      signedBalanceClass(leaveBalances.vacationRemainingDays)
-                    )}
-                    title={`${t("time.leaveVacationEarned")}: ${leaveBalances.vacationEarnedDays} · ${t("time.leaveVacationUsed")}: ${leaveBalances.vacationUsedDays}`}
-                  >
-                    {formatSignedDays(leaveBalances.vacationRemainingDays)}
-                  </span>
-                  <span className="text-white/25">·</span>
-                  <span className="text-white/45">{t("time.leaveExtraRemaining")}:</span>
-                  <span
-                    className={cn(
-                      "tabular-nums font-medium",
-                      signedBalanceClass(leaveBalances.extraVacationRemainingDays)
-                    )}
-                  >
-                    {formatSignedDays(leaveBalances.extraVacationRemainingDays)}
-                  </span>
-                </span>
-                {leaveBalances.nextVacationYear ? (
-                  <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                    <span className="text-white/45">
-                      {t("time.leaveVacationYearNext", {
-                        year: leaveBalances.nextVacationYear.vacationYearKey,
-                      })}
-                      :
-                    </span>
-                    <span
-                      className={cn(
-                        "tabular-nums font-medium",
-                        signedBalanceClass(leaveBalances.nextVacationYear.vacationRemainingDays)
-                      )}
-                      title={`${t("time.leaveVacationEarned")}: ${leaveBalances.nextVacationYear.vacationEarnedDays} · ${t("time.leaveVacationUsed")}: ${leaveBalances.nextVacationYear.vacationUsedDays}`}
-                    >
-                      {formatSignedDays(leaveBalances.nextVacationYear.vacationRemainingDays)}
-                    </span>
-                    <span className="text-white/25">·</span>
-                    <span className="text-white/45">{t("time.leaveExtraRemaining")}:</span>
-                    <span
-                      className={cn(
-                        "tabular-nums font-medium",
-                        signedBalanceClass(
-                          leaveBalances.nextVacationYear.extraVacationRemainingDays
-                        )
-                      )}
-                    >
-                      {formatSignedDays(leaveBalances.nextVacationYear.extraVacationRemainingDays)}
-                    </span>
-                  </span>
-                ) : null}
-                <span className="whitespace-nowrap">
-                  {t("time.leaveCompRemaining")}:{" "}
-                  <span
-                    className={cn(
-                      "tabular-nums font-medium",
+                      "font-medium",
                       signedBalanceClass(leaveBalances.compTimeRemainingMinutes)
                     )}
                   >
                     {formatSignedMinutes(leaveBalances.compTimeRemainingMinutes, commaDec)}
                   </span>
                 </span>
-                <span className="whitespace-nowrap">
-                  {t("time.leaveCompPeriodUsed")}:{" "}
-                  <span className="tabular-nums font-medium text-white/80">
-                    {formatMinutesAsDurationBoth(leaveBalances.compTimePeriodUsedMinutes ?? 0, commaDec)}
+                <span className="whitespace-nowrap tabular-nums">
+                  <span className="text-white/40">{t("time.categoryVacation")}:</span>{" "}
+                  <span className="font-medium text-white/80">
+                    {periodVacationUsedLabel} {t("time.periodUsedShort")}
+                  </span>
+                  <span className="text-white/25"> / </span>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      signedBalanceClass(leaveBalances.vacationRemainingDays)
+                    )}
+                  >
+                    {formatSignedDays(leaveBalances.vacationRemainingDays)}{" "}
+                    {t("time.periodLeftShort")}
+                  </span>
+                </span>
+                <span className="whitespace-nowrap tabular-nums">
+                  <span className="text-white/40">{t("time.categoryExtraVacation")}:</span>{" "}
+                  <span className="font-medium text-white/80">
+                    {periodExtraVacationUsedLabel} {t("time.periodUsedShort")}
+                  </span>
+                  <span className="text-white/25"> / </span>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      signedBalanceClass(leaveBalances.extraVacationRemainingDays)
+                    )}
+                  >
+                    {formatSignedDays(leaveBalances.extraVacationRemainingDays)}{" "}
+                    {t("time.periodLeftShort")}
                   </span>
                 </span>
                 {balancePersonId ? (
