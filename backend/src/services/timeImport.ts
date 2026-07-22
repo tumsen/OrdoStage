@@ -6,6 +6,8 @@ import {
   parseTimerlyCsv,
   type ParsedTimerlyEntry,
 } from "./parseTimerlyCsv";
+import { leaveCategoryFromSystemKey } from "./leaveTimeProjects";
+import { applyTimeEntryToLeaveLedger } from "./leaveLedger";
 
 export type ImportProjectMapping = {
   externalName: string;
@@ -181,15 +183,29 @@ export async function previewTimerlyImport(
 async function resolveProjectId(
   organizationId: string,
   mapping: ImportProjectMapping | undefined,
-  projectCache: Map<string, string>
+  projectCache: Map<string, { projectId: string; category?: TimeCategory }>
 ): Promise<{ projectId: string | null; category?: TimeCategory; skip?: boolean }> {
   if (!mapping) return { projectId: null };
   if (mapping.action === "skip") return { projectId: null, skip: true, category: mapping.category };
 
   const key = mapping.externalName;
   if (projectCache.has(key)) {
-    return { projectId: projectCache.get(key)!, category: mapping.category };
+    const cached = projectCache.get(key)!;
+    return {
+      projectId: cached.projectId,
+      category: mapping.category ?? cached.category,
+    };
   }
+
+  const withLeaveCategory = (
+    projectId: string,
+    systemKey: string | null | undefined
+  ): { projectId: string; category?: TimeCategory } => {
+    const fromProject = leaveCategoryFromSystemKey(systemKey) as TimeCategory | null;
+    const category = mapping.category ?? fromProject ?? undefined;
+    projectCache.set(key, { projectId, category: fromProject ?? mapping.category });
+    return { projectId, category };
+  };
 
   if (mapping.action === "map") {
     if (!mapping.timeProjectId) {
@@ -197,24 +213,22 @@ async function resolveProjectId(
     }
     const exists = await prisma.timeProject.findFirst({
       where: { id: mapping.timeProjectId, organizationId, isArchived: false },
-      select: { id: true },
+      select: { id: true, systemKey: true },
     });
     if (!exists) {
       throw new Error(`Project "${mapping.externalName}": target project not found`);
     }
-    projectCache.set(key, mapping.timeProjectId);
-    return { projectId: mapping.timeProjectId, category: mapping.category };
+    return withLeaveCategory(exists.id, exists.systemKey);
   }
 
   if (mapping.action === "create") {
     const name = mapping.newProjectName?.trim() || mapping.externalName;
     const existing = await prisma.timeProject.findFirst({
       where: { organizationId, name, isArchived: false },
-      select: { id: true },
+      select: { id: true, systemKey: true },
     });
     if (existing) {
-      projectCache.set(key, existing.id);
-      return { projectId: existing.id, category: mapping.category };
+      return withLeaveCategory(existing.id, existing.systemKey);
     }
     const maxSort = await prisma.timeProject.aggregate({
       where: { organizationId },
@@ -226,10 +240,9 @@ async function resolveProjectId(
         name,
         sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
       },
-      select: { id: true },
+      select: { id: true, systemKey: true },
     });
-    projectCache.set(key, created.id);
-    return { projectId: created.id, category: mapping.category };
+    return withLeaveCategory(created.id, created.systemKey);
   }
 
   return { projectId: null, category: mapping.category };
@@ -239,7 +252,7 @@ async function buildProjectResolutionMap(
   organizationId: string,
   projectMappings: ImportProjectMapping[]
 ) {
-  const cache = new Map<string, string>();
+  const cache = new Map<string, { projectId: string; category?: TimeCategory }>();
   const out = new Map<string, { projectId: string | null; category?: TimeCategory; skip?: boolean }>();
   for (const mapping of projectMappings) {
     out.set(mapping.externalName, await resolveProjectId(organizationId, mapping, cache));
@@ -460,7 +473,7 @@ export async function runTimerlyImport(input: {
   }
 
   if (creates.length > 0) {
-    await prisma.$transaction(
+    const created = await prisma.$transaction(
       creates.map((row) =>
         prisma.timeEntry.create({
           data: {
@@ -485,6 +498,17 @@ export async function runTimerlyImport(input: {
       )
     );
     imported = creates.length;
+    for (const entry of created) {
+      if (
+        entry.category === "vacation" ||
+        entry.category === "extra_vacation" ||
+        entry.category === "sick" ||
+        entry.category === "holiday" ||
+        entry.category === "comp_time"
+      ) {
+        await applyTimeEntryToLeaveLedger(entry, { createdByUserId: input.userId });
+      }
+    }
   }
 
   const nextOffset = offset + limit;
@@ -534,8 +558,8 @@ export async function remapImportedEntries(input: {
         });
         continue;
       }
-      const { projectId } = await resolveProjectId(input.organizationId, mapping, new Map());
-      if (!projectId) continue;
+      const resolved = await resolveProjectId(input.organizationId, mapping, new Map());
+      if (!resolved.projectId) continue;
       const result = await prisma.timeEntry.updateMany({
         where: {
           organizationId: input.organizationId,
@@ -543,11 +567,31 @@ export async function remapImportedEntries(input: {
           ...(input.batchId ? { importBatchId: input.batchId } : {}),
         },
         data: {
-          timeProjectId: projectId,
-          ...(mapping.category ? { category: mapping.category } : {}),
+          timeProjectId: resolved.projectId,
+          ...(resolved.category ? { category: resolved.category } : {}),
         },
       });
       projectsUpdated += result.count;
+      if (resolved.category) {
+        const entries = await prisma.timeEntry.findMany({
+          where: {
+            organizationId: input.organizationId,
+            importExternalProject: mapping.externalName,
+            ...(input.batchId ? { importBatchId: input.batchId } : {}),
+          },
+          select: {
+            id: true,
+            organizationId: true,
+            personId: true,
+            startsAt: true,
+            endsAt: true,
+            category: true,
+          },
+        });
+        for (const entry of entries) {
+          await applyTimeEntryToLeaveLedger(entry);
+        }
+      }
     }
   }
 

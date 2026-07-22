@@ -60,6 +60,22 @@ export function isLeaveDayDisplayCategory(cat: string): boolean {
   return (LEAVE_DAY_DISPLAY_CATEGORIES as readonly string[]).includes(cat);
 }
 
+const LEAVE_SYSTEM_KEY_TO_CATEGORY: Record<string, TimeCategory> = {
+  leave_vacation: "vacation",
+  leave_extra_vacation: "extra_vacation",
+  leave_sick: "sick",
+  leave_holiday: "holiday",
+  leave_comp_time: "comp_time",
+};
+
+/** Map Fravær system project (Ferie / Sygdom / …) → time category. */
+export function leaveCategoryFromSystemKey(
+  systemKey: string | null | undefined
+): TimeCategory | null {
+  if (!systemKey) return null;
+  return LEAVE_SYSTEM_KEY_TO_CATEGORY[systemKey] ?? null;
+}
+
 export function timeCategoryMessageId(cat: TimeCategory): `time.${string}` {
   return `time.${TIME_CATEGORY_MSG[cat]}`;
 }

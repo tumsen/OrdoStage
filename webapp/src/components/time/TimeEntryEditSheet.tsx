@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { isDayOffCategory, isLeaveAutoProjectCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
+import { isDayOffCategory, isLeaveAutoProjectCategory, isVacationNoteOnlyCategory, leaveCategoryFromSystemKey } from "@/lib/timeCategoryI18n";
 import { isTimesheetSettlementFillEntry, timeEntryUserVisibleNote } from "@/lib/timeEntryNotes";
 import {
   clampDayOffDurationMinutes,
@@ -162,7 +162,12 @@ export function TimeEntryEditSheet(props: {
   const activeProjects = useMemo(
     () =>
       [...projects]
-        .filter((p) => !p.isArchived && !p.systemKey)
+        .filter((p) => {
+          if (p.isArchived) return false;
+          // Manual projects + Fravær system projects (Ferie / Sygdom / …)
+          if (!p.systemKey) return true;
+          return p.systemKey.startsWith("leave_");
+        })
         .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
     [projects]
   );
@@ -612,6 +617,14 @@ export function TimeEntryEditSheet(props: {
                               value={`${group.label} ${p.name} ${p.id}`}
                               onSelect={() => {
                                 setProjectId(p.id);
+                                const leaveCat = leaveCategoryFromSystemKey(p.systemKey);
+                                if (leaveCat) {
+                                  setCategory(leaveCat);
+                                  if (isVacationNoteOnlyCategory(leaveCat)) {
+                                    setSelectedTags(new Set());
+                                  }
+                                  applyWorkDayDuration(leaveCat);
+                                }
                                 setProjectOpen(false);
                               }}
                               className="text-white aria-selected:bg-white/10"

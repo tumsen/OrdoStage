@@ -86,6 +86,19 @@ export function leaveCategoryFromSystemKey(
   return SYSTEM_KEY_TO_LEAVE_CATEGORY[systemKey] ?? null;
 }
 
+/** When an entry is assigned to Ferie / Sygdom / Feriefridage / …, use that leave category. */
+export async function leaveCategoryForProjectId(
+  organizationId: string,
+  projectId: string | null | undefined
+): Promise<LeaveAutoProjectCategory | null> {
+  if (!projectId) return null;
+  const project = await prisma.timeProject.findFirst({
+    where: { id: projectId, organizationId },
+    select: { systemKey: true },
+  });
+  return leaveCategoryFromSystemKey(project?.systemKey);
+}
+
 export async function ensureLeaveParentCategory(organizationId: string): Promise<string> {
   const existing = await prisma.timeParentCategory.findFirst({
     where: { organizationId, systemKey: LEAVE_PARENT_CATEGORY_SYSTEM_KEY },

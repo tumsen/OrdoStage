@@ -27,6 +27,7 @@ import {
   isLeaveParentCategoryKey,
   isLeaveSystemProjectKey,
   isVacationNoteOnlyCategory,
+  leaveCategoryForProjectId,
   normalizeEntryProjectAndTags,
   resolveEntryTimeProjectId,
   resolveLeaveTimeProjectId,
@@ -1931,6 +1932,13 @@ timeRouter.post("/time/bulk-update", zValidator("json", BulkTimeEntryUpdateSchem
   const data: any = {};
   if (body.action.setProjectId !== undefined) {
     data.timeProjectId = body.action.setProjectId;
+    if (!body.action.setCategory && body.action.setProjectId) {
+      const leaveCat = await leaveCategoryForProjectId(
+        user.organizationId,
+        body.action.setProjectId
+      );
+      if (leaveCat) data.category = leaveCat;
+    }
   }
   if (body.action.setCategory) {
     data.category = body.action.setCategory;
@@ -1951,7 +1959,7 @@ timeRouter.post("/time/bulk-update", zValidator("json", BulkTimeEntryUpdateSchem
   // Update the entries themselves
   const updated = Object.keys(data).length ? await prisma.timeEntry.updateMany({ where, data }) : { count: 0 };
 
-  if (body.action.setCategory === "vacation") {
+  if (data.category === "vacation" || body.action.setCategory === "vacation") {
     const vacationIds = await prisma.timeEntry.findMany({
       where,
       select: { id: true },
@@ -1961,6 +1969,24 @@ timeRouter.post("/time/bulk-update", zValidator("json", BulkTimeEntryUpdateSchem
       await prisma.timeEntryTag.deleteMany({
         where: { timeEntryId: { in: vacationIds.map((r) => r.id) } },
       });
+    }
+  }
+
+  if (data.category) {
+    const toSync = await prisma.timeEntry.findMany({
+      where,
+      select: {
+        id: true,
+        organizationId: true,
+        personId: true,
+        startsAt: true,
+        endsAt: true,
+        category: true,
+      },
+      take: 5000,
+    });
+    for (const entry of toSync) {
+      await maybeSyncLeaveLedger(user.organizationId, entry, user.id);
     }
   }
 
@@ -3964,7 +3990,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
     });
     if (!ev) return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
-  const entryCategory = body.category ?? "work";
+  let entryCategory = body.category ?? "work";
+  if (body.timeProjectId) {
+    const leaveFromProject = await leaveCategoryForProjectId(
+      user.organizationId,
+      body.timeProjectId
+    );
+    if (leaveFromProject) entryCategory = leaveFromProject;
+  }
   const resolvedCustomProjectId = await resolveEntryTimeProjectId(
     user.organizationId,
     entryCategory,
@@ -4355,10 +4388,18 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
     }
   }
 
-  const finalCategory = body.category ?? existing.category;
   const finalEventId = body.eventId !== undefined ? body.eventId : existing.eventId;
   const requestedProjectId =
     body.timeProjectId !== undefined ? body.timeProjectId : existing.timeProjectId;
+  let finalCategory = body.category ?? existing.category;
+  // Assigning to Ferie / Sygdom / Feriefridage / … always sets the matching leave category.
+  if (body.timeProjectId !== undefined && body.timeProjectId) {
+    const leaveFromProject = await leaveCategoryForProjectId(
+      user.organizationId,
+      body.timeProjectId
+    );
+    if (leaveFromProject) finalCategory = leaveFromProject;
+  }
   const resolvedProjectId = await resolveEntryTimeProjectId(
     user.organizationId,
     finalCategory,
