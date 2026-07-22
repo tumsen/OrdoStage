@@ -1643,6 +1643,7 @@ timeRouter.get("/time/report", async (c) => {
     const vacationDaysUsed = Math.round((pa.vacationMinutes / 60 / hoursPerDay) * 10) / 10;
     const vacationDaysRemaining =
       pa.vacationDaysPerYear != null ? Math.round((pa.vacationDaysPerYear - vacationDaysUsed) * 10) / 10 : null;
+    const extraVacationDaysUsed = Math.round((pa.extraVacationMinutes / 60 / hoursPerDay) * 10) / 10;
     const leave = leaveEnabled
       ? await getLeaveBalanceSummary(
           user.organizationId!,
@@ -1650,6 +1651,9 @@ timeRouter.get("/time/report", async (c) => {
           new Date(rangeEndExclusive.getTime() - 1)
         )
       : undefined;
+    const extraVacationDaysRemaining = leave
+      ? Math.round(leave.extraVacationRemainingDays * 10) / 10
+      : null;
     const earnedInPeriod = leaveEnabled ? Math.round(compEarnedByPerson.get(personId) ?? 0) : null;
     const usedInPeriod = leaveEnabled ? Math.round(pa.compTimeMinutes) : null;
     const periodDelta =
@@ -1680,6 +1684,9 @@ timeRouter.get("/time/report", async (c) => {
       vacationDaysPerYear: pa.vacationDaysPerYear,
       vacationDaysUsed: pa.vacationDaysPerYear != null || pa.vacationMinutes > 0 ? vacationDaysUsed : null,
       vacationDaysRemaining,
+      extraVacationDaysUsed:
+        pa.extraVacationMinutes > 0 || leave ? extraVacationDaysUsed : null,
+      extraVacationDaysRemaining,
       compTimeBalanceMinutes: leave ? Math.round(leave.compTimeRemainingMinutes) : null,
       compTimePeriodDeltaMinutes: periodDelta,
       compTimeEarnedMinutes: earnedInPeriod,

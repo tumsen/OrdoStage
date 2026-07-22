@@ -1902,6 +1902,10 @@ export const TimeReportPersonSchema = z.object({
   vacationDaysPerYear: z.number().nullable(),
   vacationDaysUsed: z.number().nullable(),
   vacationDaysRemaining: z.number().nullable(),
+  /** Feriefridage used in the report period (days). */
+  extraVacationDaysUsed: z.number().nullable().optional(),
+  /** Feriefridage remaining (ledger at period end when leave is on; else year − period used). */
+  extraVacationDaysRemaining: z.number().nullable().optional(),
   /** Afspadsering saldo as of range end (minutes). Null when leave management is off / all-time. */
   compTimeBalanceMinutes: z.number().nullable().optional(),
   /** Period change: earned − used (minutes). Positive = banked, negative = used. */

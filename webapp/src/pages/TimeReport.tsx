@@ -1656,6 +1656,12 @@ export default function TimeReport() {
                         <th className="text-right px-4 py-3 font-medium text-emerald-400/60 text-xs whitespace-nowrap">
                           {t("time.reportColVacLeft")}
                         </th>
+                        <th className="text-right px-4 py-3 font-medium text-teal-400/60 text-xs whitespace-nowrap">
+                          {t("time.reportColExtraUsed")}
+                        </th>
+                        <th className="text-right px-4 py-3 font-medium text-teal-400/60 text-xs whitespace-nowrap">
+                          {t("time.reportColExtraLeft")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1797,6 +1803,27 @@ export default function TimeReport() {
                               <span className="text-white/20">—</span>
                             )}
                           </td>
+                          <td className="px-4 py-3 text-right tabular-nums text-teal-300/70">
+                            {p.extraVacationDaysUsed != null ? (
+                              `${p.extraVacationDaysUsed}d`
+                            ) : (
+                              <span className="text-white/20">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {p.extraVacationDaysRemaining != null ? (
+                              <span
+                                className={cn(
+                                  "font-medium",
+                                  p.extraVacationDaysRemaining < 0 ? "text-red-300" : "text-teal-300/80"
+                                )}
+                              >
+                                {p.extraVacationDaysRemaining}d
+                              </span>
+                            ) : (
+                              <span className="text-white/20">—</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1841,6 +1868,8 @@ export default function TimeReport() {
                             </td>
                           </>
                         )}
+                        <td />
+                        <td />
                         <td />
                         <td />
                       </tr>
