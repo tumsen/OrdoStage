@@ -1,2 +1,7 @@
 # Local Railway token (see .env.railway.example)
 .env.railway
+
+# Platform-specific Prisma engines (downloaded locally; do not commit)
+node_modules/@prisma/engines/libquery_engine-*.node
+node_modules/@prisma/engines/schema-engine-*
+node_modules/prisma/libquery_engine-*.node
