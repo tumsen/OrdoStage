@@ -35,6 +35,7 @@ import {
 } from "@/lib/personDocumentTypes";
 import type { Person, PersonDocument } from "../../../backend/src/types";
 import { AddressFields, type Address } from "@/components/AddressFields";
+import { DETAIL_FIELD_LABEL_CLASS } from "@/components/StageDimensionFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1184,7 +1185,7 @@ function PersonFormDialog({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Internal / external *</Label>
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>Internal / external *</Label>
               <Controller
                 control={form.control}
                 name="affiliation"
@@ -1211,7 +1212,7 @@ function PersonFormDialog({
               ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workplace")}</Label>
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.workplace")}</Label>
               <Input
                 {...form.register("workplaceName")}
                 placeholder={t("people.workplacePlaceholder")}
@@ -1221,7 +1222,7 @@ function PersonFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workName")}</Label>
+            <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.workName")}</Label>
             <Input
               {...form.register("workName")}
               placeholder={t("people.workNamePlaceholder")}
@@ -1231,7 +1232,7 @@ function PersonFormDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workPhone")}</Label>
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.workPhone")}</Label>
               <Input
                 {...form.register("workPhone")}
                 placeholder="+45 00 00 00 00"
@@ -1239,7 +1240,7 @@ function PersonFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workEmail")}</Label>
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.workEmail")}</Label>
               <Input
                 {...form.register("workEmail")}
                 type="email"
@@ -1253,7 +1254,7 @@ function PersonFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">Default role</Label>
+            <Label className={DETAIL_FIELD_LABEL_CLASS}>Default role</Label>
             <p className="text-[10px] text-white/30 leading-snug">
               Job title in the directory. You can set a different <strong className="text-white/40">role per team</strong> on the
               Teams page. App access is not controlled here; use the permission group below (when the person has an email).
@@ -1266,7 +1267,7 @@ function PersonFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workAddress")}</Label>
+            <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.workAddress")}</Label>
             <AddressFields
               hideSearch
               value={{
@@ -1290,7 +1291,7 @@ function PersonFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">Permission group *</Label>
+            <Label className={DETAIL_FIELD_LABEL_CLASS}>Permission group *</Label>
             <p className="text-[10px] text-white/30 leading-snug">
               Every person must belong to one permission group. With an email on file, use{" "}
               <strong className="text-white/50">Send account login information</strong> when you are ready — nothing is emailed
@@ -1372,7 +1373,7 @@ function PersonFormDialog({
                 {asPage ? <p className={sectionTitle}>Notes</p> : null}
           <div className={asPage ? "contents flex-1 flex flex-col" : "space-y-1.5"}>
             {asPage ? null : (
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Notes</Label>
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>Notes</Label>
             )}
             <textarea
               {...form.register("notes")}
@@ -1391,7 +1392,7 @@ function PersonFormDialog({
               <p className={sectionTitle}>{t("people.privateSection")}</p>
 
           <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateName")} *</Label>
+            <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.privateName")} *</Label>
             <Input
               {...form.register("name")}
               placeholder="Full name"
@@ -1404,7 +1405,7 @@ function PersonFormDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privatePhone")}</Label>
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.privatePhone")}</Label>
               <Input
                 {...form.register("phone")}
                 placeholder="+45 00 00 00 00"
@@ -1412,7 +1413,7 @@ function PersonFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateEmail")}</Label>
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.privateEmail")}</Label>
               <Input
                 {...form.register("email")}
                 type="email"
@@ -1426,7 +1427,7 @@ function PersonFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateAddress")}</Label>
+            <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.privateAddress")}</Label>
             <AddressFields
               hideSearch
               value={{
@@ -1450,7 +1451,7 @@ function PersonFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-white/50 text-xs uppercase tracking-wide flex items-center gap-1.5">
+            <Label className={cn(DETAIL_FIELD_LABEL_CLASS, "flex items-center gap-1.5")}>
               <ShieldAlert size={11} className="text-amber-400/60" /> {t("people.emergencyContacts")}
             </Label>
             <div className="space-y-1.5">
@@ -1551,7 +1552,7 @@ function PersonFormDialog({
               {asPage ? <p className={sectionTitle}>Teams</p> : null}
           <div className={asPage ? "contents space-y-2" : "space-y-2"}>
             {asPage ? null : (
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Teams</Label>
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>Teams</Label>
             )}
             {canWriteOrg ? (
               <>
@@ -1648,45 +1649,47 @@ function PersonFormDialog({
                     </span>
                   </span>
                 </label>
-                <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
-                  <div className="space-y-1 min-w-0">
-                    <Label className="text-white/55 text-xs">{t("time.leaveHoursInputLabel")}</Label>
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={contractHoursInput}
-                      onChange={(e) => setContractHoursInput(e.target.value)}
-                      onBlur={() => contractAutoSave.schedule()}
-                      placeholder={
-                        contractHoursPeriod === "weekly"
-                          ? "37:00"
-                          : contractHoursPeriod === "monthly"
-                            ? "160:20"
-                            : "1924:00"
-                      }
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                    />
-                    <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
+                <div className="space-y-1">
+                  <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
+                    <div className="space-y-1 min-w-0">
+                      <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursInputLabel")}</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={contractHoursInput}
+                        onChange={(e) => setContractHoursInput(e.target.value)}
+                        onBlur={() => contractAutoSave.schedule()}
+                        placeholder={
+                          contractHoursPeriod === "weekly"
+                            ? "37:00"
+                            : contractHoursPeriod === "monthly"
+                              ? "160:20"
+                              : "1924:00"
+                        }
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursPeriodLabel")}</Label>
+                      <Select
+                        value={contractHoursPeriod}
+                        onValueChange={(v) => {
+                          setContractHoursPeriod(v as "weekly" | "monthly" | "annual");
+                          contractAutoSave.schedule();
+                        }}
+                      >
+                        <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                          <SelectItem value="weekly">{t("time.leaveHoursPeriodWeekly")}</SelectItem>
+                          <SelectItem value="monthly">{t("time.leaveHoursPeriodMonthly")}</SelectItem>
+                          <SelectItem value="annual">{t("time.leaveHoursPeriodAnnual")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-1 min-w-0">
-                    <Label className="text-white/55 text-xs">{t("time.leaveHoursPeriodLabel")}</Label>
-                    <Select
-                      value={contractHoursPeriod}
-                      onValueChange={(v) => {
-                        setContractHoursPeriod(v as "weekly" | "monthly" | "annual");
-                        contractAutoSave.schedule();
-                      }}
-                    >
-                      <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                        <SelectItem value="weekly">{t("time.leaveHoursPeriodWeekly")}</SelectItem>
-                        <SelectItem value="monthly">{t("time.leaveHoursPeriodMonthly")}</SelectItem>
-                        <SelectItem value="annual">{t("time.leaveHoursPeriodAnnual")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
                   {[
@@ -1710,7 +1713,7 @@ function PersonFormDialog({
                   ))}
                 </div>
                 <div className="space-y-1.5">
-                    <Label className="text-white/55 text-xs">{t("time.leaveProfileVacationDays")}</Label>
+                    <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
                     <Input
                       type="number"
                       min="0"
@@ -1863,45 +1866,47 @@ function PersonFormDialog({
                     </span>
                   </span>
                 </label>
-                <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
-                  <div className="space-y-1 min-w-0">
-                    <Label className="text-white/55 text-xs">{t("time.leaveHoursInputLabel")}</Label>
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={contractHoursInput}
-                      onChange={(e) => setContractHoursInput(e.target.value)}
-                      onBlur={() => contractAutoSave.schedule()}
-                      placeholder={
-                        contractHoursPeriod === "weekly"
-                          ? "37:00"
-                          : contractHoursPeriod === "monthly"
-                            ? "160:20"
-                            : "1924:00"
-                      }
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                    />
-                    <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
+                <div className="space-y-1">
+                  <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
+                    <div className="space-y-1 min-w-0">
+                      <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursInputLabel")}</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={contractHoursInput}
+                        onChange={(e) => setContractHoursInput(e.target.value)}
+                        onBlur={() => contractAutoSave.schedule()}
+                        placeholder={
+                          contractHoursPeriod === "weekly"
+                            ? "37:00"
+                            : contractHoursPeriod === "monthly"
+                              ? "160:20"
+                              : "1924:00"
+                        }
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursPeriodLabel")}</Label>
+                      <Select
+                        value={contractHoursPeriod}
+                        onValueChange={(v) => {
+                          setContractHoursPeriod(v as "weekly" | "monthly" | "annual");
+                          contractAutoSave.schedule();
+                        }}
+                      >
+                        <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                          <SelectItem value="weekly">{t("time.leaveHoursPeriodWeekly")}</SelectItem>
+                          <SelectItem value="monthly">{t("time.leaveHoursPeriodMonthly")}</SelectItem>
+                          <SelectItem value="annual">{t("time.leaveHoursPeriodAnnual")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-1 min-w-0">
-                    <Label className="text-white/55 text-xs">{t("time.leaveHoursPeriodLabel")}</Label>
-                    <Select
-                      value={contractHoursPeriod}
-                      onValueChange={(v) => {
-                        setContractHoursPeriod(v as "weekly" | "monthly" | "annual");
-                        contractAutoSave.schedule();
-                      }}
-                    >
-                      <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                        <SelectItem value="weekly">{t("time.leaveHoursPeriodWeekly")}</SelectItem>
-                        <SelectItem value="monthly">{t("time.leaveHoursPeriodMonthly")}</SelectItem>
-                        <SelectItem value="annual">{t("time.leaveHoursPeriodAnnual")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
                   {[
@@ -1931,7 +1936,7 @@ function PersonFormDialog({
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1 min-w-0">
-                    <Label className="text-white/55 text-xs">{t("time.leaveProfileVacationDays")}</Label>
+                    <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
                     <Input
                       type="number"
                       min="0"
@@ -1945,7 +1950,7 @@ function PersonFormDialog({
                     />
                   </div>
                   <div className="space-y-1 min-w-0">
-                    <Label className="text-white/55 text-xs">{t("time.leaveProfileExtraVacation")}</Label>
+                    <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileExtraVacation")}</Label>
                     <Input
                       type="number"
                       min="0"
@@ -2053,14 +2058,14 @@ function PersonFormDialog({
             >
             {!asPage ? (
             <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3 w-full max-w-md">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Profile image</Label>
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>Profile image</Label>
               {profileImageFields}
             </div>
             ) : null}
 
             <div className={asPage ? "contents space-y-2 w-full min-w-0" : "space-y-2 rounded-md border border-white/10 bg-white/[0.02] p-3 w-full min-w-0"}>
               {asPage ? null : (
-              <Label className="text-white/50 text-xs uppercase tracking-wide">Documents</Label>
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>Documents</Label>
               )}
               <p className="text-[11px] text-white/35">
                 Add passport, driver license, certificates, contracts, or other files.
@@ -2204,45 +2209,47 @@ function PersonFormDialog({
                 </span>
               </span>
             </label>
-            <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
-              <div className="space-y-1 min-w-0">
-                <Label className="text-white/55 text-xs">{t("time.leaveHoursInputLabel")}</Label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={contractHoursInput}
-                  onChange={(e) => setContractHoursInput(e.target.value)}
-                  onBlur={() => contractAutoSave.schedule()}
-                  placeholder={
-                    contractHoursPeriod === "weekly"
-                      ? "37:00"
-                      : contractHoursPeriod === "monthly"
-                        ? "160:20"
-                        : "1924:00"
-                  }
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                />
-                <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
+            <div className="space-y-1">
+              <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
+                <div className="space-y-1 min-w-0">
+                  <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursInputLabel")}</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={contractHoursInput}
+                    onChange={(e) => setContractHoursInput(e.target.value)}
+                    onBlur={() => contractAutoSave.schedule()}
+                    placeholder={
+                      contractHoursPeriod === "weekly"
+                        ? "37:00"
+                        : contractHoursPeriod === "monthly"
+                          ? "160:20"
+                          : "1924:00"
+                    }
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveHoursPeriodLabel")}</Label>
+                  <Select
+                    value={contractHoursPeriod}
+                    onValueChange={(v) => {
+                      setContractHoursPeriod(v as "weekly" | "monthly" | "annual");
+                      contractAutoSave.schedule();
+                    }}
+                  >
+                    <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                      <SelectItem value="weekly">{t("time.leaveHoursPeriodWeekly")}</SelectItem>
+                      <SelectItem value="monthly">{t("time.leaveHoursPeriodMonthly")}</SelectItem>
+                      <SelectItem value="annual">{t("time.leaveHoursPeriodAnnual")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-1 min-w-0">
-                <Label className="text-white/55 text-xs">{t("time.leaveHoursPeriodLabel")}</Label>
-                <Select
-                  value={contractHoursPeriod}
-                  onValueChange={(v) => {
-                    setContractHoursPeriod(v as "weekly" | "monthly" | "annual");
-                    contractAutoSave.schedule();
-                  }}
-                >
-                  <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                    <SelectItem value="weekly">{t("time.leaveHoursPeriodWeekly")}</SelectItem>
-                    <SelectItem value="monthly">{t("time.leaveHoursPeriodMonthly")}</SelectItem>
-                    <SelectItem value="annual">{t("time.leaveHoursPeriodAnnual")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
             </div>
             <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
               {[
@@ -2268,7 +2275,7 @@ function PersonFormDialog({
               ))}
             </div>
             <div className="space-y-1.5">
-                <Label className="text-white/55 text-xs">{t("time.leaveProfileVacationDays")}</Label>
+                <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
                 <Input
                   type="number"
                   min="0"
