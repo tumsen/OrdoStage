@@ -647,7 +647,6 @@ function PersonFormDialog({
         : person.weeklyContractHours != null
           ? String(person.weeklyContractHours)
           : String(defaultWeekly);
-    const vacation = String(DK_STATUTORY_VACATION_DAYS);
     const extra =
       profile.extraVacationDaysPerYear != null
         ? String(profile.extraVacationDaysPerYear)
