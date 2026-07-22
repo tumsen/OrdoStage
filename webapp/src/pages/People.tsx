@@ -1780,15 +1780,21 @@ function PersonFormDialog({
                     </span>
                   </span>
                 </label>
-                <label className="flex items-center gap-2 text-xs text-white/55">
+                <label className="flex items-start gap-2 text-xs text-white/55">
                   <Checkbox
+                    className="mt-0.5"
                     checked={leaveUseOrgDefaults}
                     onCheckedChange={(v) => {
                       setLeaveUseOrgDefaults(v === true);
                       contractAutoSave.schedule();
                     }}
                   />
-                  {t("time.leaveProfileUseOrgDefaults")}
+                  <span>
+                    <span className="block text-white/75">{t("time.leaveProfileUseOrgDefaults")}</span>
+                    <span className="block text-[11px] text-white/35 mt-0.5">
+                      {t("time.leaveProfileUseOrgDefaultsHint")}
+                    </span>
+                  </span>
                 </label>
                 <div className="space-y-1.5">
                   <Label className="text-white/55 text-xs">Weekly hours</Label>

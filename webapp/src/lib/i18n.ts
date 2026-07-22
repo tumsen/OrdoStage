@@ -288,6 +288,8 @@ const en = {
     leaveBalanceSectionTitle: "Balances",
     leaveProfileHint: "Work norms and vacation rights for this person.",
     leaveProfileUseOrgDefaults: "Use organization defaults",
+    leaveProfileUseOrgDefaultsHint:
+      "When on, weekly hours, vacation days, feriefridage, and monthly/annual hours follow the organization leave policy (Account → leave policy). Turn off to set personal values for this person below.",
     leaveProfileExtraVacation: "Feriefridage (days / year)",
     leaveProfileMonthlyHours: "Monthly hours",
     leaveProfileAnnualHours: "Annual hours",
@@ -1051,6 +1053,8 @@ const da: DeepPartial<typeof en> = {
     leavePolicyCompFromOvertime: "Optjen afspadsering fra overarbejde",
     leaveProfileHint: "Arbejdsnorm og ferierettigheder for denne person.",
     leaveProfileUseOrgDefaults: "Brug organisationens standarder",
+    leaveProfileUseOrgDefaultsHint:
+      "Når den er slået til, følger ugentlige timer, feriedage, feriefridage samt månedlige/årlige timer organisationens fraværspolitik (Konto → fraværspolitik). Slå fra for at sætte personlige værdier for denne person nedenfor.",
     leaveProfileExtraVacation: "Feriefridage",
     leaveProfileExtraVacationHint: "5 dage = 37 timer ved fuldtid (37 t/uge).",
     leaveProfileMonthlyHours: "Månedlige timer",
