@@ -22,6 +22,7 @@ import {
   settleCompTimeForTimesheetApproval,
 } from "../services/timesheetCompSettlement";
 import {
+  backfillLeaveEntryCategories,
   backfillLeaveEntryProjects,
   ensureAllLeaveTimeProjects,
   isLeaveParentCategoryKey,
@@ -2073,7 +2074,24 @@ timeRouter.get("/time/parent-category-catalog", async (c) => {
   await ensureAllLeaveTimeProjects(user.organizationId);
   await syncEventShowTimeProjects(user.organizationId);
   await backfillLeaveEntryProjects(user.organizationId);
+  const leaveCategoryFixed = await backfillLeaveEntryCategories(user.organizationId);
   await backfillMissingTimeProjects(user.organizationId);
+  if (leaveCategoryFixed.length > 0) {
+    const toSync = await prisma.timeEntry.findMany({
+      where: { id: { in: leaveCategoryFixed } },
+      select: {
+        id: true,
+        organizationId: true,
+        personId: true,
+        startsAt: true,
+        endsAt: true,
+        category: true,
+      },
+    });
+    for (const entry of toSync) {
+      await maybeSyncLeaveLedger(user.organizationId, entry, user.id ?? null);
+    }
+  }
   const [categories, events, tours, standaloneProjects, allProjects] = await Promise.all([
     prisma.timeParentCategory.findMany({
       where: { organizationId: user.organizationId },
@@ -2347,7 +2365,24 @@ timeRouter.get("/time/projects", async (c) => {
   await syncEventShowTimeProjects(user.organizationId);
   await ensureAllLeaveTimeProjects(user.organizationId);
   await backfillLeaveEntryProjects(user.organizationId);
+  const leaveCategoryFixed = await backfillLeaveEntryCategories(user.organizationId);
   await backfillMissingTimeProjects(user.organizationId);
+  if (leaveCategoryFixed.length > 0) {
+    const toSync = await prisma.timeEntry.findMany({
+      where: { id: { in: leaveCategoryFixed } },
+      select: {
+        id: true,
+        organizationId: true,
+        personId: true,
+        startsAt: true,
+        endsAt: true,
+        category: true,
+      },
+    });
+    for (const entry of toSync) {
+      await maybeSyncLeaveLedger(user.organizationId, entry, user.id ?? null);
+    }
+  }
   const archived = c.req.query("archived") === "1";
   const rows = await prisma.timeProject.findMany({
     where: {

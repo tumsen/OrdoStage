@@ -79,6 +79,25 @@ export function isLeaveParentCategoryKey(systemKey: string | null | undefined): 
   return systemKey === LEAVE_PARENT_CATEGORY_SYSTEM_KEY;
 }
 
+const LEAVE_PROJECT_NAME_ALIASES: Record<LeaveAutoProjectCategory, readonly string[]> = {
+  vacation: ["ferie", "vacation", "feriedag", "feriedage"],
+  extra_vacation: ["feriefridage", "feriefridag", "extra vacation", "extra vacation day", "extra vacation days"],
+  sick: ["sygdom", "sygedag", "sygedage", "sick", "sick leave"],
+  holiday: ["helligdag", "helligdage", "holiday", "public holiday"],
+  comp_time: ["afspadsering", "afsp", "comp time", "compensatory time"],
+};
+
+/** Match Fravær project names (Ferie / Sygdom / …) even without systemKey. */
+export function leaveCategoryFromProjectName(name: string | null | undefined): LeaveAutoProjectCategory | null {
+  if (!name?.trim()) return null;
+  const n = name.trim().toLowerCase();
+  for (const category of LEAVE_AUTO_PROJECT_CATEGORIES) {
+    if (LEAVE_PROJECT_DEFS[category].name.toLowerCase() === n) return category;
+    if (LEAVE_PROJECT_NAME_ALIASES[category].includes(n)) return category;
+  }
+  return null;
+}
+
 export function leaveCategoryFromSystemKey(
   systemKey: string | null | undefined
 ): LeaveAutoProjectCategory | null {
@@ -94,9 +113,27 @@ export async function leaveCategoryForProjectId(
   if (!projectId) return null;
   const project = await prisma.timeProject.findFirst({
     where: { id: projectId, organizationId },
-    select: { systemKey: true },
+    select: { systemKey: true, name: true },
   });
-  return leaveCategoryFromSystemKey(project?.systemKey);
+  if (!project) return null;
+  return (
+    leaveCategoryFromSystemKey(project.systemKey) ?? leaveCategoryFromProjectName(project.name)
+  );
+}
+
+/**
+ * Resolve a mapped/selected project to the canonical leave system project when it is
+ * (or is named like) Ferie / Sygdom / Feriefridage / …
+ */
+export async function resolveCanonicalLeaveProject(
+  organizationId: string,
+  project: { id: string; systemKey?: string | null; name?: string | null }
+): Promise<{ projectId: string; category: LeaveAutoProjectCategory } | null> {
+  const category =
+    leaveCategoryFromSystemKey(project.systemKey) ?? leaveCategoryFromProjectName(project.name);
+  if (!category) return null;
+  const projectId = await ensureLeaveTimeProject(organizationId, category);
+  return { projectId, category };
 }
 
 export async function ensureLeaveParentCategory(organizationId: string): Promise<string> {
@@ -189,6 +226,78 @@ export async function backfillLeaveEntryProjects(organizationId: string) {
       data: { timeProjectId: projectId },
     });
   }
+}
+
+/**
+ * Fix entries that sit on Ferie / Sygdom / Feriefridage (system or name-matched)
+ * but still have category "work" (common after Timerly import).
+ * Returns ids of entries whose category changed (for leave-ledger sync).
+ */
+export async function backfillLeaveEntryCategories(organizationId: string): Promise<string[]> {
+  await ensureAllLeaveTimeProjects(organizationId);
+  const changedIds: string[] = [];
+
+  // 1) Canonical leave_* projects: force matching category
+  for (const category of LEAVE_AUTO_PROJECT_CATEGORIES) {
+    const projectId = await ensureLeaveTimeProject(organizationId, category);
+    const wrong = await prisma.timeEntry.findMany({
+      where: {
+        organizationId,
+        timeProjectId: projectId,
+        NOT: { category },
+        category: { notIn: ["comp_settlement_earned", "comp_settlement_used"] },
+      },
+      select: { id: true },
+    });
+    if (wrong.length === 0) continue;
+    await prisma.timeEntry.updateMany({
+      where: { id: { in: wrong.map((r) => r.id) } },
+      data: { category },
+    });
+    if (category === "vacation") {
+      await prisma.timeEntryTag.deleteMany({
+        where: { timeEntryId: { in: wrong.map((r) => r.id) } },
+      });
+    }
+    changedIds.push(...wrong.map((r) => r.id));
+  }
+
+  // 2) Non-system projects named like leave: move entries → system project + category
+  const projects = await prisma.timeProject.findMany({
+    where: {
+      organizationId,
+      NOT: { systemKey: { startsWith: "leave_" } },
+    },
+    select: { id: true, name: true, systemKey: true },
+  });
+
+  for (const project of projects) {
+    const canonical = await resolveCanonicalLeaveProject(organizationId, project);
+    if (!canonical) continue;
+    if (canonical.projectId === project.id) continue;
+
+    const entries = await prisma.timeEntry.findMany({
+      where: {
+        organizationId,
+        timeProjectId: project.id,
+        category: { notIn: ["comp_settlement_earned", "comp_settlement_used"] },
+      },
+      select: { id: true },
+    });
+    if (entries.length === 0) continue;
+
+    const ids = entries.map((e) => e.id);
+    await prisma.timeEntry.updateMany({
+      where: { id: { in: ids } },
+      data: { timeProjectId: canonical.projectId, category: canonical.category },
+    });
+    if (canonical.category === "vacation") {
+      await prisma.timeEntryTag.deleteMany({ where: { timeEntryId: { in: ids } } });
+    }
+    changedIds.push(...ids);
+  }
+
+  return [...new Set(changedIds)];
 }
 
 export async function resolveEntryTimeProjectId(

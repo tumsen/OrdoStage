@@ -6,7 +6,7 @@ import {
   parseTimerlyCsv,
   type ParsedTimerlyEntry,
 } from "./parseTimerlyCsv";
-import { leaveCategoryFromSystemKey } from "./leaveTimeProjects";
+import { resolveCanonicalLeaveProject } from "./leaveTimeProjects";
 import { applyTimeEntryToLeaveLedger } from "./leaveLedger";
 
 export type ImportProjectMapping = {
@@ -197,13 +197,23 @@ async function resolveProjectId(
     };
   }
 
-  const withLeaveCategory = (
+  const withLeaveCategory = async (
     projectId: string,
-    systemKey: string | null | undefined
-  ): { projectId: string; category?: TimeCategory } => {
-    const fromProject = leaveCategoryFromSystemKey(systemKey) as TimeCategory | null;
-    const category = mapping.category ?? fromProject ?? undefined;
-    projectCache.set(key, { projectId, category: fromProject ?? mapping.category });
+    systemKey: string | null | undefined,
+    name: string | null | undefined
+  ): Promise<{ projectId: string; category?: TimeCategory }> => {
+    const canonical = await resolveCanonicalLeaveProject(organizationId, {
+      id: projectId,
+      systemKey,
+      name,
+    });
+    if (canonical) {
+      const category = (mapping.category ?? canonical.category) as TimeCategory;
+      projectCache.set(key, { projectId: canonical.projectId, category: canonical.category });
+      return { projectId: canonical.projectId, category };
+    }
+    const category = mapping.category;
+    projectCache.set(key, { projectId, category });
     return { projectId, category };
   };
 
@@ -213,22 +223,35 @@ async function resolveProjectId(
     }
     const exists = await prisma.timeProject.findFirst({
       where: { id: mapping.timeProjectId, organizationId, isArchived: false },
-      select: { id: true, systemKey: true },
+      select: { id: true, systemKey: true, name: true },
     });
     if (!exists) {
       throw new Error(`Project "${mapping.externalName}": target project not found`);
     }
-    return withLeaveCategory(exists.id, exists.systemKey);
+    return withLeaveCategory(exists.id, exists.systemKey, exists.name);
   }
 
   if (mapping.action === "create") {
     const name = mapping.newProjectName?.trim() || mapping.externalName;
     const existing = await prisma.timeProject.findFirst({
       where: { organizationId, name, isArchived: false },
-      select: { id: true, systemKey: true },
+      select: { id: true, systemKey: true, name: true },
     });
     if (existing) {
-      return withLeaveCategory(existing.id, existing.systemKey);
+      return withLeaveCategory(existing.id, existing.systemKey, existing.name);
+    }
+    // Creating "Ferie" / "Sygdom" / … → use canonical leave system project
+    const asLeave = await resolveCanonicalLeaveProject(organizationId, {
+      id: "",
+      name,
+      systemKey: null,
+    });
+    if (asLeave) {
+      projectCache.set(key, { projectId: asLeave.projectId, category: asLeave.category });
+      return {
+        projectId: asLeave.projectId,
+        category: (mapping.category ?? asLeave.category) as TimeCategory,
+      };
     }
     const maxSort = await prisma.timeProject.aggregate({
       where: { organizationId },
@@ -240,9 +263,9 @@ async function resolveProjectId(
         name,
         sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
       },
-      select: { id: true, systemKey: true },
+      select: { id: true, systemKey: true, name: true },
     });
-    return withLeaveCategory(created.id, created.systemKey);
+    return withLeaveCategory(created.id, created.systemKey, created.name);
   }
 
   return { projectId: null, category: mapping.category };
