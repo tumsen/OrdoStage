@@ -286,7 +286,9 @@ const en = {
     leaveNormSectionTitle: "Norm",
     leaveAbsenceSectionTitle: "Leave",
     leaveBalanceSectionTitle: "Balances",
-    leaveProfileHint: "Work norms and vacation rights for this person.",
+    leaveBalanceSectionHint:
+      "Current leave accounts and adjustments only (opening balance and change log). Contract entitlements are set under Norm.",
+    leaveProfileHint: "Contract terms: hours, vacation days, and feriefridage for this person.",
     leaveProfileUseOrgDefaults: "Use organization defaults",
     leaveProfileUseOrgDefaultsHint:
       "When on, weekly hours, vacation days, feriefridage, and monthly/annual hours follow the organization leave policy (Account → leave policy). Turn off to set personal values for this person below.",
@@ -800,6 +802,8 @@ const da: DeepPartial<typeof en> = {
     leaveNormSectionTitle: "Norm",
     leaveAbsenceSectionTitle: "Fravær",
     leaveBalanceSectionTitle: "Saldo",
+    leaveBalanceSectionHint:
+      "Kun aktuelle konti og justeringer (startsaldo og ændringslog). Kontraktvilkår sættes under Norm.",
     dayOffFullDay: "Hel dag",
     dayOffHalfDay: "Halv dag",
     dayOffSetFullDay: "Hel dag",
@@ -1051,7 +1055,7 @@ const da: DeepPartial<typeof en> = {
     leavePolicyDefaultExtraVacationHint: "5 dage = 37 timer for fuldtidsansatte (37 t/uge).",
     leavePolicyDefaultWeeklyHours: "Standard ugentlige timer",
     leavePolicyCompFromOvertime: "Optjen afspadsering fra overarbejde",
-    leaveProfileHint: "Arbejdsnorm og ferierettigheder for denne person.",
+    leaveProfileHint: "Kontraktvilkår: timer, feriedage og feriefridage for denne person.",
     leaveProfileUseOrgDefaults: "Brug organisationens standarder",
     leaveProfileUseOrgDefaultsHint:
       "Når den er slået til, følger ugentlige timer, feriedage, feriefridage samt månedlige/årlige timer organisationens fraværspolitik (Konto → fraværspolitik). Slå fra for at sætte personlige værdier for denne person nedenfor.",

@@ -1848,10 +1848,6 @@ function PersonFormDialog({
                     ))}
                   </div>
                 ) : null}
-              </div>
-
-              <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4 min-w-0"}>
-                <p className={sectionTitle}>{t("time.leaveBalanceSectionTitle")}</p>
                 <div className="space-y-1.5">
                   <Label className="text-white/55 text-xs">Vacation days / year</Label>
                   <Input
@@ -1896,6 +1892,13 @@ function PersonFormDialog({
                       <SelectItem value="active">{t("time.leaveProfileSickActive")}</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4 min-w-0"}>
+                <div>
+                  <p className={sectionTitle}>{t("time.leaveBalanceSectionTitle")}</p>
+                  <p className="text-[11px] text-white/30 mt-0.5">{t("time.leaveBalanceSectionHint")}</p>
                 </div>
                 {leaveProfileData?.leave ? (
                   <div className="rounded border border-white/8 bg-white/[0.02] px-3 py-2 text-xs text-white/50 space-y-1">
@@ -1954,7 +1957,7 @@ function PersonFormDialog({
                     </p>
                   </div>
                 ) : (
-                  <p className="text-[11px] text-white/40">{t("time.leaveProfileHint")}</p>
+                  <p className="text-[11px] text-white/40">{t("time.leaveBalanceSectionHint")}</p>
                 )}
                 {leaveProfileData?.leave ? (
                   <LeaveOpeningBalanceForm
