@@ -1695,6 +1695,18 @@ function PersonFormDialog({
                   </div>
                   <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
                 </div>
+                <div className="space-y-1">
+                  <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={contractVacationDays}
+                    onChange={(e) => setContractVacationDays(e.target.value)}
+                    onBlur={() => contractAutoSave.schedule()}
+                    placeholder="25"
+                    className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                  />
+                </div>
                 <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
                   {[
                     {
@@ -1715,20 +1727,6 @@ function PersonFormDialog({
                       <p className="font-semibold text-white/70 mt-0.5 tabular-nums text-[11px] leading-snug">{item.value}</p>
                     </div>
                   ))}
-                </div>
-                <div className="space-y-1.5">
-                    <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="365"
-                      step="0.5"
-                      value={contractVacationDays}
-                      onChange={(e) => setContractVacationDays(e.target.value)}
-                      onBlur={() => contractAutoSave.schedule()}
-                      placeholder="e.g. 25"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                    />
                 </div>
               </div>
             ) : null}
@@ -1914,6 +1912,35 @@ function PersonFormDialog({
                   </div>
                   <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
                 </div>
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="space-y-1">
+                    <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={contractVacationDays}
+                      onChange={(e) => setContractVacationDays(e.target.value)}
+                      onBlur={() => contractAutoSave.schedule()}
+                      placeholder="25"
+                      className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileExtraVacation")}</Label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={leaveExtraVacationDays}
+                      onChange={(e) => setLeaveExtraVacationDays(e.target.value)}
+                      onBlur={() => contractAutoSave.schedule()}
+                      placeholder="5"
+                      className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                    />
+                    <p className="text-[10px] text-white/40 leading-snug max-w-[14rem]">
+                      {t("time.leaveProfileExtraVacationHint")}
+                    </p>
+                  </div>
+                </div>
                 <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
                   {[
                     {
@@ -1939,35 +1966,6 @@ function PersonFormDialog({
                       </p>
                     </div>
                   ))}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1 min-w-0">
-                    <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="365"
-                      step="0.5"
-                      value={contractVacationDays}
-                      onChange={(e) => setContractVacationDays(e.target.value)}
-                      onBlur={() => contractAutoSave.schedule()}
-                      placeholder="25"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1 min-w-0">
-                    <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileExtraVacation")}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={leaveExtraVacationDays}
-                      onChange={(e) => setLeaveExtraVacationDays(e.target.value)}
-                      onBlur={() => contractAutoSave.schedule()}
-                      placeholder="5"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                    />
-                    <p className="text-[10px] text-white/40 leading-snug">{t("time.leaveProfileExtraVacationHint")}</p>
-                  </div>
                 </div>
               </div>
 
@@ -2257,6 +2255,18 @@ function PersonFormDialog({
               </div>
               <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
             </div>
+            <div className="space-y-1">
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={contractVacationDays}
+                onChange={(e) => setContractVacationDays(e.target.value)}
+                onBlur={() => contractAutoSave.schedule()}
+                placeholder="25"
+                className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+              />
+            </div>
             <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
               {[
                 {
@@ -2279,20 +2289,6 @@ function PersonFormDialog({
                   </p>
                 </div>
               ))}
-            </div>
-            <div className="space-y-1.5">
-                <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="365"
-                  step="0.5"
-                  value={contractVacationDays}
-                  onChange={(e) => setContractVacationDays(e.target.value)}
-                  onBlur={() => contractAutoSave.schedule()}
-                  placeholder="e.g. 25"
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                />
             </div>
           </div>
         ) : null}
