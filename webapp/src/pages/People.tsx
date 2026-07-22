@@ -1160,6 +1160,7 @@ function PersonFormDialog({
           <div className="space-y-1.5">
             <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateAddress")}</Label>
             <AddressFields
+              hideSearch
               value={{
                 street:  form.watch("addressStreet")  ?? "",
                 number:  form.watch("addressNumber")  ?? "",
@@ -1184,53 +1185,32 @@ function PersonFormDialog({
             <Label className="text-white/50 text-xs uppercase tracking-wide flex items-center gap-1.5">
               <ShieldAlert size={11} className="text-amber-400/60" /> {t("people.emergencyContacts")}
             </Label>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {watchedEmergencyContacts.map((contact, index) => (
                 <div
                   key={contact.id}
-                  className="rounded-md border border-white/10 bg-white/[0.02] p-2 space-y-2"
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
-                    <Input
-                      value={contact.name ?? ""}
-                      onChange={(e) => {
-                        const next = [...watchedEmergencyContacts];
-                        next[index] = { ...next[index]!, name: e.target.value };
-                        form.setValue("emergencyContacts", next, { shouldDirty: true });
-                      }}
-                      placeholder={t("people.emergencyName")}
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8"
-                    />
-                    <Input
-                      value={contact.phone ?? ""}
-                      onChange={(e) => {
-                        const next = [...watchedEmergencyContacts];
-                        next[index] = { ...next[index]!, phone: e.target.value };
-                        form.setValue("emergencyContacts", next, { shouldDirty: true });
-                      }}
-                      placeholder={t("people.emergencyPhone")}
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-white/35 hover:text-red-300"
-                      disabled={watchedEmergencyContacts.length <= 1}
-                      title={t("people.removeEmergencyContact")}
-                      onClick={() => {
-                        if (watchedEmergencyContacts.length <= 1) return;
-                        form.setValue(
-                          "emergencyContacts",
-                          watchedEmergencyContacts.filter((_, i) => i !== index),
-                          { shouldDirty: true }
-                        );
-                        if (person?.id) autoSave.schedule();
-                      }}
-                    >
-                      <Trash2 size={13} />
-                    </Button>
-                  </div>
+                  <Input
+                    value={contact.name ?? ""}
+                    onChange={(e) => {
+                      const next = [...watchedEmergencyContacts];
+                      next[index] = { ...next[index]!, name: e.target.value };
+                      form.setValue("emergencyContacts", next, { shouldDirty: true });
+                    }}
+                    placeholder={t("people.emergencyName")}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8 min-w-0 flex-1"
+                  />
+                  <Input
+                    value={contact.phone ?? ""}
+                    onChange={(e) => {
+                      const next = [...watchedEmergencyContacts];
+                      next[index] = { ...next[index]!, phone: e.target.value };
+                      form.setValue("emergencyContacts", next, { shouldDirty: true });
+                    }}
+                    placeholder={t("people.emergencyPhone")}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8 min-w-0 flex-1"
+                  />
                   <Input
                     value={contact.relationNote ?? ""}
                     onChange={(e) => {
@@ -1239,8 +1219,27 @@ function PersonFormDialog({
                       form.setValue("emergencyContacts", next, { shouldDirty: true });
                     }}
                     placeholder={t("people.emergencyRelationNote")}
-                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8 min-w-0 flex-1"
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-white/35 hover:text-red-300"
+                    disabled={watchedEmergencyContacts.length <= 1}
+                    title={t("people.removeEmergencyContact")}
+                    onClick={() => {
+                      if (watchedEmergencyContacts.length <= 1) return;
+                      form.setValue(
+                        "emergencyContacts",
+                        watchedEmergencyContacts.filter((_, i) => i !== index),
+                        { shouldDirty: true }
+                      );
+                      if (person?.id) autoSave.schedule();
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </Button>
                 </div>
               ))}
             </div>
@@ -1327,6 +1326,7 @@ function PersonFormDialog({
           <div className="space-y-1.5">
             <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workAddress")}</Label>
             <AddressFields
+              hideSearch
               value={{
                 street:  form.watch("workAddressStreet")  ?? "",
                 number:  form.watch("workAddressNumber")  ?? "",
