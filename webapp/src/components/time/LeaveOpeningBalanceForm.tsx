@@ -16,7 +16,7 @@ function todayIsoDate(): string {
 }
 
 const COMPACT_DAYS_CLASS =
-  "h-8 w-[calc(8ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white text-xs tabular-nums px-2";
+  "h-8 w-[calc(9ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white text-xs tabular-nums px-2";
 const COMPACT_DATE_CLASS =
   "h-8 w-[10rem] shrink-0 bg-white/5 border-white/10 text-white text-xs [color-scheme:dark]";
 

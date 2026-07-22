@@ -100,8 +100,7 @@ export function CompTimeHhhMmField(props: {
           }
         }}
         className={cn(
-          allowNegative ? "w-[calc(9ch+1rem)]" : "w-[calc(8ch+1rem)]",
-          "h-8 min-w-0 max-w-none shrink-0 rounded-md border border-white/10 bg-white/5 px-2",
+          "h-8 w-[calc(9ch+1rem)] min-w-0 max-w-none shrink-0 rounded-md border border-white/10 bg-white/5 px-2",
           "font-mono text-xs tabular-nums placeholder:text-white/25",
           "focus:outline-none focus:ring-1 focus:ring-emerald-500/40",
           toneClass,
