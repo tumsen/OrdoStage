@@ -1119,155 +1119,6 @@ function PersonFormDialog({
           onBlurCapture={autoSave.onBlurCapture}
         >
           <div className={asPage ? "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start" : "contents"}>
-            <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "space-y-4"}>
-              <p className={sectionTitle}>{t("people.privateSection")}</p>
-
-          <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateName")} *</Label>
-            <Input
-              {...form.register("name")}
-              placeholder="Full name"
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
-            />
-            {form.formState.errors.name ? (
-              <p className="text-red-400 text-xs">{form.formState.errors.name.message}</p>
-            ) : null}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privatePhone")}</Label>
-              <Input
-                {...form.register("phone")}
-                placeholder="+45 00 00 00 00"
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateEmail")}</Label>
-              <Input
-                {...form.register("email")}
-                type="email"
-                placeholder="email@example.com"
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
-              />
-              {form.formState.errors.email ? (
-                <p className="text-red-400 text-xs">{form.formState.errors.email.message}</p>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateAddress")}</Label>
-            <AddressFields
-              hideSearch
-              value={{
-                street:  form.watch("addressStreet")  ?? "",
-                number:  form.watch("addressNumber")  ?? "",
-                zip:     form.watch("addressZip")     ?? "",
-                city:    form.watch("addressCity")    ?? "",
-                state:   form.watch("addressState")   ?? "",
-                country: form.watch("addressCountry") ?? "",
-              }}
-              onChange={(addr: Address) => {
-                form.setValue("addressStreet",  addr.street, { shouldDirty: true });
-                form.setValue("addressNumber",  addr.number, { shouldDirty: true });
-                form.setValue("addressZip",     addr.zip, { shouldDirty: true });
-                form.setValue("addressCity",    addr.city, { shouldDirty: true });
-                form.setValue("addressState",   addr.state, { shouldDirty: true });
-                form.setValue("addressCountry", addr.country, { shouldDirty: true });
-                if (person?.id) autoSave.schedule();
-              }}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-white/50 text-xs uppercase tracking-wide flex items-center gap-1.5">
-              <ShieldAlert size={11} className="text-amber-400/60" /> {t("people.emergencyContacts")}
-            </Label>
-            <div className="space-y-1.5">
-              {watchedEmergencyContacts.map((contact, index) => (
-                <div
-                  key={contact.id}
-                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2"
-                >
-                  <Input
-                    value={contact.name ?? ""}
-                    onChange={(e) => {
-                      const next = [...watchedEmergencyContacts];
-                      next[index] = { ...next[index]!, name: e.target.value };
-                      form.setValue("emergencyContacts", next, { shouldDirty: true });
-                    }}
-                    placeholder={t("people.emergencyName")}
-                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8 min-w-0 flex-1"
-                  />
-                  <Input
-                    value={contact.phone ?? ""}
-                    onChange={(e) => {
-                      const next = [...watchedEmergencyContacts];
-                      next[index] = { ...next[index]!, phone: e.target.value };
-                      form.setValue("emergencyContacts", next, { shouldDirty: true });
-                    }}
-                    placeholder={t("people.emergencyPhone")}
-                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8 min-w-0 flex-1"
-                  />
-                  <Input
-                    value={contact.relationNote ?? ""}
-                    onChange={(e) => {
-                      const next = [...watchedEmergencyContacts];
-                      next[index] = { ...next[index]!, relationNote: e.target.value };
-                      form.setValue("emergencyContacts", next, { shouldDirty: true });
-                    }}
-                    placeholder={t("people.emergencyRelationNote")}
-                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8 min-w-0 flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-white/35 hover:text-red-300"
-                    disabled={watchedEmergencyContacts.length <= 1}
-                    title={t("people.removeEmergencyContact")}
-                    onClick={() => {
-                      if (watchedEmergencyContacts.length <= 1) return;
-                      form.setValue(
-                        "emergencyContacts",
-                        watchedEmergencyContacts.filter((_, i) => i !== index),
-                        { shouldDirty: true }
-                      );
-                      if (person?.id) autoSave.schedule();
-                    }}
-                  >
-                    <Trash2 size={13} />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 border-white/15 text-white/85"
-              onClick={() => {
-                form.setValue(
-                  "emergencyContacts",
-                  [...watchedEmergencyContacts, emptyEmergencyContact()],
-                  { shouldDirty: true }
-                );
-              }}
-            >
-              <Plus size={13} className="mr-1" /> {t("people.addEmergencyContact")}
-            </Button>
-          </div>
-
-            {asPage ? (
-              <div className="space-y-3 pt-2 border-t border-white/8">
-                <p className={sectionTitle}>Profile image</p>
-                {profileImageFields}
-              </div>
-            ) : null}
-            </div>
-
             <div className={asPage ? "flex flex-col gap-5 min-w-0" : "contents"}>
               <div className={asPage ? `${cardClass} space-y-4` : "space-y-4"}>
                 <p className={sectionTitle}>{t("people.workSection")}</p>
@@ -1444,6 +1295,156 @@ function PersonFormDialog({
           </div>
               </div>
             </div>
+
+            <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "space-y-4"}>
+              <p className={sectionTitle}>{t("people.privateSection")}</p>
+
+          <div className="space-y-1.5">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateName")} *</Label>
+            <Input
+              {...form.register("name")}
+              placeholder="Full name"
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
+            />
+            {form.formState.errors.name ? (
+              <p className="text-red-400 text-xs">{form.formState.errors.name.message}</p>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privatePhone")}</Label>
+              <Input
+                {...form.register("phone")}
+                placeholder="+45 00 00 00 00"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateEmail")}</Label>
+              <Input
+                {...form.register("email")}
+                type="email"
+                placeholder="email@example.com"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
+              />
+              {form.formState.errors.email ? (
+                <p className="text-red-400 text-xs">{form.formState.errors.email.message}</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.privateAddress")}</Label>
+            <AddressFields
+              hideSearch
+              value={{
+                street:  form.watch("addressStreet")  ?? "",
+                number:  form.watch("addressNumber")  ?? "",
+                zip:     form.watch("addressZip")     ?? "",
+                city:    form.watch("addressCity")    ?? "",
+                state:   form.watch("addressState")   ?? "",
+                country: form.watch("addressCountry") ?? "",
+              }}
+              onChange={(addr: Address) => {
+                form.setValue("addressStreet",  addr.street, { shouldDirty: true });
+                form.setValue("addressNumber",  addr.number, { shouldDirty: true });
+                form.setValue("addressZip",     addr.zip, { shouldDirty: true });
+                form.setValue("addressCity",    addr.city, { shouldDirty: true });
+                form.setValue("addressState",   addr.state, { shouldDirty: true });
+                form.setValue("addressCountry", addr.country, { shouldDirty: true });
+                if (person?.id) autoSave.schedule();
+              }}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-white/50 text-xs uppercase tracking-wide flex items-center gap-1.5">
+              <ShieldAlert size={11} className="text-amber-400/60" /> {t("people.emergencyContacts")}
+            </Label>
+            <div className="space-y-1.5">
+              {watchedEmergencyContacts.map((contact, index) => (
+                <div
+                  key={contact.id}
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2"
+                >
+                  <Input
+                    value={contact.name ?? ""}
+                    onChange={(e) => {
+                      const next = [...watchedEmergencyContacts];
+                      next[index] = { ...next[index]!, name: e.target.value };
+                      form.setValue("emergencyContacts", next, { shouldDirty: true });
+                    }}
+                    placeholder={t("people.emergencyName")}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8 min-w-0 flex-1"
+                  />
+                  <Input
+                    value={contact.phone ?? ""}
+                    onChange={(e) => {
+                      const next = [...watchedEmergencyContacts];
+                      next[index] = { ...next[index]!, phone: e.target.value };
+                      form.setValue("emergencyContacts", next, { shouldDirty: true });
+                    }}
+                    placeholder={t("people.emergencyPhone")}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8 min-w-0 flex-1"
+                  />
+                  <Input
+                    value={contact.relationNote ?? ""}
+                    onChange={(e) => {
+                      const next = [...watchedEmergencyContacts];
+                      next[index] = { ...next[index]!, relationNote: e.target.value };
+                      form.setValue("emergencyContacts", next, { shouldDirty: true });
+                    }}
+                    placeholder={t("people.emergencyRelationNote")}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30 h-8 min-w-0 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-white/35 hover:text-red-300"
+                    disabled={watchedEmergencyContacts.length <= 1}
+                    title={t("people.removeEmergencyContact")}
+                    onClick={() => {
+                      if (watchedEmergencyContacts.length <= 1) return;
+                      form.setValue(
+                        "emergencyContacts",
+                        watchedEmergencyContacts.filter((_, i) => i !== index),
+                        { shouldDirty: true }
+                      );
+                      if (person?.id) autoSave.schedule();
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 border-white/15 text-white/85"
+              onClick={() => {
+                form.setValue(
+                  "emergencyContacts",
+                  [...watchedEmergencyContacts, emptyEmergencyContact()],
+                  { shouldDirty: true }
+                );
+              }}
+            >
+              <Plus size={13} className="mr-1" /> {t("people.addEmergencyContact")}
+            </Button>
+          </div>
+
+            {asPage ? (
+              <div className="space-y-3 pt-2 border-t border-white/8">
+                <p className={sectionTitle}>Profile image</p>
+                {profileImageFields}
+              </div>
+            ) : null}
+            </div>
+
           </div>
 
           <div className={asPage ? "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start" : "contents"}>
