@@ -347,8 +347,11 @@ leaveRouter.post(
       createdByUserId: user.id,
       effectiveDate: body.effectiveDate,
       vacationRemainingDays: body.vacationRemainingDays,
+      vacationEffectiveDate: body.vacationEffectiveDate,
       extraVacationRemainingDays: body.extraVacationRemainingDays,
+      extraVacationEffectiveDate: body.extraVacationEffectiveDate,
       compTimeRemainingMinutes: body.compTimeRemainingMinutes,
+      compTimeEffectiveDate: body.compTimeEffectiveDate,
       sickDays: body.sickDays,
     });
 

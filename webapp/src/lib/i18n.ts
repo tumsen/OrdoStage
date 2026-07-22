@@ -326,9 +326,9 @@ const en = {
     leaveAdjustmentCompTimeHint: "+ adds, − subtracts",
     leaveOpeningBalanceTitle: "Opening balances",
     leaveOpeningBalanceHint:
-      "Set starting balances when moving to OrdoStage or correcting imported data. Only changed fields are applied; all updates are logged.",
+      "Set starting balances when moving to OrdoStage or correcting imported data. Only changed accounts are applied, each with its own date; all updates are logged.",
     leaveOpeningBalanceCompTime: "Overtime / deficit time balance",
-    leaveOpeningBalanceEffectiveDate: "Date (earned / as of)",
+    leaveOpeningBalanceEffectiveDate: "Date",
     leaveOpeningBalanceCompTimeHint: "HHHHH:MM or decimal (e.g. 37:30 / 37.5, max 999:59)",
     leaveOpeningBalanceNotePlaceholder: "e.g. Imported from previous payroll system, 1 Sep 2025",
     leaveOpeningBalanceSave: "Save opening balances",
@@ -828,9 +828,9 @@ const da: DeepPartial<typeof en> = {
     leaveAdjustmentCompTimeHint: "+ tilføjer, − trækker fra",
     leaveOpeningBalanceTitle: "Startsaldo",
     leaveOpeningBalanceHint:
-      "Angiv udgangspunkt når I begynder at bruge OrdoStage eller importerer fra et andet system. Kun ændrede felter gemmes; alt logges.",
+      "Angiv udgangspunkt når I begynder at bruge OrdoStage eller importerer fra et andet system. Kun ændrede konti gemmes, hver med egen dato; alt logges.",
     leaveOpeningBalanceCompTime: "Overarbejde / minustid (saldo)",
-    leaveOpeningBalanceEffectiveDate: "Dato (optjent / pr.)",
+    leaveOpeningBalanceEffectiveDate: "Dato",
     leaveOpeningBalanceCompTimeHint: "HHHHH:MM eller decimaltal (fx 37:30 / 37,5, maks 999:59)",
     leaveOpeningBalanceNotePlaceholder: "fx Importeret fra tidligere lønsystem, 1. sep. 2025",
     leaveOpeningBalanceSave: "Gem startsaldro",

@@ -308,8 +308,11 @@ export async function applyOpeningBalances(input: {
   createdByUserId?: string | null;
   effectiveDate?: string;
   vacationRemainingDays?: number;
+  vacationEffectiveDate?: string;
   extraVacationRemainingDays?: number;
+  extraVacationEffectiveDate?: string;
   compTimeRemainingMinutes?: number;
+  compTimeEffectiveDate?: string;
   sickDays?: number;
 }): Promise<LeaveBalanceSummary> {
   const asOf = new Date();
@@ -343,7 +346,11 @@ export async function applyOpeningBalances(input: {
   );
   const current = summarizeLeaveBalances(vacationYearKey, norms, earned, map);
 
-  const postDelta = async (balanceType: LeaveBalanceType, delta: number) => {
+  const postDelta = async (
+    balanceType: LeaveBalanceType,
+    delta: number,
+    effectiveDate?: string
+  ) => {
     if (Math.abs(delta) < 0.001) return;
     await postLeaveTransaction({
       organizationId: input.organizationId,
@@ -354,7 +361,7 @@ export async function applyOpeningBalances(input: {
       source: "opening_balance",
       note: input.note,
       createdByUserId: input.createdByUserId ?? null,
-      effectiveDate: input.effectiveDate,
+      effectiveDate: effectiveDate ?? input.effectiveDate,
     });
   };
 
@@ -362,19 +369,19 @@ export async function applyOpeningBalances(input: {
     // Keep accrued vacation_earned as Ferieloven optjening; hit remaining via used.
     const targetUsed = earned - input.vacationRemainingDays;
     const delta = targetUsed - current.vacationUsedDays;
-    await postDelta("vacation_used", delta);
+    await postDelta("vacation_used", delta, input.vacationEffectiveDate);
   }
 
   if (input.extraVacationRemainingDays !== undefined) {
     const targetUsed =
       norms.extraVacationDaysPerYear - input.extraVacationRemainingDays;
     const delta = targetUsed - current.extraVacationUsedDays;
-    await postDelta("extra_vacation_used", delta);
+    await postDelta("extra_vacation_used", delta, input.extraVacationEffectiveDate);
   }
 
   if (input.compTimeRemainingMinutes !== undefined) {
     const delta = input.compTimeRemainingMinutes - current.compTimeRemainingMinutes;
-    await postDelta("comp_time_earned", delta);
+    await postDelta("comp_time_earned", delta, input.compTimeEffectiveDate);
   }
 
   if (input.sickDays !== undefined) {

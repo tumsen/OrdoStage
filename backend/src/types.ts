@@ -1502,10 +1502,14 @@ export const SetLeaveOpeningBalancesSchema = z.object({
   personId: z.string().min(1),
   vacationYearKey: z.string().optional(),
   note: z.string().min(1),
+  /** Fallback date when a per-account date is omitted. */
   effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   vacationRemainingDays: z.number().min(-365).max(365).optional(),
+  vacationEffectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   extraVacationRemainingDays: z.number().min(-365).max(365).optional(),
+  extraVacationEffectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   compTimeRemainingMinutes: z.number().int().min(-59999).max(59999).optional(),
+  compTimeEffectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   sickDays: z.number().min(0).max(365).optional(),
 });
 
