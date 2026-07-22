@@ -293,6 +293,7 @@ const en = {
     leaveProfileUseOrgDefaultsHint:
       "When on, weekly hours, vacation days, feriefridage, and monthly/annual hours follow the organization leave policy (Account → leave policy). Turn off to set personal values for this person below.",
     leaveProfileExtraVacation: "Feriefridage (days / year)",
+    leaveProfileExtraVacationHint: "Default 5 days; change only if negotiated differently.",
     leaveHoursInputLabel: "Hours",
     leaveHoursInputHint: "HHHHH:MM or decimal (e.g. 37:30 / 37.5)",
     leaveHoursPeriodLabel: "Period",
@@ -301,6 +302,7 @@ const en = {
     leaveHoursPeriodAnnual: "Yearly",
     leaveProfileWeeklyHours: "Weekly hours",
     leaveProfileVacationDays: "Vacation days / year",
+    leaveProfileVacationDaysLockedHint: "Fixed at 25 days under the Danish Holiday Act (ferieloven).",
     leaveProfileMonthlyHours: "Monthly hours",
     leaveProfileAnnualHours: "Annual hours",
     leaveProfileSickStatus: "Sick leave status",
@@ -459,7 +461,6 @@ const en = {
     reportColCompBalance: "Comp balance",
     reportCompPeriodHint: "Earned − used in period",
     reportCompBalanceHint: "Afspadsering rest at period end",
-    leaveProfileExtraVacationHint: "5 days = 37 hours at full time (37 h/week).",
     leavePolicyDefaultExtraVacationHint: "5 days = 37 hours for full-time staff (37 h/week).",
     reportContractHint:
       "Click the contract hours cell to set expected weekly hours per person. Overtime = logged work hours − contracted hours over the period.",
@@ -1068,7 +1069,7 @@ const da: DeepPartial<typeof en> = {
     leaveProfileUseOrgDefaultsHint:
       "Når den er slået til, følger ugentlige timer, feriedage, feriefridage samt månedlige/årlige timer organisationens fraværspolitik (Konto → fraværspolitik). Slå fra for at sætte personlige værdier for denne person nedenfor.",
     leaveProfileExtraVacation: "Feriefridage",
-    leaveProfileExtraVacationHint: "5 dage = 37 timer ved fuldtid (37 t/uge).",
+    leaveProfileExtraVacationHint: "Standard 5 dage; ændr kun hvis andet er forhandlet.",
     leaveHoursInputLabel: "Timer",
     leaveHoursInputHint: "HHHHH:MM eller decimaltal (fx 37:30 / 37,5)",
     leaveHoursPeriodLabel: "Periode",
@@ -1077,6 +1078,7 @@ const da: DeepPartial<typeof en> = {
     leaveHoursPeriodAnnual: "Årligt",
     leaveProfileWeeklyHours: "Ugentlige timer",
     leaveProfileVacationDays: "Feriedage / år",
+    leaveProfileVacationDaysLockedHint: "Fastsat til 25 dage efter ferieloven — kan ikke ændres.",
     leaveProfileMonthlyHours: "Månedlige timer",
     leaveProfileAnnualHours: "Årlige timer",
     leaveProfileSickStatus: "Sygefraværsstatus",

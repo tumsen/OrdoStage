@@ -70,9 +70,17 @@ import { useSession } from "@/lib/auth-client";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
 import { useI18n } from "@/lib/i18n";
-import type { LeaveBalanceSummary, PersonLeaveProfile } from "@/contracts/backendTypes";
+import type { LeaveBalanceSummary, OrganizationLeavePolicy, PersonLeaveProfile } from "@/contracts/backendTypes";
 import { LeaveLedgerMenu } from "@/components/time/LeaveLedgerPanel";
 import { LeaveOpeningBalanceForm } from "@/components/time/LeaveOpeningBalanceForm";
+
+/** Danish Holiday Act (ferieloven): 25 vacation days / year — not negotiable. */
+const DK_STATUTORY_VACATION_DAYS = 25;
+const DEFAULT_EXTRA_VACATION_DAYS = 5;
+const CONTRACT_COMPACT_FIELD_CLASS =
+  "h-8 w-[calc(8ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2";
+const CONTRACT_COMPACT_FIELD_READONLY_CLASS =
+  "h-8 w-[calc(8ch+1rem)] shrink-0 bg-white/[0.03] border-white/8 text-white/55 text-sm tabular-nums px-2 cursor-default";
 import {
   PersonDocumentListRow,
   type PersonDocumentListRowHandle,
@@ -370,10 +378,10 @@ function PersonFormDialog({
   const [contractHoursPeriod, setContractHoursPeriod] = useState<"weekly" | "monthly" | "annual">(
     "weekly"
   );
-  const [contractVacationDays, setContractVacationDays] = useState<string>("");
   const [showInPayroll, setShowInPayroll] = useState(true);
-  const [leaveUseOrgDefaults, setLeaveUseOrgDefaults] = useState(true);
-  const [leaveExtraVacationDays, setLeaveExtraVacationDays] = useState("");
+  const [leaveExtraVacationDays, setLeaveExtraVacationDays] = useState(
+    String(DEFAULT_EXTRA_VACATION_DAYS)
+  );
   const [leaveSickStatus, setLeaveSickStatus] = useState<"none" | "active">("none");
   const [leaveSickNote, setLeaveSickNote] = useState("");
 
@@ -570,6 +578,12 @@ function PersonFormDialog({
     enabled: Boolean(person?.id) && canManageContracts && leaveManagementEnabled,
   });
 
+  const { data: leavePolicy } = useQuery({
+    queryKey: ["org-leave-policy"],
+    queryFn: () => api.get<OrganizationLeavePolicy>("/api/org/leave-policy"),
+    enabled: canManageContracts && leaveManagementEnabled,
+  });
+
   const { data: permissionOptions } = useQuery<DocumentPermissionOptions>({
     queryKey: ["people", "documents", permissionsDoc?.id, "permission-options"],
     queryFn: () =>
@@ -598,15 +612,13 @@ function PersonFormDialog({
   // Sync contract fields from loaded person (after contractAutoSave is defined below)
   const syncContractFromPerson = useCallback((p: Person | undefined) => {
     const weekly = p?.weeklyContractHours != null ? String(p.weeklyContractHours) : "";
-    const vacation = p?.vacationDaysPerYear != null ? String(p.vacationDaysPerYear) : "";
     setContractHoursInput(weekly);
     setContractHoursPeriod("weekly");
-    setContractVacationDays(vacation);
     setShowInPayroll(p?.showInPayroll !== false);
     return {
       contractHoursInput: weekly,
       contractHoursPeriod: "weekly" as const,
-      contractVacationDays: vacation,
+      contractVacationDays: String(DK_STATUTORY_VACATION_DAYS),
     };
   }, []);
 
@@ -626,29 +638,33 @@ function PersonFormDialog({
     if (leaveProfileSyncedForPersonRef.current === person.id) return;
     leaveProfileSyncedForPersonRef.current = person.id;
 
+    const defaultWeekly = leavePolicy?.defaultWeeklyContractHours ?? 37;
+    const defaultExtra = leavePolicy?.defaultExtraVacationDays ?? DEFAULT_EXTRA_VACATION_DAYS;
+
     const hours =
       profile.weeklyContractHours != null
         ? String(profile.weeklyContractHours)
         : person.weeklyContractHours != null
           ? String(person.weeklyContractHours)
-          : "";
-    const vacation =
-      profile.vacationDaysPerYear != null
-        ? String(profile.vacationDaysPerYear)
-        : person.vacationDaysPerYear != null
-          ? String(person.vacationDaysPerYear)
-          : "";
+          : String(defaultWeekly);
+    const vacation = String(DK_STATUTORY_VACATION_DAYS);
     const extra =
-      profile.extraVacationDaysPerYear != null ? String(profile.extraVacationDaysPerYear) : "";
+      profile.extraVacationDaysPerYear != null
+        ? String(profile.extraVacationDaysPerYear)
+        : String(defaultExtra);
 
-    setLeaveUseOrgDefaults(profile.useOrgDefaults);
     setLeaveExtraVacationDays(extra);
     setContractHoursInput(hours);
     setContractHoursPeriod("weekly");
-    setContractVacationDays(vacation);
     setLeaveSickStatus(profile.sickLeaveStatus);
     setLeaveSickNote(profile.sickLeaveNote ?? "");
-  }, [person?.id, leaveProfileData?.profile, person?.weeklyContractHours, person?.vacationDaysPerYear]);
+  }, [
+    person?.id,
+    leaveProfileData?.profile,
+    person?.weeklyContractHours,
+    leavePolicy?.defaultWeeklyContractHours,
+    leavePolicy?.defaultExtraVacationDays,
+  ]);
 
   const watchedAssignments = form.watch("teamAssignments");
   const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
@@ -1007,8 +1023,7 @@ function PersonFormDialog({
     getSnapshot: () => ({
       contractHoursInput,
       contractHoursPeriod,
-      contractVacationDays,
-      leaveUseOrgDefaults,
+      contractVacationDays: String(DK_STATUTORY_VACATION_DAYS),
       leaveExtraVacationDays,
       leaveSickStatus,
       leaveSickNote,
@@ -1022,8 +1037,7 @@ function PersonFormDialog({
       }
       const wh =
         raw === null ? null : Math.round(weeklyFromPeriodValue(raw, contractHoursPeriod) * 100) / 100;
-      const vd = contractVacationDays.trim() === "" ? null : parseFloat(contractVacationDays);
-      if (vd !== null && Number.isNaN(vd)) throw new Error("Vacation days must be a number");
+      const vd = DK_STATUTORY_VACATION_DAYS;
       const monthly =
         wh === null ? null : Math.round(((wh * 52) / 12) * 100) / 100;
       const annual = wh === null ? null : Math.round(wh * 52 * 100) / 100;
@@ -1032,13 +1046,16 @@ function PersonFormDialog({
         vacationDaysPerYear: vd,
       });
       if (leaveManagementEnabled) {
-        const extra =
-          leaveExtraVacationDays.trim() === "" ? null : parseFloat(leaveExtraVacationDays);
+        const extraParsed =
+          leaveExtraVacationDays.trim() === ""
+            ? DEFAULT_EXTRA_VACATION_DAYS
+            : parseFloat(leaveExtraVacationDays.replace(",", "."));
+        if (Number.isNaN(extraParsed)) throw new Error("Feriefridage must be a number");
         await api.patch(`/api/people/${personId}/leave-profile`, {
-          useOrgDefaults: leaveUseOrgDefaults,
+          useOrgDefaults: false,
           weeklyContractHours: wh,
           vacationDaysPerYear: vd,
-          extraVacationDaysPerYear: extra,
+          extraVacationDaysPerYear: extraParsed,
           monthlyContractHours: monthly,
           annualContractHours: annual,
           sickLeaveStatus: leaveSickStatus,
@@ -1057,8 +1074,9 @@ function PersonFormDialog({
     const base = syncContractFromPerson(person);
     contractAutoSave.markSaved({
       ...base,
-      leaveUseOrgDefaults: true,
-      leaveExtraVacationDays: "",
+      leaveExtraVacationDays: String(
+        leavePolicy?.defaultExtraVacationDays ?? DEFAULT_EXTRA_VACATION_DAYS
+      ),
       leaveSickStatus: "none" as const,
       leaveSickNote: "",
     });
@@ -1073,25 +1091,23 @@ function PersonFormDialog({
     if (leaveBaselineMarkedRef.current === person.id) return;
     leaveBaselineMarkedRef.current = person.id;
 
+    const defaultWeekly = leavePolicy?.defaultWeeklyContractHours ?? 37;
+    const defaultExtra = leavePolicy?.defaultExtraVacationDays ?? DEFAULT_EXTRA_VACATION_DAYS;
     const hours =
       profile.weeklyContractHours != null
         ? String(profile.weeklyContractHours)
         : person.weeklyContractHours != null
           ? String(person.weeklyContractHours)
-          : "";
-    const vacation =
-      profile.vacationDaysPerYear != null
-        ? String(profile.vacationDaysPerYear)
-        : person.vacationDaysPerYear != null
-          ? String(person.vacationDaysPerYear)
-          : "";
+          : String(defaultWeekly);
+    const extra =
+      profile.extraVacationDaysPerYear != null
+        ? String(profile.extraVacationDaysPerYear)
+        : String(defaultExtra);
     contractAutoSave.markSaved({
       contractHoursInput: hours,
       contractHoursPeriod: "weekly" as const,
-      contractVacationDays: vacation,
-      leaveUseOrgDefaults: profile.useOrgDefaults,
-      leaveExtraVacationDays:
-        profile.extraVacationDaysPerYear != null ? String(profile.extraVacationDaysPerYear) : "",
+      contractVacationDays: String(DK_STATUTORY_VACATION_DAYS),
+      leaveExtraVacationDays: extra,
       leaveSickStatus: profile.sickLeaveStatus,
       leaveSickNote: profile.sickLeaveNote ?? "",
     });
@@ -1099,8 +1115,9 @@ function PersonFormDialog({
   }, [
     person?.id,
     person?.weeklyContractHours,
-    person?.vacationDaysPerYear,
     leaveProfileData?.profile,
+    leavePolicy?.defaultWeeklyContractHours,
+    leavePolicy?.defaultExtraVacationDays,
     contractAutoSave.markSaved,
   ]);
 
@@ -1761,12 +1778,12 @@ function PersonFormDialog({
                       <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
                       <Input
                         type="text"
-                        inputMode="decimal"
-                        value={contractVacationDays}
-                        onChange={(e) => setContractVacationDays(e.target.value)}
-                        onBlur={() => contractAutoSave.schedule()}
-                        placeholder="25"
-                        className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                        readOnly
+                        tabIndex={-1}
+                        value={String(DK_STATUTORY_VACATION_DAYS)}
+                        className={CONTRACT_COMPACT_FIELD_READONLY_CLASS}
+                        aria-readonly="true"
+                        title={t("time.leaveProfileVacationDaysLockedHint")}
                       />
                     </div>
                   </div>
@@ -1917,22 +1934,6 @@ function PersonFormDialog({
                     </span>
                   </span>
                 </label>
-                <label className="flex items-start gap-2 text-xs text-white/55">
-                  <Checkbox
-                    className="mt-0.5"
-                    checked={leaveUseOrgDefaults}
-                    onCheckedChange={(v) => {
-                      setLeaveUseOrgDefaults(v === true);
-                      contractAutoSave.schedule();
-                    }}
-                  />
-                  <span>
-                    <span className="block text-white/75">{t("time.leaveProfileUseOrgDefaults")}</span>
-                    <span className="block text-[11px] text-white/35 mt-0.5">
-                      {t("time.leaveProfileUseOrgDefaultsHint")}
-                    </span>
-                  </span>
-                </label>
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-end gap-2">
                     <div className="space-y-1">
@@ -1952,7 +1953,7 @@ function PersonFormDialog({
                               ? "160:20"
                               : "1924:00"
                         }
-                        className="h-8 w-[calc(8ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                        className={CONTRACT_COMPACT_FIELD_CLASS}
                       />
                     </div>
                     <div className="space-y-1">
@@ -1978,12 +1979,12 @@ function PersonFormDialog({
                       <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
                       <Input
                         type="text"
-                        inputMode="decimal"
-                        value={contractVacationDays}
-                        onChange={(e) => setContractVacationDays(e.target.value)}
-                        onBlur={() => contractAutoSave.schedule()}
-                        placeholder="25"
-                        className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                        readOnly
+                        tabIndex={-1}
+                        value={String(DK_STATUTORY_VACATION_DAYS)}
+                        className={CONTRACT_COMPACT_FIELD_READONLY_CLASS}
+                        aria-readonly="true"
+                        title={t("time.leaveProfileVacationDaysLockedHint")}
                       />
                     </div>
                     <div className="space-y-1">
@@ -1995,11 +1996,14 @@ function PersonFormDialog({
                         onChange={(e) => setLeaveExtraVacationDays(e.target.value)}
                         onBlur={() => contractAutoSave.schedule()}
                         placeholder="5"
-                        className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                        className={CONTRACT_COMPACT_FIELD_CLASS}
                       />
                     </div>
                   </div>
                   <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
+                  <p className="text-[10px] text-white/40 leading-snug">
+                    {t("time.leaveProfileVacationDaysLockedHint")}
+                  </p>
                   <p className="text-[10px] text-white/40 leading-snug">{t("time.leaveProfileExtraVacationHint")}</p>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
@@ -2317,12 +2321,12 @@ function PersonFormDialog({
                   <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
                   <Input
                     type="text"
-                    inputMode="decimal"
-                    value={contractVacationDays}
-                    onChange={(e) => setContractVacationDays(e.target.value)}
-                    onBlur={() => contractAutoSave.schedule()}
-                    placeholder="25"
-                    className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                    readOnly
+                    tabIndex={-1}
+                    value={String(DK_STATUTORY_VACATION_DAYS)}
+                    className={CONTRACT_COMPACT_FIELD_READONLY_CLASS}
+                    aria-readonly="true"
+                    title={t("time.leaveProfileVacationDaysLockedHint")}
                   />
                 </div>
               </div>
