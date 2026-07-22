@@ -357,15 +357,42 @@ function PersonFormDialog({
   const { data: session } = useSession();
 
   // Work contract state (separate from main form — saved independently)
-  const [contractWeeklyHours, setContractWeeklyHours] = useState<string>("");
+  const [contractHoursInput, setContractHoursInput] = useState<string>("");
+  const [contractHoursPeriod, setContractHoursPeriod] = useState<"weekly" | "monthly" | "annual">(
+    "weekly"
+  );
   const [contractVacationDays, setContractVacationDays] = useState<string>("");
   const [showInPayroll, setShowInPayroll] = useState(true);
   const [leaveUseOrgDefaults, setLeaveUseOrgDefaults] = useState(true);
   const [leaveExtraVacationDays, setLeaveExtraVacationDays] = useState("");
-  const [leaveMonthlyHours, setLeaveMonthlyHours] = useState("");
-  const [leaveAnnualHours, setLeaveAnnualHours] = useState("");
   const [leaveSickStatus, setLeaveSickStatus] = useState<"none" | "active">("none");
   const [leaveSickNote, setLeaveSickNote] = useState("");
+
+  function weeklyFromPeriodValue(value: number, period: "weekly" | "monthly" | "annual"): number {
+    if (period === "monthly") return (value * 12) / 52;
+    if (period === "annual") return value / 52;
+    return value;
+  }
+
+  function periodValueFromWeekly(weekly: number, period: "weekly" | "monthly" | "annual"): number {
+    if (period === "monthly") return (weekly * 52) / 12;
+    if (period === "annual") return weekly * 52;
+    return weekly;
+  }
+
+  function formatHours2(n: number): string {
+    return (Math.round(n * 100) / 100).toFixed(2);
+  }
+
+  const hoursInputParsed =
+    contractHoursInput.trim() === "" ? null : parseFloat(contractHoursInput);
+  const weeklyHoursValid =
+    hoursInputParsed != null && !Number.isNaN(hoursInputParsed)
+      ? weeklyFromPeriodValue(hoursInputParsed, contractHoursPeriod)
+      : null;
+  const derivedDailyHours = weeklyHoursValid != null ? weeklyHoursValid / 5 : null;
+  const derivedMonthlyHours = weeklyHoursValid != null ? (weeklyHoursValid * 52) / 12 : null;
+  const derivedAnnualHours = weeklyHoursValid != null ? weeklyHoursValid * 52 : null;
 
   const { data: orgFeatures } = useQuery({
     queryKey: ["org", "features"],
@@ -573,10 +600,15 @@ function PersonFormDialog({
   const syncContractFromPerson = useCallback((p: Person | undefined) => {
     const weekly = p?.weeklyContractHours != null ? String(p.weeklyContractHours) : "";
     const vacation = p?.vacationDaysPerYear != null ? String(p.vacationDaysPerYear) : "";
-    setContractWeeklyHours(weekly);
+    setContractHoursInput(weekly);
+    setContractHoursPeriod("weekly");
     setContractVacationDays(vacation);
     setShowInPayroll(p?.showInPayroll !== false);
-    return { contractWeeklyHours: weekly, contractVacationDays: vacation };
+    return {
+      contractHoursInput: weekly,
+      contractHoursPeriod: "weekly" as const,
+      contractVacationDays: vacation,
+    };
   }, []);
 
   useEffect(() => {
@@ -586,12 +618,10 @@ function PersonFormDialog({
     setLeaveExtraVacationDays(
       profile.extraVacationDaysPerYear != null ? String(profile.extraVacationDaysPerYear) : ""
     );
-    setLeaveMonthlyHours(
-      profile.monthlyContractHours != null ? String(profile.monthlyContractHours) : ""
-    );
-    setLeaveAnnualHours(
-      profile.annualContractHours != null ? String(profile.annualContractHours) : ""
-    );
+    if (profile.weeklyContractHours != null) {
+      setContractHoursInput(String(profile.weeklyContractHours));
+      setContractHoursPeriod("weekly");
+    }
     setLeaveSickStatus(profile.sickLeaveStatus);
     setLeaveSickNote(profile.sickLeaveNote ?? "");
   }, [leaveProfileData?.profile]);
@@ -951,22 +981,26 @@ function PersonFormDialog({
     enabled: Boolean(person?.id) && canManageContracts,
     resetKey: person?.id ? `${person.id}-contract` : null,
     getSnapshot: () => ({
-      contractWeeklyHours,
+      contractHoursInput,
+      contractHoursPeriod,
       contractVacationDays,
       leaveUseOrgDefaults,
       leaveExtraVacationDays,
-      leaveMonthlyHours,
-      leaveAnnualHours,
       leaveSickStatus,
       leaveSickNote,
     }),
     save: async () => {
       const personId = person?.id;
       if (!personId) return;
-      const wh = contractWeeklyHours.trim() === "" ? null : parseFloat(contractWeeklyHours);
+      const raw = contractHoursInput.trim() === "" ? null : parseFloat(contractHoursInput);
+      if (raw !== null && Number.isNaN(raw)) throw new Error("Hours must be a number");
+      const wh =
+        raw === null ? null : Math.round(weeklyFromPeriodValue(raw, contractHoursPeriod) * 100) / 100;
       const vd = contractVacationDays.trim() === "" ? null : parseFloat(contractVacationDays);
-      if (wh !== null && Number.isNaN(wh)) throw new Error("Weekly hours must be a number");
       if (vd !== null && Number.isNaN(vd)) throw new Error("Vacation days must be a number");
+      const monthly =
+        wh === null ? null : Math.round(((wh * 52) / 12) * 100) / 100;
+      const annual = wh === null ? null : Math.round(wh * 52 * 100) / 100;
       await api.patch(`/api/time/person-contract/${personId}`, {
         weeklyContractHours: wh,
         vacationDaysPerYear: vd,
@@ -974,8 +1008,6 @@ function PersonFormDialog({
       if (leaveManagementEnabled) {
         const extra =
           leaveExtraVacationDays.trim() === "" ? null : parseFloat(leaveExtraVacationDays);
-        const monthly = leaveMonthlyHours.trim() === "" ? null : parseFloat(leaveMonthlyHours);
-        const annual = leaveAnnualHours.trim() === "" ? null : parseFloat(leaveAnnualHours);
         await api.patch(`/api/people/${personId}/leave-profile`, {
           useOrgDefaults: leaveUseOrgDefaults,
           weeklyContractHours: wh,
@@ -1612,23 +1644,67 @@ function PersonFormDialog({
                     </span>
                   </span>
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-white/55 text-xs">Weekly hours</Label>
+                <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
+                  <div className="space-y-1 min-w-0">
+                    <Label className="text-white/55 text-xs">{t("time.leaveHoursInputLabel")}</Label>
                     <Input
                       type="number"
                       min="0"
-                      max="168"
-                      step="0.5"
-                      value={contractWeeklyHours}
-                      onChange={(e) => setContractWeeklyHours(e.target.value)}
+                      step="0.01"
+                      value={contractHoursInput}
+                      onChange={(e) => setContractHoursInput(e.target.value)}
                       onBlur={() => contractAutoSave.schedule()}
-                      placeholder="e.g. 37"
+                      placeholder={contractHoursPeriod === "weekly" ? "37" : contractHoursPeriod === "monthly" ? "160.33" : "1924"}
                       className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-white/55 text-xs">Vacation days / year</Label>
+                  <div className="space-y-1 min-w-0">
+                    <Label className="text-white/55 text-xs">{t("time.leaveHoursPeriodLabel")}</Label>
+                    <Select
+                      value={contractHoursPeriod}
+                      onValueChange={(v) => {
+                        const next = v as "weekly" | "monthly" | "annual";
+                        if (weeklyHoursValid != null) {
+                          setContractHoursInput(formatHours2(periodValueFromWeekly(weeklyHoursValid, next)));
+                        }
+                        setContractHoursPeriod(next);
+                        contractAutoSave.schedule();
+                      }}
+                    >
+                      <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                        <SelectItem value="weekly">{t("time.leaveHoursPeriodWeekly")}</SelectItem>
+                        <SelectItem value="monthly">{t("time.leaveHoursPeriodMonthly")}</SelectItem>
+                        <SelectItem value="annual">{t("time.leaveHoursPeriodAnnual")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
+                  {[
+                    {
+                      label: t("people.hoursPerDay"),
+                      value: derivedDailyHours != null ? `${formatHours2(derivedDailyHours)} h` : "—",
+                    },
+                    {
+                      label: t("time.leaveProfileMonthlyHours"),
+                      value: derivedMonthlyHours != null ? `${formatHours2(derivedMonthlyHours)} h` : "—",
+                    },
+                    {
+                      label: t("time.leaveProfileAnnualHours"),
+                      value: derivedAnnualHours != null ? `${formatHours2(derivedAnnualHours)} h` : "—",
+                    },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
+                      <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
+                      <p className="font-semibold text-white/70 mt-0.5 tabular-nums">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1.5">
+                    <Label className="text-white/55 text-xs">{t("time.leaveProfileVacationDays")}</Label>
                     <Input
                       type="number"
                       min="0"
@@ -1640,22 +1716,7 @@ function PersonFormDialog({
                       placeholder="e.g. 25"
                       className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                     />
-                  </div>
                 </div>
-                {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) ? (
-                  <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
-                    {[
-                      { label: t("people.hoursPerDay"), value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
-                      { label: "Monthly", value: `${((parseFloat(contractWeeklyHours) * 52) / 12).toFixed(0)} h` },
-                      { label: "Yearly", value: `${(parseFloat(contractWeeklyHours) * 52).toFixed(0)} h` },
-                    ].map((item) => (
-                      <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
-                        <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
-                        <p className="font-semibold text-white/70 mt-0.5">{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             ) : null}
             {asPage && person && !canManageContracts ? (
@@ -1796,43 +1857,67 @@ function PersonFormDialog({
                     </span>
                   </span>
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
                   <div className="space-y-1 min-w-0">
-                    <Label className="text-white/55 text-xs">{t("time.leaveProfileWeeklyHours")}</Label>
+                    <Label className="text-white/55 text-xs">{t("time.leaveHoursInputLabel")}</Label>
                     <Input
                       type="number"
                       min="0"
-                      max="168"
-                      step="0.5"
-                      value={contractWeeklyHours}
-                      onChange={(e) => setContractWeeklyHours(e.target.value)}
+                      step="0.01"
+                      value={contractHoursInput}
+                      onChange={(e) => setContractHoursInput(e.target.value)}
                       onBlur={() => contractAutoSave.schedule()}
-                      placeholder="37"
+                      placeholder={contractHoursPeriod === "weekly" ? "37" : contractHoursPeriod === "monthly" ? "160.33" : "1924"}
                       className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                     />
                   </div>
                   <div className="space-y-1 min-w-0">
-                    <Label className="text-white/55 text-xs">{t("time.leaveProfileMonthlyHours")}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={leaveMonthlyHours}
-                      onChange={(e) => setLeaveMonthlyHours(e.target.value)}
-                      onBlur={() => contractAutoSave.schedule()}
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                    />
+                    <Label className="text-white/55 text-xs">{t("time.leaveHoursPeriodLabel")}</Label>
+                    <Select
+                      value={contractHoursPeriod}
+                      onValueChange={(v) => {
+                        const next = v as "weekly" | "monthly" | "annual";
+                        if (weeklyHoursValid != null) {
+                          setContractHoursInput(formatHours2(periodValueFromWeekly(weeklyHoursValid, next)));
+                        }
+                        setContractHoursPeriod(next);
+                        contractAutoSave.schedule();
+                      }}
+                    >
+                      <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                        <SelectItem value="weekly">{t("time.leaveHoursPeriodWeekly")}</SelectItem>
+                        <SelectItem value="monthly">{t("time.leaveHoursPeriodMonthly")}</SelectItem>
+                        <SelectItem value="annual">{t("time.leaveHoursPeriodAnnual")}</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-1 min-w-0">
-                    <Label className="text-white/55 text-xs">{t("time.leaveProfileAnnualHours")}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={leaveAnnualHours}
-                      onChange={(e) => setLeaveAnnualHours(e.target.value)}
-                      onBlur={() => contractAutoSave.schedule()}
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                    />
-                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
+                  {[
+                    {
+                      label: t("people.hoursPerDay"),
+                      value: derivedDailyHours != null ? `${formatHours2(derivedDailyHours)} h` : "—",
+                    },
+                    {
+                      label: t("time.leaveProfileMonthlyHours"),
+                      value: derivedMonthlyHours != null ? `${formatHours2(derivedMonthlyHours)} h` : "—",
+                    },
+                    {
+                      label: t("time.leaveProfileAnnualHours"),
+                      value: derivedAnnualHours != null ? `${formatHours2(derivedAnnualHours)} h` : "—",
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center"
+                    >
+                      <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
+                      <p className="font-semibold text-white/70 mt-0.5 tabular-nums">{item.value}</p>
+                    </div>
+                  ))}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1 min-w-0">
@@ -2109,23 +2194,67 @@ function PersonFormDialog({
                 </span>
               </span>
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-white/55 text-xs">Weekly hours</Label>
+            <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-2 items-end">
+              <div className="space-y-1 min-w-0">
+                <Label className="text-white/55 text-xs">{t("time.leaveHoursInputLabel")}</Label>
                 <Input
                   type="number"
                   min="0"
-                  max="168"
-                  step="0.5"
-                  value={contractWeeklyHours}
-                  onChange={(e) => setContractWeeklyHours(e.target.value)}
+                  step="0.01"
+                  value={contractHoursInput}
+                  onChange={(e) => setContractHoursInput(e.target.value)}
                   onBlur={() => contractAutoSave.schedule()}
-                  placeholder="e.g. 37"
+                  placeholder={contractHoursPeriod === "weekly" ? "37" : contractHoursPeriod === "monthly" ? "160.33" : "1924"}
                   className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-white/55 text-xs">Vacation days / year</Label>
+              <div className="space-y-1 min-w-0">
+                <Label className="text-white/55 text-xs">{t("time.leaveHoursPeriodLabel")}</Label>
+                <Select
+                  value={contractHoursPeriod}
+                  onValueChange={(v) => {
+                    const next = v as "weekly" | "monthly" | "annual";
+                    if (weeklyHoursValid != null) {
+                      setContractHoursInput(formatHours2(periodValueFromWeekly(weeklyHoursValid, next)));
+                    }
+                    setContractHoursPeriod(next);
+                    contractAutoSave.schedule();
+                  }}
+                >
+                  <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                    <SelectItem value="weekly">{t("time.leaveHoursPeriodWeekly")}</SelectItem>
+                    <SelectItem value="monthly">{t("time.leaveHoursPeriodMonthly")}</SelectItem>
+                    <SelectItem value="annual">{t("time.leaveHoursPeriodAnnual")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
+              {[
+                {
+                  label: t("people.hoursPerDay"),
+                  value: derivedDailyHours != null ? `${formatHours2(derivedDailyHours)} h` : "—",
+                },
+                {
+                  label: t("time.leaveProfileMonthlyHours"),
+                  value: derivedMonthlyHours != null ? `${formatHours2(derivedMonthlyHours)} h` : "—",
+                },
+                {
+                  label: t("time.leaveProfileAnnualHours"),
+                  value: derivedAnnualHours != null ? `${formatHours2(derivedAnnualHours)} h` : "—",
+                },
+              ].map((item) => (
+                <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
+                  <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
+                  <p className="font-semibold text-white/70 mt-0.5 tabular-nums">{item.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+                <Label className="text-white/55 text-xs">{t("time.leaveProfileVacationDays")}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -2137,22 +2266,7 @@ function PersonFormDialog({
                   placeholder="e.g. 25"
                   className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
                 />
-              </div>
             </div>
-            {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) && (
-              <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
-                {[
-                  { label: t("people.hoursPerDay"), value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
-                  { label: "Monthly", value: `${((parseFloat(contractWeeklyHours) * 52) / 12).toFixed(0)} h` },
-                  { label: "Yearly", value: `${(parseFloat(contractWeeklyHours) * 52).toFixed(0)} h` },
-                ].map((item) => (
-                  <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
-                    <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
-                    <p className="font-semibold text-white/70 mt-0.5">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         ) : null}
         </div>
