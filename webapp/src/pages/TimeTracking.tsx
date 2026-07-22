@@ -70,7 +70,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useI18n } from "@/lib/i18n";
 import { toast, useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { timeCategoryMessageId, isCompSettlementCategory, isDayOffCategory, isLeaveAutoProjectCategory, isLeaveDayDisplayCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
+import { timeCategoryMessageId, isCompSettlementCategory, isDayOffCategory, isLeaveAutoProjectCategory, isLeaveDayDisplayCategory, isNonAccountingTimeCategory, isVacationNoteOnlyCategory } from "@/lib/timeCategoryI18n";
 import { isTimesheetSettlementFillEntry, timeEntryUserVisibleNote } from "@/lib/timeEntryNotes";
 import { displayHex, hexToRgba } from "@/lib/timeCatalogColors";
 import { TimeEntryEditSheet } from "@/components/time/TimeEntryEditSheet";
@@ -907,8 +907,6 @@ export default function TimeTracking() {
       queryClient.invalidateQueries({ queryKey: ["time-leave-balances"] });
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       const settlement = data.compSettlement;
-      const fillMinutes =
-        settlement?.days?.reduce((s, d) => s + (d.fillMinutes ?? 0), 0) ?? 0;
       if (leaveManagementEnabled && settlement && settlement.totalDeltaMinutes !== 0) {
         const sign = settlement.totalDeltaMinutes >= 0 ? "+" : "";
         const h = Math.floor(Math.abs(settlement.totalDeltaMinutes) / 60);
@@ -917,8 +915,6 @@ export default function TimeTracking() {
         timeNotify({
           title: t("time.timesheetApprovedCompAdjusted", { delta }),
         });
-      } else if (leaveManagementEnabled && settlement && fillMinutes > 0) {
-        timeNotify({ title: t("time.timesheetApprovedCompFilled") });
       } else if (
         leaveManagementEnabled &&
         settlement &&
@@ -1435,6 +1431,7 @@ export default function TimeTracking() {
   const totalsByDay = useMemo(() => {
     const acc = new Map<string, number>();
     for (const e of entries ?? []) {
+      if (isNonAccountingTimeCategory(e.category ?? "")) continue;
       const k = format(parseISO(e.startsAt), "yyyy-MM-dd");
       const mins =
         (parseISO(e.endsAt).getTime() - parseISO(e.startsAt).getTime()) / 60_000;
@@ -1465,7 +1462,7 @@ export default function TimeTracking() {
   const totalsByColumnDay = useMemo(() => {
     const acc = new Map<string, number>();
     for (const e of entries ?? []) {
-      if (isCompSettlementCategory(e.category ?? "")) continue;
+      if (isNonAccountingTimeCategory(e.category ?? "")) continue;
       const start = parseISO(e.startsAt);
       const end = parseISO(e.endsAt);
       const mins = Math.max(0, (end.getTime() - start.getTime()) / 60_000);
@@ -2627,7 +2624,7 @@ export default function TimeTracking() {
                                     </button>
                                     <button
                                       type="button"
-                                      title={`${t("time.addCompTimeDay")} (${workDayDurationLabel})`}
+                                      title={`${t("time.addUnavailableDay")} (${workDayDurationLabel})`}
                                       onClick={() => addDayOff("comp_time")}
                                       className="rounded bg-cyan-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-cyan-300/70 hover:bg-cyan-500/30 hover:text-cyan-200"
                                     >

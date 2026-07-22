@@ -8,17 +8,16 @@ import {
   resolveVacationYear,
 } from "../rules/leave/danishLeave";
 import {
-  applyTimeEntryToLeaveLedger,
   ensureOrgLeavePolicy,
   mapOrgLeavePolicy,
   mapPersonLeaveProfile,
   postLeaveTransaction,
   removeTimeEntryFromLeaveLedger,
 } from "./leaveLedger";
-import { ensureLeaveTimeProject } from "./leaveTimeProjects";
 
 export const TIMESHEET_COMP_SETTLEMENT_SOURCE = "timesheet_settlement";
 const APPROVAL_NOTE_PREFIX = "timesheetApprovalId:";
+/** Legacy note prefix for auto-created afspadsering fill entries (cleaned on settle/reopen). */
 export const SETTLEMENT_ENTRY_NOTE_PREFIX = "timesheetSettlementEntry:";
 
 type DayParts = {
@@ -26,7 +25,6 @@ type DayParts = {
   vacationMinutes: number;
   extraVacationMinutes: number;
   holidayMinutes: number;
-  compTimeMinutes: number;
 };
 
 function emptyDayParts(): DayParts {
@@ -35,11 +33,10 @@ function emptyDayParts(): DayParts {
     vacationMinutes: 0,
     extraVacationMinutes: 0,
     holidayMinutes: 0,
-    compTimeMinutes: 0,
   };
 }
 
-/** Minutes that count toward the daily norm (not afspadsering, sick, or travel). */
+/** Minutes that count toward the daily/weekly norm (not N/A, sick, travel, or settlement markers). */
 export function normFulfillingMinutes(parts: DayParts): number {
   return (
     parts.workMinutes +
@@ -50,29 +47,27 @@ export function normFulfillingMinutes(parts: DayParts): number {
 }
 
 /**
- * Afspadsering auto-fill per weekday, capped so fulfilling + existing comp + new fill
- * does not exceed the person's weekly contract (e.g. 37h), even when other days are over daily norm.
+ * Under-norm minutes per weekday, capped so fulfilling + new under-norm use
+ * does not exceed the person's weekly contract (e.g. 37h).
+ * Visual N/A (`comp_time`) blocks are ignored — they do not fill the week.
  */
 export function distributeWeeklyCompFillMinutes(input: {
   weekdayStats: Array<{
     fulfillingMinutes: number;
-    existingCompMinutes: number;
+    /** @deprecated Ignored — visual blocks do not affect settlement. */
+    existingCompMinutes?: number;
   }>;
   dailyNormMinutes: number;
   weeklyNormMinutes: number;
 }): number[] {
   const { weekdayStats, dailyNormMinutes, weeklyNormMinutes } = input;
   let weekFulfilling = 0;
-  let weekComp = 0;
   const rawCaps: number[] = [];
   for (const d of weekdayStats) {
     weekFulfilling += d.fulfillingMinutes;
-    weekComp += d.existingCompMinutes;
-    rawCaps.push(
-      Math.max(0, dailyNormMinutes - d.fulfillingMinutes - d.existingCompMinutes)
-    );
+    rawCaps.push(Math.max(0, dailyNormMinutes - d.fulfillingMinutes));
   }
-  let fillBudget = Math.max(0, weeklyNormMinutes - weekFulfilling - weekComp);
+  let fillBudget = Math.max(0, weeklyNormMinutes - weekFulfilling);
   return rawCaps.map((cap) => {
     const fill = Math.min(cap, fillBudget);
     fillBudget -= fill;
@@ -80,7 +75,7 @@ export function distributeWeeklyCompFillMinutes(input: {
   });
 }
 
-/** Cap desired per-day fill so total blocks never exceed available comp-time balance. */
+/** @deprecated Visual blocks no longer consume balance; kept for callers/tests. */
 export function capFillMinutesByAvailableBalance(
   desiredFillMinutesPerDay: number[],
   availableMinutes: number
@@ -93,35 +88,11 @@ export function capFillMinutesByAvailableBalance(
   });
 }
 
-async function getCompTimeRemainingMinutes(
-  organizationId: string,
-  personId: string,
-  vacationYearKey: string
-): Promise<number> {
-  const rows = await prisma.leaveBalance.findMany({
-    where: {
-      organizationId,
-      personId,
-      vacationYearKey,
-      balanceType: { in: ["comp_time_earned", "comp_time_used"] },
-    },
-    select: { balanceType: true, amount: true },
-  });
-  let earned = 0;
-  let used = 0;
-  for (const r of rows) {
-    if (r.balanceType === "comp_time_earned") earned = r.amount;
-    if (r.balanceType === "comp_time_used") used = r.amount;
-  }
-  return Math.round(earned - used);
-}
-
 function addCategoryMinutes(parts: DayParts, category: string, minutes: number) {
   if (category === "work") parts.workMinutes += minutes;
   else if (category === "vacation") parts.vacationMinutes += minutes;
   else if (category === "extra_vacation") parts.extraVacationMinutes += minutes;
   else if (category === "holiday") parts.holidayMinutes += minutes;
-  else if (category === "comp_time") parts.compTimeMinutes += minutes;
 }
 
 function aggregateByLocalDay(
@@ -139,7 +110,15 @@ function aggregateByLocalDay(
     const durMin = Math.max(0, (clippedEnd - clippedStart) / 60_000);
     if (durMin <= 0) continue;
     const cat = row.category || "work";
-    if (cat === "comp_settlement_earned" || cat === "comp_settlement_used") continue;
+    if (
+      cat === "comp_time" ||
+      cat === "comp_settlement_earned" ||
+      cat === "comp_settlement_used" ||
+      cat === "sick" ||
+      cat === "travel_allowance"
+    ) {
+      continue;
+    }
     const dateKey = DateTime.fromMillis(clippedStart, { zone }).toFormat("yyyy-MM-dd");
     if (!map.has(dateKey)) map.set(dateKey, emptyDayParts());
     addCategoryMinutes(map.get(dateKey)!, cat, durMin);
@@ -184,6 +163,7 @@ async function resolveUserIdForPerson(
   return fallbackUserId ?? null;
 }
 
+/** Remove legacy auto-fill afspadsering time entries created by older settlement. */
 async function deleteSettlementFillEntries(input: {
   organizationId: string;
   personId?: string;
@@ -219,33 +199,13 @@ async function deleteSettlementFillEntries(input: {
   }
 }
 
-function fillWindowAfterDayLoad(
-  dateKey: string,
-  durationMinutes: number,
-  zone: string,
-  dayEntries: Array<{ endsAt: Date }>
-): { startsAt: Date; endsAt: Date } {
-  let start = DateTime.fromFormat(dateKey, "yyyy-MM-dd", { zone }).set({
-    hour: 8,
-    minute: 0,
-    second: 0,
-    millisecond: 0,
-  });
-  for (const e of dayEntries) {
-    const end = DateTime.fromJSDate(e.endsAt, { zone });
-    if (end > start) start = end;
-  }
-  const ends = start.plus({ minutes: durationMinutes });
-  return { startsAt: start.toJSDate(), endsAt: ends.toJSDate() };
-}
-
 export type TimesheetCompSettlementDay = {
   date: string;
   fulfillingMinutes: number;
   dailyNormMinutes: number;
-  /** Net ledger effect for the day: +overtime earned, −afspadsering fill created. */
+  /** Net ledger effect for the day: +overtime earned, −under-norm use. */
   deltaMinutes: number;
-  /** Afspadsering minutes auto-created as time entries on under-norm days. */
+  /** Always 0 — settlement no longer creates calendar fill blocks. */
   fillMinutes: number;
 };
 
@@ -254,7 +214,7 @@ export type TimesheetCompSettlementResult = {
   dailyNormMinutes: number;
   weeklyNormMinutes: number;
   totalDeltaMinutes: number;
-  /** Minustid: under-norm minutes booked on ledger without afspadsering time entries. */
+  /** Under-norm minutes booked on the leave ledger (no calendar blocks). */
   deficitLedgerMinutes: number;
   days: TimesheetCompSettlementDay[];
 };
@@ -301,13 +261,31 @@ export async function settleCompTimeForTimesheetApproval(input: {
     return empty;
   }
 
-  // Remove legacy settlement blocks / previous auto-fill for this week before settling.
+  // Clean legacy auto-fill blocks from older settlement versions.
   await deleteSettlementFillEntries({
     organizationId: input.organizationId,
     personId: input.personId,
     periodStart: input.periodStart,
     periodEnd: input.periodEnd,
   });
+
+  // Drop legacy time_entry ledger posts for visual N/A blocks in this week so
+  // under-norm settlement owns the saldo (no double debit).
+  {
+    const visualBlocks = await prisma.timeEntry.findMany({
+      where: {
+        organizationId: input.organizationId,
+        personId: input.personId,
+        category: "comp_time",
+        startsAt: { lt: input.periodEnd },
+        endsAt: { gt: input.periodStart },
+      },
+      select: { id: true },
+    });
+    for (const row of visualBlocks) {
+      await removeTimeEntryFromLeaveLedger(row.id);
+    }
+  }
 
   const person = await prisma.person.findFirst({
     where: { id: input.personId, organizationId: input.organizationId },
@@ -340,21 +318,17 @@ export async function settleCompTimeForTimesheetApproval(input: {
   );
   if (!userId) return empty;
 
-  const compProjectId = await ensureLeaveTimeProject(input.organizationId, "comp_time");
-
   const weekdayStats = weekdayKeys.map((dateKey) => {
     const parts = byDay.get(dateKey) ?? emptyDayParts();
     return {
       dateKey,
       fulfillingMinutes: Math.round(normFulfillingMinutes(parts)),
-      existingCompMinutes: Math.round(parts.compTimeMinutes),
     };
   });
 
-  const fillByDayIndex = distributeWeeklyCompFillMinutes({
+  const underNormByDayIndex = distributeWeeklyCompFillMinutes({
     weekdayStats: weekdayStats.map((d) => ({
       fulfillingMinutes: d.fulfillingMinutes,
-      existingCompMinutes: d.existingCompMinutes,
     })),
     dailyNormMinutes,
     weeklyNormMinutes,
@@ -362,7 +336,7 @@ export async function settleCompTimeForTimesheetApproval(input: {
 
   const vacationYearForWeek = resolveVacationYear(input.periodStart, policy);
 
-  // Credit overtime first so same-week earnings count toward available afspadsering.
+  // Credit overtime first so same-week earnings count toward the balance before under-norm use.
   for (let i = 0; i < weekdayStats.length; i++) {
     const { dateKey, fulfillingMinutes } = weekdayStats[i]!;
     const overtimeMinutes = Math.max(0, fulfillingMinutes - dailyNormMinutes);
@@ -384,58 +358,24 @@ export async function settleCompTimeForTimesheetApproval(input: {
     });
   }
 
-  const compRemaining = await getCompTimeRemainingMinutes(
-    input.organizationId,
-    input.personId,
-    vacationYearForWeek.key
-  );
-  const blockFillByDayIndex = capFillMinutesByAvailableBalance(fillByDayIndex, compRemaining);
-  const totalDesiredFill = fillByDayIndex.reduce((s, m) => s + m, 0);
-  const totalBlockFill = blockFillByDayIndex.reduce((s, m) => s + m, 0);
-  const deficitLedgerMinutes = Math.max(0, totalDesiredFill - totalBlockFill);
+  const deficitLedgerMinutes = underNormByDayIndex.reduce((s, m) => s + m, 0);
 
   const days: TimesheetCompSettlementDay[] = [];
   let totalDeltaMinutes = 0;
 
   for (let i = 0; i < weekdayStats.length; i++) {
     const { dateKey, fulfillingMinutes } = weekdayStats[i]!;
-    const desiredFill = fillByDayIndex[i] ?? 0;
-    const fillMinutes = blockFillByDayIndex[i] ?? 0;
+    const underNormMinutes = underNormByDayIndex[i] ?? 0;
     const overtimeMinutes = Math.max(0, fulfillingMinutes - dailyNormMinutes);
-    if (overtimeMinutes === 0 && fillMinutes === 0 && desiredFill === 0) continue;
+    if (overtimeMinutes === 0 && underNormMinutes === 0) continue;
 
-    let dayDelta = overtimeMinutes > 0 ? overtimeMinutes : 0;
-
-    if (fillMinutes > 0) {
-      const dayEntries = entries.filter((e) => {
-        const key = DateTime.fromJSDate(e.startsAt, { zone }).toFormat("yyyy-MM-dd");
-        return key === dateKey;
-      });
-      const { startsAt, endsAt } = fillWindowAfterDayLoad(dateKey, fillMinutes, zone, dayEntries);
-      const created = await prisma.timeEntry.create({
-        data: {
-          organizationId: input.organizationId,
-          userId,
-          personId: input.personId,
-          startsAt,
-          endsAt,
-          kind: "custom",
-          category: "comp_time",
-          timeProjectId: compProjectId,
-          isLocked: true,
-          note: `${SETTLEMENT_ENTRY_NOTE_PREFIX}${input.timesheetApprovalId}:${dateKey}`,
-        },
-      });
-      await applyTimeEntryToLeaveLedger(created, { createdByUserId: input.createdByUserId });
-      dayDelta -= fillMinutes;
-    }
-
+    const dayDelta = overtimeMinutes - underNormMinutes;
     days.push({
       date: dateKey,
       fulfillingMinutes,
       dailyNormMinutes,
       deltaMinutes: dayDelta,
-      fillMinutes,
+      fillMinutes: 0,
     });
     totalDeltaMinutes += dayDelta;
   }
@@ -450,10 +390,9 @@ export async function settleCompTimeForTimesheetApproval(input: {
       source: TIMESHEET_COMP_SETTLEMENT_SOURCE,
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,
-      note: `${APPROVAL_NOTE_PREFIX}${input.timesheetApprovalId} undernorm_deficit:${deficitLedgerMinutes}`,
+      note: `${APPROVAL_NOTE_PREFIX}${input.timesheetApprovalId} undernorm:${deficitLedgerMinutes}`,
       createdByUserId: input.createdByUserId,
     });
-    totalDeltaMinutes -= deficitLedgerMinutes;
   }
 
   return {

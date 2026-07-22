@@ -302,7 +302,7 @@ export function categoryToLeaveBalanceType(
 ): "vacation_used" | "extra_vacation_used" | "comp_time_used" | "sick_days" | null {
   if (category === "vacation") return "vacation_used";
   if (category === "extra_vacation") return "extra_vacation_used";
-  if (category === "comp_time") return "comp_time_used";
+  // `comp_time` calendar blocks are visual N/A only — saldo is settled on week approval.
   if (category === "sick") return "sick_days";
   return null;
 }

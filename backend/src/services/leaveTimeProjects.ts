@@ -54,7 +54,8 @@ const LEAVE_PROJECT_DEFS: Record<
   },
   comp_time: {
     systemKey: "leave_comp_time",
-    name: "Afspadsering",
+    /** Visual N/A / not-present block — does not affect the afspadsering saldo. */
+    name: "Ikke til stede",
     color: "#22d3ee",
     sortOrder: -41,
   },
@@ -84,7 +85,16 @@ const LEAVE_PROJECT_NAME_ALIASES: Record<LeaveAutoProjectCategory, readonly stri
   extra_vacation: ["feriefridage", "feriefridag", "extra vacation", "extra vacation day", "extra vacation days"],
   sick: ["sygdom", "sygedag", "sygedage", "sick", "sick leave"],
   holiday: ["helligdag", "helligdage", "holiday", "public holiday"],
-  comp_time: ["afspadsering", "afsp", "comp time", "compensatory time"],
+  comp_time: [
+    "ikke til stede",
+    "n/a",
+    "na",
+    "unavailable",
+    "afspadsering",
+    "afsp",
+    "comp time",
+    "compensatory time",
+  ],
 };
 
 /** Match Fravær project names (Ferie / Sygdom / …) even without systemKey. */

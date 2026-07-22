@@ -1472,8 +1472,8 @@ export const LeaveBalanceSummarySchema = z.object({
   compTimeRemainingMinutes: z.number(),
   sickDays: z.number(),
   /**
-   * Afspadsering taken (time entries category=comp_time) in the requested from/to
-   * range — week or month matching the time tracking view.
+   * Visual N/A / not-present blocks in the requested from/to range (category=comp_time).
+   * Does not affect the afspadsering saldo — that is settled on week approval.
    */
   compTimePeriodUsedMinutes: z.number().optional(),
   /** Next ferieår vacation overview (earned/used/remaining as of today). */

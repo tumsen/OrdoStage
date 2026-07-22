@@ -98,7 +98,7 @@ const TIME_CATEGORY_LABELS: Record<TimeCategory, string> = {
   work: "Work time",
   vacation: "Vacation",
   extra_vacation: "Extra vacation",
-  comp_time: "Comp time",
+  comp_time: "Unavailable",
   comp_settlement_earned: "Comp time",
   comp_settlement_used: "Comp time",
   sick: "Sick leave",

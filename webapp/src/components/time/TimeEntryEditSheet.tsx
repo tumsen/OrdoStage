@@ -395,7 +395,7 @@ export function TimeEntryEditSheet(props: {
     ...(leaveManagementEnabled
       ? [
           { value: "extra_vacation" as const, label: t("time.categoryExtraVacation"), color: "text-teal-300" },
-          { value: "comp_time" as const, label: t("time.categoryCompTime"), color: "text-cyan-300" },
+          { value: "comp_time" as const, label: t("time.categoryUnavailable"), color: "text-cyan-300" },
         ]
       : []),
     { value: "sick", label: t("time.categorySick"), color: "text-orange-300" },

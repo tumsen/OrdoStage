@@ -1,5 +1,14 @@
 import type { TimeCategory } from "@/contracts/backendTypes";
 
+/** Calendar blocks that do not count toward hour totals or leave saldo. */
+export function isNonAccountingTimeCategory(cat: string): boolean {
+  return (
+    cat === "comp_time" ||
+    cat === "comp_settlement_earned" ||
+    cat === "comp_settlement_used"
+  );
+}
+
 /** Week-approval settlement blocks (ledger already updated; display-only). */
 export function isCompSettlementCategory(cat: string): cat is TimeCategory {
   return cat === "comp_settlement_earned" || cat === "comp_settlement_used";
@@ -10,9 +19,9 @@ const TIME_CATEGORY_MSG: Record<TimeCategory, string> = {
   work: "categoryWork",
   vacation: "categoryVacation",
   extra_vacation: "categoryExtraVacation",
-  comp_time: "categoryCompTime",
-  comp_settlement_earned: "categoryCompTime",
-  comp_settlement_used: "categoryCompTime",
+  comp_time: "categoryUnavailable",
+  comp_settlement_earned: "categoryUnavailable",
+  comp_settlement_used: "categoryUnavailable",
   sick: "categorySick",
   holiday: "categoryHoliday",
   travel_allowance: "categoryTravelAllowance",

@@ -482,7 +482,10 @@ export async function sumCompTimeEarnedMinutesInRange(
   return map;
 }
 
-/** Afspadsering used in range from time entries (`category=comp_time`). */
+/**
+ * Afspadsering used in range from leave ledger (`comp_time_used`), not from visual N/A
+ * calendar blocks (`category=comp_time`).
+ */
 export async function sumCompTimeUsedMinutesInRange(
   organizationId: string,
   personIds: string[],
@@ -492,30 +495,31 @@ export async function sumCompTimeUsedMinutesInRange(
   const map = new Map<string, number>();
   if (personIds.length === 0) return map;
 
-  const entries = await prisma.timeEntry.findMany({
+  const rows = await prisma.leaveTransaction.findMany({
     where: {
       organizationId,
       personId: { in: personIds },
-      category: "comp_time",
-      startsAt: { lt: rangeEndExclusive },
-      endsAt: { gt: rangeStart },
+      balanceType: "comp_time_used",
+      OR: [
+        {
+          periodStart: { gte: rangeStart, lt: rangeEndExclusive },
+        },
+        {
+          periodStart: null,
+          createdAt: { gte: rangeStart, lt: rangeEndExclusive },
+        },
+      ],
     },
-    select: { personId: true, startsAt: true, endsAt: true },
+    select: { personId: true, amount: true },
   });
 
-  const startMs = rangeStart.getTime();
-  const endMs = rangeEndExclusive.getTime();
-  for (const e of entries) {
-    const clippedStart = Math.max(e.startsAt.getTime(), startMs);
-    const clippedEnd = Math.min(e.endsAt.getTime(), endMs);
-    const dur = Math.max(0, (clippedEnd - clippedStart) / 60_000);
-    if (dur <= 0) continue;
-    map.set(e.personId, (map.get(e.personId) ?? 0) + dur);
+  for (const row of rows) {
+    map.set(row.personId, (map.get(row.personId) ?? 0) + row.amount);
   }
   return map;
 }
 
-/** Net afspadsering change in range: earned − used (manual + auto-fill). */
+/** Net afspadsering change in range: earned − used (ledger only). */
 export async function computeCompTimePeriodDeltaMinutes(
   organizationId: string,
   personId: string,

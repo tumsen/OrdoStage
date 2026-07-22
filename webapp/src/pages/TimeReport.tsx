@@ -1754,7 +1754,7 @@ export default function TimeReport() {
                                     )}
                                     title={
                                       p.compTimeEarnedMinutes != null
-                                        ? `${t("time.payrollColCompEarned")}: ${fmtMins(p.compTimeEarnedMinutes)} · ${t("time.categoryCompTime")}: ${fmtMins(p.compTimeMinutes)}`
+                                        ? `${t("time.payrollColCompEarned")}: ${fmtMins(p.compTimeEarnedMinutes)} · ${t("time.categoryUnavailable")}: ${fmtMins(p.compTimeMinutes)}`
                                         : undefined
                                     }
                                   >

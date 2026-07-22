@@ -16,6 +16,7 @@ import {
   getLeaveBalanceSummary,
   removeTimeEntryFromLeaveLedger,
   sumCompTimeEarnedMinutesInRange,
+  sumCompTimeUsedMinutesInRange,
 } from "../services/leaveLedger";
 import {
   reverseCompTimeForTimesheetReopen,
@@ -1568,8 +1569,10 @@ timeRouter.get("/time/report", async (c) => {
       });
     }
     const pp = byProject.get(projKey)!;
-    pp.totalMinutes += durMin;
-    if (cat === "work") pp.workMinutes += durMin;
+    if (cat !== "comp_time") {
+      pp.totalMinutes += durMin;
+      if (cat === "work") pp.workMinutes += durMin;
+    }
 
     // byParentCategory
     const parentCatKey = row.timeProject?.timeParentCategoryId ?? null;
@@ -1583,8 +1586,10 @@ timeRouter.get("/time/report", async (c) => {
       });
     }
     const pca = byParentCategory.get(parentCatKey)!;
-    pca.totalMinutes += durMin;
-    if (cat === "work") pca.workMinutes += durMin;
+    if (cat !== "comp_time") {
+      pca.totalMinutes += durMin;
+      if (cat === "work") pca.workMinutes += durMin;
+    }
 
     // byDay
     if (!byDay.has(dateKey)) {
@@ -1629,14 +1634,22 @@ timeRouter.get("/time/report", async (c) => {
         rangeEndExclusive
       )
     : new Map<string, number>();
+  const compUsedByPerson = leaveEnabled
+    ? await sumCompTimeUsedMinutesInRange(
+        user.organizationId!,
+        personIdsForLeave,
+        rangeStart,
+        rangeEndExclusive
+      )
+    : new Map<string, number>();
 
   const byPersonArr = await Promise.all(
     [...byPerson.entries()].map(async ([personId, pa]) => {
+    // Visual N/A (`comp_time`) blocks are excluded from hour totals / OT base.
     const total =
       pa.workMinutes +
       pa.vacationMinutes +
       pa.extraVacationMinutes +
-      pa.compTimeMinutes +
       pa.sickMinutes +
       pa.holidayMinutes +
       pa.travelAllowanceMinutes;
@@ -1661,7 +1674,9 @@ timeRouter.get("/time/report", async (c) => {
       ? Math.round(leave.extraVacationRemainingDays * 10) / 10
       : null;
     const earnedInPeriod = leaveEnabled ? Math.round(compEarnedByPerson.get(personId) ?? 0) : null;
-    const usedInPeriod = leaveEnabled ? Math.round(pa.compTimeMinutes) : null;
+    const usedInPeriod = leaveEnabled
+      ? Math.round(compUsedByPerson.get(personId) ?? 0)
+      : null;
     const periodDelta =
       earnedInPeriod != null && usedInPeriod != null ? earnedInPeriod - usedInPeriod : null;
     return {
@@ -1725,7 +1740,6 @@ timeRouter.get("/time/report", async (c) => {
         dp.workMinutes +
         dp.vacationMinutes +
         dp.extraVacationMinutes +
-        dp.compTimeMinutes +
         dp.sickMinutes +
         dp.holidayMinutes +
         dp.travelAllowanceMinutes,
@@ -1774,7 +1788,6 @@ timeRouter.get("/time/report", async (c) => {
           summaryWork +
           summaryVac +
           summaryExtraVac +
-          summaryComp +
           summarySick +
           summaryHoliday +
           summaryTravelAllowance,
