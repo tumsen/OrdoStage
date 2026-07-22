@@ -104,7 +104,11 @@ export default function PersonEdit() {
       <PersonFormDialog
         asPage
         person={person}
-        onAutoSaveState={setAutoSaveState}
+        onAutoSaveState={(next) => {
+          setAutoSaveState((prev) =>
+            prev.status === next.status && prev.error === next.error ? prev : next
+          );
+        }}
         onPersonUpdated={(updated) => {
           queryClient.setQueryData(["people", personId], updated);
         }}

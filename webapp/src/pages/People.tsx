@@ -16,7 +16,6 @@ import { confirmDeleteAction } from "@/lib/deleteConfirm";
 import {
   DURATION_HOURS_INPUT_MAX_LENGTH,
   formatDurationHoursBoth,
-  formatDurationHoursForInput,
   formatSignedMinutesAsDurationBoth,
   parseDurationHours,
 } from "@/lib/durationHours";
@@ -406,6 +405,7 @@ function PersonFormDialog({
   const { data: teams } = useQuery({
     queryKey: ["departments"],
     queryFn: () => api.get<Team[]>("/api/departments"),
+    enabled: asPage || Boolean(open),
   });
 
   const { data: permissionGroupRows = [] } = useQuery({
@@ -596,40 +596,59 @@ function PersonFormDialog({
   }, [permissionState, permissionsDoc?.id, permissionOptions?.teams]);
 
   // Sync contract fields from loaded person (after contractAutoSave is defined below)
-  const syncContractFromPerson = useCallback(
-    (p: Person | undefined) => {
-      const weekly =
-        p?.weeklyContractHours != null
-          ? formatDurationHoursForInput(p.weeklyContractHours, commaDecimal)
-          : "";
-      const vacation = p?.vacationDaysPerYear != null ? String(p.vacationDaysPerYear) : "";
-      setContractHoursInput(weekly);
-      setContractHoursPeriod("weekly");
-      setContractVacationDays(vacation);
-      setShowInPayroll(p?.showInPayroll !== false);
-      return {
-        contractHoursInput: weekly,
-        contractHoursPeriod: "weekly" as const,
-        contractVacationDays: vacation,
-      };
-    },
-    [commaDecimal]
-  );
+  const syncContractFromPerson = useCallback((p: Person | undefined) => {
+    const weekly = p?.weeklyContractHours != null ? String(p.weeklyContractHours) : "";
+    const vacation = p?.vacationDaysPerYear != null ? String(p.vacationDaysPerYear) : "";
+    setContractHoursInput(weekly);
+    setContractHoursPeriod("weekly");
+    setContractVacationDays(vacation);
+    setShowInPayroll(p?.showInPayroll !== false);
+    return {
+      contractHoursInput: weekly,
+      contractHoursPeriod: "weekly" as const,
+      contractVacationDays: vacation,
+    };
+  }, []);
+
+  const leaveProfileSyncedForPersonRef = useRef<string | null>(null);
+  const leaveBaselineMarkedRef = useRef<string | null>(null);
 
   useEffect(() => {
+    leaveProfileSyncedForPersonRef.current = null;
+    leaveBaselineMarkedRef.current = null;
+  }, [person?.id]);
+
+  // Applied once per person when leave profile first arrives — do not re-apply on refetch
+  // (that fought autosave and could cause save/refetch loops).
+  useEffect(() => {
     const profile = leaveProfileData?.profile;
-    if (!profile) return;
+    if (!person?.id || !profile) return;
+    if (leaveProfileSyncedForPersonRef.current === person.id) return;
+    leaveProfileSyncedForPersonRef.current = person.id;
+
+    const hours =
+      profile.weeklyContractHours != null
+        ? String(profile.weeklyContractHours)
+        : person.weeklyContractHours != null
+          ? String(person.weeklyContractHours)
+          : "";
+    const vacation =
+      profile.vacationDaysPerYear != null
+        ? String(profile.vacationDaysPerYear)
+        : person.vacationDaysPerYear != null
+          ? String(person.vacationDaysPerYear)
+          : "";
+    const extra =
+      profile.extraVacationDaysPerYear != null ? String(profile.extraVacationDaysPerYear) : "";
+
     setLeaveUseOrgDefaults(profile.useOrgDefaults);
-    setLeaveExtraVacationDays(
-      profile.extraVacationDaysPerYear != null ? String(profile.extraVacationDaysPerYear) : ""
-    );
-    if (profile.weeklyContractHours != null) {
-      setContractHoursInput(formatDurationHoursForInput(profile.weeklyContractHours, commaDecimal));
-      setContractHoursPeriod("weekly");
-    }
+    setLeaveExtraVacationDays(extra);
+    setContractHoursInput(hours);
+    setContractHoursPeriod("weekly");
+    setContractVacationDays(vacation);
     setLeaveSickStatus(profile.sickLeaveStatus);
     setLeaveSickNote(profile.sickLeaveNote ?? "");
-  }, [leaveProfileData?.profile, commaDecimal]);
+  }, [person?.id, leaveProfileData?.profile, person?.weeklyContractHours, person?.vacationDaysPerYear]);
 
   const watchedAssignments = form.watch("teamAssignments");
   const selectedTeamIds = new Set((watchedAssignments ?? []).map((a) => a.teamId).filter(Boolean));
@@ -1035,10 +1054,55 @@ function PersonFormDialog({
   });
 
   useEffect(() => {
-    const snapshot = syncContractFromPerson(person);
-    contractAutoSave.markSaved(snapshot);
+    const base = syncContractFromPerson(person);
+    contractAutoSave.markSaved({
+      ...base,
+      leaveUseOrgDefaults: true,
+      leaveExtraVacationDays: "",
+      leaveSickStatus: "none" as const,
+      leaveSickNote: "",
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load contract when switching person only
   }, [person?.id, syncContractFromPerson, contractAutoSave.markSaved]);
+
+  // Once leave fields are applied, mark a complete baseline (avoids dirty snapshot / save storms).
+  useEffect(() => {
+    const profile = leaveProfileData?.profile;
+    if (!person?.id || !profile) return;
+    if (leaveProfileSyncedForPersonRef.current !== person.id) return;
+    if (leaveBaselineMarkedRef.current === person.id) return;
+    leaveBaselineMarkedRef.current = person.id;
+
+    const hours =
+      profile.weeklyContractHours != null
+        ? String(profile.weeklyContractHours)
+        : person.weeklyContractHours != null
+          ? String(person.weeklyContractHours)
+          : "";
+    const vacation =
+      profile.vacationDaysPerYear != null
+        ? String(profile.vacationDaysPerYear)
+        : person.vacationDaysPerYear != null
+          ? String(person.vacationDaysPerYear)
+          : "";
+    contractAutoSave.markSaved({
+      contractHoursInput: hours,
+      contractHoursPeriod: "weekly" as const,
+      contractVacationDays: vacation,
+      leaveUseOrgDefaults: profile.useOrgDefaults,
+      leaveExtraVacationDays:
+        profile.extraVacationDaysPerYear != null ? String(profile.extraVacationDaysPerYear) : "",
+      leaveSickStatus: profile.sickLeaveStatus,
+      leaveSickNote: profile.sickLeaveNote ?? "",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per person after leave profile first sync
+  }, [
+    person?.id,
+    person?.weeklyContractHours,
+    person?.vacationDaysPerYear,
+    leaveProfileData?.profile,
+    contractAutoSave.markSaved,
+  ]);
 
   useEffect(() => {
     if (!asPage || !onAutoSaveState) return;
@@ -1175,7 +1239,8 @@ function PersonFormDialog({
 
   const watchedEmergencyContacts = form.watch("emergencyContacts") ?? [];
 
-  const formBody = (
+  const formBody =
+    asPage || open ? (
         <div
           className={asPage ? "w-full space-y-6 pb-4" : "space-y-4 py-1"}
           onBlurCapture={autoSave.onBlurCapture}
@@ -1692,20 +1757,20 @@ function PersonFormDialog({
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="space-y-1">
+                      <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={contractVacationDays}
+                        onChange={(e) => setContractVacationDays(e.target.value)}
+                        onBlur={() => contractAutoSave.schedule()}
+                        placeholder="25"
+                        className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                      />
+                    </div>
                   </div>
                   <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
-                  <Input
-                    type="text"
-                    inputMode="decimal"
-                    value={contractVacationDays}
-                    onChange={(e) => setContractVacationDays(e.target.value)}
-                    onBlur={() => contractAutoSave.schedule()}
-                    placeholder="25"
-                    className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
-                  />
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
                   {[
@@ -1909,37 +1974,33 @@ function PersonFormDialog({
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="space-y-1">
+                      <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={contractVacationDays}
+                        onChange={(e) => setContractVacationDays(e.target.value)}
+                        onBlur={() => contractAutoSave.schedule()}
+                        placeholder="25"
+                        className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileExtraVacation")}</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={leaveExtraVacationDays}
+                        onChange={(e) => setLeaveExtraVacationDays(e.target.value)}
+                        onBlur={() => contractAutoSave.schedule()}
+                        placeholder="5"
+                        className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                      />
+                    </div>
                   </div>
                   <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
-                </div>
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="space-y-1">
-                    <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={contractVacationDays}
-                      onChange={(e) => setContractVacationDays(e.target.value)}
-                      onBlur={() => contractAutoSave.schedule()}
-                      placeholder="25"
-                      className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileExtraVacation")}</Label>
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={leaveExtraVacationDays}
-                      onChange={(e) => setLeaveExtraVacationDays(e.target.value)}
-                      onBlur={() => contractAutoSave.schedule()}
-                      placeholder="5"
-                      className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
-                    />
-                    <p className="text-[10px] text-white/40 leading-snug max-w-[14rem]">
-                      {t("time.leaveProfileExtraVacationHint")}
-                    </p>
-                  </div>
+                  <p className="text-[10px] text-white/40 leading-snug">{t("time.leaveProfileExtraVacationHint")}</p>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
                   {[
@@ -2252,20 +2313,20 @@ function PersonFormDialog({
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-1">
+                  <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={contractVacationDays}
+                    onChange={(e) => setContractVacationDays(e.target.value)}
+                    onBlur={() => contractAutoSave.schedule()}
+                    placeholder="25"
+                    className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
+                  />
+                </div>
               </div>
               <p className="text-[10px] text-white/30">{t("time.leaveHoursInputHint")}</p>
-            </div>
-            <div className="space-y-1">
-              <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("time.leaveProfileVacationDays")}</Label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={contractVacationDays}
-                onChange={(e) => setContractVacationDays(e.target.value)}
-                onBlur={() => contractAutoSave.schedule()}
-                placeholder="25"
-                className="h-8 w-[calc(5ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-sm tabular-nums px-2"
-              />
             </div>
             <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
               {[
@@ -2293,7 +2354,7 @@ function PersonFormDialog({
           </div>
         ) : null}
         </div>
-  );
+  ) : null;
 
   if (asPage) {
     return (
@@ -2310,7 +2371,7 @@ function PersonFormDialog({
         <DialogHeader>
           <DialogTitle>{person ? t("people.editPerson") : t("people.addPerson")}</DialogTitle>
         </DialogHeader>
-        {formBody}
+        {open ? formBody : null}
         <DialogFooter>{formFooter}</DialogFooter>
       </DialogContent>
     </Dialog>
