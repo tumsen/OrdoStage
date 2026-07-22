@@ -139,7 +139,7 @@ const en = {
     catalogProjectRenamed: "Project renamed.",
     catalogLeaveProjectKind: "Absence",
     catalogLeaveCategoryHint:
-      "System projects for vacation, sick leave, holidays, and compensatory time. Move registrations here to change their leave category.",
+      "Only system projects (Ferie, Feriefridage, Sygdom, Helligdag, Afspadsering). Each accepts only its matching leave category — you cannot add your own projects here.",
     catalogMoveAllEntriesHint:
       "Choose a work project or an absence project. Moving to absence also updates the registration category and leave balances.",
     catalogMoveAllToLeaveConfirm: "Move to absence",
@@ -1014,7 +1014,7 @@ const da: DeepPartial<typeof en> = {
     catalogProjectRenamed: "Projekt omdøbt.",
     catalogLeaveProjectKind: "Fravær",
     catalogLeaveCategoryHint:
-      "Systemprojekter for ferie, sygdom, helligdage og afspadsering. Flyt registreringer hertil for at skifte fraværskategori.",
+      "Kun systemprojekter (Ferie, Feriefridage, Sygdom, Helligdag, Afspadsering). Hvert projekt accepterer kun den matching fraværskategori — du kan ikke oprette egne projekter her.",
     catalogMoveAllEntriesHint:
       "Vælg et arbejdsprojekt eller et fraværsprojekt. Flytning til fravær opdaterer også kategorien og feriesaldoen.",
     catalogMoveAllToLeaveConfirm: "Flyt til fravær",

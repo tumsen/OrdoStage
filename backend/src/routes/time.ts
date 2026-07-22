@@ -25,11 +25,13 @@ import {
   backfillLeaveEntryCategories,
   backfillLeaveEntryProjects,
   ensureAllLeaveTimeProjects,
+  isLeaveParentCategoryId,
   isLeaveParentCategoryKey,
   isLeaveSystemProjectKey,
   isVacationNoteOnlyCategory,
   leaveCategoryForProjectId,
   normalizeEntryProjectAndTags,
+  resolveCanonicalLeaveProject,
   resolveEntryTimeProjectId,
   resolveLeaveTimeProjectId,
 } from "../services/leaveTimeProjects";
@@ -2288,6 +2290,19 @@ timeRouter.patch("/time/parent-category-link", zValidator("json", LinkTimeParent
   }
   const parentId = parentResolved.value ?? null;
 
+  if (parentId && (await isLeaveParentCategoryId(user.organizationId, parentId))) {
+    return c.json(
+      {
+        error: {
+          message:
+            "Fravær indeholder kun systemprojekter. Flyt ikke almindelige projekter, events eller ture hertil.",
+          code: "FORBIDDEN",
+        },
+      },
+      403
+    );
+  }
+
   if (body.type === "event") {
     const ev = await prisma.event.findFirst({
       where: { id: body.id, organizationId: user.organizationId },
@@ -2474,6 +2489,18 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
   if (!parentResolved.ok) {
     return c.json({ error: { message: "Parent category not found", code: "NOT_FOUND" } }, 404);
   }
+  if (await isLeaveParentCategoryId(user.organizationId, parentResolved.value)) {
+    return c.json(
+      {
+        error: {
+          message:
+            "Fravær indeholder kun systemprojekter (Ferie, Sygdom, Feriefridage, …). Opret ikke egne projekter der.",
+          code: "FORBIDDEN",
+        },
+      },
+      403
+    );
+  }
   const isStandalone = !eventId && !eventShowId && !body.tourId && !body.tourShowId;
 
   const row = await prisma.timeProject.create({
@@ -2574,6 +2601,18 @@ timeRouter.patch("/time/projects/:id", zValidator("json", PatchTimeProjectSchema
     );
     if (!parentResolved.ok) {
       return c.json({ error: { message: "Parent category not found", code: "NOT_FOUND" } }, 404);
+    }
+    if (await isLeaveParentCategoryId(user.organizationId, parentResolved.value)) {
+      return c.json(
+        {
+          error: {
+            message:
+              "Fravær indeholder kun systemprojekter. Flyt ikke almindelige projekter hertil.",
+            code: "FORBIDDEN",
+          },
+        },
+        403
+      );
     }
     parentCategoryPatch = parentResolved.value ?? null;
   }
@@ -4026,17 +4065,24 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
     if (!ev) return c.json({ error: { message: "Event not found", code: "NOT_FOUND" } }, 404);
   }
   let entryCategory = body.category ?? "work";
+  let requestedCustomProjectId = body.timeProjectId ?? null;
   if (body.timeProjectId) {
-    const leaveFromProject = await leaveCategoryForProjectId(
-      user.organizationId,
-      body.timeProjectId
-    );
-    if (leaveFromProject) entryCategory = leaveFromProject;
+    const project = await prisma.timeProject.findFirst({
+      where: { id: body.timeProjectId, organizationId: user.organizationId },
+      select: { id: true, systemKey: true, name: true },
+    });
+    if (project) {
+      const canonical = await resolveCanonicalLeaveProject(user.organizationId, project);
+      if (canonical) {
+        entryCategory = canonical.category;
+        requestedCustomProjectId = canonical.projectId;
+      }
+    }
   }
   const resolvedCustomProjectId = await resolveEntryTimeProjectId(
     user.organizationId,
     entryCategory,
-    body.timeProjectId ?? null
+    requestedCustomProjectId
   );
   const normalizedCustom = normalizeEntryProjectAndTags(
     entryCategory,
@@ -4424,16 +4470,24 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
   }
 
   const finalEventId = body.eventId !== undefined ? body.eventId : existing.eventId;
-  const requestedProjectId =
+  let requestedProjectId =
     body.timeProjectId !== undefined ? body.timeProjectId : existing.timeProjectId;
   let finalCategory = body.category ?? existing.category;
-  // Assigning to Ferie / Sygdom / Feriefridage / … always sets the matching leave category.
-  if (body.timeProjectId !== undefined && body.timeProjectId) {
-    const leaveFromProject = await leaveCategoryForProjectId(
-      user.organizationId,
-      body.timeProjectId
-    );
-    if (leaveFromProject) finalCategory = leaveFromProject;
+  // Fravær system projects (Ferie / Sygdom / …) always lock the matching leave category.
+  const projectIdForLeaveCheck =
+    body.timeProjectId !== undefined ? body.timeProjectId : existing.timeProjectId;
+  if (projectIdForLeaveCheck) {
+    const project = await prisma.timeProject.findFirst({
+      where: { id: projectIdForLeaveCheck, organizationId: user.organizationId },
+      select: { id: true, systemKey: true, name: true },
+    });
+    if (project) {
+      const canonical = await resolveCanonicalLeaveProject(user.organizationId, project);
+      if (canonical) {
+        finalCategory = canonical.category;
+        requestedProjectId = canonical.projectId;
+      }
+    }
   }
   const resolvedProjectId = await resolveEntryTimeProjectId(
     user.organizationId,

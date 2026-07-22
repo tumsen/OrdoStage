@@ -211,6 +211,81 @@ export async function ensureAllLeaveTimeProjects(organizationId: string) {
   for (const category of LEAVE_AUTO_PROJECT_CATEGORIES) {
     await ensureLeaveTimeProject(organizationId, category);
   }
+  await sanitizeLeaveParentProjects(organizationId);
+}
+
+/** True when this parent category id is the Fravær (absence) system category. */
+export async function isLeaveParentCategoryId(
+  organizationId: string,
+  parentCategoryId: string | null | undefined
+): Promise<boolean> {
+  if (!parentCategoryId) return false;
+  const row = await prisma.timeParentCategory.findFirst({
+    where: { id: parentCategoryId, organizationId },
+    select: { systemKey: true },
+  });
+  return isLeaveParentCategoryKey(row?.systemKey);
+}
+
+/**
+ * Fravær may only contain the five leave_* system projects.
+ * Name-matched duplicates are merged into the system project; other projects are unlinked.
+ */
+export async function sanitizeLeaveParentProjects(organizationId: string): Promise<void> {
+  const parentId = await ensureLeaveParentCategory(organizationId);
+  const underFravaer = await prisma.timeProject.findMany({
+    where: {
+      organizationId,
+      timeParentCategoryId: parentId,
+      NOT: { systemKey: { startsWith: "leave_" } },
+    },
+    select: { id: true, name: true, systemKey: true },
+  });
+
+  for (const project of underFravaer) {
+    const canonical = await resolveCanonicalLeaveProject(organizationId, project);
+    if (canonical && canonical.projectId !== project.id) {
+      await prisma.timeEntry.updateMany({
+        where: {
+          organizationId,
+          timeProjectId: project.id,
+          category: { notIn: ["comp_settlement_earned", "comp_settlement_used"] },
+        },
+        data: { timeProjectId: canonical.projectId, category: canonical.category },
+      });
+      if (canonical.category === "vacation") {
+        const ids = (
+          await prisma.timeEntry.findMany({
+            where: { organizationId, timeProjectId: canonical.projectId, category: "vacation" },
+            select: { id: true },
+            take: 5000,
+          })
+        ).map((e) => e.id);
+        if (ids.length) {
+          await prisma.timeEntryTag.deleteMany({ where: { timeEntryId: { in: ids } } });
+        }
+      }
+      const stillUsed = await prisma.timeEntry.count({
+        where: { organizationId, timeProjectId: project.id },
+      });
+      if (stillUsed === 0) {
+        await prisma.timeProject.update({
+          where: { id: project.id },
+          data: { timeParentCategoryId: null, isArchived: true },
+        });
+      } else {
+        await prisma.timeProject.update({
+          where: { id: project.id },
+          data: { timeParentCategoryId: null },
+        });
+      }
+      continue;
+    }
+    await prisma.timeProject.update({
+      where: { id: project.id },
+      data: { timeParentCategoryId: null },
+    });
+  }
 }
 
 /** Point existing leave entries at the correct system project. */
