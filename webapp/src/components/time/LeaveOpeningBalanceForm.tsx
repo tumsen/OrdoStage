@@ -30,7 +30,6 @@ export function LeaveOpeningBalanceForm(props: {
   const [vacationRemaining, setVacationRemaining] = useState("");
   const [extraVacationRemaining, setExtraVacationRemaining] = useState("");
   const [compTimeMinutes, setCompTimeMinutes] = useState(leave.compTimeRemainingMinutes);
-  const [sickDays, setSickDays] = useState("");
   const [effectiveDate, setEffectiveDate] = useState(todayIsoDate);
   const [note, setNote] = useState("");
 
@@ -38,12 +37,10 @@ export function LeaveOpeningBalanceForm(props: {
     setVacationRemaining(leave.vacationRemainingDays.toFixed(1));
     setExtraVacationRemaining(leave.extraVacationRemainingDays.toFixed(1));
     setCompTimeMinutes(leave.compTimeRemainingMinutes);
-    setSickDays(String(leave.sickDays));
   }, [
     leave.vacationRemainingDays,
     leave.extraVacationRemainingDays,
     leave.compTimeRemainingMinutes,
-    leave.sickDays,
   ]);
 
   const saveMutation = useMutation({
@@ -56,7 +53,6 @@ export function LeaveOpeningBalanceForm(props: {
         vacationRemainingDays?: number;
         extraVacationRemainingDays?: number;
         compTimeRemainingMinutes?: number;
-        sickDays?: number;
       } = {
         personId,
         vacationYearKey: leave.vacationYearKey,
@@ -64,12 +60,12 @@ export function LeaveOpeningBalanceForm(props: {
         effectiveDate,
       };
 
-      const vac = parseFloat(vacationRemaining);
+      const vac = parseFloat(vacationRemaining.replace(",", "."));
       if (!Number.isNaN(vac) && vac !== leave.vacationRemainingDays) {
         payload.vacationRemainingDays = vac;
       }
 
-      const extra = parseFloat(extraVacationRemaining);
+      const extra = parseFloat(extraVacationRemaining.replace(",", "."));
       if (!Number.isNaN(extra) && extra !== leave.extraVacationRemainingDays) {
         payload.extraVacationRemainingDays = extra;
       }
@@ -78,16 +74,10 @@ export function LeaveOpeningBalanceForm(props: {
         payload.compTimeRemainingMinutes = compTimeMinutes;
       }
 
-      const sick = parseFloat(sickDays);
-      if (!Number.isNaN(sick) && sick !== leave.sickDays) {
-        payload.sickDays = sick;
-      }
-
       const hasChange =
         payload.vacationRemainingDays !== undefined ||
         payload.extraVacationRemainingDays !== undefined ||
-        payload.compTimeRemainingMinutes !== undefined ||
-        payload.sickDays !== undefined;
+        payload.compTimeRemainingMinutes !== undefined;
 
       if (!hasChange) {
         throw new Error(t("time.leaveOpeningBalanceNoChanges"));
@@ -131,21 +121,21 @@ export function LeaveOpeningBalanceForm(props: {
         <div className="space-y-1">
           <Label className="text-[10px] text-white/45">{t("time.leaveVacationRemaining")}</Label>
           <Input
-            type="number"
-            step="0.5"
+            type="text"
+            inputMode="decimal"
             value={vacationRemaining}
             onChange={(e) => setVacationRemaining(e.target.value)}
-            className="h-8 bg-white/5 border-white/10 text-white text-xs"
+            className="h-8 bg-white/5 border-white/10 text-white text-xs tabular-nums"
           />
         </div>
         <div className="space-y-1">
           <Label className="text-[10px] text-white/45">{t("time.leaveExtraRemaining")}</Label>
           <Input
-            type="number"
-            step="0.5"
+            type="text"
+            inputMode="decimal"
             value={extraVacationRemaining}
             onChange={(e) => setExtraVacationRemaining(e.target.value)}
-            className="h-8 bg-white/5 border-white/10 text-white text-xs"
+            className="h-8 bg-white/5 border-white/10 text-white text-xs tabular-nums"
           />
         </div>
         <div className="space-y-1">
@@ -153,6 +143,7 @@ export function LeaveOpeningBalanceForm(props: {
           <CompTimeHhhMmField
             valueMinutes={compTimeMinutes}
             onChangeMinutes={setCompTimeMinutes}
+            allowNegative
             aria-label={t("time.leaveOpeningBalanceCompTime")}
           />
         </div>
@@ -163,17 +154,6 @@ export function LeaveOpeningBalanceForm(props: {
             value={effectiveDate}
             onChange={(e) => setEffectiveDate(e.target.value)}
             className="h-8 bg-white/5 border-white/10 text-white text-xs [color-scheme:dark]"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-[10px] text-white/45">{t("time.leaveSickDays")}</Label>
-          <Input
-            type="number"
-            step="0.5"
-            min="0"
-            value={sickDays}
-            onChange={(e) => setSickDays(e.target.value)}
-            className="h-8 bg-white/5 border-white/10 text-white text-xs"
           />
         </div>
       </div>

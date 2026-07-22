@@ -35,7 +35,6 @@ const ADJUSTMENT_BALANCE_TYPES = [
   "extra_vacation_used",
   "comp_time_earned",
   "comp_time_used",
-  "sick_days",
 ] as const;
 
 type AdjustmentBalanceType = (typeof ADJUSTMENT_BALANCE_TYPES)[number];
