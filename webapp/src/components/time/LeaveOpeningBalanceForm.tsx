@@ -17,11 +17,12 @@ function todayIsoDate(): string {
 
 /** Fixed cell widths so ferie / feriefridage / overarbejde match exactly. */
 const VALUE_CELL = "w-[7.5rem] shrink-0";
-const DATE_CELL = "w-[10rem] shrink-0";
+/** YYYY-MM-DD (10ch) + padding + native calendar control — no wider. */
+const DATE_CELL = "w-[calc(10ch+1.75rem)] shrink-0";
 const VALUE_INPUT =
   "h-8 w-full min-w-0 bg-white/5 border-white/10 text-white text-xs tabular-nums font-mono px-2";
 const DATE_INPUT =
-  "h-8 w-full min-w-0 bg-white/5 border-white/10 text-white text-xs [color-scheme:dark]";
+  "h-8 w-full min-w-0 bg-white/5 border-white/10 text-white text-xs tabular-nums px-1.5 [color-scheme:dark]";
 
 export function LeaveOpeningBalanceForm(props: {
   personId: string;
