@@ -160,11 +160,13 @@ function emptyEmergencyContact() {
   return { id: newEmergencyContactId(), name: "", phone: "", relationNote: "" };
 }
 
+/** Stable ids so controlled form `values` / reset snapshots do not churn every render. */
 function emergencyContactsFromPerson(person: Person | null | undefined) {
   const rows = person?.emergencyContacts;
+  const personKey = person?.id ?? "new";
   if (Array.isArray(rows) && rows.length > 0) {
-    return rows.map((row) => ({
-      id: row.id || newEmergencyContactId(),
+    return rows.map((row, index) => ({
+      id: row.id || `ec-${personKey}-${index}`,
       name: row.name ?? "",
       phone: row.phone ?? "",
       relationNote: row.relationNote ?? "",
@@ -173,14 +175,76 @@ function emergencyContactsFromPerson(person: Person | null | undefined) {
   if (person?.emergencyContactName || person?.emergencyContactPhone) {
     return [
       {
-        id: newEmergencyContactId(),
+        id: `ec-${personKey}-legacy`,
         name: person.emergencyContactName ?? "",
         phone: person.emergencyContactPhone ?? "",
         relationNote: "",
       },
     ];
   }
-  return [emptyEmergencyContact()];
+  return [{ id: `ec-${personKey}-placeholder`, name: "", phone: "", relationNote: "" }];
+}
+
+const EMPTY_PERSON_FORM_VALUES: PersonFormValues = {
+  name: "",
+  affiliation: "internal",
+  role: "",
+  permissionGroupId: "",
+  email: "",
+  phone: "",
+  addressStreet: "",
+  addressNumber: "",
+  addressZip: "",
+  addressCity: "",
+  addressState: "",
+  addressCountry: "",
+  workplaceName: "",
+  workName: "",
+  workEmail: "",
+  workPhone: "",
+  workAddressStreet: "",
+  workAddressNumber: "",
+  workAddressZip: "",
+  workAddressCity: "",
+  workAddressState: "",
+  workAddressCountry: "",
+  emergencyContacts: [{ id: "ec-new-placeholder", name: "", phone: "", relationNote: "" }],
+  notes: "",
+  teamAssignments: [],
+};
+
+function personToFormValues(person: Person): PersonFormValues {
+  return {
+    name: person.name,
+    affiliation: person.affiliation ?? "internal",
+    role: person.role ?? "",
+    permissionGroupId: person.permissionGroupId ?? "",
+    email: person.email ?? "",
+    phone: person.phone ?? "",
+    addressStreet: person.addressStreet ?? "",
+    addressNumber: person.addressNumber ?? "",
+    addressZip: person.addressZip ?? "",
+    addressCity: person.addressCity ?? "",
+    addressState: person.addressState ?? "",
+    addressCountry: person.addressCountry ?? "",
+    workplaceName: person.workplaceName ?? "",
+    workName: person.workName ?? "",
+    workEmail: person.workEmail ?? "",
+    workPhone: person.workPhone ?? "",
+    workAddressStreet: person.workAddressStreet ?? "",
+    workAddressNumber: person.workAddressNumber ?? "",
+    workAddressZip: person.workAddressZip ?? "",
+    workAddressCity: person.workAddressCity ?? "",
+    workAddressState: person.workAddressState ?? "",
+    workAddressCountry: person.workAddressCountry ?? "",
+    emergencyContacts: emergencyContactsFromPerson(person),
+    notes: person.notes ?? "",
+    teamAssignments:
+      person.teamMemberships?.map((membership) => ({
+        teamId: membership.teamId,
+        role: membership.role ?? "",
+      })) ?? [],
+  };
 }
 
 type PeopleSortMode = "alphabetical" | "teams" | "internal" | "external";
@@ -429,66 +493,20 @@ function PersonFormDialog({
 
   const form = useForm<PersonFormValues>({
     resolver: zodResolver(PersonFormSchema),
-    values: person
-      ? {
-          name: person.name,
-          affiliation: person.affiliation ?? "internal",
-          role: person.role ?? "",
-          permissionGroupId: person.permissionGroupId ?? "",
-          email: person.email ?? "",
-          phone: person.phone ?? "",
-          addressStreet:  person.addressStreet  ?? "",
-          addressNumber:  person.addressNumber  ?? "",
-          addressZip:     person.addressZip     ?? "",
-          addressCity:    person.addressCity    ?? "",
-          addressState:   person.addressState   ?? "",
-          addressCountry: person.addressCountry ?? "",
-          workplaceName: person.workplaceName ?? "",
-          workName: person.workName ?? "",
-          workEmail: person.workEmail ?? "",
-          workPhone: person.workPhone ?? "",
-          workAddressStreet:  person.workAddressStreet  ?? "",
-          workAddressNumber:  person.workAddressNumber  ?? "",
-          workAddressZip:     person.workAddressZip     ?? "",
-          workAddressCity:    person.workAddressCity    ?? "",
-          workAddressState:   person.workAddressState   ?? "",
-          workAddressCountry: person.workAddressCountry ?? "",
-          emergencyContacts: emergencyContactsFromPerson(person),
-          notes: person.notes ?? "",
-          teamAssignments:
-            person.teamMemberships?.map((membership) => ({
-              teamId: membership.teamId,
-              role: membership.role ?? "",
-            })) ?? [],
-        }
-      : {
-          name: "",
-          affiliation: "internal",
-          role: "",
-          permissionGroupId: "",
-          email: "",
-          phone: "",
-          addressStreet:  "",
-          addressNumber:  "",
-          addressZip:     "",
-          addressCity:    "",
-          addressState:   "",
-          addressCountry: "",
-          workplaceName: "",
-          workName: "",
-          workEmail: "",
-          workPhone: "",
-          workAddressStreet:  "",
-          workAddressNumber:  "",
-          workAddressZip:     "",
-          workAddressCity:    "",
-          workAddressState:   "",
-          workAddressCountry: "",
-          emergencyContacts: [emptyEmergencyContact()],
-          notes: "",
-          teamAssignments: [],
-        },
+    defaultValues: person ? personToFormValues(person) : EMPTY_PERSON_FORM_VALUES,
   });
+
+  // Reset only when opening/switching person — not on every person prop refresh (that hung the edit page).
+  useEffect(() => {
+    if (asPage) {
+      if (!person?.id) return;
+      form.reset(personToFormValues(person));
+      return;
+    }
+    if (!open) return;
+    form.reset(person ? personToFormValues(person) : EMPTY_PERSON_FORM_VALUES);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: identity of form session only
+  }, [asPage, open, person?.id]);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
