@@ -1625,9 +1625,7 @@ function PersonFormDialog({
           <div
             className={
               asPage
-                ? person && canManageContracts && leaveManagementEnabled
-                  ? "w-full"
-                  : "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start"
+                ? "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start"
                 : "contents"
             }
           >
