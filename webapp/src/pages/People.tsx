@@ -1502,7 +1502,15 @@ function PersonFormDialog({
 
           </div>
 
-          <div className={asPage ? "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start" : "contents"}>
+          <div
+            className={
+              asPage
+                ? person && canManageContracts && leaveManagementEnabled
+                  ? "w-full"
+                  : "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start"
+                : "contents"
+            }
+          >
             <div className={asPage ? `${cardClass} space-y-2 min-w-0` : "contents"}>
               {asPage ? <p className={sectionTitle}>Teams</p> : null}
           <div className={asPage ? "contents space-y-2" : "space-y-2"}>
@@ -1581,18 +1589,14 @@ function PersonFormDialog({
           </div>
             </div>
 
-            {asPage && person && canManageContracts ? (
+            {asPage && person && canManageContracts && !leaveManagementEnabled ? (
               <div
                 className={`${cardClass} space-y-4 min-w-0`}
                 onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
               >
-                <p className={sectionTitle}>
-                  {leaveManagementEnabled ? t("time.leaveProfileTitle") : t("people.workContract")}
-                </p>
+                <p className={sectionTitle}>{t("people.workContract")}</p>
                 <p className="text-[11px] text-white/30">
-                  {leaveManagementEnabled
-                    ? t("time.leaveProfileHint")
-                    : "Used for overtime and vacation tracking in time reports."}
+                  Used for overtime and vacation tracking in time reports.
                 </p>
                 <label className="flex items-start gap-2 text-xs text-white/55">
                   <Checkbox
@@ -1608,18 +1612,6 @@ function PersonFormDialog({
                     </span>
                   </span>
                 </label>
-                {leaveManagementEnabled ? (
-                  <label className="flex items-center gap-2 text-xs text-white/55">
-                    <Checkbox
-                      checked={leaveUseOrgDefaults}
-                      onCheckedChange={(v) => {
-                        setLeaveUseOrgDefaults(v === true);
-                        contractAutoSave.schedule();
-                      }}
-                    />
-                    {t("time.leaveProfileUseOrgDefaults")}
-                  </label>
-                ) : null}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label className="text-white/55 text-xs">Weekly hours</Label>
@@ -1650,64 +1642,161 @@ function PersonFormDialog({
                     />
                   </div>
                 </div>
-                {leaveManagementEnabled ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-white/55 text-xs">{t("time.leaveProfileExtraVacation")}</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={leaveExtraVacationDays}
-                        onChange={(e) => setLeaveExtraVacationDays(e.target.value)}
-                        onBlur={() => contractAutoSave.schedule()}
-                        placeholder="e.g. 5"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                      />
-                      <p className="text-[10px] text-white/40">{t("time.leaveProfileExtraVacationHint")}</p>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-white/55 text-xs">{t("time.leaveProfileMonthlyHours")}</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={leaveMonthlyHours}
-                        onChange={(e) => setLeaveMonthlyHours(e.target.value)}
-                        onBlur={() => contractAutoSave.schedule()}
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-white/55 text-xs">{t("time.leaveProfileAnnualHours")}</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={leaveAnnualHours}
-                        onChange={(e) => setLeaveAnnualHours(e.target.value)}
-                        onBlur={() => contractAutoSave.schedule()}
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-white/55 text-xs">{t("time.leaveProfileSickStatus")}</Label>
-                      <Select
-                        value={leaveSickStatus}
-                        onValueChange={(v) => {
-                          setLeaveSickStatus(v as "none" | "active");
-                          contractAutoSave.schedule();
-                        }}
-                      >
-                        <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#16161f] border-white/10 text-white">
-                          <SelectItem value="none">{t("time.leaveProfileSickNone")}</SelectItem>
-                          <SelectItem value="active">{t("time.leaveProfileSickActive")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) ? (
+                  <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
+                    {[
+                      { label: t("people.hoursPerDay"), value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
+                      { label: "Monthly", value: `${((parseFloat(contractWeeklyHours) * 52) / 12).toFixed(0)} h` },
+                      { label: "Yearly", value: `${(parseFloat(contractWeeklyHours) * 52).toFixed(0)} h` },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
+                        <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
+                        <p className="font-semibold text-white/70 mt-0.5">{item.value}</p>
+                      </div>
+                    ))}
                   </div>
                 ) : null}
-                {leaveManagementEnabled && leaveProfileData?.leave ? (
+              </div>
+            ) : null}
+            {asPage && person && !canManageContracts ? (
+              <div className="hidden md:block" aria-hidden />
+            ) : null}
+          </div>
+
+          {asPage && person && canManageContracts && leaveManagementEnabled ? (
+            <div
+              className="grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start w-full"
+              onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
+            >
+              <div className={`${cardClass} space-y-4 min-w-0`}>
+                <p className={sectionTitle}>{t("time.leaveNormSectionTitle")}</p>
+                <p className="text-[11px] text-white/30">{t("time.leaveProfileHint")}</p>
+                <label className="flex items-start gap-2 text-xs text-white/55">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={showInPayroll}
+                    disabled={showInPayrollMutation.isPending}
+                    onCheckedChange={(v) => showInPayrollMutation.mutate(v === true)}
+                  />
+                  <span>
+                    <span className="block text-white/75">{t("time.showInPayroll")}</span>
+                    <span className="block text-[11px] text-white/35 mt-0.5">
+                      {t("time.showInPayrollHint")}
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-white/55">
+                  <Checkbox
+                    checked={leaveUseOrgDefaults}
+                    onCheckedChange={(v) => {
+                      setLeaveUseOrgDefaults(v === true);
+                      contractAutoSave.schedule();
+                    }}
+                  />
+                  {t("time.leaveProfileUseOrgDefaults")}
+                </label>
+                <div className="space-y-1.5">
+                  <Label className="text-white/55 text-xs">Weekly hours</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="168"
+                    step="0.5"
+                    value={contractWeeklyHours}
+                    onChange={(e) => setContractWeeklyHours(e.target.value)}
+                    onBlur={() => contractAutoSave.schedule()}
+                    placeholder="e.g. 37"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-white/55 text-xs">{t("time.leaveProfileMonthlyHours")}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={leaveMonthlyHours}
+                      onChange={(e) => setLeaveMonthlyHours(e.target.value)}
+                      onBlur={() => contractAutoSave.schedule()}
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-white/55 text-xs">{t("time.leaveProfileAnnualHours")}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={leaveAnnualHours}
+                      onChange={(e) => setLeaveAnnualHours(e.target.value)}
+                      onBlur={() => contractAutoSave.schedule()}
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) ? (
+                  <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
+                    {[
+                      { label: t("people.hoursPerDay"), value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
+                      { label: "Monthly", value: `${((parseFloat(contractWeeklyHours) * 52) / 12).toFixed(0)} h` },
+                      { label: "Yearly", value: `${(parseFloat(contractWeeklyHours) * 52).toFixed(0)} h` },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
+                        <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
+                        <p className="font-semibold text-white/70 mt-0.5">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className={`${cardClass} space-y-4 min-w-0`}>
+                <p className={sectionTitle}>{t("time.leaveAbsenceSectionTitle")}</p>
+                <div className="space-y-1.5">
+                  <Label className="text-white/55 text-xs">Vacation days / year</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    step="0.5"
+                    value={contractVacationDays}
+                    onChange={(e) => setContractVacationDays(e.target.value)}
+                    onBlur={() => contractAutoSave.schedule()}
+                    placeholder="e.g. 25"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-white/55 text-xs">{t("time.leaveProfileExtraVacation")}</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={leaveExtraVacationDays}
+                    onChange={(e) => setLeaveExtraVacationDays(e.target.value)}
+                    onBlur={() => contractAutoSave.schedule()}
+                    placeholder="e.g. 5"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                  />
+                  <p className="text-[10px] text-white/40">{t("time.leaveProfileExtraVacationHint")}</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-white/55 text-xs">{t("time.leaveProfileSickStatus")}</Label>
+                  <Select
+                    value={leaveSickStatus}
+                    onValueChange={(v) => {
+                      setLeaveSickStatus(v as "none" | "active");
+                      contractAutoSave.schedule();
+                    }}
+                  >
+                    <SelectTrigger className="h-8 bg-white/5 border-white/10 text-white text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#16161f] border-white/10 text-white">
+                      <SelectItem value="none">{t("time.leaveProfileSickNone")}</SelectItem>
+                      <SelectItem value="active">{t("time.leaveProfileSickActive")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {leaveProfileData?.leave ? (
                   <div className="rounded border border-white/8 bg-white/[0.02] px-3 py-2 text-xs text-white/50 space-y-1">
                     <p className="text-white/35 uppercase tracking-wide text-[10px]">{t("time.leaveBalancesTitle")}</p>
                     <p>
@@ -1764,42 +1853,23 @@ function PersonFormDialog({
                     </p>
                   </div>
                 ) : null}
-                {leaveManagementEnabled && leaveProfileData?.leave && person && canManageContracts ? (
+                {leaveProfileData?.leave ? (
                   <LeaveOpeningBalanceForm
                     personId={person.id}
                     leave={leaveProfileData.leave}
                     canEdit={canManageContracts}
                   />
                 ) : null}
-                {leaveManagementEnabled && person ? (
-                  <LeaveLedgerMenu
-                    personId={person.id}
-                    vacationYearKey={leaveProfileData?.leave?.vacationYearKey}
-                    leave={leaveProfileData?.leave}
-                    canAdjust={canManageContracts}
-                    showOpeningBalance={false}
-                  />
-                ) : null}
-                {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) ? (
-                  <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
-                    {[
-                      { label: t("people.hoursPerDay"), value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
-                      { label: "Monthly", value: `${((parseFloat(contractWeeklyHours) * 52) / 12).toFixed(0)} h` },
-                      { label: "Yearly", value: `${(parseFloat(contractWeeklyHours) * 52).toFixed(0)} h` },
-                    ].map((item) => (
-                      <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
-                        <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
-                        <p className="font-semibold text-white/70 mt-0.5">{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                <LeaveLedgerMenu
+                  personId={person.id}
+                  vacationYearKey={leaveProfileData?.leave?.vacationYearKey}
+                  leave={leaveProfileData?.leave}
+                  canAdjust={canManageContracts}
+                  showOpeningBalance={false}
+                />
               </div>
-            ) : null}
-            {asPage && person && !canManageContracts ? (
-              <div className="hidden md:block" aria-hidden />
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           <Dialog open={teamPickerOpen} onOpenChange={setTeamPickerOpen}>
             <DialogContent className="bg-[#16161f] border-white/10 text-white max-w-lg">
@@ -2032,80 +2102,112 @@ function PersonFormDialog({
             <p className="text-red-400 text-xs">{uploadError}</p>
           ) : null}
 
-        {/* Work contract — dialog layout only (page layout uses column in teams row) */}
+        {/* Work contract / leave — dialog layout only (page layout uses separate row) */}
         {!asPage && person && canManageContracts ? (
-          <div
-            className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4"
-            onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
-          >
-            <div>
-              <p className={sectionTitle}>
-                {leaveManagementEnabled ? t("time.leaveProfileTitle") : t("people.workContract")}
-              </p>
-              <p className="text-[11px] text-white/30 mt-0.5">
-                {leaveManagementEnabled
-                  ? t("time.leaveProfileHint")
-                  : "Used for overtime and vacation tracking in time reports."}
-              </p>
-            </div>
-            <label className="flex items-start gap-2 text-xs text-white/55">
-              <Checkbox
-                className="mt-0.5"
-                checked={showInPayroll}
-                disabled={showInPayrollMutation.isPending}
-                onCheckedChange={(v) => showInPayrollMutation.mutate(v === true)}
-              />
-              <span>
-                <span className="block text-white/75">{t("time.showInPayroll")}</span>
-                <span className="block text-[11px] text-white/35 mt-0.5">
-                  {t("time.showInPayrollHint")}
-                </span>
-              </span>
-            </label>
-            {leaveManagementEnabled ? (
-              <label className="flex items-center gap-2 text-xs text-white/55">
-                <Checkbox
-                  checked={leaveUseOrgDefaults}
-                  onCheckedChange={(v) => {
-                    setLeaveUseOrgDefaults(v === true);
-                    contractAutoSave.schedule();
-                  }}
-                />
-                {t("time.leaveProfileUseOrgDefaults")}
-              </label>
-            ) : null}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-white/55 text-xs">Weekly hours</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="168"
-                  step="0.5"
-                  value={contractWeeklyHours}
-                  onChange={(e) => setContractWeeklyHours(e.target.value)}
-                  onBlur={() => contractAutoSave.schedule()}
-                  placeholder="e.g. 37"
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                />
+          leaveManagementEnabled ? (
+            <div
+              className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+              onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
+            >
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4">
+                <div>
+                  <p className={sectionTitle}>{t("time.leaveNormSectionTitle")}</p>
+                  <p className="text-[11px] text-white/30 mt-0.5">{t("time.leaveProfileHint")}</p>
+                </div>
+                <label className="flex items-start gap-2 text-xs text-white/55">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={showInPayroll}
+                    disabled={showInPayrollMutation.isPending}
+                    onCheckedChange={(v) => showInPayrollMutation.mutate(v === true)}
+                  />
+                  <span>
+                    <span className="block text-white/75">{t("time.showInPayroll")}</span>
+                    <span className="block text-[11px] text-white/35 mt-0.5">
+                      {t("time.showInPayrollHint")}
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-white/55">
+                  <Checkbox
+                    checked={leaveUseOrgDefaults}
+                    onCheckedChange={(v) => {
+                      setLeaveUseOrgDefaults(v === true);
+                      contractAutoSave.schedule();
+                    }}
+                  />
+                  {t("time.leaveProfileUseOrgDefaults")}
+                </label>
+                <div className="space-y-1.5">
+                  <Label className="text-white/55 text-xs">Weekly hours</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="168"
+                    step="0.5"
+                    value={contractWeeklyHours}
+                    onChange={(e) => setContractWeeklyHours(e.target.value)}
+                    onBlur={() => contractAutoSave.schedule()}
+                    placeholder="e.g. 37"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-white/55 text-xs">{t("time.leaveProfileMonthlyHours")}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={leaveMonthlyHours}
+                      onChange={(e) => setLeaveMonthlyHours(e.target.value)}
+                      onBlur={() => contractAutoSave.schedule()}
+                      className="bg-white/5 border-white/10 text-white h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-white/55 text-xs">{t("time.leaveProfileAnnualHours")}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={leaveAnnualHours}
+                      onChange={(e) => setLeaveAnnualHours(e.target.value)}
+                      onBlur={() => contractAutoSave.schedule()}
+                      className="bg-white/5 border-white/10 text-white h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) ? (
+                  <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
+                    {[
+                      { label: t("people.hoursPerDay"), value: `${(parseFloat(contractWeeklyHours) / 5).toFixed(1)} h` },
+                      { label: "Monthly", value: `${((parseFloat(contractWeeklyHours) * 52) / 12).toFixed(0)} h` },
+                      { label: "Yearly", value: `${(parseFloat(contractWeeklyHours) * 52).toFixed(0)} h` },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded bg-white/[0.03] border border-white/8 px-2 py-1.5 text-center">
+                        <p className="text-[10px] text-white/30 uppercase tracking-wide">{item.label}</p>
+                        <p className="font-semibold text-white/70 mt-0.5">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-white/55 text-xs">Vacation days / year</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="365"
-                  step="0.5"
-                  value={contractVacationDays}
-                  onChange={(e) => setContractVacationDays(e.target.value)}
-                  onBlur={() => contractAutoSave.schedule()}
-                  placeholder="e.g. 25"
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
-                />
-              </div>
-            </div>
-            {leaveManagementEnabled ? (
-              <div className="grid grid-cols-2 gap-3">
+
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4">
+                <p className={sectionTitle}>{t("time.leaveAbsenceSectionTitle")}</p>
+                <div className="space-y-1.5">
+                  <Label className="text-white/55 text-xs">Vacation days / year</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="365"
+                    step="0.5"
+                    value={contractVacationDays}
+                    onChange={(e) => setContractVacationDays(e.target.value)}
+                    onBlur={() => contractAutoSave.schedule()}
+                    placeholder="e.g. 25"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                  />
+                </div>
                 <div className="space-y-1.5">
                   <Label className="text-white/55 text-xs">{t("time.leaveProfileExtraVacation")}</Label>
                   <Input
@@ -2137,8 +2239,62 @@ function PersonFormDialog({
                   </Select>
                 </div>
               </div>
-            ) : null}
-            {/* Derived display */}
+            </div>
+          ) : (
+          <div
+            className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4"
+            onBlurCapture={autoSaveBlurCapture(() => contractAutoSave.schedule(), true)}
+          >
+            <div>
+              <p className={sectionTitle}>{t("people.workContract")}</p>
+              <p className="text-[11px] text-white/30 mt-0.5">
+                Used for overtime and vacation tracking in time reports.
+              </p>
+            </div>
+            <label className="flex items-start gap-2 text-xs text-white/55">
+              <Checkbox
+                className="mt-0.5"
+                checked={showInPayroll}
+                disabled={showInPayrollMutation.isPending}
+                onCheckedChange={(v) => showInPayrollMutation.mutate(v === true)}
+              />
+              <span>
+                <span className="block text-white/75">{t("time.showInPayroll")}</span>
+                <span className="block text-[11px] text-white/35 mt-0.5">
+                  {t("time.showInPayrollHint")}
+                </span>
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-white/55 text-xs">Weekly hours</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="168"
+                  step="0.5"
+                  value={contractWeeklyHours}
+                  onChange={(e) => setContractWeeklyHours(e.target.value)}
+                  onBlur={() => contractAutoSave.schedule()}
+                  placeholder="e.g. 37"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-white/55 text-xs">Vacation days / year</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="365"
+                  step="0.5"
+                  value={contractVacationDays}
+                  onChange={(e) => setContractVacationDays(e.target.value)}
+                  onBlur={() => contractAutoSave.schedule()}
+                  placeholder="e.g. 25"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-8 text-sm"
+                />
+              </div>
+            </div>
             {contractWeeklyHours && !isNaN(parseFloat(contractWeeklyHours)) && (
               <div className="grid grid-cols-3 gap-2 text-xs text-white/45">
                 {[
@@ -2154,6 +2310,7 @@ function PersonFormDialog({
               </div>
             )}
           </div>
+          )
         ) : null}
         </div>
   );
