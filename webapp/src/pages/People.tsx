@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns";
 import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, ShieldAlert, Trash2, User } from "lucide-react";
+import { File, Plus, ShieldAlert, Trash2, User } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAutoSaveForm } from "@/hooks/useAutoSaveForm";
 import { useAutoSave, type AutoSaveStatus, autoSaveBlurCapture } from "@/hooks/useAutoSave";
@@ -1864,72 +1864,85 @@ function PersonFormDialog({
               <p className="text-[11px] text-white/35">
                 Add passport, driver license, certificates, contracts, or other files.
               </p>
-              <div className="flex flex-col gap-2 px-2 py-2 text-xs border border-white/10 rounded-md bg-white/[0.02] w-full min-w-0 sm:flex-row sm:items-center sm:gap-2">
-                  <Input
-                    placeholder="Document name"
-                    value={docName}
-                    onChange={(e) => setDocName(e.target.value)}
-                    className="h-7 w-full min-w-[8rem] max-w-[14rem] bg-white/5 border-white/10 text-white placeholder:text-white/25"
-                  />
-                  <Select value={docType} onValueChange={(v) => setDocType(v as PersonDocumentTypeKey)}>
-                    <SelectTrigger className="h-7 w-full min-w-[9rem] max-w-[12rem] bg-white/5 border-white/10 text-white text-[11px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-64">
-                      {PERSON_DOCUMENT_TYPE_OPTIONS.map((value) => (
-                        <SelectItem key={value} value={value}>
-                          {personDocumentTypeLabel(value)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-white/55 whitespace-nowrap">
-                    <Checkbox
-                      checked={docDoesNotExpire}
-                      onCheckedChange={(v) => {
-                        setDocDoesNotExpire(v === true);
-                        if (v === true) setDocExpires("");
-                      }}
-                      className="border-white/30 data-[state=checked]:bg-violet-600"
+              <div className="rounded border border-white/10">
+              <div className="flex flex-col gap-2 px-2 py-2 text-xs border-b border-white/5 last:border-0 w-full min-w-0 sm:flex-row sm:items-center sm:gap-2">
+                  <div
+                    className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/35 flex items-center justify-center"
+                    aria-hidden
+                  >
+                    <File className="h-5 w-5 text-white/40" />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                    <Input
+                      placeholder="Document name"
+                      value={docName}
+                      onChange={(e) => setDocName(e.target.value)}
+                      className="h-7 w-full min-w-[8rem] max-w-[14rem] bg-white/5 border-white/10 text-white placeholder:text-white/25"
+                      aria-label="Document name"
                     />
-                    <span>Does not expire</span>
-                  </label>
-                  <DateInputWithWeekday
-                    value={docExpires}
-                    disabled={docDoesNotExpire}
-                    onChange={setDocExpires}
-                    className="h-7 rounded border border-white/10 bg-white/5 px-1.5 py-0 text-white text-[11px] disabled:opacity-40"
-                    weekdayClassName="text-sm text-white/45"
-                  />
-                  <Input
-                    type="file"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] ?? null;
-                      setDocFile(f);
-                      if (f && !docName.trim()) setDocName(f.name.replace(/\.[^.]+$/, ""));
-                    }}
-                    className="h-7 w-full min-w-[10rem] max-w-[16rem] bg-white/5 border-white/10 text-white file:text-white file:text-[10px] file:mr-2"
-                  />
-                  {person ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-7 shrink-0 bg-indigo-700 hover:bg-indigo-600 text-white"
-                      disabled={uploadDocMutation.isPending || !docFile}
-                      onClick={() => uploadDocMutation.mutate()}
-                    >
-                      {uploadDocMutation.isPending ? "Uploading…" : "Upload"}
-                    </Button>
-                  ) : null}
+                    <Select value={docType} onValueChange={(v) => setDocType(v as PersonDocumentTypeKey)}>
+                      <SelectTrigger
+                        className="h-7 w-full min-w-[9rem] max-w-[12rem] bg-white/5 border-white/10 text-white text-[11px]"
+                        aria-label="Document type"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#16161f] border-white/10 text-white max-h-64">
+                        {PERSON_DOCUMENT_TYPE_OPTIONS.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {personDocumentTypeLabel(value)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <label className="text-white/35 truncate text-[10px] sm:max-w-[10rem] cursor-pointer hover:text-white/55">
+                      <input
+                        type="file"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] ?? null;
+                          setDocFile(f);
+                          if (f && !docName.trim()) setDocName(f.name.replace(/\.[^.]+$/, ""));
+                        }}
+                      />
+                      <span title={docFile?.name}>
+                        {docFile?.name ?? "Choose file…"}
+                      </span>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-white/55 whitespace-nowrap">
+                      <Checkbox
+                        checked={docDoesNotExpire}
+                        onCheckedChange={(v) => {
+                          setDocDoesNotExpire(v === true);
+                          if (v === true) setDocExpires("");
+                        }}
+                        className="border-white/30 data-[state=checked]:bg-violet-600"
+                      />
+                      <span>Does not expire</span>
+                    </label>
+                    <DateInputWithWeekday
+                      value={docExpires}
+                      disabled={docDoesNotExpire}
+                      onChange={setDocExpires}
+                      className="h-7 rounded border border-white/10 bg-white/5 px-1.5 py-0 text-white text-[11px] disabled:opacity-40 disabled:cursor-not-allowed"
+                      weekdayClassName="text-sm text-white/45"
+                    />
+                    {person ? (
+                      <button
+                        type="button"
+                        className="text-blue-300 hover:text-blue-200 disabled:opacity-40"
+                        disabled={uploadDocMutation.isPending || !docFile}
+                        onClick={() => uploadDocMutation.mutate()}
+                      >
+                        {uploadDocMutation.isPending ? "…" : "Upload"}
+                      </button>
+                    ) : null}
+                  </div>
               </div>
-              {!person ? (
-                <p className="text-[11px] text-white/35">
-                  {t("people.documentAfterAdd")}
-                </p>
-              ) : null}
-              {personDocuments && personDocuments.length > 0 ? (
-                <div className="rounded border border-white/10">
-                  {personDocuments.map((doc) => (
+              {personDocuments && personDocuments.length > 0
+                ? personDocuments.map((doc) => (
                     <PersonDocumentListRow
                       key={doc.id}
                       ref={(h) => {
@@ -1949,8 +1962,13 @@ function PersonFormDialog({
                       onEditPermissions={(d) => setPermissionsDoc(d)}
                       onDelete={(id) => deleteDocMutation.mutate(id)}
                     />
-                  ))}
-                </div>
+                  ))
+                : null}
+              </div>
+              {!person ? (
+                <p className="text-[11px] text-white/35">
+                  {t("people.documentAfterAdd")}
+                </p>
               ) : null}
             </div>
             </div>
