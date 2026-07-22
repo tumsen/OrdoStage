@@ -4,16 +4,21 @@ import { parseDurationHours } from "@/lib/durationHours";
 export const COMP_TIME_MAX_MINUTES = 999 * 60 + 59;
 
 /** Total minutes → "H:MM" or "HHH:MM" (no fixed hour padding while typing). */
-export function formatCompTimeHhhMm(totalMinutes: number): string {
-  if (!Number.isFinite(totalMinutes)) return "0:00";
-  const sign = totalMinutes < 0 ? "-" : "";
+export function formatCompTimeHhhMm(
+  totalMinutes: number,
+  opts?: { showSign?: boolean }
+): string {
+  if (!Number.isFinite(totalMinutes)) return opts?.showSign ? "+0:00" : "0:00";
   const capped = Math.min(
     COMP_TIME_MAX_MINUTES,
     Math.max(0, Math.abs(Math.round(totalMinutes)))
   );
   const h = Math.floor(capped / 60);
   const m = capped % 60;
-  return `${sign}${h}:${String(m).padStart(2, "0")}`;
+  const body = `${h}:${String(m).padStart(2, "0")}`;
+  if (totalMinutes < 0) return `-${body}`;
+  if (opts?.showSign) return `+${body}`;
+  return body;
 }
 
 /**
@@ -35,8 +40,11 @@ export function parseCompTimeHhhMm(input: string): number | null {
 }
 
 /** Normalize free-form input to canonical HHH:MM on blur. */
-export function normalizeCompTimeHhhMm(input: string): string {
+export function normalizeCompTimeHhhMm(
+  input: string,
+  opts?: { showSign?: boolean }
+): string {
   const parsed = parseCompTimeHhhMm(input);
   if (parsed === null) return input.trim();
-  return formatCompTimeHhhMm(parsed);
+  return formatCompTimeHhhMm(parsed, opts);
 }

@@ -15,6 +15,11 @@ function todayIsoDate(): string {
   return format(new Date(), "yyyy-MM-dd");
 }
 
+const COMPACT_DAYS_CLASS =
+  "h-8 w-[calc(8ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white text-xs tabular-nums px-2";
+const COMPACT_DATE_CLASS =
+  "h-8 w-[10rem] shrink-0 bg-white/5 border-white/10 text-white text-xs [color-scheme:dark]";
+
 export function LeaveOpeningBalanceForm(props: {
   personId: string;
   leave: LeaveBalanceSummary;
@@ -110,10 +115,6 @@ export function LeaveOpeningBalanceForm(props: {
 
   if (!canEdit) return null;
 
-  const dateInputClass =
-    "h-8 w-full min-w-0 bg-white/5 border-white/10 text-white text-xs [color-scheme:dark]";
-  const rowClass = "grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(9.5rem,11rem)] items-end";
-
   return (
     <div
       className={
@@ -128,67 +129,64 @@ export function LeaveOpeningBalanceForm(props: {
       </div>
 
       <div className="space-y-2.5">
-        <div className={rowClass}>
-          <div className="space-y-1 min-w-0">
-            <Label className="text-[10px] text-white/45">{t("time.leaveVacationRemaining")}</Label>
+        <div className="space-y-1">
+          <Label className="text-[10px] text-white/45">{t("time.leaveVacationRemaining")}</Label>
+          <div className="flex flex-wrap items-center gap-2">
             <Input
               type="text"
               inputMode="decimal"
               value={vacationRemaining}
               onChange={(e) => setVacationRemaining(e.target.value)}
-              className="h-8 bg-white/5 border-white/10 text-white text-xs tabular-nums"
+              className={COMPACT_DAYS_CLASS}
+              aria-label={t("time.leaveVacationRemaining")}
             />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-white/45">{t("time.leaveOpeningBalanceEffectiveDate")}</Label>
             <Input
               type="date"
               value={vacationDate}
               onChange={(e) => setVacationDate(e.target.value)}
-              className={dateInputClass}
+              className={COMPACT_DATE_CLASS}
+              aria-label={`${t("time.leaveVacationRemaining")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
             />
           </div>
         </div>
 
-        <div className={rowClass}>
-          <div className="space-y-1 min-w-0">
-            <Label className="text-[10px] text-white/45">{t("time.leaveExtraRemaining")}</Label>
+        <div className="space-y-1">
+          <Label className="text-[10px] text-white/45">{t("time.leaveExtraRemaining")}</Label>
+          <div className="flex flex-wrap items-center gap-2">
             <Input
               type="text"
               inputMode="decimal"
               value={extraVacationRemaining}
               onChange={(e) => setExtraVacationRemaining(e.target.value)}
-              className="h-8 bg-white/5 border-white/10 text-white text-xs tabular-nums"
+              className={COMPACT_DAYS_CLASS}
+              aria-label={t("time.leaveExtraRemaining")}
             />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-white/45">{t("time.leaveOpeningBalanceEffectiveDate")}</Label>
             <Input
               type="date"
               value={extraVacationDate}
               onChange={(e) => setExtraVacationDate(e.target.value)}
-              className={dateInputClass}
+              className={COMPACT_DATE_CLASS}
+              aria-label={`${t("time.leaveExtraRemaining")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
             />
           </div>
         </div>
 
-        <div className={rowClass}>
-          <div className="space-y-1 min-w-0">
-            <Label className="text-[10px] text-white/45">{t("time.leaveOpeningBalanceCompTime")}</Label>
+        <div className="space-y-1">
+          <Label className="text-[10px] text-white/45">{t("time.leaveOpeningBalanceCompTime")}</Label>
+          <div className="flex flex-wrap items-center gap-2">
             <CompTimeHhhMmField
               valueMinutes={compTimeMinutes}
               onChangeMinutes={setCompTimeMinutes}
               allowNegative
+              showHint={false}
               aria-label={t("time.leaveOpeningBalanceCompTime")}
             />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-white/45">{t("time.leaveOpeningBalanceEffectiveDate")}</Label>
             <Input
               type="date"
               value={compTimeDate}
               onChange={(e) => setCompTimeDate(e.target.value)}
-              className={dateInputClass}
+              className={COMPACT_DATE_CLASS}
+              aria-label={`${t("time.leaveOpeningBalanceCompTime")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
             />
           </div>
         </div>
