@@ -15,10 +15,13 @@ function todayIsoDate(): string {
   return format(new Date(), "yyyy-MM-dd");
 }
 
-const COMPACT_DAYS_CLASS =
-  "h-8 w-[calc(9ch+1rem)] shrink-0 bg-white/5 border-white/10 text-white text-xs tabular-nums px-2";
-const COMPACT_DATE_CLASS =
-  "h-8 w-[10rem] shrink-0 bg-white/5 border-white/10 text-white text-xs [color-scheme:dark]";
+/** Fixed cell widths so ferie / feriefridage / overarbejde match exactly. */
+const VALUE_CELL = "w-[7.5rem] shrink-0";
+const DATE_CELL = "w-[10rem] shrink-0";
+const VALUE_INPUT =
+  "h-8 w-full min-w-0 bg-white/5 border-white/10 text-white text-xs tabular-nums font-mono px-2";
+const DATE_INPUT =
+  "h-8 w-full min-w-0 bg-white/5 border-white/10 text-white text-xs [color-scheme:dark]";
 
 export function LeaveOpeningBalanceForm(props: {
   personId: string;
@@ -131,63 +134,77 @@ export function LeaveOpeningBalanceForm(props: {
       <div className="space-y-2.5">
         <div className="space-y-1">
           <Label className="text-[10px] text-white/45">{t("time.leaveVacationRemaining")}</Label>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={vacationRemaining}
-              onChange={(e) => setVacationRemaining(e.target.value)}
-              className={COMPACT_DAYS_CLASS}
-              aria-label={t("time.leaveVacationRemaining")}
-            />
-            <Input
-              type="date"
-              value={vacationDate}
-              onChange={(e) => setVacationDate(e.target.value)}
-              className={COMPACT_DATE_CLASS}
-              aria-label={`${t("time.leaveVacationRemaining")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
-            />
+          <div className="flex items-center gap-2">
+            <div className={VALUE_CELL}>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={vacationRemaining}
+                onChange={(e) => setVacationRemaining(e.target.value)}
+                className={VALUE_INPUT}
+                aria-label={t("time.leaveVacationRemaining")}
+              />
+            </div>
+            <div className={DATE_CELL}>
+              <Input
+                type="date"
+                value={vacationDate}
+                onChange={(e) => setVacationDate(e.target.value)}
+                className={DATE_INPUT}
+                aria-label={`${t("time.leaveVacationRemaining")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
+              />
+            </div>
           </div>
         </div>
 
         <div className="space-y-1">
           <Label className="text-[10px] text-white/45">{t("time.leaveExtraRemaining")}</Label>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={extraVacationRemaining}
-              onChange={(e) => setExtraVacationRemaining(e.target.value)}
-              className={COMPACT_DAYS_CLASS}
-              aria-label={t("time.leaveExtraRemaining")}
-            />
-            <Input
-              type="date"
-              value={extraVacationDate}
-              onChange={(e) => setExtraVacationDate(e.target.value)}
-              className={COMPACT_DATE_CLASS}
-              aria-label={`${t("time.leaveExtraRemaining")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
-            />
+          <div className="flex items-center gap-2">
+            <div className={VALUE_CELL}>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={extraVacationRemaining}
+                onChange={(e) => setExtraVacationRemaining(e.target.value)}
+                className={VALUE_INPUT}
+                aria-label={t("time.leaveExtraRemaining")}
+              />
+            </div>
+            <div className={DATE_CELL}>
+              <Input
+                type="date"
+                value={extraVacationDate}
+                onChange={(e) => setExtraVacationDate(e.target.value)}
+                className={DATE_INPUT}
+                aria-label={`${t("time.leaveExtraRemaining")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
+              />
+            </div>
           </div>
         </div>
 
         <div className="space-y-1">
           <Label className="text-[10px] text-white/45">{t("time.leaveOpeningBalanceCompTime")}</Label>
-          <div className="flex flex-wrap items-center gap-2">
-            <CompTimeHhhMmField
-              valueMinutes={compTimeMinutes}
-              onChangeMinutes={setCompTimeMinutes}
-              allowNegative
-              showHint={false}
-              aria-label={t("time.leaveOpeningBalanceCompTime")}
-            />
-            <Input
-              type="date"
-              value={compTimeDate}
-              onChange={(e) => setCompTimeDate(e.target.value)}
-              className={COMPACT_DATE_CLASS}
-              aria-label={`${t("time.leaveOpeningBalanceCompTime")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
-            />
+          <div className="flex items-center gap-2">
+            <div className={VALUE_CELL}>
+              <CompTimeHhhMmField
+                valueMinutes={compTimeMinutes}
+                onChangeMinutes={setCompTimeMinutes}
+                allowNegative
+                showHint={false}
+                className="w-full"
+                inputClassName="w-full"
+                aria-label={t("time.leaveOpeningBalanceCompTime")}
+              />
+            </div>
+            <div className={DATE_CELL}>
+              <Input
+                type="date"
+                value={compTimeDate}
+                onChange={(e) => setCompTimeDate(e.target.value)}
+                className={DATE_INPUT}
+                aria-label={`${t("time.leaveOpeningBalanceCompTime")} ${t("time.leaveOpeningBalanceEffectiveDate")}`}
+              />
+            </div>
           </div>
         </div>
       </div>
