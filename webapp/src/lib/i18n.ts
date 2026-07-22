@@ -293,6 +293,8 @@ const en = {
     leaveProfileUseOrgDefaultsHint:
       "When on, weekly hours, vacation days, feriefridage, and monthly/annual hours follow the organization leave policy (Account → leave policy). Turn off to set personal values for this person below.",
     leaveProfileExtraVacation: "Feriefridage (days / year)",
+    leaveProfileWeeklyHours: "Weekly hours",
+    leaveProfileVacationDays: "Vacation days / year",
     leaveProfileMonthlyHours: "Monthly hours",
     leaveProfileAnnualHours: "Annual hours",
     leaveProfileSickStatus: "Sick leave status",
@@ -1061,6 +1063,8 @@ const da: DeepPartial<typeof en> = {
       "Når den er slået til, følger ugentlige timer, feriedage, feriefridage samt månedlige/årlige timer organisationens fraværspolitik (Konto → fraværspolitik). Slå fra for at sætte personlige værdier for denne person nedenfor.",
     leaveProfileExtraVacation: "Feriefridage",
     leaveProfileExtraVacationHint: "5 dage = 37 timer ved fuldtid (37 t/uge).",
+    leaveProfileWeeklyHours: "Ugentlige timer",
+    leaveProfileVacationDays: "Feriedage / år",
     leaveProfileMonthlyHours: "Månedlige timer",
     leaveProfileAnnualHours: "Årlige timer",
     leaveProfileSickStatus: "Sygefraværsstatus",
