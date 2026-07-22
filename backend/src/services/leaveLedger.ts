@@ -8,6 +8,7 @@ import {
   resolveNextVacationYear,
   resolveVacationYear,
   summarizeLeaveBalances,
+  workDayDurationMinutesFromHoursPerDay,
 } from "../rules/leave/danishLeave";
 import type {
   LeaveBalanceSummary,
@@ -220,14 +221,16 @@ export async function applyTimeEntryToLeaveLedger(
     0,
     Math.round((entry.endsAt.getTime() - entry.startsAt.getTime()) / 60_000)
   );
-  const maxDayMin = Math.round(norms.hoursPerVacationDay * 60);
+  const maxDayMin = workDayDurationMinutesFromHoursPerDay(norms.hoursPerVacationDay);
   const cappedDurationMin =
     maxDayMin > 0 ? Math.min(durationMin, maxDayMin) : durationMin;
 
   const amount =
     balanceType === "comp_time_used"
       ? cappedDurationMin
-      : minutesToVacationDays(cappedDurationMin, norms.hoursPerVacationDay);
+      : maxDayMin > 0 && Math.abs(cappedDurationMin - maxDayMin) <= 1
+        ? 1
+        : minutesToVacationDays(cappedDurationMin, norms.hoursPerVacationDay);
   if (amount <= 0) return;
 
   await syncVacationEarnedForPerson(entry.organizationId, entry.personId, entry.startsAt);

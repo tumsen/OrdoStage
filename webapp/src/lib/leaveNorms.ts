@@ -125,14 +125,37 @@ export function durationHmToMinutes(hm: string): number {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
-/** Convert leave minutes to days using weekly contract ÷ 5. */
+/**
+ * Convert leave minutes → days using weekly contract ÷ 5.
+ * Full work days (e.g. 7:24 / 7.4h at 37h/uge) stay whole numbers; decimals
+ * only when a true partial day is registered.
+ */
 export function minutesToLeaveDays(
   minutes: number,
   weeklyHours?: number | null
 ): number {
   const dayMin = workDayDurationMinutes(weeklyHours);
   if (dayMin <= 0 || !Number.isFinite(minutes)) return 0;
-  return Math.round((minutes / dayMin) * 100) / 100;
+  const sign = minutes < 0 ? -1 : 1;
+  const abs = Math.round(Math.abs(minutes));
+  if (abs === 0) return 0;
+
+  if (abs % dayMin === 0) return sign * (abs / dayMin);
+
+  const whole = Math.floor(abs / dayMin);
+  const rem = abs - whole * dayMin;
+  if (whole > 0 && rem <= whole) return sign * whole;
+  if (whole >= 0 && dayMin - rem <= Math.max(1, whole)) return sign * (whole + 1);
+
+  const raw = abs / dayMin;
+  const frac = raw - whole;
+  if (whole >= 1 && frac < 0.05) return sign * whole;
+  if (whole >= 1 && frac > 0.95) return sign * (whole + 1);
+
+  const partial = Math.round((rem / dayMin) * 100) / 100;
+  if (partial >= 1) return sign * (whole + 1);
+  if (partial <= 0) return sign * whole;
+  return sign * (whole + partial);
 }
 
 /** Display leave duration as days, e.g. `1d`, `0,5d`, `1.5d`. */

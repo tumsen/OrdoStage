@@ -14,6 +14,52 @@ export function hoursPerWorkDayFromWeekly(weeklyHours: number | null | undefined
   return DEFAULT_WEEKLY_HOURS / 5;
 }
 
+/** Whole-minute duration for one leave day (weekly ÷ 5). Prefer this over hours×60 float. */
+export function workDayDurationMinutes(weeklyHours: number | null | undefined): number {
+  const weekly = weeklyHours != null && weeklyHours > 0 ? weeklyHours : DEFAULT_WEEKLY_HOURS;
+  return Math.round((weekly * 60) / 5);
+}
+
+/** Day length in minutes from hours/day (e.g. 7.4 → 444), avoiding float drift. */
+export function workDayDurationMinutesFromHoursPerDay(hoursPerDay: number): number {
+  if (!(hoursPerDay > 0)) return 0;
+  // Classic 37h/5: use integer path when hours match the default fifth.
+  const defaultDay = workDayDurationMinutes(DEFAULT_WEEKLY_HOURS);
+  if (Math.abs(hoursPerDay * 60 - defaultDay) < 0.5) return defaultDay;
+  return Math.round(hoursPerDay * 60);
+}
+
+/**
+ * Convert leave minutes → days.
+ * Exact (or near-exact) full work days stay whole numbers — no 4.03 for 4×7:24.
+ * Decimals only when a true partial day remains.
+ */
+export function minutesToLeaveDaysFromDayMin(minutes: number, dayMin: number): number {
+  if (!(dayMin > 0) || !Number.isFinite(minutes)) return 0;
+  const sign = minutes < 0 ? -1 : 1;
+  const abs = Math.round(Math.abs(minutes));
+  if (abs === 0) return 0;
+
+  if (abs % dayMin === 0) return sign * (abs / dayMin);
+
+  const whole = Math.floor(abs / dayMin);
+  const rem = abs - whole * dayMin;
+  // ≤1 min drift per counted day (ISO/clock rounding) → still whole days
+  if (whole > 0 && rem <= whole) return sign * whole;
+  if (whole >= 0 && dayMin - rem <= Math.max(1, whole)) return sign * (whole + 1);
+
+  // Near-whole totals (e.g. 4×447 vs 4×444) when clearly not a partial-day registration
+  const raw = abs / dayMin;
+  const frac = raw - whole;
+  if (whole >= 1 && frac < 0.05) return sign * whole;
+  if (whole >= 1 && frac > 0.95) return sign * (whole + 1);
+
+  const partial = Math.round((rem / dayMin) * 100) / 100;
+  if (partial >= 1) return sign * (whole + 1);
+  if (partial <= 0) return sign * whole;
+  return sign * (whole + partial);
+}
+
 /**
  * Overtime vs prorated contract minutes.
  * When `includeLeaveInNorm` is true (Danish leave module): work + vacation +
@@ -247,8 +293,8 @@ export function accrueVacationEarnedForDateRange(
 }
 
 export function minutesToVacationDays(minutes: number, hoursPerDay: number): number {
-  if (hoursPerDay <= 0) return 0;
-  return Math.round((minutes / 60 / hoursPerDay) * 100) / 100;
+  const dayMin = workDayDurationMinutesFromHoursPerDay(hoursPerDay);
+  return minutesToLeaveDaysFromDayMin(minutes, dayMin);
 }
 
 export function categoryToLeaveBalanceType(
