@@ -219,6 +219,10 @@ export function PersonCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-white/90">{person.name}</span>
+          {person.workName?.trim() &&
+          person.workName.trim().toLowerCase() !== person.name.trim().toLowerCase() ? (
+            <span className="text-xs text-white/45">({person.workName.trim()})</span>
+          ) : null}
           <AffiliationBadge affiliation={person.affiliation ?? "internal"} />
           <PersonRoleBadge role={person.role} />
           {!isActive ? (
@@ -248,6 +252,17 @@ export function PersonCard({
               {person.email}
             </a>
           ) : null}
+          {person.workEmail?.trim() &&
+          person.workEmail.trim().toLowerCase() !== (person.email ?? "").trim().toLowerCase() ? (
+            <a
+              href={`mailto:${person.workEmail.trim()}`}
+              className="text-xs text-white/40 hover:text-blue-400 flex items-center gap-1 transition-colors"
+              title="Work email"
+            >
+              <Mail size={10} />
+              {person.workEmail.trim()}
+            </a>
+          ) : null}
           {person.phone ? (
             <a
               href={`tel:${person.phone}`}
@@ -255,6 +270,17 @@ export function PersonCard({
             >
               <Phone size={10} />
               {person.phone}
+            </a>
+          ) : null}
+          {person.workPhone?.trim() &&
+          person.workPhone.trim() !== (person.phone ?? "").trim() ? (
+            <a
+              href={`tel:${person.workPhone.trim()}`}
+              className="text-xs text-white/40 hover:text-blue-400 flex items-center gap-1 transition-colors"
+              title="Work phone"
+            >
+              <Phone size={10} />
+              {person.workPhone.trim()}
             </a>
           ) : null}
           {person.addressStreet || person.addressCity || person.addressCountry ? (

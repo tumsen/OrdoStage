@@ -360,6 +360,10 @@ model Person {
   addressCountry        String?
   /** Workplace / employer label (work section). */
   workplaceName         String?
+  /** Optional work display name (may differ from private name). */
+  workName              String?
+  workEmail             String?
+  workPhone             String?
   workAddressStreet     String?
   workAddressNumber     String?
   workAddressZip        String?

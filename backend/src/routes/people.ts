@@ -179,6 +179,9 @@ function serializePerson(person: {
   addressState:   string | null;
   addressCountry: string | null;
   workplaceName?: string | null;
+  workName?: string | null;
+  workEmail?: string | null;
+  workPhone?: string | null;
   workAddressStreet?: string | null;
   workAddressNumber?: string | null;
   workAddressZip?: string | null;
@@ -246,6 +249,9 @@ function serializePerson(person: {
     addressState:   person.addressState   ?? null,
     addressCountry: person.addressCountry ?? null,
     workplaceName: person.workplaceName ?? null,
+    workName: person.workName ?? null,
+    workEmail: person.workEmail ?? null,
+    workPhone: person.workPhone ?? null,
     workAddressStreet: person.workAddressStreet ?? null,
     workAddressNumber: person.workAddressNumber ?? null,
     workAddressZip: person.workAddressZip ?? null,
@@ -679,6 +685,9 @@ peopleRouter.post("/people", zValidator("json", CreatePersonSchema), async (c) =
       addressState:   body.addressState   ?? null,
       addressCountry: body.addressCountry ?? null,
       workplaceName: body.workplaceName ?? null,
+      workName: body.workName ?? null,
+      workEmail: body.workEmail?.trim() ? body.workEmail.trim() : null,
+      workPhone: body.workPhone ?? null,
       workAddressStreet: body.workAddressStreet ?? null,
       workAddressNumber: body.workAddressNumber ?? null,
       workAddressZip: body.workAddressZip ?? null,
@@ -967,6 +976,11 @@ peopleRouter.put("/people/:id", zValidator("json", UpdatePersonSchema), async (c
       ...(body.addressState   !== undefined && { addressState:   body.addressState }),
       ...(body.addressCountry !== undefined && { addressCountry: body.addressCountry }),
       ...(body.workplaceName !== undefined && { workplaceName: body.workplaceName }),
+      ...(body.workName !== undefined && { workName: body.workName }),
+      ...(body.workEmail !== undefined && {
+        workEmail: body.workEmail?.trim() ? body.workEmail.trim() : null,
+      }),
+      ...(body.workPhone !== undefined && { workPhone: body.workPhone }),
       ...(body.workAddressStreet !== undefined && { workAddressStreet: body.workAddressStreet }),
       ...(body.workAddressNumber !== undefined && { workAddressNumber: body.workAddressNumber }),
       ...(body.workAddressZip !== undefined && { workAddressZip: body.workAddressZip }),

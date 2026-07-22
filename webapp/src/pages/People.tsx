@@ -111,6 +111,9 @@ const PersonFormSchema = z.object({
   addressState:   z.string().optional(),
   addressCountry: z.string().optional(),
   workplaceName: z.string().optional(),
+  workName: z.string().optional(),
+  workEmail: z.string().email("Invalid email").optional().or(z.literal("")),
+  workPhone: z.string().optional(),
   workAddressStreet:  z.string().optional(),
   workAddressNumber:  z.string().optional(),
   workAddressZip:     z.string().optional(),
@@ -407,6 +410,9 @@ function PersonFormDialog({
           addressState:   person.addressState   ?? "",
           addressCountry: person.addressCountry ?? "",
           workplaceName: person.workplaceName ?? "",
+          workName: person.workName ?? "",
+          workEmail: person.workEmail ?? "",
+          workPhone: person.workPhone ?? "",
           workAddressStreet:  person.workAddressStreet  ?? "",
           workAddressNumber:  person.workAddressNumber  ?? "",
           workAddressZip:     person.workAddressZip     ?? "",
@@ -435,6 +441,9 @@ function PersonFormDialog({
           addressState:   "",
           addressCountry: "",
           workplaceName: "",
+          workName: "",
+          workEmail: "",
+          workPhone: "",
           workAddressStreet:  "",
           workAddressNumber:  "",
           workAddressZip:     "",
@@ -670,6 +679,9 @@ function PersonFormDialog({
         addressState:   values.addressState   || undefined,
         addressCountry: values.addressCountry || undefined,
         workplaceName: values.workplaceName || undefined,
+        workName: values.workName || undefined,
+        workEmail: values.workEmail || undefined,
+        workPhone: values.workPhone || undefined,
         workAddressStreet:  values.workAddressStreet  || undefined,
         workAddressNumber:  values.workAddressNumber  || undefined,
         workAddressZip:     values.workAddressZip     || undefined,
@@ -1027,14 +1039,14 @@ function PersonFormDialog({
       : null);
 
   const profileImageFields = (
-    <>
+    <div className="space-y-2">
       <p className="text-[11px] text-white/35">
         {person?.id
           ? "Uploads automatically when you choose a file."
           : t("people.photoAfterAdd")}
       </p>
-      {profileImageSrc ? (
-        <div className="space-y-2">
+      <div className="flex flex-wrap items-start gap-3">
+        {profileImageSrc ? (
           <CircularPhotoEditor
             src={profileImageSrc}
             alt={person ? `${person.name} profile` : "Profile preview"}
@@ -1046,34 +1058,45 @@ function PersonFormDialog({
             editable
             hoverPreview
           />
-          <p className="text-[10px] text-white/40">
-            Drag to pan and scroll or use the zoom slider to scale. Crop saves automatically when you leave the page.
-          </p>
+        ) : (
+          <div
+            className="h-40 w-40 shrink-0 rounded-full border border-dashed border-white/15 bg-white/[0.03] flex items-center justify-center"
+            aria-hidden
+          >
+            <User size={36} className="text-white/25" />
+          </div>
+        )}
+        <div className="flex min-w-0 flex-1 flex-col gap-2 justify-center self-center">
+          <Input
+            type="file"
+            accept="image/*"
+            disabled={uploadPhotoMutation.isPending}
+            onChange={(e) => handleProfilePhotoChange(e.target.files?.[0] ?? null)}
+            className="max-w-sm bg-white/5 border-white/10 text-white file:text-white"
+          />
+          {person?.hasPhoto && person?.id ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-fit border-white/15 text-white/70"
+              disabled={removePhotoMutation.isPending || uploadPhotoMutation.isPending}
+              onClick={() => removePhotoMutation.mutate()}
+            >
+              {removePhotoMutation.isPending ? "Deleting…" : "Delete image"}
+            </Button>
+          ) : null}
+          {uploadPhotoMutation.isPending ? (
+            <p className="text-xs text-white/45">Uploading profile image…</p>
+          ) : null}
+          {profileImageSrc ? (
+            <p className="text-[10px] text-white/40 max-w-sm">
+              Drag to pan and scroll or use the zoom slider to scale. Crop saves automatically when you leave the page.
+            </p>
+          ) : null}
         </div>
-      ) : null}
-      <Input
-        type="file"
-        accept="image/*"
-        disabled={uploadPhotoMutation.isPending}
-        onChange={(e) => handleProfilePhotoChange(e.target.files?.[0] ?? null)}
-        className="bg-white/5 border-white/10 text-white file:text-white"
-      />
-      {uploadPhotoMutation.isPending ? (
-        <p className="text-xs text-white/45">Uploading profile image…</p>
-      ) : null}
-      {person?.hasPhoto && person?.id ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="border-white/15 text-white/70"
-          disabled={removePhotoMutation.isPending || uploadPhotoMutation.isPending}
-          onClick={() => removePhotoMutation.mutate()}
-        >
-          {removePhotoMutation.isPending ? "Deleting…" : "Delete image"}
-        </Button>
-      ) : null}
-    </>
+      </div>
+    </div>
   );
 
   const formFooter = (
@@ -1158,6 +1181,38 @@ function PersonFormDialog({
                 placeholder={t("people.workplacePlaceholder")}
                 className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
               />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workName")}</Label>
+            <Input
+              {...form.register("workName")}
+              placeholder={t("people.workNamePlaceholder")}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workPhone")}</Label>
+              <Input
+                {...form.register("workPhone")}
+                placeholder="+45 00 00 00 00"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/50 text-xs uppercase tracking-wide">{t("people.workEmail")}</Label>
+              <Input
+                {...form.register("workEmail")}
+                type="email"
+                placeholder="work@example.com"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-white/30"
+              />
+              {form.formState.errors.workEmail ? (
+                <p className="text-red-400 text-xs">{form.formState.errors.workEmail.message}</p>
+              ) : null}
             </div>
           </div>
 
