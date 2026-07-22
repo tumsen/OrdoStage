@@ -2494,7 +2494,7 @@ timeRouter.post("/time/projects", zValidator("json", CreateTimeProjectSchema), a
       {
         error: {
           message:
-            "Fravær indeholder kun systemprojekter (Ferie, Sygdom, Feriefridage, …). Opret ikke egne projekter der.",
+            "Fravær indeholder kun systemprojekter (Ferie, Sygdom, Feriefridag, …). Opret ikke egne projekter der.",
           code: "FORBIDDEN",
         },
       },

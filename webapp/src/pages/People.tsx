@@ -1067,7 +1067,7 @@ function PersonFormDialog({
           leaveExtraVacationDays.trim() === ""
             ? DEFAULT_EXTRA_VACATION_DAYS
             : parseFloat(leaveExtraVacationDays.replace(",", "."));
-        if (Number.isNaN(extraParsed)) throw new Error("Feriefridage must be a number");
+        if (Number.isNaN(extraParsed)) throw new Error("Feriefridag must be a number");
         await api.patch(`/api/people/${personId}/leave-profile`, {
           useOrgDefaults: false,
           weeklyContractHours: wh,

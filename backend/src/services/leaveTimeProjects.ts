@@ -41,7 +41,7 @@ const LEAVE_PROJECT_DEFS: Record<
   },
   extra_vacation: {
     systemKey: "leave_extra_vacation",
-    name: "Feriefridage",
+    name: "Feriefridag",
     color: "#2dd4bf",
     sortOrder: -44,
   },
