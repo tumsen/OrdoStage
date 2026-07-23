@@ -1458,9 +1458,29 @@ export default function TimeReport() {
                   </span>
                 </span>
               ) : null}
-              {periodOverview.compBalance != null ? (
+              {periodOverview.deviation != null ? (
                 <span className="whitespace-nowrap tabular-nums">
                   <span className="text-white/40">{t("time.leaveWorkAccount")}:</span>{" "}
+                  <span
+                    className={cn(
+                      "font-medium",
+                      periodOverview.deviation > 0
+                        ? "text-cyan-300"
+                        : periodOverview.deviation < 0
+                          ? "text-orange-300"
+                          : "text-white/70"
+                    )}
+                  >
+                    {fmtSignedMins(periodOverview.deviation)}
+                  </span>
+                  <span className="text-white/35 ml-1.5">
+                    ({t("time.reportWorkAccountEqualsOvertime")})
+                  </span>
+                </span>
+              ) : null}
+              {periodOverview.compBalance != null ? (
+                <span className="whitespace-nowrap tabular-nums">
+                  <span className="text-white/40">{t("time.reportColCompBalance")}:</span>{" "}
                   <span
                     className={cn(
                       "font-medium",
