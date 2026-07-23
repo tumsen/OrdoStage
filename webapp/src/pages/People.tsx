@@ -452,7 +452,19 @@ function PersonFormDialog({
 
   function weeklyFromPeriodValue(value: number, period: "weekly" | "monthly" | "annual"): number {
     if (period === "monthly") return (value * 12) / 52;
-    if (period === "annual") return value / 52;
+    if (period === "annual") {
+      // Bruttonorm: annual hours → weekly via this year's weekdays × daily
+      const year = new Date().getFullYear();
+      let weekdays = 0;
+      for (let m = 0; m < 12; m++) {
+        const daysInMonth = new Date(year, m + 1, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dow = new Date(year, m, d).getDay();
+          if (dow >= 1 && dow <= 5) weekdays += 1;
+        }
+      }
+      return weekdays > 0 ? (value * 5) / weekdays : value / 52;
+    }
     return value;
   }
 
@@ -463,7 +475,20 @@ function PersonFormDialog({
       : null;
   const derivedDailyHours = weeklyHoursValid != null ? weeklyHoursValid / 5 : null;
   const derivedMonthlyHours = weeklyHoursValid != null ? (weeklyHoursValid * 52) / 12 : null;
-  const derivedAnnualHours = weeklyHoursValid != null ? weeklyHoursValid * 52 : null;
+  const currentYearWeekdays = useMemo(() => {
+    const year = new Date().getFullYear();
+    let weekdays = 0;
+    for (let m = 0; m < 12; m++) {
+      const daysInMonth = new Date(year, m + 1, 0).getDate();
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dow = new Date(year, m, d).getDay();
+        if (dow >= 1 && dow <= 5) weekdays += 1;
+      }
+    }
+    return weekdays;
+  }, []);
+  const derivedAnnualHours =
+    weeklyHoursValid != null ? (currentYearWeekdays * weeklyHoursValid) / 5 : null;
 
   const { data: orgFeatures } = useQuery({
     queryKey: ["org", "features"],
@@ -1062,7 +1087,11 @@ function PersonFormDialog({
       const vd = DK_STATUTORY_VACATION_DAYS;
       const monthly =
         wh === null ? null : Math.round(((wh * 52) / 12) * 100) / 100;
-      const annual = wh === null ? null : Math.round(wh * 52 * 100) / 100;
+      // Bruttonorm for this calendar year: weekdays × daily hours
+      const annual =
+        wh === null
+          ? null
+          : Math.round(((currentYearWeekdays * wh) / 5) * 100) / 100;
       const startYmd = employmentStartDate.trim() === "" ? null : employmentStartDate.trim();
       if (startYmd && !/^\d{4}-\d{2}-\d{2}$/.test(startYmd)) {
         throw new Error("Employment start date must be yyyy-MM-dd");

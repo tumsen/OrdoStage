@@ -171,7 +171,7 @@ export function resolveLeaveNorms(
   const annualContractHours =
     !useOrg && profile?.annualContractHours != null
       ? profile.annualContractHours
-      : weekly * 52;
+      : weekly * 52; // display fallback; period norms use weekdays × daily
 
   return {
     weeklyContractHours: weekly,
@@ -358,8 +358,9 @@ export function employmentStartYmd(
 }
 
 /**
- * Inclusive calendar-day count for contract/OT, starting no earlier than employment start.
+ * Inclusive calendar-day count, starting no earlier than employment start.
  * Returns 0 when employment begins after the period.
+ * Prefer {@link employmentAwareWeekdayCount} for bruttonorm (work/OT).
  */
 export function employmentAwareInclusiveDayCount(
   periodFromYmd: string,
@@ -375,6 +376,54 @@ export function employmentAwareInclusiveDayCount(
   const b = DateTime.fromFormat(periodToYmdInclusive, "yyyy-MM-dd", { zone: "utc" });
   if (!a.isValid || !b.isValid) return 0;
   return Math.max(0, Math.floor(b.diff(a, "days").days) + 1);
+}
+
+/**
+ * Count Mon–Fri days in [from, to] inclusive, starting no earlier than employment start.
+ * Bruttonorm = this × daily work minutes (weekly ÷ 5, e.g. 7.4h at 37h/week).
+ */
+export function employmentAwareWeekdayCount(
+  periodFromYmd: string,
+  periodToYmdInclusive: string,
+  employmentStartYmdValue: string | null | undefined,
+  zone = "utc"
+): number {
+  const from =
+    employmentStartYmdValue && employmentStartYmdValue > periodFromYmd
+      ? employmentStartYmdValue
+      : periodFromYmd;
+  if (from > periodToYmdInclusive) return 0;
+  let cursor = DateTime.fromFormat(from, "yyyy-MM-dd", { zone });
+  const end = DateTime.fromFormat(periodToYmdInclusive, "yyyy-MM-dd", { zone });
+  if (!cursor.isValid || !end.isValid) return 0;
+  let n = 0;
+  while (cursor <= end) {
+    // Luxon weekday: 1 = Monday … 7 = Sunday
+    if (cursor.weekday >= 1 && cursor.weekday <= 5) n += 1;
+    cursor = cursor.plus({ days: 1 });
+  }
+  return n;
+}
+
+/**
+ * Contract / bruttonorm minutes for a period: weekdays × daily norm (weekly ÷ 5).
+ * Honours employment start date.
+ */
+export function contractMinutesForWeekdayPeriod(
+  weeklyHours: number | null | undefined,
+  periodFromYmd: string,
+  periodToYmdInclusive: string,
+  employmentStartYmdValue?: string | null,
+  zone = "utc"
+): number | null {
+  if (weeklyHours == null || !(weeklyHours > 0)) return null;
+  const weekdays = employmentAwareWeekdayCount(
+    periodFromYmd,
+    periodToYmdInclusive,
+    employmentStartYmdValue,
+    zone
+  );
+  return weekdays * workDayDurationMinutes(weeklyHours);
 }
 
 /** Whether an instant’s local calendar day is on/after employment start (or start unset). */

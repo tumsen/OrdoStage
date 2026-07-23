@@ -1925,7 +1925,9 @@ export const TimeReportPersonSchema = z.object({
   holidayMinutes: z.number(),
   travelAllowanceMinutes: z.number(),
   weeklyContractHours: z.number().nullable(),
-  /** Calendar days used for contractMinutes (may be shorter than report range after hire date). */
+  /** Mon–Fri days in the period used for bruttonorm (after employment start). */
+  contractWeekdays: z.number().nullable().optional(),
+  /** @deprecated Alias of contractWeekdays (weekday count, not calendar days). */
   contractRangeDays: z.number().nullable().optional(),
   employmentStartDate: z
     .string()

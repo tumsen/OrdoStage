@@ -23,7 +23,7 @@ import {
   postLeaveTransaction,
   sumCompTimeUsedMinutesInRange,
 } from "../services/leaveLedger";
-import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays, accrueVacationEarnedForDateRange, employmentAwareInclusiveDayCount, employmentStartYmd } from "../rules/leave/danishLeave";
+import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays, accrueVacationEarnedForDateRange, contractMinutesForWeekdayPeriod, employmentStartYmd } from "../rules/leave/danishLeave";
 import { DateTime } from "luxon";
 import { getClientWallClockZone } from "../clientWallClock";
 
@@ -565,11 +565,13 @@ leaveRouter.get("/time/payroll-export", async (c) => {
     const vacationUsedInPeriod = minutesToVacationDays(vacationMinutes, hoursPerDay);
     const extraVacationUsedInPeriod = minutesToVacationDays(extraVacationMinutes, hoursPerDay);
     const sickDaysInPeriod = minutesToVacationDays(sickMinutes, hoursPerDay);
-    const personRangeDays = employmentAwareInclusiveDayCount(fromStr, toStr, hireYmd);
-    const contractMinutes =
-      norms.weeklyContractHours != null
-        ? (personRangeDays / 7) * norms.weeklyContractHours * 60
-        : null;
+    const contractMinutes = contractMinutesForWeekdayPeriod(
+      norms.weeklyContractHours,
+      fromStr,
+      toStr,
+      hireYmd,
+      zone
+    );
     const overtimeMinutes = positiveOvertimeMinutes(
       { workMinutes, vacationMinutes, extraVacationMinutes, holidayMinutes },
       contractMinutes,

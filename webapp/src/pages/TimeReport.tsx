@@ -73,6 +73,7 @@ import {
   vacationYearFromStartYear,
   DEFAULT_VACATION_YEAR_POLICY,
   formatLeaveDaysFromMinutes,
+  workDayDurationMinutes,
 } from "@/lib/leaveNorms";
 import { isCountryFeatureEnabled } from "@/lib/countryFeatures";
 import type { OrganizationCountryFeatures } from "@/lib/countryFeatures";
@@ -1068,9 +1069,10 @@ export default function TimeReport() {
       const contractHours = contractOverrides.has(p.personId)
         ? contractOverrides.get(p.personId)
         : p.weeklyContractHours;
+      const weekdays = p.contractWeekdays ?? p.contractRangeDays ?? null;
       const contractMinutes =
-        contractHours != null
-          ? ((p.contractRangeDays ?? report.summary.rangeDays) / 7) * contractHours * 60
+        contractHours != null && weekdays != null
+          ? weekdays * workDayDurationMinutes(contractHours)
           : null;
       return {
         ...p,

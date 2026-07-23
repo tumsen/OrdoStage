@@ -11,7 +11,8 @@ import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { getCountryRuleSet, type TravelAllowanceType, type TravelClaimDayLine, type MileageVehicleType } from "../rules/countryRuleSets";
 import { isCountryFeatureEnabled } from "../countryFeatures";
 import {
-  employmentAwareInclusiveDayCount,
+  contractMinutesForWeekdayPeriod,
+  employmentAwareWeekdayCount,
   employmentStartYmd,
   hoursPerWorkDayFromWeekly,
   minutesToVacationDays,
@@ -1711,15 +1712,19 @@ timeRouter.get("/time/report", async (c) => {
       pa.sickMinutes +
       pa.holidayMinutes +
       pa.travelAllowanceMinutes;
-    const personRangeDays = employmentAwareInclusiveDayCount(
+    const personWeekdays = employmentAwareWeekdayCount(
       reportPeriodFromYmd,
       reportPeriodToYmd,
-      pa.employmentStartYmd
+      pa.employmentStartYmd,
+      clientZone
     );
-    const contractMinutes =
-      pa.weeklyContractHours != null
-        ? (personRangeDays / 7) * pa.weeklyContractHours * 60
-        : null;
+    const contractMinutes = contractMinutesForWeekdayPeriod(
+      pa.weeklyContractHours,
+      reportPeriodFromYmd,
+      reportPeriodToYmd,
+      pa.employmentStartYmd,
+      clientZone
+    );
     // Leave days: integer work-day minutes (37h → 444 min = 7:24), not float hours÷7.4
     const hoursPerDay = hoursPerWorkDayFromWeekly(pa.weeklyContractHours);
     const vacationDaysUsed = minutesToVacationDays(pa.vacationMinutes, hoursPerDay);
@@ -1756,7 +1761,9 @@ timeRouter.get("/time/report", async (c) => {
       holidayMinutes: pa.holidayMinutes,
       travelAllowanceMinutes: pa.travelAllowanceMinutes,
       weeklyContractHours: pa.weeklyContractHours,
-      contractRangeDays: pa.weeklyContractHours != null ? personRangeDays : null,
+      contractWeekdays: pa.weeklyContractHours != null ? personWeekdays : null,
+      /** @deprecated use contractWeekdays — kept for older clients */
+      contractRangeDays: pa.weeklyContractHours != null ? personWeekdays : null,
       employmentStartDate: pa.employmentStartYmd,
       contractMinutes,
       overtimeMinutes: overtimeAgainstContract(
