@@ -2373,6 +2373,10 @@ export default function TimeTracking() {
                 setEditingEntryId(item.id);
               }}
               onDateClick={(day) => {
+                if (copySourceEntry && canEditVisiblePeriod) {
+                  pasteCopyToDay(format(day, "yyyy-MM-dd"));
+                  return;
+                }
                 setAnchor(day);
                 setMode("week");
               }}
@@ -3488,6 +3492,13 @@ export default function TimeTracking() {
         saving={updateEntry.isPending}
         onDelete={(id) => deleteEntry.mutate(id)}
         deleting={deleteEntry.isPending}
+        onCopy={
+          canEditVisiblePeriod
+            ? (entry) => {
+                setCopySourceEntry(entry);
+              }
+            : undefined
+        }
         entrySummary={editingEntryJobSummary}
         leaveManagementEnabled={leaveManagementEnabled}
         workDayDurationMinutes={workDayMinutes}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { format, parseISO } from "date-fns";
-import { ChevronsUpDown, Lock, LockOpen } from "lucide-react";
+import { Copy, ChevronsUpDown, Lock, LockOpen } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -120,6 +120,8 @@ export function TimeEntryEditSheet(props: {
   saving: boolean;
   onDelete: (id: string) => void;
   deleting: boolean;
+  /** Enter copy mode with this entry (parent pastes on next day click). */
+  onCopy?: (entry: TimeEntry) => void;
   entrySummary?: string | null;
   leaveManagementEnabled?: boolean;
   /** One vacation/sick day in minutes (weekly contract ÷ 5). */
@@ -141,6 +143,7 @@ export function TimeEntryEditSheet(props: {
     saving,
     onDelete,
     deleting,
+    onCopy,
     entrySummary,
     leaveManagementEnabled = false,
     workDayDurationMinutes = 0,
@@ -720,6 +723,24 @@ export function TimeEntryEditSheet(props: {
             error={entryAutoSave.error}
             className="w-full justify-center"
           />
+          {onCopy && entry ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-white/15 text-white/80"
+              disabled={saving || deleting}
+              onClick={() => {
+                const source = entry;
+                void entryAutoSave.flush().finally(() => {
+                  onCopy(source);
+                  onOpenChange(false);
+                });
+              }}
+            >
+              <Copy className="mr-1.5 h-3.5 w-3.5" />
+              {t("time.copyEntry")}
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"
