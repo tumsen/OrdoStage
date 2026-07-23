@@ -90,7 +90,7 @@ export function CalendarCell({
     >
       {/* Day number */}
       <div className="flex items-center justify-between gap-1 px-0.5">
-        <div className="flex min-w-0 items-baseline gap-1">
+        <div className="flex min-w-0 items-center gap-1">
           <span
             className={cn(
               "text-xs font-medium leading-none shrink-0",
@@ -99,20 +99,20 @@ export function CalendarCell({
           >
             {date.getDate()}
           </span>
-          {dayTotalMinutes > 0 ? (
-            <span
-              className={cn(
-                "truncate text-[10px] leading-none tabular-nums",
-                isToday ? "text-indigo-200/75" : "text-white/45"
-              )}
-              title={formatMinutesAsDurationBoth(dayTotalMinutes, commaDec)}
-            >
-              {formatMinutesAsDurationBoth(dayTotalMinutes, commaDec)}
-            </span>
+          {isToday ? (
+            <span className={cn(CALENDAR_TODAY_LABEL_CLASS, "shrink-0")}>{t("common.today")}</span>
           ) : null}
         </div>
-        {isToday ? (
-          <span className={cn(CALENDAR_TODAY_LABEL_CLASS, "shrink-0")}>{t("common.today")}</span>
+        {dayTotalMinutes > 0 ? (
+          <span
+            className={cn(
+              "shrink-0 text-[10px] leading-none tabular-nums",
+              isToday ? "text-indigo-200/75" : "text-white/45"
+            )}
+            title={formatMinutesAsDurationBoth(dayTotalMinutes, commaDec)}
+          >
+            {formatMinutesAsDurationBoth(dayTotalMinutes, commaDec)}
+          </span>
         ) : null}
       </div>
 
