@@ -128,6 +128,7 @@ export default function TimeImport() {
     batchId: string;
     imported: number;
     skipped: number;
+    skippedDuplicates: number;
   } | null>(null);
 
   const { data: batches } = useQuery({
@@ -224,6 +225,7 @@ export default function TimeImport() {
       let offset = 0;
       let totalImported = 0;
       let totalSkipped = 0;
+      let totalSkippedDuplicates = 0;
       const limit = 200;
 
       setImportProgress({ imported: 0, total: preview?.entryCount ?? 0 });
@@ -233,6 +235,7 @@ export default function TimeImport() {
           batchId: string;
           imported: number;
           skipped: number;
+          skippedDuplicates: number;
           done: boolean;
           nextOffset: number;
           totalSlots: number;
@@ -245,9 +248,15 @@ export default function TimeImport() {
         batchId = data.batchId;
         totalImported += data.imported;
         totalSkipped += data.skipped;
+        totalSkippedDuplicates += data.skippedDuplicates ?? 0;
         setImportProgress({ imported: totalImported, total: data.totalSlots });
         if (data.done) {
-          return { batchId: data.batchId, imported: totalImported, skipped: totalSkipped };
+          return {
+            batchId: data.batchId,
+            imported: totalImported,
+            skipped: totalSkipped,
+            skippedDuplicates: totalSkippedDuplicates,
+          };
         }
         offset = data.nextOffset;
       }
@@ -257,9 +266,13 @@ export default function TimeImport() {
       setImportProgress(null);
       queryClient.invalidateQueries({ queryKey: ["time-import-batches"] });
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
+      const dupPart =
+        data.skippedDuplicates > 0
+          ? `, ${data.skippedDuplicates} ${t("time.importEntriesSkippedDuplicates")}`
+          : "";
       toast({
         title: t("time.importDone"),
-        description: `${data.imported} ${t("time.importEntriesImported")}`,
+        description: `${data.imported} ${t("time.importEntriesImported")}${dupPart}`,
       });
     },
     onError: (e: Error) => {
@@ -634,8 +647,14 @@ export default function TimeImport() {
 
               {importResult ? (
                 <p className="text-xs text-emerald-300/80">
-                  {t("time.importDone")}: {importResult.imported} importeret, {importResult.skipped}{" "}
-                  sprunget over (batch {importResult.batchId.slice(0, 8)}…)
+                  {t("time.importDone")}: {importResult.imported} {t("time.importEntriesImported")}
+                  {importResult.skippedDuplicates > 0
+                    ? `, ${importResult.skippedDuplicates} ${t("time.importEntriesSkippedDuplicates")}`
+                    : ""}
+                  {importResult.skipped > importResult.skippedDuplicates
+                    ? `, ${importResult.skipped - importResult.skippedDuplicates} ${t("time.importEntriesSkippedOther")}`
+                    : ""}{" "}
+                  (batch {importResult.batchId.slice(0, 8)}…)
                 </p>
               ) : null}
             </>

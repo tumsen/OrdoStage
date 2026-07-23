@@ -323,6 +323,14 @@ function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
+/**
+ * Same person + exact start/end → already exists.
+ * Do not include project/category: remapped imports may have moved entries to other projects.
+ */
+function timeEntryDedupeKey(personId: string, startsAt: Date, endsAt: Date): string {
+  return `${personId}\0${startsAt.toISOString()}\0${endsAt.toISOString()}`;
+}
+
 async function resolveTagIds(
   organizationId: string,
   externalTags: string[],
@@ -428,6 +436,7 @@ export async function runTimerlyImport(input: {
 
   let imported = 0;
   let skipped = 0;
+  let skippedDuplicates = 0;
   const errors: { rowIndex: number; reason: string }[] = [];
   const creates: {
     organizationId: string;
@@ -444,6 +453,8 @@ export async function runTimerlyImport(input: {
     importExternalTags: string | null;
     tagIds: string[];
   }[] = [];
+  /** Dedupes within this CSV chunk before checking the database. */
+  const pendingKeys = new Set<string>();
 
   for (const slot of slice) {
     const personId = personByExternal.get(slot.personName);
@@ -472,6 +483,14 @@ export async function runTimerlyImport(input: {
       continue;
     }
 
+    const dedupeKey = timeEntryDedupeKey(personId, times.startsAt, times.endsAt);
+    if (pendingKeys.has(dedupeKey)) {
+      skipped++;
+      skippedDuplicates++;
+      continue;
+    }
+    pendingKeys.add(dedupeKey);
+
     const tagIds = uniqueStrings(
       slot.tags
         .map((t) => tagLookup.get(t))
@@ -495,9 +514,48 @@ export async function runTimerlyImport(input: {
     });
   }
 
+  let toCreate = creates;
   if (creates.length > 0) {
+    const personIds = [...new Set(creates.map((c) => c.personId))];
+    let minStart = creates[0]!.startsAt;
+    let maxStart = creates[0]!.startsAt;
+    for (const c of creates) {
+      if (c.startsAt < minStart) minStart = c.startsAt;
+      if (c.startsAt > maxStart) maxStart = c.startsAt;
+    }
+
+    const existing = await prisma.timeEntry.findMany({
+      where: {
+        organizationId: input.organizationId,
+        personId: { in: personIds },
+        startsAt: { gte: minStart, lte: maxStart },
+      },
+      select: {
+        personId: true,
+        startsAt: true,
+        endsAt: true,
+      },
+    });
+
+    const existingKeys = new Set(
+      existing.map((e) => timeEntryDedupeKey(e.personId, e.startsAt, e.endsAt))
+    );
+
+    toCreate = [];
+    for (const row of creates) {
+      const key = timeEntryDedupeKey(row.personId, row.startsAt, row.endsAt);
+      if (existingKeys.has(key)) {
+        skipped++;
+        skippedDuplicates++;
+        continue;
+      }
+      toCreate.push(row);
+    }
+  }
+
+  if (toCreate.length > 0) {
     const created = await prisma.$transaction(
-      creates.map((row) =>
+      toCreate.map((row) =>
         prisma.timeEntry.create({
           data: {
             organizationId: row.organizationId,
@@ -520,7 +578,7 @@ export async function runTimerlyImport(input: {
         })
       )
     );
-    imported = creates.length;
+    imported = toCreate.length;
     for (const entry of created) {
       if (
         entry.category === "vacation" ||
@@ -551,6 +609,7 @@ export async function runTimerlyImport(input: {
     batchId,
     imported,
     skipped,
+    skippedDuplicates,
     done,
     nextOffset: done ? slots.length : nextOffset,
     totalSlots: slots.length,

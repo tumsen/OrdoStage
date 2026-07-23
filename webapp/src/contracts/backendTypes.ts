@@ -1572,6 +1572,8 @@ export const TimeImportRunResultSchema = z.object({
   batchId: z.string(),
   imported: z.number(),
   skipped: z.number(),
+  /** Rows skipped because the same person + start/end already exists (ignores project/category). */
+  skippedDuplicates: z.number(),
   done: z.boolean(),
   nextOffset: z.number(),
   totalSlots: z.number(),
