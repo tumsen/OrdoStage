@@ -2369,6 +2369,7 @@ export default function TimeTracking() {
               month={anchor.getMonth()}
               items={monthCalendarItems}
               pillLimit={6}
+              dayTotalsByYmd={totalsByColumnDay}
               onItemClick={(item) => {
                 setEditingEntryId(item.id);
               }}

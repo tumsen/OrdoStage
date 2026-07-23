@@ -13,12 +13,15 @@ import {
   calendarVenueBookingSummaryLine,
   backingVenueBookingForEvent,
   orphanBackingVenueBookings,
+  toDateStr,
 } from "./scheduleUtils";
 import {
   CALENDAR_TODAY_CELL_CLASS,
   CALENDAR_TODAY_DAY_NUMBER_CLASS,
   CALENDAR_TODAY_LABEL_CLASS,
 } from "@/lib/weekGridColumns";
+import { formatMinutesAsDurationBoth } from "@/lib/durationHours";
+import { commaDecimalForLanguage } from "@/lib/timeGrid";
 
 const PILL_LIMIT = 3;
 
@@ -29,6 +32,8 @@ interface CalendarCellProps {
   onItemClick: (item: CalendarItem) => void;
   onDateClick?: (date: Date) => void;
   pillLimit?: number;
+  /** Optional day hour totals (yyyy-MM-dd → minutes). Shown after the date number. */
+  dayTotalsByYmd?: Map<string, number>;
 }
 
 export function CalendarCell({
@@ -38,12 +43,14 @@ export function CalendarCell({
   onItemClick,
   onDateClick,
   pillLimit = PILL_LIMIT,
+  dayTotalsByYmd,
 }: CalendarCellProps) {
   const { t } = useI18n();
   const { effective } = usePreferences();
   const locale =
     effective?.language === "da" ? "da-DK" : effective?.language === "de" ? "de-DE" : "en-US";
   const hour12 = effective?.timeFormat === "12h";
+  const commaDec = commaDecimalForLanguage(effective?.language ?? "en");
 
   if (!date) {
     return (
@@ -59,6 +66,7 @@ export function CalendarCell({
   const visible = combinedForPills.slice(0, pillLimit);
   const overflow = combinedForPills.length - pillLimit;
   const orphanIds = new Set(orphanBacking.map((b) => b.id));
+  const dayTotalMinutes = dayTotalsByYmd?.get(toDateStr(date)) ?? 0;
 
   return (
     <div
@@ -81,17 +89,30 @@ export function CalendarCell({
       )}
     >
       {/* Day number */}
-      <div className="flex items-center justify-between px-0.5">
-        <span
-          className={cn(
-            "text-xs font-medium leading-none",
-            isToday ? CALENDAR_TODAY_DAY_NUMBER_CLASS : "text-white/50"
-          )}
-        >
-          {date.getDate()}
-        </span>
+      <div className="flex items-center justify-between gap-1 px-0.5">
+        <div className="flex min-w-0 items-baseline gap-1">
+          <span
+            className={cn(
+              "text-xs font-medium leading-none shrink-0",
+              isToday ? CALENDAR_TODAY_DAY_NUMBER_CLASS : "text-white/50"
+            )}
+          >
+            {date.getDate()}
+          </span>
+          {dayTotalMinutes > 0 ? (
+            <span
+              className={cn(
+                "truncate text-[10px] leading-none tabular-nums",
+                isToday ? "text-indigo-200/75" : "text-white/45"
+              )}
+              title={formatMinutesAsDurationBoth(dayTotalMinutes, commaDec)}
+            >
+              {formatMinutesAsDurationBoth(dayTotalMinutes, commaDec)}
+            </span>
+          ) : null}
+        </div>
         {isToday ? (
-          <span className={CALENDAR_TODAY_LABEL_CLASS}>{t("common.today")}</span>
+          <span className={cn(CALENDAR_TODAY_LABEL_CLASS, "shrink-0")}>{t("common.today")}</span>
         ) : null}
       </div>
 

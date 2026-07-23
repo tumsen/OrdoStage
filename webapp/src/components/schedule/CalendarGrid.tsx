@@ -16,6 +16,8 @@ interface CalendarGridProps {
    * When many month grids share one vertical scroller (e.g. year view), turn off so only one sticky row is not fighting others.
    */
   stickyDowHeader?: boolean;
+  /** Optional day hour totals (yyyy-MM-dd → minutes). Shown after each date number. */
+  dayTotalsByYmd?: Map<string, number>;
 }
 
 export function CalendarGrid({
@@ -26,6 +28,7 @@ export function CalendarGrid({
   onDateClick,
   stickyDowHeader = true,
   pillLimit,
+  dayTotalsByYmd,
 }: CalendarGridProps) {
   const cells = getMonthDays(year, month);
   const todayStr = toDateStr(new Date());
@@ -60,6 +63,7 @@ export function CalendarGrid({
             onItemClick={onItemClick}
             onDateClick={onDateClick}
             pillLimit={pillLimit}
+            dayTotalsByYmd={dayTotalsByYmd}
           />
         ))}
       </div>
