@@ -442,6 +442,7 @@ function PersonFormDialog({
   const [contractHoursPeriod, setContractHoursPeriod] = useState<"weekly" | "monthly" | "annual">(
     "weekly"
   );
+  const [employmentStartDate, setEmploymentStartDate] = useState("");
   const [showInPayroll, setShowInPayroll] = useState(true);
   const [leaveExtraVacationDays, setLeaveExtraVacationDays] = useState(
     String(DEFAULT_EXTRA_VACATION_DAYS)
@@ -630,13 +631,16 @@ function PersonFormDialog({
   // Sync contract fields from loaded person (after contractAutoSave is defined below)
   const syncContractFromPerson = useCallback((p: Person | undefined) => {
     const weekly = p?.weeklyContractHours != null ? String(p.weeklyContractHours) : "";
+    const start = p?.employmentStartDate ?? "";
     setContractHoursInput(weekly);
     setContractHoursPeriod("weekly");
+    setEmploymentStartDate(start);
     setShowInPayroll(p?.showInPayroll !== false);
     return {
       contractHoursInput: weekly,
       contractHoursPeriod: "weekly" as const,
       contractVacationDays: String(DK_STATUTORY_VACATION_DAYS),
+      employmentStartDate: start,
     };
   }, []);
 
@@ -1041,6 +1045,7 @@ function PersonFormDialog({
       contractHoursInput,
       contractHoursPeriod,
       contractVacationDays: String(DK_STATUTORY_VACATION_DAYS),
+      employmentStartDate,
       leaveExtraVacationDays,
       leaveSickStatus,
       leaveSickNote,
@@ -1058,9 +1063,14 @@ function PersonFormDialog({
       const monthly =
         wh === null ? null : Math.round(((wh * 52) / 12) * 100) / 100;
       const annual = wh === null ? null : Math.round(wh * 52 * 100) / 100;
+      const startYmd = employmentStartDate.trim() === "" ? null : employmentStartDate.trim();
+      if (startYmd && !/^\d{4}-\d{2}-\d{2}$/.test(startYmd)) {
+        throw new Error("Employment start date must be yyyy-MM-dd");
+      }
       await api.patch(`/api/time/person-contract/${personId}`, {
         weeklyContractHours: wh,
         vacationDaysPerYear: vd,
+        employmentStartDate: startYmd,
       });
       if (leaveManagementEnabled) {
         const extraParsed =
@@ -1124,6 +1134,7 @@ function PersonFormDialog({
       contractHoursInput: hours,
       contractHoursPeriod: "weekly" as const,
       contractVacationDays: String(DK_STATUTORY_VACATION_DAYS),
+      employmentStartDate: person.employmentStartDate ?? "",
       leaveExtraVacationDays: extra,
       leaveSickStatus: profile.sickLeaveStatus,
       leaveSickNote: profile.sickLeaveNote ?? "",
@@ -1132,6 +1143,7 @@ function PersonFormDialog({
   }, [
     person?.id,
     person?.weeklyContractHours,
+    person?.employmentStartDate,
     leaveProfileData?.profile,
     leavePolicy?.defaultWeeklyContractHours,
     leavePolicy?.defaultExtraVacationDays,
@@ -1732,8 +1744,22 @@ function PersonFormDialog({
               >
                 <p className={sectionTitle}>{t("people.workContract")}</p>
                 <p className="text-[11px] text-white/30">
-                  Used for overtime and vacation tracking in time reports.
+                  {t("people.workContractHint")}
                 </p>
+                <div className="space-y-1 max-w-xs">
+                  <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.employmentStartDate")}</Label>
+                  <DateInputWithWeekday
+                    value={employmentStartDate}
+                    onChange={(v) => {
+                      setEmploymentStartDate(v);
+                      contractAutoSave.schedule();
+                    }}
+                    className="h-8 bg-white/5 border-white/10 text-white text-sm"
+                  />
+                  <p className="text-[10px] text-white/35 leading-snug">
+                    {t("people.employmentStartDateHint")}
+                  </p>
+                </div>
                 <label className="flex items-start gap-2 text-xs text-white/55">
                   <Checkbox
                     className="mt-0.5"
@@ -1935,6 +1961,20 @@ function PersonFormDialog({
               <div className={asPage ? `${cardClass} space-y-4 min-w-0` : "rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-4 min-w-0"}>
                 <p className={sectionTitle}>{t("time.leaveNormSectionTitle")}</p>
                 <p className="text-[11px] text-white/30">{t("time.leaveProfileHint")}</p>
+                <div className="space-y-1 max-w-xs">
+                  <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.employmentStartDate")}</Label>
+                  <DateInputWithWeekday
+                    value={employmentStartDate}
+                    onChange={(v) => {
+                      setEmploymentStartDate(v);
+                      contractAutoSave.schedule();
+                    }}
+                    className="h-8 bg-white/5 border-white/10 text-white text-sm"
+                  />
+                  <p className="text-[10px] text-white/35 leading-snug">
+                    {t("people.employmentStartDateHint")}
+                  </p>
+                </div>
                 <label className="flex items-start gap-2 text-xs text-white/55">
                   <Checkbox
                     className="mt-0.5"
@@ -2274,7 +2314,21 @@ function PersonFormDialog({
             <div>
               <p className={sectionTitle}>{t("people.workContract")}</p>
               <p className="text-[11px] text-white/30 mt-0.5">
-                Used for overtime and vacation tracking in time reports.
+                {t("people.workContractHint")}
+              </p>
+            </div>
+            <div className="space-y-1 max-w-xs">
+              <Label className={DETAIL_FIELD_LABEL_CLASS}>{t("people.employmentStartDate")}</Label>
+              <DateInputWithWeekday
+                value={employmentStartDate}
+                onChange={(v) => {
+                  setEmploymentStartDate(v);
+                  contractAutoSave.schedule();
+                }}
+                className="h-8 bg-white/5 border-white/10 text-white text-sm"
+              />
+              <p className="text-[10px] text-white/35 leading-snug">
+                {t("people.employmentStartDateHint")}
               </p>
             </div>
             <label className="flex items-start gap-2 text-xs text-white/55">

@@ -412,6 +412,8 @@ model Person {
   weeklyContractHours Float?
   /** Yearly vacation day allowance (e.g. 25 days in Denmark). */
   vacationDaysPerYear Float?
+  /** First day of employment — work/overtime norms apply from this date (inclusive). */
+  employmentStartDate DateTime?
   /** When a manager last sent the app login / password-setup email (manual action only). */
   appLoginEmailSentAt DateTime?
   createdAt        DateTime                @default(now())

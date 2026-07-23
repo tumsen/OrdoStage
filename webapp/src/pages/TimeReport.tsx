@@ -1069,7 +1069,9 @@ export default function TimeReport() {
         ? contractOverrides.get(p.personId)
         : p.weeklyContractHours;
       const contractMinutes =
-        contractHours != null ? (report.summary.rangeDays / 7) * contractHours * 60 : null;
+        contractHours != null
+          ? ((p.contractRangeDays ?? report.summary.rangeDays) / 7) * contractHours * 60
+          : null;
       return {
         ...p,
         weeklyContractHours: contractHours ?? null,

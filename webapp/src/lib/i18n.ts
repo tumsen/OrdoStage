@@ -577,6 +577,9 @@ const en = {
   people: {
     workContract: "Work contract",
     workContractHint: "Used for overtime and vacation tracking.",
+    employmentStartDate: "Employment start",
+    employmentStartDateHint:
+      "Work hours and overtime are calculated from this date. Leave blank if employed for the full period.",
     hoursPerDay: "Hours/day",
     editPerson: "Edit person",
     addPerson: "Add person",
@@ -1264,6 +1267,9 @@ const da: DeepPartial<typeof en> = {
   people: {
     workContract: "Arbejdskontrakt",
     workContractHint: "Bruges til overarbejde og ferieregnskab.",
+    employmentStartDate: "Ansættelsesstart",
+    employmentStartDateHint:
+      "Arbejdstid og overtid beregnes fra denne dato. Lad feltet være tomt, hvis personen har været ansat i hele perioden.",
     hoursPerDay: "Timer/dag",
     editPerson: "Rediger person",
     addPerson: "Tilføj person",

@@ -10,7 +10,14 @@ import type { EffectiveRole } from "../effectiveRole";
 import { isPostgresDatabaseUrl } from "../databaseUrl";
 import { getCountryRuleSet, type TravelAllowanceType, type TravelClaimDayLine, type MileageVehicleType } from "../rules/countryRuleSets";
 import { isCountryFeatureEnabled } from "../countryFeatures";
-import { hoursPerWorkDayFromWeekly, overtimeAgainstContract, minutesToVacationDays } from "../rules/leave/danishLeave";
+import {
+  employmentAwareInclusiveDayCount,
+  employmentStartYmd,
+  hoursPerWorkDayFromWeekly,
+  minutesToVacationDays,
+  overtimeAgainstContract,
+  parseEmploymentStartDate,
+} from "../rules/leave/danishLeave";
 import {
   applyTimeEntryToLeaveLedger,
   getLeaveBalanceSummary,
@@ -1363,10 +1370,22 @@ timeRouter.get("/time/people", async (c) => {
   }
   const people = await prisma.person.findMany({
     where: { organizationId: user.organizationId, isActive: true },
-    select: { id: true, name: true, email: true, weeklyContractHours: true, vacationDaysPerYear: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      weeklyContractHours: true,
+      vacationDaysPerYear: true,
+      employmentStartDate: true,
+    },
     orderBy: { name: "asc" },
   });
-  return c.json({ data: people });
+  return c.json({
+    data: people.map((p) => ({
+      ...p,
+      employmentStartDate: employmentStartYmd(p.employmentStartDate),
+    })),
+  });
 });
 
 // PATCH /api/time/person-contract/:personId — set weekly contract hours
@@ -1393,6 +1412,9 @@ timeRouter.patch(
       data: {
         ...(body.weeklyContractHours !== undefined ? { weeklyContractHours: body.weeklyContractHours } : {}),
         ...(body.vacationDaysPerYear !== undefined ? { vacationDaysPerYear: body.vacationDaysPerYear } : {}),
+        ...(body.employmentStartDate !== undefined
+          ? { employmentStartDate: parseEmploymentStartDate(body.employmentStartDate) }
+          : {}),
       },
     });
     return c.json({ data: { ok: true } });
@@ -1464,7 +1486,15 @@ timeRouter.get("/time/report", async (c) => {
   const rows = await prisma.timeEntry.findMany({
     where: { AND: andClauses },
     include: {
-      person: { select: { id: true, name: true, weeklyContractHours: true, vacationDaysPerYear: true } },
+      person: {
+        select: {
+          id: true,
+          name: true,
+          weeklyContractHours: true,
+          vacationDaysPerYear: true,
+          employmentStartDate: true,
+        },
+      },
       timeProject: {
         select: { id: true, name: true, timeParentCategoryId: true },
       },
@@ -1505,6 +1535,7 @@ timeRouter.get("/time/report", async (c) => {
     travelAllowanceMinutes: number;
     weeklyContractHours: number | null;
     vacationDaysPerYear: number | null;
+    employmentStartYmd: string | null;
   };
   type ProjectAgg = { projectName: string; workMinutes: number; totalMinutes: number };
   type ParentCategoryAgg = {
@@ -1531,7 +1562,11 @@ timeRouter.get("/time/report", async (c) => {
   const rangeEndMs = allTime ? Number.POSITIVE_INFINITY : rangeEndExclusive.getTime();
 
   for (const row of rows) {
-    const clippedStart = Math.max(row.startsAt.getTime(), rangeStartMs);
+    const hireYmd = employmentStartYmd(row.person.employmentStartDate);
+    const hireStartMs = hireYmd
+      ? DateTime.fromFormat(hireYmd, "yyyy-MM-dd", { zone: clientZone }).startOf("day").toMillis()
+      : Number.NEGATIVE_INFINITY;
+    const clippedStart = Math.max(row.startsAt.getTime(), rangeStartMs, hireStartMs);
     const clippedEnd = Math.min(row.endsAt.getTime(), rangeEndMs);
     const durMin = Math.max(0, (clippedEnd - clippedStart) / 60_000);
     if (durMin <= 0) continue;
@@ -1551,6 +1586,7 @@ timeRouter.get("/time/report", async (c) => {
         travelAllowanceMinutes: 0,
         weeklyContractHours: row.person.weeklyContractHours ?? null,
         vacationDaysPerYear: row.person.vacationDaysPerYear ?? null,
+        employmentStartYmd: hireYmd,
       });
     }
     const pa = byPerson.get(row.personId)!;
@@ -1646,6 +1682,25 @@ timeRouter.get("/time/report", async (c) => {
       )
     : new Map<string, number>();
 
+  const reportPeriodFromYmd = allTime
+    ? DateTime.fromMillis(
+        rows.length
+          ? Math.min(...rows.map((row) => row.startsAt.getTime()))
+          : Date.now(),
+        { zone: clientZone }
+      ).toFormat("yyyy-MM-dd")
+    : DateTime.fromJSDate(rangeStart, { zone: clientZone }).toFormat("yyyy-MM-dd");
+  const reportPeriodToYmd = allTime
+    ? DateTime.fromMillis(
+        rows.length
+          ? Math.max(...rows.map((row) => row.endsAt.getTime()))
+          : Date.now(),
+        { zone: clientZone }
+      ).toFormat("yyyy-MM-dd")
+    : DateTime.fromMillis(rangeEndExclusive.getTime() - 1, { zone: clientZone }).toFormat(
+        "yyyy-MM-dd"
+      );
+
   const byPersonArr = await Promise.all(
     [...byPerson.entries()].map(async ([personId, pa]) => {
     // Visual N/A (`comp_time`) blocks are excluded from hour totals / OT base.
@@ -1656,8 +1711,15 @@ timeRouter.get("/time/report", async (c) => {
       pa.sickMinutes +
       pa.holidayMinutes +
       pa.travelAllowanceMinutes;
+    const personRangeDays = employmentAwareInclusiveDayCount(
+      reportPeriodFromYmd,
+      reportPeriodToYmd,
+      pa.employmentStartYmd
+    );
     const contractMinutes =
-      pa.weeklyContractHours != null ? (rangeDays / 7) * pa.weeklyContractHours * 60 : null;
+      pa.weeklyContractHours != null
+        ? (personRangeDays / 7) * pa.weeklyContractHours * 60
+        : null;
     // Leave days: integer work-day minutes (37h → 444 min = 7:24), not float hours÷7.4
     const hoursPerDay = hoursPerWorkDayFromWeekly(pa.weeklyContractHours);
     const vacationDaysUsed = minutesToVacationDays(pa.vacationMinutes, hoursPerDay);
@@ -1694,6 +1756,8 @@ timeRouter.get("/time/report", async (c) => {
       holidayMinutes: pa.holidayMinutes,
       travelAllowanceMinutes: pa.travelAllowanceMinutes,
       weeklyContractHours: pa.weeklyContractHours,
+      contractRangeDays: pa.weeklyContractHours != null ? personRangeDays : null,
+      employmentStartDate: pa.employmentStartYmd,
       contractMinutes,
       overtimeMinutes: overtimeAgainstContract(
         {

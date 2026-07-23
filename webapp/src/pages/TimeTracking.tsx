@@ -665,12 +665,18 @@ export default function TimeTracking() {
           name: string;
           email: string | null;
           weeklyContractHours?: number | null;
+          employmentStartDate?: string | null;
         }>
       >("/api/time/people"),
     enabled: readAll,
   });
 
-  type MePerson = { id: string; weeklyContractHours?: number | null; vacationDaysPerYear?: number | null };
+  type MePerson = {
+    id: string;
+    weeklyContractHours?: number | null;
+    vacationDaysPerYear?: number | null;
+    employmentStartDate?: string | null;
+  };
   const { data: mePerson } = useQuery({
     queryKey: ["people", "me"],
     queryFn: () => api.get<MePerson | null>("/api/people/me"),
@@ -1652,22 +1658,45 @@ export default function TimeTracking() {
     return peopleForFilter?.find((p) => p.id === targetId)?.weeklyContractHours ?? null;
   }, [readAll, selectedPersonId, mePerson, peopleForFilter]);
 
+  const activePersonEmploymentStart = useMemo(() => {
+    const targetId = readAll && selectedPersonId ? selectedPersonId : mePerson?.id;
+    if (!targetId) return mePerson?.employmentStartDate ?? null;
+    if (targetId === mePerson?.id) return mePerson.employmentStartDate ?? null;
+    return peopleForFilter?.find((p) => p.id === targetId)?.employmentStartDate ?? null;
+  }, [readAll, selectedPersonId, mePerson, peopleForFilter]);
+
   const periodNormMinutes = useMemo(() => {
     const weekly =
       activePersonWeeklyHours != null && activePersonWeeklyHours > 0
         ? activePersonWeeklyHours
         : 37;
     const daily = workDayDurationMinutes(weekly);
-    if (mode === "week") return Math.round(weekly * 60);
+    const hireYmd = activePersonEmploymentStart ?? null;
+    if (mode === "week") {
+      const weekStart = startOfWeek(anchor, { weekStartsOn: WEEK_STARTS_ON });
+      const weekEnd = endOfWeek(anchor, { weekStartsOn: WEEK_STARTS_ON });
+      let weekdays = 0;
+      for (const d of eachDayOfInterval({ start: weekStart, end: weekEnd })) {
+        const dow = getDay(d);
+        if (dow < 1 || dow > 5) continue;
+        const ymd = format(d, "yyyy-MM-dd");
+        if (hireYmd && ymd < hireYmd) continue;
+        weekdays += 1;
+      }
+      return weekdays * daily;
+    }
     const monthStart = startOfMonth(anchor);
     const monthEnd = endOfMonth(anchor);
     let weekdays = 0;
     for (const d of eachDayOfInterval({ start: monthStart, end: monthEnd })) {
       const dow = getDay(d); // 0 = Sun … 6 = Sat
-      if (dow >= 1 && dow <= 5) weekdays += 1;
+      if (dow < 1 || dow > 5) continue;
+      const ymd = format(d, "yyyy-MM-dd");
+      if (hireYmd && ymd < hireYmd) continue;
+      weekdays += 1;
     }
     return weekdays * daily;
-  }, [mode, anchor, activePersonWeeklyHours]);
+  }, [mode, anchor, activePersonWeeklyHours, activePersonEmploymentStart]);
 
   const periodDeviationMinutes = periodFulfillingMinutes - periodNormMinutes;
 

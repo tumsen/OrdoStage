@@ -336,3 +336,53 @@ export function summarizeLeaveBalances(
     sickDays,
   };
 }
+
+/** Calendar yyyy-MM-dd in zone (defaults UTC for stored date-only fields). */
+export function calendarYmd(d: Date, zone = "utc"): string {
+  return DateTime.fromJSDate(d, { zone }).toFormat("yyyy-MM-dd");
+}
+
+/** Parse yyyy-MM-dd to a UTC midnight Date for storage. */
+export function parseEmploymentStartDate(
+  ymd: string | null | undefined
+): Date | null {
+  if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  return DateTime.fromFormat(ymd, "yyyy-MM-dd", { zone: "utc" }).startOf("day").toJSDate();
+}
+
+export function employmentStartYmd(
+  employmentStartDate: Date | null | undefined
+): string | null {
+  if (!employmentStartDate) return null;
+  return calendarYmd(employmentStartDate, "utc");
+}
+
+/**
+ * Inclusive calendar-day count for contract/OT, starting no earlier than employment start.
+ * Returns 0 when employment begins after the period.
+ */
+export function employmentAwareInclusiveDayCount(
+  periodFromYmd: string,
+  periodToYmdInclusive: string,
+  employmentStartYmdValue: string | null | undefined
+): number {
+  const from =
+    employmentStartYmdValue && employmentStartYmdValue > periodFromYmd
+      ? employmentStartYmdValue
+      : periodFromYmd;
+  if (from > periodToYmdInclusive) return 0;
+  const a = DateTime.fromFormat(from, "yyyy-MM-dd", { zone: "utc" });
+  const b = DateTime.fromFormat(periodToYmdInclusive, "yyyy-MM-dd", { zone: "utc" });
+  if (!a.isValid || !b.isValid) return 0;
+  return Math.max(0, Math.floor(b.diff(a, "days").days) + 1);
+}
+
+/** Whether an instant’s local calendar day is on/after employment start (or start unset). */
+export function isOnOrAfterEmploymentStart(
+  instant: Date,
+  employmentStartYmdValue: string | null | undefined,
+  zone: string
+): boolean {
+  if (!employmentStartYmdValue) return true;
+  return calendarYmd(instant, zone) >= employmentStartYmdValue;
+}

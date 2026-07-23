@@ -3,6 +3,7 @@ import { prisma } from "../prisma";
 import { getClientWallClockZone } from "../clientWallClock";
 import { isCountryFeatureEnabled } from "../countryFeatures";
 import {
+  employmentStartYmd,
   hoursPerWorkDayFromWeekly,
   resolveLeaveNorms,
   resolveVacationYear,
@@ -289,14 +290,19 @@ export async function settleCompTimeForTimesheetApproval(input: {
 
   const person = await prisma.person.findFirst({
     where: { id: input.personId, organizationId: input.organizationId },
-    select: { weeklyContractHours: true, vacationDaysPerYear: true, leaveProfile: true },
+    select: {
+      weeklyContractHours: true,
+      vacationDaysPerYear: true,
+      employmentStartDate: true,
+      leaveProfile: true,
+    },
   });
   if (!person) return empty;
 
   const policy = mapOrgLeavePolicy(policyRow);
   const norms = resolveLeaveNorms(policy, mapPersonLeaveProfile(person.leaveProfile), person);
   const dailyNormMinutes = Math.round(hoursPerWorkDayFromWeekly(norms.weeklyContractHours) * 60);
-  const weeklyNormMinutes = Math.round(norms.weeklyContractHours * 60);
+  const hireYmd = employmentStartYmd(person.employmentStartDate);
 
   const entries = await prisma.timeEntry.findMany({
     where: {
@@ -309,7 +315,11 @@ export async function settleCompTimeForTimesheetApproval(input: {
   });
 
   const byDay = aggregateByLocalDay(entries, input.periodStart, input.periodEnd, zone);
-  const weekdayKeys = weekdayDateKeysInPeriod(input.periodStart, input.periodEnd, zone);
+  const weekdayKeys = weekdayDateKeysInPeriod(input.periodStart, input.periodEnd, zone).filter(
+    (dateKey) => !hireYmd || dateKey >= hireYmd
+  );
+  // Mid-week hire → only remaining weekdays count toward the weekly norm.
+  const weeklyNormMinutes = dailyNormMinutes * weekdayKeys.length;
 
   const userId = await resolveUserIdForPerson(
     input.organizationId,

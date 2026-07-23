@@ -1,7 +1,7 @@
 import { getClientWallClockZone } from "../clientWallClock";
 import { prisma } from "../prisma";
 import {
-  accrueVacationEarnedDays,
+  accrueVacationEarnedDaysBetween,
   categoryToLeaveBalanceType,
   minutesToVacationDays,
   resolveLeaveNorms,
@@ -156,16 +156,25 @@ export async function syncVacationEarnedForPerson(
   const profileRow = await prisma.personLeaveProfile.findUnique({ where: { personId } });
   const person = await prisma.person.findFirst({
     where: { id: personId, organizationId },
-    select: { weeklyContractHours: true, vacationDaysPerYear: true },
+    select: {
+      weeklyContractHours: true,
+      vacationDaysPerYear: true,
+      employmentStartDate: true,
+    },
   });
   if (!person) return;
   const norms = resolveLeaveNorms(policy, mapPersonLeaveProfile(profileRow), person);
   const vacationYear = forcedVacationYear ?? resolveVacationYear(asOf, policy);
-  const earned = accrueVacationEarnedDays(
-    norms,
-    vacationYear,
+  const zone = getClientWallClockZone();
+  const hire = person.employmentStartDate;
+  const rangeStart =
+    hire && hire.getTime() > vacationYear.start.getTime() ? hire : vacationYear.start;
+  const earned = accrueVacationEarnedDaysBetween(
+    norms.vacationDaysPerYear,
+    rangeStart,
+    vacationYear.end,
     asOf,
-    getClientWallClockZone()
+    zone
   );
   const existing = await prisma.leaveBalance.findUnique({
     where: {
@@ -331,7 +340,11 @@ export async function applyOpeningBalances(input: {
   });
   const person = await prisma.person.findFirst({
     where: { id: input.personId, organizationId: input.organizationId },
-    select: { weeklyContractHours: true, vacationDaysPerYear: true },
+    select: {
+      weeklyContractHours: true,
+      vacationDaysPerYear: true,
+      employmentStartDate: true,
+    },
   });
   const norms = resolveLeaveNorms(policy, mapPersonLeaveProfile(profileRow), person ?? undefined);
 
@@ -341,9 +354,14 @@ export async function applyOpeningBalances(input: {
   const map: Record<string, number> = {};
   for (const r of rows) map[r.balanceType] = r.amount;
 
-  const earned = accrueVacationEarnedDays(
-    norms,
-    resolveVacationYear(asOf, policy),
+  const vy = resolveVacationYear(asOf, policy);
+  const hire = person?.employmentStartDate;
+  const rangeStart =
+    hire && hire.getTime() > vy.start.getTime() ? hire : vy.start;
+  const earned = accrueVacationEarnedDaysBetween(
+    norms.vacationDaysPerYear,
+    rangeStart,
+    vy.end,
     asOf,
     getClientWallClockZone()
   );
@@ -406,7 +424,11 @@ export async function getLeaveBalanceSummary(
   const profileRow = await prisma.personLeaveProfile.findUnique({ where: { personId } });
   const person = await prisma.person.findFirst({
     where: { id: personId, organizationId },
-    select: { weeklyContractHours: true, vacationDaysPerYear: true },
+    select: {
+      weeklyContractHours: true,
+      vacationDaysPerYear: true,
+      employmentStartDate: true,
+    },
   });
   const norms = resolveLeaveNorms(policy, mapPersonLeaveProfile(profileRow), person ?? undefined);
   const vacationYear = forcedVacationYear ?? resolveVacationYear(asOf, policy);
@@ -418,9 +440,13 @@ export async function getLeaveBalanceSummary(
   const map: Record<string, number> = {};
   for (const r of rows) map[r.balanceType] = r.amount;
 
-  const earned = accrueVacationEarnedDays(
-    norms,
-    vacationYear,
+  const hire = person?.employmentStartDate;
+  const rangeStart =
+    hire && hire.getTime() > vacationYear.start.getTime() ? hire : vacationYear.start;
+  const earned = accrueVacationEarnedDaysBetween(
+    norms.vacationDaysPerYear,
+    rangeStart,
+    vacationYear.end,
     asOf,
     getClientWallClockZone()
   );

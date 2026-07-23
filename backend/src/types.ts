@@ -246,6 +246,12 @@ export const PersonSchema = z.object({
   /** Work contract — set by admins with time.read_all. */
   weeklyContractHours: z.number().nullable().optional(),
   vacationDaysPerYear: z.number().nullable().optional(),
+  /** First day of employment (yyyy-MM-dd). Work/overtime norms apply from this date. */
+  employmentStartDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
   /** ISO timestamp when login invitation email was last sent (null = never). */
   appLoginEmailSentAt: z.string().nullable().optional(),
   createdAt: z.string(),
@@ -1901,6 +1907,10 @@ export const ApproveTimesheetSchema = z.object({
 export const SetPersonContractSchema = z.object({
   weeklyContractHours: z.number().min(0).max(168).nullable().optional(),
   vacationDaysPerYear: z.number().min(0).max(365).nullable().optional(),
+  /** First day of employment (yyyy-MM-dd), or null to clear. */
+  employmentStartDate: z
+    .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.null()])
+    .optional(),
 });
 
 export const TimeReportPersonSchema = z.object({
@@ -1915,6 +1925,13 @@ export const TimeReportPersonSchema = z.object({
   holidayMinutes: z.number(),
   travelAllowanceMinutes: z.number(),
   weeklyContractHours: z.number().nullable(),
+  /** Calendar days used for contractMinutes (may be shorter than report range after hire date). */
+  contractRangeDays: z.number().nullable().optional(),
+  employmentStartDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
   contractMinutes: z.number().nullable(),
   overtimeMinutes: z.number().nullable(),
   vacationDaysPerYear: z.number().nullable(),

@@ -202,6 +202,7 @@ function serializePerson(person: {
   showInPayroll?: boolean;
   weeklyContractHours?: number | null;
   vacationDaysPerYear?: number | null;
+  employmentStartDate?: Date | null;
   teamMemberships?: Array<{
     departmentId: string;
     role: string | null;
@@ -272,6 +273,15 @@ function serializePerson(person: {
     showInPayroll: person.showInPayroll ?? true,
     weeklyContractHours: person.weeklyContractHours ?? null,
     vacationDaysPerYear: person.vacationDaysPerYear ?? null,
+    employmentStartDate: person.employmentStartDate
+      ? (() => {
+          const d = person.employmentStartDate!;
+          const y = d.getUTCFullYear();
+          const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+          const day = String(d.getUTCDate()).padStart(2, "0");
+          return `${y}-${m}-${day}`;
+        })()
+      : null,
     teamIds: (person.teamMemberships ?? []).map((membership) => membership.departmentId),
     teams: (person.teamMemberships ?? []).map((membership) => ({
       id: membership.department.id,

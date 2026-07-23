@@ -23,7 +23,7 @@ import {
   postLeaveTransaction,
   sumCompTimeUsedMinutesInRange,
 } from "../services/leaveLedger";
-import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays, accrueVacationEarnedForDateRange } from "../rules/leave/danishLeave";
+import { resolveVacationYear, resolveLeaveNorms, positiveOvertimeMinutes, hoursPerWorkDayFromWeekly, minutesToVacationDays, accrueVacationEarnedForDateRange, employmentAwareInclusiveDayCount, employmentStartYmd } from "../rules/leave/danishLeave";
 import { DateTime } from "luxon";
 import { getClientWallClockZone } from "../clientWallClock";
 
@@ -498,6 +498,7 @@ leaveRouter.get("/time/payroll-export", async (c) => {
       name: true,
       weeklyContractHours: true,
       vacationDaysPerYear: true,
+      employmentStartDate: true,
       leaveProfile: true,
     },
     orderBy: { name: "asc" },
@@ -515,17 +516,6 @@ leaveRouter.get("/time/payroll-export", async (c) => {
       category: true,
     },
   });
-
-  // Inclusive calendar days in the selected from–to range.
-  const rangeDays = Math.max(
-    1,
-    Math.round(
-      DateTime.fromFormat(toStr, "yyyy-MM-dd", { zone }).diff(
-        DateTime.fromFormat(fromStr, "yyyy-MM-dd", { zone }),
-        "days"
-      ).days
-    ) + 1
-  );
 
   const approvals = approvedOnly
     ? await prisma.timesheetApproval.findMany({
@@ -549,6 +539,10 @@ leaveRouter.get("/time/payroll-export", async (c) => {
       mapPersonLeaveProfile(p.leaveProfile),
       p
     );
+    const hireYmd = employmentStartYmd(p.employmentStartDate);
+    const hireStartMs = hireYmd
+      ? DateTime.fromFormat(hireYmd, "yyyy-MM-dd", { zone }).startOf("day").toMillis()
+      : Number.NEGATIVE_INFINITY;
     const personEntries = entries.filter((e) => e.personId === p.id);
     let workMinutes = 0;
     let vacationMinutes = 0;
@@ -556,8 +550,11 @@ leaveRouter.get("/time/payroll-export", async (c) => {
     let holidayMinutes = 0;
     let sickMinutes = 0;
     for (const e of personEntries) {
+      const clippedStart = Math.max(e.startsAt.getTime(), hireStartMs);
+      const clippedEnd = e.endsAt.getTime();
+      const dur = Math.max(0, (clippedEnd - clippedStart) / 60_000);
+      if (dur <= 0) continue;
       const cat = e.category || "work";
-      const dur = Math.max(0, (e.endsAt.getTime() - e.startsAt.getTime()) / 60_000);
       if (cat === "work") workMinutes += dur;
       else if (cat === "vacation") vacationMinutes += dur;
       else if (cat === "extra_vacation") extraVacationMinutes += dur;
@@ -568,8 +565,11 @@ leaveRouter.get("/time/payroll-export", async (c) => {
     const vacationUsedInPeriod = minutesToVacationDays(vacationMinutes, hoursPerDay);
     const extraVacationUsedInPeriod = minutesToVacationDays(extraVacationMinutes, hoursPerDay);
     const sickDaysInPeriod = minutesToVacationDays(sickMinutes, hoursPerDay);
+    const personRangeDays = employmentAwareInclusiveDayCount(fromStr, toStr, hireYmd);
     const contractMinutes =
-      norms.weeklyContractHours != null ? (rangeDays / 7) * norms.weeklyContractHours * 60 : null;
+      norms.weeklyContractHours != null
+        ? (personRangeDays / 7) * norms.weeklyContractHours * 60
+        : null;
     const overtimeMinutes = positiveOvertimeMinutes(
       { workMinutes, vacationMinutes, extraVacationMinutes, holidayMinutes },
       contractMinutes,
@@ -600,12 +600,16 @@ leaveRouter.get("/time/payroll-export", async (c) => {
     // Used + earned-in-period from the selected from–to range (e.g. month for payroll).
     // Remaining / comp are ferieår saldo as of period end (samtidighedsferie).
     const leave = await getLeaveBalanceSummary(user.organizationId, p.id, toInclusive);
-    const vacationEarnedInPeriod = accrueVacationEarnedForDateRange(
-      norms.vacationDaysPerYear,
-      fromStr,
-      toStr,
-      zone
-    );
+    const vacationEarnFrom = hireYmd && hireYmd > fromStr ? hireYmd : fromStr;
+    const vacationEarnedInPeriod =
+      vacationEarnFrom <= toStr
+        ? accrueVacationEarnedForDateRange(
+            norms.vacationDaysPerYear,
+            vacationEarnFrom,
+            toStr,
+            zone
+          )
+        : 0;
 
     exportPeople.push({
       personId: p.id,
