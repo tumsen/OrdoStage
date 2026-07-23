@@ -1105,6 +1105,41 @@ export default function TimeReport() {
     });
   }, [report, sortPersonBy, sortPersonDir, contractOverrides, leaveManagementEnabled]);
 
+  /** Period totals — norm uses hire-aware contractRangeDays per person. */
+  const periodOverview = useMemo(() => {
+    if (!report || sortedPersons.length === 0) return null;
+    let contractMinutes = 0;
+    let hasContract = false;
+    let fulfillingMinutes = 0;
+    let compDelta = 0;
+    let compBalance = 0;
+    let hasComp = false;
+    for (const p of sortedPersons) {
+      if (p.contractMinutes != null) {
+        contractMinutes += p.contractMinutes;
+        hasContract = true;
+      }
+      fulfillingMinutes +=
+        p.workMinutes + p.vacationMinutes + p.extraVacationMinutes + p.holidayMinutes;
+      if (p.compTimePeriodDeltaMinutes != null) {
+        compDelta += p.compTimePeriodDeltaMinutes;
+        hasComp = true;
+      }
+      if (p.compTimeBalanceMinutes != null) {
+        compBalance += p.compTimeBalanceMinutes;
+        hasComp = true;
+      }
+    }
+    const deviation = hasContract ? fulfillingMinutes - contractMinutes : null;
+    return {
+      contractMinutes: hasContract ? Math.round(contractMinutes) : null,
+      fulfillingMinutes: Math.round(fulfillingMinutes),
+      deviation: deviation != null ? Math.round(deviation) : null,
+      compDelta: hasComp && showCompBalance ? Math.round(compDelta) : null,
+      compBalance: hasComp && showCompBalance ? Math.round(compBalance) : null,
+    };
+  }, [report, sortedPersons, showCompBalance]);
+
   const handleContractSaved = useCallback((personId: string, hours: number | null) => {
     setContractOverrides((prev) => new Map(prev).set(personId, hours));
   }, []);
@@ -1387,6 +1422,60 @@ export default function TimeReport() {
 
       {/* Summary cards */}
       {report && (
+        <div className="space-y-3">
+          {periodOverview ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/60 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <span className="whitespace-nowrap tabular-nums">
+                <span className="text-white/40">{t("time.periodNorm")}:</span>{" "}
+                <span className="font-medium text-white/80">
+                  {periodOverview.contractMinutes != null
+                    ? fmtMins(periodOverview.contractMinutes)
+                    : "—"}
+                </span>
+              </span>
+              <span className="whitespace-nowrap tabular-nums">
+                <span className="text-white/40">{t("time.periodRegistered")}:</span>{" "}
+                <span className="font-medium text-white/80">
+                  {fmtMins(periodOverview.fulfillingMinutes)}
+                </span>
+              </span>
+              {periodOverview.deviation != null ? (
+                <span className="whitespace-nowrap tabular-nums">
+                  <span className="text-white/40">{t("time.periodDeviation")}:</span>{" "}
+                  <span
+                    className={cn(
+                      "font-medium",
+                      periodOverview.deviation > 0
+                        ? "text-cyan-300"
+                        : periodOverview.deviation < 0
+                          ? "text-orange-300"
+                          : "text-white/70"
+                    )}
+                  >
+                    {fmtSignedMins(periodOverview.deviation)}
+                  </span>
+                </span>
+              ) : null}
+              {periodOverview.compBalance != null ? (
+                <span className="whitespace-nowrap tabular-nums">
+                  <span className="text-white/40">{t("time.leaveWorkAccount")}:</span>{" "}
+                  <span
+                    className={cn(
+                      "font-medium",
+                      periodOverview.compBalance < 0 ? "text-orange-300" : "text-cyan-300"
+                    )}
+                  >
+                    {fmtCompHhhMm(periodOverview.compBalance)}
+                  </span>
+                  {periodOverview.compDelta != null ? (
+                    <span className="text-white/35 ml-1.5">
+                      ({fmtSignedMins(periodOverview.compDelta)} {t("time.reportCompPeriodHint")})
+                    </span>
+                  ) : null}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           <SummaryCard
             label={t("time.reportTotalHours")}
@@ -1460,6 +1549,7 @@ export default function TimeReport() {
             value={String(report.byPerson.length)}
             sub={`${report.summary.rangeDays} days`}
           />
+        </div>
         </div>
       )}
 

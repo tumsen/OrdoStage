@@ -486,9 +486,9 @@ const en = {
     reportCompBalanceHint: "Afspadsering rest at period end",
     leavePolicyDefaultExtraVacationHint: "5 days = 37 hours for full-time staff (37 h/week).",
     reportContractHint:
-      "Click the contract hours cell to set expected weekly hours per person. Overtime = logged work hours − contracted hours over the period.",
+      "Click the contract hours cell to set expected weekly hours per person. Overtime = logged work hours − contracted hours over the period (from employment start when set).",
     reportContractHintDk:
-      "Click the contract hours cell to set expected weekly hours per person. With Danish leave enabled: overtime = (work + vacation + feriefridage + holidays) − contracted hours. Comp Δ = afspadsering earned − used in the period; Comp balance is remaining at period end.",
+      "Click the contract hours cell to set expected weekly hours per person. With Danish leave enabled: overtime = (work + vacation + feriefridage + holidays) − contracted hours. Norm days start at employment start when set. Comp Δ = afspadsering earned − used in the period; Comp balance is remaining at period end.",
   },
   account: {
     title: "Account",
@@ -1176,8 +1176,8 @@ const da: DeepPartial<typeof en> = {
     reportColContract: "Kontrakt t/uge",
     reportColShare: "Andel",
     reportNoData: "Ingen registreringer for de valgte filtre.",
-    reportContractHint: "Klik på kontrakt-timecellen for at sætte forventede ugentlige timer pr. person. Overarbejde = loggede arbejdstimer − kontrakt-timer i perioden.",
-    reportContractHintDk: "Klik på kontrakt-timecellen for at sætte forventede ugentlige timer pr. person. Med dansk fravær: overarbejde = (arbejde + ferie + feriefridage + helligdage) − kontrakt-timer. Afsp. Δ = optjent − brugt i perioden; Afsp. saldo er rest ved periodens slut.",
+    reportContractHint: "Klik på kontrakt-timecellen for at sætte forventede ugentlige timer pr. person. Overarbejde = loggede arbejdstimer − kontrakt-timer i perioden (fra ansættelsesstart når sat).",
+    reportContractHintDk: "Klik på kontrakt-timecellen for at sætte forventede ugentlige timer pr. person. Med dansk fravær: overarbejde = (arbejde + ferie + feriefridage + helligdage) − kontrakt-timer. Norm-dage starter ved ansættelsesstart når sat. Afsp. Δ = optjent − brugt i perioden; Afsp. saldo er rest ved periodens slut.",
     reportColOvertime: "Overarbejde",
   },
   account: {
