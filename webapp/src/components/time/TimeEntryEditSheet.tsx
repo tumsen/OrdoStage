@@ -44,13 +44,14 @@ import {
   SplitDurationHhMmInput,
   SplitTimeInput,
 } from "@/components/SplitTimeField";
-import { DayTimelineStrip, DAY_TIMELINE_TOTAL_PX, type DayTimelineSibling } from "@/components/time/DayTimelineStrip";
+import { DayTimelineStrip, DAY_TIMELINE_GUTTER_PX, type DayTimelineSibling } from "@/components/time/DayTimelineStrip";
 import { localCalendarYmdFromUtcIso } from "@/lib/browserUserTime";
 import {
   MINUTES_PER_DAY,
   minutesFromWindowStart,
   rangeOverlapsColumnWindow,
 } from "@/lib/timeGrid";
+import { useWeekDayColumnWidthPx } from "@/hooks/useWeekDayColumnWidthPx";
 
 type PatchBody = {
   note: string | null;
@@ -158,6 +159,8 @@ export function TimeEntryEditSheet(props: {
     workDayDurationMinutes = 0,
     daySiblingEntries = [],
   } = props;
+  const weekDayColWidthPx = useWeekDayColumnWidthPx(open);
+  const timelineTotalPx = DAY_TIMELINE_GUTTER_PX + weekDayColWidthPx;
 
   const liveRangeRef = useRef(liveRange);
   liveRangeRef.current = liveRange;
@@ -465,7 +468,7 @@ export function TimeEntryEditSheet(props: {
           "bg-[#0d0d14] border-white/10 text-white w-full",
           isMobile
             ? "flex h-[100dvh] max-h-[100dvh] flex-col gap-0 overflow-hidden p-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:max-w-md"
-            : "overflow-y-auto sm:max-w-3xl"
+            : "overflow-y-auto sm:max-w-[min(96vw,56rem)]"
         )}
       >
         <SheetHeader className={cn(isMobile && "shrink-0 space-y-0.5 text-left")}>
@@ -777,7 +780,7 @@ export function TimeEntryEditSheet(props: {
               "shrink-0 overflow-y-auto border-l border-white/10",
               isMobile ? "self-stretch pl-2" : "sticky top-0 self-start pl-3"
             )}
-            style={{ width: DAY_TIMELINE_TOTAL_PX + (isMobile ? 8 : 12) }}
+            style={{ width: timelineTotalPx + (isMobile ? 8 : 12) }}
           >
             <DayTimelineStrip
               startHm={startHm}
@@ -790,6 +793,7 @@ export function TimeEntryEditSheet(props: {
                 isDayOff && workDayDurationMinutes > 0 ? dayOffDurationMin : null
               }
               timeFormat={timeFormat}
+              dayColWidthPx={weekDayColWidthPx}
               aria-label={t("time.dayTimelineLabel")}
             />
           </div>

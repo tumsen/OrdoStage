@@ -32,10 +32,7 @@ type DragState = {
   grabOffsetMin: number;
 };
 
-/** Same footprint as one week-grid day at min width: gutter + day column. */
 export const DAY_TIMELINE_GUTTER_PX = WEEK_GRID_TIME_GUTTER_PX;
-export const DAY_TIMELINE_DAY_COL_PX = WEEK_GRID_DAY_COL_AT_MIN_PX;
-export const DAY_TIMELINE_TOTAL_PX = DAY_TIMELINE_GUTTER_PX + DAY_TIMELINE_DAY_COL_PX;
 
 function hmToMinutes(hm: string): number {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
@@ -78,6 +75,8 @@ export function DayTimelineStrip(props: {
   /** When set, only move the block (end follows start + duration). */
   fixedDurationMinutes?: number | null;
   timeFormat?: TimeFormat;
+  /** Day column width in px — must match week view `[data-day-col]` width. */
+  dayColWidthPx?: number;
   className?: string;
   "aria-label"?: string;
 }) {
@@ -90,9 +89,13 @@ export function DayTimelineStrip(props: {
     disabled = false,
     fixedDurationMinutes = null,
     timeFormat = "24h",
+    dayColWidthPx = WEEK_GRID_DAY_COL_AT_MIN_PX,
     className,
     "aria-label": ariaLabel,
   } = props;
+
+  const dayColPx = Math.max(WEEK_GRID_DAY_COL_AT_MIN_PX, Math.round(dayColWidthPx));
+  const totalPx = DAY_TIMELINE_GUTTER_PX + dayColPx;
 
   const trackRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -219,13 +222,13 @@ export function DayTimelineStrip(props: {
   return (
     <div
       className={cn("select-none", className)}
-      style={{ width: DAY_TIMELINE_TOTAL_PX }}
+      style={{ width: totalPx }}
       aria-label={ariaLabel}
     >
       <div
         className="grid min-w-0"
         style={{
-          gridTemplateColumns: `${DAY_TIMELINE_GUTTER_PX}px ${DAY_TIMELINE_DAY_COL_PX}px`,
+          gridTemplateColumns: `${DAY_TIMELINE_GUTTER_PX}px ${dayColPx}px`,
           height: FRAME_HEIGHT,
         }}
       >
