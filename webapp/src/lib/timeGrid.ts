@@ -155,6 +155,73 @@ export function timeRangesOverlap(
   return aStart.getTime() < bEnd.getTime() && aEnd.getTime() > bStart.getTime();
 }
 
+export type TimeNeighborSpan = { start: Date; end: Date };
+
+/**
+ * Clamp a proposed range so it does not overlap any neighbor (per person).
+ * - resizeEnd: end stops at the next block's start
+ * - resizeStart: start stops at the previous block's end
+ * - move: keeps duration; snaps entirely before or after an overlapping block
+ *   (whichever side is closer to the desired position)
+ */
+export function clampRangeAgainstNeighbors(
+  start: Date,
+  end: Date,
+  neighbors: TimeNeighborSpan[],
+  mode: "move" | "resizeStart" | "resizeEnd"
+): { start: Date; end: Date } {
+  const s0 = start.getTime();
+  const e0 = end.getTime();
+  if (!(e0 > s0) || neighbors.length === 0) return { start, end };
+
+  if (mode === "resizeEnd") {
+    let endMs = e0;
+    for (const n of neighbors) {
+      const ns = n.start.getTime();
+      const ne = n.end.getTime();
+      if (ne <= s0 || ns >= endMs) continue;
+      // Neighbor starts at/after our start → cannot grow past its start
+      if (ns >= s0) endMs = Math.min(endMs, ns);
+    }
+    const minEnd = s0 + TIME_SNAP_MINUTES * 60_000;
+    return { start, end: new Date(Math.max(minEnd, endMs)) };
+  }
+
+  if (mode === "resizeStart") {
+    let startMs = s0;
+    for (const n of neighbors) {
+      const ns = n.start.getTime();
+      const ne = n.end.getTime();
+      if (ne <= startMs || ns >= e0) continue;
+      // Neighbor ends at/before our end → cannot shrink start past its end
+      if (ne <= e0) startMs = Math.max(startMs, ne);
+    }
+    const maxStart = e0 - TIME_SNAP_MINUTES * 60_000;
+    return { start: new Date(Math.min(maxStart, startMs)), end };
+  }
+
+  // move — fixed duration
+  const dur = e0 - s0;
+  let startMs = s0;
+  for (let pass = 0; pass < neighbors.length + 2; pass++) {
+    const endMs = startMs + dur;
+    let hit: TimeNeighborSpan | null = null;
+    for (const n of neighbors) {
+      if (timeRangesOverlap(new Date(startMs), new Date(endMs), n.start, n.end)) {
+        hit = n;
+        break;
+      }
+    }
+    if (!hit) break;
+    const before = hit.start.getTime() - dur;
+    const after = hit.end.getTime();
+    const center = startMs + dur / 2;
+    const hitCenter = (hit.start.getTime() + hit.end.getTime()) / 2;
+    startMs = center <= hitCenter ? before : after;
+  }
+  return { start: new Date(startMs), end: new Date(startMs + dur) };
+}
+
 export type TimeEntryLayoutInput<T> = {
   id: string;
   timeProjectId: string | null;

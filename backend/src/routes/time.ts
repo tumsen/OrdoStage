@@ -797,28 +797,6 @@ function parseRange(c: { req: { query: (k: string) => string | undefined } }) {
 
 type TimeSpan = { startsAt: Date; endsAt: Date };
 
-function subtractSpan(base: TimeSpan, blockers: TimeSpan[]): TimeSpan[] {
-  let out: TimeSpan[] = [base];
-  for (const b of blockers) {
-    const next: TimeSpan[] = [];
-    for (const s of out) {
-      if (b.endsAt <= s.startsAt || b.startsAt >= s.endsAt) {
-        next.push(s);
-        continue;
-      }
-      if (b.startsAt > s.startsAt) {
-        next.push({ startsAt: s.startsAt, endsAt: b.startsAt });
-      }
-      if (b.endsAt < s.endsAt) {
-        next.push({ startsAt: b.endsAt, endsAt: s.endsAt });
-      }
-    }
-    out = next.filter((s) => s.endsAt.getTime() > s.startsAt.getTime());
-    if (out.length === 0) break;
-  }
-  return out;
-}
-
 async function computeNonOverlappingSpans(args: {
   organizationId: string;
   personId: string;
@@ -843,10 +821,12 @@ async function computeNonOverlappingSpans(args: {
     select: { startsAt: true, endsAt: true },
     orderBy: { startsAt: "asc" },
   });
-  return subtractSpan(
-    { startsAt: args.startsAt, endsAt: args.endsAt },
-    overlaps.map((o) => ({ startsAt: o.startsAt, endsAt: o.endsAt }))
-  );
+  // Hard rule: no overlapping registrations per person (touching endpoints OK).
+  // Previously we carved free gaps / split entries — that is no longer allowed.
+  if (overlaps.length > 0) {
+    return [];
+  }
+  return [{ startsAt: args.startsAt, endsAt: args.endsAt }];
 }
 
 function segmentGroupIdAfterSplit(
@@ -3428,14 +3408,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         });
         if (spans.length === 0) {
           return c.json(
-            { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+            { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
             409
           );
         }
         const primary = spans[0];
         if (!primary) {
           return c.json(
-            { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+            { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
             409
           );
         }
@@ -3504,14 +3484,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       });
       if (spans.length === 0) {
         return c.json(
-          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
           409
         );
       }
       const primary = spans[0];
       if (!primary) {
         return c.json(
-          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
           409
         );
       }
@@ -3651,14 +3631,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         });
         if (spans.length === 0) {
           return c.json(
-            { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+            { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
             409
           );
         }
         const primary = spans[0];
         if (!primary) {
           return c.json(
-            { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+            { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
             409
           );
         }
@@ -3706,14 +3686,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       });
       if (spans.length === 0) {
         return c.json(
-          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
           409
         );
       }
       const primary = spans[0];
       if (!primary) {
         return c.json(
-          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
           409
         );
       }
@@ -3841,14 +3821,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
         });
         if (spans.length === 0) {
           return c.json(
-            { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+            { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
             409
           );
         }
         const primary = spans[0];
         if (!primary) {
           return c.json(
-            { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+            { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
             409
           );
         }
@@ -3896,14 +3876,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       });
       if (spans.length === 0) {
         return c.json(
-          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
           409
         );
       }
       const primary = spans[0];
       if (!primary) {
         return c.json(
-          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
           409
         );
       }
@@ -4000,14 +3980,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
       });
       if (spans.length === 0) {
         return c.json(
-          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
           409
         );
       }
       const primary = spans[0];
       if (!primary) {
         return c.json(
-          { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+          { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
           409
         );
       }
@@ -4072,14 +4052,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
     });
     if (spans.length === 0) {
       return c.json(
-        { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+        { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
         409
       );
     }
     const primary = spans[0];
     if (!primary) {
       return c.json(
-        { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+        { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
         409
       );
     }
@@ -4235,14 +4215,14 @@ timeRouter.post("/time/entries", zValidator("json", CreateTimeEntrySchema), asyn
   });
   if (spans.length === 0) {
     return c.json(
-      { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+      { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
       409
     );
   }
   const primary = spans[0];
   if (!primary) {
     return c.json(
-      { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+      { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
       409
     );
   }
@@ -4637,14 +4617,14 @@ timeRouter.patch("/time/entries/:id", zValidator("json", PatchTimeEntrySchema), 
   });
   if (spans.length === 0) {
     return c.json(
-      { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+      { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
       409
     );
   }
   const primary = spans[0];
   if (!primary) {
     return c.json(
-      { error: { message: "Time range fully overlaps existing entries", code: "OVERLAP_CONFLICT" } },
+      { error: { message: "Time range overlaps existing entries", code: "OVERLAP_CONFLICT" } },
       409
     );
   }

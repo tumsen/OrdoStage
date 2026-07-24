@@ -129,6 +129,7 @@ export default function TimeImport() {
     imported: number;
     skipped: number;
     skippedDuplicates: number;
+    skippedOverlaps: number;
   } | null>(null);
 
   const { data: batches } = useQuery({
@@ -226,6 +227,7 @@ export default function TimeImport() {
       let totalImported = 0;
       let totalSkipped = 0;
       let totalSkippedDuplicates = 0;
+      let totalSkippedOverlaps = 0;
       const limit = 200;
 
       setImportProgress({ imported: 0, total: preview?.entryCount ?? 0 });
@@ -236,6 +238,7 @@ export default function TimeImport() {
           imported: number;
           skipped: number;
           skippedDuplicates: number;
+          skippedOverlaps?: number;
           done: boolean;
           nextOffset: number;
           totalSlots: number;
@@ -249,6 +252,7 @@ export default function TimeImport() {
         totalImported += data.imported;
         totalSkipped += data.skipped;
         totalSkippedDuplicates += data.skippedDuplicates ?? 0;
+        totalSkippedOverlaps += data.skippedOverlaps ?? 0;
         setImportProgress({ imported: totalImported, total: data.totalSlots });
         if (data.done) {
           return {
@@ -256,6 +260,7 @@ export default function TimeImport() {
             imported: totalImported,
             skipped: totalSkipped,
             skippedDuplicates: totalSkippedDuplicates,
+            skippedOverlaps: totalSkippedOverlaps,
           };
         }
         offset = data.nextOffset;
@@ -270,9 +275,13 @@ export default function TimeImport() {
         data.skippedDuplicates > 0
           ? `, ${data.skippedDuplicates} ${t("time.importEntriesSkippedDuplicates")}`
           : "";
+      const ovPart =
+        data.skippedOverlaps > 0
+          ? `, ${data.skippedOverlaps} ${t("time.importEntriesSkippedOverlaps")}`
+          : "";
       toast({
         title: t("time.importDone"),
-        description: `${data.imported} ${t("time.importEntriesImported")}${dupPart}`,
+        description: `${data.imported} ${t("time.importEntriesImported")}${dupPart}${ovPart}`,
       });
     },
     onError: (e: Error) => {
@@ -651,8 +660,16 @@ export default function TimeImport() {
                   {importResult.skippedDuplicates > 0
                     ? `, ${importResult.skippedDuplicates} ${t("time.importEntriesSkippedDuplicates")}`
                     : ""}
-                  {importResult.skipped > importResult.skippedDuplicates
-                    ? `, ${importResult.skipped - importResult.skippedDuplicates} ${t("time.importEntriesSkippedOther")}`
+                  {importResult.skippedOverlaps > 0
+                    ? `, ${importResult.skippedOverlaps} ${t("time.importEntriesSkippedOverlaps")}`
+                    : ""}
+                  {importResult.skipped >
+                  importResult.skippedDuplicates + importResult.skippedOverlaps
+                    ? `, ${
+                        importResult.skipped -
+                        importResult.skippedDuplicates -
+                        importResult.skippedOverlaps
+                      } ${t("time.importEntriesSkippedOther")}`
                     : ""}{" "}
                   (batch {importResult.batchId.slice(0, 8)}…)
                 </p>

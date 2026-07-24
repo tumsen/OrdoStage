@@ -132,6 +132,8 @@ import {
   rangeOverlapsColumnWindow,
   rawWindowMinutesFromY,
   snapWindowMinutes,
+  clampRangeAgainstNeighbors,
+  timeRangesOverlap,
 } from "@/lib/timeGrid";
 import {
   CALENDAR_GRID_SCROLLER_CLASS,
@@ -723,6 +725,8 @@ export default function TimeTracking() {
       api.get<TimeEntry[]>(`/api/time/entries?from=${rangeFrom}&to=${rangeTo}${personQs}`),
     enabled: canUsePage && Boolean(mePerson?.id),
   });
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
 
   const { data: approvals } = useQuery({
     queryKey: ["time-approvals", rangeFrom, rangeTo, readAll, selectedPersonId],
@@ -1229,13 +1233,40 @@ export default function TimeTracking() {
         const sh = displayStartHourRef.current;
         const dtA = dateFromColumnAndWindowMinutes(dayA, winA, sh);
         const dtB = dateFromColumnAndWindowMinutes(dayB, winB, sh);
-        const absStart = dtA < dtB ? dtA : dtB;
-        const absEnd = dtA < dtB ? dtB : dtA;
+        const absStartRaw = dtA < dtB ? dtA : dtB;
+        const absEndRaw = dtA < dtB ? dtB : dtA;
 
         const minMs = TIME_SNAP_MINUTES * 60 * 1000;
-        if (absEnd.getTime() - absStart.getTime() < minMs) {
+        if (absEndRaw.getTime() - absStartRaw.getTime() < minMs) {
           hideAllCreateOverlays();
           return;
+        }
+
+        const neighbors = (entriesRef.current ?? []).map((e) => ({
+          start: parseISO(e.startsAt),
+          end: parseISO(e.endsAt),
+        }));
+        // Grow from the drag origin side: if start was fixed-ish use resizeEnd semantics
+        // by clamping the full proposed range against neighbors via move-style snap when
+        // it would overlap, else trim ends.
+        let absStart = absStartRaw;
+        let absEnd = absEndRaw;
+        if (neighbors.some((n) => timeRangesOverlap(absStart, absEnd, n.start, n.end))) {
+          // Prefer trimming the end toward the pointer direction
+          ({ start: absStart, end: absEnd } = clampRangeAgainstNeighbors(
+            absStart,
+            absEnd,
+            neighbors,
+            dtB >= dtA ? "resizeEnd" : "resizeStart"
+          ));
+          if (absEnd.getTime() - absStart.getTime() < minMs) {
+            hideAllCreateOverlays();
+            return;
+          }
+          if (neighbors.some((n) => timeRangesOverlap(absStart, absEnd, n.start, n.end))) {
+            hideAllCreateOverlays();
+            return;
+          }
         }
 
         createEntry.mutate(
@@ -1272,6 +1303,19 @@ export default function TimeTracking() {
     ]
   );
 
+  const neighborSpansForEntry = useCallback((entryId: string) => {
+    const list = entriesRef.current ?? [];
+    const self = list.find((e) => e.id === entryId);
+    const groupId = self?.segmentGroupId ?? null;
+    return list
+      .filter((e) => {
+        if (e.id === entryId) return false;
+        if (groupId && e.segmentGroupId === groupId) return false;
+        return true;
+      })
+      .map((e) => ({ start: parseISO(e.startsAt), end: parseISO(e.endsAt) }));
+  }, []);
+
   const attachEntryDragListeners = useCallback(() => {
     const onMove = (ev: PointerEvent) => {
       const cur = entryDragRef.current;
@@ -1285,6 +1329,7 @@ export default function TimeTracking() {
       const sh = displayStartHourRef.current;
       const ymd = dayYmdForColumnIndex(idx);
       if (!ymd) return;
+      const neighbors = neighborSpansForEntry(cur.entryId);
 
       if (cur.kind === "move") {
         if (!cur.moveThresholdPassed) {
@@ -1302,8 +1347,14 @@ export default function TimeTracking() {
               Math.round(cur.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
             );
         const newStartWin = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, mSnap)));
-        const newStart = dateFromColumnAndWindowMinutes(ymd, newStartWin, sh);
-        const newEnd = new Date(newStart.getTime() + dur * 60000);
+        let newStart = dateFromColumnAndWindowMinutes(ymd, newStartWin, sh);
+        let newEnd = new Date(newStart.getTime() + dur * 60000);
+        ({ start: newStart, end: newEnd } = clampRangeAgainstNeighbors(
+          newStart,
+          newEnd,
+          neighbors,
+          "move"
+        ));
         setDragOverride({
           entryId: cur.entryId,
           startsAt: newStart.toISOString(),
@@ -1313,10 +1364,11 @@ export default function TimeTracking() {
       }
 
       if (cur.kind === "resizeEnd") {
-        const newEnd = dateFromColumnAndWindowMinutes(ymd, mSnap, sh);
+        const proposedEnd = dateFromColumnAndWindowMinutes(ymd, mSnap, sh);
         const start = parseISO(cur.origStartsAtIso);
         const minEnd = new Date(start.getTime() + TIME_SNAP_MINUTES * 60000);
-        const endsAt = newEnd.getTime() < minEnd.getTime() ? minEnd : newEnd;
+        let endsAt = proposedEnd.getTime() < minEnd.getTime() ? minEnd : proposedEnd;
+        ({ end: endsAt } = clampRangeAgainstNeighbors(start, endsAt, neighbors, "resizeEnd"));
         setDragOverride({
           entryId: cur.entryId,
           startsAt: cur.origStartsAtIso,
@@ -1326,10 +1378,11 @@ export default function TimeTracking() {
       }
 
       if (cur.kind === "resizeStart") {
-        const newStart = dateFromColumnAndWindowMinutes(ymd, mSnap, sh);
+        const proposedStart = dateFromColumnAndWindowMinutes(ymd, mSnap, sh);
         const end = parseISO(cur.origEndsAtIso);
         const maxStart = new Date(end.getTime() - TIME_SNAP_MINUTES * 60000);
-        const startsAt = newStart.getTime() > maxStart.getTime() ? maxStart : newStart;
+        let startsAt = proposedStart.getTime() > maxStart.getTime() ? maxStart : proposedStart;
+        ({ start: startsAt } = clampRangeAgainstNeighbors(startsAt, end, neighbors, "resizeStart"));
         setDragOverride({
           entryId: cur.entryId,
           startsAt: startsAt.toISOString(),
@@ -1368,11 +1421,14 @@ export default function TimeTracking() {
         return;
       }
 
+      const neighbors = neighborSpansForEntry(d.entryId);
+
       if (d.kind === "resizeEnd") {
-        const newEnd = dateFromColumnAndWindowMinutes(ymd, m, sh);
+        const proposedEnd = dateFromColumnAndWindowMinutes(ymd, m, sh);
         const start = parseISO(d.origStartsAtIso);
         const minEnd = new Date(start.getTime() + TIME_SNAP_MINUTES * 60000);
-        const endsAt = newEnd.getTime() < minEnd.getTime() ? minEnd : newEnd;
+        let endsAt = proposedEnd.getTime() < minEnd.getTime() ? minEnd : proposedEnd;
+        ({ end: endsAt } = clampRangeAgainstNeighbors(start, endsAt, neighbors, "resizeEnd"));
         updateEntry.mutate({
           id: d.entryId,
           body: {
@@ -1385,10 +1441,11 @@ export default function TimeTracking() {
       }
 
       if (d.kind === "resizeStart") {
-        const newStart = dateFromColumnAndWindowMinutes(ymd, m, sh);
+        const proposedStart = dateFromColumnAndWindowMinutes(ymd, m, sh);
         const end = parseISO(d.origEndsAtIso);
         const maxStart = new Date(end.getTime() - TIME_SNAP_MINUTES * 60000);
-        const startsAt = newStart.getTime() > maxStart.getTime() ? maxStart : newStart;
+        let startsAt = proposedStart.getTime() > maxStart.getTime() ? maxStart : proposedStart;
+        ({ start: startsAt } = clampRangeAgainstNeighbors(startsAt, end, neighbors, "resizeStart"));
         updateEntry.mutate({
           id: d.entryId,
           body: {
@@ -1407,8 +1464,14 @@ export default function TimeTracking() {
             Math.round(d.durationMin / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES
           );
       const newStartWin = clampMinutesToDay(Math.max(0, Math.min(MINUTES_PER_DAY - dur, m)));
-      const newStart = dateFromColumnAndWindowMinutes(ymd, newStartWin, sh);
-      const newEnd = new Date(newStart.getTime() + dur * 60000);
+      let newStart = dateFromColumnAndWindowMinutes(ymd, newStartWin, sh);
+      let newEnd = new Date(newStart.getTime() + dur * 60000);
+      ({ start: newStart, end: newEnd } = clampRangeAgainstNeighbors(
+        newStart,
+        newEnd,
+        neighbors,
+        "move"
+      ));
       updateEntry.mutate({
         id: d.entryId,
         body: {
@@ -1422,7 +1485,14 @@ export default function TimeTracking() {
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", finish);
-  }, [minutesFromY, updateEntry, setEditingEntryId, dayYmdForColumnIndex, findGridColumnIndexAtX]);
+  }, [
+    minutesFromY,
+    updateEntry,
+    setEditingEntryId,
+    dayYmdForColumnIndex,
+    findGridColumnIndexAtX,
+    neighborSpansForEntry,
+  ]);
 
   const entryByJobId = useMemo(() => {
     const m = new Map<string, TimeEntry>();

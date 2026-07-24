@@ -437,6 +437,7 @@ export async function runTimerlyImport(input: {
   let imported = 0;
   let skipped = 0;
   let skippedDuplicates = 0;
+  let skippedOverlaps = 0;
   const errors: { rowIndex: number; reason: string }[] = [];
   const creates: {
     organizationId: string;
@@ -518,17 +519,18 @@ export async function runTimerlyImport(input: {
   if (creates.length > 0) {
     const personIds = [...new Set(creates.map((c) => c.personId))];
     let minStart = creates[0]!.startsAt;
-    let maxStart = creates[0]!.startsAt;
+    let maxEnd = creates[0]!.endsAt;
     for (const c of creates) {
       if (c.startsAt < minStart) minStart = c.startsAt;
-      if (c.startsAt > maxStart) maxStart = c.startsAt;
+      if (c.endsAt > maxEnd) maxEnd = c.endsAt;
     }
 
     const existing = await prisma.timeEntry.findMany({
       where: {
         organizationId: input.organizationId,
         personId: { in: personIds },
-        startsAt: { gte: minStart, lte: maxStart },
+        startsAt: { lt: maxEnd },
+        endsAt: { gt: minStart },
       },
       select: {
         personId: true,
@@ -540,6 +542,11 @@ export async function runTimerlyImport(input: {
     const existingKeys = new Set(
       existing.map((e) => timeEntryDedupeKey(e.personId, e.startsAt, e.endsAt))
     );
+    const occupied: { personId: string; startsAt: Date; endsAt: Date }[] = existing.map((e) => ({
+      personId: e.personId,
+      startsAt: e.startsAt,
+      endsAt: e.endsAt,
+    }));
 
     toCreate = [];
     for (const row of creates) {
@@ -549,6 +556,19 @@ export async function runTimerlyImport(input: {
         skippedDuplicates++;
         continue;
       }
+      const overlaps = occupied.some(
+        (o) =>
+          o.personId === row.personId &&
+          o.startsAt.getTime() < row.endsAt.getTime() &&
+          o.endsAt.getTime() > row.startsAt.getTime()
+      );
+      if (overlaps) {
+        skipped++;
+        skippedOverlaps++;
+        continue;
+      }
+      occupied.push({ personId: row.personId, startsAt: row.startsAt, endsAt: row.endsAt });
+      existingKeys.add(key);
       toCreate.push(row);
     }
   }
@@ -610,6 +630,7 @@ export async function runTimerlyImport(input: {
     imported,
     skipped,
     skippedDuplicates,
+    skippedOverlaps,
     done,
     nextOffset: done ? slots.length : nextOffset,
     totalSlots: slots.length,
