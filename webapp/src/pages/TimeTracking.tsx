@@ -1001,6 +1001,20 @@ export default function TimeTracking() {
     };
   }, [dragOverride, editingEntryId]);
 
+  const editingDaySiblingEntries = useMemo(() => {
+    if (!editingEntry || !entries) return [];
+    const dayYmd = localCalendarYmdFromUtcIso(
+      entryLiveDragRange?.startsAt ?? editingEntry.startsAt
+    );
+    return entries.filter((e) => {
+      if (e.id === editingEntry.id) return false;
+      const s = parseISO(e.startsAt);
+      const end = parseISO(e.endsAt);
+      if (!Number.isFinite(s.getTime()) || !Number.isFinite(end.getTime())) return false;
+      return rangeOverlapsColumnWindow(s, end, dayYmd, 0);
+    });
+  }, [editingEntry, entries, entryLiveDragRange]);
+
   const minutesFromY = useCallback((clientY: number, colEl: HTMLElement | null) => {
     if (!colEl) return null;
     const rect = colEl.getBoundingClientRect();
@@ -2478,8 +2492,54 @@ export default function TimeTracking() {
                   pasteCopyToDay(format(day, "yyyy-MM-dd"));
                   return;
                 }
-                setAnchor(day);
-                setMode("week");
+                if (!canEditVisiblePeriod) {
+                  setAnchor(day);
+                  setMode("week");
+                  return;
+                }
+                if (createEntry.isPending) return;
+                const ymd = format(day, "yyyy-MM-dd");
+                const dayEntries = (entries ?? []).filter((e) => {
+                  const s = parseISO(e.startsAt);
+                  const end = parseISO(e.endsAt);
+                  if (!Number.isFinite(s.getTime()) || !Number.isFinite(end.getTime())) return false;
+                  return rangeOverlapsColumnWindow(s, end, ymd, 0);
+                });
+                const neighbors = dayEntries.map((e) => ({
+                  start: parseISO(e.startsAt),
+                  end: parseISO(e.endsAt),
+                }));
+                let startsAtIso: string | null = null;
+                let endsAtIso: string | null = null;
+                for (let hour = 8; hour <= 20; hour++) {
+                  for (const minute of [0, 30] as const) {
+                    const hm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+                    const candidateStart = wallClockYmdHhMmToUtcIso(ymd, hm);
+                    const candidateEnd = addMinutesToUtcIso(candidateStart, 60);
+                    if (!candidateEnd) continue;
+                    const s = parseISO(candidateStart);
+                    const e = parseISO(candidateEnd);
+                    if (!neighbors.some((n) => timeRangesOverlap(s, e, n.start, n.end))) {
+                      startsAtIso = candidateStart;
+                      endsAtIso = candidateEnd;
+                      break;
+                    }
+                  }
+                  if (startsAtIso) break;
+                }
+                if (!startsAtIso || !endsAtIso) {
+                  startsAtIso = wallClockYmdHhMmToUtcIso(ymd, "09:00");
+                  endsAtIso = addMinutesToUtcIso(startsAtIso, 60);
+                }
+                if (!startsAtIso || !endsAtIso) return;
+                createEntry.mutate(
+                  { kind: "custom", startsAt: startsAtIso, endsAt: endsAtIso },
+                  {
+                    onSuccess: (created) => {
+                      setEditingEntryId(created.id);
+                    },
+                  }
+                );
               }}
             />
           </div>
@@ -3603,6 +3663,7 @@ export default function TimeTracking() {
         entrySummary={editingEntryJobSummary}
         leaveManagementEnabled={leaveManagementEnabled}
         workDayDurationMinutes={workDayMinutes}
+        daySiblingEntries={editingDaySiblingEntries}
       />
       <AlertDialog open={approveConfirmOpen} onOpenChange={setApproveConfirmOpen}>
         <AlertDialogContent className="bg-[#16161f] border-white/10 text-white">

@@ -92,6 +92,7 @@ const en = {
     endTimeLabel: "End",
     editTimePreciseHint:
       "Use any minute (HH:MM), e.g. 07:24 for 7h 24m. Dragging on the week grid still snaps to 5 minutes.",
+    dayTimelineLabel: "24-hour timeline",
     searchProjects: "Search projects…",
     noProjectMatches: "No matching projects.",
     saveEntry: "Save",
@@ -752,6 +753,7 @@ const da: DeepPartial<typeof en> = {
     entryCopied: "Registrering kopieret.",
     editTimePreciseHint:
       "Brug præcis tid (TT:MM), fx 07:24 for 7 t. 24 min. Træk på ugen snupper stadig til 5 minutter.",
+    dayTimelineLabel: "24-timers tidslinje",
     weekToolsExpand: "Kommende jobs & katalog",
     weekColumnDayHours: "Dag",
     weekColumnRunningHours: "Sum",
@@ -1423,6 +1425,7 @@ const de: DeepPartial<typeof en> = {
   time: {
     editTimePreciseHint:
       "Beliebige Minute (HH:MM), z. B. 07:24 für 7h 24m. Ziehen in der Wochenansicht bleibt auf 5 Minuten gerastert.",
+    dayTimelineLabel: "24-Stunden-Zeitachse",
     weekToolsExpand: "Anstehende Jobs & Katalog",
   },
   account: {

@@ -44,6 +44,13 @@ import {
   SplitDurationHhMmInput,
   SplitTimeInput,
 } from "@/components/SplitTimeField";
+import { DayTimelineStrip, type DayTimelineSibling } from "@/components/time/DayTimelineStrip";
+import { localCalendarYmdFromUtcIso } from "@/lib/browserUserTime";
+import {
+  MINUTES_PER_DAY,
+  minutesFromWindowStart,
+  rangeOverlapsColumnWindow,
+} from "@/lib/timeGrid";
 
 type PatchBody = {
   note: string | null;
@@ -126,6 +133,8 @@ export function TimeEntryEditSheet(props: {
   leaveManagementEnabled?: boolean;
   /** One vacation/sick day in minutes (weekly contract ÷ 5). */
   workDayDurationMinutes?: number;
+  /** Other entries on the same local day (shown on the 24h timeline). */
+  daySiblingEntries?: TimeEntry[];
 }) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
@@ -147,6 +156,7 @@ export function TimeEntryEditSheet(props: {
     entrySummary,
     leaveManagementEnabled = false,
     workDayDurationMinutes = 0,
+    daySiblingEntries = [],
   } = props;
 
   const liveRangeRef = useRef(liveRange);
@@ -222,6 +232,40 @@ export function TimeEntryEditSheet(props: {
     const p = activeProjects.find((x) => x.id === projectId);
     return p ? displayHex(p.color, p.id) : null;
   }, [projectId, activeProjects]);
+
+  const entryDayYmd = useMemo(() => {
+    if (!entry) return null;
+    const base = liveRange?.startsAt ?? entry.startsAt;
+    return localCalendarYmdFromUtcIso(base);
+  }, [entry, liveRange]);
+
+  const timelineSiblings: DayTimelineSibling[] = useMemo(() => {
+    if (!entryDayYmd || !entry) return [];
+    const projectColorById = new Map(projects.map((p) => [p.id, displayHex(p.color, p.id)]));
+    const out: DayTimelineSibling[] = [];
+    for (const sib of daySiblingEntries) {
+      if (sib.id === entry.id) continue;
+      const s = parseISO(sib.startsAt);
+      const e = parseISO(sib.endsAt);
+      if (!Number.isFinite(s.getTime()) || !Number.isFinite(e.getTime())) continue;
+      if (!rangeOverlapsColumnWindow(s, e, entryDayYmd, 0)) continue;
+      let startMin = minutesFromWindowStart(s, entryDayYmd, 0);
+      let endMin = minutesFromWindowStart(e, entryDayYmd, 0);
+      if (endMin < startMin) endMin += MINUTES_PER_DAY;
+      startMin = Math.max(0, startMin);
+      endMin = Math.min(MINUTES_PER_DAY, endMin);
+      if (endMin - startMin < 1) continue;
+      out.push({
+        id: sib.id,
+        startMin,
+        endMin,
+        color: sib.timeProjectId
+          ? projectColorById.get(sib.timeProjectId) ?? "rgba(255,255,255,0.35)"
+          : "rgba(255,255,255,0.35)",
+      });
+    }
+    return out;
+  }, [daySiblingEntries, entry, entryDayYmd, projects]);
 
   useEffect(() => {
     if (!entry || !open) return;
@@ -387,6 +431,14 @@ export function TimeEntryEditSheet(props: {
     }
   };
 
+  const handleTimelineRangeChange = (nextStartHm: string, nextEndHm: string) => {
+    if (!entry || entry.isLocked) return;
+    handleStartHmChange(nextStartHm);
+    if (!(isDayOffCategory(category) && workDayDurationMinutes > 0)) {
+      setEndHm(nextEndHm);
+    }
+  };
+
   const isDayOff = isDayOffCategory(category);
   const isVacationNoteOnly = isVacationNoteOnlyCategory(category);
   const usesLeaveSystemProject = isLeaveAutoProjectCategory(category);
@@ -410,10 +462,10 @@ export function TimeEntryEditSheet(props: {
     <Sheet open={open} onOpenChange={sheetOnOpenChange}>
       <SheetContent
         className={cn(
-          "bg-[#0d0d14] border-white/10 text-white w-full sm:max-w-md",
+          "bg-[#0d0d14] border-white/10 text-white w-full",
           isMobile
-            ? "flex h-[100dvh] max-h-[100dvh] flex-col gap-0 overflow-hidden p-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-            : "overflow-y-auto"
+            ? "flex h-[100dvh] max-h-[100dvh] flex-col gap-0 overflow-hidden p-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:max-w-md"
+            : "overflow-y-auto sm:max-w-2xl"
         )}
       >
         <SheetHeader className={cn(isMobile && "shrink-0 space-y-0.5 text-left")}>
@@ -431,13 +483,21 @@ export function TimeEntryEditSheet(props: {
         </SheetHeader>
         <div
           className={cn(
-            "grid gap-4",
+            "flex min-h-0 py-2",
             isMobile
-              ? "min-h-0 flex-1 grid-rows-[auto_auto_auto_auto_minmax(0,1fr)] gap-2 overflow-hidden py-2"
-              : "py-4"
+              ? "flex-1 flex-row gap-0 overflow-hidden"
+              : "items-start gap-0 py-4"
           )}
-          onBlurCapture={entryAutoSave.onBlurCapture}
         >
+          <div
+            className={cn(
+              "grid gap-4",
+              isMobile
+                ? "min-h-0 min-w-0 flex-1 grid-rows-[auto_auto_auto_auto_minmax(0,1fr)] gap-2 overflow-hidden pr-2"
+                : "min-w-0 flex-1 gap-4 pr-4"
+            )}
+            onBlurCapture={entryAutoSave.onBlurCapture}
+          >
           <div
             className={cn(
               "rounded-md border border-white/10 bg-white/[0.03] flex items-center justify-between gap-2",
@@ -709,6 +769,33 @@ export function TimeEntryEditSheet(props: {
                 "bg-white/5 border-white/10 text-white placeholder:text-white/35 resize-none",
                 isMobile ? "min-h-0 h-14 text-xs" : "min-h-[100px]"
               )}
+            />
+          </div>
+          </div>
+          <div
+            className={cn(
+              "flex shrink-0 flex-col gap-1.5 border-l border-white/10 pl-2",
+              isMobile
+                ? "w-[5.5rem] self-stretch overflow-y-auto"
+                : "sticky top-0 w-[7.75rem] self-start pl-3"
+            )}
+          >
+            <div className={cn("text-white/55", isMobile ? "text-[9px] leading-tight" : "text-[11px]")}>
+              {t("time.dayTimelineLabel")}
+            </div>
+            <DayTimelineStrip
+              startHm={startHm}
+              endHm={endHm}
+              onChangeRange={handleTimelineRangeChange}
+              siblings={timelineSiblings}
+              activeColor={selectedProjectColor ?? "#f5c518"}
+              disabled={!entry || entry.isLocked}
+              fixedDurationMinutes={
+                isDayOff && workDayDurationMinutes > 0 ? dayOffDurationMin : null
+              }
+              timeFormat={timeFormat}
+              aria-label={t("time.dayTimelineLabel")}
+              compact={isMobile}
             />
           </div>
         </div>
