@@ -1,5 +1,5 @@
 import { prisma } from "../prisma";
-import { wallClockInstantFromDateIsoAndHHMM } from "../clientWallClock";
+import { wallClockInstantFromDateIsoAndHHMM, getClientWallClockZone, normalizeClientIanaZone } from "../clientWallClock";
 import type { TimeCategory } from "../types";
 import {
   expandTimerlyTimeSlots,
@@ -7,8 +7,9 @@ import {
   type ParsedTimerlyEntry,
 } from "./parseTimerlyCsv";
 import { resolveCanonicalLeaveProject } from "./leaveTimeProjects";
-import { applyTimeEntryToLeaveLedger } from "./leaveLedger";
+import { applyTimeEntryToLeaveLedger, removeTimeEntryFromLeaveLedger } from "./leaveLedger";
 import { shiftSpanPastOccupied, isLikelyLunchBreak, timeSpansOverlap } from "./timeOverlap";
+import { DateTime } from "luxon";
 
 export type ImportProjectMapping = {
   externalName: string;
@@ -324,6 +325,65 @@ function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
+/** Import wall-clock zone: request header, else Copenhagen (DK orgs). */
+function importWallClockZone(): string {
+  const z = normalizeClientIanaZone(getClientWallClockZone());
+  return z === "UTC" ? "Europe/Copenhagen" : z;
+}
+
+/**
+ * Before writing Timely rows for a person+day, remove other entries that start that day
+ * (unlocked, not from this same import batch) so re-import replaces instead of stacking.
+ */
+async function replaceExistingEntriesOnImportDays(args: {
+  organizationId: string;
+  batchId: string;
+  personDateIsos: { personId: string; dateIso: string }[];
+}): Promise<number> {
+  const zone = importWallClockZone();
+  const seen = new Set<string>();
+  let deleted = 0;
+
+  for (const { personId, dateIso } of args.personDateIsos) {
+    const key = `${personId}\0${dateIso}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const dayStart = DateTime.fromISO(dateIso, { zone }).startOf("day");
+    if (!dayStart.isValid) continue;
+    const dayEnd = dayStart.plus({ days: 1 });
+
+    const existing = await prisma.timeEntry.findMany({
+      where: {
+        organizationId: args.organizationId,
+        personId,
+        isLocked: false,
+        startsAt: { gte: dayStart.toJSDate(), lt: dayEnd.toJSDate() },
+        OR: [{ importBatchId: null }, { importBatchId: { not: args.batchId } }],
+      },
+      select: { id: true, category: true },
+    });
+    if (existing.length === 0) continue;
+
+    for (const e of existing) {
+      if (
+        e.category === "vacation" ||
+        e.category === "extra_vacation" ||
+        e.category === "sick" ||
+        e.category === "holiday" ||
+        e.category === "comp_time"
+      ) {
+        await removeTimeEntryFromLeaveLedger(e.id);
+      }
+    }
+    await prisma.timeEntry.deleteMany({
+      where: { id: { in: existing.map((e) => e.id) } },
+    });
+    deleted += existing.length;
+  }
+  return deleted;
+}
+
 /**
  * Same person + exact start/end → already exists.
  * Do not include project/category: remapped imports may have moved entries to other projects.
@@ -440,11 +500,13 @@ export async function runTimerlyImport(input: {
   let skippedDuplicates = 0;
   let shiftedOverlaps = 0;
   let droppedLunchBreaks = 0;
+  let replacedExisting = 0;
   const errors: { rowIndex: number; reason: string }[] = [];
   const creates: {
     organizationId: string;
     userId: string;
     personId: string;
+    dateIso: string;
     startsAt: Date;
     endsAt: Date;
     kind: string;
@@ -504,6 +566,7 @@ export async function runTimerlyImport(input: {
       organizationId: input.organizationId,
       userId: input.userId,
       personId,
+      dateIso: slot.dateIso,
       startsAt: times.startsAt,
       endsAt: times.endsAt,
       kind: "custom",
@@ -519,6 +582,12 @@ export async function runTimerlyImport(input: {
 
   let toCreate = creates;
   if (creates.length > 0) {
+    replacedExisting = await replaceExistingEntriesOnImportDays({
+      organizationId: input.organizationId,
+      batchId: batchId!,
+      personDateIsos: creates.map((c) => ({ personId: c.personId, dateIso: c.dateIso })),
+    });
+
     // Resolve overlaps in chronological order so later rows stack after earlier ones.
     creates.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || a.endsAt.getTime() - b.endsAt.getTime());
 
@@ -729,6 +798,7 @@ export async function runTimerlyImport(input: {
     skippedDuplicates,
     shiftedOverlaps,
     droppedLunchBreaks,
+    replacedExisting,
     done,
     nextOffset: done ? slots.length : nextOffset,
     totalSlots: slots.length,

@@ -131,6 +131,7 @@ export default function TimeImport() {
     skippedDuplicates: number;
     shiftedOverlaps: number;
     droppedLunchBreaks: number;
+    replacedExisting: number;
   } | null>(null);
 
   const { data: batches } = useQuery({
@@ -230,6 +231,7 @@ export default function TimeImport() {
       let totalSkippedDuplicates = 0;
       let totalShiftedOverlaps = 0;
       let totalDroppedLunch = 0;
+      let totalReplacedExisting = 0;
       const limit = 200;
 
       setImportProgress({ imported: 0, total: preview?.entryCount ?? 0 });
@@ -242,6 +244,7 @@ export default function TimeImport() {
           skippedDuplicates: number;
           shiftedOverlaps?: number;
           droppedLunchBreaks?: number;
+          replacedExisting?: number;
           done: boolean;
           nextOffset: number;
           totalSlots: number;
@@ -257,6 +260,7 @@ export default function TimeImport() {
         totalSkippedDuplicates += data.skippedDuplicates ?? 0;
         totalShiftedOverlaps += data.shiftedOverlaps ?? 0;
         totalDroppedLunch += data.droppedLunchBreaks ?? 0;
+        totalReplacedExisting += data.replacedExisting ?? 0;
         setImportProgress({ imported: totalImported, total: data.totalSlots });
         if (data.done) {
           return {
@@ -266,6 +270,7 @@ export default function TimeImport() {
             skippedDuplicates: totalSkippedDuplicates,
             shiftedOverlaps: totalShiftedOverlaps,
             droppedLunchBreaks: totalDroppedLunch,
+            replacedExisting: totalReplacedExisting,
           };
         }
         offset = data.nextOffset;
@@ -288,9 +293,13 @@ export default function TimeImport() {
         data.droppedLunchBreaks > 0
           ? `, ${data.droppedLunchBreaks} ${t("time.importEntriesDroppedLunch")}`
           : "";
+      const replacedPart =
+        data.replacedExisting > 0
+          ? `, ${data.replacedExisting} ${t("time.importEntriesReplacedExisting")}`
+          : "";
       toast({
         title: t("time.importDone"),
-        description: `${data.imported} ${t("time.importEntriesImported")}${dupPart}${shiftPart}${lunchPart}`,
+        description: `${data.imported} ${t("time.importEntriesImported")}${dupPart}${shiftPart}${lunchPart}${replacedPart}`,
       });
     },
     onError: (e: Error) => {
@@ -674,6 +683,9 @@ export default function TimeImport() {
                     : ""}
                   {importResult.droppedLunchBreaks > 0
                     ? `, ${importResult.droppedLunchBreaks} ${t("time.importEntriesDroppedLunch")}`
+                    : ""}
+                  {importResult.replacedExisting > 0
+                    ? `, ${importResult.replacedExisting} ${t("time.importEntriesReplacedExisting")}`
                     : ""}
                   {importResult.skipped > importResult.skippedDuplicates
                     ? `, ${

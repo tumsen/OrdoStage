@@ -1584,6 +1584,8 @@ export const TimeImportRunResultSchema = z.object({
   shiftedOverlaps: z.number().optional(),
   /** Lunch / paid-pause blocks dropped because they sat on top of another registration. */
   droppedLunchBreaks: z.number().optional(),
+  /** Existing unlocked entries removed for person+days covered by this import (replace, not stack). */
+  replacedExisting: z.number().optional(),
   done: z.boolean(),
   nextOffset: z.number(),
   totalSlots: z.number(),
