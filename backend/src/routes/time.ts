@@ -30,6 +30,7 @@ import {
   reverseCompTimeForTimesheetReopen,
   settleCompTimeForTimesheetApproval,
 } from "../services/timesheetCompSettlement";
+import { shiftSpanPastOccupied } from "../services/timeOverlap";
 import {
   backfillLeaveEntryCategories,
   backfillLeaveEntryProjects,
@@ -810,23 +811,33 @@ async function computeNonOverlappingSpans(args: {
   if (args.excludeEntryId) notOr.push({ id: args.excludeEntryId });
   if (args.excludeSegmentGroupId) notOr.push({ segmentGroupId: args.excludeSegmentGroupId });
 
-  const overlaps = await prisma.timeEntry.findMany({
-    where: {
-      organizationId: args.organizationId,
-      personId: args.personId,
-      startsAt: { lt: args.endsAt },
-      endsAt: { gt: args.startsAt },
-      ...(notOr.length ? { NOT: { OR: notOr } } : {}),
-    },
-    select: { startsAt: true, endsAt: true },
-    orderBy: { startsAt: "asc" },
-  });
-  // Hard rule: no overlapping registrations per person (touching endpoints OK).
-  // Previously we carved free gaps / split entries — that is no longer allowed.
-  if (overlaps.length > 0) {
-    return [];
+  const durationMs = args.endsAt.getTime() - args.startsAt.getTime();
+  if (durationMs <= 0) return [];
+
+  let startsAt = args.startsAt;
+  let endsAt = args.endsAt;
+
+  // Iteratively load blockers and shift forward until the span is free.
+  for (let pass = 0; pass < 64; pass++) {
+    const overlaps = await prisma.timeEntry.findMany({
+      where: {
+        organizationId: args.organizationId,
+        personId: args.personId,
+        startsAt: { lt: endsAt },
+        endsAt: { gt: startsAt },
+        ...(notOr.length ? { NOT: { OR: notOr } } : {}),
+      },
+      select: { startsAt: true, endsAt: true },
+      orderBy: { startsAt: "asc" },
+    });
+    if (overlaps.length === 0) {
+      return [{ startsAt, endsAt }];
+    }
+    const resolved = shiftSpanPastOccupied(startsAt, endsAt, overlaps);
+    startsAt = resolved.startsAt;
+    endsAt = resolved.endsAt;
   }
-  return [{ startsAt: args.startsAt, endsAt: args.endsAt }];
+  return [];
 }
 
 function segmentGroupIdAfterSplit(

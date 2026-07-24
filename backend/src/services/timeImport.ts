@@ -8,6 +8,7 @@ import {
 } from "./parseTimerlyCsv";
 import { resolveCanonicalLeaveProject } from "./leaveTimeProjects";
 import { applyTimeEntryToLeaveLedger } from "./leaveLedger";
+import { shiftSpanPastOccupied, isLikelyLunchBreak, timeSpansOverlap } from "./timeOverlap";
 
 export type ImportProjectMapping = {
   externalName: string;
@@ -437,7 +438,8 @@ export async function runTimerlyImport(input: {
   let imported = 0;
   let skipped = 0;
   let skippedDuplicates = 0;
-  let skippedOverlaps = 0;
+  let shiftedOverlaps = 0;
+  let droppedLunchBreaks = 0;
   const errors: { rowIndex: number; reason: string }[] = [];
   const creates: {
     organizationId: string;
@@ -517,6 +519,9 @@ export async function runTimerlyImport(input: {
 
   let toCreate = creates;
   if (creates.length > 0) {
+    // Resolve overlaps in chronological order so later rows stack after earlier ones.
+    creates.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || a.endsAt.getTime() - b.endsAt.getTime());
+
     const personIds = [...new Set(creates.map((c) => c.personId))];
     let minStart = creates[0]!.startsAt;
     let maxEnd = creates[0]!.endsAt;
@@ -524,29 +529,52 @@ export async function runTimerlyImport(input: {
       if (c.startsAt < minStart) minStart = c.startsAt;
       if (c.endsAt > maxEnd) maxEnd = c.endsAt;
     }
+    // Buffer: shifting may push entries later into the same day/week.
+    const loadUntil = new Date(maxEnd.getTime() + 14 * 86_400_000);
 
     const existing = await prisma.timeEntry.findMany({
       where: {
         organizationId: input.organizationId,
         personId: { in: personIds },
-        startsAt: { lt: maxEnd },
+        startsAt: { lt: loadUntil },
         endsAt: { gt: minStart },
       },
       select: {
+        id: true,
         personId: true,
         startsAt: true,
         endsAt: true,
+        note: true,
+        importExternalTags: true,
+        importExternalProject: true,
+        timeProject: { select: { name: true } },
       },
     });
 
     const existingKeys = new Set(
       existing.map((e) => timeEntryDedupeKey(e.personId, e.startsAt, e.endsAt))
     );
-    const occupied: { personId: string; startsAt: Date; endsAt: Date }[] = existing.map((e) => ({
+    type Occ = {
+      personId: string;
+      startsAt: Date;
+      endsAt: Date;
+      isLunch: boolean;
+      entryId?: string;
+    };
+    const occupied: Occ[] = existing.map((e) => ({
       personId: e.personId,
       startsAt: e.startsAt,
       endsAt: e.endsAt,
+      entryId: e.id,
+      isLunch: isLikelyLunchBreak({
+        startsAt: e.startsAt,
+        endsAt: e.endsAt,
+        note: e.note,
+        tagsText: e.importExternalTags,
+        projectName: e.importExternalProject ?? e.timeProject?.name ?? null,
+      }),
     }));
+    const lunchIdsToDelete = new Set<string>();
 
     toCreate = [];
     for (const row of creates) {
@@ -556,20 +584,89 @@ export async function runTimerlyImport(input: {
         skippedDuplicates++;
         continue;
       }
-      const overlaps = occupied.some(
-        (o) =>
-          o.personId === row.personId &&
-          o.startsAt.getTime() < row.endsAt.getTime() &&
-          o.endsAt.getTime() > row.startsAt.getTime()
-      );
-      if (overlaps) {
-        skipped++;
-        skippedOverlaps++;
-        continue;
+
+      const rowIsLunch = isLikelyLunchBreak({
+        startsAt: row.startsAt,
+        endsAt: row.endsAt,
+        note: row.note,
+        tagsText: row.importExternalTags,
+        projectName: row.importExternalProject,
+      });
+
+      let personOccupied = occupied.filter((o) => o.personId === row.personId);
+
+      if (rowIsLunch) {
+        const coversNonLunch = personOccupied.some(
+          (o) =>
+            !o.isLunch &&
+            timeSpansOverlap(row.startsAt, row.endsAt, o.startsAt, o.endsAt)
+        );
+        if (coversNonLunch) {
+          droppedLunchBreaks++;
+          continue;
+        }
+      } else {
+        // Work (etc.) wins: delete lunch breaks that sit on / inside this registration.
+        const overlappingLunches = personOccupied.filter(
+          (o) =>
+            o.isLunch && timeSpansOverlap(row.startsAt, row.endsAt, o.startsAt, o.endsAt)
+        );
+        for (const lunch of overlappingLunches) {
+          if (lunch.entryId) lunchIdsToDelete.add(lunch.entryId);
+          droppedLunchBreaks++;
+        }
+        if (overlappingLunches.length > 0) {
+          for (let i = occupied.length - 1; i >= 0; i--) {
+            const o = occupied[i]!;
+            if (o.personId !== row.personId || !o.isLunch) continue;
+            const match = overlappingLunches.some(
+              (l) =>
+                l.startsAt.getTime() === o.startsAt.getTime() &&
+                l.endsAt.getTime() === o.endsAt.getTime() &&
+                (l.entryId ? l.entryId === o.entryId : !o.entryId)
+            );
+            if (!match) continue;
+            occupied.splice(i, 1);
+          }
+          // Drop pending creates for same-batch lunches already queued.
+          toCreate = toCreate.filter((c) => {
+            const hit = overlappingLunches.some(
+              (l) =>
+                !l.entryId &&
+                l.personId === c.personId &&
+                l.startsAt.getTime() === c.startsAt.getTime() &&
+                l.endsAt.getTime() === c.endsAt.getTime()
+            );
+            return !hit;
+          });
+          personOccupied = occupied.filter((o) => o.personId === row.personId);
+        }
       }
-      occupied.push({ personId: row.personId, startsAt: row.startsAt, endsAt: row.endsAt });
-      existingKeys.add(key);
-      toCreate.push(row);
+
+      const resolved = shiftSpanPastOccupied(row.startsAt, row.endsAt, personOccupied);
+      if (resolved.shifted) shiftedOverlaps++;
+      const adjusted = {
+        ...row,
+        startsAt: resolved.startsAt,
+        endsAt: resolved.endsAt,
+      };
+      occupied.push({
+        personId: adjusted.personId,
+        startsAt: adjusted.startsAt,
+        endsAt: adjusted.endsAt,
+        isLunch: rowIsLunch,
+      });
+      existingKeys.add(timeEntryDedupeKey(adjusted.personId, adjusted.startsAt, adjusted.endsAt));
+      toCreate.push(adjusted);
+    }
+
+    if (lunchIdsToDelete.size > 0) {
+      await prisma.timeEntry.deleteMany({
+        where: {
+          organizationId: input.organizationId,
+          id: { in: [...lunchIdsToDelete] },
+        },
+      });
     }
   }
 
@@ -630,7 +727,8 @@ export async function runTimerlyImport(input: {
     imported,
     skipped,
     skippedDuplicates,
-    skippedOverlaps,
+    shiftedOverlaps,
+    droppedLunchBreaks,
     done,
     nextOffset: done ? slots.length : nextOffset,
     totalSlots: slots.length,

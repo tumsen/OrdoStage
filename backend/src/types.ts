@@ -1580,8 +1580,10 @@ export const TimeImportRunResultSchema = z.object({
   skipped: z.number(),
   /** Rows skipped because the same person + start/end already exists (ignores project/category). */
   skippedDuplicates: z.number(),
-  /** Rows skipped because the time range overlaps an existing (or earlier in-batch) entry. */
-  skippedOverlaps: z.number().optional(),
+  /** Rows whose start/end were auto-shifted to avoid overlapping another entry. */
+  shiftedOverlaps: z.number().optional(),
+  /** Lunch / paid-pause blocks dropped because they sat on top of another registration. */
+  droppedLunchBreaks: z.number().optional(),
   done: z.boolean(),
   nextOffset: z.number(),
   totalSlots: z.number(),
