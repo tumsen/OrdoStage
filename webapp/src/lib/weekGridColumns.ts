@@ -9,6 +9,17 @@ export const WEEK_GRID_MIN_DRAG_PX = 8;
 /** Pixel height per hour in week/day time grids — keep in sync across Schedule and Time. */
 export const CALENDAR_PX_PER_HOUR = 36;
 
+/** Left time-label gutter width in week/day grids (`56px` in `gridTemplateColumns`). */
+export const WEEK_GRID_TIME_GUTTER_PX = 56;
+
+/** Minimum week grid content width (Time week `min-w-[720px]`). */
+export const WEEK_GRID_MIN_CONTENT_WIDTH_PX = 720;
+
+/** Day column width when the week grid is at its minimum content width. */
+export const WEEK_GRID_DAY_COL_AT_MIN_PX = Math.floor(
+  (WEEK_GRID_MIN_CONTENT_WIDTH_PX - WEEK_GRID_TIME_GUTTER_PX) / 7
+);
+
 /** Space above the midnight grid line (matches `h-6` footer strip under 24:00). */
 export const CALENDAR_TIME_GRID_TOP_PAD_PX = 24;
 

@@ -44,7 +44,7 @@ import {
   SplitDurationHhMmInput,
   SplitTimeInput,
 } from "@/components/SplitTimeField";
-import { DayTimelineStrip, type DayTimelineSibling } from "@/components/time/DayTimelineStrip";
+import { DayTimelineStrip, DAY_TIMELINE_TOTAL_PX, type DayTimelineSibling } from "@/components/time/DayTimelineStrip";
 import { localCalendarYmdFromUtcIso } from "@/lib/browserUserTime";
 import {
   MINUTES_PER_DAY,
@@ -465,7 +465,7 @@ export function TimeEntryEditSheet(props: {
           "bg-[#0d0d14] border-white/10 text-white w-full",
           isMobile
             ? "flex h-[100dvh] max-h-[100dvh] flex-col gap-0 overflow-hidden p-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:max-w-md"
-            : "overflow-y-auto sm:max-w-2xl"
+            : "overflow-y-auto sm:max-w-3xl"
         )}
       >
         <SheetHeader className={cn(isMobile && "shrink-0 space-y-0.5 text-left")}>
@@ -774,15 +774,11 @@ export function TimeEntryEditSheet(props: {
           </div>
           <div
             className={cn(
-              "flex shrink-0 flex-col gap-1.5 border-l border-white/10 pl-2",
-              isMobile
-                ? "w-[5.5rem] self-stretch overflow-y-auto"
-                : "sticky top-0 w-[7.75rem] self-start pl-3"
+              "shrink-0 overflow-y-auto border-l border-white/10",
+              isMobile ? "self-stretch pl-2" : "sticky top-0 self-start pl-3"
             )}
+            style={{ width: DAY_TIMELINE_TOTAL_PX + (isMobile ? 8 : 12) }}
           >
-            <div className={cn("text-white/55", isMobile ? "text-[9px] leading-tight" : "text-[11px]")}>
-              {t("time.dayTimelineLabel")}
-            </div>
             <DayTimelineStrip
               startHm={startHm}
               endHm={endHm}
@@ -795,7 +791,6 @@ export function TimeEntryEditSheet(props: {
               }
               timeFormat={timeFormat}
               aria-label={t("time.dayTimelineLabel")}
-              compact={isMobile}
             />
           </div>
         </div>

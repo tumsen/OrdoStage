@@ -147,6 +147,7 @@ import {
   CALENDAR_TODAY_LABEL_CLASS,
   findColumnIndexAtX,
   WEEK_GRID_MIN_DRAG_PX,
+  WEEK_GRID_TIME_GUTTER_PX,
 } from "@/lib/weekGridColumns";
 import { isLocalCalendarToday } from "@/lib/dateUtils";
 
@@ -605,7 +606,7 @@ export default function TimeTracking() {
   }, [mobileDaySchedule, anchor, isMobile, mode, weekDays, selectedDayIndex]);
 
   const weekGridTemplateColumns = useMemo(
-    () => `56px repeat(${gridDays.length}, minmax(0, 1fr))`,
+    () => `${WEEK_GRID_TIME_GUTTER_PX}px repeat(${gridDays.length}, minmax(0, 1fr))`,
     [gridDays.length]
   );
 

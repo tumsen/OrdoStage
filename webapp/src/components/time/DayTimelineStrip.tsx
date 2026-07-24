@@ -2,9 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import {
   MINUTES_PER_DAY,
   TIME_SNAP_MINUTES,
+  bottomBoundaryLabel,
   formatHourLabel,
   snapWindowMinutes,
 } from "@/lib/timeGrid";
+import {
+  CALENDAR_PX_PER_HOUR,
+  CALENDAR_TIME_GRID_TOP_PAD_PX,
+  WEEK_GRID_DAY_COL_AT_MIN_PX,
+  WEEK_GRID_TIME_GUTTER_PX,
+} from "@/lib/weekGridColumns";
 import { cn } from "@/lib/utils";
 import type { TimeFormat } from "@/lib/preferences";
 
@@ -24,6 +31,11 @@ type DragState = {
   endMin: number;
   grabOffsetMin: number;
 };
+
+/** Same footprint as one week-grid day at min width: gutter + day column. */
+export const DAY_TIMELINE_GUTTER_PX = WEEK_GRID_TIME_GUTTER_PX;
+export const DAY_TIMELINE_DAY_COL_PX = WEEK_GRID_DAY_COL_AT_MIN_PX;
+export const DAY_TIMELINE_TOTAL_PX = DAY_TIMELINE_GUTTER_PX + DAY_TIMELINE_DAY_COL_PX;
 
 function hmToMinutes(hm: string): number {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
@@ -51,7 +63,10 @@ function minutesFromClientY(
 }
 
 const HANDLE_PX = 8;
-const PX_PER_HOUR = 28;
+const PX_PER_HOUR = CALENDAR_PX_PER_HOUR;
+const TOP_PAD = CALENDAR_TIME_GRID_TOP_PAD_PX;
+const COLUMN_HEIGHT = 24 * PX_PER_HOUR;
+const FRAME_HEIGHT = TOP_PAD + COLUMN_HEIGHT;
 
 export function DayTimelineStrip(props: {
   startHm: string;
@@ -63,8 +78,6 @@ export function DayTimelineStrip(props: {
   /** When set, only move the block (end follows start + duration). */
   fixedDurationMinutes?: number | null;
   timeFormat?: TimeFormat;
-  /** Denser hour rows (e.g. mobile side strip). */
-  compact?: boolean;
   className?: string;
   "aria-label"?: string;
 }) {
@@ -77,7 +90,6 @@ export function DayTimelineStrip(props: {
     disabled = false,
     fixedDurationMinutes = null,
     timeFormat = "24h",
-    compact = false,
     className,
     "aria-label": ariaLabel,
   } = props;
@@ -96,8 +108,6 @@ export function DayTimelineStrip(props: {
 
   const viewStart = drag?.startMin ?? committedStart;
   const viewEnd = drag?.endMin ?? committedEnd;
-  const pxPerHour = compact ? 18 : PX_PER_HOUR;
-  const trackHeight = 24 * pxPerHour;
 
   useEffect(() => {
     if (!drag) return;
@@ -129,7 +139,12 @@ export function DayTimelineStrip(props: {
           }
           return { ...prev, startMin, endMin };
         }
-        if (prev.mode === "move" || (fixedDurationMinutes != null && prev.mode !== "resizeStart" && prev.mode !== "resizeEnd")) {
+        if (
+          prev.mode === "move" ||
+          (fixedDurationMinutes != null &&
+            prev.mode !== "resizeStart" &&
+            prev.mode !== "resizeEnd")
+        ) {
           const dur = fixedDurationMinutes ?? prev.endMin - prev.startMin;
           let startMin = snapWindowMinutes(snapped - prev.grabOffsetMin);
           startMin = Math.max(0, Math.min(MINUTES_PER_DAY - minDur, startMin));
@@ -153,7 +168,9 @@ export function DayTimelineStrip(props: {
       const endHmOut =
         prev.endMin >= MINUTES_PER_DAY
           ? "00:00"
-          : minutesToHm(Math.min(MINUTES_PER_DAY - 1, Math.max(prev.startMin + 1, prev.endMin)));
+          : minutesToHm(
+              Math.min(MINUTES_PER_DAY - 1, Math.max(prev.startMin + 1, prev.endMin))
+            );
       onChangeRangeRef.current(minutesToHm(prev.startMin), endHmOut);
     };
 
@@ -197,100 +214,124 @@ export function DayTimelineStrip(props: {
   const activeTop = (viewStart / MINUTES_PER_DAY) * 100;
   const activeHeight = (Math.max(TIME_SNAP_MINUTES, viewEnd - viewStart) / MINUTES_PER_DAY) * 100;
   const color = activeColor || "#f5c518";
+  const tf = timeFormat === "24h" ? "24h" : "12h";
 
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
+    <div
+      className={cn("select-none", className)}
+      style={{ width: DAY_TIMELINE_TOTAL_PX }}
+      aria-label={ariaLabel}
+    >
       <div
-        ref={trackRef}
-        role="slider"
-        aria-label={ariaLabel}
-        aria-valuemin={0}
-        aria-valuemax={MINUTES_PER_DAY}
-        aria-valuenow={viewStart}
-        aria-disabled={disabled || undefined}
-        className={cn(
-          "relative w-full select-none overflow-hidden rounded-md border border-white/10 bg-white/[0.03]",
-          disabled ? "cursor-not-allowed opacity-60" : "cursor-crosshair"
-        )}
-        style={{ height: trackHeight }}
-        onPointerDown={(ev) => {
-          if (disabled || ev.button !== 0) return;
-          ev.preventDefault();
-          const el = trackRef.current;
-          if (!el) return;
-          const rect = el.getBoundingClientRect();
-          const raw = minutesFromClientY(ev.clientY, rect.top, rect.height);
-          const topPx = (committedStart / MINUTES_PER_DAY) * rect.height;
-          const bottomPx = (committedEnd / MINUTES_PER_DAY) * rect.height;
-          const y = ev.clientY - rect.top;
-          if (y >= topPx && y <= bottomPx) {
-            if (fixedDurationMinutes == null && y - topPx <= HANDLE_PX) {
-              beginDrag("resizeStart", ev.clientY);
-              return;
-            }
-            if (fixedDurationMinutes == null && bottomPx - y <= HANDLE_PX) {
-              beginDrag("resizeEnd", ev.clientY);
-              return;
-            }
-            beginDrag("move", ev.clientY, raw - committedStart);
-            return;
-          }
-          beginDrag("create", ev.clientY);
+        className="grid min-w-0"
+        style={{
+          gridTemplateColumns: `${DAY_TIMELINE_GUTTER_PX}px ${DAY_TIMELINE_DAY_COL_PX}px`,
+          height: FRAME_HEIGHT,
         }}
       >
-        {Array.from({ length: 25 }, (_, i) => (
+        <div className="relative box-border" style={{ height: FRAME_HEIGHT }}>
           <div
-            key={`h-${i}`}
-            className="pointer-events-none absolute left-0 right-0 border-t border-white/[0.06]"
-            style={{ top: `${(i / 24) * 100}%` }}
-          />
-        ))}
-        {Array.from({ length: 24 }, (_, hour) => (
-          <div
-            key={`lbl-${hour}`}
-            className="pointer-events-none absolute left-1 z-[1] text-[9px] leading-none text-white/35"
-            style={{ top: `calc(${(hour / 24) * 100}% + 2px)` }}
+            className="pointer-events-none absolute inset-x-0 border-r border-white/10"
+            style={{ top: TOP_PAD, height: COLUMN_HEIGHT }}
           >
-            {formatHourLabel(hour, timeFormat)}
+            {Array.from({ length: 24 }).map((_, h) => (
+              <div
+                key={h}
+                className="pointer-events-none absolute left-0 right-1 z-[1] flex -translate-y-1/2 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums"
+                style={{ top: h * PX_PER_HOUR }}
+              >
+                {formatHourLabel(h, tf)}
+              </div>
+            ))}
+            <span className="pointer-events-none absolute bottom-0 left-0 right-1 z-[1] flex translate-y-1 items-end justify-end text-right text-[9px] leading-[10px] text-white/50 tabular-nums">
+              {bottomBoundaryLabel(0, tf)}
+            </span>
           </div>
-        ))}
-        {siblings.map((sib) => {
-          const top = (sib.startMin / MINUTES_PER_DAY) * 100;
-          const height = (Math.max(5, sib.endMin - sib.startMin) / MINUTES_PER_DAY) * 100;
-          return (
+        </div>
+
+        <div className="relative min-h-0 min-w-0 box-border" style={{ height: FRAME_HEIGHT }}>
+          <div
+            ref={trackRef}
+            role="slider"
+            aria-valuemin={0}
+            aria-valuemax={MINUTES_PER_DAY}
+            aria-valuenow={viewStart}
+            aria-disabled={disabled || undefined}
+            className={cn(
+              "absolute inset-x-0 touch-none",
+              disabled ? "cursor-not-allowed opacity-60" : "cursor-crosshair"
+            )}
+            style={{ top: TOP_PAD, height: COLUMN_HEIGHT }}
+            onPointerDown={(ev) => {
+              if (disabled || ev.button !== 0) return;
+              ev.preventDefault();
+              const el = trackRef.current;
+              if (!el) return;
+              const rect = el.getBoundingClientRect();
+              const raw = minutesFromClientY(ev.clientY, rect.top, rect.height);
+              const topPx = (committedStart / MINUTES_PER_DAY) * rect.height;
+              const bottomPx = (committedEnd / MINUTES_PER_DAY) * rect.height;
+              const y = ev.clientY - rect.top;
+              if (y >= topPx && y <= bottomPx) {
+                if (fixedDurationMinutes == null && y - topPx <= HANDLE_PX) {
+                  beginDrag("resizeStart", ev.clientY);
+                  return;
+                }
+                if (fixedDurationMinutes == null && bottomPx - y <= HANDLE_PX) {
+                  beginDrag("resizeEnd", ev.clientY);
+                  return;
+                }
+                beginDrag("move", ev.clientY, raw - committedStart);
+                return;
+              }
+              beginDrag("create", ev.clientY);
+            }}
+          >
+            {Array.from({ length: 24 }).map((_, h) => (
+              <div
+                key={h}
+                className="pointer-events-none absolute left-0 right-0 z-0 border-t border-white/[0.1]"
+                style={{ top: h * PX_PER_HOUR }}
+              />
+            ))}
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 border-t border-white/[0.1]" />
+
+            {siblings.map((sib) => {
+              const top = (sib.startMin / MINUTES_PER_DAY) * 100;
+              const height = (Math.max(5, sib.endMin - sib.startMin) / MINUTES_PER_DAY) * 100;
+              return (
+                <div
+                  key={sib.id}
+                  className="pointer-events-none absolute left-0.5 right-0.5 z-[1] rounded border border-white/15 opacity-45"
+                  style={{
+                    top: `${top}%`,
+                    height: `${height}%`,
+                    backgroundColor: sib.color,
+                  }}
+                />
+              );
+            })}
+
             <div
-              key={sib.id}
               className={cn(
-                "pointer-events-none absolute right-1 rounded-sm opacity-40",
-                compact ? "left-6" : "left-8"
+                "absolute left-0.5 right-0.5 z-[2] rounded border border-white/25 shadow-sm",
+                !disabled && "cursor-grab active:cursor-grabbing"
               )}
               style={{
-                top: `${top}%`,
-                height: `${height}%`,
-                backgroundColor: sib.color,
+                top: `${activeTop}%`,
+                height: `${activeHeight}%`,
+                backgroundColor: color,
+                minHeight: 4,
               }}
-            />
-          );
-        })}
-        <div
-          className={cn(
-            "absolute right-1 z-[2] rounded-sm border border-white/25 shadow-sm",
-            compact ? "left-6" : "left-8",
-            !disabled && "cursor-grab active:cursor-grabbing"
-          )}
-          style={{
-            top: `${activeTop}%`,
-            height: `${activeHeight}%`,
-            backgroundColor: color,
-            minHeight: 4,
-          }}
-        >
-          {fixedDurationMinutes == null && !disabled ? (
-            <>
-              <div className="absolute inset-x-0 top-0 h-2 cursor-ns-resize" data-handle="start" />
-              <div className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize" data-handle="end" />
-            </>
-          ) : null}
+            >
+              {fixedDurationMinutes == null && !disabled ? (
+                <>
+                  <div className="absolute inset-x-0 top-0 h-2 cursor-ns-resize" data-handle="start" />
+                  <div className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize" data-handle="end" />
+                </>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
     </div>
