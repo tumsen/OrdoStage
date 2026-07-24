@@ -1084,6 +1084,7 @@ export default function TimeReport() {
             vacationMinutes: p.vacationMinutes,
             extraVacationMinutes: p.extraVacationMinutes,
             holidayMinutes: p.holidayMinutes,
+            sickMinutes: p.sickMinutes,
           },
           contractMinutes,
           { includeLeaveInNorm: leaveManagementEnabled }
@@ -1122,7 +1123,11 @@ export default function TimeReport() {
         hasContract = true;
       }
       fulfillingMinutes +=
-        p.workMinutes + p.vacationMinutes + p.extraVacationMinutes + p.holidayMinutes;
+        p.workMinutes +
+        p.vacationMinutes +
+        p.extraVacationMinutes +
+        p.holidayMinutes +
+        p.sickMinutes;
       if (p.compTimePeriodDeltaMinutes != null) {
         compDelta += p.compTimePeriodDeltaMinutes;
         hasComp = true;

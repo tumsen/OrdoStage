@@ -63,7 +63,7 @@ export function minutesToLeaveDaysFromDayMin(minutes: number, dayMin: number): n
 /**
  * Overtime vs prorated contract minutes.
  * When `includeLeaveInNorm` is true (Danish leave module): work + vacation +
- * feriefridage + holidays fulfill the weekly/period norm (e.g. 37h).
+ * feriefridage + holidays + sick fulfill the weekly/period norm (e.g. 37h).
  * When false: classic work-only overtime.
  *
  * Returns signed minutes (positive = over norm, negative = under). Callers that
@@ -75,6 +75,7 @@ export function overtimeAgainstContract(
     vacationMinutes?: number;
     extraVacationMinutes?: number;
     holidayMinutes?: number;
+    sickMinutes?: number;
   },
   contractMinutes: number | null | undefined,
   opts?: { includeLeaveInNorm?: boolean }
@@ -85,7 +86,8 @@ export function overtimeAgainstContract(
       parts.workMinutes +
       (parts.vacationMinutes ?? 0) +
       (parts.extraVacationMinutes ?? 0) +
-      (parts.holidayMinutes ?? 0);
+      (parts.holidayMinutes ?? 0) +
+      (parts.sickMinutes ?? 0);
     return fulfilling - contractMinutes;
   }
   return parts.workMinutes - contractMinutes;

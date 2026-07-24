@@ -26,6 +26,7 @@ type DayParts = {
   vacationMinutes: number;
   extraVacationMinutes: number;
   holidayMinutes: number;
+  sickMinutes: number;
 };
 
 function emptyDayParts(): DayParts {
@@ -34,16 +35,18 @@ function emptyDayParts(): DayParts {
     vacationMinutes: 0,
     extraVacationMinutes: 0,
     holidayMinutes: 0,
+    sickMinutes: 0,
   };
 }
 
-/** Minutes that count toward the daily/weekly norm (not N/A, sick, travel, or settlement markers). */
+/** Minutes that count toward the daily/weekly norm (not N/A, travel, or settlement markers). */
 export function normFulfillingMinutes(parts: DayParts): number {
   return (
     parts.workMinutes +
     parts.vacationMinutes +
     parts.extraVacationMinutes +
-    parts.holidayMinutes
+    parts.holidayMinutes +
+    parts.sickMinutes
   );
 }
 
@@ -94,6 +97,7 @@ function addCategoryMinutes(parts: DayParts, category: string, minutes: number) 
   else if (category === "vacation") parts.vacationMinutes += minutes;
   else if (category === "extra_vacation") parts.extraVacationMinutes += minutes;
   else if (category === "holiday") parts.holidayMinutes += minutes;
+  else if (category === "sick") parts.sickMinutes += minutes;
 }
 
 function aggregateByLocalDay(
@@ -115,7 +119,6 @@ function aggregateByLocalDay(
       cat === "comp_time" ||
       cat === "comp_settlement_earned" ||
       cat === "comp_settlement_used" ||
-      cat === "sick" ||
       cat === "travel_allowance"
     ) {
       continue;

@@ -573,7 +573,7 @@ leaveRouter.get("/time/payroll-export", async (c) => {
       zone
     );
     const overtimeMinutes = positiveOvertimeMinutes(
-      { workMinutes, vacationMinutes, extraVacationMinutes, holidayMinutes },
+      { workMinutes, vacationMinutes, extraVacationMinutes, holidayMinutes, sickMinutes },
       contractMinutes,
       { includeLeaveInNorm: true }
     );

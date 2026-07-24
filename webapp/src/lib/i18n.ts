@@ -370,7 +370,7 @@ const en = {
     leaveSource_opening_balance: "Opening balance",
     leaveSource_reversal: "Reversal",
     timesheetApproveHint:
-      "Approving settles each weekday (Mon–Fri) against the daily norm (weekly contract ÷ 5, e.g. 7h 24m at 37h/week). Work + vacation + feriefridage + holidays count toward the norm. Overtime credits the afspadsering balance; under-norm days debit it — no calendar blocks are created. Unavailable (N/A) blocks are visual only and do not affect the balance.",
+      "Approving settles each weekday (Mon–Fri) against the daily norm (weekly contract ÷ 5, e.g. 7h 24m at 37h/week). Work + vacation + feriefridage + holidays + sick count toward the norm. Overtime credits the afspadsering balance; under-norm days debit it — no calendar blocks are created. Unavailable (N/A) blocks are visual only and do not affect the balance.",
     timesheetApproveConfirmTitle: "Approve this week?",
     timesheetApproveConfirmBody: "The week will be locked and can only be reopened by someone with permission to view everyone’s time.",
     timesheetApproveConfirm: "Approve week",
@@ -492,7 +492,7 @@ const en = {
     reportContractHint:
       "Click the contract hours cell to set expected weekly hours per person. Overtime = logged work hours − bruttonorm (daily hours × weekdays in the period, from employment start when set).",
     reportContractHintDk:
-      "Click the contract hours cell to set expected weekly hours per person. With Danish leave enabled: overtime = (work + vacation + feriefridage + holidays) − bruttonorm (daily hours × Mon–Fri days). Norm starts at employment start when set. Comp Δ = afspadsering earned − used in the period; Comp balance is remaining at period end.",
+      "Click the contract hours cell to set expected weekly hours per person. With Danish leave enabled: overtime = (work + vacation + feriefridage + holidays + sick) − bruttonorm (daily hours × Mon–Fri days). Norm starts at employment start when set. Comp Δ = afspadsering earned − used in the period; Comp balance is remaining at period end.",
   },
   account: {
     title: "Account",
@@ -882,7 +882,7 @@ const da: DeepPartial<typeof en> = {
     leaveSource_timesheet_settlement: "Ugegodkendelse (dagsnorm)",
     leaveSource_reversal: "Tilbageførsel",
     timesheetApproveHint:
-      "Godkendelse afregner hver hverdag (man–fre) mod dagsnormen (ugentlig kontrakt ÷ 5, fx 7t 24m ved 37t/uge). Arbejde + ferie + feriefridage + helligdage tæller med. Overarbejde krediteres afspadseringssaldoen; under-norm debiteres den — der oprettes ingen kalenderblokke. Ikke til stede (N/A) er kun visuelt og påvirker ikke saldoen.",
+      "Godkendelse afregner hver hverdag (man–fre) mod dagsnormen (ugentlig kontrakt ÷ 5, fx 7t 24m ved 37t/uge). Arbejde + ferie + feriefridage + helligdage + sygdom tæller med. Overarbejde krediteres afspadseringssaldoen; under-norm debiteres den — der oprettes ingen kalenderblokke. Ikke til stede (N/A) er kun visuelt og påvirker ikke saldoen.",
     timesheetApproveConfirmTitle: "Godkend denne uge?",
     timesheetApproveConfirmBody: "Ugen låses og kan kun genåbnes af nogen med adgang til at se alles timer.",
     timesheetApproveConfirm: "Godkend uge",
@@ -1185,7 +1185,7 @@ const da: DeepPartial<typeof en> = {
     reportColShare: "Andel",
     reportNoData: "Ingen registreringer for de valgte filtre.",
     reportContractHint: "Klik på kontrakt-timecellen for at sætte forventede ugentlige timer pr. person. Overarbejde = loggede arbejdstimer − bruttonorm (dagsnorm × hverdage i perioden, fra ansættelsesstart når sat).",
-    reportContractHintDk: "Klik på kontrakt-timecellen for at sætte forventede ugentlige timer pr. person. Med dansk fravær: overarbejde = (arbejde + ferie + feriefridage + helligdage) − bruttonorm (dagsnorm × man–fre-dage). Norm starter ved ansættelsesstart når sat. Afsp. Δ = optjent − brugt i perioden; Afsp. saldo er rest ved periodens slut.",
+    reportContractHintDk: "Klik på kontrakt-timecellen for at sætte forventede ugentlige timer pr. person. Med dansk fravær: overarbejde = (arbejde + ferie + feriefridage + helligdage + sygdom) − bruttonorm (dagsnorm × man–fre-dage). Norm starter ved ansættelsesstart når sat. Afsp. Δ = optjent − brugt i perioden; Afsp. saldo er rest ved periodens slut.",
     reportColOvertime: "Overarbejde",
   },
   account: {

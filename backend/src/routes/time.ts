@@ -1763,6 +1763,7 @@ timeRouter.get("/time/report", async (c) => {
           vacationMinutes: pa.vacationMinutes,
           extraVacationMinutes: pa.extraVacationMinutes,
           holidayMinutes: pa.holidayMinutes,
+          sickMinutes: pa.sickMinutes,
         },
         contractMinutes,
         { includeLeaveInNorm: leaveManagementEnabled }

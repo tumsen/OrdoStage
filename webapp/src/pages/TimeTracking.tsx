@@ -1516,7 +1516,7 @@ export default function TimeTracking() {
     return acc;
   }, [entries, displayStartHour]);
 
-  /** Minutes that count toward the period norm (work + vacation + feriefridag + holiday). */
+  /** Minutes that count toward the period norm (work + vacation + feriefridag + holiday + sick). */
   const periodFulfillingMinutes = useMemo(() => {
     let sum = 0;
     for (const e of entries ?? []) {
@@ -1525,7 +1525,8 @@ export default function TimeTracking() {
         cat !== "work" &&
         cat !== "vacation" &&
         cat !== "extra_vacation" &&
-        cat !== "holiday"
+        cat !== "holiday" &&
+        cat !== "sick"
       ) {
         continue;
       }
